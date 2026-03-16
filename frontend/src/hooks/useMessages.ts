@@ -6,7 +6,7 @@ interface UseMessages {
   messages: Message[]
   isStreaming: boolean
   loadMessages: (threadId: string) => Promise<void>
-  sendMessage: (threadId: string, content: string) => Promise<void>
+  sendMessage: (threadId: string, content: string, model?: string) => Promise<void>
 }
 
 function makeTempId() {
@@ -22,7 +22,7 @@ export function useMessages(): UseMessages {
     setMessages(data)
   }, [])
 
-  const sendMessage = useCallback(async (threadId: string, content: string) => {
+  const sendMessage = useCallback(async (threadId: string, content: string, model?: string) => {
     // Optimistic user message
     const userMsg: Message = {
       id: makeTempId(),
@@ -60,6 +60,7 @@ export function useMessages(): UseMessages {
       () => {
         setIsStreaming(false)
       },
+      model,
     )
   }, [])
 

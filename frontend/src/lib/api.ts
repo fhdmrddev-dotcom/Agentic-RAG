@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message } from "../types"
+import type { Thread, Message, Document } from "../types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
@@ -11,6 +11,13 @@ async function getAuthHeaders(): Promise<HeadersInit> {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
   }
+}
+
+async function getAuthToken(): Promise<string> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error("Not authenticated")
+  return token
 }
 
 export async function listThreads(): Promise<Thread[]> {
@@ -38,17 +45,25 @@ export async function getMessages(threadId: string): Promise<Message[]> {
   return res.json() as Promise<Message[]>
 }
 
+export async function listModels(): Promise<{ models: string[]; default: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/models`, { headers })
+  if (!res.ok) throw new Error("Failed to list models")
+  return res.json() as Promise<{ models: string[]; default: string }>
+}
+
 export async function streamMessage(
   threadId: string,
   content: string,
   onDelta: (text: string) => void,
   onDone: () => void,
+  model?: string,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, model }),
   })
 
   if (!res.ok) throw new Error("Failed to send message")
@@ -85,4 +100,64 @@ export async function streamMessage(
   }
 
   onDone()
+}
+
+export async function listDocuments(): Promise<Document[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents`, { headers })
+  if (!res.ok) throw new Error("Failed to list documents")
+  return res.json() as Promise<Document[]>
+}
+
+export async function uploadDocument(file: File): Promise<Document> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  const res = await fetch(`${API_BASE}/documents/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }))
+    throw new Error((err as { detail: string }).detail ?? "Upload failed")
+  }
+  return res.json() as Promise<Document>
+}
+
+export async function deleteDocument(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete document")
+}
+
+export interface AppSettings {
+  llm_model: string
+  available_models: string[]
+  embedding_model: string
+  embedding_model_locked: boolean
+}
+
+export async function getSettings(): Promise<AppSettings> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings`, { headers })
+  if (!res.ok) throw new Error("Failed to get settings")
+  return res.json() as Promise<AppSettings>
+}
+
+export async function updateEmbeddingModel(model: string): Promise<AppSettings> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/embedding-model`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ embedding_model: model }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Update failed" }))
+    throw new Error((err as { detail: string }).detail ?? "Update failed")
+  }
+  return res.json() as Promise<AppSettings>
 }

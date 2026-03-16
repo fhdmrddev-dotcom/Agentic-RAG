@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 class MessageCreate(BaseModel):
     content: str
+    model: str | None = None
 
 
 class MessageResponse(BaseModel):

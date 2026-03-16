@@ -1,0 +1,13 @@
+Agentic RAG Test Document
+
+This document is used for E2E testing of the document ingestion pipeline.
+
+Key facts about this test document:
+1. The capital of France is Paris.
+2. The speed of light in a vacuum is approximately 299,792,458 metres per second.
+3. Water boils at 100 degrees Celsius at standard atmospheric pressure.
+4. The chemical formula for water is H2O.
+5. Python was created by Guido van Rossum.
+
+This document should be fully indexed and searchable via the RAG retrieval pipeline.
+Questions about France, the speed of light, water, or Python should retrieve this document.

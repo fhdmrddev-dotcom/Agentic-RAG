@@ -16,6 +16,7 @@ app = FastAPI(title="Agentic RAG API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
+    allow_origin_regex=r"http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,5 +28,17 @@ async def health():
     return {"status": "ok"}
 
 
-from app.api import threads  # noqa: E402
+@app.get("/models")
+async def list_models():
+    if settings.available_models:
+        models = [m.strip() for m in settings.available_models.split(",") if m.strip()]
+    else:
+        models = [settings.llm_model]
+    return {"models": models, "default": settings.llm_model}
+
+
+from app.api import threads, documents, settings as settings_api  # noqa: E402
+
 app.include_router(threads.router)
+app.include_router(documents.router)
+app.include_router(settings_api.router)
