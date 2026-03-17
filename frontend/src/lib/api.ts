@@ -109,7 +109,7 @@ export async function listDocuments(): Promise<Document[]> {
   return res.json() as Promise<Document[]>
 }
 
-export async function uploadDocument(file: File): Promise<Document> {
+export async function uploadDocument(file: File): Promise<{ doc: Document; isDuplicate: boolean }> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
@@ -122,7 +122,8 @@ export async function uploadDocument(file: File): Promise<Document> {
     const err = await res.json().catch(() => ({ detail: "Upload failed" }))
     throw new Error((err as { detail: string }).detail ?? "Upload failed")
   }
-  return res.json() as Promise<Document>
+  const doc = await res.json() as Document
+  return { doc, isDuplicate: res.status === 200 }
 }
 
 export async function deleteDocument(id: string): Promise<void> {

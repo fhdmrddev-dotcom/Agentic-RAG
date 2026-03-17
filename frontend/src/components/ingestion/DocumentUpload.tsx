@@ -3,7 +3,7 @@ import { Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Props {
-  onUpload: (file: File) => Promise<void>
+  onUpload: (file: File) => Promise<{ isDuplicate: boolean }>
   uploading: boolean
 }
 
@@ -11,11 +11,14 @@ export function DocumentUpload({ onUpload, uploading }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
   async function handleFile(file: File) {
     setError(null)
+    setNotice(null)
     try {
-      await onUpload(file)
+      const { isDuplicate } = await onUpload(file)
+      if (isDuplicate) setNotice("This file is already up to date — skipped re-ingestion.")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed")
     }
@@ -58,6 +61,7 @@ export function DocumentUpload({ onUpload, uploading }: Props) {
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
+      {notice && <p className="text-sm text-muted-foreground mt-2">{notice}</p>}
 
       <input
         ref={inputRef}

@@ -1,8 +1,9 @@
+import hashlib
 import io
 from uuid import uuid4
 
 from docx import Document as DocxDocument
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
 from pypdf import PdfReader
 from supabase import Client
 
@@ -34,6 +35,7 @@ def extract_text(raw: bytes, mime_type: str) -> str:
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    response: Response,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
@@ -59,6 +61,39 @@ async def upload_document(
             detail="File is empty",
         )
 
+    content_hash = hashlib.sha256(raw).hexdigest()
+
+    # Case 1: exact duplicate already completed — skip re-ingestion
+    existing = (
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", current_user["id"])
+        .eq("content_hash", content_hash)
+        .eq("status", "completed")
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        response.status_code = status.HTTP_200_OK
+        return existing.data[0]
+
+    # Case 2: same filename, different content → delete old and re-ingest
+    stale = (
+        supabase.table("documents")
+        .select("id, file_path")
+        .eq("user_id", current_user["id"])
+        .eq("filename", file.filename)
+        .neq("content_hash", content_hash)
+        .limit(1)
+        .execute()
+    )
+    if stale.data:
+        try:
+            supabase.storage.from_("documents").remove([stale.data[0]["file_path"]])
+        except Exception:
+            pass
+        supabase.table("documents").delete().eq("id", stale.data[0]["id"]).execute()
+
     try:
         text = extract_text(raw, mime_type)
     except Exception as e:
@@ -78,6 +113,7 @@ async def upload_document(
         "file_size": len(raw),
         "mime_type": mime_type,
         "status": "pending",
+        "content_hash": content_hash,
     }
     result = supabase.table("documents").insert(doc_data).execute()
     doc = result.data[0]

@@ -49,6 +49,19 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] 7.2 Ingestion: empty file, UTF-8 decode error, embedding errors
   - [x] 7.3 PROGRESS.md updated
 
+### Module 3: Record Manager ✅ COMPLETE
+- [x] 1. DB migration: `content_hash` column + indexes + unique constraint
+- [x] 2. Backend: SHA-256 hash + 3-case decision tree (skip / replace / new)
+- [x] 3. Pydantic: `content_hash` field on `DocumentResponse`
+- [x] 4. Frontend types: `content_hash` on `Document` interface
+- [x] 5. `api.ts`: `uploadDocument` returns `{ doc, isDuplicate }`
+- [x] 6. `useDocuments`: `upload` returns `{ isDuplicate }`
+- [x] 7. `DocumentUpload`: duplicate notice UI
+
+#### Notes (Module 3)
+- Run `006_record_manager.sql` in Supabase SQL editor before testing
+- Existing rows will have `content_hash = null` — GET /documents will still work (field is nullable)
+
 #### Notes (Module 2)
 - Run `002_module2_byo_retrieval.sql` in Supabase SQL editor before starting backend
 - Create a `documents` Storage bucket in Supabase dashboard (public or private)

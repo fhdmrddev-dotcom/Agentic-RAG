@@ -6,7 +6,7 @@ import type { Document } from "@/types"
 interface UseDocuments {
   documents: Document[]
   uploading: boolean
-  upload: (file: File) => Promise<void>
+  upload: (file: File) => Promise<{ isDuplicate: boolean }>
   deleteDoc: (id: string) => Promise<void>
 }
 
@@ -23,10 +23,15 @@ export function useDocuments(): UseDocuments {
   useEffect(() => {
     loadDocuments().catch(console.error)
 
-    supabase.auth.getSession().then(({ data }) => {
-      const userId = data.session?.user.id ?? null
-      if (!userId) return
+    let cancelled = false
 
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return
+      if (!data.session?.user.id) return
+
+      // No user_id filter here — RLS policies ensure users only receive their
+      // own rows. Adding a column filter on UPDATE events requires
+      // REPLICA IDENTITY FULL on the table; omitting it avoids that requirement.
       const channel = supabase
         .channel("documents-changes")
         .on(
@@ -35,7 +40,6 @@ export function useDocuments(): UseDocuments {
             event: "*",
             schema: "public",
             table: "documents",
-            filter: `user_id=eq.${userId}`,
           },
           (payload) => {
             if (payload.eventType === "UPDATE") {
@@ -59,6 +63,7 @@ export function useDocuments(): UseDocuments {
     })
 
     return () => {
+      cancelled = true
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
@@ -66,16 +71,17 @@ export function useDocuments(): UseDocuments {
     }
   }, [loadDocuments])
 
-  const upload = useCallback(async (file: File) => {
+  const upload = useCallback(async (file: File): Promise<{ isDuplicate: boolean }> => {
     setUploading(true)
     try {
-      const doc = await uploadDocument(file)
+      const { doc, isDuplicate } = await uploadDocument(file)
       // Optimistically add the document immediately; Realtime UPDATE events
       // will still fire to update status (pending → processing → completed)
       setDocuments((prev) => {
         if (prev.some((d) => d.id === doc.id)) return prev
         return [doc, ...prev]
       })
+      return { isDuplicate }
     } finally {
       setUploading(false)
     }
