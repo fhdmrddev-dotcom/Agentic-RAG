@@ -62,6 +62,23 @@ Track your progress through the masterclass. Update this file as you complete mo
 - Run `006_record_manager.sql` in Supabase SQL editor before testing
 - Existing rows will have `content_hash = null` — GET /documents will still work (field is nullable)
 
+### Module 4: Chat Thread Management ✅ COMPLETE
+- [x] 1. Auto-title: LLM generates 4-6 word title after first message exchange; sent as SSE event, updates sidebar instantly
+- [x] 2. Delete thread: `DELETE /threads/{id}` endpoint; messages cascade-delete in DB; sidebar updates instantly
+- [x] 3. Rename thread: `PATCH /threads/{id}` endpoint; inline edit in sidebar on hover → `...` menu → Rename
+- [x] 4. `ThreadUpdate` Pydantic model
+- [x] 5. `api.ts`: `deleteThread`, `renameThread` functions
+- [x] 6. `useThreads`: `deleteThread`, `renameThread`, `updateThreadTitle` callbacks
+- [x] 7. `ChatLayout`: wires title update callback to ChatArea
+- [x] 8. `ChatArea`: accepts `onTitleUpdate` prop, passes to `sendMessage`
+- [x] 9. `useMessages`: passes `onTitleUpdate` through to `streamMessage`
+- [x] 10. `Sidebar`: hover `...` menu per thread with Rename (inline input) + Delete (trash)
+
+#### Notes (Module 4)
+- No DB migration needed — uses existing `threads` table
+- Auto-title fires only on first exchange (history has exactly 1 message when stream starts)
+- supabase-py v2: UPDATE requires a follow-up SELECT to return the updated row
+
 #### Notes (Module 2)
 - Run `002_module2_byo_retrieval.sql` in Supabase SQL editor before starting backend
 - Create a `documents` Storage bucket in Supabase dashboard (public or private)

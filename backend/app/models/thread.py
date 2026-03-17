@@ -8,6 +8,10 @@ class ThreadCreate(BaseModel):
     title: str = "New Chat"
 
 
+class ThreadUpdate(BaseModel):
+    title: str
+
+
 class ThreadResponse(BaseModel):
     id: UUID
     user_id: UUID

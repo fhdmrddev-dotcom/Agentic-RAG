@@ -9,8 +9,9 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
-from app.models.thread import ThreadCreate, ThreadResponse
-from app.services.openai_service import create_streaming_chat
+from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.config import settings
+from app.services.openai_service import create_streaming_chat, get_llm_client
 from app.services.retrieval_service import search_documents
 
 router = APIRouter(prefix="/threads", tags=["threads"])
@@ -51,6 +52,50 @@ async def create_thread(
         .execute()
     )
     return response.data[0]
+
+
+@router.patch("/{thread_id}", response_model=ThreadResponse)
+async def rename_thread(
+    thread_id: str,
+    body: ThreadUpdate,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    supabase.table("threads").update({"title": body.title.strip() or "New Chat"}).eq("id", thread_id).eq("user_id", current_user["id"]).execute()
+    result = supabase.table("threads").select("*").eq("id", thread_id).eq("user_id", current_user["id"]).single().execute()
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+    return result.data
+
+
+@router.delete("/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_thread(
+    thread_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
+
+
+def generate_thread_title(first_user_message: str) -> str:
+    """Call LLM to produce a short thread title from the first user message."""
+    try:
+        client = get_llm_client()
+        response = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
+                },
+                {"role": "user", "content": first_user_message[:500]},
+            ],
+            max_tokens=20,
+            stream=False,
+        )
+        return response.choices[0].message.content.strip() or "New Chat"
+    except Exception:
+        return first_user_message[:40].strip() or "New Chat"
 
 
 @router.get("/{thread_id}/messages", response_model=list[MessageResponse])
@@ -220,6 +265,13 @@ async def send_message(
 
         # Touch thread so it rises in updated_at ordering
         supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
+
+        # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
+        if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
+            first_user_msg = history_resp.data[0]["content"]
+            title = generate_thread_title(first_user_msg)
+            supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
+            yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
 
         yield "data: [DONE]\n\n"
 

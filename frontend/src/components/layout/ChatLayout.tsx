@@ -1,3 +1,4 @@
+import { useCallback } from "react"
 import { Sidebar } from "./Sidebar"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
@@ -12,7 +13,24 @@ interface Props {
 }
 
 export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
-  const { threads, selectedThread, loading: _loading, loadThreads, selectThread, newThread } = useThreads()
+  const {
+    threads,
+    selectedThread,
+    loading: _loading,
+    loadThreads,
+    selectThread,
+    newThread,
+    deleteThread,
+    renameThread,
+    updateThreadTitle,
+  } = useThreads()
+
+  const handleTitleUpdate = useCallback(
+    (title: string) => {
+      if (selectedThread) updateThreadTitle(selectedThread.id, title)
+    },
+    [selectedThread, updateThreadTitle],
+  )
 
   return (
     <div className="flex h-screen bg-background">
@@ -25,6 +43,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
         loadThreads={loadThreads}
         activeView={activeView}
         onNavigate={onNavigate}
+        onDeleteThread={deleteThread}
+        onRenameThread={renameThread}
       />
       <main className="flex-1 overflow-hidden">
         {activeView === "documents" ? (
@@ -32,7 +52,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
         ) : activeView === "settings" ? (
           <SettingsPage />
         ) : (
-          <ChatArea thread={selectedThread} onCreateThread={newThread} />
+          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} />
         )}
       </main>
     </div>

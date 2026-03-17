@@ -52,12 +52,30 @@ export async function listModels(): Promise<{ models: string[]; default: string 
   return res.json() as Promise<{ models: string[]; default: string }>
 }
 
+export async function deleteThread(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${id}`, { method: "DELETE", headers })
+  if (!res.ok) throw new Error("Failed to delete thread")
+}
+
+export async function renameThread(id: string, title: string): Promise<Thread> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) throw new Error("Failed to rename thread")
+  return res.json() as Promise<Thread>
+}
+
 export async function streamMessage(
   threadId: string,
   content: string,
   onDelta: (text: string) => void,
   onDone: () => void,
   model?: string,
+  onTitleUpdate?: (title: string) => void,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
@@ -92,6 +110,8 @@ export async function streamMessage(
         const parsed = JSON.parse(raw) as { type: string; content: string }
         if (parsed.type === "delta") {
           onDelta(parsed.content)
+        } else if (parsed.type === "title" && onTitleUpdate) {
+          onTitleUpdate(parsed.content)
         }
       } catch {
         // ignore malformed lines

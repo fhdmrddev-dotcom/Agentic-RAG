@@ -9,9 +9,10 @@ import { Sparkles } from "lucide-react"
 interface Props {
   thread: Thread | null
   onCreateThread: () => Promise<Thread>
+  onTitleUpdate?: (title: string) => void
 }
 
-export function ChatArea({ thread, onCreateThread }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
@@ -36,7 +37,7 @@ export function ChatArea({ thread, onCreateThread }: Props) {
     if (!activeThread) {
       activeThread = await onCreateThread()
     }
-    await sendMessage(activeThread.id, content, selectedModel || undefined)
+    await sendMessage(activeThread.id, content, selectedModel || undefined, onTitleUpdate)
   }
 
   const inputBar = (
