@@ -4,7 +4,7 @@ import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
 import { listModels } from "@/lib/api"
 import type { Thread } from "@/types"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sparkles } from "lucide-react"
 
 interface Props {
   thread: Thread | null
@@ -39,43 +39,46 @@ export function ChatArea({ thread, onCreateThread }: Props) {
     await sendMessage(activeThread.id, content, selectedModel || undefined)
   }
 
-  const modelSelector = models.length > 1 && (
-    <Select value={selectedModel} onValueChange={setSelectedModel}>
-      <SelectTrigger className="h-7 text-xs w-auto max-w-[220px] border-0 bg-muted/50 focus:ring-0">
-        <SelectValue placeholder="Model" />
-      </SelectTrigger>
-      <SelectContent>
-        {models.map((m) => (
-          <SelectItem key={m} value={m} className="text-xs">
-            {m}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+  const inputBar = (
+    <MessageInput
+      onSend={handleSend}
+      disabled={isStreaming}
+      models={models}
+      selectedModel={selectedModel}
+      onModelChange={setSelectedModel}
+    />
   )
 
   if (!thread) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          <div className="text-center space-y-2">
-            <p className="text-2xl">👋</p>
-            <p>Select a chat or start a new one</p>
+      <div className="flex flex-col h-full bg-background">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center space-y-4 max-w-sm px-6">
+            <div className="flex justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="w-7 h-7 text-primary" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <h2 className="font-semibold text-lg">How can I help you?</h2>
+              <p className="text-sm text-muted-foreground">
+                Ask me anything, or upload documents and I'll answer based on their content.
+              </p>
+            </div>
           </div>
         </div>
-        <MessageInput onSend={handleSend} disabled={isStreaming} />
+        {inputBar}
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="border-b px-6 py-3 flex items-center justify-between gap-4">
-        <h2 className="font-medium text-sm truncate">{thread.title}</h2>
-        {modelSelector}
+    <div className="flex flex-col h-full bg-background">
+      <div className="border-b px-6 py-3 bg-background/80 backdrop-blur-sm">
+        <h2 className="font-medium text-sm truncate text-foreground">{thread.title}</h2>
       </div>
       <MessageList messages={messages} isStreaming={isStreaming} />
-      <MessageInput onSend={handleSend} disabled={isStreaming} />
+      {inputBar}
     </div>
   )
 }
