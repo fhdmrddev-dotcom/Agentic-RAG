@@ -97,16 +97,27 @@ Track your progress through the masterclass. Update this file as you complete mo
 - System prompt updated to guide LLM to use `metadata_filter` for scoped queries
 - Sidebar fix: replaced Radix ScrollArea with plain div (ScrollArea viewport doesn't constrain child widths), three-dots menu uses absolute overlay with solid bg
 
-### Module 5: Multi-Format Support [ ] NOT STARTED
+### Module 5: Multi-Format Support ✅ COMPLETE
 
-- [ ] PDF/DOCX/HTML/Markdown via docling (PDF and docx are already implemented)
-- [ ] Cascade deletes
+- [X] PDF extraction (pypdf), DOCX extraction (python-docx), HTML, Markdown — all supported
+- [X] Cascade deletes (document_chunks → documents via ON DELETE CASCADE)
 
-### Module 6: Hybrid Search & Reranking [ ] NOT STARTED
+### Module 6: Hybrid Search & Reranking ✅ COMPLETE
 
-- [ ] Keyword + vector search
-- [ ] RRF combination
-- [ ] Reranking
+- [X] DB migration: `search_vector tsvector` column + GIN index + trigger + backfill (`008_hybrid_search.sql`)
+- [X] DB migration: dimension-agnostic `match_document_chunks` — removes `vector(1536)` hardcode (`008b_dynamic_vector_match.sql`)
+- [X] Config: `hybrid_search_enabled`, `hybrid_candidate_count`, `vector/keyword_search_weight`, `rrf_k`, `embedding_dimensions`, `rerank_*` settings
+- [X] `rerank_service.py`: API (Cohere via httpx) + local (sentence-transformers CrossEncoder, lazy-loaded), graceful fallback, LangSmith traceable
+- [X] `retrieval_service.py`: hybrid RRF fusion (`_vector_search` + `_keyword_search` + `_rrf_fuse`), optional reranking, backward-compatible vector-only fallback
+- [X] `requirements.txt`: added `sentence-transformers>=3.0.0`
+
+#### Notes (Module 6)
+
+- Run `008_hybrid_search.sql` then `008b_dynamic_vector_match.sql` in Supabase SQL editor
+- Hybrid search is **enabled by default** (`HYBRID_SEARCH_ENABLED=true`) — set to `false` to revert to vector-only
+- Reranking is **disabled by default** (`RERANK_ENABLED=false`) — no Cohere key required for normal operation
+- Local reranking (`RERANK_PROVIDER=local`) auto-downloads `cross-encoder/ms-marco-MiniLM-L-6-v2` (~80MB) on first use
+- Switching embedding models requires: update `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`, run `SELECT resize_embedding_column(N)`, re-ingest all documents
 
 ### Module 7: Additional Tools [ ] NOT STARTED
 
