@@ -18,10 +18,28 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_base_url: str = ""
     embedding_model: str = "text-embedding-3-small"
+    # Must match the embedding model's output dimension.
+    # 1536 = text-embedding-3-small, 768 = nomic-embed-text, 384 = all-MiniLM-L6-v2
+    # Only change if switching models (requires resize_embedding_column + re-ingestion)
+    embedding_dimensions: int = 1536
 
     # Retrieval settings
     retrieval_top_k: int = 5
     retrieval_match_threshold: float = 0.3
+
+    # Hybrid search (vector + keyword with RRF fusion)
+    hybrid_search_enabled: bool = True
+    hybrid_candidate_count: int = 20  # candidates from each method before fusion
+    vector_search_weight: float = 1.0
+    keyword_search_weight: float = 1.0
+    rrf_k: int = 60  # RRF constant (standard: 60)
+
+    # Reranking (disabled by default — requires Cohere API key or local model)
+    rerank_enabled: bool = False
+    rerank_provider: str = "api"  # "api" (Cohere) or "local" (sentence-transformers)
+    rerank_api_key: str = ""      # required when rerank_provider="api"
+    rerank_model: str = "rerank-v3.5"  # API: "rerank-v3.5" | Local: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    rerank_top_n: int = 5         # final results returned after reranking
 
     # Chunking settings
     chunk_size: int = 1000
