@@ -139,6 +139,23 @@ Track your progress through the masterclass. Update this file as you complete mo
 - API keys are write-only: GET responses return `has_api_key: bool` only; empty string on PUT = keep existing key
 - First provider added auto-activates; switching active provider updates chat model dropdown on next load
 
+### Module 6.2: Settings Architecture Refactor ✅ COMPLETE
+
+- [X] DB migration: `010_app_settings.sql` — global `app_settings` table (single row, `id='global'`); replaces per-user settings
+- [X] DB migration: `011_cleanup_user_settings.sql` — drops all env-related columns from `user_settings`; adds `preferences jsonb` for future UI prefs
+- [X] `backend/app/models/user_settings.py` — `load_app_settings(supabase)` reads global row + `.env` fallback; `_v()` treats NULL and empty string as unset
+- [X] `backend/app/api/settings.py` — all reads/writes use `app_settings`; embedding/reranking/retrieval endpoints are read-only (env only); only LLM Providers write to DB
+- [X] `backend/app/services/openai_service.py` — `get_embedding_client()` falls back to `llm_api_key` + `llm_base_url` together (prevents key/endpoint mismatch)
+- [X] `backend/app/api/documents.py` — replaced stale `user_settings` read with `load_app_settings()`
+- [X] `frontend/src/pages/SettingsPage.tsx` — simplified: Embedding, Reranking, Retrieval are read-only displays; only LLM Providers section is editable
+
+#### Notes (Module 6.2)
+
+- Run `010_app_settings.sql` then `011_cleanup_user_settings.sql` in Supabase SQL editor
+- `app_settings` has a single `id='global'` row seeded by the migration — no user ownership, all users are admins
+- Embedding/reranking/retrieval settings are now `.env`-only; the Settings UI shows current values but cannot change them
+- `user_settings` table is now reserved for user-specific UI preferences (theme, language etc.) — no overlap with `.env`
+
 ### Module 7: Additional Tools [ ] NOT STARTED
 
 - [ ] Text-to-SQL tool
