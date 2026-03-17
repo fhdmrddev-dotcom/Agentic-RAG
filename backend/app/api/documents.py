@@ -174,6 +174,8 @@ async def delete_document(
 
 
 def ingest_document(document_id: str, text: str, user_id: str, supabase: Client) -> None:
+    import logging, traceback
+    log = logging.getLogger(__name__)
     try:
         supabase.table("documents").update({"status": "processing"}).eq("id", document_id).execute()
 
@@ -185,7 +187,7 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
             }).eq("id", document_id).execute()
             return
 
-        app_settings = load_app_settings(supabase)
+        app_settings = load_app_settings()
         embeddings = embed_chunks(chunks, model=app_settings.embedding_model or None)
 
         chunk_rows = [
@@ -211,6 +213,7 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
         }).eq("id", document_id).execute()
 
     except Exception as e:
+        log.error("ingest_document failed: %s\n%s", e, traceback.format_exc())
         supabase.table("documents").update({
             "status": "failed",
             "error_message": str(e)[:500],

@@ -161,7 +161,7 @@ async def send_message(
 
     async def event_stream() -> AsyncGenerator[str, None]:
         # Load user settings for this request
-        user_settings = load_user_settings(current_user["id"], supabase)
+        user_settings = load_user_settings(current_user["id"])
 
         # Load full message history (includes just-inserted user message)
         history_resp = (

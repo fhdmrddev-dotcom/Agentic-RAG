@@ -60,16 +60,22 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
 def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
     if user_settings is not None:
         if user_settings.embedding_api_key:
-            # Explicit embedding key — use it with the embedding base_url (if set)
+            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
             api_key = user_settings.embedding_api_key
             base_url = user_settings.embedding_base_url or None
         else:
-            # No explicit embedding key — fall back to LLM provider credentials (key + base_url)
+            # No dedicated key — reuse LLM credentials (key + base_url)
             api_key = user_settings.llm_api_key
             base_url = user_settings.embedding_base_url or user_settings.llm_base_url or None
     else:
-        api_key = settings.embedding_api_key or settings.llm_api_key
-        base_url = settings.embedding_base_url or settings.llm_base_url or None
+        if settings.embedding_api_key:
+            # Dedicated embedding key — use its own base_url only, never inherit LLM base_url
+            api_key = settings.embedding_api_key
+            base_url = settings.embedding_base_url or None
+        else:
+            # No dedicated key — reuse LLM credentials (key + base_url)
+            api_key = settings.llm_api_key
+            base_url = settings.embedding_base_url or settings.llm_base_url or None
 
     kwargs: dict = {"api_key": api_key}
     if base_url:
