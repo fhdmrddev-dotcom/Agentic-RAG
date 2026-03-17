@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
-import { listModels } from "@/lib/api"
+import { getSettings } from "@/lib/api"
 import type { Thread } from "@/types"
 import { Sparkles } from "lucide-react"
 
@@ -18,10 +18,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
   const [selectedModel, setSelectedModel] = useState<string>("")
 
   useEffect(() => {
-    listModels()
-      .then(({ models, default: def }) => {
-        setModels(models)
-        setSelectedModel(def)
+    getSettings()
+      .then((s) => {
+        setModels(s.available_models)
+        setSelectedModel(s.llm_model)
       })
       .catch(console.error)
   }, [])

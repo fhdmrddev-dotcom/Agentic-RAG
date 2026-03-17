@@ -9,6 +9,7 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentResponse
+from app.models.user_settings import load_app_settings
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -184,11 +185,8 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
             }).eq("id", document_id).execute()
             return
 
-        # Look up user's preferred embedding model
-        user_prefs = supabase.table("user_settings").select("embedding_model").eq("user_id", user_id).limit(1).execute()
-        preferred_model = user_prefs.data[0]["embedding_model"] if user_prefs.data and user_prefs.data[0].get("embedding_model") else None
-
-        embeddings = embed_chunks(chunks, model=preferred_model)
+        app_settings = load_app_settings(supabase)
+        embeddings = embed_chunks(chunks, model=app_settings.embedding_model or None)
 
         chunk_rows = [
             {
