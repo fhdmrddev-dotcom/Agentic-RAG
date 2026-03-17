@@ -5,6 +5,16 @@ from uuid import UUID
 from pydantic import BaseModel
 
 
+class DocumentMetadata(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    date: str | None = None           # ISO 8601 preferred
+    document_type: str | None = None  # "report", "tutorial", "article", etc.
+    topics: list[str] | None = None
+    language: str | None = None
+    summary: str | None = None
+
+
 class DocumentResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -16,5 +26,6 @@ class DocumentResponse(BaseModel):
     error_message: str | None
     chunk_count: int | None
     content_hash: str | None
+    metadata: DocumentMetadata | None = None
     created_at: datetime
     updated_at: datetime

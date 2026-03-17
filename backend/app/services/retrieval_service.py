@@ -6,18 +6,24 @@ from app.services.openai_service import embed_texts
 
 
 @traceable(name="search-documents", run_type="retriever")
-def search_documents(query: str, user_id: str, supabase: Client) -> list[dict]:
+def search_documents(
+    query: str,
+    user_id: str,
+    supabase: Client,
+    metadata_filter: dict | None = None,
+) -> list[dict]:
     query_embedding = embed_texts([query])[0]
 
-    result = supabase.rpc(
-        "match_document_chunks",
-        {
-            "query_embedding": query_embedding,
-            "match_user_id": user_id,
-            "match_count": settings.retrieval_top_k,
-            "match_threshold": settings.retrieval_match_threshold,
-        },
-    ).execute()
+    rpc_params: dict = {
+        "query_embedding": query_embedding,
+        "match_user_id": user_id,
+        "match_count": settings.retrieval_top_k,
+        "match_threshold": settings.retrieval_match_threshold,
+    }
+    if metadata_filter:
+        rpc_params["metadata_filter"] = metadata_filter
+
+    result = supabase.rpc("match_document_chunks", rpc_params).execute()
 
     if not result.data:
         return []

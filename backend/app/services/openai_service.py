@@ -7,14 +7,30 @@ SEARCH_DOCUMENTS_TOOL = {
     "type": "function",
     "function": {
         "name": "search_documents",
-        "description": "Search the user's uploaded documents for relevant information to answer their question.",
+        "description": (
+            "Search the user's uploaded documents for relevant information. "
+            "Use metadata_filter to narrow results to specific document attributes "
+            "when the user's request implies a scope (e.g. 'find all 2024 reports', "
+            "'only look in Python tutorials', 'search financial documents'). "
+            "Supported filter keys: document_type, language, author, date."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "The search query to find relevant document chunks.",
-                }
+                    "description": "The semantic search query to find relevant document chunks.",
+                },
+                "metadata_filter": {
+                    "type": "object",
+                    "description": (
+                        "Optional JSONB containment filter applied to document metadata. "
+                        "Each key-value pair must match the stored metadata exactly. "
+                        "Example: {\"document_type\": \"report\"} or {\"language\": \"French\"}. "
+                        "Omit this parameter when no document-level scoping is needed."
+                    ),
+                    "additionalProperties": {"type": "string"},
+                },
             },
             "required": ["query"],
         },

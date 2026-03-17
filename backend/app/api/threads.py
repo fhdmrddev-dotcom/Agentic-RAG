@@ -225,7 +225,8 @@ async def send_message(
                     if tc["name"] == "search_documents":
                         try:
                             args = json.loads(tc["arguments"])
-                            results = search_documents(args["query"], current_user["id"], supabase)
+                            metadata_filter = args.get("metadata_filter") or None
+                            results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter)
                             tool_result = json.dumps(results) if results else "No relevant documents found."
                         except json.JSONDecodeError:
                             tool_result = "Error parsing tool arguments"

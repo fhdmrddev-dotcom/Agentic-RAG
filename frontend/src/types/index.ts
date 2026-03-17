@@ -16,6 +16,16 @@ export interface Message {
   updated_at: string
 }
 
+export interface DocumentMetadata {
+  title?: string
+  author?: string
+  date?: string
+  document_type?: string
+  topics?: string[]
+  language?: string
+  summary?: string
+}
+
 export interface Document {
   id: string
   user_id: string
@@ -27,6 +37,7 @@ export interface Document {
   error_message: string | null
   chunk_count: number | null
   content_hash: string | null
+  metadata: DocumentMetadata | null
   created_at: string
   updated_at: string
 }

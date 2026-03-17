@@ -9,7 +9,7 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentResponse
-from app.services.embedding_service import chunk_text, embed_chunks
+from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -202,9 +202,14 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
         ]
         supabase.table("document_chunks").insert(chunk_rows).execute()
 
+        # Extract metadata — best-effort, never blocks completion
+        metadata = extract_metadata(text)
+        metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+
         supabase.table("documents").update({
             "status": "completed",
             "chunk_count": len(chunks),
+            "metadata": metadata_dict,
         }).eq("id", document_id).execute()
 
     except Exception as e:
