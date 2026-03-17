@@ -94,6 +94,8 @@ Track your progress through the masterclass. Update this file as you complete mo
 - Metadata extraction uses `content[:3000]` to keep token usage low (~750 tokens per document)
 - Uses `json_object` response format for broad OpenRouter/Ollama/LM Studio compatibility
 - Extraction is best-effort — failures are logged but never block ingestion
+- System prompt updated to guide LLM to use `metadata_filter` for scoped queries
+- Sidebar fix: replaced Radix ScrollArea with plain div (ScrollArea viewport doesn't constrain child widths), three-dots menu uses absolute overlay with solid bg
 
 ### Module 5: Multi-Format Support [ ] NOT STARTED
 
