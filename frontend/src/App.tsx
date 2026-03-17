@@ -1,10 +1,14 @@
+import { useState } from "react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 
+export type ActiveView = "chat" | "documents" | "settings"
+
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
+  const [activeView, setActiveView] = useState<ActiveView>("chat")
 
   if (loading) {
     return (
@@ -18,7 +22,13 @@ function App() {
     return <AuthPage onSignIn={signIn} onSignUp={signUp} />
   }
 
-  return <ChatLayout onSignOut={signOut} />
+  return (
+    <ChatLayout
+      onSignOut={signOut}
+      activeView={activeView}
+      onNavigate={setActiveView}
+    />
+  )
 }
 
 export default App
