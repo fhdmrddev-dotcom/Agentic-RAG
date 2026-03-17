@@ -119,6 +119,26 @@ Track your progress through the masterclass. Update this file as you complete mo
 - Local reranking (`RERANK_PROVIDER=local`) auto-downloads `cross-encoder/ms-marco-MiniLM-L-6-v2` (~80MB) on first use
 - Switching embedding models requires: update `EMBEDDING_MODEL` + `EMBEDDING_DIMENSIONS`, run `SELECT resize_embedding_column(N)`, re-ingest all documents
 
+### Module 6.1: UI Settings — LLM Providers, Embedding, Reranking & Retrieval ✅ COMPLETE
+
+- [X] DB migration: `009_user_settings_extended.sql` — adds llm_providers (JSONB), embedding_*, rerank_*, retrieval_* columns
+- [X] `backend/app/models/user_settings.py` — `LLMProvider`, `UserEffectiveSettings`, `load_user_settings()`
+- [X] `backend/app/api/settings.py` — full CRUD: GET /settings, PUT /providers, DELETE /providers/{id}, PATCH /providers/{id}/activate, PUT /embedding, PUT /reranking, PUT /retrieval
+- [X] `backend/app/services/openai_service.py` — `get_llm_client()`, `get_embedding_client()`, `create_streaming_chat()`, `embed_texts()` accept optional `user_settings`
+- [X] `backend/app/services/rerank_service.py` — `rerank()` accepts optional `user_settings`
+- [X] `backend/app/services/retrieval_service.py` — `search_documents()` accepts optional `user_settings`; all config reads from effective settings
+- [X] `backend/app/api/threads.py` — loads `UserEffectiveSettings` per-request, passes to all services
+- [X] `frontend/src/lib/api.ts` — `FullAppSettings` type, new API functions for all settings sections
+- [X] `frontend/src/pages/SettingsPage.tsx` — full rewrite: LLM Providers, Embedding, Reranking, Retrieval sections
+- [X] `frontend/src/components/chat/ChatArea.tsx` — reads available_models from getSettings() (active provider)
+
+#### Notes (Module 6.1)
+
+- Run `009_user_settings_extended.sql` in Supabase SQL editor before starting the backend
+- All new user_settings columns are nullable — NULL = use env default (zero user impact on existing rows)
+- API keys are write-only: GET responses return `has_api_key: bool` only; empty string on PUT = keep existing key
+- First provider added auto-activates; switching active provider updates chat model dropdown on next load
+
 ### Module 7: Additional Tools [ ] NOT STARTED
 
 - [ ] Text-to-SQL tool

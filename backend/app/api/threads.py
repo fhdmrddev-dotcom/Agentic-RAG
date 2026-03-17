@@ -10,6 +10,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.models.user_settings import load_user_settings
 from app.config import settings
 from app.services.openai_service import create_streaming_chat, get_llm_client
 from app.services.retrieval_service import search_documents
@@ -82,12 +83,13 @@ async def delete_thread(
     supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
 
 
-def generate_thread_title(first_user_message: str) -> str:
+def generate_thread_title(first_user_message: str, user_settings=None) -> str:
     """Call LLM to produce a short thread title from the first user message."""
     try:
-        client = get_llm_client()
+        client = get_llm_client(user_settings)
+        model = user_settings.llm_model if user_settings else settings.llm_model
         response = client.chat.completions.create(
-            model=settings.llm_model,
+            model=model,
             messages=[
                 {
                     "role": "system",
@@ -158,6 +160,9 @@ async def send_message(
     }).execute()
 
     async def event_stream() -> AsyncGenerator[str, None]:
+        # Load user settings for this request
+        user_settings = load_user_settings(current_user["id"], supabase)
+
         # Load full message history (includes just-inserted user message)
         history_resp = (
             supabase.table("messages")
@@ -177,7 +182,7 @@ async def send_message(
         finish_reason: str | None = None
 
         try:
-            stream = create_streaming_chat(messages, model=body.model)
+            stream = create_streaming_chat(messages, model=body.model, user_settings=user_settings)
 
             for chunk in stream:
                 if not chunk.choices:
@@ -231,7 +236,7 @@ async def send_message(
                         try:
                             args = json.loads(tc["arguments"])
                             metadata_filter = args.get("metadata_filter") or None
-                            results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter)
+                            results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter, user_settings=user_settings)
                             tool_result = json.dumps(results) if results else "No relevant documents found."
                         except json.JSONDecodeError:
                             tool_result = "Error parsing tool arguments"
@@ -245,7 +250,7 @@ async def send_message(
                         })
 
                 # Second streaming call — no tools to prevent recursion
-                stream2 = create_streaming_chat(messages, tool_choice="none", model=body.model)
+                stream2 = create_streaming_chat(messages, tool_choice="none", model=body.model, user_settings=user_settings)
                 for chunk in stream2:
                     if not chunk.choices:
                         continue
@@ -275,7 +280,7 @@ async def send_message(
         # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
         if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
             first_user_msg = history_resp.data[0]["content"]
-            title = generate_thread_title(first_user_msg)
+            title = generate_thread_title(first_user_msg, user_settings=user_settings)
             supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
             yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
 

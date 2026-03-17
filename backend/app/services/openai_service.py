@@ -1,7 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from langsmith import traceable
 from openai import OpenAI
 
 from app.config import settings
+
+if TYPE_CHECKING:
+    from app.models.user_settings import UserEffectiveSettings
 
 SEARCH_DOCUMENTS_TOOL = {
     "type": "function",
@@ -38,26 +45,43 @@ SEARCH_DOCUMENTS_TOOL = {
 }
 
 
-def get_llm_client() -> OpenAI:
-    kwargs: dict = {"api_key": settings.llm_api_key}
-    if settings.llm_base_url:
-        kwargs["base_url"] = settings.llm_base_url
+def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
+    if user_settings is not None:
+        kwargs: dict = {"api_key": user_settings.llm_api_key}
+        if user_settings.llm_base_url:
+            kwargs["base_url"] = user_settings.llm_base_url
+    else:
+        kwargs = {"api_key": settings.llm_api_key}
+        if settings.llm_base_url:
+            kwargs["base_url"] = settings.llm_base_url
     return OpenAI(**kwargs)
 
 
-def get_embedding_client() -> OpenAI:
-    api_key = settings.embedding_api_key or settings.llm_api_key
-    kwargs: dict = {"api_key": api_key}
-    if settings.embedding_base_url:
-        kwargs["base_url"] = settings.embedding_base_url
+def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
+    if user_settings is not None:
+        api_key = user_settings.embedding_api_key or user_settings.llm_api_key
+        kwargs: dict = {"api_key": api_key}
+        if user_settings.embedding_base_url:
+            kwargs["base_url"] = user_settings.embedding_base_url
+    else:
+        api_key = settings.embedding_api_key or settings.llm_api_key
+        kwargs = {"api_key": api_key}
+        if settings.embedding_base_url:
+            kwargs["base_url"] = settings.embedding_base_url
     return OpenAI(**kwargs)
 
 
 @traceable(name="chat-completions", run_type="llm")
-def create_streaming_chat(messages: list[dict], tool_choice: str = "auto", model: str | None = None):
-    client = get_llm_client()
+def create_streaming_chat(
+    messages: list[dict],
+    tool_choice: str = "auto",
+    model: str | None = None,
+    user_settings: UserEffectiveSettings | None = None,
+):
+    client = get_llm_client(user_settings)
+    effective_model = model or (user_settings.llm_model if user_settings else settings.llm_model)
     kwargs: dict = {
-        "model": model or settings.llm_model,
+        "model": effective_model,
         "messages": messages,
         "stream": True,
     }
@@ -67,10 +91,15 @@ def create_streaming_chat(messages: list[dict], tool_choice: str = "auto", model
     return client.chat.completions.create(**kwargs)
 
 
-def embed_texts(texts: list[str], model: str | None = None) -> list[list[float]]:
-    client = get_embedding_client()
+def embed_texts(
+    texts: list[str],
+    model: str | None = None,
+    user_settings: UserEffectiveSettings | None = None,
+) -> list[list[float]]:
+    client = get_embedding_client(user_settings)
+    effective_model = model or (user_settings.embedding_model if user_settings else settings.embedding_model)
     response = client.embeddings.create(
-        model=model or settings.embedding_model,
+        model=effective_model,
         input=texts,
     )
     return [item.embedding for item in response.data]
