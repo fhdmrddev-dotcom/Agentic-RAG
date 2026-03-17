@@ -144,17 +144,26 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [X] DB migration: `010_app_settings.sql` — global `app_settings` table (single row, `id='global'`); replaces per-user settings
 - [X] DB migration: `011_cleanup_user_settings.sql` — drops all env-related columns from `user_settings`; adds `preferences jsonb` for future UI prefs
 - [X] `backend/app/models/user_settings.py` — `load_app_settings(supabase)` reads global row + `.env` fallback; `_v()` treats NULL and empty string as unset
-- [X] `backend/app/api/settings.py` — all reads/writes use `app_settings`; embedding/reranking/retrieval endpoints are read-only (env only); only LLM Providers write to DB
+- [X] `backend/app/api/settings.py` — all settings read from `.env`; Settings UI is fully read-only (no DB writes)
 - [X] `backend/app/services/openai_service.py` — `get_embedding_client()` falls back to `llm_api_key` + `llm_base_url` together (prevents key/endpoint mismatch)
 - [X] `backend/app/api/documents.py` — replaced stale `user_settings` read with `load_app_settings()`
-- [X] `frontend/src/pages/SettingsPage.tsx` — simplified: Embedding, Reranking, Retrieval are read-only displays; only LLM Providers section is editable
+- [X] `frontend/src/pages/SettingsPage.tsx` — fully read-only dashboard showing LLM, Embedding, Reranking, Retrieval values from `.env`
 
 #### Notes (Module 6.2)
 
 - Run `010_app_settings.sql` then `011_cleanup_user_settings.sql` in Supabase SQL editor
-- `app_settings` has a single `id='global'` row seeded by the migration — no user ownership, all users are admins
-- Embedding/reranking/retrieval settings are now `.env`-only; the Settings UI shows current values but cannot change them
-- `user_settings` table is now reserved for user-specific UI preferences (theme, language etc.) — no overlap with `.env`
+- All settings come from `.env` — Settings page is an inspection dashboard only
+- `user_settings` table is reserved for future user-specific UI preferences
+
+#### Deferred: UI-Based LLM Provider Configuration
+
+**Goal:** Allow adding/switching local model providers (Ollama, LM Studio, etc.) via the Settings UI without touching `.env`.
+
+**What's needed:**
+- Fix the root cause: old uvicorn process (different terminal session) stays alive on port 8000 with stale code after hot-reload — write logic must handle this gracefully, or document a restart requirement
+- Implement: `PUT /settings/providers`, `DELETE /settings/providers/{id}`, `PATCH /settings/providers/{id}/activate` writing to `app_settings.llm_providers`
+- The `app_settings` table and backend API already support this (migrations + handlers exist but UI is disabled)
+- Re-enable editable LLM Providers section in `SettingsPage.tsx`
 
 ### Module 7: Additional Tools [ ] NOT STARTED
 
