@@ -50,13 +50,13 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] 7.3 PROGRESS.md updated
 
 ### Module 3: Record Manager ✅ COMPLETE
-- [x] 1. DB migration: `content_hash` column + indexes + unique constraint (`006_record_manager.sql`)
-- [x] 2. Backend: SHA-256 hash on upload + 3-case decision tree (skip duplicate / replace stale / new)
-- [x] 3. Pydantic: `content_hash: str | None` field on `DocumentResponse`
-- [x] 4. Frontend types: `content_hash: string | null` on `Document` interface
-- [x] 5. `api.ts`: `uploadDocument` returns `{ doc, isDuplicate }` using HTTP 200 vs 201
-- [x] 6. `useDocuments`: `upload` returns `Promise<{ isDuplicate: boolean }>`
-- [x] 7. `DocumentUpload`: shows "already up to date" notice on duplicate
+- [x] DB migration: `content_hash` column + indexes + unique constraint (`006_record_manager.sql`)
+- [x] Backend: SHA-256 hash on upload + 3-case decision tree (skip duplicate / replace stale / new)
+- [x] Pydantic: `content_hash: str | None` field on `DocumentResponse`
+- [x] Frontend types: `content_hash: string | null` on `Document` interface
+- [x] `api.ts`: `uploadDocument` returns `{ doc, isDuplicate }` using HTTP 200 vs 201
+- [x] `useDocuments`: `upload` returns `Promise<{ isDuplicate: boolean }>`
+- [x] `DocumentUpload`: shows "already up to date" notice on duplicate
 
 ### UX Enhancements (outside PRD modules) ✅ COMPLETE
 - [x] Auto-title: LLM generates 4-6 word title after first exchange; sent as SSE event → sidebar updates instantly
