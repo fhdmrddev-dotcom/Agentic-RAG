@@ -50,34 +50,47 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] 7.3 PROGRESS.md updated
 
 ### Module 3: Record Manager ✅ COMPLETE
-- [x] 1. DB migration: `content_hash` column + indexes + unique constraint
-- [x] 2. Backend: SHA-256 hash + 3-case decision tree (skip / replace / new)
-- [x] 3. Pydantic: `content_hash` field on `DocumentResponse`
-- [x] 4. Frontend types: `content_hash` on `Document` interface
-- [x] 5. `api.ts`: `uploadDocument` returns `{ doc, isDuplicate }`
-- [x] 6. `useDocuments`: `upload` returns `{ isDuplicate }`
-- [x] 7. `DocumentUpload`: duplicate notice UI
+- [x] 1. DB migration: `content_hash` column + indexes + unique constraint (`006_record_manager.sql`)
+- [x] 2. Backend: SHA-256 hash on upload + 3-case decision tree (skip duplicate / replace stale / new)
+- [x] 3. Pydantic: `content_hash: str | None` field on `DocumentResponse`
+- [x] 4. Frontend types: `content_hash: string | null` on `Document` interface
+- [x] 5. `api.ts`: `uploadDocument` returns `{ doc, isDuplicate }` using HTTP 200 vs 201
+- [x] 6. `useDocuments`: `upload` returns `Promise<{ isDuplicate: boolean }>`
+- [x] 7. `DocumentUpload`: shows "already up to date" notice on duplicate
+
+### UX Enhancements (outside PRD modules) ✅ COMPLETE
+- [x] Auto-title: LLM generates 4-6 word title after first exchange; sent as SSE event → sidebar updates instantly
+- [x] Delete thread: `DELETE /threads/{id}`; messages cascade-delete in DB
+- [x] Rename thread: `PATCH /threads/{id}`; inline edit via hover `...` menu in sidebar
+- [x] `ThreadUpdate` Pydantic model; `deleteThread` + `renameThread` in api.ts + useThreads
 
 #### Notes (Module 3)
 - Run `006_record_manager.sql` in Supabase SQL editor before testing
-- Existing rows will have `content_hash = null` — GET /documents will still work (field is nullable)
+- Existing rows will have `content_hash = null` — nullable field, no impact on existing data
+- supabase-py v2: UPDATE does not return rows — do a follow-up SELECT to get updated row
 
-### Module 4: Chat Thread Management ✅ COMPLETE
-- [x] 1. Auto-title: LLM generates 4-6 word title after first message exchange; sent as SSE event, updates sidebar instantly
-- [x] 2. Delete thread: `DELETE /threads/{id}` endpoint; messages cascade-delete in DB; sidebar updates instantly
-- [x] 3. Rename thread: `PATCH /threads/{id}` endpoint; inline edit in sidebar on hover → `...` menu → Rename
-- [x] 4. `ThreadUpdate` Pydantic model
-- [x] 5. `api.ts`: `deleteThread`, `renameThread` functions
-- [x] 6. `useThreads`: `deleteThread`, `renameThread`, `updateThreadTitle` callbacks
-- [x] 7. `ChatLayout`: wires title update callback to ChatArea
-- [x] 8. `ChatArea`: accepts `onTitleUpdate` prop, passes to `sendMessage`
-- [x] 9. `useMessages`: passes `onTitleUpdate` through to `streamMessage`
-- [x] 10. `Sidebar`: hover `...` menu per thread with Rename (inline input) + Delete (trash)
+### Module 4: Metadata Extraction [ ] NOT STARTED
+- [ ] LLM extracts structured metadata from documents on ingestion
+- [ ] Store metadata fields on `documents` table
+- [ ] Filter retrieval by metadata
 
-#### Notes (Module 4)
-- No DB migration needed — uses existing `threads` table
-- Auto-title fires only on first exchange (history has exactly 1 message when stream starts)
-- supabase-py v2: UPDATE requires a follow-up SELECT to return the updated row
+### Module 5: Multi-Format Support [ ] NOT STARTED
+- [ ] PDF/DOCX/HTML/Markdown via docling
+- [ ] Cascade deletes
+
+### Module 6: Hybrid Search & Reranking [ ] NOT STARTED
+- [ ] Keyword + vector search
+- [ ] RRF combination
+- [ ] Reranking
+
+### Module 7: Additional Tools [ ] NOT STARTED
+- [ ] Text-to-SQL tool
+- [ ] Web search fallback
+
+### Module 8: Sub-Agents [ ] NOT STARTED
+- [ ] Detect full-document scenarios
+- [ ] Spawn isolated sub-agent with its own tools
+- [ ] Nested tool call display in UI
 
 #### Notes (Module 2)
 - Run `002_module2_byo_retrieval.sql` in Supabase SQL editor before starting backend
