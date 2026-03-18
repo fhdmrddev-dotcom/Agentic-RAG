@@ -6,13 +6,14 @@ import type { Document } from "@/types"
 interface UseDocuments {
   documents: Document[]
   uploading: boolean
+  uploadingCount: number
   upload: (file: File) => Promise<{ isDuplicate: boolean }>
   deleteDoc: (id: string) => Promise<void>
 }
 
 export function useDocuments(): UseDocuments {
   const [documents, setDocuments] = useState<Document[]>([])
-  const [uploading, setUploading] = useState(false)
+  const [uploadingCount, setUploadingCount] = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const loadDocuments = useCallback(async () => {
@@ -72,7 +73,7 @@ export function useDocuments(): UseDocuments {
   }, [loadDocuments])
 
   const upload = useCallback(async (file: File): Promise<{ isDuplicate: boolean }> => {
-    setUploading(true)
+    setUploadingCount((c) => c + 1)
     try {
       const { doc, isDuplicate } = await uploadDocument(file)
       // Optimistically add the document immediately; Realtime UPDATE events
@@ -83,7 +84,7 @@ export function useDocuments(): UseDocuments {
       })
       return { isDuplicate }
     } finally {
-      setUploading(false)
+      setUploadingCount((c) => c - 1)
     }
   }, [])
 
@@ -93,5 +94,5 @@ export function useDocuments(): UseDocuments {
     setDocuments((prev) => prev.filter((d) => d.id !== id))
   }, [])
 
-  return { documents, uploading, upload, deleteDoc }
+  return { documents, uploading: uploadingCount > 0, uploadingCount, upload, deleteDoc }
 }

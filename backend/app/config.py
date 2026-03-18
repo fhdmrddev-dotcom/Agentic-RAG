@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
+    # Web search (Tavily) — tool is disabled when key is absent
+    tavily_api_key: str = ""
+    web_search_max_results: int = 5
+
+    @property
+    def web_search_enabled(self) -> bool:
+        return bool(self.tavily_api_key)
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"

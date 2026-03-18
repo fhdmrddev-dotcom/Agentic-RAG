@@ -14,20 +14,26 @@ from app.models.user_settings import load_user_settings
 from app.config import settings
 from app.services.openai_service import create_streaming_chat, get_llm_client
 from app.services.retrieval_service import search_documents
+from app.services.web_search_service import web_search
+from app.services.sql_service import query_documents
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant with access to the user's uploaded documents. "
-    "ALWAYS call the search_documents tool before answering any question that could relate to the user's documents — "
-    "including questions about specific keywords, URLs, names, codes, file contents, or phrases. "
-    "Never assume a term is absent from documents without searching first. "
-    "When the user asks 'which file contains X' or 'find X', always search for X directly as the query. "
-    "When the user refers to a specific type of document (e.g. 'my reports', 'the dissertation', "
-    "'specifications', 'tutorials'), use the metadata_filter parameter to narrow results by "
-    "document_type, author, language, or date. "
-    "Always indicate when information comes from a document. "
-    "If no relevant documents are found after searching, say so and answer from general knowledge."
+    "You are a helpful AI assistant. You have three tools — use the RIGHT one for each question:\n\n"
+    "1. query_documents — ALWAYS use this for questions about the user's file library: "
+    "'how many documents', 'list my files', 'which documents', 'how many PDFs', etc. "
+    "Do NOT add a user_id filter. Example SQL: SELECT COUNT(*) FROM documents\n\n"
+    "2. search_documents — use this to find information INSIDE document contents. "
+    "Use metadata_filter to narrow by document_type, author, language, or date.\n\n"
+    "3. web_search — use this DIRECTLY (without searching documents first) for: "
+    "current events, software versions, news, sports results, prices, or any general world knowledge. "
+    "Always include the source URL in your answer.\n\n"
+    "Key rules:\n"
+    "- Questions about file counts/lists → query_documents\n"
+    "- Questions about document contents → search_documents\n"
+    "- Questions about the world/internet → web_search (call it first, do not try search_documents)\n"
+    "- Always say where the information came from."
 )
 
 
@@ -231,23 +237,36 @@ async def send_message(
                 })
 
                 # Execute each tool call
+                import logging
+                logger = logging.getLogger(__name__)
                 for tc in tool_calls:
-                    if tc["name"] == "search_documents":
-                        try:
-                            args = json.loads(tc["arguments"])
+                    tool_name = tc["name"]
+                    try:
+                        args = json.loads(tc["arguments"])
+                        if tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
                             results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter, user_settings=user_settings)
                             tool_result = json.dumps(results) if results else "No relevant documents found."
-                        except json.JSONDecodeError:
-                            tool_result = "Error parsing tool arguments"
-                        except Exception as e:
-                            tool_result = f"Search error: {str(e)}"
+                        elif tool_name == "query_documents":
+                            tool_result = query_documents(args["query"], current_user["id"], supabase)
+                        elif tool_name == "web_search":
+                            tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
+                        else:
+                            tool_result = f"Unknown tool: {tool_name}"
+                    except json.JSONDecodeError:
+                        tool_result = "Error parsing tool arguments"
+                    except (ValueError, RuntimeError) as e:
+                        logger.error("Tool %s failed: %s", tool_name, e)
+                        tool_result = f"Tool error: {e}"
+                    except Exception as e:
+                        logger.error("Tool %s unexpected error: %s", tool_name, e)
+                        tool_result = f"Tool execution failed: {e}"
 
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tc["id"],
-                            "content": tool_result,
-                        })
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["id"],
+                        "content": tool_result,
+                    })
 
                 # Second streaming call — no tools to prevent recursion
                 stream2 = create_streaming_chat(messages, tool_choice="none", model=body.model, user_settings=user_settings)
