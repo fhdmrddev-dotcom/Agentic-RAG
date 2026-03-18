@@ -45,6 +45,68 @@ SEARCH_DOCUMENTS_TOOL = {
 }
 
 
+QUERY_DOCUMENTS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "query_documents",
+        "description": (
+            "Run a SQL SELECT query against the user's documents table to answer "
+            "structured questions about their uploaded files. Use for questions like "
+            "'how many documents do I have?', 'list all PDFs', 'which files were "
+            "uploaded in 2024?'. "
+            "Table: documents. Columns: id (uuid), filename (text), file_type (text), "
+            "status (text, e.g. 'completed'), created_at (timestamptz), "
+            "metadata (jsonb with keys: title, author, date, document_type, topics, "
+            "language, summary). "
+            "The query is automatically scoped to the current user — do NOT add a "
+            "user_id filter yourself."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "A valid SQL SELECT statement. No semicolons.",
+                }
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+WEB_SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "web_search",
+        "description": (
+            "Search the web for current information not available in the user's "
+            "uploaded documents. Use when the user asks about recent events, "
+            "general knowledge, or topics clearly outside their document library. "
+            "Always prefer search_documents first if the answer may be in their files. "
+            "Always cite sources (title + URL) in your response."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The web search query.",
+                }
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+
+def get_tools() -> list[dict]:
+    """Return the active tool list based on current config."""
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL]
+    if settings.web_search_enabled:
+        tools.append(WEB_SEARCH_TOOL)
+    return tools
+
+
 def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
     if user_settings is not None:
         kwargs: dict = {"api_key": user_settings.llm_api_key}
@@ -98,7 +160,7 @@ def create_streaming_chat(
         "stream": True,
     }
     if tool_choice == "auto":
-        kwargs["tools"] = [SEARCH_DOCUMENTS_TOOL]
+        kwargs["tools"] = get_tools()
         kwargs["tool_choice"] = "auto"
     return client.chat.completions.create(**kwargs)
 

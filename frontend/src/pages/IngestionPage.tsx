@@ -3,7 +3,7 @@ import { DocumentList } from "@/components/ingestion/DocumentList"
 import { useDocuments } from "@/hooks/useDocuments"
 
 export function IngestionPage() {
-  const { documents, uploading, upload, deleteDoc } = useDocuments()
+  const { documents, uploading, uploadingCount, upload, deleteDoc } = useDocuments()
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-8">
@@ -15,7 +15,7 @@ export function IngestionPage() {
           </p>
         </div>
 
-        <DocumentUpload onUpload={upload} uploading={uploading} />
+        <DocumentUpload onUpload={upload} uploading={uploading} uploadingCount={uploadingCount} />
 
         <DocumentList documents={documents} onDelete={deleteDoc} />
       </div>

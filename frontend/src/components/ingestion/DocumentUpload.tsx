@@ -5,37 +5,55 @@ import { cn } from "@/lib/utils"
 interface Props {
   onUpload: (file: File) => Promise<{ isDuplicate: boolean }>
   uploading: boolean
+  uploadingCount?: number
 }
 
-export function DocumentUpload({ onUpload, uploading }: Props) {
+interface BatchResult {
+  uploaded: number
+  duplicates: number
+  errors: string[]
+}
+
+export function DocumentUpload({ onUpload, uploading, uploadingCount = 0 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [result, setResult] = useState<BatchResult | null>(null)
 
-  async function handleFile(file: File) {
-    setError(null)
-    setNotice(null)
-    try {
-      const { isDuplicate } = await onUpload(file)
-      if (isDuplicate) setNotice("This file is already up to date — skipped re-ingestion.")
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed")
+  async function handleFiles(files: File[]) {
+    if (!files.length) return
+    setResult(null)
+
+    const outcomes = await Promise.allSettled(files.map((f) => onUpload(f)))
+
+    const batch: BatchResult = { uploaded: 0, duplicates: 0, errors: [] }
+    for (const outcome of outcomes) {
+      if (outcome.status === "fulfilled") {
+        if (outcome.value.isDuplicate) batch.duplicates++
+        else batch.uploaded++
+      } else {
+        batch.errors.push(outcome.reason instanceof Error ? outcome.reason.message : "Upload failed")
+      }
     }
+    setResult(batch)
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    handleFiles(Array.from(e.dataTransfer.files))
   }
 
   function onInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) handleFile(file)
+    handleFiles(Array.from(e.target.files || []))
     e.target.value = ""
   }
+
+  const statusLabel =
+    uploadingCount > 1
+      ? `Uploading ${uploadingCount} files…`
+      : uploading
+        ? "Uploading…"
+        : null
 
   return (
     <div className="space-y-2">
@@ -52,20 +70,39 @@ export function DocumentUpload({ onUpload, uploading }: Props) {
       >
         <Upload className="h-8 w-8 text-muted-foreground" />
         <div className="text-center">
-          <p className="text-sm font-medium">Drop a file here or click to browse</p>
-          <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx</p>
+          <p className="text-sm font-medium">Drop files here or click to browse</p>
+          <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx · Multiple files allowed</p>
         </div>
         {uploading && (
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="flex items-center gap-2">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            {statusLabel && <span className="text-xs text-muted-foreground">{statusLabel}</span>}
+          </div>
         )}
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {notice && <p className="text-sm text-muted-foreground mt-2">{notice}</p>}
+      {result && !uploading && (
+        <div className="space-y-1">
+          {(result.uploaded > 0 || result.duplicates > 0) && (
+            <p className="text-sm text-muted-foreground">
+              {[
+                result.uploaded > 0 && `${result.uploaded} uploaded`,
+                result.duplicates > 0 && `${result.duplicates} already up to date`,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          )}
+          {result.errors.map((err, i) => (
+            <p key={i} className="text-sm text-destructive">{err}</p>
+          ))}
+        </div>
+      )}
 
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept=".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={onInputChange}

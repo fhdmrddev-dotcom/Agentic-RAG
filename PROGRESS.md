@@ -165,10 +165,20 @@ Track your progress through the masterclass. Update this file as you complete mo
 - The `app_settings` table and backend API already support this (migrations + handlers exist but UI is disabled)
 - Re-enable editable LLM Providers section in `SettingsPage.tsx`
 
-### Module 7: Additional Tools [ ] NOT STARTED
+### Module 7: Additional Tools ✅ COMPLETE
 
-- [ ] Text-to-SQL tool
-- [ ] Web search fallback
+- [x] Text-to-SQL tool (`query_documents` — RPC + sql_service.py, migration 012)
+- [x] Web search fallback (`web_search` — Tavily via web_search_service.py, auto-disabled without key)
+- [x] Multi-tool dispatch loop in threads.py
+- [x] Updated system prompt with tool routing guidance
+- [x] Multi-file upload (frontend only — useDocuments counter, DocumentUpload batch handling)
+
+#### Notes (Module 7)
+
+- Run `012_query_documents_fn.sql` in Supabase SQL editor before using the query_documents tool
+- Add `TAVILY_API_KEY=tvly-...` to `backend/.env` to enable web search (tool is silently excluded when key is absent)
+- `query_documents` is always available (no key required) — it queries the `documents` table via RPC with RLS enforced
+- Multi-file upload: select or drag multiple files at once; each uploads concurrently; duplicate files are skipped gracefully
 
 ### Module 8: Sub-Agents [ ] NOT STARTED
 
