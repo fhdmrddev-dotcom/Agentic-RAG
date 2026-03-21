@@ -136,3 +136,90 @@ class TestLs:
         folder_ids = {f["id"] for f in data["folders"]}
         assert FOLDER_PRIVATE not in folder_ids
         assert len(data["folders"]) == 2
+
+
+# ── TestTree ──────────────────────────────────────────────────────────────────
+
+FOLDER_GRANDCHILD = str(uuid4())  # "january" under q1 (used in depth truncation test)
+
+
+class TestTree:
+    def test_tree_root(self, client, auth_headers, mock_builder):
+        """GET /kb/tree?path=/ returns 200 with tree containing root folders and nested children."""
+        # Sequential execute calls:
+        # 1. _fetch_visible_folders — folders query
+        # 2. in_("folder_id", all_ids) — documents in subtree
+        # 3. is_("folder_id", "null") — root documents (root path only)
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+            _make_result([_doc_row(DOC_IN_REPORTS, "report.pdf", FOLDER_ROOT_A)]),
+            _make_result([_doc_row(DOC_ROOT, "readme.pdf")]),
+        ]
+        response = client.get("/kb/tree?path=/", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["path"] == "/"
+        assert data["depth"] is None
+        root_names = {n["name"] for n in data["tree"]}
+        assert "reports" in root_names
+        assert "notes" in root_names
+        # reports should have q1 as a child
+        reports_node = next(n for n in data["tree"] if n["name"] == "reports")
+        child_names = {c["name"] for c in reports_node["children"]}
+        assert "q1" in child_names
+
+    def test_tree_depth_truncation(self, client, auth_headers, mock_builder):
+        """GET /kb/tree?path=/reports&depth=1 truncates grandchildren with truncated=True."""
+        # Build: reports -> q1 -> january (3 levels)
+        folders_with_grandchild = _standard_folders() + [
+            _folder_row(FOLDER_GRANDCHILD, "january", parent_id=FOLDER_CHILD),
+        ]
+        # Sequential execute calls:
+        # 1. _fetch_visible_folders
+        # 2. in_("folder_id", all_ids) — no docs needed
+        mock_builder.execute.side_effect = [
+            _make_result(folders_with_grandchild),
+            _make_result([]),
+        ]
+        response = client.get("/kb/tree?path=/reports&depth=1", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["tree"]) == 1
+        reports_node = data["tree"][0]
+        assert reports_node["name"] == "reports"
+        assert reports_node["truncated"] is False
+        # q1 is at depth 0 relative to reports' children; with depth=1, q1 (depth=1) is truncated
+        assert len(reports_node["children"]) == 1
+        q1_node = reports_node["children"][0]
+        assert q1_node["name"] == "q1"
+        assert q1_node["truncated"] is True
+        assert q1_node["children"] == []
+
+    def test_tree_not_found(self, client, auth_headers, mock_builder):
+        """GET /kb/tree?path=/nonexistent returns 404."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+        ]
+        response = client.get("/kb/tree?path=/nonexistent", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_tree_rls(self, client, auth_headers, mock_builder):
+        """tree does not expose private folders of other users.
+
+        Simulates DB-level RLS: _fetch_visible_folders returns only user's
+        own + global folders. FOLDER_PRIVATE (another user's private folder)
+        is absent from the result.
+        """
+        # _standard_folders() does NOT contain FOLDER_PRIVATE (other user's folder)
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+            _make_result([]),
+            _make_result([]),
+        ]
+        response = client.get("/kb/tree?path=/", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        # Flatten all node IDs in tree
+        all_ids = {n["id"] for n in data["tree"]}
+        assert FOLDER_PRIVATE not in all_ids
+        assert len(data["tree"]) == 2
