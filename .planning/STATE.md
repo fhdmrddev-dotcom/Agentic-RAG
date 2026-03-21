@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-search-tools-01-PLAN.md (grep endpoint)
-last_updated: "2026-03-21T21:05:43.578Z"
+stopped_at: Completed 05-search-tools-02-PLAN.md (glob endpoint + agent wiring)
+last_updated: "2026-03-21T21:12:07.305Z"
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Plan: 2 of 2
 | Phase 04-navigation-tools P01 | 2min 27sec | 3 tasks | 5 files |
 | Phase 04-navigation-tools P02 | 2min | 2 tasks | 2 files |
 | Phase 05-search-tools P01 | 2min | 2 tasks | 3 files |
+| Phase 05-search-tools P02 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 04-navigation-tools patch]: ls_path()/tree_path() helpers extracted from HTTP endpoints so threads.py can call them directly — no HTTP round-trip needed in the agent loop
 - [Phase 04-navigation-tools patch]: LS_TOOL + TREE_TOOL added to openai_service.get_tools(); system prompt updated from 4 to 6 tools; query_documents repositioned for analytical queries only
 - [Phase 05-search-tools]: grep_path reuses Phase 4 shared helpers for path scoping; _inject_user_id_for_grep implemented inline in kb.py; grep returns document names only per PROJECT.md decision
+- [Phase 05-search-tools]: glob_path uses _glob_pattern_to_regex() with regex for ** matching rather than fnmatch alone — fnmatch does not support ** recursive path segments
+- [Phase 05-search-tools]: glob_path matches against both full path and filename alone to support simple patterns like *.pdf regardless of folder depth
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T21:05:43.574Z
-Stopped at: Completed 05-search-tools-01-PLAN.md (grep endpoint)
+Last session: 2026-03-21T21:12:07.301Z
+Stopped at: Completed 05-search-tools-02-PLAN.md (glob endpoint + agent wiring)
 Resume file: None

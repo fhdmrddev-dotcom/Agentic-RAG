@@ -98,7 +98,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 05-01-PLAN.md — grep endpoint with Pydantic models, path-scoped regex search, and integration tests (TOOL-03)
-- [ ] 05-02-PLAN.md — glob endpoint with path-aware filename matching, agent wiring for grep+glob, and integration tests (TOOL-04)
+- [x] 05-02-PLAN.md — glob endpoint with path-aware filename matching, agent wiring for grep+glob, and integration tests (TOOL-04)
 
 ### Phase 6: Read Tool
 **Goal**: The agent can retrieve full document content or any specific line range from stored markdown
