@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. API endpoints for folder CRUD return correct responses and enforce Row-Level Security for all operations
 **Plans**: 2 plans
 Plans:
-- [ ] 01-01-PLAN.md — Migration SQL, Pydantic models, and CRUD API endpoints
+- [x] 01-01-PLAN.md — Migration SQL, Pydantic models, and CRUD API endpoints
 - [ ] 01-02-PLAN.md — Integration tests for folder CRUD endpoints
 
 ### Phase 2: Document-Folder Integration
@@ -117,7 +117,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Folder Schema & Core APIs | 0/2 | Planning complete | - |
+| 1. Folder Schema & Core APIs | 1/2 | In Progress|  |
 | 2. Document-Folder Integration | 0/? | Not started | - |
 | 3. Ingestion UI | 0/? | Not started | - |
 | 4. Navigation Tools | 0/? | Not started | - |
