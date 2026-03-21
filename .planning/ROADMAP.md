@@ -50,7 +50,10 @@ Plans:
   2. User can move a file to a different folder and it appears under the new folder immediately
   3. User can move a folder (including all its contents) to a different parent folder without data loss
   4. Every ingested document has its full extracted markdown stored in the database alongside its chunks, accessible for grep and read operations
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 02-01-PLAN.md — Migration SQL, Pydantic model updates, and API endpoint changes
+- [ ] 02-02-PLAN.md — Integration tests for document-folder features
 
 ### Phase 3: Ingestion UI
 **Goal**: The ingestion interface displays the full folder hierarchy and lets users manage folders and target uploads without leaving the page
@@ -117,8 +120,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Folder Schema & Core APIs | 1/2 | In Progress|  |
-| 2. Document-Folder Integration | 0/? | Not started | - |
+| 1. Folder Schema & Core APIs | 2/2 | Complete |  |
+| 2. Document-Folder Integration | 0/2 | Not started | - |
 | 3. Ingestion UI | 0/? | Not started | - |
 | 4. Navigation Tools | 0/? | Not started | - |
 | 5. Search Tools | 0/? | Not started | - |
