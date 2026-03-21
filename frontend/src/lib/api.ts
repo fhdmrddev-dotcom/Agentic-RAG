@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document } from "../types"
+import type { Thread, Message, Document, Folder } from "../types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
@@ -144,10 +144,11 @@ export async function listDocuments(): Promise<Document[]> {
   return res.json() as Promise<Document[]>
 }
 
-export async function uploadDocument(file: File): Promise<{ doc: Document; isDuplicate: boolean }> {
+export async function uploadDocument(file: File, folderId?: string | null): Promise<{ doc: Document; isDuplicate: boolean }> {
   const token = await getAuthToken()
   const formData = new FormData()
   formData.append("file", file)
+  if (folderId) formData.append("folder_id", folderId)
   const res = await fetch(`${API_BASE}/documents/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -168,6 +169,44 @@ export async function deleteDocument(id: string): Promise<void> {
     headers,
   })
   if (!res.ok) throw new Error("Failed to delete document")
+}
+
+export async function listFolders(): Promise<Folder[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/folders`, { headers })
+  if (!res.ok) throw new Error("Failed to list folders")
+  return res.json() as Promise<Folder[]>
+}
+
+export async function createFolder(name: string, parentId: string | null, isGlobal = false): Promise<Folder> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/folders`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name, parent_id: parentId, is_global: isGlobal }),
+  })
+  if (!res.ok) throw new Error("Failed to create folder")
+  return res.json() as Promise<Folder>
+}
+
+export async function renameFolder(id: string, name: string): Promise<Folder> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/folders/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ name }),
+  })
+  if (!res.ok) throw new Error("Failed to rename folder")
+  return res.json() as Promise<Folder>
+}
+
+export async function deleteFolder(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/folders/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete folder")
 }
 
 export interface FullAppSettings {

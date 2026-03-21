@@ -28,6 +28,10 @@ import {
   listDocuments,
   uploadDocument,
   deleteDocument,
+  listFolders,
+  createFolder,
+  renameFolder,
+  deleteFolder,
 } from "@/lib/api"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -216,5 +220,202 @@ describe("deleteDocument", () => {
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain("/documents/doc-123")
     expect(options?.method).toBe("DELETE")
+  })
+})
+
+describe("listFolders", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("makes GET /folders with Authorization header", async () => {
+    const fetchMock = mockFetch([])
+    vi.stubGlobal("fetch", fetchMock)
+
+    await listFolders()
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/folders")
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer mock-token")
+  })
+
+  it("returns parsed Folder array", async () => {
+    const folders = [{ id: "f1", name: "Docs", parent_id: null, is_global: false }]
+    vi.stubGlobal("fetch", mockFetch(folders))
+    const result = await listFolders()
+    expect(result).toEqual(folders)
+  })
+})
+
+describe("createFolder", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("makes POST /folders with name, parent_id, is_global", async () => {
+    const folder = { id: "f1", name: "Reports", parent_id: null, is_global: false }
+    const fetchMock = mockFetch(folder, 201)
+    vi.stubGlobal("fetch", fetchMock)
+
+    await createFolder("Reports", null, false)
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/folders")
+    expect(options?.method).toBe("POST")
+    const body = JSON.parse(options?.body as string) as Record<string, unknown>
+    expect(body.name).toBe("Reports")
+    expect(body.parent_id).toBeNull()
+    expect(body.is_global).toBe(false)
+  })
+
+  it("defaults is_global to false when not provided", async () => {
+    const folder = { id: "f2", name: "Notes", parent_id: null, is_global: false }
+    const fetchMock = mockFetch(folder, 201)
+    vi.stubGlobal("fetch", fetchMock)
+
+    await createFolder("Notes", null)
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(options?.body as string) as Record<string, unknown>
+    expect(body.is_global).toBe(false)
+  })
+
+  it("returns the created folder", async () => {
+    const folder = { id: "f3", name: "Archive", parent_id: "p1", is_global: true }
+    vi.stubGlobal("fetch", mockFetch(folder, 201))
+    const result = await createFolder("Archive", "p1", true)
+    expect(result).toEqual(folder)
+  })
+})
+
+describe("renameFolder", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("makes PATCH /folders/:id with name in body", async () => {
+    const updated = { id: "f1", name: "New Name" }
+    const fetchMock = mockFetch(updated)
+    vi.stubGlobal("fetch", fetchMock)
+
+    await renameFolder("f1", "New Name")
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/folders/f1")
+    expect(options?.method).toBe("PATCH")
+    const body = JSON.parse(options?.body as string) as Record<string, unknown>
+    expect(body.name).toBe("New Name")
+  })
+
+  it("returns the updated folder", async () => {
+    const updated = { id: "f1", name: "Renamed" }
+    vi.stubGlobal("fetch", mockFetch(updated))
+    const result = await renameFolder("f1", "Renamed")
+    expect(result).toEqual(updated)
+  })
+})
+
+describe("deleteFolder", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("makes DELETE /folders/:id", async () => {
+    const fetchMock = mockFetch(null, 204)
+    vi.stubGlobal("fetch", fetchMock)
+
+    await deleteFolder("folder-42")
+
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/folders/folder-42")
+    expect(options?.method).toBe("DELETE")
+  })
+
+  it("includes Authorization header", async () => {
+    const fetchMock = mockFetch(null, 204)
+    vi.stubGlobal("fetch", fetchMock)
+
+    await deleteFolder("folder-42")
+
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer mock-token")
+  })
+})
+
+describe("uploadDocument with folderId", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("appends folder_id to FormData when folderId is provided", async () => {
+    const docResponse = { id: "d1", filename: "test.txt", status: "pending" }
+    const fetchMock = mockFetch(docResponse, 201)
+    vi.stubGlobal("fetch", fetchMock)
+
+    const appendSpy = vi.spyOn(FormData.prototype, "append")
+    const file = new File(["hello"], "test.txt", { type: "text/plain" })
+    await uploadDocument(file, "folder-123")
+
+    const appendCalls = appendSpy.mock.calls.map((c) => c[0])
+    expect(appendCalls).toContain("folder_id")
+    const folderIdCall = appendSpy.mock.calls.find((c) => c[0] === "folder_id")
+    expect(folderIdCall?.[1]).toBe("folder-123")
+
+    appendSpy.mockRestore()
+  })
+
+  it("does NOT append folder_id when folderId is not provided", async () => {
+    const docResponse = { id: "d1", filename: "test.txt", status: "pending" }
+    const fetchMock = mockFetch(docResponse, 201)
+    vi.stubGlobal("fetch", fetchMock)
+
+    const appendSpy = vi.spyOn(FormData.prototype, "append")
+    const file = new File(["hello"], "test.txt", { type: "text/plain" })
+    await uploadDocument(file)
+
+    const appendCalls = appendSpy.mock.calls.map((c) => c[0])
+    expect(appendCalls).not.toContain("folder_id")
+
+    appendSpy.mockRestore()
+  })
+
+  it("does NOT append folder_id when folderId is null", async () => {
+    const docResponse = { id: "d1", filename: "test.txt", status: "pending" }
+    const fetchMock = mockFetch(docResponse, 201)
+    vi.stubGlobal("fetch", fetchMock)
+
+    const appendSpy = vi.spyOn(FormData.prototype, "append")
+    const file = new File(["hello"], "test.txt", { type: "text/plain" })
+    await uploadDocument(file, null)
+
+    const appendCalls = appendSpy.mock.calls.map((c) => c[0])
+    expect(appendCalls).not.toContain("folder_id")
+
+    appendSpy.mockRestore()
   })
 })

@@ -43,9 +43,20 @@ export interface DocumentMetadata {
   summary?: string
 }
 
+export interface Folder {
+  id: string
+  user_id: string
+  name: string
+  parent_id: string | null
+  is_global: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Document {
   id: string
   user_id: string
+  folder_id: string | null
   filename: string
   file_path: string
   file_size: number
