@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-21T19:28:34.526Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-21T19:32:12.561Z"
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -53,6 +53,7 @@ Plan: 2 of 2
 | Phase 03-ingestion-ui P01 | 4min 24sec | 2 tasks | 7 files |
 | Phase 03-ingestion-ui P02 | 6min 7sec | 2 tasks | 9 files |
 | Phase 04-navigation-tools P01 | 2min 27sec | 3 tasks | 5 files |
+| Phase 04-navigation-tools P02 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase 03-ingestion-ui]: shadcn CLI on Windows creates files in literal @/ directory — files manually copied to correct path, @/ added to .gitignore
 - [Phase 04-navigation-tools]: Single-fetch all visible folders + in-memory tree build avoids N+1 queries for path resolution
 - [Phase 04-navigation-tools]: conftest .is_ and .or_ wiring added globally — fixes Pitfall 3 for all current and future tests
+- [Phase 04-navigation-tools]: depth=1 means show target's immediate children, truncate their children — current_depth starts at 0 for target's direct children
+- [Phase 04-navigation-tools]: Empty all_ids list guard before in_() query prevents Supabase rejecting empty-list queries
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T19:28:34.522Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-03-21T19:32:12.557Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None

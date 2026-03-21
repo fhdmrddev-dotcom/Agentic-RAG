@@ -83,7 +83,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 04-01-PLAN.md — Pydantic models, shared helpers, ls endpoint with integration tests (TOOL-01)
-- [ ] 04-02-PLAN.md — tree endpoint with depth-limited serialization and integration tests (TOOL-02)
+- [x] 04-02-PLAN.md — tree endpoint with depth-limited serialization and integration tests (TOOL-02)
 
 ### Phase 5: Search Tools
 **Goal**: The agent can find documents by content pattern or filename pattern across the knowledge base
