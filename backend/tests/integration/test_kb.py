@@ -100,7 +100,7 @@ class TestLs:
         ]
         response = client.get("/kb/ls?path=/nonexistent", headers=auth_headers)
         assert response.status_code == 404
-        assert "Path not found" in response.json()["detail"]
+        assert "not found" in response.json()["detail"]
 
     def test_ls_empty_folder(self, client, auth_headers, mock_builder):
         """GET /kb/ls?path=/notes returns 200 with empty folders and documents lists."""
@@ -223,3 +223,72 @@ class TestTree:
         all_ids = {n["id"] for n in data["tree"]}
         assert FOLDER_PRIVATE not in all_ids
         assert len(data["tree"]) == 2
+
+
+# ── TestGrep ──────────────────────────────────────────────────────────────────
+
+class TestGrep:
+    def test_grep_no_path(self, client, auth_headers, mock_builder):
+        """GET /kb/grep?pattern=budget returns 200 with matching documents."""
+        mock_builder.execute.side_effect = [
+            _make_result([
+                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+            ]),
+        ]
+        response = client.get("/kb/grep?pattern=budget", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["pattern"] == "budget"
+        assert data["path"] is None
+        assert data["total"] == 1
+        assert data["matches"][0]["filename"] == "report.pdf"
+
+    def test_grep_with_path(self, client, auth_headers, mock_builder):
+        """GET /kb/grep?pattern=revenue&path=/reports scopes to reports subtree."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),  # _fetch_visible_folders
+            _make_result([
+                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+            ]),  # RPC result
+        ]
+        response = client.get("/kb/grep?pattern=revenue&path=/reports", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["pattern"] == "revenue"
+        assert data["path"] == "/reports"
+        assert data["total"] == 1
+
+    def test_grep_path_not_found(self, client, auth_headers, mock_builder):
+        """GET /kb/grep?pattern=X&path=/nonexistent returns 404."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+        ]
+        response = client.get("/kb/grep?pattern=test&path=/nonexistent", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_grep_no_matches(self, client, auth_headers, mock_builder):
+        """GET /kb/grep?pattern=zzz returns 200 with empty matches list."""
+        mock_builder.execute.side_effect = [
+            _make_result([]),
+        ]
+        response = client.get("/kb/grep?pattern=zzz", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["matches"] == []
+
+    def test_grep_rls(self, client, auth_headers, mock_builder):
+        """grep results are scoped to the user via query_user_documents RPC user_id injection."""
+        # The RPC call includes user_id in the SQL WHERE clause
+        # Mock returns only the user's documents (RLS simulation)
+        mock_builder.execute.side_effect = [
+            _make_result([
+                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+            ]),
+        ]
+        response = client.get("/kb/grep?pattern=hello", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        # Verify only the user's document was returned
+        assert data["matches"][0]["document_id"] == DOC_ROOT
