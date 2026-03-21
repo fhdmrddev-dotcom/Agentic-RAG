@@ -53,7 +53,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 02-01-PLAN.md — Migration SQL, Pydantic model updates, and API endpoint changes
-- [ ] 02-02-PLAN.md — Integration tests for document-folder features
+- [x] 02-02-PLAN.md — Integration tests for document-folder features
 
 ### Phase 3: Ingestion UI
 **Goal**: The ingestion interface displays the full folder hierarchy and lets users manage folders and target uploads without leaving the page

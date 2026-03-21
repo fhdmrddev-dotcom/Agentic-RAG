@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-document-folder-integration 02-01-PLAN.md
-last_updated: "2026-03-21T14:39:16.312Z"
+stopped_at: Completed 02-document-folder-integration 02-02-PLAN.md
+last_updated: "2026-03-21T14:45:52.575Z"
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -49,6 +49,7 @@ Plan: 2 of 2
 | Phase 01-folder-schema-core-apis P01 | 2 | 2 tasks | 4 files |
 | Phase 01-folder-schema-core-apis P02 | 3min | 1 tasks | 1 files |
 | Phase 02-document-folder-integration P01 | 2 | 2 tasks | 5 files |
+| Phase 02-document-folder-integration P02 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [Phase 02-document-folder-integration]: ON DELETE SET NULL on folder_id FK: deleting a folder orphans documents to root rather than destroying them
 - [Phase 02-document-folder-integration]: full_markdown excluded from DocumentResponse (too large); Phase 6 read tool retrieves it via dedicated query
 - [Phase 02-document-folder-integration]: folder_id accepted as Form field on upload because multipart/form-data cannot mix JSON body with file upload
+- [Phase 02-document-folder-integration]: Multi-query upload tests require mock_builder side_effect (sequential calls: dedup + stale + insert cannot share single execute result)
+- [Phase 02-document-folder-integration]: .neq() and .limit() added to conftest builder wiring — required by dedup/stale queries added in Plan 01
 
 ### Pending Todos
 
@@ -80,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T14:39:16.308Z
-Stopped at: Completed 02-document-folder-integration 02-01-PLAN.md
+Last session: 2026-03-21T14:45:52.571Z
+Stopped at: Completed 02-document-folder-integration 02-02-PLAN.md
 Resume file: None
