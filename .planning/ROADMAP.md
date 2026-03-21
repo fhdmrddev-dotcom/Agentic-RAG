@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Folder Schema & Core APIs** - Database foundation for nested folders with global/per-user support and CRUD endpoints
 - [x] **Phase 2: Document-Folder Integration** - Connect documents to folders, store full markdown, enable file and folder moves
-- [ ] **Phase 3: Ingestion UI** - Folder tree visualization with CRUD controls and folder-targeted uploads
+- [x] **Phase 3: Ingestion UI** - Folder tree visualization with CRUD controls and folder-targeted uploads
 - [ ] **Phase 4: Navigation Tools** - ls and tree tools for browsing folder structure
 - [ ] **Phase 5: Search Tools** - grep and glob tools for content and filename searching
 - [ ] **Phase 6: Read Tool** - Full document and line-range reading capability
@@ -69,7 +69,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md — Types, API functions, buildFolderTree utility, and useFolders hook
 - [x] 03-02-PLAN.md — FolderNode, FolderCreateInput, and FolderTree components with shadcn installs
-- [ ] 03-03-PLAN.md — IngestionPage two-panel layout, DocumentUpload/DocumentList modifications, and visual verification
+- [x] 03-03-PLAN.md — IngestionPage two-panel layout, DocumentUpload/DocumentList modifications, and visual verification
 
 ### Phase 4: Navigation Tools
 **Goal**: The agent can enumerate files and folders at any path using ls and tree, with output sized to fit context window constraints
@@ -80,7 +80,10 @@ Plans:
   2. Agent calls `tree(path)` and receives a hierarchical structure showing all descendants with correct indentation
   3. Agent calls `tree(path, depth=2)` and output is truncated at the specified depth with a clear indicator that deeper content exists
   4. Both tools respect RLS — agent sees global folders plus the authenticated user's private folders, nothing else
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 04-01-PLAN.md — Pydantic models, shared helpers, ls endpoint with integration tests (TOOL-01)
+- [ ] 04-02-PLAN.md — tree endpoint with depth-limited serialization and integration tests (TOOL-02)
 
 ### Phase 5: Search Tools
 **Goal**: The agent can find documents by content pattern or filename pattern across the knowledge base
@@ -126,8 +129,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Folder Schema & Core APIs | 2/2 | Complete | 2026-03-21 |
 | 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
-| 3. Ingestion UI | 2/3 | In Progress|  |
-| 4. Navigation Tools | 0/? | Not started | - |
+| 3. Ingestion UI | 3/3 | Complete | 2026-03-21 |
+| 4. Navigation Tools | 0/2 | Not started | - |
 | 5. Search Tools | 0/? | Not started | - |
 | 6. Read Tool | 0/? | Not started | - |
 | 7. Explorer Sub-Agent | 0/? | Not started | - |
