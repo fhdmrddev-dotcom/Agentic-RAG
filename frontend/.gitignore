@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Stray shadcn CLI output directory (shadcn CLI sometimes creates @/ on Windows)
+@/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

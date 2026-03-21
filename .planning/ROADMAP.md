@@ -68,7 +68,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 03-01-PLAN.md — Types, API functions, buildFolderTree utility, and useFolders hook
-- [ ] 03-02-PLAN.md — FolderNode, FolderCreateInput, and FolderTree components with shadcn installs
+- [x] 03-02-PLAN.md — FolderNode, FolderCreateInput, and FolderTree components with shadcn installs
 - [ ] 03-03-PLAN.md — IngestionPage two-panel layout, DocumentUpload/DocumentList modifications, and visual verification
 
 ### Phase 4: Navigation Tools
@@ -126,7 +126,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Folder Schema & Core APIs | 2/2 | Complete | 2026-03-21 |
 | 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
-| 3. Ingestion UI | 1/3 | In Progress|  |
+| 3. Ingestion UI | 2/3 | In Progress|  |
 | 4. Navigation Tools | 0/? | Not started | - |
 | 5. Search Tools | 0/? | Not started | - |
 | 6. Read Tool | 0/? | Not started | - |

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-ingestion-ui 03-01-PLAN.md
-last_updated: "2026-03-21T16:54:00.647Z"
+stopped_at: Completed 03-ingestion-ui 03-02-PLAN.md
+last_updated: "2026-03-21T17:02:52.142Z"
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-21)
 ## Current Position
 
 Phase: 03 (ingestion-ui) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Plan: 2 of 3
 | Phase 02-document-folder-integration P01 | 2 | 2 tasks | 5 files |
 | Phase 02-document-folder-integration P02 | 8min | 2 tasks | 3 files |
 | Phase 03-ingestion-ui P01 | 4min 24sec | 2 tasks | 7 files |
+| Phase 03-ingestion-ui P02 | 6min 7sec | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ Recent decisions affecting current work:
 - [Phase 02-document-folder-integration]: .neq() and .limit() added to conftest builder wiring — required by dedup/stale queries added in Plan 01
 - [Phase 03-ingestion-ui]: uploadDocument: append folder_id only when folderId is truthy string (avoids sending null string to backend)
 - [Phase 03-ingestion-ui]: useFolders: no user_id filter on Realtime channel — RLS handles row isolation, avoids REPLICA IDENTITY FULL requirement
+- [Phase 03-ingestion-ui]: Tests wrap renders in TooltipProvider — Radix tooltip requires provider context even in test environments
+- [Phase 03-ingestion-ui]: data-testid='globe-icon' on Globe svg enables deterministic test querying for global folder distinction
+- [Phase 03-ingestion-ui]: shadcn CLI on Windows creates files in literal @/ directory — files manually copied to correct path, @/ added to .gitignore
 
 ### Pending Todos
 
@@ -86,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T16:54:00.643Z
-Stopped at: Completed 03-ingestion-ui 03-01-PLAN.md
+Last session: 2026-03-21T17:02:52.137Z
+Stopped at: Completed 03-ingestion-ui 03-02-PLAN.md
 Resume file: None
