@@ -17,31 +17,49 @@ from app.services.retrieval_service import search_documents, resolve_document_id
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
 from app.services.sub_agent_service import run_sub_agent
+from app.api.kb import ls_path, tree_path, grep_path, glob_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant. You have four tools — use the RIGHT one for each question:\n\n"
-    "1. query_documents — ALWAYS use this for questions about the user's file library: "
-    "'how many documents', 'list my files', 'which documents', 'how many PDFs', etc. "
-    "Do NOT add a user_id filter. Example SQL: SELECT COUNT(*) FROM documents\n\n"
-    "2. search_documents — use this to find information INSIDE document contents. "
+    "You are a helpful AI assistant. You have eight tools — use the RIGHT one for each question:\n\n"
+    "1. ls — List the immediate contents (subfolders and documents) at a folder path. "
+    "Use for browsing and navigation: 'what folders do I have?', 'what's in my Reports folder?', "
+    "'list documents in /Finance/Q1', 'show me the subfolders of Research'. "
+    "Use path='/' for the root level.\n\n"
+    "2. tree — Show the full folder hierarchy as a tree with documents attached. "
+    "Use when the user wants a structural overview: 'show me my folder structure', "
+    "'what's the hierarchy?', 'show everything in Research as a tree'. "
+    "Optionally pass depth to limit expansion (e.g. depth=2).\n\n"
+    "3. grep — Search inside document contents using a regex pattern. Returns document names "
+    "where the extracted markdown matches. Use for finding specific text or patterns: "
+    "'find documents mentioning budget', 'which files contain Python code?'. "
+    "Optionally scope to a folder path.\n\n"
+    "4. glob — Find documents by filename pattern using glob syntax. Use for locating files by "
+    "name or extension: 'find all PDFs', 'find files named report*', 'find .docx files in reports'. "
+    "Supports *, ?, **.\n\n"
+    "5. query_documents — Run a SQL SELECT against the documents or folders tables. "
+    "Use for analytical/structured questions: 'how many documents do I have?', "
+    "'list all PDFs', 'which files were uploaded in 2024?', 'which folder is X in?'. "
+    "Do NOT add a user_id filter. "
+    "Example: SELECT d.filename FROM documents d JOIN folders f ON d.folder_id = f.id "
+    "WHERE f.name = 'Research'.\n\n"
+    "6. search_documents — Find information INSIDE document contents using semantic search. "
     "Use metadata_filter to narrow by document_type, author, language, or date.\n\n"
-    "3. web_search — use this for current events, software versions, news, sports results, prices, "
-    "or general world knowledge that is UNLIKELY to be in the user's uploaded documents. "
-    "If the question could be answered from uploaded documents, try search_documents FIRST. "
-    "Always include the source URL in your answer.\n\n"
-    "4. analyze_document — use this for tasks requiring the FULL content of a specific document: "
-    "summarization, detailed analysis, comparison, extracting all key points, critiquing arguments. "
-    "You can use a partial or approximate filename (e.g. 'Elitefooty PRD') — it will be matched "
-    "automatically. If you need to confirm the exact filename first, call query_documents. "
+    "7. analyze_document — Read the FULL content of a specific document for tasks requiring "
+    "the entire document: summarization, detailed analysis, comparison, extracting all key points. "
+    "You can use a partial or approximate filename — it will be matched automatically. "
     "Do NOT use search_documents for whole-document analysis tasks.\n\n"
+    "8. web_search — Search the web for current events, software versions, news, or general world "
+    "knowledge UNLIKELY to be in the user's uploaded documents. Always include the source URL.\n\n"
     "Key rules:\n"
-    "- Questions about file counts/lists → query_documents\n"
-    "- Questions about document contents/excerpts → search_documents\n"
-    "- Deep analysis/summary of a whole document → analyze_document (you may chain query_documents "
-    "first to confirm the filename, then call analyze_document)\n"
-    "- Questions about the world/internet (not in documents) → web_search\n"
+    "- Browse/navigate folders → ls or tree\n"
+    "- Find documents by content pattern → grep\n"
+    "- Find documents by filename pattern → glob\n"
+    "- Analytical questions about the library (counts, filters, joins) → query_documents\n"
+    "- Find information inside documents → search_documents\n"
+    "- Deep analysis/summary of a whole document → analyze_document\n"
+    "- World/internet knowledge → web_search\n"
     "- Always say where the information came from."
 )
 
@@ -270,7 +288,19 @@ async def send_message(
                     try:
                         args = json.loads(tc["arguments"])
                         yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args})}\n\n"
-                        if tool_name == "search_documents":
+                        if tool_name == "ls":
+                            result = ls_path(args.get("path", "/"), current_user["id"], supabase)
+                            tool_result = json.dumps(result)
+                        elif tool_name == "tree":
+                            result = tree_path(args.get("path", "/"), args.get("depth"), current_user["id"], supabase)
+                            tool_result = json.dumps(result)
+                        elif tool_name == "grep":
+                            result = grep_path(args.get("pattern", ""), args.get("path"), current_user["id"], supabase)
+                            tool_result = json.dumps(result)
+                        elif tool_name == "glob":
+                            result = glob_path(args.get("pattern", ""), current_user["id"], supabase)
+                            tool_result = json.dumps(result)
+                        elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
                             results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter, user_settings=user_settings)
                             tool_result = json.dumps(results) if results else "No relevant documents found."

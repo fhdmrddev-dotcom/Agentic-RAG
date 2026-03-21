@@ -52,3 +52,16 @@ class GrepResponse(BaseModel):
     path: str | None
     matches: list[GrepMatch]
     total: int
+
+
+class GlobMatch(BaseModel):
+    document_id: UUID
+    filename: str
+    path: str  # Full path, e.g. "/reports/q1/report.pdf"
+    folder_id: UUID | None
+
+
+class GlobResponse(BaseModel):
+    pattern: str
+    matches: list[GlobMatch]
+    total: int

@@ -50,14 +50,19 @@ QUERY_DOCUMENTS_TOOL = {
     "function": {
         "name": "query_documents",
         "description": (
-            "Run a SQL SELECT query against the user's documents table to answer "
-            "structured questions about their uploaded files. Use for questions like "
-            "'how many documents do I have?', 'list all PDFs', 'which files were "
-            "uploaded in 2024?'. "
+            "Run a SQL SELECT query against the user's documents or folders tables to answer "
+            "structured questions about their uploaded files and folder organisation. Use for "
+            "questions like 'how many documents do I have?', 'list all PDFs', 'which files were "
+            "uploaded in 2024?', 'what folders do I have?', 'which folder is X in?'. "
             "Table: documents. Columns: id (uuid), filename (text), file_type (text), "
-            "status (text, e.g. 'completed'), created_at (timestamptz), "
+            "status (text, e.g. 'completed'), created_at (timestamptz), folder_id (uuid, nullable, "
+            "references folders.id), "
             "metadata (jsonb with keys: title, author, date, document_type, topics, "
             "language, summary). "
+            "Table: folders. Columns: id (uuid), name (text), parent_id (uuid, nullable), "
+            "user_id (uuid), is_global (boolean). "
+            "JOIN example: SELECT d.filename, f.name AS folder FROM documents d "
+            "LEFT JOIN folders f ON d.folder_id = f.id. "
             "The query is automatically scoped to the current user — do NOT add a "
             "user_id filter yourself."
         ),
@@ -70,6 +75,107 @@ QUERY_DOCUMENTS_TOOL = {
                 }
             },
             "required": ["query"],
+        },
+    },
+}
+
+LS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ls",
+        "description": (
+            "List the immediate contents (subfolders and documents) at a folder path in the user's "
+            "knowledge base. Use for navigation questions: 'what's in my Reports folder?', "
+            "'list documents in /Finance/Q1', 'show me the subfolders of Research', "
+            "'what folders do I have at the root?'. Use path='/' for root. "
+            "Prefer ls over query_documents for folder browsing and navigation tasks."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Folder path to list, e.g. '/', '/Reports', '/Finance/Q1'.",
+                }
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+TREE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "tree",
+        "description": (
+            "Show the full folder hierarchy of the user's knowledge base as a tree, with documents "
+            "attached to each folder. Use when the user wants a structural overview: 'show me my "
+            "folder structure', 'what's the hierarchy?', 'show everything in Research as a tree'. "
+            "Use depth to limit expansion (e.g. depth=2 for two levels). Omit depth for the full tree."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Root path for the tree, e.g. '/' or '/Reports'.",
+                },
+                "depth": {
+                    "type": "integer",
+                    "description": "Max depth to expand (1 = immediate children only). Omit for full tree.",
+                },
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+GREP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "grep",
+        "description": (
+            "Search the content of the user's documents using a regex pattern. Returns document names "
+            "where the extracted markdown content matches. Use for finding specific text, code snippets, "
+            "or patterns inside documents: 'find documents mentioning budget', 'which files contain Python code?', "
+            "'find all references to API keys'. Optionally scope to a folder path."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Regex pattern to search for in document content (Postgres ~ operator).",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Optional folder path to scope search, e.g. '/reports'. Omit to search all documents.",
+                },
+            },
+            "required": ["pattern"],
+        },
+    },
+}
+
+GLOB_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "glob",
+        "description": (
+            "Find documents by filename pattern using glob syntax. Use for locating files by name "
+            "or extension: 'find all PDFs', 'find files named report*', 'find all .docx files in reports'. "
+            "Supports * (any chars), ? (single char), ** (recursive directory match). "
+            "Examples: '*.pdf', 'reports/**/*.pdf', 'meeting-notes-*'."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern for filename matching, e.g. '*.pdf', 'reports/**/*.pdf'.",
+                },
+            },
+            "required": ["pattern"],
         },
     },
 }
@@ -129,7 +235,7 @@ ANALYZE_DOCUMENT_TOOL = {
 
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, ANALYZE_DOCUMENT_TOOL]
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, ANALYZE_DOCUMENT_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     return tools

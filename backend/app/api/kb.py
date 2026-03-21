@@ -1,9 +1,10 @@
+import fnmatch
 import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.kb import LsResponse, TreeResponse, GrepResponse
+from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse
 
 router = APIRouter(prefix="/kb", tags=["kb"])
 
@@ -249,3 +250,69 @@ async def grep(
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return GrepResponse(**result)
+
+
+def _build_folder_path_map(nodes: dict[str, dict], roots: list[dict]) -> dict[str, str]:
+    """Build folder_id -> full_path mapping by walking the tree."""
+    paths: dict[str, str] = {}
+
+    def _walk(node: dict, parent_path: str):
+        node_path = f"{parent_path}/{node['name']}" if parent_path else f"/{node['name']}"
+        paths[node["id"]] = node_path
+        for child in node["children"]:
+            _walk(child, node_path)
+
+    for root in roots:
+        _walk(root, "")
+    return paths
+
+
+def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
+    """Match document filenames against a glob pattern, path-aware.
+
+    Patterns like '*.pdf' match any PDF. Patterns like 'reports/**/*.pdf'
+    match PDFs under /reports at any depth. Uses fnmatch for matching.
+    """
+    all_folders = _fetch_visible_folders(supabase, user_id)
+    nodes, roots = _build_tree_map(all_folders)
+    folder_paths = _build_folder_path_map(nodes, roots)
+
+    # Fetch all user's documents
+    result = (
+        supabase.table("documents")
+        .select("id, filename, folder_id")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    docs = result.data or []
+
+    matches = []
+    for doc in docs:
+        fid = doc.get("folder_id")
+        if fid and fid in folder_paths:
+            doc_full_path = f"{folder_paths[fid]}/{doc['filename']}"
+        else:
+            doc_full_path = f"/{doc['filename']}"
+
+        # Strip leading slash for fnmatch comparison with pattern
+        matchable = doc_full_path.lstrip("/")
+        # Also try just the filename for simple patterns like *.pdf
+        if fnmatch.fnmatch(matchable, pattern) or fnmatch.fnmatch(doc["filename"], pattern):
+            matches.append({
+                "document_id": doc["id"],
+                "filename": doc["filename"],
+                "path": doc_full_path,
+                "folder_id": fid,
+            })
+
+    return {"pattern": pattern, "matches": matches, "total": len(matches)}
+
+
+@router.get("/glob", response_model=GlobResponse)
+async def glob_search(
+    pattern: str = Query(description="Glob pattern for filename matching, e.g. *.pdf or reports/**/*.pdf"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    result = glob_path(pattern, current_user["id"], supabase)
+    return GlobResponse(**result)
