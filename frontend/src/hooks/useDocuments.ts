@@ -7,7 +7,7 @@ interface UseDocuments {
   documents: Document[]
   uploading: boolean
   uploadingCount: number
-  upload: (file: File) => Promise<{ isDuplicate: boolean }>
+  upload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
   deleteDoc: (id: string) => Promise<void>
 }
 
@@ -72,10 +72,10 @@ export function useDocuments(): UseDocuments {
     }
   }, [loadDocuments])
 
-  const upload = useCallback(async (file: File): Promise<{ isDuplicate: boolean }> => {
+  const upload = useCallback(async (file: File, folderId?: string | null): Promise<{ isDuplicate: boolean }> => {
     setUploadingCount((c) => c + 1)
     try {
-      const { doc, isDuplicate } = await uploadDocument(file)
+      const { doc, isDuplicate } = await uploadDocument(file, folderId)
       // Optimistically add the document immediately; Realtime UPDATE events
       // will still fire to update status (pending → processing → completed)
       setDocuments((prev) => {

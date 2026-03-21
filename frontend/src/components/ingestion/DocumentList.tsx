@@ -7,6 +7,7 @@ import type { Document, DocumentMetadata } from "@/types"
 interface Props {
   documents: Document[]
   onDelete: (id: string) => void
+  folderId?: string | null
 }
 
 function formatBytes(bytes: number): string {
@@ -71,8 +72,19 @@ function MetadataPanel({ metadata }: { metadata: DocumentMetadata }) {
   )
 }
 
-export function DocumentList({ documents, onDelete }: Props) {
+export function DocumentList({ documents, onDelete, folderId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+
+  // Filter by selected folder:
+  // - folderId === undefined: no folder context — show all (backward compat)
+  // - folderId === null: Root — show root-level documents (folder_id === null)
+  // - folderId = string: show only documents in that folder
+  const filtered =
+    folderId === undefined
+      ? documents
+      : folderId === null
+        ? documents.filter((d) => d.folder_id === null)
+        : documents.filter((d) => d.folder_id === folderId)
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -81,11 +93,20 @@ export function DocumentList({ documents, onDelete }: Props) {
       return next
     })
 
-  if (documents.length === 0) {
+  if (filtered.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground text-center py-8">
-        No documents uploaded yet.
-      </p>
+      <div>
+        <p className="text-sm text-muted-foreground text-center py-8">
+          {folderId === null || folderId === undefined
+            ? "No documents uploaded yet."
+            : "No documents in this folder"}
+        </p>
+        {folderId !== null && folderId !== undefined && (
+          <p className="text-xs text-muted-foreground text-center">
+            Upload files above to add them here.
+          </p>
+        )}
+      </div>
     )
   }
 
@@ -106,7 +127,7 @@ export function DocumentList({ documents, onDelete }: Props) {
           </tr>
         </thead>
         <tbody>
-          {documents.map((doc) => (
+          {filtered.map((doc) => (
             <Fragment key={doc.id}>
               <tr
                 className="border-b last:border-0 hover:bg-muted/20 transition-colors"

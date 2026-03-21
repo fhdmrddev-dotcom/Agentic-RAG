@@ -3,9 +3,11 @@ import { Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Props {
-  onUpload: (file: File) => Promise<{ isDuplicate: boolean }>
+  onUpload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
   uploading: boolean
   uploadingCount?: number
+  folderId?: string | null
+  folderName?: string | null
 }
 
 interface BatchResult {
@@ -14,7 +16,7 @@ interface BatchResult {
   errors: string[]
 }
 
-export function DocumentUpload({ onUpload, uploading, uploadingCount = 0 }: Props) {
+export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folderId, folderName }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [result, setResult] = useState<BatchResult | null>(null)
@@ -23,7 +25,7 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0 }: Prop
     if (!files.length) return
     setResult(null)
 
-    const outcomes = await Promise.allSettled(files.map((f) => onUpload(f)))
+    const outcomes = await Promise.allSettled(files.map((f) => onUpload(f, folderId)))
 
     const batch: BatchResult = { uploaded: 0, duplicates: 0, errors: [] }
     for (const outcome of outcomes) {
@@ -70,7 +72,10 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0 }: Prop
       >
         <Upload className="h-8 w-8 text-muted-foreground" />
         <div className="text-center">
-          <p className="text-sm font-medium">Drop files here or click to browse</p>
+          <p className="text-sm font-medium">
+            {folderName ? `Upload to ${folderName}` : "Upload to Root"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Drop files here or click to browse</p>
           <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx · Multiple files allowed</p>
         </div>
         {uploading && (
