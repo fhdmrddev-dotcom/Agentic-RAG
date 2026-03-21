@@ -14,6 +14,10 @@ class FolderUpdate(BaseModel):
     name: str
 
 
+class FolderMoveRequest(BaseModel):
+    parent_id: UUID | None  # None = move to root
+
+
 class FolderResponse(BaseModel):
     id: UUID
     user_id: UUID

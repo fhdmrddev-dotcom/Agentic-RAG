@@ -15,9 +15,14 @@ class DocumentMetadata(BaseModel):
     summary: str | None = None
 
 
+class DocumentMoveRequest(BaseModel):
+    folder_id: UUID | None  # None = move to root
+
+
 class DocumentResponse(BaseModel):
     id: UUID
     user_id: UUID
+    folder_id: UUID | None = None
     filename: str
     file_path: str
     file_size: int
