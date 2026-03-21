@@ -66,19 +66,28 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 
 ## Context
 
-**Existing Architecture:** React/Vite frontend + FastAPI backend + Supabase (Postgres with pgvector). Documents are ingested via pypdf + python-docx, chunked, embedded, and stored in Postgres. Currently no folder hierarchy — documents are flat per-user.
+**Existing Architecture:** React/Vite frontend + FastAPI backend + Supabase (Postgres with pgvector). Supabase can run locally via Docker or as a cloud instance — deployment is configured purely via environment variables and migration files. Documents are ingested via pypdf + python-docx, chunked, embedded, and stored in Postgres. Currently no folder hierarchy — documents are flat per-user.
 
-**Key Difference from Claude Code:** Claude Code greps/globs raw source files. This knowledge base has PDFs, DOCX, etc. that need extraction first. The tools search *extracted markdown content* in Supabase, not raw files.
+**Current Schema (what exists):**
+- `documents`: id, user_id, filename, file_path, file_size, mime_type, status, error_message, chunk_count, content_hash, metadata, created_at, updated_at — **no folder_id, no full_markdown**
+- `document_chunks`: id, document_id, user_id, content (chunk text), chunk_index, embedding (vector), search_vector (tsvector), created_at
+- `threads` + `messages` + `profiles` + `user_settings` + `app_settings`
+- No `folders` table exists yet
 
-**Storage Model:** Documents stored in Supabase Storage bucket. Metadata and chunks in Postgres. New folder structure will be a Postgres table with parent_id for nesting. Full markdown stored alongside chunks for efficient grep/read.
+**Schema Changes This Milestone:**
+- Phase 1: CREATE `folders` table (id, user_id, name, parent_id, is_global, created_at, updated_at) with adjacency list + RLS
+- Phase 2: ADD `folder_id` (nullable FK → folders) and `full_markdown` (text) to `documents`
 
-**Sub-agent Pattern:** Existing sub-agent loads full document content into isolated context. Explorer sub-agent will follow similar pattern but with access to all KB tools.
+**Key Difference from Claude Code:** Claude Code greps/globs raw source files. This knowledge base has PDFs, DOCX, etc. that need extraction first. The tools search *extracted markdown content* stored in Supabase, not raw files.
+
+**Sub-agent Pattern:** Existing sub-agent (Module 8) loads full document content into isolated context. Explorer sub-agent will follow the same pattern but with access to all KB tools.
 
 **Modules History:** 8 modules completed (auth, BYO retrieval, record manager, metadata, multi-format, hybrid search + settings, additional tools, sub-agents).
 
 ## Constraints
 
 - **Tech stack**: Must use existing Supabase infrastructure — no new databases or storage systems
+- **Supabase deployment**: Agnostic — works with local Docker or cloud; all schema changes delivered as numbered migration SQL files
 - **Extraction**: Keep pypdf + python-docx pipeline — no Docling migration in v1.0
 - **Context window**: Tree/ls output must respect context limits — use depth limits and truncation
 - **RLS**: All tools must respect Row-Level Security — users only see their folders/documents (except global)
