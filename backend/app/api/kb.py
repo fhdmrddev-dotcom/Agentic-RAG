@@ -267,11 +267,27 @@ def _build_folder_path_map(nodes: dict[str, dict], roots: list[dict]) -> dict[st
     return paths
 
 
+def _glob_pattern_to_regex(pattern: str) -> re.Pattern:
+    """Convert a glob pattern with ** support into a compiled regex.
+
+    ** matches any number of path segments (including zero or one).
+    * matches any characters except path separators.
+    ? matches any single character except a path separator.
+    """
+    # Replace **/ and ** with a placeholder, then escape, then restore as .*
+    p = pattern.replace("**/", "\x00DSTAR\x00").replace("**", "\x00DSTAR\x00")
+    p = re.escape(p)
+    p = p.replace(re.escape("\x00DSTAR\x00"), ".*")
+    p = p.replace(r"\*", "[^/]*")
+    p = p.replace(r"\?", "[^/]")
+    return re.compile("^" + p + "$")
+
+
 def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
     """Match document filenames against a glob pattern, path-aware.
 
     Patterns like '*.pdf' match any PDF. Patterns like 'reports/**/*.pdf'
-    match PDFs under /reports at any depth. Uses fnmatch for matching.
+    match PDFs under /reports at any depth. Supports *, ?, and ** (recursive).
     """
     all_folders = _fetch_visible_folders(supabase, user_id)
     nodes, roots = _build_tree_map(all_folders)
@@ -286,6 +302,8 @@ def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
     )
     docs = result.data or []
 
+    compiled = _glob_pattern_to_regex(pattern)
+
     matches = []
     for doc in docs:
         fid = doc.get("folder_id")
@@ -294,10 +312,10 @@ def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
         else:
             doc_full_path = f"/{doc['filename']}"
 
-        # Strip leading slash for fnmatch comparison with pattern
+        # Strip leading slash for comparison with pattern
         matchable = doc_full_path.lstrip("/")
-        # Also try just the filename for simple patterns like *.pdf
-        if fnmatch.fnmatch(matchable, pattern) or fnmatch.fnmatch(doc["filename"], pattern):
+        # Match against full path or just filename (for simple patterns like *.pdf)
+        if compiled.match(matchable) or fnmatch.fnmatch(doc["filename"], pattern):
             matches.append({
                 "document_id": doc["id"],
                 "filename": doc["filename"],

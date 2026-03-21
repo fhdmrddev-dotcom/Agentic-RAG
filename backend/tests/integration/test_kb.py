@@ -292,3 +292,85 @@ class TestGrep:
         assert data["total"] == 1
         # Verify only the user's document was returned
         assert data["matches"][0]["document_id"] == DOC_ROOT
+
+
+# ── TestGlob ──────────────────────────────────────────────────────────────────
+
+class TestGlob:
+    def test_glob_simple_extension(self, client, auth_headers, mock_builder):
+        """GET /kb/glob?pattern=*.pdf returns all PDF documents."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),  # _fetch_visible_folders
+            _make_result([
+                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+            ]),  # documents query
+        ]
+        response = client.get("/kb/glob?pattern=*.pdf", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["pattern"] == "*.pdf"
+        assert data["total"] == 2
+        filenames = {m["filename"] for m in data["matches"]}
+        assert "report.pdf" in filenames
+        assert "readme.pdf" in filenames
+
+    def test_glob_path_scoped(self, client, auth_headers, mock_builder):
+        """GET /kb/glob?pattern=reports/**/*.pdf returns PDFs under /reports."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+            _make_result([
+                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+            ]),
+        ]
+        response = client.get("/kb/glob?pattern=reports/**/*.pdf", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        # Only report.pdf matches (it's under /reports), readme.pdf is at root
+        assert data["total"] == 1
+        assert data["matches"][0]["filename"] == "report.pdf"
+        assert "/reports/" in data["matches"][0]["path"]
+
+    def test_glob_no_matches(self, client, auth_headers, mock_builder):
+        """GET /kb/glob?pattern=*.xlsx returns 200 with empty matches."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+            _make_result([
+                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+            ]),
+        ]
+        response = client.get("/kb/glob?pattern=*.xlsx", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert data["matches"] == []
+
+    def test_glob_rls(self, client, auth_headers, mock_builder):
+        """glob results are scoped to the user via .eq("user_id") on documents query."""
+        mock_builder.execute.side_effect = [
+            _make_result([]),  # no folders visible
+            _make_result([
+                {"id": DOC_ROOT, "filename": "my-doc.pdf", "folder_id": None},
+            ]),  # only user's docs returned
+        ]
+        response = client.get("/kb/glob?pattern=*.pdf", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["matches"][0]["filename"] == "my-doc.pdf"
+
+    def test_glob_wildcard_filename(self, client, auth_headers, mock_builder):
+        """GET /kb/glob?pattern=report* matches filenames starting with 'report'."""
+        mock_builder.execute.side_effect = [
+            _make_result(_standard_folders()),
+            _make_result([
+                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+            ]),
+        ]
+        response = client.get("/kb/glob?pattern=report*", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["matches"][0]["filename"] == "report.pdf"
