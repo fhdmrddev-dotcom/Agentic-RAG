@@ -35,7 +35,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can delete a folder and all nested subfolders and their documents are cascaded correctly
   4. A global folder created by any user is visible to all users; a per-user folder is visible only to its owner (RLS enforced)
   5. API endpoints for folder CRUD return correct responses and enforce Row-Level Security for all operations
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 01-01-PLAN.md — Migration SQL, Pydantic models, and CRUD API endpoints
+- [ ] 01-02-PLAN.md — Integration tests for folder CRUD endpoints
 
 ### Phase 2: Document-Folder Integration
 **Goal**: Documents belong to folders, full extracted markdown is stored alongside chunks, and users can reorganize both files and folders
@@ -114,7 +117,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Folder Schema & Core APIs | 0/? | Not started | - |
+| 1. Folder Schema & Core APIs | 0/2 | Planning complete | - |
 | 2. Document-Folder Integration | 0/? | Not started | - |
 | 3. Ingestion UI | 0/? | Not started | - |
 | 4. Navigation Tools | 0/? | Not started | - |
