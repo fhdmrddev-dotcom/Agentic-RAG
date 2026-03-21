@@ -203,3 +203,45 @@ Track your progress through the masterclass. Update this file as you complete mo
 - Run `002_module2_byo_retrieval.sql` in Supabase SQL editor before starting backend
 - Create a `documents` Storage bucket in Supabase dashboard (public or private)
 - Update `backend/.env`: replace OPENAI_API_KEY with LLM_API_KEY, add LLM_MODEL, EMBEDDING_MODEL, etc.
+
+---
+
+## Milestone: Knowledge Base Explorer (v1.0)
+
+Build a hierarchical folder system + AI agent tools to explore the knowledge base like a filesystem.
+
+### Phase 1: Folder Schema & Core APIs ✅ COMPLETE
+
+- [x] Migration `013_folders.sql` — `folders` table with adjacency list, RLS, cascade deletes
+- [x] Pydantic models — `FolderCreate`, `FolderRename`, `FolderResponse`
+- [x] `backend/app/api/folders.py` — full CRUD: POST, GET /folders, GET /folders/{id}/children, PATCH /folders/{id}/rename, DELETE /folders/{id}
+- [x] Global folder visibility — `is_global` flag, RLS uses `.or_()` to include global folders for all users
+
+#### Notes (Phase 1)
+
+- Run `013_folders.sql` in Supabase SQL editor (or `supabase db push` for local Docker)
+- Global folders are visible to all users; per-user folders are private (RLS enforced)
+
+### Phase 2: Document-Folder Integration ✅ COMPLETE
+
+- [x] Migration `014_document_folder_integration.sql` — adds `folder_id` (nullable FK → folders, ON DELETE SET NULL) and `full_markdown` (text) to `documents`
+- [x] `DocumentResponse` gains `folder_id` field; new `DocumentMoveRequest` and `FolderMoveRequest` models
+- [x] `PATCH /documents/{id}/move` — move document to folder or root (folder_id: null)
+- [x] `PATCH /folders/{id}/move` — move folder to new parent with ownership validation
+- [x] Upload endpoint accepts `folder_id` form field; validates folder accessibility before insert
+- [x] `full_markdown` stored on ingest completion for grep/read tool use later
+
+#### Notes (Phase 2)
+
+- Run `014_document_folder_integration.sql` in Supabase SQL editor before using move endpoints
+- 51 integration tests passing (24 document + 27 folder)
+
+### Phase 3: Ingestion UI 🔲 NOT STARTED
+
+### Phase 4: Navigation Tools 🔲 NOT STARTED
+
+### Phase 5: Search Tools 🔲 NOT STARTED
+
+### Phase 6: Read Tool 🔲 NOT STARTED
+
+### Phase 7: Explorer Sub-Agent 🔲 NOT STARTED

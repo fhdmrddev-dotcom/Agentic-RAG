@@ -14,8 +14,8 @@ All database changes are delivered as numbered migration SQL files compatible wi
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Folder Schema & Core APIs** - Database foundation for nested folders with global/per-user support and CRUD endpoints
-- [ ] **Phase 2: Document-Folder Integration** - Connect documents to folders, store full markdown, enable file and folder moves
+- [x] **Phase 1: Folder Schema & Core APIs** - Database foundation for nested folders with global/per-user support and CRUD endpoints
+- [x] **Phase 2: Document-Folder Integration** - Connect documents to folders, store full markdown, enable file and folder moves
 - [ ] **Phase 3: Ingestion UI** - Folder tree visualization with CRUD controls and folder-targeted uploads
 - [ ] **Phase 4: Navigation Tools** - ls and tree tools for browsing folder structure
 - [ ] **Phase 5: Search Tools** - grep and glob tools for content and filename searching
@@ -120,8 +120,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Folder Schema & Core APIs | 2/2 | Complete |  |
-| 2. Document-Folder Integration | 0/2 | Not started | - |
+| 1. Folder Schema & Core APIs | 2/2 | Complete | 2026-03-21 |
+| 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
 | 3. Ingestion UI | 0/? | Not started | - |
 | 4. Navigation Tools | 0/? | Not started | - |
 | 5. Search Tools | 0/? | Not started | - |
