@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: unknown
 stopped_at: Phase 6 UI-SPEC approved
-last_updated: "2026-03-21T21:33:39.286Z"
+last_updated: "2026-03-21T21:34:09.882Z"
 progress:
   total_phases: 7
   completed_phases: 5
@@ -100,6 +100,12 @@ None yet.
 ### Blockers/Concerns
 
 None yet.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260322-26g | Improve tool call display for ls, tree, grep, and glob tools in chat UI with rich result rendering | 2026-03-21 | 7943a7c | [260322-26g-improve-tool-call-display-for-ls-tree-gr](./quick/260322-26g-improve-tool-call-display-for-ls-tree-gr/) |
 
 ## Session Continuity
 
