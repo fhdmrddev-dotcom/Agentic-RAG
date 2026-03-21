@@ -30,7 +30,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
     if (thread) {
       loadMessages(thread.id).catch(console.error)
     }
-  }, [thread, loadMessages])
+  }, [thread?.id, loadMessages])
 
   const handleSend = async (content: string) => {
     let activeThread = thread

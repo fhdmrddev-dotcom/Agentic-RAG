@@ -99,9 +99,37 @@ WEB_SEARCH_TOOL = {
 }
 
 
+ANALYZE_DOCUMENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "analyze_document",
+        "description": (
+            "Perform deep analysis of a specific document by reading its FULL content. "
+            "Use for summarization, comparison, critique, extracting key points — tasks "
+            "requiring the entire document, not just chunks. Provide the document filename "
+            "as it appears in the user's library."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string",
+                    "description": "The filename of the document to analyze. Partial or approximate names are accepted (e.g. 'Elitefooty PRD' will match 'PRD Update_ EliteFooty App Architecture.docx').",
+                },
+                "task": {
+                    "type": "string",
+                    "description": "What the user wants done with the document (e.g., 'summarize', 'critique arguments', 'extract key points').",
+                },
+            },
+            "required": ["filename", "task"],
+        },
+    },
+}
+
+
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL]
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, ANALYZE_DOCUMENT_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     return tools

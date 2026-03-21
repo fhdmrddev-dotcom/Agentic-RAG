@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["supabase-mcp-proxy.js"],
+      "env": {
+        "SUPABASE_MCP_URL": "http://127.0.0.1:54321/mcp",
+        "SUPABASE_SERVICE_KEY": "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz"
+      }
+    }
+  }
+}

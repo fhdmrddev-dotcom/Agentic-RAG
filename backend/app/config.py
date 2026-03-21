@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     def web_search_enabled(self) -> bool:
         return bool(self.tavily_api_key)
 
+    # Sub-agent settings
+    sub_agent_max_chars: int = 100000
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"

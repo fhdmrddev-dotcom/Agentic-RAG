@@ -18,3 +18,4 @@ class MessageResponse(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
+    tool_calls: list[dict] | None = None

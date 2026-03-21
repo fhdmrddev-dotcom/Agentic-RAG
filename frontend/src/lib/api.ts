@@ -76,6 +76,11 @@ export async function streamMessage(
   onDone: () => void,
   model?: string,
   onTitleUpdate?: (title: string) => void,
+  onToolStart?: (name: string, args: Record<string, string>) => void,
+  onToolEnd?: (name: string) => void,
+  onSubAgentStart?: (filename: string, task: string) => void,
+  onSubAgentDelta?: (text: string) => void,
+  onSubAgentDone?: () => void,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
@@ -107,11 +112,21 @@ export async function streamMessage(
         return
       }
       try {
-        const parsed = JSON.parse(raw) as { type: string; content: string }
+        const parsed = JSON.parse(raw) as Record<string, unknown>
         if (parsed.type === "delta") {
-          onDelta(parsed.content)
+          onDelta(parsed.content as string)
         } else if (parsed.type === "title" && onTitleUpdate) {
-          onTitleUpdate(parsed.content)
+          onTitleUpdate(parsed.content as string)
+        } else if (parsed.type === "tool_start" && onToolStart) {
+          onToolStart(parsed.name as string, parsed.args as Record<string, string>)
+        } else if (parsed.type === "tool_end" && onToolEnd) {
+          onToolEnd(parsed.name as string)
+        } else if (parsed.type === "sub_agent_start" && onSubAgentStart) {
+          onSubAgentStart(parsed.filename as string, parsed.task as string)
+        } else if (parsed.type === "sub_agent_delta" && onSubAgentDelta) {
+          onSubAgentDelta(parsed.content as string)
+        } else if (parsed.type === "sub_agent_done" && onSubAgentDone) {
+          onSubAgentDone()
         }
       } catch {
         // ignore malformed lines

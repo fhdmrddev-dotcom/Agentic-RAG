@@ -1,6 +1,12 @@
 -- Module 6.1: Extend user_settings with LLM providers, embedding, reranking, retrieval config
 -- All new columns are nullable — NULL means "use env default"
 
+CREATE TABLE IF NOT EXISTS public.user_settings (
+  user_id uuid PRIMARY KEY,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 ALTER TABLE public.user_settings
   ADD COLUMN IF NOT EXISTS llm_providers          jsonb    DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS embedding_base_url     text,

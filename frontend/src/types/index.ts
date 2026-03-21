@@ -6,6 +6,21 @@ export interface Thread {
   updated_at: string
 }
 
+export interface SubAgentState {
+  filename: string
+  task: string
+  content: string
+  status: "running" | "done"
+}
+
+export interface ToolCall {
+  name: string
+  args: Record<string, string>
+  status: "running" | "done"
+  result?: string
+  sub_agent?: SubAgentState
+}
+
 export interface Message {
   id: string
   thread_id: string
@@ -14,6 +29,8 @@ export interface Message {
   content: string
   created_at: string
   updated_at: string
+  tool_calls?: ToolCall[]
+  sub_agent?: SubAgentState
 }
 
 export interface DocumentMetadata {

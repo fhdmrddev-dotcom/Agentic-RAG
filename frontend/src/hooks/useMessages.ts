@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import type { Message } from "../types"
+import type { Message, ToolCall } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
 
 interface UseMessages {
@@ -45,6 +45,7 @@ export function useMessages(): UseMessages {
       content: "",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      tool_calls: [],
     }
     setMessages((prev) => [...prev, assistantMsg])
     setIsStreaming(true)
@@ -62,6 +63,56 @@ export function useMessages(): UseMessages {
       },
       model,
       onTitleUpdate,
+      // onToolStart
+      (name, args) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const newTool: ToolCall = { name, args, status: "running" }
+            return { ...m, tool_calls: [...(m.tool_calls ?? []), newTool] }
+          }),
+        )
+      },
+      // onToolEnd
+      (name) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const updated = (m.tool_calls ?? []).map((tc) =>
+              tc.name === name && tc.status === "running" ? { ...tc, status: "done" as const } : tc,
+            )
+            return { ...m, tool_calls: updated }
+          }),
+        )
+      },
+      // onSubAgentStart
+      (filename, task) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
+              : m,
+          ),
+        )
+      },
+      // onSubAgentDelta
+      (text) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId || !m.sub_agent) return m
+            return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
+          }),
+        )
+      },
+      // onSubAgentDone
+      () => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId || !m.sub_agent) return m
+            return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
+          }),
+        )
+      },
     )
   }, [])
 

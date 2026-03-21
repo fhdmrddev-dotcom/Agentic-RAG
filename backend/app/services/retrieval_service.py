@@ -118,6 +118,64 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
+def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
+    """Case-insensitive filename lookup for a user's document. Tries exact match then partial match."""
+    # Exact case-insensitive match
+    result = (
+        supabase.table("documents")
+        .select("id")
+        .eq("user_id", user_id)
+        .ilike("filename", filename)
+        .limit(1)
+        .execute()
+    )
+    if result.data:
+        return result.data[0]["id"]
+    # Partial match (allows approximate filenames like "Elitefooty PRD")
+    result = (
+        supabase.table("documents")
+        .select("id")
+        .eq("user_id", user_id)
+        .ilike("filename", f"%{filename}%")
+        .limit(1)
+        .execute()
+    )
+    if result.data:
+        return result.data[0]["id"]
+    return None
+
+
+def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
+    """Fetch complete document content by concatenating all ordered chunks."""
+    doc_result = (
+        supabase.table("documents")
+        .select("id, filename, metadata")
+        .eq("id", document_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    if not doc_result.data:
+        return None
+
+    doc = doc_result.data
+    chunks_result = (
+        supabase.table("document_chunks")
+        .select("content")
+        .eq("document_id", document_id)
+        .order("chunk_index")
+        .execute()
+    )
+    chunks = chunks_result.data or []
+    full_text = "\n\n".join(c["content"] for c in chunks)
+    return {
+        "document_id": doc["id"],
+        "filename": doc["filename"],
+        "metadata": doc.get("metadata"),
+        "content": full_text,
+    }
+
+
 @traceable(name="search-documents", run_type="retriever")
 def search_documents(
     query: str,

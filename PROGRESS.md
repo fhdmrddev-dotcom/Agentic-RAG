@@ -180,11 +180,23 @@ Track your progress through the masterclass. Update this file as you complete mo
 - `query_documents` is always available (no key required) — it queries the `documents` table via RPC with RLS enforced
 - Multi-file upload: select or drag multiple files at once; each uploads concurrently; duplicate files are skipped gracefully
 
-### Module 8: Sub-Agents [ ] NOT STARTED
+### Module 8: Sub-Agents ✅ COMPLETE
 
-- [ ] Detect full-document scenarios
-- [ ] Spawn isolated sub-agent with its own tools
-- [ ] Nested tool call display in UI
+- [x] `analyze_document` tool — triggers sub-agent for full-document tasks (summarization, analysis)
+- [x] `sub_agent_service.py` — isolated streaming LLM call with full document content
+- [x] Multi-turn agentic loop (up to 5 iterations) — enables tool chaining (e.g. query_documents → analyze_document)
+- [x] `ToolCallPanel.tsx` — nested tool call display with sub-agent streaming preview
+- [x] `types/index.ts` — `ToolCall`, `SubAgentState` types added to `Message`
+- [x] `useMessages.ts` — handles `tool_start`, `tool_end`, `sub_agent_start/delta/done` SSE events
+- [x] `api.ts` — `streamMessage` wired for all sub-agent SSE event types
+- [x] Fuzzy filename matching in `resolve_document_id` (partial match fallback)
+
+#### Notes (Module 8)
+
+- Sub-agent receives full document text (up to `SUB_AGENT_MAX_CHARS`, default 100k chars)
+- Tool chaining works: LLM can call `query_documents` to find filename, then `analyze_document`
+- Sub-agent output is streamed live in the ToolCallPanel, then fed back as tool result for LLM final response
+- `tool_calls` are in-memory only (not persisted to DB) — they reset on page reload
 
 #### Notes (Module 2)
 

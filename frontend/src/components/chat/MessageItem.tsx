@@ -1,6 +1,8 @@
 import { Bot, Loader2, User } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
+import { ToolCallPanel } from "./ToolCallPanel"
+import { MarkdownRenderer } from "./MarkdownRenderer"
 
 interface Props {
   message: Message
@@ -31,19 +33,22 @@ export function MessageItem({ message, isStreaming }: Props) {
         <Bot className="w-3.5 h-3.5 text-primary-foreground" />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
-        {isStreaming && message.content === "" ? (
+        {message.tool_calls && message.tool_calls.length > 0 && (
+          <ToolCallPanel toolCalls={message.tool_calls} subAgent={message.sub_agent} />
+        )}
+        {isStreaming && message.content === "" && (!message.tool_calls || message.tool_calls.length === 0) ? (
           <span className="flex items-center gap-2 text-muted-foreground italic text-sm">
             <Loader2 className="w-4 h-4 animate-spin" />
             Thinking…
           </span>
-        ) : (
-          <div className={cn("text-sm leading-relaxed text-foreground")}>
-            <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        ) : message.content ? (
+          <div className="text-sm text-foreground">
+            <MarkdownRenderer content={message.content} />
             {isStreaming && (
-              <span className="inline-block w-2 h-4 ml-1 bg-foreground/40 animate-pulse rounded-sm align-text-bottom" />
+              <span className="inline-block w-2 h-4 ml-0.5 bg-foreground/40 animate-pulse rounded-sm align-text-bottom" />
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )
