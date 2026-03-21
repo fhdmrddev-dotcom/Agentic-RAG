@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 05-search-tools-02-PLAN.md (glob endpoint + agent wiring)
-last_updated: "2026-03-21T21:15:06.835Z"
+stopped_at: Phase 6 UI-SPEC approved
+last_updated: "2026-03-21T21:33:39.286Z"
 progress:
   total_phases: 7
   completed_phases: 5
@@ -103,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T21:12:07.301Z
-Stopped at: Completed 05-search-tools-02-PLAN.md (glob endpoint + agent wiring)
-Resume file: None
+Last session: 2026-03-21T21:33:39.279Z
+Stopped at: Phase 6 UI-SPEC approved
+Resume file: .planning/phases/06-read-tool/06-UI-SPEC.md
