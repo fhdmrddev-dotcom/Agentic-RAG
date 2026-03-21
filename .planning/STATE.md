@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 02-document-folder-integration 02-02-PLAN.md
-last_updated: "2026-03-21T14:49:20.796Z"
+stopped_at: Completed 03-ingestion-ui 03-01-PLAN.md
+last_updated: "2026-03-21T16:54:00.647Z"
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 7
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 02 — document-folder-integration
+**Current focus:** Phase 03 — ingestion-ui
 
 ## Current Position
 
-Phase: 3
-Plan: Not started
+Phase: 03 (ingestion-ui) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -50,6 +50,7 @@ Plan: Not started
 | Phase 01-folder-schema-core-apis P02 | 3min | 1 tasks | 1 files |
 | Phase 02-document-folder-integration P01 | 2 | 2 tasks | 5 files |
 | Phase 02-document-folder-integration P02 | 8min | 2 tasks | 3 files |
+| Phase 03-ingestion-ui P01 | 4min 24sec | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 02-document-folder-integration]: folder_id accepted as Form field on upload because multipart/form-data cannot mix JSON body with file upload
 - [Phase 02-document-folder-integration]: Multi-query upload tests require mock_builder side_effect (sequential calls: dedup + stale + insert cannot share single execute result)
 - [Phase 02-document-folder-integration]: .neq() and .limit() added to conftest builder wiring — required by dedup/stale queries added in Plan 01
+- [Phase 03-ingestion-ui]: uploadDocument: append folder_id only when folderId is truthy string (avoids sending null string to backend)
+- [Phase 03-ingestion-ui]: useFolders: no user_id filter on Realtime channel — RLS handles row isolation, avoids REPLICA IDENTITY FULL requirement
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T14:45:52.571Z
-Stopped at: Completed 02-document-folder-integration 02-02-PLAN.md
+Last session: 2026-03-21T16:54:00.643Z
+Stopped at: Completed 03-ingestion-ui 03-01-PLAN.md
 Resume file: None
