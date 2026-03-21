@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-03-21T19:35:23.179Z"
+stopped_at: Completed 05-search-tools-01-PLAN.md (grep endpoint)
+last_updated: "2026-03-21T21:05:43.578Z"
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 11
+  completed_plans: 10
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 04 — navigation-tools
+**Current focus:** Phase 05 — search-tools
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
+Phase: 05 (search-tools) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Plan: Not started
 | Phase 03-ingestion-ui P02 | 6min 7sec | 2 tasks | 9 files |
 | Phase 04-navigation-tools P01 | 2min 27sec | 3 tasks | 5 files |
 | Phase 04-navigation-tools P02 | 2min | 2 tasks | 2 files |
+| Phase 05-search-tools P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 04-navigation-tools]: conftest .is_ and .or_ wiring added globally — fixes Pitfall 3 for all current and future tests
 - [Phase 04-navigation-tools]: depth=1 means show target's immediate children, truncate their children — current_depth starts at 0 for target's direct children
 - [Phase 04-navigation-tools]: Empty all_ids list guard before in_() query prevents Supabase rejecting empty-list queries
+- [Phase 04-navigation-tools patch]: ls_path()/tree_path() helpers extracted from HTTP endpoints so threads.py can call them directly — no HTTP round-trip needed in the agent loop
+- [Phase 04-navigation-tools patch]: LS_TOOL + TREE_TOOL added to openai_service.get_tools(); system prompt updated from 4 to 6 tools; query_documents repositioned for analytical queries only
+- [Phase 05-search-tools]: grep_path reuses Phase 4 shared helpers for path scoping; _inject_user_id_for_grep implemented inline in kb.py; grep returns document names only per PROJECT.md decision
 
 ### Pending Todos
 
@@ -96,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T19:32:12.557Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-03-21T21:05:43.574Z
+Stopped at: Completed 05-search-tools-01-PLAN.md (grep endpoint)
 Resume file: None

@@ -97,7 +97,7 @@ Plans:
   5. Both tools return only documents the authenticated user is permitted to see (global + own private)
 **Plans**: 2 plans
 Plans:
-- [ ] 05-01-PLAN.md — grep endpoint with Pydantic models, path-scoped regex search, and integration tests (TOOL-03)
+- [x] 05-01-PLAN.md — grep endpoint with Pydantic models, path-scoped regex search, and integration tests (TOOL-03)
 - [ ] 05-02-PLAN.md — glob endpoint with path-aware filename matching, agent wiring for grep+glob, and integration tests (TOOL-04)
 
 ### Phase 6: Read Tool
@@ -134,6 +134,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
 | 3. Ingestion UI | 3/3 | Complete | 2026-03-21 |
 | 4. Navigation Tools | 2/2 | Complete | 2026-03-22 |
-| 5. Search Tools | 0/2 | Not started | - |
+| 5. Search Tools | 1/2 | In Progress|  |
 | 6. Read Tool | 0/? | Not started | - |
 | 7. Explorer Sub-Agent | 0/? | Not started | - |
