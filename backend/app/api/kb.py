@@ -1,8 +1,9 @@
+import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.kb import LsResponse, TreeResponse
+from app.models.kb import LsResponse, TreeResponse, GrepResponse
 
 router = APIRouter(prefix="/kb", tags=["kb"])
 
@@ -56,17 +57,12 @@ def _resolve_path(path: str, roots: list[dict]) -> dict | None:
     return current_node
 
 
-@router.get("/ls", response_model=LsResponse)
-async def ls(
-    path: str = Query(default="/", description="Folder path, e.g. /reports/q1"),
-    current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
-):
-    all_folders = _fetch_visible_folders(supabase, current_user["id"])
+def ls_path(path: str, user_id: str, supabase: Client) -> dict:
+    """Core ls logic callable outside the HTTP layer (e.g. from the agent tool loop)."""
+    all_folders = _fetch_visible_folders(supabase, user_id)
     nodes, roots = _build_tree_map(all_folders)
 
     if path.strip("/") == "":
-        # Root: list root folders + root documents (folder_id IS NULL)
         folder_entries = [
             {"id": r["id"], "name": r["name"], "is_global": r["is_global"]}
             for r in roots
@@ -75,15 +71,14 @@ async def ls(
             supabase.table("documents")
             .select("id, filename, status, created_at")
             .is_("folder_id", "null")
-            .eq("user_id", current_user["id"])
+            .eq("user_id", user_id)
             .execute()
         )
-        return LsResponse(path="/", folders=folder_entries, documents=doc_result.data)
+        return {"path": "/", "folders": folder_entries, "documents": doc_result.data}
 
-    # Subfolder path
     target = _resolve_path(path, roots)
     if target is None:
-        raise HTTPException(status_code=404, detail="Path not found")
+        return {"error": f"Path '{path}' not found"}
 
     folder_entries = [
         {"id": c["id"], "name": c["name"], "is_global": c["is_global"]}
@@ -93,10 +88,69 @@ async def ls(
         supabase.table("documents")
         .select("id, filename, status, created_at")
         .eq("folder_id", target["id"])
-        .eq("user_id", current_user["id"])
+        .eq("user_id", user_id)
         .execute()
     )
-    return LsResponse(path=path, folders=folder_entries, documents=doc_result.data)
+    return {"path": path, "folders": folder_entries, "documents": doc_result.data}
+
+
+def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> dict:
+    """Core tree logic callable outside the HTTP layer (e.g. from the agent tool loop)."""
+    all_folders = _fetch_visible_folders(supabase, user_id)
+    nodes, roots = _build_tree_map(all_folders)
+
+    if path.strip("/") == "":
+        target_nodes = roots
+    else:
+        target = _resolve_path(path, roots)
+        if target is None:
+            return {"error": f"Path '{path}' not found"}
+        target_nodes = [target]
+
+    all_ids = []
+    for tn in target_nodes:
+        all_ids.extend(_collect_folder_ids(tn))
+
+    if all_ids:
+        doc_result = (
+            supabase.table("documents")
+            .select("id, filename, folder_id, status, created_at")
+            .in_("folder_id", all_ids)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        docs_by_folder: dict[str, list[dict]] = {}
+        for doc in doc_result.data:
+            fid = doc["folder_id"]
+            if fid not in docs_by_folder:
+                docs_by_folder[fid] = []
+            docs_by_folder[fid].append({
+                "id": doc["id"],
+                "filename": doc["filename"],
+                "status": doc["status"],
+                "created_at": doc["created_at"],
+            })
+    else:
+        docs_by_folder = {}
+
+    for fid, doc_list in docs_by_folder.items():
+        if fid in nodes:
+            nodes[fid]["documents"] = doc_list
+
+    serialized = [_serialize_tree(tn, 0, depth) for tn in target_nodes]
+    return {"path": path, "depth": depth, "tree": serialized}
+
+
+@router.get("/ls", response_model=LsResponse)
+async def ls(
+    path: str = Query(default="/", description="Folder path, e.g. /reports/q1"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    result = ls_path(path, current_user["id"], supabase)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return LsResponse(**result)
 
 
 def _collect_folder_ids(node: dict) -> list[str]:
@@ -141,65 +195,57 @@ async def tree(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    all_folders = _fetch_visible_folders(supabase, current_user["id"])
-    nodes, roots = _build_tree_map(all_folders)
+    result = tree_path(path, depth, current_user["id"], supabase)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return TreeResponse(**result)
 
-    if path.strip("/") == "":
-        # Root tree: all root nodes
-        target_nodes = roots
-    else:
+
+def _inject_user_id_for_grep(sql: str, user_id: str) -> str:
+    """Inject user_id filter into grep SQL. Always targets documents table."""
+    condition = f"documents.user_id = '{user_id}'"
+    if re.search(r"\bwhere\b", sql, re.IGNORECASE):
+        return re.sub(r"\b(where)\b", f"WHERE {condition} AND", sql, count=1, flags=re.IGNORECASE)
+    return sql + f" WHERE {condition}"
+
+
+def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) -> dict:
+    """Search document full_markdown for regex pattern, optionally scoped to a folder subtree."""
+    # Determine folder scoping
+    folder_ids: list[str] | None = None
+    if path and path.strip("/") != "":
+        all_folders = _fetch_visible_folders(supabase, user_id)
+        nodes, roots = _build_tree_map(all_folders)
         target = _resolve_path(path, roots)
         if target is None:
-            raise HTTPException(status_code=404, detail="Path not found")
-        target_nodes = [target]
+            return {"error": f"Path '{path}' not found"}
+        folder_ids = _collect_folder_ids(target)
 
-    # Collect all folder IDs in the target subtree(s) for document fetch
-    all_ids = []
-    for tn in target_nodes:
-        all_ids.extend(_collect_folder_ids(tn))
+    # Build SQL query using Postgres regex operator ~
+    escaped_pattern = pattern.replace("'", "''")
+    sql = f"SELECT id, filename, folder_id FROM documents WHERE full_markdown ~ '{escaped_pattern}'"
+    if folder_ids is not None:
+        ids_list = ", ".join(f"'{fid}'" for fid in folder_ids)
+        sql += f" AND folder_id IN ({ids_list})"
 
-    # Fetch documents in the subtree (guard against empty list — avoids in_() empty list error)
-    if all_ids:
-        doc_result = (
-            supabase.table("documents")
-            .select("id, filename, folder_id, status, created_at")
-            .in_("folder_id", all_ids)
-            .eq("user_id", current_user["id"])
-            .execute()
-        )
-        docs_by_folder: dict[str, list[dict]] = {}
-        for doc in doc_result.data:
-            fid = doc["folder_id"]
-            if fid not in docs_by_folder:
-                docs_by_folder[fid] = []
-            docs_by_folder[fid].append({
-                "id": doc["id"],
-                "filename": doc["filename"],
-                "status": doc["status"],
-                "created_at": doc["created_at"],
-            })
-    else:
-        docs_by_folder = {}
+    try:
+        result = supabase.rpc("query_user_documents", {"sql_query": _inject_user_id_for_grep(sql, user_id)}).execute()
+    except Exception as e:
+        return {"error": f"Grep failed: {e}"}
 
-    # Attach documents to nodes (mutates the in-memory tree)
-    for fid, doc_list in docs_by_folder.items():
-        if fid in nodes:
-            nodes[fid]["documents"] = doc_list
+    rows = result.data or []
+    matches = [{"document_id": r["id"], "filename": r["filename"], "folder_id": r.get("folder_id")} for r in rows]
+    return {"pattern": pattern, "path": path, "matches": matches, "total": len(matches)}
 
-    # For root tree, also fetch root-level documents (folder_id IS NULL)
-    if path.strip("/") == "":
-        root_doc_result = (
-            supabase.table("documents")
-            .select("id, filename, status, created_at")
-            .is_("folder_id", "null")
-            .eq("user_id", current_user["id"])
-            .execute()
-        )
-        root_docs = root_doc_result.data  # noqa: F841 — available for future use
-    else:
-        root_docs = []  # noqa: F841
 
-    # Serialize with depth limit
-    serialized = [_serialize_tree(tn, 0, depth) for tn in target_nodes]
-
-    return TreeResponse(path=path, depth=depth, tree=serialized)
+@router.get("/grep", response_model=GrepResponse)
+async def grep(
+    pattern: str = Query(description="Regex pattern to search in document content"),
+    path: str | None = Query(default=None, description="Optional folder path to scope search, e.g. /reports"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    result = grep_path(pattern, path, current_user["id"], supabase)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return GrepResponse(**result)

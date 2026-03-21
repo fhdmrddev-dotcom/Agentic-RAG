@@ -39,3 +39,16 @@ class TreeResponse(BaseModel):
     path: str
     depth: int | None
     tree: list[TreeNode]
+
+
+class GrepMatch(BaseModel):
+    document_id: UUID
+    filename: str
+    folder_id: UUID | None
+
+
+class GrepResponse(BaseModel):
+    pattern: str
+    path: str | None
+    matches: list[GrepMatch]
+    total: int
