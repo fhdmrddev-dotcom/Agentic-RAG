@@ -5,10 +5,12 @@ import {
   Folder as FolderIcon,
   Globe,
   Pencil,
+  Plus,
   Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { FolderCreateInput } from "./FolderCreateInput"
 import type { FolderNode as FolderNodeType } from "@/lib/folderTree"
 
 interface FolderNodeProps {
@@ -18,6 +20,7 @@ interface FolderNodeProps {
   expandedIds: Set<string>
   editingId: string | null
   deletingId: string | null
+  creatingInParentId: string | "root" | null
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
   onStartRename: (id: string, currentName: string) => void
@@ -27,6 +30,8 @@ interface FolderNodeProps {
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onCreateSubfolder: (parentId: string) => void
+  onCreateCommit: (name: string) => void
+  onCreateCancel: () => void
 }
 
 export function FolderNode({
@@ -36,6 +41,7 @@ export function FolderNode({
   expandedIds,
   editingId,
   deletingId,
+  creatingInParentId,
   onSelect,
   onToggleExpand,
   onStartRename,
@@ -44,6 +50,9 @@ export function FolderNode({
   onStartDelete,
   onConfirmDelete,
   onCancelDelete,
+  onCreateSubfolder,
+  onCreateCommit,
+  onCreateCancel,
 }: FolderNodeProps) {
   const isSelected = node.id === selectedFolderId
   const isExpanded = expandedIds.has(node.id)
@@ -66,7 +75,7 @@ export function FolderNode({
           className={[
             "flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer group",
             isSelected
-              ? "bg-accent text-accent-foreground"
+              ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
               : "hover:bg-accent",
           ].join(" ")}
           onClick={() => {
@@ -134,6 +143,23 @@ export function FolderNode({
                     className="h-7 w-7 p-0"
                     onClick={(e) => {
                       e.stopPropagation()
+                      onCreateSubfolder(node.id)
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>New subfolder</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
                       onStartRename(node.id, node.name)
                     }}
                   >
@@ -167,7 +193,7 @@ export function FolderNode({
         {isDeleting && (
           <div className="ml-8 py-1 px-2 text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
             <span>
-              Delete {node.name} and all its contents? This cannot be undone.
+              Delete <strong>{node.name}</strong>? This will permanently delete the folder and all documents inside it. This cannot be undone.
             </span>
             <Button
               variant="destructive"
@@ -187,6 +213,15 @@ export function FolderNode({
             </Button>
           </div>
         )}
+
+        {/* Inline subfolder create input */}
+        {creatingInParentId === node.id && (
+          <FolderCreateInput
+            depth={depth + 1}
+            onCommit={onCreateCommit}
+            onCancel={onCreateCancel}
+          />
+        )}
       </div>
 
       {/* Recursive children */}
@@ -201,6 +236,7 @@ export function FolderNode({
             expandedIds={expandedIds}
             editingId={editingId}
             deletingId={deletingId}
+            creatingInParentId={creatingInParentId}
             onSelect={onSelect}
             onToggleExpand={onToggleExpand}
             onStartRename={onStartRename}
@@ -209,7 +245,9 @@ export function FolderNode({
             onStartDelete={onStartDelete}
             onConfirmDelete={onConfirmDelete}
             onCancelDelete={onCancelDelete}
-            onCreateSubfolder={() => {}}
+            onCreateSubfolder={onCreateSubfolder}
+            onCreateCommit={onCreateCommit}
+            onCreateCancel={onCreateCancel}
           />
         ))}
     </div>

@@ -80,6 +80,8 @@ export function FolderTree({
   }
 
   const handleCreateSubfolder = (parentId: string) => {
+    // Auto-expand the parent so the new input is visible
+    setExpandedIds((prev) => new Set([...prev, parentId]))
     setCreatingInParentId(parentId)
   }
 
@@ -125,7 +127,7 @@ export function FolderTree({
         className={[
           "flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer",
           selectedFolderId === null
-            ? "bg-accent text-accent-foreground"
+            ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
             : "hover:bg-accent",
         ].join(" ")}
         onClick={() => onSelectFolder(null)}
@@ -162,6 +164,7 @@ export function FolderTree({
             expandedIds={expandedIds}
             editingId={editingId}
             deletingId={deletingId}
+            creatingInParentId={creatingInParentId}
             onSelect={onSelectFolder}
             onToggleExpand={handleToggleExpand}
             onStartRename={handleStartRename}
@@ -171,6 +174,8 @@ export function FolderTree({
             onConfirmDelete={handleConfirmDelete}
             onCancelDelete={handleCancelDelete}
             onCreateSubfolder={handleCreateSubfolder}
+            onCreateCommit={handleCreateCommit}
+            onCreateCancel={handleCreateCancel}
           />
         ))
       )}

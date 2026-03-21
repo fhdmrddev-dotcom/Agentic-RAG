@@ -41,6 +41,9 @@ const defaultProps = {
   onConfirmDelete: vi.fn(),
   onCancelDelete: vi.fn(),
   onCreateSubfolder: vi.fn(),
+  creatingInParentId: null,
+  onCreateCommit: vi.fn(),
+  onCreateCancel: vi.fn(),
 }
 
 describe("FolderNode", () => {
@@ -152,11 +155,11 @@ describe("FolderNode", () => {
       />
     )
     expect(
-      screen.getByText(/Delete My Folder and all its contents/i)
+      screen.getByText(/permanently delete the folder and all documents inside it/i)
     ).toBeInTheDocument()
   })
 
-  it("applies bg-accent class when node is selected", () => {
+  it("applies selected highlight class when node is selected", () => {
     const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
@@ -164,7 +167,7 @@ describe("FolderNode", () => {
         selectedFolderId="node-1"
       />
     )
-    const row = container.querySelector(".bg-accent")
+    const row = container.querySelector(".border-primary")
     expect(row).toBeInTheDocument()
   })
 })

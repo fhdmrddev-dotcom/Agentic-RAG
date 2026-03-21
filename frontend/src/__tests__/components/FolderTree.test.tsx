@@ -71,12 +71,12 @@ describe("FolderTree", () => {
     ).toBeInTheDocument()
   })
 
-  it("Root node is highlighted (bg-accent) when no folder selected", () => {
+  it("Root node is highlighted when no folder selected", () => {
     renderWithTooltip(
       <FolderTree {...defaultProps} selectedFolderId={null} />
     )
-    // The Root row should have bg-accent
-    const rootRow = screen.getByText("Root").closest(".bg-accent")
+    // The Root row should have the primary border highlight
+    const rootRow = screen.getByText("Root").closest(".border-primary")
     expect(rootRow).toBeInTheDocument()
   })
 

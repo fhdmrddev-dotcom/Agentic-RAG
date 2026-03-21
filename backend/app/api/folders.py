@@ -112,7 +112,36 @@ async def delete_folder(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Delete a folder. DB cascade handles descendant folders."""
+    """Delete a folder and all documents inside it (storage + DB + chunks)."""
+    # 1. Collect this folder and all descendant folder IDs (BFS)
+    all_folder_ids = [folder_id]
+    queue = [folder_id]
+    while queue:
+        parent = queue.pop(0)
+        children = supabase.table("folders").select("id").eq("parent_id", parent).execute()
+        for child in children.data:
+            all_folder_ids.append(child["id"])
+            queue.append(child["id"])
+
+    # 2. Find all documents in these folders
+    docs_result = (
+        supabase.table("documents")
+        .select("id, file_path")
+        .in_("folder_id", all_folder_ids)
+        .execute()
+    )
+
+    # 3. Delete each document from storage, then DB (chunks cascade via FK)
+    for doc in docs_result.data:
+        try:
+            supabase.storage.from_("documents").remove([doc["file_path"]])
+        except Exception:
+            pass
+    if docs_result.data:
+        doc_ids = [d["id"] for d in docs_result.data]
+        supabase.table("documents").delete().in_("id", doc_ids).execute()
+
+    # 4. Delete the folder (DB cascade handles descendant folders)
     supabase.table("folders").delete().eq("id", folder_id).eq("user_id", current_user["id"]).execute()
 
 

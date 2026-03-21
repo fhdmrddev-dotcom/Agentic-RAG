@@ -14,22 +14,35 @@ def _inject_user_id(sql: str, user_id: str) -> str:
     """
     Inject a user_id WHERE clause into the query.
     The service role client bypasses RLS, so we must scope manually.
-    Handles queries with or without existing WHERE, ORDER BY, GROUP BY, LIMIT.
+
+    Rules:
+    - documents-only query  → documents.user_id = '{user_id}'
+    - folders-only query    → (folders.user_id = '{user_id}' OR folders.is_global = true)
+    - JOIN (both tables)    → documents.user_id = '{user_id}'  (documents already scopes the user)
     """
+    has_documents = bool(re.search(r"\bdocuments\b", sql, re.IGNORECASE))
+    has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
+
+    if has_folders and not has_documents:
+        condition = f"(folders.user_id = '{user_id}' OR folders.is_global = true)"
+    else:
+        # documents-only or JOIN — scope via documents table
+        condition = f"documents.user_id = '{user_id}'"
+
     # Already has a WHERE clause — append AND
     if re.search(r"\bwhere\b", sql, re.IGNORECASE):
         return re.sub(
             r"\b(where)\b",
-            f"WHERE user_id = '{user_id}' AND",
+            f"WHERE {condition} AND",
             sql, count=1, flags=re.IGNORECASE,
         )
-    # Has ORDER BY / GROUP BY / LIMIT — insert WHERE before them
+    # Has ORDER BY / GROUP BY / LIMIT / HAVING — insert WHERE before them
     match = re.search(r"\b(order\s+by|group\s+by|limit|having)\b", sql, re.IGNORECASE)
     if match:
         pos = match.start()
-        return sql[:pos] + f"WHERE user_id = '{user_id}' " + sql[pos:]
+        return sql[:pos] + f"WHERE {condition} " + sql[pos:]
     # Plain query — append at end
-    return sql + f" WHERE user_id = '{user_id}'"
+    return sql + f" WHERE {condition}"
 
 
 def query_documents(sql_query: str, user_id: str, supabase: Client) -> str:

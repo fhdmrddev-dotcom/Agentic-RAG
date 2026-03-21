@@ -105,6 +105,10 @@ None — plan executed cleanly; only deviation was a pre-existing broken test as
 ## Known Stubs
 None — grep endpoint is fully wired to query_user_documents RPC.
 
+## Self-Check: PASSED
+
+All created/modified files confirmed on disk. All task commits verified in git log.
+
 ## Next Phase Readiness
 - grep_path helper is ready for import in threads.py agent tool loop (Plan 02 will wire GREP_TOOL)
 - GET /kb/grep endpoint is live and tested
