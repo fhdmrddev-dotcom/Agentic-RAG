@@ -82,7 +82,7 @@ Plans:
   4. Both tools respect RLS — agent sees global folders plus the authenticated user's private folders, nothing else
 **Plans**: 2 plans
 Plans:
-- [ ] 04-01-PLAN.md — Pydantic models, shared helpers, ls endpoint with integration tests (TOOL-01)
+- [x] 04-01-PLAN.md — Pydantic models, shared helpers, ls endpoint with integration tests (TOOL-01)
 - [ ] 04-02-PLAN.md — tree endpoint with depth-limited serialization and integration tests (TOOL-02)
 
 ### Phase 5: Search Tools
@@ -130,7 +130,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Folder Schema & Core APIs | 2/2 | Complete | 2026-03-21 |
 | 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
 | 3. Ingestion UI | 3/3 | Complete | 2026-03-21 |
-| 4. Navigation Tools | 0/2 | Not started | - |
+| 4. Navigation Tools | 1/2 | In Progress|  |
 | 5. Search Tools | 0/? | Not started | - |
 | 6. Read Tool | 0/? | Not started | - |
 | 7. Explorer Sub-Agent | 0/? | Not started | - |

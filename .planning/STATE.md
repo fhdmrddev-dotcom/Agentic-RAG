@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: "Paused at checkpoint: 03-03 Task 2 human-verify"
-last_updated: "2026-03-21T17:06:44.619Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-21T19:28:34.526Z"
 progress:
   total_phases: 7
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 6
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 03 — ingestion-ui
+**Current focus:** Phase 04 — navigation-tools
 
 ## Current Position
 
-Phase: 03 (ingestion-ui) — EXECUTING
-Plan: 3 of 3
+Phase: 04 (navigation-tools) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Plan: 3 of 3
 | Phase 02-document-folder-integration P02 | 8min | 2 tasks | 3 files |
 | Phase 03-ingestion-ui P01 | 4min 24sec | 2 tasks | 7 files |
 | Phase 03-ingestion-ui P02 | 6min 7sec | 2 tasks | 9 files |
+| Phase 04-navigation-tools P01 | 2min 27sec | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ Recent decisions affecting current work:
 - [Phase 03-ingestion-ui]: Tests wrap renders in TooltipProvider — Radix tooltip requires provider context even in test environments
 - [Phase 03-ingestion-ui]: data-testid='globe-icon' on Globe svg enables deterministic test querying for global folder distinction
 - [Phase 03-ingestion-ui]: shadcn CLI on Windows creates files in literal @/ directory — files manually copied to correct path, @/ added to .gitignore
+- [Phase 04-navigation-tools]: Single-fetch all visible folders + in-memory tree build avoids N+1 queries for path resolution
+- [Phase 04-navigation-tools]: conftest .is_ and .or_ wiring added globally — fixes Pitfall 3 for all current and future tests
 
 ### Pending Todos
 
@@ -90,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T17:06:44.614Z
-Stopped at: Paused at checkpoint: 03-03 Task 2 human-verify
+Last session: 2026-03-21T19:28:34.522Z
+Stopped at: Completed 04-01-PLAN.md
 Resume file: None
