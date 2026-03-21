@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.folder import FolderCreate, FolderUpdate, FolderResponse
+from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -114,3 +114,37 @@ async def delete_folder(
 ):
     """Delete a folder. DB cascade handles descendant folders."""
     supabase.table("folders").delete().eq("id", folder_id).eq("user_id", current_user["id"]).execute()
+
+
+@router.patch("/{folder_id}/move", response_model=FolderResponse)
+async def move_folder(
+    folder_id: str,
+    body: FolderMoveRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Move a folder to a different parent. parent_id=null moves to root."""
+    # 1. Validate new parent accessibility (if not moving to root)
+    if body.parent_id:
+        parent = (
+            supabase.table("folders")
+            .select("id")
+            .eq("id", str(body.parent_id))
+            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .maybe_single()
+            .execute()
+        )
+        if not parent.data:
+            raise HTTPException(status_code=404, detail="Parent folder not found")
+
+    # 2. Perform move (ownership enforced via user_id filter)
+    result = (
+        supabase.table("folders")
+        .update({"parent_id": str(body.parent_id) if body.parent_id else None})
+        .eq("id", folder_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return result.data[0]

@@ -3,12 +3,12 @@ import io
 from uuid import uuid4
 
 from docx import Document as DocxDocument
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Response, UploadFile, status
 from pypdf import PdfReader
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.document import DocumentResponse
+from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 
@@ -39,6 +39,7 @@ async def upload_document(
     response: Response,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    folder_id: str | None = Form(None),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -61,6 +62,19 @@ async def upload_document(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="File is empty",
         )
+
+    # Validate folder_id if provided (per DOC-01)
+    if folder_id:
+        folder_check = (
+            supabase.table("folders")
+            .select("id")
+            .eq("id", folder_id)
+            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .maybe_single()
+            .execute()
+        )
+        if not folder_check.data:
+            raise HTTPException(status_code=404, detail="Folder not found")
 
     content_hash = hashlib.sha256(raw).hexdigest()
 
@@ -115,6 +129,7 @@ async def upload_document(
         "mime_type": mime_type,
         "status": "pending",
         "content_hash": content_hash,
+        "folder_id": folder_id,
     }
     result = supabase.table("documents").insert(doc_data).execute()
     doc = result.data[0]
@@ -173,6 +188,50 @@ async def delete_document(
     supabase.table("documents").delete().eq("id", document_id).execute()
 
 
+@router.patch("/{document_id}/move", response_model=DocumentResponse)
+async def move_document(
+    document_id: str,
+    body: DocumentMoveRequest,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Move a document to a different folder. folder_id=null moves to root."""
+    # 1. Verify document ownership
+    doc = (
+        supabase.table("documents")
+        .select("id")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Validate target folder accessibility (if not moving to root)
+    if body.folder_id:
+        folder = (
+            supabase.table("folders")
+            .select("id")
+            .eq("id", str(body.folder_id))
+            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .maybe_single()
+            .execute()
+        )
+        if not folder.data:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+    # 3. Perform move
+    result = (
+        supabase.table("documents")
+        .update({"folder_id": str(body.folder_id) if body.folder_id else None})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    return result.data[0]
+
+
 def ingest_document(document_id: str, text: str, user_id: str, supabase: Client) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
@@ -210,6 +269,7 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
             "status": "completed",
             "chunk_count": len(chunks),
             "metadata": metadata_dict,
+            "full_markdown": text,
         }).eq("id", document_id).execute()
 
     except Exception as e:
