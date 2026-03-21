@@ -236,11 +236,49 @@ Build a hierarchical folder system + AI agent tools to explore the knowledge bas
 - Run `014_document_folder_integration.sql` in Supabase SQL editor before using move endpoints
 - 51 integration tests passing (24 document + 27 folder)
 
-### Phase 3: Ingestion UI 🔲 NOT STARTED
+### Phase 3: Ingestion UI ✅ COMPLETE
 
-### Phase 4: Navigation Tools 🔲 NOT STARTED
+- [x] Plan 01: useFolders hook + Folder types + buildFolderTree utility + api.ts folder methods + Realtime subscription
+- [x] Plan 02: FolderNode, FolderCreateInput, FolderTree components with 19 tests (TDD), shadcn dialog + tooltip installed
+- [x] Plan 03: Two-panel IngestionPage — folder tree (left 260px), DocumentUpload with folder targeting + dynamic label, DocumentList with folder filtering, human-verified
 
-### Phase 5: Search Tools 🔲 NOT STARTED
+#### Notes (Phase 3)
+
+- Global folders visible to all users; created via API only (no UI toggle in v1.0)
+- Realtime folder sync uses no user_id filter — RLS enforces row isolation
+- shadcn CLI on Windows creates files in literal `@/` dir — copy manually to `src/components/ui/`
+
+### Phase 4: Navigation Tools ✅ COMPLETE
+
+- [x] Plan 01: `/kb/ls` endpoint — lists immediate contents at a folder path; shared helpers `_fetch_visible_folders`, `_build_tree_map`, `_resolve_path`; 5 integration tests
+- [x] Plan 02: `/kb/tree` endpoint — depth-limited recursive folder serialization with `truncated` indicators; `_collect_folder_ids` BFS + `_serialize_tree`; 4 integration tests
+- [x] Patch: `ls_path()` + `tree_path()` service helpers extracted from endpoints; `LS_TOOL` + `TREE_TOOL` registered in `openai_service.py`; dispatch wired in `threads.py`; system prompt updated to 6 tools
+
+#### Notes (Phase 4)
+
+- `ls` tool: agent lists folder contents by path (use `path='/'` for root)
+- `tree` tool: agent gets full hierarchy as nested JSON; optional `depth` parameter limits expansion
+- Both tools respect RLS — users see only their own + global folders
+- `query_documents` retained for analytical/SQL-style questions (counts, joins, filters)
+
+### Phase 5: Search Tools ✅ COMPLETE
+
+- [x] Plan 01: `/kb/grep` endpoint — regex search over `full_markdown` content, path-scoped, returns matching document names; `grep_path()` helper; `GREP_TOOL` registered; 5 integration tests
+- [x] Plan 02: `/kb/glob` endpoint — filename pattern matching with `**` recursive support, `glob_path()` helper; `GLOB_TOOL` registered; `GREP_TOOL + GLOB_TOOL` dispatched in `threads.py`; system prompt updated to 8 tools; 4 integration tests
+
+#### Notes (Phase 5)
+
+- `grep` searches extracted markdown content (`full_markdown`) — only works on ingested documents
+- `glob` matches against both full path and filename alone (e.g., `*.pdf` matches regardless of folder depth)
+- `**` glob patterns use regex internally (`fnmatch` does not support recursive path segments)
+- System prompt now routes: `ls`/`tree` for navigation, `grep`/`glob` for finding, `search_documents` for semantic, `query_documents` for SQL-style
+
+### UI Enhancement: Rich Tool Call Display ✅ COMPLETE
+
+- [x] `ToolCallPanel.tsx` — distinct icons for `ls` (FolderOpen), `tree` (GitBranch), `grep` (TextSearch), `glob` (FileSearch)
+- [x] Collapsed state shows result count badge ("2 folders, 5 documents" / "12 matches")
+- [x] Expanded state renders structured listings: `ls` → folder + file sections with status badges; `tree` → recursive indented hierarchy (3 levels); `grep`/`glob` → scrollable filename/path lists in monospace
+- [x] Defensive JSON parsing (try/catch on `tool_call.result`) — graceful error display on parse failure
 
 ### Phase 6: Read Tool 🔲 NOT STARTED
 
