@@ -3,8 +3,13 @@
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { FolderNode as FolderNodeComponent } from "@/components/ingestion/FolderNode"
 import type { FolderNode } from "@/lib/folderTree"
+
+function renderWithTooltip(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>)
+}
 
 // Helper to build a minimal FolderNode object
 function makeNode(overrides: Partial<FolderNode> = {}): FolderNode {
@@ -40,7 +45,7 @@ const defaultProps = {
 
 describe("FolderNode", () => {
   it("renders folder name", () => {
-    render(<FolderNodeComponent node={makeNode()} {...defaultProps} />)
+    renderWithTooltip(<FolderNodeComponent node={makeNode()} {...defaultProps} />)
     expect(screen.getByText("My Folder")).toBeInTheDocument()
   })
 
@@ -48,7 +53,7 @@ describe("FolderNode", () => {
     const nodeWithChild = makeNode({
       children: [makeNode({ id: "child-1", name: "Child" })],
     })
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent node={nodeWithChild} {...defaultProps} />
     )
     // chevron is an svg from lucide (ChevronRight or ChevronDown)
@@ -57,16 +62,16 @@ describe("FolderNode", () => {
   })
 
   it("does not render a clickable chevron span when node has no children", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent node={makeNode()} {...defaultProps} />
     )
-    // The spacer div has data-testid="chevron-spacer" or no button for chevron
+    // No chevron button when no children
     const chevronBtn = container.querySelector("[data-testid='chevron-btn']")
     expect(chevronBtn).not.toBeInTheDocument()
   })
 
   it("shows Folder icon always", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent node={makeNode({ is_global: false })} {...defaultProps} />
     )
     // Folder icon is present (lucide renders as svg)
@@ -75,7 +80,7 @@ describe("FolderNode", () => {
   })
 
   it("shows Globe icon when is_global=true", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode({ is_global: true })}
         {...defaultProps}
@@ -86,7 +91,7 @@ describe("FolderNode", () => {
   })
 
   it("does not show Globe icon when is_global=false", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode({ is_global: false })}
         {...defaultProps}
@@ -97,7 +102,7 @@ describe("FolderNode", () => {
   })
 
   it("inline rename: renders input when editingId matches node id", () => {
-    render(
+    renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
         {...defaultProps}
@@ -110,7 +115,7 @@ describe("FolderNode", () => {
 
   it("inline rename: Enter key calls onCommitRename", () => {
     const onCommitRename = vi.fn()
-    render(
+    renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
         {...defaultProps}
@@ -125,7 +130,7 @@ describe("FolderNode", () => {
 
   it("inline rename: Escape key calls onCancelRename", () => {
     const onCancelRename = vi.fn()
-    render(
+    renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
         {...defaultProps}
@@ -139,7 +144,7 @@ describe("FolderNode", () => {
   })
 
   it("delete confirmation: renders confirmation text when deletingId matches", () => {
-    render(
+    renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
         {...defaultProps}
@@ -152,7 +157,7 @@ describe("FolderNode", () => {
   })
 
   it("applies bg-accent class when node is selected", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode()}
         {...defaultProps}

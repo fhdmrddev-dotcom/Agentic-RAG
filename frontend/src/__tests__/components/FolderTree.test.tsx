@@ -3,8 +3,13 @@
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import type { Folder } from "@/types"
+
+function renderWithTooltip(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>)
+}
 
 // Sample folder data
 const sampleFolders: Folder[] = [
@@ -48,18 +53,18 @@ const defaultProps = {
 
 describe("FolderTree", () => {
   it("renders 'Root' node", () => {
-    render(<FolderTree {...defaultProps} />)
+    renderWithTooltip(<FolderTree {...defaultProps} />)
     expect(screen.getByText("Root")).toBeInTheDocument()
   })
 
   it("renders folder tree from flat list (node names appear)", () => {
-    render(<FolderTree {...defaultProps} />)
+    renderWithTooltip(<FolderTree {...defaultProps} />)
     expect(screen.getByText("Alpha")).toBeInTheDocument()
     expect(screen.getByText("Beta")).toBeInTheDocument()
   })
 
   it("shows empty state when no folders", () => {
-    render(<FolderTree {...defaultProps} folders={[]} />)
+    renderWithTooltip(<FolderTree {...defaultProps} folders={[]} />)
     expect(screen.getByText("No folders yet")).toBeInTheDocument()
     expect(
       screen.getByText("Create a folder to organize your documents.")
@@ -67,7 +72,7 @@ describe("FolderTree", () => {
   })
 
   it("Root node is highlighted (bg-accent) when no folder selected", () => {
-    const { container } = render(
+    renderWithTooltip(
       <FolderTree {...defaultProps} selectedFolderId={null} />
     )
     // The Root row should have bg-accent
@@ -77,20 +82,24 @@ describe("FolderTree", () => {
 
   it("clicking a folder node calls onSelectFolder with folder id", () => {
     const onSelectFolder = vi.fn()
-    render(<FolderTree {...defaultProps} onSelectFolder={onSelectFolder} />)
+    renderWithTooltip(
+      <FolderTree {...defaultProps} onSelectFolder={onSelectFolder} />
+    )
     fireEvent.click(screen.getByText("Alpha"))
     expect(onSelectFolder).toHaveBeenCalledWith("folder-1")
   })
 
   it("clicking Root calls onSelectFolder(null)", () => {
     const onSelectFolder = vi.fn()
-    render(<FolderTree {...defaultProps} onSelectFolder={onSelectFolder} />)
+    renderWithTooltip(
+      <FolderTree {...defaultProps} onSelectFolder={onSelectFolder} />
+    )
     fireEvent.click(screen.getByText("Root"))
     expect(onSelectFolder).toHaveBeenCalledWith(null)
   })
 
   it("global folder shows Globe icon", () => {
-    const { container } = render(<FolderTree {...defaultProps} />)
+    const { container } = renderWithTooltip(<FolderTree {...defaultProps} />)
     // Beta is global — should have a Globe icon (data-testid='globe-icon')
     const globeIcons = container.querySelectorAll("[data-testid='globe-icon']")
     expect(globeIcons.length).toBeGreaterThan(0)
@@ -108,7 +117,7 @@ describe("FolderTree", () => {
         updated_at: "2026-01-01T00:00:00Z",
       },
     ]
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <FolderTree {...defaultProps} folders={privateFolders} />
     )
     const globeIcons = container.querySelectorAll("[data-testid='globe-icon']")
