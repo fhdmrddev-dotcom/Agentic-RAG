@@ -39,11 +39,15 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - ✓ Text-to-SQL tool (`query_documents`) — Module 7
 - ✓ Web search fallback (Tavily) — Module 7
 
+### Validated
+
+- ✓ Nested folder structure with unlimited depth — Phase 1
+- ✓ Global folders (shared across all users) and per-user folders (private) — Phase 1
+- ✓ Document-folder integration (folder_id FK on documents, move document, move folder) — Phase 2
+- ✓ Store full extracted markdown alongside chunks for grep/read operations — Phase 2
+
 ### Active
 
-- [ ] Nested folder structure with unlimited depth
-- [ ] Global folders (shared across all users) and per-user folders (private)
-- [ ] Store full extracted markdown alongside chunks for grep/read operations
 - [ ] `ls` tool — list files and subfolders in a given path
 - [ ] `tree` tool — hierarchical structure with depth limit and truncation
 - [ ] `grep` tool — regex search over document content, returns matching document names
@@ -51,9 +55,7 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - [ ] `read` tool — read full document or line range (split at newlines)
 - [ ] Explorer sub-agent — orchestrates KB tools + document analysis agent for deep exploration
 - [ ] Folder CRUD in ingestion UI (create, rename, delete folders)
-- [ ] Move files between folders
-- [ ] Move folders (with contents)
-- [ ] Upload files to selected folder
+- [ ] Upload files to selected folder in UI
 - [ ] Visual indicator in UI for global vs per-user folders
 
 ### Out of Scope
@@ -97,9 +99,9 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Store full markdown alongside chunks | Enables efficient grep/read without reconstruction from chunks | — Pending |
-| Unlimited folder nesting depth | Flexibility like a real filesystem | — Pending |
-| Global + per-user folders (no teams) | Avoids permission complexity while enabling shared content | — Pending |
+| Store full markdown alongside chunks | Enables efficient grep/read without reconstruction from chunks | Implemented in Phase 2 — `full_markdown` column on documents, stored on ingest |
+| Unlimited folder nesting depth | Flexibility like a real filesystem | Implemented in Phase 1 — adjacency list with no depth limit |
+| Global + per-user folders (no teams) | Avoids permission complexity while enabling shared content | Implemented in Phase 1 — `is_global` flag on folders with RLS |
 | grep returns document names only | Keeps output lightweight; use read for content | — Pending |
 | tree uses depth limit + truncation | Protects context window for large KBs | — Pending |
 | Keep pypdf + python-docx (not Docling) | Already working; avoids migration risk | — Pending |
@@ -122,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-21 after milestone v1.0 initialization*
+*Last updated: 2026-03-21 after Phase 2 complete (document-folder-integration)*
