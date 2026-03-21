@@ -43,7 +43,7 @@ Declared values (multiples of 4):
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level spacing |
 
-Exceptions: ToolCallPanel rows use 14px (px-3.5) horizontal padding — matching existing pattern from ToolCallPanel.tsx. Do not normalize; consistency with existing component overrides the scale.
+The `read_document` row in ToolCallPanel inherits existing row padding from the parent container. No new spacing value is introduced by this phase.
 
 Source: Observed in `ToolCallPanel.tsx` and `DocumentList.tsx`.
 
@@ -53,12 +53,13 @@ Source: Observed in `ToolCallPanel.tsx` and `DocumentList.tsx`.
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 14px (text-sm) | 400 | 1.5 |
-| Label | 12px (text-xs) | 500 (font-medium) | 1.4 |
-| Heading | 20px (text-xl, markdown h1 = 20px) | 700 | 1.3 |
-| Display | 28px | 600 (semibold) | 1.2 |
+| Body | 14px (text-sm) | 400 (regular) | 1.5 |
+| Display | 28px | 400 (regular) | 1.2 |
+| Label | 12px (text-xs) | 500 (medium) | 1.4 |
+| Heading | 20px (text-xl, markdown h1 = 20px) | 500 (medium) | 1.3 |
 
 Notes:
+- Two weights only: 400 (regular) for Body and Display; 500 (medium) for Label and Heading.
 - ToolCallPanel tool labels use 12px at weight 500 — matches Label role above.
 - Read tool output displayed inside ToolCallPanel uses monospace 12px (matching existing `.markdown pre` pattern: `font-size: 0.78rem`, `font-family: ui-monospace, monospace`, `line-height: 1.6`).
 - Line-numbered content: use monospace at 12px, line-height 1.6, matching the existing `markdown pre` token.
