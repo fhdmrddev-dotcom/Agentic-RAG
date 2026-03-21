@@ -3,6 +3,7 @@ import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 export type ActiveView = "chat" | "documents" | "settings"
 
@@ -23,11 +24,13 @@ function App() {
   }
 
   return (
-    <ChatLayout
-      onSignOut={signOut}
-      activeView={activeView}
-      onNavigate={setActiveView}
-    />
+    <TooltipProvider>
+      <ChatLayout
+        onSignOut={signOut}
+        activeView={activeView}
+        onNavigate={setActiveView}
+      />
+    </TooltipProvider>
   )
 }
 
