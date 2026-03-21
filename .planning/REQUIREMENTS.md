@@ -12,14 +12,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **FOLDER-01**: User can create folders with unlimited nesting depth
 - [x] **FOLDER-02**: User can rename existing folders
 - [x] **FOLDER-03**: User can delete folders (cascades to contents)
-- [ ] **FOLDER-04**: User can move folders to a different parent folder
+- [x] **FOLDER-04**: User can move folders to a different parent folder
 - [x] **FOLDER-05**: System supports global folders (visible to all users) and per-user folders (private)
 
 ### Document Management
 
-- [ ] **DOC-01**: User can upload files into a specific folder
-- [ ] **DOC-02**: User can move files between folders
-- [ ] **DOC-03**: System stores full extracted markdown alongside chunks for each document
+- [x] **DOC-01**: User can upload files into a specific folder
+- [x] **DOC-02**: User can move files between folders
+- [x] **DOC-03**: System stores full extracted markdown alongside chunks for each document
 
 ### KB Exploration Tools
 
@@ -99,11 +99,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOLDER-01 | Phase 1 | Complete |
 | FOLDER-02 | Phase 1 | Complete |
 | FOLDER-03 | Phase 1 | Complete |
-| FOLDER-04 | Phase 2 | Pending |
+| FOLDER-04 | Phase 2 | Complete |
 | FOLDER-05 | Phase 1 | Complete |
-| DOC-01 | Phase 2 | Pending |
-| DOC-02 | Phase 2 | Pending |
-| DOC-03 | Phase 2 | Pending |
+| DOC-01 | Phase 2 | Complete |
+| DOC-02 | Phase 2 | Complete |
+| DOC-03 | Phase 2 | Complete |
 | TOOL-01 | Phase 4 | Pending |
 | TOOL-02 | Phase 4 | Pending |
 | TOOL-03 | Phase 5 | Pending |

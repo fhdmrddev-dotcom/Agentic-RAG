@@ -52,7 +52,7 @@ Plans:
   4. Every ingested document has its full extracted markdown stored in the database alongside its chunks, accessible for grep and read operations
 **Plans**: 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Migration SQL, Pydantic model updates, and API endpoint changes
+- [x] 02-01-PLAN.md — Migration SQL, Pydantic model updates, and API endpoint changes
 - [ ] 02-02-PLAN.md — Integration tests for document-folder features
 
 ### Phase 3: Ingestion UI
