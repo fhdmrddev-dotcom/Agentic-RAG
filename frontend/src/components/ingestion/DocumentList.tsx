@@ -83,7 +83,7 @@ export function DocumentList({ documents, onDelete, folderId }: Props) {
     folderId === undefined
       ? documents
       : folderId === null
-        ? documents.filter((d) => d.folder_id === null)
+        ? documents.filter((d) => d.folder_id == null)  // == catches null AND undefined (pre-migration docs)
         : documents.filter((d) => d.folder_id === folderId)
 
   const toggle = (id: string) =>
@@ -97,11 +97,11 @@ export function DocumentList({ documents, onDelete, folderId }: Props) {
     return (
       <div>
         <p className="text-sm text-muted-foreground text-center py-8">
-          {folderId === null || folderId === undefined
+          {folderId == null
             ? "No documents uploaded yet."
             : "No documents in this folder"}
         </p>
-        {folderId !== null && folderId !== undefined && (
+        {folderId != null && (
           <p className="text-xs text-muted-foreground text-center">
             Upload files above to add them here.
           </p>
