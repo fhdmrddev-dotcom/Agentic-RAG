@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-folder-schema-core-apis 01-01-PLAN.md
-last_updated: "2026-03-21T12:29:04.345Z"
+stopped_at: Completed 01-folder-schema-core-apis 01-02-PLAN.md
+last_updated: "2026-03-21T12:33:47.377Z"
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -47,6 +47,7 @@ Plan: 2 of 2
 
 *Updated after each plan completion*
 | Phase 01-folder-schema-core-apis P01 | 2 | 2 tasks | 4 files |
+| Phase 01-folder-schema-core-apis P02 | 3min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,7 @@ Recent decisions affecting current work:
 - [Phase 01-folder-schema-core-apis]: Any authenticated user can create global folders — no admin concept in v1.0
 - [Phase 01-folder-schema-core-apis]: GET /folders returns owned + global in single list with is_global field for frontend distinction
 - [Phase 01-folder-schema-core-apis]: parent_id validation on create verifies parent is accessible (owned OR global) to prevent cross-user nesting
+- [Phase 01-folder-schema-core-apis]: or_() breaks MagicMock chain by default — restore with mock_builder.or_.return_value = mock_builder in tests needing it
 
 ### Pending Todos
 
@@ -74,6 +76,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21T12:29:04.341Z
-Stopped at: Completed 01-folder-schema-core-apis 01-01-PLAN.md
+Last session: 2026-03-21T12:33:47.373Z
+Stopped at: Completed 01-folder-schema-core-apis 01-02-PLAN.md
 Resume file: None

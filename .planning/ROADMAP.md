@@ -38,7 +38,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 Plans:
 - [x] 01-01-PLAN.md — Migration SQL, Pydantic models, and CRUD API endpoints
-- [ ] 01-02-PLAN.md — Integration tests for folder CRUD endpoints
+- [x] 01-02-PLAN.md — Integration tests for folder CRUD endpoints
 
 ### Phase 2: Document-Folder Integration
 **Goal**: Documents belong to folders, full extracted markdown is stored alongside chunks, and users can reorganize both files and folders
