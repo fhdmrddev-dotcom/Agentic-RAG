@@ -99,6 +99,41 @@ async def ls(
     return LsResponse(path=path, folders=folder_entries, documents=doc_result.data)
 
 
+def _collect_folder_ids(node: dict) -> list[str]:
+    """Collect all folder IDs in the subtree (BFS) including the node itself."""
+    ids = [node["id"]]
+    queue = list(node["children"])
+    while queue:
+        current = queue.pop(0)
+        ids.append(current["id"])
+        queue.extend(current["children"])
+    return ids
+
+
+def _serialize_tree(node: dict, current_depth: int, max_depth: int | None) -> dict:
+    """Recursively serialize a folder node. Truncate at max_depth."""
+    if max_depth is not None and current_depth >= max_depth:
+        has_content = len(node["children"]) + len(node["documents"]) > 0
+        return {
+            "id": node["id"],
+            "name": node["name"],
+            "type": "folder",
+            "is_global": node["is_global"],
+            "truncated": has_content,
+            "children": [],
+            "documents": [],
+        }
+    return {
+        "id": node["id"],
+        "name": node["name"],
+        "type": "folder",
+        "is_global": node["is_global"],
+        "truncated": False,
+        "children": [_serialize_tree(c, current_depth + 1, max_depth) for c in node["children"]],
+        "documents": node["documents"],
+    }
+
+
 @router.get("/tree", response_model=TreeResponse)
 async def tree(
     path: str = Query(default="/", description="Folder path, e.g. /reports"),
@@ -106,4 +141,65 @@ async def tree(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    pass  # Implemented in Plan 02
+    all_folders = _fetch_visible_folders(supabase, current_user["id"])
+    nodes, roots = _build_tree_map(all_folders)
+
+    if path.strip("/") == "":
+        # Root tree: all root nodes
+        target_nodes = roots
+    else:
+        target = _resolve_path(path, roots)
+        if target is None:
+            raise HTTPException(status_code=404, detail="Path not found")
+        target_nodes = [target]
+
+    # Collect all folder IDs in the target subtree(s) for document fetch
+    all_ids = []
+    for tn in target_nodes:
+        all_ids.extend(_collect_folder_ids(tn))
+
+    # Fetch documents in the subtree (guard against empty list — avoids in_() empty list error)
+    if all_ids:
+        doc_result = (
+            supabase.table("documents")
+            .select("id, filename, folder_id, status, created_at")
+            .in_("folder_id", all_ids)
+            .eq("user_id", current_user["id"])
+            .execute()
+        )
+        docs_by_folder: dict[str, list[dict]] = {}
+        for doc in doc_result.data:
+            fid = doc["folder_id"]
+            if fid not in docs_by_folder:
+                docs_by_folder[fid] = []
+            docs_by_folder[fid].append({
+                "id": doc["id"],
+                "filename": doc["filename"],
+                "status": doc["status"],
+                "created_at": doc["created_at"],
+            })
+    else:
+        docs_by_folder = {}
+
+    # Attach documents to nodes (mutates the in-memory tree)
+    for fid, doc_list in docs_by_folder.items():
+        if fid in nodes:
+            nodes[fid]["documents"] = doc_list
+
+    # For root tree, also fetch root-level documents (folder_id IS NULL)
+    if path.strip("/") == "":
+        root_doc_result = (
+            supabase.table("documents")
+            .select("id, filename, status, created_at")
+            .is_("folder_id", "null")
+            .eq("user_id", current_user["id"])
+            .execute()
+        )
+        root_docs = root_doc_result.data  # noqa: F841 — available for future use
+    else:
+        root_docs = []  # noqa: F841
+
+    # Serialize with depth limit
+    serialized = [_serialize_tree(tn, 0, depth) for tn in target_nodes]
+
+    return TreeResponse(path=path, depth=depth, tree=serialized)
