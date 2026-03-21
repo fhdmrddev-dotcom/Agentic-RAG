@@ -50,8 +50,8 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 
 - ✓ `ls` tool — list files and subfolders in a given path — Validated in Phase 04: navigation-tools
 - ✓ `tree` tool — hierarchical structure with depth limit and truncation — Validated in Phase 04: navigation-tools
-- [ ] `grep` tool — regex search over document content, returns matching document names
-- [ ] `glob` tool — file pattern matching against document names (e.g., `*.md`, `reports/**/*.pdf`)
+- ✓ `grep` tool — regex search over document content, returns matching document names — Validated in Phase 05: search-tools
+- ✓ `glob` tool — file pattern matching against document names (e.g., `*.md`, `reports/**/*.pdf`) — Validated in Phase 05: search-tools
 - [ ] `read` tool — read full document or line range (split at newlines)
 - [ ] Explorer sub-agent — orchestrates KB tools + document analysis agent for deep exploration
 - [ ] Folder CRUD in ingestion UI (create, rename, delete folders)
@@ -102,7 +102,7 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 | Store full markdown alongside chunks | Enables efficient grep/read without reconstruction from chunks | Implemented in Phase 2 — `full_markdown` column on documents, stored on ingest |
 | Unlimited folder nesting depth | Flexibility like a real filesystem | Implemented in Phase 1 — adjacency list with no depth limit |
 | Global + per-user folders (no teams) | Avoids permission complexity while enabling shared content | Implemented in Phase 1 — `is_global` flag on folders with RLS |
-| grep returns document names only | Keeps output lightweight; use read for content | — Pending |
+| grep returns document names only | Keeps output lightweight; use read for content | Implemented in Phase 5 — `grep_path` returns id/filename/folder_id only |
 | tree uses depth limit + truncation | Protects context window for large KBs | Implemented in Phase 4 — `truncated=True` on cut nodes, depth param |
 | Keep pypdf + python-docx (not Docling) | Already working; avoids migration risk | — Pending |
 
@@ -124,4 +124,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-21 after Phase 2 complete (document-folder-integration)*
+*Last updated: 2026-03-22 after Phase 5 complete (search-tools)*
