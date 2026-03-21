@@ -65,7 +65,11 @@ Plans:
   3. User can create a new folder, rename an existing folder, and delete a folder entirely from the UI without page reload
   4. When a folder is selected in the tree, a file upload targets that folder and the document appears under it after ingestion completes
   5. The folder tree updates in real time as folders are created, renamed, or deleted without requiring a manual refresh
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 03-01-PLAN.md — Types, API functions, buildFolderTree utility, and useFolders hook
+- [ ] 03-02-PLAN.md — FolderNode, FolderCreateInput, and FolderTree components with shadcn installs
+- [ ] 03-03-PLAN.md — IngestionPage two-panel layout, DocumentUpload/DocumentList modifications, and visual verification
 
 ### Phase 4: Navigation Tools
 **Goal**: The agent can enumerate files and folders at any path using ls and tree, with output sized to fit context window constraints
@@ -122,7 +126,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Folder Schema & Core APIs | 2/2 | Complete | 2026-03-21 |
 | 2. Document-Folder Integration | 2/2 | Complete | 2026-03-21 |
-| 3. Ingestion UI | 0/? | Not started | - |
+| 3. Ingestion UI | 0/3 | Not started | - |
 | 4. Navigation Tools | 0/? | Not started | - |
 | 5. Search Tools | 0/? | Not started | - |
 | 6. Read Tool | 0/? | Not started | - |
