@@ -300,3 +300,64 @@ class TestDeleteFolder:
         builder = _supabase.table.return_value
         eq_calls = [str(c) for c in builder.eq.call_args_list]
         assert any(FOLDER_ID in c for c in eq_calls)
+
+
+# ── PATCH /folders/{id}/move ──────────────────────────────────────────────────
+
+class TestMoveFolder:
+    def test_move_to_valid_parent(self, client, auth_headers, mock_builder):
+        """PATCH /folders/{id}/move with valid parent returns 200."""
+        PARENT_ID = str(uuid4())
+        mock_builder.or_.return_value = mock_builder
+        mock_builder.execute.side_effect = [
+            _make_result({"id": PARENT_ID}),                         # parent validation
+            _make_result([_folder_row(parent_id=PARENT_ID)]),        # update result
+        ]
+        response = client.patch(
+            f"/folders/{FOLDER_ID}/move",
+            headers=auth_headers,
+            json={"parent_id": PARENT_ID},
+        )
+        assert response.status_code == 200
+        assert response.json()["parent_id"] == PARENT_ID
+
+    def test_move_to_root(self, client, auth_headers, mock_builder):
+        """PATCH /folders/{id}/move with parent_id=null moves to root."""
+        mock_builder.execute.side_effect = [
+            _make_result([_folder_row(parent_id=None)]),  # update result (no parent validation)
+        ]
+        response = client.patch(
+            f"/folders/{FOLDER_ID}/move",
+            headers=auth_headers,
+            json={"parent_id": None},
+        )
+        assert response.status_code == 200
+        assert response.json()["parent_id"] is None
+
+    def test_move_to_invalid_parent(self, client, auth_headers, mock_builder):
+        """PATCH /folders/{id}/move with non-existent parent returns 404."""
+        PARENT_ID = str(uuid4())
+        mock_builder.or_.return_value = mock_builder
+        mock_builder.execute.side_effect = [
+            _make_result(None),  # parent validation: not found
+        ]
+        response = client.patch(
+            f"/folders/{FOLDER_ID}/move",
+            headers=auth_headers,
+            json={"parent_id": PARENT_ID},
+        )
+        assert response.status_code == 404
+        assert "Parent folder not found" in response.json()["detail"]
+
+    def test_move_folder_not_owned(self, client, auth_headers, mock_builder):
+        """PATCH /folders/{id}/move on folder not owned by user returns 404."""
+        mock_builder.execute.side_effect = [
+            _make_result([]),  # update returns empty (folder not owned)
+        ]
+        response = client.patch(
+            f"/folders/{FOLDER_ID}/move",
+            headers=auth_headers,
+            json={"parent_id": None},
+        )
+        assert response.status_code == 404
+        assert "Folder not found" in response.json()["detail"]
