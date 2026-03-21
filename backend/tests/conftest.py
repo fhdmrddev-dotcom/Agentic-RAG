@@ -40,6 +40,8 @@ def _make_builder(execute_result):
     b.limit.return_value = b
     b.single.return_value = b
     b.maybe_single.return_value = b
+    b.is_.return_value = b
+    b.or_.return_value = b
     b.execute.return_value = execute_result
     b.execute.side_effect = None
     return b
@@ -100,6 +102,8 @@ def reset_mocks():
     _builder.limit.return_value = _builder
     _builder.single.return_value = _builder
     _builder.maybe_single.return_value = _builder
+    _builder.is_.return_value = _builder
+    _builder.or_.return_value = _builder
     _builder.execute.side_effect = None
     _builder.execute.return_value = _execute_result
 
