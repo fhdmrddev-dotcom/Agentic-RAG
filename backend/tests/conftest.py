@@ -34,8 +34,10 @@ def _make_builder(execute_result):
     b.update.return_value = b
     b.delete.return_value = b
     b.eq.return_value = b
+    b.neq.return_value = b
     b.in_.return_value = b
     b.order.return_value = b
+    b.limit.return_value = b
     b.single.return_value = b
     b.maybe_single.return_value = b
     b.execute.return_value = execute_result
@@ -92,8 +94,10 @@ def reset_mocks():
     _builder.update.return_value = _builder
     _builder.delete.return_value = _builder
     _builder.eq.return_value = _builder
+    _builder.neq.return_value = _builder
     _builder.in_.return_value = _builder
     _builder.order.return_value = _builder
+    _builder.limit.return_value = _builder
     _builder.single.return_value = _builder
     _builder.maybe_single.return_value = _builder
     _builder.execute.side_effect = None
