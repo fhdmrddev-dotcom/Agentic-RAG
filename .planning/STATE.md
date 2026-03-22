@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 06-read-tool-02-PLAN.md
-last_updated: "2026-03-22T06:47:31.017Z"
+stopped_at: Completed 06-read-tool 06-01-PLAN.md
+last_updated: "2026-03-22T06:49:24.322Z"
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
 ---
 
 # Project State
@@ -57,6 +57,7 @@ Plan: 2 of 2
 | Phase 05-search-tools P01 | 2min | 2 tasks | 3 files |
 | Phase 05-search-tools P02 | 4min | 2 tasks | 5 files |
 | Phase 06-read-tool P02 | 1min | 1 tasks | 1 files |
+| Phase 06-read-tool P01 | 2min 43sec | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Recent decisions affecting current work:
 - [Phase 05-search-tools]: glob_path matches against both full path and filename alone to support simple patterns like *.pdf regardless of folder depth
 - [Phase 06-read-tool]: toolSummary uses document_id (not filename) because args-only data available during streaming
 - [Phase 06-read-tool]: ReadDocumentResult renders error inline with text-destructive matching component-per-tool pattern
+- [Phase 06-read-tool]: Wrap single().execute() in try/except for zero-row guard (supabase-py raises APIError on zero rows)
+- [Phase 06-read-tool]: end_line clamped silently — LLM may guess large end_line; partial results better than error
 
 ### Pending Todos
 
@@ -112,6 +115,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T06:47:31.013Z
-Stopped at: Completed 06-read-tool-02-PLAN.md
+Last session: 2026-03-22T06:49:24.318Z
+Stopped at: Completed 06-read-tool 06-01-PLAN.md
 Resume file: None

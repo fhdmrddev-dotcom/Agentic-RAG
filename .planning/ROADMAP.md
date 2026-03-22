@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Ingestion UI** - Folder tree visualization with CRUD controls and folder-targeted uploads
 - [x] **Phase 4: Navigation Tools** - ls and tree tools for browsing folder structure
 - [x] **Phase 5: Search Tools** - grep and glob tools for content and filename searching
-- [ ] **Phase 6: Read Tool** - Full document and line-range reading capability
+- [x] **Phase 6: Read Tool** - Full document and line-range reading capability (completed 2026-03-22)
 - [ ] **Phase 7: Explorer Sub-Agent** - Orchestration agent with access to all KB tools
 
 ## Phase Details
@@ -111,7 +111,7 @@ Plans:
   4. Line-range output includes the line numbers in the response so the agent can orient further reads
 **Plans**: 2 plans
 Plans:
-- [ ] 06-01-PLAN.md — Backend read_path helper, ReadResponse model, endpoint, OpenAI tool spec, threads.py wiring, and integration tests (TOOL-05, TOOL-06)
+- [x] 06-01-PLAN.md — Backend read_path helper, ReadResponse model, endpoint, OpenAI tool spec, threads.py wiring, and integration tests (TOOL-05, TOOL-06)
 - [x] 06-02-PLAN.md — Frontend ToolCallPanel extension with ReadDocumentResult component (TOOL-05, TOOL-06)
 
 ### Phase 7: Explorer Sub-Agent
@@ -138,5 +138,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Ingestion UI | 3/3 | Complete | 2026-03-21 |
 | 4. Navigation Tools | 2/2 | Complete | 2026-03-22 |
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
-| 6. Read Tool | 1/2 | In Progress|  |
+| 6. Read Tool | 2/2 | Complete   | 2026-03-22 |
 | 7. Explorer Sub-Agent | 0/? | Not started | - |
