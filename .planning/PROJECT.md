@@ -52,7 +52,7 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - ✓ `tree` tool — hierarchical structure with depth limit and truncation — Validated in Phase 04: navigation-tools
 - ✓ `grep` tool — regex search over document content, returns matching document names — Validated in Phase 05: search-tools
 - ✓ `glob` tool — file pattern matching against document names (e.g., `*.md`, `reports/**/*.pdf`) — Validated in Phase 05: search-tools
-- [ ] `read` tool — read full document or line range (split at newlines)
+- ✓ `read` tool — read full document or line range (split at newlines) — Validated in Phase 06: read-tool
 - [ ] Explorer sub-agent — orchestrates KB tools + document analysis agent for deep exploration
 - [ ] Folder CRUD in ingestion UI (create, rename, delete folders)
 - [ ] Upload files to selected folder in UI
