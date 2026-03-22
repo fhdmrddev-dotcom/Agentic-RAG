@@ -17,12 +17,12 @@ from app.services.retrieval_service import search_documents, resolve_document_id
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
 from app.services.sub_agent_service import run_sub_agent
-from app.api.kb import ls_path, tree_path, grep_path, glob_path
+from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant. You have eight tools — use the RIGHT one for each question:\n\n"
+    "You are a helpful AI assistant. You have nine tools — use the RIGHT one for each question:\n\n"
     "1. ls — List the immediate contents (subfolders and documents) at a folder path. "
     "Use for browsing and navigation: 'what folders do I have?', 'what's in my Reports folder?', "
     "'list documents in /Finance/Q1', 'show me the subfolders of Research'. "
@@ -38,24 +38,28 @@ SYSTEM_PROMPT = (
     "4. glob — Find documents by filename pattern using glob syntax. Use for locating files by "
     "name or extension: 'find all PDFs', 'find files named report*', 'find .docx files in reports'. "
     "Supports *, ?, **.\n\n"
-    "5. query_documents — Run a SQL SELECT against the documents or folders tables. "
+    "5. read_document — Read the full markdown content of a document (or a specific line range) by its document_id. "
+    "Use AFTER grep or glob to inspect actual content. Pass start_line/end_line for a targeted section. "
+    "Line-range output includes line numbers for orientation. document_id is a UUID from grep/glob/ls results.\n\n"
+    "6. query_documents — Run a SQL SELECT against the documents or folders tables. "
     "Use for analytical/structured questions: 'how many documents do I have?', "
     "'list all PDFs', 'which files were uploaded in 2024?', 'which folder is X in?'. "
     "Do NOT add a user_id filter. "
     "Example: SELECT d.filename FROM documents d JOIN folders f ON d.folder_id = f.id "
     "WHERE f.name = 'Research'.\n\n"
-    "6. search_documents — Find information INSIDE document contents using semantic search. "
+    "7. search_documents — Find information INSIDE document contents using semantic search. "
     "Use metadata_filter to narrow by document_type, author, language, or date.\n\n"
-    "7. analyze_document — Read the FULL content of a specific document for tasks requiring "
+    "8. analyze_document — Read the FULL content of a specific document for tasks requiring "
     "the entire document: summarization, detailed analysis, comparison, extracting all key points. "
     "You can use a partial or approximate filename — it will be matched automatically. "
     "Do NOT use search_documents for whole-document analysis tasks.\n\n"
-    "8. web_search — Search the web for current events, software versions, news, or general world "
+    "9. web_search — Search the web for current events, software versions, news, or general world "
     "knowledge UNLIKELY to be in the user's uploaded documents. Always include the source URL.\n\n"
     "Key rules:\n"
     "- Browse/navigate folders → ls or tree\n"
     "- Find documents by content pattern → grep\n"
     "- Find documents by filename pattern → glob\n"
+    "- Read full document content or a line range → read_document\n"
     "- Analytical questions about the library (counts, filters, joins) → query_documents\n"
     "- Find information inside documents → search_documents\n"
     "- Deep analysis/summary of a whole document → analyze_document\n"
@@ -299,6 +303,15 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "glob":
                             result = glob_path(args.get("pattern", ""), current_user["id"], supabase)
+                            tool_result = json.dumps(result)
+                        elif tool_name == "read_document":
+                            result = read_path(
+                                args["document_id"],
+                                current_user["id"],
+                                supabase,
+                                args.get("start_line"),
+                                args.get("end_line"),
+                            )
                             tool_result = json.dumps(result)
                         elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None

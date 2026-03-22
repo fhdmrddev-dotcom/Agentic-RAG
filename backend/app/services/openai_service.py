@@ -180,6 +180,39 @@ GLOB_TOOL = {
     },
 }
 
+READ_DOCUMENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "read_document",
+        "description": (
+            "Read the raw markdown content of a document by its ID. "
+            "Use after grep or glob to inspect the full content or a specific section. "
+            "Provide start_line and end_line to read a specific range (1-based, inclusive). "
+            "Omit both to read the full document. "
+            "Line-range results include line numbers so you can orient further reads."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_id": {
+                    "type": "string",
+                    "description": "UUID of the document to read.",
+                },
+                "start_line": {
+                    "type": "integer",
+                    "description": "First line to return (1-based, inclusive). Omit for full document.",
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "Last line to return (1-based, inclusive). Omit for full document.",
+                },
+            },
+            "required": ["document_id"],
+        },
+    },
+}
+
+
 WEB_SEARCH_TOOL = {
     "type": "function",
     "function": {
@@ -235,7 +268,7 @@ ANALYZE_DOCUMENT_TOOL = {
 
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, ANALYZE_DOCUMENT_TOOL]
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     return tools
