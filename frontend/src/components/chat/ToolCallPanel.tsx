@@ -3,9 +3,10 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  Folder,
+  Folder, BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ToolCall, SubAgentState } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 
@@ -23,6 +24,7 @@ function toolIcon(name: string) {
   if (name === "tree") return <GitBranch className="w-3.5 h-3.5" />
   if (name === "grep") return <TextSearch className="w-3.5 h-3.5" />
   if (name === "glob") return <FileSearch className="w-3.5 h-3.5" />
+  if (name === "read_document") return <BookOpen className="w-3.5 h-3.5" />
   return <Wrench className="w-3.5 h-3.5" />
 }
 
@@ -35,10 +37,12 @@ function toolLabel(name: string) {
   if (name === "tree") return "Browsing folder tree"
   if (name === "grep") return "Searching file contents"
   if (name === "glob") return "Finding files by pattern"
+  if (name === "read_document") return "Reading document"
   return name
 }
 
 function toolSummary(tc: ToolCall) {
+  if (tc.name === "read_document" && tc.args.document_id) return tc.args.document_id
   if (tc.name === "ls" && tc.args.path) return tc.args.path
   if (tc.name === "tree" && tc.args.path) return tc.args.path
   if (tc.name === "grep" && tc.args.pattern) return tc.args.pattern
@@ -205,11 +209,50 @@ function GlobResult({ parsed }: { parsed: any }) {
   )
 }
 
+function ReadDocumentResult({ parsed }: { parsed: any }) {
+  const [open, setOpen] = useState(false)
+
+  if (!parsed) return null
+
+  if (parsed.error) {
+    return <div className="mt-1 text-xs text-destructive italic">{parsed.error}</div>
+  }
+
+  const isRange = parsed.start_line != null && parsed.end_line != null
+  const header = isRange
+    ? `Lines ${parsed.start_line}\u2013${parsed.end_line}`
+    : "Full document"
+  const content: string = parsed.content ?? ""
+
+  return (
+    <div className="mt-1.5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground/70 transition-colors"
+      >
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <span>{header}</span>
+      </button>
+      {open && (
+        <div className="mt-1.5 ml-4 rounded-md border border-border/40 bg-background/60">
+          <ScrollArea className="max-h-64">
+            <pre className="p-2 text-xs font-mono leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
+              {content || <span className="italic text-muted-foreground">No content available for this document.</span>}
+            </pre>
+          </ScrollArea>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function renderResult(name: string, parsed: any): React.ReactNode {
   if (name === "ls") return <LsResult parsed={parsed} />
   if (name === "tree") return <TreeResult parsed={parsed} />
   if (name === "grep") return <GrepResult parsed={parsed} />
   if (name === "glob") return <GlobResult parsed={parsed} />
+  if (name === "read_document") return <ReadDocumentResult parsed={parsed} />
   return null
 }
 
