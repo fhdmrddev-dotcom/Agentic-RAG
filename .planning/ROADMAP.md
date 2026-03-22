@@ -124,7 +124,10 @@ Plans:
   3. Explorer sub-agent returns a coherent synthesized answer — not raw JSON tool output — that directly addresses the user's question
   4. Explorer sub-agent handles the case where no matching documents are found and communicates this clearly instead of returning empty results silently
   5. Explorer sub-agent is accessible from the main chat interface as a selectable agent mode
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 07-01-PLAN.md — Backend: agent_mode on MessageCreate, explorer system prompt, KB-only tool list, send_message branching, unit tests (AGENT-01, AGENT-02, AGENT-03)
+- [ ] 07-02-PLAN.md — Frontend: agent_mode in API/hook layers, mode selector dropdown in chat toolbar, visual verification (AGENT-01, AGENT-03)
 
 ## Progress
 
@@ -139,4 +142,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Navigation Tools | 2/2 | Complete | 2026-03-22 |
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
 | 6. Read Tool | 2/2 | Complete   | 2026-03-22 |
-| 7. Explorer Sub-Agent | 0/? | Not started | - |
+| 7. Explorer Sub-Agent | 0/2 | Not started | - |
