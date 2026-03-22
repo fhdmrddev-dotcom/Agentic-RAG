@@ -16,6 +16,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
+  const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
 
   useEffect(() => {
     getSettings()
@@ -37,7 +38,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
     if (!activeThread) {
       activeThread = await onCreateThread()
     }
-    await sendMessage(activeThread.id, content, selectedModel || undefined, onTitleUpdate)
+    await sendMessage(activeThread.id, content, selectedModel || undefined, onTitleUpdate, agentMode)
   }
 
   const inputBar = (
@@ -47,6 +48,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
       models={models}
       selectedModel={selectedModel}
       onModelChange={setSelectedModel}
+      agentMode={agentMode}
+      onAgentModeChange={setAgentMode}
     />
   )
 

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Cpu } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,9 +16,11 @@ interface Props {
   models?: string[]
   selectedModel?: string
   onModelChange?: (model: string) => void
+  agentMode?: "default" | "explorer"
+  onAgentModeChange?: (mode: "default" | "explorer") => void
 }
 
-export function MessageInput({ onSend, disabled, models = [], selectedModel, onModelChange }: Props) {
+export function MessageInput({ onSend, disabled, models = [], selectedModel, onModelChange, agentMode = "default", onAgentModeChange }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -80,7 +82,7 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
 
         {/* Bottom toolbar */}
         <div className="flex items-center justify-between px-2 pb-2 pt-1">
-          {/* Left: model selector */}
+          {/* Left: model selector + agent mode selector */}
           <div className="flex items-center">
             {showModelSelector ? (
               <DropdownMenu>
@@ -123,6 +125,43 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
                   {displayName(selectedModel)}
                 </span>
               )
+            )}
+            {onAgentModeChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium",
+                      "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                      "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      agentMode === "explorer" && "text-primary",
+                    )}
+                    data-testid="agent-mode-selector"
+                  >
+                    <Compass className="h-3 w-3 shrink-0" />
+                    <span>{agentMode === "explorer" ? "Explorer" : "General"}</span>
+                    <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
+                  <DropdownMenuItem
+                    onSelect={() => onAgentModeChange("default")}
+                    className={cn("text-xs cursor-pointer gap-2", agentMode === "default" && "font-medium bg-accent")}
+                  >
+                    <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    General
+                    {agentMode === "default" && <span className="ml-auto text-[10px] text-muted-foreground">active</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => onAgentModeChange("explorer")}
+                    className={cn("text-xs cursor-pointer gap-2", agentMode === "explorer" && "font-medium bg-accent")}
+                  >
+                    <Compass className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    Explorer
+                    {agentMode === "explorer" && <span className="ml-auto text-[10px] text-muted-foreground">active</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 

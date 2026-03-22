@@ -81,12 +81,13 @@ export async function streamMessage(
   onSubAgentStart?: (filename: string, task: string) => void,
   onSubAgentDelta?: (text: string) => void,
   onSubAgentDone?: () => void,
+  agentMode?: string,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content, model }),
+    body: JSON.stringify({ content, model, agent_mode: agentMode ?? "default" }),
   })
 
   if (!res.ok) throw new Error("Failed to send message")
