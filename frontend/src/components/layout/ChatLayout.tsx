@@ -1,4 +1,4 @@
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { Sidebar } from "./Sidebar"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
@@ -25,11 +25,17 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
     updateThreadTitle,
   } = useThreads()
 
+  const selectedThreadRef = useRef(selectedThread)
+  useEffect(() => {
+    selectedThreadRef.current = selectedThread
+  }, [selectedThread])
+
   const handleTitleUpdate = useCallback(
     (title: string) => {
-      if (selectedThread) updateThreadTitle(selectedThread.id, title)
+      const thread = selectedThreadRef.current
+      if (thread) updateThreadTitle(thread.id, title)
     },
-    [selectedThread, updateThreadTitle],
+    [updateThreadTitle],
   )
 
   return (

@@ -19,6 +19,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
 
   useEffect(() => {
+    setAgentMode("default")
+  }, [thread?.id])
+
+  useEffect(() => {
     getSettings()
       .then((s) => {
         setModels(s.available_models)
