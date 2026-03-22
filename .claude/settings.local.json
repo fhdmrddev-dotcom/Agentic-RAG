@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(source venv/Scripts/activate)",
+      "Bash(powershell -Command \"\n\\\\$pid = \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess\nWrite-Host 'Current listening PID:' \\\\$pid\nif \\(\\\\$pid -and \\\\$pid -gt 0\\) { \n  Stop-Process -Id \\\\$pid -Force -ErrorAction SilentlyContinue\n  Write-Host 'Killed'\n}\nStart-Sleep 2\n\\\\$after = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\nWrite-Host 'Still listening:' \\\\$after.Count\n\" 2>&1)",
+      "Bash(powershell -Command \"\n\\\\$procId = \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess\nWrite-Host 'Listening PID:' \\\\$procId\nStop-Process -Id \\\\$procId -Force -ErrorAction SilentlyContinue\nStart-Sleep 2\n\\\\$after = \\(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue\\).OwningProcess\nWrite-Host 'After kill:' \\\\$after\n\" 2>&1)",
+      "Bash(curl -s http://127.0.0.1:8000/health)",
+      "Bash(tasklist)",
+      "Bash(tasklist /FI \"PID eq 23604\")"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase-local"
+  ]
+}

@@ -280,6 +280,16 @@ Build a hierarchical folder system + AI agent tools to explore the knowledge bas
 - [x] Expanded state renders structured listings: `ls` → folder + file sections with status badges; `tree` → recursive indented hierarchy (3 levels); `grep`/`glob` → scrollable filename/path lists in monospace
 - [x] Defensive JSON parsing (try/catch on `tool_call.result`) — graceful error display on parse failure
 
-### Phase 6: Read Tool 🔲 NOT STARTED
+### Phase 6: Read Tool ✅ COMPLETE
+
+- [x] Plan 01: `ReadResponse` Pydantic model, `read_path()` helper (1-based line slicing, clamp), `GET /kb/read` endpoint, `READ_DOCUMENT_TOOL` registered in `get_tools()`, `threads.py` handler, system prompt updated to 9 tools; 5 integration tests (24 total passing)
+- [x] Plan 02: `ToolCallPanel.tsx` extended — `BookOpen` icon, "Reading document" label, collapsible `ReadDocumentResult` with `ScrollArea` + monospace `<pre>`, error styling in `text-destructive`
+
+#### Notes (Phase 6)
+
+- `read` tool accepts a path and optional `start_line`/`end_line` (1-based, inclusive); omitting line params returns full document
+- Line numbers are prepended to each line in the response for easy navigation
+- `full_markdown` fetched directly from `documents` table — only works on ingested documents
+- System prompt now references 9 tools; `read_document` positioned at slot 5
 
 ### Phase 7: Explorer Sub-Agent 🔲 NOT STARTED
