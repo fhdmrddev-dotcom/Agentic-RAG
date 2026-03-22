@@ -374,3 +374,78 @@ class TestGlob:
         data = response.json()
         assert data["total"] == 1
         assert data["matches"][0]["filename"] == "report.pdf"
+
+
+# ── TestRead ──────────────────────────────────────────────────────────────────
+
+def _doc_row_with_content(doc_id, filename, full_markdown, folder_id=None, status="completed"):
+    row = _doc_row(doc_id, filename, folder_id, status)
+    row["full_markdown"] = full_markdown
+    return row
+
+
+class TestRead:
+    def test_read_full_document(self, client, auth_headers, mock_builder):
+        """GET /kb/read?document_id={id} returns 200 with full markdown content."""
+        mock_builder.execute.return_value = _make_result(
+            _doc_row_with_content(DOC_IN_REPORTS, "report.pdf", "Line one\nLine two\nLine three")
+        )
+        response = client.get(f"/kb/read?document_id={DOC_IN_REPORTS}", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["document_id"] == DOC_IN_REPORTS
+        assert data["filename"] == "report.pdf"
+        assert data["total_lines"] == 3
+        assert data["content"] == "Line one\nLine two\nLine three"
+        assert data["start_line"] is None
+        assert data["end_line"] is None
+
+    def test_read_line_range(self, client, auth_headers, mock_builder):
+        """GET /kb/read?document_id={id}&start_line=2&end_line=3 returns numbered lines."""
+        mock_builder.execute.return_value = _make_result(
+            _doc_row_with_content(DOC_IN_REPORTS, "report.pdf", "Line one\nLine two\nLine three")
+        )
+        response = client.get(
+            f"/kb/read?document_id={DOC_IN_REPORTS}&start_line=2&end_line=3",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["start_line"] == 2
+        assert data["end_line"] == 3
+        assert data["total_lines"] == 3
+        assert "2: Line two" in data["content"]
+        assert "3: Line three" in data["content"]
+
+    def test_read_not_found(self, client, auth_headers, mock_builder):
+        """GET /kb/read?document_id={nonexistent} returns 404."""
+        mock_builder.execute.return_value = _make_result(None)
+        nonexistent_id = str(uuid4())
+        response = client.get(f"/kb/read?document_id={nonexistent_id}", headers=auth_headers)
+        assert response.status_code == 404
+
+    def test_read_no_content(self, client, auth_headers, mock_builder):
+        """GET /kb/read?document_id={id} with full_markdown=None returns 404 with 'No content available'."""
+        mock_builder.execute.return_value = _make_result(
+            _doc_row_with_content(DOC_IN_REPORTS, "report.pdf", None)
+        )
+        response = client.get(f"/kb/read?document_id={DOC_IN_REPORTS}", headers=auth_headers)
+        assert response.status_code == 404
+        assert "No content available" in response.json()["detail"]
+
+    def test_read_line_range_clamped(self, client, auth_headers, mock_builder):
+        """GET /kb/read?document_id={id}&start_line=1&end_line=9999 clamps end_line to total_lines."""
+        mock_builder.execute.return_value = _make_result(
+            _doc_row_with_content(DOC_IN_REPORTS, "report.pdf", "Line one\nLine two\nLine three")
+        )
+        response = client.get(
+            f"/kb/read?document_id={DOC_IN_REPORTS}&start_line=1&end_line=9999",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["end_line"] == 3  # clamped from 9999
+        assert data["total_lines"] == 3
+        assert "1: Line one" in data["content"]
+        assert "2: Line two" in data["content"]
+        assert "3: Line three" in data["content"]
