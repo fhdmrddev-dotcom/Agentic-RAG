@@ -112,7 +112,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [ ] 06-01-PLAN.md — Backend read_path helper, ReadResponse model, endpoint, OpenAI tool spec, threads.py wiring, and integration tests (TOOL-05, TOOL-06)
-- [ ] 06-02-PLAN.md — Frontend ToolCallPanel extension with ReadDocumentResult component (TOOL-05, TOOL-06)
+- [x] 06-02-PLAN.md — Frontend ToolCallPanel extension with ReadDocumentResult component (TOOL-05, TOOL-06)
 
 ### Phase 7: Explorer Sub-Agent
 **Goal**: A dedicated sub-agent orchestrates all KB tools and the document analysis sub-agent to deliver synthesized findings to the user
@@ -138,5 +138,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Ingestion UI | 3/3 | Complete | 2026-03-21 |
 | 4. Navigation Tools | 2/2 | Complete | 2026-03-22 |
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
-| 6. Read Tool | 0/2 | Not started | - |
+| 6. Read Tool | 1/2 | In Progress|  |
 | 7. Explorer Sub-Agent | 0/? | Not started | - |

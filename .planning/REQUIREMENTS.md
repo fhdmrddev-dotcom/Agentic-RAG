@@ -27,8 +27,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **TOOL-02**: Agent can use `tree(path, depth?, limit?)` to get hierarchical structure with depth limit and truncation
 - [x] **TOOL-03**: Agent can use `grep(pattern, path?)` to regex search content, returns matching document names
 - [x] **TOOL-04**: Agent can use `glob(pattern)` to match filenames by pattern (e.g., `*.pdf`, `reports/**/*`)
-- [ ] **TOOL-05**: Agent can use `read(document_id)` to read full document content
-- [ ] **TOOL-06**: Agent can use `read(document_id, start_line, end_line)` to read specific line range
+- [x] **TOOL-05**: Agent can use `read(document_id)` to read full document content
+- [x] **TOOL-06**: Agent can use `read(document_id, start_line, end_line)` to read specific line range
 
 ### Explorer Sub-Agent
 
@@ -108,8 +108,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOOL-02 | Phase 4 | Complete |
 | TOOL-03 | Phase 5 | Complete |
 | TOOL-04 | Phase 5 | Complete |
-| TOOL-05 | Phase 6 | Pending |
-| TOOL-06 | Phase 6 | Pending |
+| TOOL-05 | Phase 6 | Complete |
+| TOOL-06 | Phase 6 | Complete |
 | AGENT-01 | Phase 7 | Pending |
 | AGENT-02 | Phase 7 | Pending |
 | AGENT-03 | Phase 7 | Pending |
