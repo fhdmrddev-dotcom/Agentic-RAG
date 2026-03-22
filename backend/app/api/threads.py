@@ -12,7 +12,7 @@ from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.models.user_settings import load_user_settings
 from app.config import settings
-from app.services.openai_service import create_streaming_chat, get_llm_client
+from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
@@ -213,24 +213,34 @@ async def send_message(
             .execute()
         )
 
-        messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        # Select system prompt, tools, and iteration limit based on agent mode
+        if body.agent_mode == "explorer":
+            active_system_prompt = EXPLORER_SYSTEM_PROMPT
+            active_tools = get_explorer_tools()
+            max_iterations = 8
+        else:
+            active_system_prompt = SYSTEM_PROMPT
+            active_tools = None  # None = use default get_tools() in create_streaming_chat
+            max_iterations = 5
+
+        messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         for msg in history_resp.data:
             messages.append({"role": msg["role"], "content": msg["content"]})
 
         full_content = ""
         persisted_tool_calls: list[dict] = []
-        MAX_ITERATIONS = 5
 
         try:
-            for iteration in range(MAX_ITERATIONS):
+            for iteration in range(max_iterations):
                 # On the final iteration force a text response to avoid an infinite loop
-                force_no_tools = (iteration == MAX_ITERATIONS - 1)
+                force_no_tools = (iteration == max_iterations - 1)
                 tool_choice = "none" if force_no_tools else "auto"
                 stream = create_streaming_chat(
                     messages,
                     model=body.model,
                     user_settings=user_settings,
                     tool_choice=tool_choice,
+                    tools_override=active_tools,
                 )
 
                 tool_calls_buffer: dict = {}
