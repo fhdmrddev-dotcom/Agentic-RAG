@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class MessageCreate(BaseModel):
     content: str
     model: str | None = None
+    agent_mode: str = "default"   # "default" | "explorer"
 
 
 class MessageResponse(BaseModel):

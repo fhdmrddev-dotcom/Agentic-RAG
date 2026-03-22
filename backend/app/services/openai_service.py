@@ -266,12 +266,43 @@ ANALYZE_DOCUMENT_TOOL = {
 }
 
 
+EXPLORER_SYSTEM_PROMPT = (
+    "You are a Knowledge Base Explorer. You navigate the user's document library "
+    "using filesystem-like tools to find and synthesize information.\n\n"
+    "Available tools:\n"
+    "1. ls - list files and subfolders at a path\n"
+    "2. tree - view hierarchical folder structure\n"
+    "3. grep - search document contents by regex pattern\n"
+    "4. glob - find documents by filename pattern\n"
+    "5. read_document - read full or partial document content by document_id\n"
+    "6. analyze_document - perform deep analysis of a full document\n\n"
+    "Exploration strategy:\n"
+    "- Start with ls('/') or tree('/') to orient yourself\n"
+    "- Use grep to find documents containing relevant content\n"
+    "- Use glob to find documents by filename pattern\n"
+    "- Use read_document to inspect content after grep/glob identifies candidates\n"
+    "- Use analyze_document when the task requires understanding an entire document\n\n"
+    "Rules:\n"
+    "- Always return a coherent synthesized answer in prose - never return raw JSON, "
+    "raw filenames, or tool output as your final response\n"
+    "- If no relevant documents are found, say so clearly and describe what you searched for\n"
+    "- Cite which document(s) your answer draws from\n"
+    "- When calling analyze_document, use the filename from ls/grep/glob results, not the document_id UUID\n"
+    "- Use document_id from grep/glob/ls results when calling read_document"
+)
+
+
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     return tools
+
+
+def get_explorer_tools() -> list[dict]:
+    """Tool list for explorer mode: KB navigation + document analysis only."""
+    return [LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
 
 
 def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
@@ -318,6 +349,7 @@ def create_streaming_chat(
     tool_choice: str = "auto",
     model: str | None = None,
     user_settings: UserEffectiveSettings | None = None,
+    tools_override: list[dict] | None = None,
 ):
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
@@ -327,7 +359,7 @@ def create_streaming_chat(
         "stream": True,
     }
     if tool_choice == "auto":
-        kwargs["tools"] = get_tools()
+        kwargs["tools"] = tools_override if tools_override is not None else get_tools()
         kwargs["tool_choice"] = "auto"
     return client.chat.completions.create(**kwargs)
 
