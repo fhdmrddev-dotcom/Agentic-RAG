@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
-from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse
+from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
 
 router = APIRouter(prefix="/kb", tags=["kb"])
 
@@ -334,3 +334,72 @@ async def glob_search(
 ):
     result = glob_path(pattern, current_user["id"], supabase)
     return GlobResponse(**result)
+
+
+def read_path(
+    document_id: str,
+    user_id: str,
+    supabase: Client,
+    start_line: int | None = None,
+    end_line: int | None = None,
+) -> dict:
+    """Fetch full_markdown for a document, optionally sliced to a line range."""
+    try:
+        result = (
+            supabase.table("documents")
+            .select("id, filename, full_markdown")
+            .eq("id", document_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+    except Exception:
+        return {"error": f"Document '{document_id}' not found or access denied."}
+
+    if not result.data:
+        return {"error": f"Document '{document_id}' not found or access denied."}
+
+    doc = result.data
+    markdown = doc.get("full_markdown") or ""
+
+    if not markdown:
+        return {"error": "No content available for this document."}
+
+    lines = markdown.splitlines()
+    total_lines = len(lines)
+
+    if start_line is not None and end_line is not None:
+        if start_line < 1 or end_line < start_line or start_line > total_lines:
+            return {"error": f"Line range {start_line}-{end_line} is out of bounds. Document has {total_lines} lines."}
+        end_line = min(end_line, total_lines)
+        sliced = lines[start_line - 1 : end_line]
+        numbered = "\n".join(f"{start_line + i}: {line}" for i, line in enumerate(sliced))
+        return {
+            "document_id": document_id,
+            "filename": doc["filename"],
+            "start_line": start_line,
+            "end_line": end_line,
+            "total_lines": total_lines,
+            "content": numbered,
+        }
+
+    return {
+        "document_id": document_id,
+        "filename": doc["filename"],
+        "total_lines": total_lines,
+        "content": markdown,
+    }
+
+
+@router.get("/read", response_model=ReadResponse)
+async def read(
+    document_id: str = Query(description="UUID of the document to read"),
+    start_line: int | None = Query(default=None, ge=1, description="First line to return (1-based, inclusive)"),
+    end_line: int | None = Query(default=None, ge=1, description="Last line to return (1-based, inclusive)"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    result = read_path(document_id, current_user["id"], supabase, start_line, end_line)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return ReadResponse(**result)

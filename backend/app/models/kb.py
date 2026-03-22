@@ -65,3 +65,12 @@ class GlobResponse(BaseModel):
     pattern: str
     matches: list[GlobMatch]
     total: int
+
+
+class ReadResponse(BaseModel):
+    document_id: UUID
+    filename: str
+    total_lines: int
+    content: str
+    start_line: int | None = None
+    end_line: int | None = None
