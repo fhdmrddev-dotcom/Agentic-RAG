@@ -8,7 +8,7 @@ interface UseThreads {
   loading: boolean
   loadThreads: () => Promise<void>
   selectThread: (thread: Thread) => void
-  newThread: () => Promise<Thread>
+  newThread: (folderId?: string | null) => Promise<Thread>
   deleteThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
   updateThreadTitle: (id: string, title: string) => void
@@ -33,8 +33,8 @@ export function useThreads(): UseThreads {
     setSelectedThread(thread)
   }, [])
 
-  const newThread = useCallback(async () => {
-    const thread = await createThread()
+  const newThread = useCallback(async (folderId?: string | null) => {
+    const thread = await createThread("New Chat", folderId)
     setThreads((prev) => [thread, ...prev])
     setSelectedThread(thread)
     return thread

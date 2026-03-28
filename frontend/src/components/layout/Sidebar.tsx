@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal } from "lucide-react"
-import type { Thread } from "@/types"
+import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon } from "lucide-react"
+import type { Folder, Thread } from "@/types"
 import type { ActiveView } from "@/App"
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   onNavigate: (view: ActiveView) => void
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
+  folders: Folder[]
 }
 
 export function Sidebar({
@@ -29,6 +30,7 @@ export function Sidebar({
   onNavigate,
   onDeleteThread,
   onRenameThread,
+  folders: _folders,
 }: Props) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -138,6 +140,9 @@ export function Sidebar({
                       <span className="text-sm" title={thread.title}>
                         {thread.title}
                       </span>
+                      {thread.folder_id && (
+                        <FolderIcon className="h-3 w-3 shrink-0 text-primary/60" />
+                      )}
                     </div>
 
                     {/* Dots button overlaid on right */}

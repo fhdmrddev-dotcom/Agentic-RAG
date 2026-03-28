@@ -3,23 +3,26 @@ import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
 import { getSettings } from "@/lib/api"
-import type { Thread } from "@/types"
-import { Sparkles } from "lucide-react"
+import type { Folder, Thread } from "@/types"
+import { Folder as FolderIcon, Sparkles } from "lucide-react"
 
 interface Props {
   thread: Thread | null
-  onCreateThread: () => Promise<Thread>
+  onCreateThread: (folderId?: string | null) => Promise<Thread>
   onTitleUpdate?: (title: string) => void
+  folders: Folder[]
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
+  const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
 
   useEffect(() => {
     setAgentMode("default")
+    setScopeFolderId(null)
   }, [thread?.id])
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
   const handleSend = async (content: string) => {
     let activeThread = thread
     if (!activeThread) {
-      activeThread = await onCreateThread()
+      activeThread = await onCreateThread(scopeFolderId)
     }
     await sendMessage(activeThread.id, content, selectedModel || undefined, onTitleUpdate, agentMode)
   }
@@ -73,6 +76,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
                 Ask me anything, or upload documents and I'll answer based on their content.
               </p>
             </div>
+            {folders.length > 0 && (
+              <div className="mt-2">
+                <select
+                  value={scopeFolderId ?? ""}
+                  onChange={(e) => setScopeFolderId(e.target.value || null)}
+                  className="text-sm border rounded-md px-3 py-1.5 bg-background text-foreground"
+                >
+                  <option value="">All documents</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Scope this conversation to a specific folder
+                </p>
+              </div>
+            )}
           </div>
         </div>
         {inputBar}
@@ -80,10 +100,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate }: Props) {
     )
   }
 
+  const scopedFolder = thread.folder_id ? folders.find((f) => f.id === thread.folder_id) : null
+
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b px-6 py-3 bg-background/80 backdrop-blur-sm">
+      <div className="border-b px-6 py-3 bg-background/80 backdrop-blur-sm flex items-center gap-2">
         <h2 className="font-medium text-sm truncate text-foreground">{thread.title}</h2>
+        {thread.folder_id && (
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+            <FolderIcon className="h-3 w-3" />
+            {scopedFolder?.name ?? "Folder"}
+          </span>
+        )}
       </div>
       <MessageList messages={messages} isStreaming={isStreaming} />
       {inputBar}

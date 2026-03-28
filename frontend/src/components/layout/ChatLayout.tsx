@@ -4,6 +4,7 @@ import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { useThreads } from "@/hooks/useThreads"
+import { useFolders } from "@/hooks/useFolders"
 import type { ActiveView } from "@/App"
 
 interface Props {
@@ -24,6 +25,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
     renameThread,
     updateThreadTitle,
   } = useThreads()
+
+  const { folders } = useFolders()
 
   const selectedThreadRef = useRef(selectedThread)
   useEffect(() => {
@@ -51,6 +54,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
         onNavigate={onNavigate}
         onDeleteThread={deleteThread}
         onRenameThread={renameThread}
+        folders={folders}
       />
       <main className="flex-1 overflow-hidden">
         {activeView === "documents" ? (
@@ -58,7 +62,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
         ) : activeView === "settings" ? (
           <SettingsPage />
         ) : (
-          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} />
+          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} />
         )}
       </main>
     </div>

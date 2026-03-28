@@ -27,12 +27,14 @@ export async function listThreads(): Promise<Thread[]> {
   return res.json() as Promise<Thread[]>
 }
 
-export async function createThread(title = "New Chat"): Promise<Thread> {
+export async function createThread(title = "New Chat", folderId?: string | null): Promise<Thread> {
   const headers = await getAuthHeaders()
+  const body: Record<string, string> = { title }
+  if (folderId) body.folder_id = folderId
   const res = await fetch(`${API_BASE}/threads`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error("Failed to create thread")
   return res.json() as Promise<Thread>
