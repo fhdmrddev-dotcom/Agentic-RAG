@@ -2,6 +2,7 @@ import { useState, useMemo } from "react"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
 import { DocumentList } from "@/components/ingestion/DocumentList"
 import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
+import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
@@ -17,6 +18,21 @@ export function IngestionPage() {
     if (selectedFolderId === null) return null
     const folder = folders.find((f) => f.id === selectedFolderId)
     return folder?.name ?? null
+  }, [selectedFolderId, folders])
+
+  const selectedFolder = useMemo(() => {
+    if (selectedFolderId === null) return null
+    return folders.find((f) => f.id === selectedFolderId) ?? null
+  }, [selectedFolderId, folders])
+
+  const folderDocuments = useMemo(() => {
+    if (selectedFolderId === null) return []
+    return documents.filter((d) => d.folder_id === selectedFolderId)
+  }, [selectedFolderId, documents])
+
+  const subfolderCount = useMemo(() => {
+    if (selectedFolderId === null) return 0
+    return folders.filter((f) => f.parent_id === selectedFolderId).length
   }, [selectedFolderId, folders])
 
   return (
@@ -46,11 +62,20 @@ export function IngestionPage() {
           {/* Right panel: Breadcrumb + Upload + Document List */}
           <div className="flex-1 flex flex-col overflow-y-auto space-y-6">
             {selectedFolderId !== null && (
-              <FolderBreadcrumb
-                folders={folders}
-                selectedFolderId={selectedFolderId}
-                onSelectFolder={setSelectedFolderId}
-              />
+              <>
+                <FolderBreadcrumb
+                  folders={folders}
+                  selectedFolderId={selectedFolderId}
+                  onSelectFolder={setSelectedFolderId}
+                />
+                {selectedFolder && (
+                  <FolderDetail
+                    folder={selectedFolder}
+                    documents={folderDocuments}
+                    subfolderCount={subfolderCount}
+                  />
+                )}
+              </>
             )}
             <DocumentUpload
               onUpload={upload}
