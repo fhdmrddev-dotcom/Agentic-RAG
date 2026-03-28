@@ -56,7 +56,10 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - [ ] Explorer sub-agent — orchestrates KB tools + document analysis agent for deep exploration
 - [ ] Folder CRUD in ingestion UI (create, rename, delete folders)
 - [ ] Upload files to selected folder in UI
-- [ ] Visual indicator in UI for global vs per-user folders
+- ✓ Visual indicator in UI for global vs per-user folders — Validated in Phase 08: folder-system-enhancements
+- ✓ Global folder RLS: documents in global folders readable by all authenticated users — Validated in Phase 08: folder-system-enhancements
+- ✓ Folder-scoped chat threads: RAG retrieval auto-scoped to folder subtree — Validated in Phase 08: folder-system-enhancements
+- ✓ Folder detail info bar: compact stats (doc count, size, subfolders, date) in ingestion UI — Validated in Phase 08: folder-system-enhancements
 
 ### Out of Scope
 
@@ -124,4 +127,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-22 after Phase 5 complete (search-tools)*
+*Last updated: 2026-03-28 after Phase 8 complete (folder-system-enhancements)*
