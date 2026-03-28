@@ -114,9 +114,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260322-26g | Improve tool call display for ls, tree, grep, and glob tools in chat UI with rich result rendering | 2026-03-21 | 7943a7c | [260322-26g-improve-tool-call-display-for-ls-tree-gr](./quick/260322-26g-improve-tool-call-display-for-ls-tree-gr/) |
+| 260328-v6n | Fix 6 bugs (folder-aware dedup, duplicate folder names, tool call state indicator, overflow, delete confirm, breadcrumb) + design doc for Issues 7-9 | 2026-03-28 | 8c4e352 | [260328-v6n-investigate-and-plan-fixes-for-duplicate](./quick/260328-v6n-investigate-and-plan-fixes-for-duplicate/) |
 
 ## Session Continuity
 
-Last session: 2026-03-22T07:37:38.334Z
-Stopped at: Checkpoint: 07-02 Task 2 awaiting human verification of explorer mode UI
+Last session: 2026-03-28T00:00:00Z
+Stopped at: Quick task 260328-v6n complete
 Resume file: None
