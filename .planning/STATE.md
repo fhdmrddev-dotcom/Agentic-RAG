@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 08-02-PLAN.md
-last_updated: "2026-03-28T19:11:40.230Z"
+stopped_at: Completed 08-03-PLAN.md
+last_updated: "2026-03-28T19:14:02.648Z"
 progress:
   total_phases: 8
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # Project State
@@ -61,6 +61,7 @@ Plan: 3 of 3
 | Phase 07-explorer-sub-agent P01 | 3min 30sec | 2 tasks | 4 files |
 | Phase 08-folder-system-enhancements P01 | 2min 24sec | 2 tasks | 8 files |
 | Phase 08-folder-system-enhancements P02 | 3min 18sec | 2 tasks | 9 files |
+| Phase 08-folder-system-enhancements P03 | 1min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,7 @@ Recent decisions affecting current work:
 - [Phase 08-folder-system-enhancements]: Python-side subtree resolution (_get_subtree recursive helper) preferred over SQL CTE for folder scope
 - [Phase 08-folder-system-enhancements]: ON DELETE SET NULL on threads.folder_id — thread history preserved when folder deleted; thread reverts to unscoped
 - [Phase 08-folder-system-enhancements]: Keyword search not folder-filtered at RPC level; vector search handles scoping and RRF fusion produces net-scoped results
+- [Phase 08-folder-system-enhancements]: All folder stats derived from existing hook state — no new backend API endpoints needed for FolderDetail info bar
 
 ### Pending Todos
 
@@ -125,6 +127,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-28T19:11:40.225Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-03-28T19:14:02.641Z
+Stopped at: Completed 08-03-PLAN.md
 Resume file: None

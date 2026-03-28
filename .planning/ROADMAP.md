@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Search Tools** - grep and glob tools for content and filename searching
 - [x] **Phase 6: Read Tool** - Full document and line-range reading capability (completed 2026-03-22)
 - [ ] **Phase 7: Explorer Sub-Agent** - Orchestration agent with access to all KB tools
-- [ ] **Phase 8: Folder System Enhancements** - Global folder sharing with RLS, folder-scoped chat, and folder appearance improvements
+- [x] **Phase 8: Folder System Enhancements** - Global folder sharing with RLS, folder-scoped chat, and folder appearance improvements (completed 2026-03-28)
 
 ## Phase Details
 
@@ -144,7 +144,7 @@ Plans:
 Plans:
 - [x] 08-01-PLAN.md — Global folder toggle + document RLS (FOLDER-08, FOLDER-09)
 - [x] 08-02-PLAN.md — Folder-scoped chat with recursive subtree retrieval (CHAT-01, CHAT-02)
-- [ ] 08-03-PLAN.md — Folder detail info bar component (UI-07)
+- [x] 08-03-PLAN.md — Folder detail info bar component (UI-07)
 
 ## Progress
 
@@ -160,4 +160,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
 | 6. Read Tool | 2/2 | Complete   | 2026-03-22 |
 | 7. Explorer Sub-Agent | 1/2 | In Progress|  |
-| 8. Folder System Enhancements | 2/3 | In Progress|  |
+| 8. Folder System Enhancements | 3/3 | Complete   | 2026-03-28 |
