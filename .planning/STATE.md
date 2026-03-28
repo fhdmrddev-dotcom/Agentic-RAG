@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: "Checkpoint: 07-02 Task 2 awaiting human verification of explorer mode UI"
-last_updated: "2026-03-22T07:37:38.338Z"
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-03-28T19:06:08.201Z"
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
-  total_plans: 15
-  completed_plans: 14
+  total_plans: 18
+  completed_plans: 15
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-21)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 07 — explorer-sub-agent
+**Current focus:** Phase 08 — folder-system-enhancements
 
 ## Current Position
 
-Phase: 07 (explorer-sub-agent) — EXECUTING
-Plan: 2 of 2
+Phase: 08 (folder-system-enhancements) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Plan: 2 of 2
 | Phase 06-read-tool P02 | 1min | 1 tasks | 1 files |
 | Phase 06-read-tool P01 | 2min 43sec | 3 tasks | 5 files |
 | Phase 07-explorer-sub-agent P01 | 3min 30sec | 2 tasks | 4 files |
+| Phase 08-folder-system-enhancements P01 | 2min 24sec | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase 06-read-tool]: Wrap single().execute() in try/except for zero-row guard (supabase-py raises APIError on zero rows)
 - [Phase 06-read-tool]: end_line clamped silently — LLM may guess large end_line; partial results better than error
 - [Phase 07-explorer-sub-agent]: tools_override=None signals default mode — no override means get_tools() is used, so default mode behavior is completely unchanged
+- [Phase 08-folder-system-enhancements]: Use 403 (not 404) when toggle-global is called by non-owner — distinguishes permission denial from missing resource
+- [Phase 08-folder-system-enhancements]: document_chunks RLS not updated — match_document_chunks RPC is SECURITY DEFINER so RAG queries already bypass RLS
 
 ### Pending Todos
 
@@ -118,6 +121,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-28T00:00:00Z
-Stopped at: Quick task 260328-v6n complete
+Last session: 2026-03-28T19:06:08.191Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
