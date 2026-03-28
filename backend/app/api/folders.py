@@ -195,6 +195,42 @@ async def delete_folder(
     supabase.table("folders").delete().eq("id", folder_id).eq("user_id", current_user["id"]).execute()
 
 
+@router.patch("/{folder_id}/toggle-global", response_model=FolderResponse)
+async def toggle_global(
+    folder_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Toggle is_global on a folder. Only the folder owner can toggle."""
+    # 1. Fetch current folder (owner-only)
+    current = (
+        supabase.table("folders")
+        .select("*")
+        .eq("id", folder_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not current.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Folder not found or you are not the owner",
+        )
+
+    new_value = not current.data["is_global"]
+
+    result = (
+        supabase.table("folders")
+        .update({"is_global": new_value})
+        .eq("id", folder_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return result.data[0]
+
+
 @router.patch("/{folder_id}/move", response_model=FolderResponse)
 async def move_folder(
     folder_id: str,
