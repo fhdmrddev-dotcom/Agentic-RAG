@@ -143,7 +143,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 08-01-PLAN.md — Global folder toggle + document RLS (FOLDER-08, FOLDER-09)
-- [ ] 08-02-PLAN.md — Folder-scoped chat with recursive subtree retrieval (CHAT-01, CHAT-02)
+- [x] 08-02-PLAN.md — Folder-scoped chat with recursive subtree retrieval (CHAT-01, CHAT-02)
 - [ ] 08-03-PLAN.md — Folder detail info bar component (UI-07)
 
 ## Progress
@@ -160,4 +160,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
 | 6. Read Tool | 2/2 | Complete   | 2026-03-22 |
 | 7. Explorer Sub-Agent | 1/2 | In Progress|  |
-| 8. Folder System Enhancements | 1/3 | In Progress|  |
+| 8. Folder System Enhancements | 2/3 | In Progress|  |

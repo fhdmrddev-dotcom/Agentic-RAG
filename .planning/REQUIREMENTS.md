@@ -47,8 +47,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **FOLDER-08**: User can toggle a folder's global/shared status from the UI (no API or DB required)
 - [x] **FOLDER-09**: Documents inside a global folder are readable by all authenticated users (RLS updated to allow access when `folder.is_global = true`)
-- [ ] **CHAT-01**: User can scope a new chat thread to a specific folder; RAG retrieval is limited to that folder and its subfolders recursively
-- [ ] **CHAT-02**: Folder-scoped threads display a scope badge in the sidebar and chat header; scope is fixed at thread creation
+- [x] **CHAT-01**: User can scope a new chat thread to a specific folder; RAG retrieval is limited to that folder and its subfolders recursively
+- [x] **CHAT-02**: Folder-scoped threads display a scope badge in the sidebar and chat header; scope is fixed at thread creation
 - [ ] **UI-07**: Selecting a folder in the ingestion UI shows a compact info bar with folder stats (document count, total size, global badge, creation date)
 
 ## v2 Requirements
