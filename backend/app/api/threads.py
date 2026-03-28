@@ -264,6 +264,18 @@ async def send_message(
             active_tools = None  # None = use default get_tools() in create_streaming_chat
             max_iterations = 5
 
+        # Augment system prompt with folder scope context so LLM generates scoped queries
+        if scoped_folder_path:
+            folder_scope_note = (
+                f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
+                f"All tool calls should be restricted to this folder and its subfolders. "
+                f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
+                f"When using query_documents, always include a folder filter (e.g., "
+                f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
+                f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
+            )
+            active_system_prompt = active_system_prompt + folder_scope_note
+
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         for msg in history_resp.data:
             messages.append({"role": msg["role"], "content": msg["content"]})
@@ -357,6 +369,13 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "glob":
                             result = glob_path(args.get("pattern", ""), current_user["id"], supabase)
+                            # Scope glob results to folder subtree if thread is folder-scoped
+                            if folder_subtree_ids is not None and "matches" in result:
+                                result["matches"] = [
+                                    m for m in result["matches"]
+                                    if m.get("folder_id") in folder_subtree_ids
+                                ]
+                                result["total"] = len(result["matches"])
                             tool_result = json.dumps(result)
                         elif tool_name == "read_document":
                             result = read_path(
@@ -377,7 +396,7 @@ async def send_message(
                             )
                             tool_result = json.dumps(results) if results else "No relevant documents found."
                         elif tool_name == "query_documents":
-                            tool_result = query_documents(args["query"], current_user["id"], supabase)
+                            tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
                             tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
                         elif tool_name == "analyze_document":

@@ -45,7 +45,24 @@ def _inject_user_id(sql: str, user_id: str) -> str:
     return sql + f" WHERE {condition}"
 
 
-def query_documents(sql_query: str, user_id: str, supabase: Client) -> str:
+def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
+    """Inject folder_id IN (...) filter to restrict to a folder subtree."""
+    if not folder_ids:
+        return sql
+    ids_list = ", ".join(f"'{fid}'" for fid in folder_ids)
+    has_documents = bool(re.search(r"\bdocuments\b", sql, re.IGNORECASE))
+    has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
+    if has_folders and not has_documents:
+        condition = f"folders.id IN ({ids_list})"
+    else:
+        condition = f"documents.folder_id IN ({ids_list})"
+    # Already has WHERE (from _inject_user_id) — append AND
+    if re.search(r"\bwhere\b", sql, re.IGNORECASE):
+        return sql.rstrip() + f" AND {condition}"
+    return sql + f" WHERE {condition}"
+
+
+def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:
     """
     Execute a SELECT query against the user's documents table via the
     query_user_documents RPC. Injects user_id filter since the service role
@@ -61,6 +78,10 @@ def query_documents(sql_query: str, user_id: str, supabase: Client) -> str:
 
     # Scope to current user (service role bypasses RLS)
     scoped = _inject_user_id(clean, user_id)
+
+    # Scope to folder subtree if provided
+    if folder_ids:
+        scoped = _inject_folder_scope(scoped, folder_ids)
 
     try:
         result = supabase.rpc("query_user_documents", {"sql_query": scoped}).execute()
