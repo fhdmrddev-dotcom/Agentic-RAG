@@ -32,9 +32,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Explorer Sub-Agent
 
-- [ ] **AGENT-01**: Explorer sub-agent has access to all KB tools (ls, tree, grep, glob, read)
-- [ ] **AGENT-02**: Explorer sub-agent can invoke document analysis sub-agent for deep document analysis
-- [ ] **AGENT-03**: Explorer sub-agent returns synthesized findings, not raw tool output
+- [x] **AGENT-01**: Explorer sub-agent has access to all KB tools (ls, tree, grep, glob, read)
+- [x] **AGENT-02**: Explorer sub-agent can invoke document analysis sub-agent for deep document analysis
+- [x] **AGENT-03**: Explorer sub-agent returns synthesized findings, not raw tool output
 
 ### Ingestion Interface
 
@@ -42,6 +42,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **UI-02**: Folder tree visually distinguishes global folders from per-user folders
 - [x] **UI-03**: User can create, rename, and delete folders via UI
 - [x] **UI-04**: File upload targets the currently selected folder
+
+### Folder Sharing & Scoped Chat
+
+- [ ] **FOLDER-08**: User can toggle a folder's global/shared status from the UI (no API or DB required)
+- [ ] **FOLDER-09**: Documents inside a global folder are readable by all authenticated users (RLS updated to allow access when `folder.is_global = true`)
+- [ ] **CHAT-01**: User can scope a new chat thread to a specific folder; RAG retrieval is limited to that folder and its subfolders recursively
+- [ ] **CHAT-02**: Folder-scoped threads display a scope badge in the sidebar and chat header; scope is fixed at thread creation
+- [ ] **UI-07**: Selecting a folder in the ingestion UI shows a compact info bar with folder stats (document count, total size, global badge, creation date)
 
 ## v2 Requirements
 
@@ -110,17 +118,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TOOL-04 | Phase 5 | Complete |
 | TOOL-05 | Phase 6 | Complete |
 | TOOL-06 | Phase 6 | Complete |
-| AGENT-01 | Phase 7 | Pending |
-| AGENT-02 | Phase 7 | Pending |
-| AGENT-03 | Phase 7 | Pending |
+| AGENT-01 | Phase 7 | Complete |
+| AGENT-02 | Phase 7 | Complete |
+| AGENT-03 | Phase 7 | Complete |
 | UI-01 | Phase 3 | Complete |
 | UI-02 | Phase 3 | Complete |
 | UI-03 | Phase 3 | Complete |
 | UI-04 | Phase 3 | Complete |
 
+| FOLDER-08 | Phase 8 | Not Started |
+| FOLDER-09 | Phase 8 | Not Started |
+| CHAT-01 | Phase 8 | Not Started |
+| CHAT-02 | Phase 8 | Not Started |
+| UI-07 | Phase 8 | Not Started |
+
 **Coverage:**
-- v1 requirements: 21 total
-- Mapped to phases: 21
+- v1 requirements: 26 total
+- Mapped to phases: 26
 - Unmapped: 0 ✓
 
 ---

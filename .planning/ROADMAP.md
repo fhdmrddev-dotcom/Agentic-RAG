@@ -21,6 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Search Tools** - grep and glob tools for content and filename searching
 - [x] **Phase 6: Read Tool** - Full document and line-range reading capability (completed 2026-03-22)
 - [ ] **Phase 7: Explorer Sub-Agent** - Orchestration agent with access to all KB tools
+- [ ] **Phase 8: Folder System Enhancements** - Global folder sharing with RLS, folder-scoped chat, and folder appearance improvements
 
 ## Phase Details
 
@@ -129,10 +130,22 @@ Plans:
 - [x] 07-01-PLAN.md — Backend: agent_mode on MessageCreate, explorer system prompt, KB-only tool list, send_message branching, unit tests (AGENT-01, AGENT-02, AGENT-03)
 - [ ] 07-02-PLAN.md — Frontend: agent_mode in API/hook layers, mode selector dropdown in chat toolbar, visual verification (AGENT-01, AGENT-03)
 
+### Phase 8: Folder System Enhancements
+**Goal**: Global folders share documents with all users via updated RLS, users can scope chat threads to a specific folder (with recursive subfolder retrieval), and the ingestion UI shows a folder detail info bar with stats
+**Depends on**: Phase 7
+**Requirements**: FOLDER-08, FOLDER-09, CHAT-01, CHAT-02, UI-07
+**Success Criteria** (what must be TRUE):
+  1. Folder owner can toggle `is_global` from the UI; toggling immediately changes folder visibility for all users without a page reload
+  2. Documents inside a global folder are readable by all authenticated users (RLS policy updated); documents in private folders remain private
+  3. User can create a new chat thread scoped to a folder; the thread's scope is fixed at creation and visible as a badge in the sidebar and chat header
+  4. When chatting in a folder-scoped thread, retrieval searches the selected folder and all its subfolders recursively; documents outside the folder are excluded
+  5. Selecting a folder in the ingestion UI shows a compact info bar (doc count, total size, global badge, creation date) between the breadcrumb and the document list
+**Plans**: 3 plans
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -143,3 +156,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 5. Search Tools | 2/2 | Complete | 2026-03-21 |
 | 6. Read Tool | 2/2 | Complete   | 2026-03-22 |
 | 7. Explorer Sub-Agent | 1/2 | In Progress|  |
+| 8. Folder System Enhancements | 0/3 | Not Started |  |
