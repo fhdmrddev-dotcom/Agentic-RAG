@@ -5,6 +5,7 @@ import {
   createFolder as apiCreateFolder,
   renameFolder as apiRenameFolder,
   deleteFolder as apiDeleteFolder,
+  toggleFolderGlobal as apiToggleFolderGlobal,
 } from "@/lib/api"
 import type { Folder } from "@/types"
 
@@ -13,6 +14,7 @@ interface UseFolders {
   createFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
   renameFolder: (id: string, name: string) => Promise<void>
   deleteFolder: (id: string) => Promise<void>
+  toggleGlobal: (id: string) => Promise<void>
 }
 
 export function useFolders(): UseFolders {
@@ -102,5 +104,10 @@ export function useFolders(): UseFolders {
     setFolders((prev) => prev.filter((f) => f.id !== id))
   }, [])
 
-  return { folders, createFolder, renameFolder, deleteFolder }
+  const toggleGlobal = useCallback(async (id: string): Promise<void> => {
+    const updated = await apiToggleFolderGlobal(id)
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, is_global: updated.is_global } : f)))
+  }, [])
+
+  return { folders, createFolder, renameFolder, deleteFolder, toggleGlobal }
 }

@@ -9,7 +9,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 
 export function IngestionPage() {
   const { documents, uploading, uploadingCount, upload, deleteDoc } = useDocuments()
-  const { folders, createFolder, renameFolder, deleteFolder } = useFolders()
+  const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
 
   // Derive selected folder name for upload label
@@ -39,6 +39,7 @@ export function IngestionPage() {
               onCreateFolder={createFolder}
               onRenameFolder={renameFolder}
               onDeleteFolder={deleteFolder}
+              onToggleGlobal={toggleGlobal}
             />
           </div>
 

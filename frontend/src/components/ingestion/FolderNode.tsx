@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 import { FolderCreateInput } from "./FolderCreateInput"
 import type { FolderNode as FolderNodeType } from "@/lib/folderTree"
 
@@ -30,8 +31,9 @@ interface FolderNodeProps {
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onCreateSubfolder: (parentId: string) => void
-  onCreateCommit: (name: string) => void
+  onCreateCommit: (name: string, isGlobal: boolean) => void
   onCreateCancel: () => void
+  onToggleGlobal: (id: string) => void
 }
 
 export function FolderNode({
@@ -53,6 +55,7 @@ export function FolderNode({
   onCreateSubfolder,
   onCreateCommit,
   onCreateCancel,
+  onToggleGlobal,
 }: FolderNodeProps) {
   const isSelected = node.id === selectedFolderId
   const isExpanded = expandedIds.has(node.id)
@@ -185,6 +188,25 @@ export function FolderNode({
                 </TooltipTrigger>
                 <TooltipContent>Delete</TooltipContent>
               </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn("h-7 w-7 p-0", node.is_global && "text-primary")}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleGlobal(node.id)
+                    }}
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {node.is_global ? "Make private" : "Make global (visible to all users)"}
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
         </div>
@@ -248,6 +270,7 @@ export function FolderNode({
             onCreateSubfolder={onCreateSubfolder}
             onCreateCommit={onCreateCommit}
             onCreateCancel={onCreateCancel}
+            onToggleGlobal={onToggleGlobal}
           />
         ))}
     </div>

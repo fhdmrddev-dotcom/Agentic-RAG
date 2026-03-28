@@ -210,6 +210,19 @@ export async function deleteFolder(id: string): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete folder")
 }
 
+export async function toggleFolderGlobal(id: string): Promise<Folder> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/folders/${id}/toggle-global`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) {
+    if (res.status === 403) throw new Error("Only the folder owner can toggle global status")
+    throw new Error("Failed to toggle folder global status")
+  }
+  return res.json() as Promise<Folder>
+}
+
 export interface FullAppSettings {
   llm_model: string
   available_models: string[]
