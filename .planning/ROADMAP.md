@@ -141,6 +141,10 @@ Plans:
   4. When chatting in a folder-scoped thread, retrieval searches the selected folder and all its subfolders recursively; documents outside the folder are excluded
   5. Selecting a folder in the ingestion UI shows a compact info bar (doc count, total size, global badge, creation date) between the breadcrumb and the document list
 **Plans**: 3 plans
+Plans:
+- [ ] 08-01-PLAN.md — Global folder toggle + document RLS (FOLDER-08, FOLDER-09)
+- [ ] 08-02-PLAN.md — Folder-scoped chat with recursive subtree retrieval (CHAT-01, CHAT-02)
+- [ ] 08-03-PLAN.md — Folder detail info bar component (UI-07)
 
 ## Progress
 
