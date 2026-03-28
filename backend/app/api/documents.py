@@ -78,16 +78,20 @@ async def upload_document(
 
     content_hash = hashlib.sha256(raw).hexdigest()
 
-    # Case 1: exact duplicate already completed — skip re-ingestion
-    existing = (
+    # Case 1: exact duplicate already completed in the same folder — skip re-ingestion
+    # Duplicate check is folder-scoped: same file in different folders creates separate entries.
+    dedup_query = (
         supabase.table("documents")
         .select("*")
         .eq("user_id", current_user["id"])
         .eq("content_hash", content_hash)
         .eq("status", "completed")
-        .limit(1)
-        .execute()
     )
+    if folder_id:
+        dedup_query = dedup_query.eq("folder_id", folder_id)
+    else:
+        dedup_query = dedup_query.is_("folder_id", "null")
+    existing = dedup_query.limit(1).execute()
     if existing.data:
         response.status_code = status.HTTP_200_OK
         return existing.data[0]

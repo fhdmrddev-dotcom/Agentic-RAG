@@ -73,6 +73,24 @@ async def create_folder(
         if not parent.data:
             raise HTTPException(status_code=404, detail="Parent folder not found")
 
+    # Check for duplicate folder name under same parent for same user
+    name_check_query = (
+        supabase.table("folders")
+        .select("id")
+        .eq("name", body.name.strip())
+        .eq("user_id", current_user["id"])
+    )
+    if body.parent_id:
+        name_check_query = name_check_query.eq("parent_id", str(body.parent_id))
+    else:
+        name_check_query = name_check_query.is_("parent_id", "null")
+    name_check = name_check_query.maybe_single().execute()
+    if name_check.data:
+        raise HTTPException(
+            status_code=409,
+            detail="A folder with this name already exists in this location",
+        )
+
     result = (
         supabase.table("folders")
         .insert({
@@ -94,6 +112,38 @@ async def rename_folder(
     supabase: Client = Depends(get_supabase),
 ):
     """Rename a folder. Only the owner can rename."""
+    # Fetch current folder to know its parent_id for duplicate name check
+    current = (
+        supabase.table("folders")
+        .select("id, parent_id")
+        .eq("id", folder_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not current.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+
+    # Check for duplicate name under same parent (excluding the folder itself)
+    parent_id = current.data.get("parent_id")
+    name_check_query = (
+        supabase.table("folders")
+        .select("id")
+        .eq("name", body.name.strip())
+        .eq("user_id", current_user["id"])
+        .neq("id", folder_id)
+    )
+    if parent_id:
+        name_check_query = name_check_query.eq("parent_id", parent_id)
+    else:
+        name_check_query = name_check_query.is_("parent_id", "null")
+    name_check = name_check_query.maybe_single().execute()
+    if name_check.data:
+        raise HTTPException(
+            status_code=409,
+            detail="A folder with this name already exists in this location",
+        )
+
     result = (
         supabase.table("folders")
         .update({"name": body.name.strip()})
