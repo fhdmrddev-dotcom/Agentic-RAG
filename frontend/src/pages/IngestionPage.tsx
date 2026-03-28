@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { DocumentUpload } from "@/components/ingestion/DocumentUpload"
 import { DocumentList } from "@/components/ingestion/DocumentList"
+import { FolderBreadcrumb } from "@/components/ingestion/FolderBreadcrumb"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
@@ -41,8 +42,15 @@ export function IngestionPage() {
             />
           </div>
 
-          {/* Right panel: Upload + Document List */}
+          {/* Right panel: Breadcrumb + Upload + Document List */}
           <div className="flex-1 flex flex-col overflow-y-auto space-y-6">
+            {selectedFolderId !== null && (
+              <FolderBreadcrumb
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                onSelectFolder={setSelectedFolderId}
+              />
+            )}
             <DocumentUpload
               onUpload={upload}
               uploading={uploading}

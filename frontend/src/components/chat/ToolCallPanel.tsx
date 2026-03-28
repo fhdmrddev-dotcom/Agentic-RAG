@@ -99,20 +99,20 @@ function LsResult({ parsed }: { parsed: any }) {
   const folders: any[] = parsed.folders ?? []
   const documents: any[] = parsed.documents ?? []
   return (
-    <div className="max-h-48 overflow-y-auto space-y-0.5">
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-0.5">
       {folders.map((f: any, i: number) => (
-        <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80">
+        <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0">
           <Folder className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-          <span>{f.name}</span>
+          <span className="truncate">{f.name}</span>
           {f.is_global && (
             <span className="text-[10px] text-muted-foreground">(global)</span>
           )}
         </div>
       ))}
       {documents.map((d: any, i: number) => (
-        <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80">
+        <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0">
           <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-          <span>{d.filename}</span>
+          <span className="truncate">{d.filename}</span>
           {d.status && <StatusBadge status={d.status} />}
         </div>
       ))}
@@ -130,13 +130,13 @@ function TreeNodeRow({ node, depth }: { node: any; depth: number }) {
   )
   return (
     <>
-      <div style={{ marginLeft: indent }} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80">
+      <div style={{ marginLeft: indent }} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0">
         {node.type === "folder" ? (
           <Folder className="w-3 h-3 text-muted-foreground flex-shrink-0" />
         ) : (
           <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
         )}
-        <span>{node.name}</span>
+        <span className="truncate">{node.name}</span>
         {node.is_global && (
           <span className="text-[10px] text-muted-foreground">(global)</span>
         )}
@@ -145,10 +145,10 @@ function TreeNodeRow({ node, depth }: { node: any; depth: number }) {
         <div
           key={i}
           style={{ marginLeft: indent + 16 }}
-          className="flex items-center gap-1.5 text-xs font-mono text-foreground/80"
+          className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0"
         >
           <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-          <span>{doc.filename}</span>
+          <span className="truncate">{doc.filename}</span>
         </div>
       ))}
       {Array.isArray(node.children) && node.children.map((child: any, i: number) => (
@@ -161,7 +161,7 @@ function TreeNodeRow({ node, depth }: { node: any; depth: number }) {
 function TreeResult({ parsed }: { parsed: any }) {
   const tree: any[] = parsed.tree ?? []
   return (
-    <div className="max-h-48 overflow-y-auto space-y-0.5">
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-0.5">
       {tree.length === 0 ? (
         <span className="text-xs text-muted-foreground italic">Empty tree</span>
       ) : (
@@ -176,14 +176,14 @@ function TreeResult({ parsed }: { parsed: any }) {
 function GrepResult({ parsed }: { parsed: any }) {
   const matches: any[] = parsed.matches ?? []
   return (
-    <div className="max-h-48 overflow-y-auto space-y-0.5">
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-0.5">
       {matches.length === 0 ? (
         <span className="text-xs text-muted-foreground italic">No matches</span>
       ) : (
         matches.map((m: any, i: number) => (
-          <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80">
+          <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0">
             <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-            <span>{m.filename}</span>
+            <span className="truncate">{m.filename}</span>
           </div>
         ))
       )}
@@ -194,14 +194,14 @@ function GrepResult({ parsed }: { parsed: any }) {
 function GlobResult({ parsed }: { parsed: any }) {
   const matches: any[] = parsed.matches ?? []
   return (
-    <div className="max-h-48 overflow-y-auto space-y-0.5">
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-0.5">
       {matches.length === 0 ? (
         <span className="text-xs text-muted-foreground italic">No matches</span>
       ) : (
         matches.map((m: any, i: number) => (
-          <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80">
+          <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-foreground/80 min-w-0">
             <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-            <span>{m.path ?? m.filename}</span>
+            <span className="truncate">{m.path ?? m.filename}</span>
           </div>
         ))
       )}
@@ -348,7 +348,7 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
 
   return (
     <div className={cn(
-      "mb-3 rounded-xl border overflow-hidden text-sm transition-colors",
+      "mb-3 rounded-xl border overflow-hidden max-w-full text-sm transition-colors",
       allDone
         ? "border-border/40 bg-muted/10"
         : "border-primary/20 bg-primary/5"
@@ -378,7 +378,7 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
 
       {/* Body */}
       {isExpanded && (
-        <div className="px-3.5 pb-3 space-y-2 border-t border-border/30">
+        <div className="px-3.5 pb-3 space-y-2 border-t border-border/30 min-w-0 overflow-hidden">
           {toolCalls.map((tc, i) => {
             const summary = toolSummary(tc)
             // Use persisted sub_agent or live streaming sub_agent

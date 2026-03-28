@@ -1,5 +1,13 @@
 import { Fragment, useState } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react"
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
 import type { Document, DocumentMetadata } from "@/types"
@@ -74,6 +82,7 @@ function MetadataPanel({ metadata }: { metadata: DocumentMetadata }) {
 
 export function DocumentList({ documents, onDelete, folderId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
 
   // Filter by selected folder:
   // - folderId === undefined: no folder context — show all (backward compat)
@@ -114,65 +123,97 @@ export function DocumentList({ documents, onDelete, folderId }: Props) {
     doc.status === "completed" && doc.metadata != null
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="px-2 py-3 w-8" />
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filename</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Size</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Chunks</th>
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-            <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((doc) => (
-            <Fragment key={doc.id}>
-              <tr
-                className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-              >
-                <td className="px-2 py-3">
-                  {hasMetadata(doc) && (
-                    <button
-                      onClick={() => toggle(doc.id)}
-                      className="text-muted-foreground hover:text-foreground"
-                      aria-label={expanded.has(doc.id) ? "Collapse metadata" : "Expand metadata"}
+    <>
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              <th className="px-2 py-3 w-8" />
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filename</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Size</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Chunks</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((doc) => (
+              <Fragment key={doc.id}>
+                <tr
+                  className="border-b last:border-0 hover:bg-muted/20 transition-colors"
+                >
+                  <td className="px-2 py-3">
+                    {hasMetadata(doc) && (
+                      <button
+                        onClick={() => toggle(doc.id)}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={expanded.has(doc.id) ? "Collapse metadata" : "Expand metadata"}
+                      >
+                        {expanded.has(doc.id)
+                          ? <ChevronDown className="h-3.5 w-3.5" />
+                          : <ChevronRight className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 font-medium max-w-xs truncate">{doc.filename}</td>
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{doc.chunk_count ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <DocumentStatusBadge status={doc.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setDeleteTarget(doc)}
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                     >
-                      {expanded.has(doc.id)
-                        ? <ChevronDown className="h-3.5 w-3.5" />
-                        : <ChevronRight className="h-3.5 w-3.5" />}
-                    </button>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-medium max-w-xs truncate">{doc.filename}</td>
-                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
-                <td className="px-4 py-3 text-muted-foreground">{doc.chunk_count ?? "—"}</td>
-                <td className="px-4 py-3">
-                  <DocumentStatusBadge status={doc.status} />
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(doc.id)}
-                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </td>
-              </tr>
-              {hasMetadata(doc) && expanded.has(doc.id) && (
-                <tr>
-                  <td colSpan={6} className="p-0">
-                    <MetadataPanel metadata={doc.metadata!} />
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </td>
                 </tr>
-              )}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                {hasMetadata(doc) && expanded.has(doc.id) && (
+                  <tr>
+                    <td colSpan={6} className="p-0">
+                      <MetadataPanel metadata={doc.metadata!} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete document?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">{deleteTarget?.filename}</span>{" "}
+              and all its chunks. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteTarget) {
+                  onDelete(deleteTarget.id)
+                  setDeleteTarget(null)
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

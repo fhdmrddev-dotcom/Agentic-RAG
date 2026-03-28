@@ -41,6 +41,11 @@ export function MessageItem({ message, isStreaming }: Props) {
             <Loader2 className="w-4 h-4 animate-spin" />
             Thinking…
           </span>
+        ) : isStreaming && message.content === "" && message.tool_calls && message.tool_calls.length > 0 && message.tool_calls.every((tc) => tc.status === "done") ? (
+          <span className="flex items-center gap-2 text-muted-foreground italic text-sm mt-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Generating response…
+          </span>
         ) : message.content ? (
           <div className="text-sm text-foreground">
             <MarkdownRenderer content={message.content} />
