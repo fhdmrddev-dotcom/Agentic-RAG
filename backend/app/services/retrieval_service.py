@@ -28,6 +28,7 @@ def _vector_search(
     top_n: int,
     match_threshold: float,
     user_settings: UserEffectiveSettings | None,
+    folder_ids: list[str] | None = None,
 ) -> list[dict]:
     query_embedding = embed_texts([query], user_settings=user_settings)[0]
     params: dict = {
@@ -38,6 +39,8 @@ def _vector_search(
     }
     if metadata_filter:
         params["metadata_filter"] = metadata_filter
+    if folder_ids:
+        params["p_folder_ids"] = folder_ids
 
     result = supabase.rpc("match_document_chunks", params).execute()
     return result.data or []
@@ -183,6 +186,7 @@ def search_documents(
     supabase: Client,
     metadata_filter: dict | None = None,
     user_settings: UserEffectiveSettings | None = None,
+    folder_ids: list[str] | None = None,
 ) -> list[dict]:
     # Resolve effective config values
     hybrid_enabled = user_settings.hybrid_search_enabled if user_settings else settings.hybrid_search_enabled
@@ -200,6 +204,7 @@ def search_documents(
             query, user_id, supabase, metadata_filter,
             top_n=top_k, match_threshold=match_threshold,
             user_settings=user_settings,
+            folder_ids=folder_ids,
         )
         return _enrich_with_filenames(rows, supabase)
 
@@ -208,6 +213,7 @@ def search_documents(
         query, user_id, supabase, metadata_filter,
         top_n=candidate_count, match_threshold=match_threshold,
         user_settings=user_settings,
+        folder_ids=folder_ids,
     )
     keyword_rows = _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count)
 

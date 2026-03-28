@@ -89,11 +89,10 @@ async def create_thread(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    response = (
-        supabase.table("threads")
-        .insert({"user_id": current_user["id"], "title": body.title})
-        .execute()
-    )
+    insert_data: dict = {"user_id": current_user["id"], "title": body.title}
+    if body.folder_id:
+        insert_data["folder_id"] = str(body.folder_id)
+    response = supabase.table("threads").insert(insert_data).execute()
     return response.data[0]
 
 
@@ -203,6 +202,48 @@ async def send_message(
         # Load user settings for this request
         user_settings = load_user_settings(current_user["id"])
 
+        # Load thread's folder scope
+        thread_data = (
+            supabase.table("threads")
+            .select("folder_id")
+            .eq("id", thread_id)
+            .single()
+            .execute()
+        )
+        thread_folder_id: str | None = thread_data.data.get("folder_id") if thread_data.data else None
+
+        # Resolve folder subtree if scoped
+        folder_subtree_ids: list[str] | None = None
+        scoped_folder_path: str | None = None
+        if thread_folder_id:
+            all_folders = (
+                supabase.table("folders")
+                .select("id, parent_id, name")
+                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .execute()
+            ).data or []
+
+            def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
+                result = [root_id]
+                for f in folders:
+                    if f["parent_id"] == root_id:
+                        result.extend(_get_subtree(f["id"], folders))
+                return result
+
+            folder_subtree_ids = _get_subtree(thread_folder_id, all_folders)
+
+            # Build scoped folder path for ls/tree/grep default path
+            folder_map = {f["id"]: f for f in all_folders}
+            path_parts = []
+            current_fid: str | None = thread_folder_id
+            while current_fid:
+                f = folder_map.get(current_fid)
+                if not f:
+                    break
+                path_parts.append(f.get("name", ""))
+                current_fid = f.get("parent_id")
+            scoped_folder_path = "/" + "/".join(reversed(path_parts))
+
         # Load full message history (includes just-inserted user message)
         history_resp = (
             supabase.table("messages")
@@ -303,13 +344,16 @@ async def send_message(
                         args = json.loads(tc["arguments"])
                         yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args})}\n\n"
                         if tool_name == "ls":
-                            result = ls_path(args.get("path", "/"), current_user["id"], supabase)
+                            path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
+                            result = ls_path(path, current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "tree":
-                            result = tree_path(args.get("path", "/"), args.get("depth"), current_user["id"], supabase)
+                            path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
+                            result = tree_path(path, args.get("depth"), current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "grep":
-                            result = grep_path(args.get("pattern", ""), args.get("path"), current_user["id"], supabase)
+                            path = args.get("path") or scoped_folder_path
+                            result = grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "glob":
                             result = glob_path(args.get("pattern", ""), current_user["id"], supabase)
@@ -325,7 +369,12 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
-                            results = search_documents(args["query"], current_user["id"], supabase, metadata_filter=metadata_filter, user_settings=user_settings)
+                            results = search_documents(
+                                args["query"], current_user["id"], supabase,
+                                metadata_filter=metadata_filter,
+                                user_settings=user_settings,
+                                folder_ids=folder_subtree_ids,
+                            )
                             tool_result = json.dumps(results) if results else "No relevant documents found."
                         elif tool_name == "query_documents":
                             tool_result = query_documents(args["query"], current_user["id"], supabase)
