@@ -62,10 +62,10 @@
 
 ### Persistent Tool Memory
 
-- [ ] **TMEM-01**: When the LLM calls a tool, the `tool_call_id` is stored alongside the tool name, args, and result in the `messages.tool_calls` JSONB column (no schema change required)
-- [ ] **TMEM-02**: When loading conversation history for a new turn, assistant messages with tool calls are reconstructed as proper multi-turn sequences: `assistant (tool_calls)` → `tool (result)` → `assistant (text)`
-- [ ] **TMEM-03**: The LLM can reference prior tool results across conversation turns without re-executing the tool
-- [ ] **TMEM-04**: Persisted tool results are capped at 2000 characters to prevent database bloat (existing behavior preserved)
+- [x] **TMEM-01**: When the LLM calls a tool, the `tool_call_id` is stored alongside the tool name, args, and result in the `messages.tool_calls` JSONB column (no schema change required)
+- [x] **TMEM-02**: When loading conversation history for a new turn, assistant messages with tool calls are reconstructed as proper multi-turn sequences: `assistant (tool_calls)` → `tool (result)` → `assistant (text)`
+- [x] **TMEM-03**: The LLM can reference prior tool results across conversation turns without re-executing the tool
+- [x] **TMEM-04**: Persisted tool results are capped at 2000 characters to prevent database bloat (existing behavior preserved)
 
 ---
 
@@ -112,10 +112,10 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TMEM-01 | Phase 1 | Pending |
-| TMEM-02 | Phase 1 | Pending |
-| TMEM-03 | Phase 1 | Pending |
-| TMEM-04 | Phase 1 | Pending |
+| TMEM-01 | Phase 1 | Complete |
+| TMEM-02 | Phase 1 | Complete |
+| TMEM-03 | Phase 1 | Complete |
+| TMEM-04 | Phase 1 | Complete |
 | SKIL-01 | Phase 2 | Pending |
 | SKIL-02 | Phase 2 | Pending |
 | SKIL-03 | Phase 2 | Pending |

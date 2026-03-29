@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Agent Skills & Code Execution
-status: ready_to_plan
-stopped_at: —
-last_updated: "2026-03-29T00:00:00.000Z"
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-29T14:51:36.055Z"
 last_activity: 2026-03-29
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 7
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
 ---
 
 # Project State
@@ -20,14 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 9 — Persistent Tool Memory (ready to plan)
+**Current focus:** Phase 09 — persistent-tool-memory
 
 ## Current Position
 
-Phase: 9 (Persistent Tool Memory — not yet started)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-29 — v2.0 roadmap approved, 7 phases (9–15) defined
+Phase: 09 (persistent-tool-memory) — EXECUTING
+Plan: 1 of 1
 
 ## Performance Metrics
 
@@ -65,6 +63,7 @@ Last activity: 2026-03-29 — v2.0 roadmap approved, 7 phases (9–15) defined
 | Phase 08-folder-system-enhancements P01 | 2min 24sec | 2 tasks | 8 files |
 | Phase 08-folder-system-enhancements P02 | 3min 18sec | 2 tasks | 9 files |
 | Phase 08-folder-system-enhancements P03 | 1min | 1 tasks | 2 files |
+| Phase 09-persistent-tool-memory P01 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -112,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 08-folder-system-enhancements]: ON DELETE SET NULL on threads.folder_id — thread history preserved when folder deleted; thread reverts to unscoped
 - [Phase 08-folder-system-enhancements]: Keyword search not folder-filtered at RPC level; vector search handles scoping and RRF fusion produces net-scoped results
 - [Phase 08-folder-system-enhancements]: All folder stats derived from existing hook state — no new backend API endpoints needed for FolderDetail info bar
+- [Phase 09-persistent-tool-memory]: _reconstruct_history extracted as module-level function so tests can import it directly without HTTP setup
+- [Phase 09-persistent-tool-memory]: all(tc.get('tool_call_id') guard ensures backward compat — any entry missing the field falls back to plain assistant message
 
 ### Pending Todos
 
@@ -133,5 +134,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-03-29
-Stopped at: Completed 08-03-PLAN.md
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None

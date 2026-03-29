@@ -47,9 +47,9 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
   2. Conversation history loaded for a new turn contains proper multi-turn sequences: `assistant (tool_calls)` → `tool (result)` → `assistant (text)` for every prior tool-using turn
   3. Persisted tool results in the `tool_calls` JSONB column include `tool_call_id` alongside name, args, result, and status
   4. Tool results persisted in JSONB are capped at 2000 characters (existing cap preserved)
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 09-01-PLAN.md — Persist tool_call_id + reconstruct multi-turn tool call history
+- [x] 09-01-PLAN.md — Persist tool_call_id + reconstruct multi-turn tool call history
 
 ### Phase 10: Agent Skills Core
 **Goal**: Skills exist as first-class database entities with full CRUD, global/private ownership, and file attachment support
@@ -136,7 +136,7 @@ Plans:
 | 6. Read Tool | v1.0 | 2/2 | Complete | 2026-03-22 |
 | 7. Explorer Sub-Agent | v1.0 | 2/2 | Complete | 2026-03-22 |
 | 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
-| 9. Persistent Tool Memory | v2.0 | 0/1 | Pending | — |
+| 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
 | 10. Agent Skills Core | v2.0 | 0/? | Pending | — |
 | 11. Skills LLM Integration | v2.0 | 0/? | Pending | — |
 | 12. Skills UI | v2.0 | 0/? | Pending | — |
