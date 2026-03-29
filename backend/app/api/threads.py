@@ -440,6 +440,7 @@ async def send_message(
                         "content": tool_result,
                     })
                     persisted_tool_calls.append({
+                        "tool_call_id": tc["id"],
                         "name": tool_name,
                         "args": args,
                         "result": tool_result[:2000],  # trim large results
