@@ -125,9 +125,10 @@ None yet.
 | 260322-26g | Improve tool call display for ls, tree, grep, and glob tools in chat UI with rich result rendering | 2026-03-21 | 7943a7c | [260322-26g-improve-tool-call-display-for-ls-tree-gr](./quick/260322-26g-improve-tool-call-display-for-ls-tree-gr/) |
 | 260328-v6n | Fix 6 bugs (folder-aware dedup, duplicate folder names, tool call state indicator, overflow, delete confirm, breadcrumb) + design doc for Issues 7-9 | 2026-03-28 | 8c4e352 | [260328-v6n-investigate-and-plan-fixes-for-duplicate](./quick/260328-v6n-investigate-and-plan-fixes-for-duplicate/) |
 | 260328-wqj | Fix folder-scoped chat returning results from all folders — scope query_documents SQL, glob, and system prompt to folder subtree | 2026-03-28 | eaf7848 | [260328-wqj-fix-folder-scoped-chat-returning-results](./quick/260328-wqj-fix-folder-scoped-chat-returning-results/) |
+| 260328-x6n | Fix bug: folder not created when pressing Enter in folder input | 2026-03-29 | 2852601 | [260328-x6n-fix-bug-folder-not-created-when-pressing](./quick/260328-x6n-fix-bug-folder-not-created-when-pressing/) |
 
 ## Session Continuity
 
-Last session: 2026-03-28T19:14:02.641Z
+Last activity: 2026-03-29 - Completed quick task 260328-x6n: Fix bug: folder not created when pressing Enter in folder input
 Stopped at: Completed 08-03-PLAN.md
 Resume file: None
