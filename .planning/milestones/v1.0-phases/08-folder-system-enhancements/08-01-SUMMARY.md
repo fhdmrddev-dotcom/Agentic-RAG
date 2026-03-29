@@ -116,6 +116,13 @@ supabase migration up
 - Phase 08-02 (folder-scoped chat) can proceed — global folder structure is now semantically complete
 - No blockers
 
+## Self-Check: PASSED
+
+- `supabase/migrations/015_global_folder_document_rls.sql` — FOUND
+- `.planning/phases/08-folder-system-enhancements/08-01-SUMMARY.md` — FOUND
+- Commit `6208193` — FOUND
+- Commit `ee9ef1a` — FOUND
+
 ---
 *Phase: 08-folder-system-enhancements*
 *Completed: 2026-03-28*
