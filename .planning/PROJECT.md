@@ -22,9 +22,10 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 ## Current State
 
 **Shipped:** v1.0 Knowledge Base Explorer — 2026-03-29
+**Active:** v2.0 Agent Skills & Code Execution — Phase 9 complete (2026-03-29)
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector)
 **Codebase:** ~8,900 LOC (Python + TypeScript)
-**Phases shipped:** 8 phases, 18 plans, 22 tasks
+**Phases shipped:** 9 phases (8 v1.0 + 1 v2.0), 19 plans, 24 tasks
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 
 ## Requirements
@@ -73,7 +74,7 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - [ ] Skill Building-Block Files stored in Supabase Storage, listed on `load_skill`, read via `read_skill_file` tool
 - [ ] Code Execution Sandbox (Docker/llm-sandbox, session persistence by thread, SSE streaming, `SANDBOX_ENABLED` flag)
 - [ ] Skills Open Standard ZIP import/export (agentskills.io format, SKILL.md frontmatter)
-- [ ] Persistent Tool Memory — store tool results in JSONB, reconstruct full tool call history on conversation load
+- ✓ Persistent Tool Memory — store tool results in JSONB, reconstruct full tool call history on conversation load — v2.0 Phase 9
 
 ### Out of Scope
 
