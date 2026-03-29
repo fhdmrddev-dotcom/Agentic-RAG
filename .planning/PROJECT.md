@@ -2,28 +2,24 @@
 
 ## What This Is
 
-A Claude Code-inspired exploration layer built on top of the existing Agentic RAG application. Users organize documents into nested folders (global or personal), and the AI agent can navigate, search, and read that structure using filesystem-like tools — just like Claude Code explores codebases.
+A Claude Code-inspired exploration layer built on top of the existing Agentic RAG application. Users organize documents into nested folders (global or personal), and the AI agent can navigate, search, and read that structure using filesystem-like tools — just like Claude Code explores codebases. Ships with a General/Explorer mode toggle in the chat UI so users can switch the agent into KB-focused exploration mode on demand.
 
 ## Core Value
 
 The agent can explore the knowledge base the same way Claude Code explores codebases — navigating folders, pattern-matching filenames, searching content, and reading specific documents.
 
-## Current Milestone: v1.0 Knowledge Base Explorer
+## Current State
 
-**Goal:** Build a hierarchical folder system with agent-facing KB exploration tools (ls, tree, grep, glob, read) and an orchestrating explorer sub-agent.
-
-**Target features:**
-- Nested folder structure (global + per-user) with CRUD APIs
-- Document-folder integration + full markdown storage
-- Ingestion UI with folder tree visualization
-- Navigation tools: `ls`, `tree`
-- Search tools: `grep`, `glob`
-- Read tool: full document and line-range reading
-- Explorer sub-agent orchestrating all KB tools
+**Shipped:** v1.0 Knowledge Base Explorer — 2026-03-29
+**Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector)
+**Codebase:** ~8,900 LOC (Python + TypeScript)
+**Phases shipped:** 8 phases, 18 plans, 22 tasks
 
 ## Requirements
 
 ### Validated
+
+*Pre-existing (from prior modules):*
 
 - ✓ Chat interface with SSE streaming — Module 1
 - ✓ Document ingestion with multi-format support (PDF, DOCX, HTML, Markdown via pypdf + python-docx) — Module 5
@@ -39,27 +35,29 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - ✓ Text-to-SQL tool (`query_documents`) — Module 7
 - ✓ Web search fallback (Tavily) — Module 7
 
-### Validated
+*v1.0 milestone:*
 
-- ✓ Nested folder structure with unlimited depth — Phase 1
-- ✓ Global folders (shared across all users) and per-user folders (private) — Phase 1
-- ✓ Document-folder integration (folder_id FK on documents, move document, move folder) — Phase 2
-- ✓ Store full extracted markdown alongside chunks for grep/read operations — Phase 2
+- ✓ Nested folder structure with unlimited depth — v1.0 Phase 1
+- ✓ Global folders (shared across all users) and per-user folders (private) — v1.0 Phase 1
+- ✓ Document-folder integration (folder_id FK on documents, move document, move folder) — v1.0 Phase 2
+- ✓ Store full extracted markdown alongside chunks for grep/read operations — v1.0 Phase 2
+- ✓ Folder CRUD in ingestion UI (create, rename, delete folders) — v1.0 Phase 3
+- ✓ Upload files to selected folder in UI — v1.0 Phase 3
+- ✓ `ls` tool — list files and subfolders in a given path — v1.0 Phase 4
+- ✓ `tree` tool — hierarchical structure with depth limit and truncation — v1.0 Phase 4
+- ✓ `grep` tool — regex search over document content, returns matching document names — v1.0 Phase 5
+- ✓ `glob` tool — file pattern matching against document names (e.g., `*.md`, `reports/**/*.pdf`) — v1.0 Phase 5
+- ✓ `read` tool — read full document or line range (split at newlines) — v1.0 Phase 6
+- ✓ Explorer sub-agent — orchestrates KB tools for synthesized exploration answers — v1.0 Phase 7
+- ✓ Explorer mode selector in chat UI (General / Explorer toggle) — v1.0 Phase 7
+- ✓ Visual indicator for global vs per-user folders — v1.0 Phase 8
+- ✓ Global folder RLS: documents in global folders readable by all authenticated users — v1.0 Phase 8
+- ✓ Folder-scoped chat threads: RAG retrieval auto-scoped to folder subtree — v1.0 Phase 8
+- ✓ Folder detail info bar: compact stats (doc count, size, subfolders, date) in ingestion UI — v1.0 Phase 8
 
 ### Active
 
-- ✓ `ls` tool — list files and subfolders in a given path — Validated in Phase 04: navigation-tools
-- ✓ `tree` tool — hierarchical structure with depth limit and truncation — Validated in Phase 04: navigation-tools
-- ✓ `grep` tool — regex search over document content, returns matching document names — Validated in Phase 05: search-tools
-- ✓ `glob` tool — file pattern matching against document names (e.g., `*.md`, `reports/**/*.pdf`) — Validated in Phase 05: search-tools
-- ✓ `read` tool — read full document or line range (split at newlines) — Validated in Phase 06: read-tool
-- [ ] Explorer sub-agent — orchestrates KB tools + document analysis agent for deep exploration
-- [ ] Folder CRUD in ingestion UI (create, rename, delete folders)
-- [ ] Upload files to selected folder in UI
-- ✓ Visual indicator in UI for global vs per-user folders — Validated in Phase 08: folder-system-enhancements
-- ✓ Global folder RLS: documents in global folders readable by all authenticated users — Validated in Phase 08: folder-system-enhancements
-- ✓ Folder-scoped chat threads: RAG retrieval auto-scoped to folder subtree — Validated in Phase 08: folder-system-enhancements
-- ✓ Folder detail info bar: compact stats (doc count, size, subfolders, date) in ingestion UI — Validated in Phase 08: folder-system-enhancements
+*(None — clean slate for next milestone)*
 
 ### Out of Scope
 
@@ -71,60 +69,47 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 
 ## Context
 
-**Existing Architecture:** React/Vite frontend + FastAPI backend + Supabase (Postgres with pgvector). Supabase can run locally via Docker or as a cloud instance — deployment is configured purely via environment variables and migration files. Documents are ingested via pypdf + python-docx, chunked, embedded, and stored in Postgres. Currently no folder hierarchy — documents are flat per-user.
+**Architecture:** React/Vite frontend + FastAPI backend + Supabase (Postgres with pgvector). Supabase can run locally via Docker or as a cloud instance — configured purely via environment variables and migration SQL files.
 
-**Current Schema (what exists):**
-- `documents`: id, user_id, filename, file_path, file_size, mime_type, status, error_message, chunk_count, content_hash, metadata, created_at, updated_at — **no folder_id, no full_markdown**
-- `document_chunks`: id, document_id, user_id, content (chunk text), chunk_index, embedding (vector), search_vector (tsvector), created_at
-- `threads` + `messages` + `profiles` + `user_settings` + `app_settings`
-- No `folders` table exists yet
+**Schema (v1.0 shipped state):**
+- `folders`: id, user_id, name, parent_id, is_global, created_at, updated_at — adjacency list with RLS
+- `documents`: id, user_id, folder_id, filename, file_path, file_size, mime_type, status, full_markdown, chunk_count, content_hash, metadata, created_at, updated_at
+- `document_chunks`: id, document_id, user_id, content, chunk_index, embedding (vector), search_vector (tsvector), created_at
+- `threads`: id, user_id, folder_id (nullable FK → scoped chat), title, created_at
+- `messages`, `profiles`, `user_settings`, `app_settings`
 
-**Schema Changes This Milestone:**
-- Phase 1: CREATE `folders` table (id, user_id, name, parent_id, is_global, created_at, updated_at) with adjacency list + RLS
-- Phase 2: ADD `folder_id` (nullable FK → folders) and `full_markdown` (text) to `documents`
+**Agent modes:**
+- General: default chat with all tools (search, query_documents, web_search, analyze_document, ls, tree, grep, glob, read_document)
+- Explorer: KB-focused mode with only KB tools (ls, tree, grep, glob, read_document, analyze_document), dedicated system prompt, max_iterations=8
 
 **Key Difference from Claude Code:** Claude Code greps/globs raw source files. This knowledge base has PDFs, DOCX, etc. that need extraction first. The tools search *extracted markdown content* stored in Supabase, not raw files.
-
-**Sub-agent Pattern:** Existing sub-agent (Module 8) loads full document content into isolated context. Explorer sub-agent will follow the same pattern but with access to all KB tools.
-
-**Modules History:** 8 modules completed (auth, BYO retrieval, record manager, metadata, multi-format, hybrid search + settings, additional tools, sub-agents).
-
-## Constraints
-
-- **Tech stack**: Must use existing Supabase infrastructure — no new databases or storage systems
-- **Supabase deployment**: Agnostic — works with local Docker or cloud; all schema changes delivered as numbered migration SQL files
-- **Extraction**: Keep pypdf + python-docx pipeline — no Docling migration in v1.0
-- **Context window**: Tree/ls output must respect context limits — use depth limits and truncation
-- **RLS**: All tools must respect Row-Level Security — users only see their folders/documents (except global)
-- **Ingestion dependency**: grep/glob/read only work on ingested content, not raw uploaded files
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Store full markdown alongside chunks | Enables efficient grep/read without reconstruction from chunks | Implemented in Phase 2 — `full_markdown` column on documents, stored on ingest |
-| Unlimited folder nesting depth | Flexibility like a real filesystem | Implemented in Phase 1 — adjacency list with no depth limit |
-| Global + per-user folders (no teams) | Avoids permission complexity while enabling shared content | Implemented in Phase 1 — `is_global` flag on folders with RLS |
-| grep returns document names only | Keeps output lightweight; use read for content | Implemented in Phase 5 — `grep_path` returns id/filename/folder_id only |
-| tree uses depth limit + truncation | Protects context window for large KBs | Implemented in Phase 4 — `truncated=True` on cut nodes, depth param |
-| Keep pypdf + python-docx (not Docling) | Already working; avoids migration risk | — Pending |
+| Store full markdown alongside chunks | Enables efficient grep/read without reconstruction from chunks | ✓ Good — implemented Phase 2, used by read/grep tools |
+| Unlimited folder nesting depth | Flexibility like a real filesystem | ✓ Good — adjacency list with no depth limit |
+| Global + per-user folders (no teams) | Avoids permission complexity while enabling shared content | ✓ Good — `is_global` flag + RLS |
+| grep returns document names only | Keeps output lightweight; use read for content | ✓ Good — agents follow up with read when content needed |
+| tree uses depth limit + truncation | Protects context window for large KBs | ✓ Good — `truncated=True` indicator on cut nodes |
+| Keep pypdf + python-docx (not Docling) | Already working; avoids migration risk | ✓ Good — no issues encountered |
+| ON DELETE SET NULL on folder_id FK | Deleting folder orphans documents to root, not destroys them | ✓ Good — safe default behavior |
+| document_chunks RLS not updated | match_document_chunks RPC is SECURITY DEFINER — RAG queries bypass RLS correctly | ✓ Good — no change needed |
+| Python-side subtree resolution | Preferred over SQL CTE for folder scoping — simpler, testable | ✓ Good — used in grep, glob, query_documents, system prompt |
+| ON DELETE SET NULL on threads.folder_id | Thread history preserved when folder deleted; thread reverts to unscoped | ✓ Good — no data loss on folder delete |
+| tools_override=None signals default mode | No override → get_tools() used; default mode completely unchanged | ✓ Good — clean branching pattern |
+| agentMode state lives in ChatArea | Resets automatically on thread switch (ChatArea remounts per thread) | ✓ Good — correct v1.0 behavior |
+| Use 403 not 404 for toggle-global by non-owner | Distinguishes permission denial from missing resource | ✓ Good — clearer error semantics |
 
-## Evolution
+## Constraints
 
-This document evolves at phase transitions and milestone boundaries.
-
-**After each phase transition** (via `/gsd:transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
-
-**After each milestone** (via `/gsd:complete-milestone`):
-1. Full review of all sections
-2. Core Value check — still the right priority?
-3. Audit Out of Scope — reasons still valid?
-4. Update Context with current state
+- **Tech stack**: Must use existing Supabase infrastructure — no new databases or storage systems
+- **Supabase deployment**: Agnostic — works with local Docker or cloud; all schema changes as numbered migration SQL files
+- **Extraction**: Keep pypdf + python-docx pipeline — no Docling migration
+- **Context window**: Tree/ls output must respect context limits — use depth limits and truncation
+- **RLS**: All tools must respect Row-Level Security — users only see their folders/documents (except global)
+- **Ingestion dependency**: grep/glob/read only work on ingested content, not raw uploaded files
 
 ---
-*Last updated: 2026-03-28 after Phase 8 complete (folder-system-enhancements)*
+*Last updated: 2026-03-29 after v1.0 milestone complete*
