@@ -17,7 +17,7 @@ export function MessageList({ messages, isStreaming }: Props) {
 
   return (
     <ScrollArea className="flex-1">
-      <div className="space-y-0 px-6 py-6">
+      <div className="space-y-1 px-6 py-6 max-w-4xl mx-auto">
         {messages.map((msg, idx) => {
           const isLastAssistant =
             msg.role === "assistant" && idx === messages.length - 1

@@ -5,6 +5,7 @@ import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
+import { useTheme } from "@/hooks/useTheme"
 import type { ActiveView } from "@/App"
 
 interface Props {
@@ -27,6 +28,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
   } = useThreads()
 
   const { folders } = useFolders()
+  const { theme, toggleTheme } = useTheme()
 
   const selectedThreadRef = useRef(selectedThread)
   useEffect(() => {
@@ -55,6 +57,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
         onDeleteThread={deleteThread}
         onRenameThread={renameThread}
         folders={folders}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       <main className="flex-1 overflow-hidden">
         {activeView === "documents" ? (

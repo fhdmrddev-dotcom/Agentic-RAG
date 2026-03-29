@@ -14,13 +14,13 @@ export function MessageItem({ message, isStreaming }: Props) {
 
   if (isUser) {
     return (
-      <div className="flex justify-end py-2">
-        <div className="flex items-end gap-2 max-w-[70%]">
-          <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed">
+      <div className="flex justify-end py-2 animate-fadeSlideUp">
+        <div className="flex items-end gap-2.5 max-w-[70%]">
+          <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
           </div>
-          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border flex items-center justify-center mb-0.5">
-            <User className="w-3.5 h-3.5 text-foreground" />
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-muted border border-border/50 flex items-center justify-center mb-0.5">
+            <User className="w-3.5 h-3.5 text-foreground/70" />
           </div>
         </div>
       </div>
@@ -28,29 +28,39 @@ export function MessageItem({ message, isStreaming }: Props) {
   }
 
   return (
-    <div className="flex gap-3 py-3">
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center mt-0.5">
-        <Bot className="w-3.5 h-3.5 text-primary-foreground" />
+    <div className="flex gap-3 py-3 animate-fadeSlideUp">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20">
+        <Bot className="w-4 h-4 text-white" />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         {message.tool_calls && message.tool_calls.length > 0 && (
           <ToolCallPanel toolCalls={message.tool_calls} subAgent={message.sub_agent} />
         )}
         {isStreaming && message.content === "" && (!message.tool_calls || message.tool_calls.length === 0) ? (
-          <span className="flex items-center gap-2 text-muted-foreground italic text-sm">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Thinking…
+          <span className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="italic">Thinking</span>
+            <span className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0ms" }} />
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "200ms" }} />
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "400ms" }} />
+            </span>
           </span>
         ) : isStreaming && message.content === "" && message.tool_calls && message.tool_calls.length > 0 && message.tool_calls.every((tc) => tc.status === "done") ? (
-          <span className="flex items-center gap-2 text-muted-foreground italic text-sm mt-1">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            Generating response…
+          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+            <span className="italic">Generating response</span>
+            <span className="flex gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0ms" }} />
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "200ms" }} />
+              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "400ms" }} />
+            </span>
           </span>
         ) : message.content ? (
           <div className="text-sm text-foreground">
             <MarkdownRenderer content={message.content} />
             {isStreaming && (
-              <span className="inline-block w-2 h-4 ml-0.5 bg-foreground/40 animate-pulse rounded-sm align-text-bottom" />
+              <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
           </div>
         ) : null}

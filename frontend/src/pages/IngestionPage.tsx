@@ -39,15 +39,15 @@ export function IngestionPage() {
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold">Documents</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-headline font-bold text-foreground">Documents</h1>
+          <p className="text-muted-foreground mt-1.5 text-sm">
             Upload documents to give the AI context for your conversations.
           </p>
         </div>
 
         <div className="flex flex-row gap-6 flex-1 min-h-0">
-          {/* Left panel: Folder Tree — 260px fixed */}
-          <div className="w-64 shrink-0 flex flex-col overflow-y-auto border rounded-lg bg-sidebar p-3">
+          {/* Left panel: Folder Tree */}
+          <div className="w-64 shrink-0 flex flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border p-3">
             <FolderTree
               folders={folders}
               selectedFolderId={selectedFolderId}

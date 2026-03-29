@@ -85,7 +85,7 @@ async def create_folder(
     else:
         name_check_query = name_check_query.is_("parent_id", "null")
     name_check = name_check_query.maybe_single().execute()
-    if name_check.data:
+    if name_check and name_check.data:
         raise HTTPException(
             status_code=409,
             detail="A folder with this name already exists in this location",
@@ -138,7 +138,7 @@ async def rename_folder(
     else:
         name_check_query = name_check_query.is_("parent_id", "null")
     name_check = name_check_query.maybe_single().execute()
-    if name_check.data:
+    if name_check and name_check.data:
         raise HTTPException(
             status_code=409,
             detail="A folder with this name already exists in this location",

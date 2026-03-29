@@ -6,21 +6,29 @@
 
 **Key accomplishments:**
 
-- Postgres adjacency-list folders table with RLS, 4 policies, cascade delete, and 5 FastAPI CRUD endpoints covering create/list/list-children/rename/delete with service-role ownership enforcement
-- 23 integration tests across 5 test classes verifying folder create/list/rename/delete endpoints with ownership enforcement, global visibility, whitespace stripping, and parent_id validation
-- Migration 014 adds folder_id FK and full_markdown to documents; upload and move endpoints wire documents and folders together with ownership-enforced PATCH /move routes.
-- 51 passing integration tests covering upload-with-folder, document move, folder move, and full_markdown storage — with conftest builder fix enabling multi-query mock patterns.
-- One-liner:
-- One-liner:
-- One-liner:
-- FastAPI /kb/ls endpoint with in-memory tree path resolution, Pydantic response models, and 5 passing integration tests covering root listing, subfolder listing, 404, empty folder, and RLS filtering
-- GET /kb/tree endpoint with depth-limited recursive folder serialization, truncation indicators, and 4 integration tests — completes TOOL-02 and Phase 4 navigation tools
-- GET /kb/glob endpoint with glob_path helper: filename pattern matching using
-- BookOpen icon, "Reading document" label, and collapsible ReadDocumentResult component added to ToolCallPanel for read_document tool call display
-- One-liner:
-- One-liner:
-- RLS migration + PATCH toggle-global endpoint + Globe button in folder tree hover actions + isGlobal checkbox in create input
-- Migration + backend subtree resolution + frontend folder picker and scope badges — scoped threads auto-restrict RAG retrieval and KB tools to the selected folder subtree
-- New FolderDetail component showing compact stats bar (doc count, size, global badge, subfolder count, creation date) mounted in IngestionPage between breadcrumb and upload
+- Postgres adjacency-list folders table with RLS, cascade delete, and 5 FastAPI CRUD endpoints (create/list/children/rename/delete) with ownership enforcement
+- Document-folder integration: `folder_id` FK, `full_markdown` storage, and move endpoints for files and folders
+- Ingestion UI two-panel layout with folder tree, CRUD controls, and folder-targeted uploads (51 integration tests)
+- `ls` and `tree` KB navigation tools with in-memory path resolution, depth limits, and truncation indicators
+- `grep` (regex content search) and `glob` (filename pattern matching with `**` support) search tools
+- `read` tool for full document or line-range retrieval from stored markdown
+- Explorer sub-agent: backend mode branching on `agent_mode` with 6 KB-only tools and dedicated system prompt
+- General/Explorer mode selector dropdown in chat toolbar (Compass icon, agentMode state in ChatArea)
+- Global folder sharing via updated RLS (migration 015); folder-scoped chat threads with recursive subtree RAG scoping (migration 016)
+- FolderDetail info bar: doc count, total size, global badge, subfolder count, creation date
+
+## Post-v1.0 Enhancements (2026-03-29)
+
+**Aether Intelligence Design System** (visual-only, no functionality changes):
+
+- Complete CSS variable system with dark + light mode (`--background`, `--foreground`, `--primary`, `--card`, `--muted`, `--border`, `--success`, `--sidebar`, etc.)
+- Theme toggle (Sun/Moon) in Sidebar; `useTheme` hook persists to localStorage, respects `prefers-color-scheme`; FOUC prevention script in `index.html`
+- Google Fonts (Inter + Manrope), custom Tailwind font families (`sans`, `headline`, `mono`), keyframe animations (`fadeSlideUp`, `pulseGlow`)
+- Glassmorphism chat input, gradient user bubbles, animated thinking dots, color-coded tool call icons, gradient send button
+- AuthPage gradient orbs + glassmorphism card; IngestionPage/SettingsPage ghost-border cards
+
+**Backend bug fix:**
+
+- `folders.py` null-guard: `maybe_single().execute()` can return `None` when no row exists; added `if name_check and name_check.data` guard in both create and rename endpoints to prevent `AttributeError` on `None.data`
 
 ---

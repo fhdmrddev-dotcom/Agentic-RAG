@@ -64,31 +64,31 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders }: Pro
     return (
       <div className="flex flex-col h-full bg-background">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center space-y-4 max-w-sm px-6">
+          <div className="text-center space-y-5 max-w-md px-6 animate-fadeSlideUp">
             <div className="flex justify-center">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Sparkles className="w-7 h-7 text-primary" />
+              <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                <Sparkles className="w-8 h-8 text-white" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <h2 className="font-semibold text-lg">How can I help you?</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-2">
+              <h2 className="font-headline font-bold text-xl text-foreground">How can I help you?</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 Ask me anything, or upload documents and I'll answer based on their content.
               </p>
             </div>
             {folders.length > 0 && (
-              <div className="mt-2">
+              <div className="mt-3">
                 <select
                   value={scopeFolderId ?? ""}
                   onChange={(e) => setScopeFolderId(e.target.value || null)}
-                  className="text-sm border rounded-md px-3 py-1.5 bg-background text-foreground"
+                  className="text-sm rounded-lg px-4 py-2 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                 >
                   <option value="">All documents</option>
                   {folders.map((f) => (
                     <option key={f.id} value={f.id}>{f.name}</option>
                   ))}
                 </select>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5">
                   Scope this conversation to a specific folder
                 </p>
               </div>
@@ -104,10 +104,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders }: Pro
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="border-b px-6 py-3 bg-background/80 backdrop-blur-sm flex items-center gap-2">
-        <h2 className="font-medium text-sm truncate text-foreground">{thread.title}</h2>
+      <div className="px-6 py-3 bg-background/80 backdrop-blur-md flex items-center gap-2.5 border-b border-border/30">
+        <h2 className="font-headline font-semibold text-sm truncate text-foreground">{thread.title}</h2>
         {thread.folder_id && (
-          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+          <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium shrink-0">
             <FolderIcon className="h-3 w-3" />
             {scopedFolder?.name ?? "Folder"}
           </span>

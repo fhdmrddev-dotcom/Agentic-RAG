@@ -14,6 +14,7 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector)
 **Codebase:** ~8,900 LOC (Python + TypeScript)
 **Phases shipped:** 8 phases, 18 plans, 22 tasks
+**Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 
 ## Requirements
 

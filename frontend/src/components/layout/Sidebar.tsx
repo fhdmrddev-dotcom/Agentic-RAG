@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon } from "lucide-react"
+import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon, Moon, Sun } from "lucide-react"
 import type { Folder, Thread } from "@/types"
 import type { ActiveView } from "@/App"
 
@@ -17,6 +17,8 @@ interface Props {
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
   folders: Folder[]
+  theme: "light" | "dark"
+  onToggleTheme: () => void
 }
 
 export function Sidebar({
@@ -31,6 +33,8 @@ export function Sidebar({
   onDeleteThread,
   onRenameThread,
   folders: _folders,
+  theme,
+  onToggleTheme,
 }: Props) {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -59,23 +63,23 @@ export function Sidebar({
   }
 
   return (
-    <div className="flex flex-col h-full w-64 border-r bg-sidebar overflow-hidden">
+    <div className="flex flex-col h-full w-64 bg-sidebar overflow-hidden border-r border-border/20">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-4 py-4 border-b">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary">
-          <Sparkles className="w-4 h-4 text-primary-foreground" />
+      <div className="flex items-center gap-2.5 px-4 py-4">
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl gradient-primary shadow-sm shadow-primary/20">
+          <Sparkles className="w-4.5 h-4.5 text-white" />
         </div>
         <div className="flex flex-col leading-none">
-          <span className="font-semibold text-sm tracking-tight">Agentic RAG</span>
-          <span className="text-[10px] text-muted-foreground">Powered by AI</span>
+          <span className="font-headline font-bold text-sm tracking-tight text-sidebar-foreground">Agentic RAG</span>
+          <span className="text-[10px] text-muted-foreground mt-0.5">Powered by AI</span>
         </div>
       </div>
 
       {/* New Chat */}
-      <div className="px-3 py-3">
+      <div className="px-3 py-2">
         <Button
           onClick={() => { onNavigate("chat"); onNewThread() }}
-          className="w-full justify-start gap-2"
+          className="w-full justify-start gap-2 ghost-border bg-transparent hover:bg-accent/50 text-sidebar-foreground transition-all"
           variant="outline"
           size="sm"
         >
@@ -85,15 +89,15 @@ export function Sidebar({
       </div>
 
       {/* Thread list */}
-      <div className="flex-1 px-2 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 px-2 overflow-y-auto overflow-x-hidden mt-1">
         {threads.length > 0 && (
-          <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+          <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
             Recent
           </p>
         )}
         <div className="space-y-0.5 pb-2">
           {threads.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-6">No chats yet</p>
+            <p className="text-xs text-muted-foreground text-center py-8 opacity-60">No chats yet</p>
           )}
           {threads.map((thread) => {
             const isSelected = activeView === "chat" && selectedThread?.id === thread.id
@@ -101,11 +105,6 @@ export function Sidebar({
             const isMenuOpen = menuOpenId === thread.id
             const isHovered = hoveredId === thread.id
             const showActions = isHovered || isMenuOpen
-
-            // Pick gradient color based on row state
-            const gradientColor = isSelected || isHovered
-              ? "var(--accent)"
-              : "var(--sidebar)"
 
             return (
               <div
@@ -124,24 +123,30 @@ export function Sidebar({
                       if (e.key === "Enter") commitRename(thread.id)
                       if (e.key === "Escape") setEditingId(null)
                     }}
-                    className="w-full px-3 py-1.5 text-sm bg-background border rounded outline-none"
+                    className="w-full px-3 py-1.5 text-sm bg-card border border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
                   />
                 ) : (
                   <div
                     className={cn(
-                      "relative rounded-md cursor-pointer",
-                      isSelected ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                      "relative rounded-lg cursor-pointer transition-all duration-150",
+                      isSelected
+                        ? "bg-accent text-sidebar-foreground"
+                        : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
                     )}
                     onClick={() => { onNavigate("chat"); onSelectThread(thread) }}
                   >
-                    {/* Title row — single line, no wrapping, overflow hidden */}
+                    {/* Active indicator */}
+                    {isSelected && (
+                      <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
+                    )}
+                    {/* Title row */}
                     <div className="px-3 py-2 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0" />
-                      <span className="text-sm" title={thread.title}>
+                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                      <span className="text-sm truncate" title={thread.title}>
                         {thread.title}
                       </span>
                       {thread.folder_id && (
-                        <FolderIcon className="h-3 w-3 shrink-0 text-primary/60" />
+                        <FolderIcon className="h-3 w-3 shrink-0 text-primary/50" />
                       )}
                     </div>
 
@@ -154,7 +159,7 @@ export function Sidebar({
                           setMenuOpenId(isMenuOpen ? null : thread.id)
                         }}
                       >
-                        <span className="p-1 rounded bg-accent hover:bg-muted inline-flex">
+                        <span className="p-1 rounded-md bg-accent hover:bg-muted inline-flex transition-colors">
                           <MoreHorizontal className="h-4 w-4" />
                         </span>
                       </div>
@@ -162,22 +167,22 @@ export function Sidebar({
                   </div>
                 )}
 
-                {/* Dropdown menu — outside the overflow-hidden row */}
+                {/* Dropdown menu */}
                 {isMenuOpen && (
                   <div
-                    className="absolute right-2 top-full mt-0.5 z-50 w-36 rounded-md border bg-popover shadow-md py-1"
+                    className="absolute right-2 top-full mt-0.5 z-50 w-36 rounded-lg ghost-border bg-popover shadow-lg shadow-black/20 py-1"
                     onMouseLeave={() => setMenuOpenId(null)}
                   >
                     <button
                       onClick={() => startRename(thread)}
-                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent"
+                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent transition-colors"
                     >
                       <Pencil className="h-3.5 w-3.5" />
                       Rename
                     </button>
                     <button
                       onClick={async () => { setMenuOpenId(null); await onDeleteThread(thread.id) }}
-                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent text-destructive"
+                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                       Delete
@@ -191,14 +196,16 @@ export function Sidebar({
       </div>
 
       {/* Bottom nav */}
-      <div className="border-t px-2 py-3 space-y-0.5">
+      <div className="border-t border-border/20 px-2 py-3 space-y-0.5">
         <Button
           onClick={() => onNavigate("documents")}
           variant={activeView === "documents" ? "secondary" : "ghost"}
           size="sm"
           className={cn(
-            "w-full justify-start gap-2",
-            activeView !== "documents" && "text-muted-foreground hover:text-foreground",
+            "w-full justify-start gap-2 transition-all",
+            activeView === "documents"
+              ? "text-primary font-medium"
+              : "text-muted-foreground hover:text-sidebar-foreground",
           )}
         >
           <FileText className="h-4 w-4" />
@@ -209,18 +216,33 @@ export function Sidebar({
           variant={activeView === "settings" ? "secondary" : "ghost"}
           size="sm"
           className={cn(
-            "w-full justify-start gap-2",
-            activeView !== "settings" && "text-muted-foreground hover:text-foreground",
+            "w-full justify-start gap-2 transition-all",
+            activeView === "settings"
+              ? "text-primary font-medium"
+              : "text-muted-foreground hover:text-sidebar-foreground",
           )}
         >
           <Settings className="h-4 w-4" />
           Settings
         </Button>
+
+        {/* Theme toggle + Sign out row */}
+        <div className="flex items-center gap-1 pt-1">
+          <Button
+            onClick={onToggleTheme}
+            variant="ghost"
+            size="sm"
+            className="flex-1 justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </Button>
+        </div>
         <Button
           onClick={onSignOut}
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-all"
         >
           <LogOut className="h-4 w-4" />
           Sign Out

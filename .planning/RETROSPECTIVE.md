@@ -52,6 +52,11 @@ Living retrospective — updated at each milestone boundary.
 - Quick task commits should reference the task ID in the message for traceability
 - `conftest` mock builder gaps surface late in test runs — audit builder wiring at phase start
 
+### Post-Milestone Additions (same session)
+
+- **Aether Intelligence design system** applied after milestone archive — complete visual overhaul with dark/light mode, CSS variables, Inter/Manrope fonts, glassmorphism, animations. Visual-only; no hooks, API, or data changes.
+- **folders.py null-guard** — `maybe_single().execute()` returns `None` when no row found; both create and rename were doing `name_check.data` without checking for `None`. Fixed with `if name_check and name_check.data`.
+
 ### Cost Observations
 
 - Model: claude-sonnet-4-6 throughout
