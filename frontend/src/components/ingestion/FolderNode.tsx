@@ -124,8 +124,14 @@ export function FolderNode({
               onChange={(e) => setEditValue(e.target.value)}
               onBlur={() => onCommitRename(node.id, editValue.trim())}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onCommitRename(node.id, editValue.trim())
-                if (e.key === "Escape") onCancelRename()
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  onCommitRename(node.id, editValue.trim())
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault()
+                  onCancelRename()
+                }
               }}
               className="flex-1 px-1 py-0.5 text-sm bg-background border rounded outline-none"
               autoFocus
