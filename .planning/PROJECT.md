@@ -8,6 +8,17 @@ A Claude Code-inspired exploration layer built on top of the existing Agentic RA
 
 The agent can explore the knowledge base the same way Claude Code explores codebases — navigating folders, pattern-matching filenames, searching content, and reading specific documents.
 
+## Current Milestone: v2.0 Agent Skills & Code Execution
+
+**Goal:** Transform the chat app into a customizable AI agent platform with reusable skills, sandboxed code execution, and persistent tool memory.
+
+**Target features:**
+- Agent Skills — named reusable behavior units with progressive discovery, AI-guided creation, full CRUD UI (new Skills tab)
+- Skill Building-Block Files — files attached to skills, loaded on demand by the LLM
+- Code Execution Sandbox — Docker-based Python sandbox with session persistence and SSE streaming
+- Skills Open Standard — ZIP import/export compatible with agentskills.io
+- Persistent Tool Memory — store and replay tool call results across conversation turns
+
 ## Current State
 
 **Shipped:** v1.0 Knowledge Base Explorer — 2026-03-29
@@ -58,7 +69,11 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 
 ### Active
 
-*(None — clean slate for next milestone)*
+- [ ] Agent Skills with progressive discovery (`load_skill` / `save_skill` tools), full CRUD UI, global/private ownership model
+- [ ] Skill Building-Block Files stored in Supabase Storage, listed on `load_skill`, read via `read_skill_file` tool
+- [ ] Code Execution Sandbox (Docker/llm-sandbox, session persistence by thread, SSE streaming, `SANDBOX_ENABLED` flag)
+- [ ] Skills Open Standard ZIP import/export (agentskills.io format, SKILL.md frontmatter)
+- [ ] Persistent Tool Memory — store tool results in JSONB, reconstruct full tool call history on conversation load
 
 ### Out of Scope
 
@@ -112,5 +127,22 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 - **RLS**: All tools must respect Row-Level Security — users only see their folders/documents (except global)
 - **Ingestion dependency**: grep/glob/read only work on ingested content, not raw uploaded files
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-03-29 after v1.0 milestone complete*
+*Last updated: 2026-03-29 — Milestone v2.0 started*

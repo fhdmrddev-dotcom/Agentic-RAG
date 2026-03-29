@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: Knowledge Base Explorer
-status: complete
-stopped_at: v1.0 milestone archived
+milestone: v2.0
+milestone_name: Agent Skills & Code Execution
+status: defining_requirements
+stopped_at: —
 last_updated: "2026-03-29T00:00:00.000Z"
 last_activity: 2026-03-29
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 18
-  completed_plans: 18
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,12 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 08 — folder-system-enhancements
+**Current focus:** Defining requirements for v2.0 — Agent Skills & Code Execution
 
 ## Current Position
 
-Phase: 08
-Plan: Not started
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-29 — Milestone v2.0 started
 
 ## Performance Metrics
 
