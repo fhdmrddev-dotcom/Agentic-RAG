@@ -206,7 +206,7 @@ Track your progress through the masterclass. Update this file as you complete mo
 
 ---
 
-## Milestone: Knowledge Base Explorer (v1.0)
+## Milestone: Knowledge Base Explorer (v1.0) ✅ COMPLETE — 2026-03-29
 
 Build a hierarchical folder system + AI agent tools to explore the knowledge base like a filesystem.
 
@@ -292,4 +292,112 @@ Build a hierarchical folder system + AI agent tools to explore the knowledge bas
 - `full_markdown` fetched directly from `documents` table — only works on ingested documents
 - System prompt now references 9 tools; `read_document` positioned at slot 5
 
-### Phase 7: Explorer Sub-Agent 🔲 NOT STARTED
+### Phase 7: Explorer Sub-Agent ✅ COMPLETE
+
+- [x] Plan 01: Backend explorer mode — `agent_mode="explorer"` parameter on POST /threads/{id}/messages; distinct `EXPLORER_SYSTEM_PROMPT`; KB-only tool set (6 tools); max_iterations raised to 8; default mode unchanged
+- [x] Plan 02: Frontend agent mode selector — General/Explorer dropdown in MessageInput toolbar; `agentMode` state in ChatArea; threaded through `useMessages.sendMessage` → `streamMessage` → POST body as `agent_mode`
+
+#### Notes (Phase 7)
+
+- Explorer mode accessible via the mode selector dropdown in the chat input toolbar (Compass icon)
+- Selecting Explorer sends `agent_mode="explorer"` to the backend; General mode sends `agent_mode="default"`
+- Mode defaults to General on page load and resets on thread switch (agentMode state lives in ChatArea)
+
+### Phase 8: Folder System Enhancements ✅ COMPLETE
+
+- [x] Plan 01: Global folder toggle — migration `015_global_folder_document_rls.sql` (documents RLS updated for global folder visibility), `PATCH /folders/{id}/toggle-global` backend endpoint (owner-only, 403 for non-owners), Globe toggle button in FolderNode hover actions, isGlobal checkbox in FolderCreateInput
+- [x] Plan 02: Folder-scoped chat threads — migration `016_thread_folder_scope.sql` (folder_id on threads, updated match_document_chunks RPC with p_folder_ids), backend subtree resolution + scoped tool dispatch, frontend folder picker dropdown + scope badge in chat header + folder icon in sidebar
+- [x] Plan 03: Folder detail info bar — `FolderDetail.tsx` component (doc count, total size, global badge, subfolder count, creation date), mounted in IngestionPage between breadcrumb and upload
+
+#### Notes (Phase 8)
+
+- Run `015_global_folder_document_rls.sql` and `016_thread_folder_scope.sql` in Supabase SQL editor (or `supabase db push`)
+- Global folder toggle: only the folder owner can toggle; non-owners receive 403
+- Folder-scoped threads: scope is fixed at creation; deleting the scoped folder reverts thread to unscoped (ON DELETE SET NULL)
+- Human verification required: cross-user RLS testing, live scope badge rendering, and retrieval restriction validation require a running app with multiple Supabase sessions
+
+---
+
+### UI Enhancement: Aether Intelligence Design System ✅ COMPLETE
+
+> **Agent:** Antigravity (Google DeepMind)
+> **Date:** 2026-03-29
+> **Scope:** Visual-only — zero functionality, hooks, API, or data structure changes.
+
+A complete visual overhaul of the frontend implementing the "Aether Intelligence" design system with **dark + light mode support** and a sidebar theme toggle.
+
+#### Design System Foundation
+
+- [x] `frontend/index.html` — Google Fonts (Inter + Manrope), `<meta>` SEO tags, FOUC prevention `<script>` that applies `dark` class before first paint
+- [x] `frontend/src/index.css` — **Complete rewrite.** CSS variable system (`--background`, `--foreground`, `--primary`, `--card`, `--muted`, `--border`, `--success`, `--sidebar`, etc.) with two modes:
+  - `:root` = light mode (soft bluish-grey `hsl(220 20% 97%)`)
+  - `.dark` = dark mode (deep navy `hsl(216 45% 4%)`)
+  - Custom utility classes: `.glass`, `.glass-strong`, `.ghost-border`, `.gradient-primary`, `.gradient-primary-text`, `.font-headline`
+  - Keyframe animations: `fadeSlideUp`, `pulseGlow`, `shimmer`, `dotPulse`
+  - Full markdown rendering styles (`.markdown h1/h2/h3/p/ul/ol/code/pre/table/blockquote`)
+  - Custom scrollbar styling
+- [x] `frontend/tailwind.config.js` — **Complete rewrite.** `darkMode: ["class"]`, extended with:
+  - Font families: `sans` (Inter), `headline` (Manrope), `mono` (JetBrains Mono)
+  - All semantic colors mapped to CSS variables (`background`, `foreground`, `card`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `success`, `border`, `input`, `ring`, `sidebar`)
+  - Custom keyframes (`fadeSlideUp`, `pulseGlow`) and animation utilities
+  - Plugins: `tailwindcss-animate`, `@tailwindcss/typography`
+
+#### Theme Hook (NEW FILE)
+
+- [x] `frontend/src/hooks/useTheme.ts` — **New file.** Exports `useTheme()` hook:
+  - Returns `{ theme, toggleTheme, setTheme }`
+  - Persists to `localStorage` key `"theme"`
+  - Respects `prefers-color-scheme: dark` on first visit
+  - Toggles `.dark` class on `document.documentElement`
+
+#### Component Visual Updates (no logic changes)
+
+All components below were visually updated. **No hooks, props, state, API calls, or data handling were changed.** Only Tailwind classes and JSX structure were modified.
+
+| File | Key Visual Changes |
+|------|--------------------|
+| `ToolCallPanel.tsx` | Color-coded tool icons (amber=web_search, emerald=query_docs, violet=analyze), `pulseGlow` animation on running tools, gradient left accent on sub-agent blocks, `ghost-border` instead of solid borders, collapsible result previews with count summaries |
+| `MessageItem.tsx` | User bubbles use `gradient-primary` (indigo→violet) instead of flat `bg-primary`, bot avatar uses gradient circle, `fadeSlideUp` entrance animation, animated thinking dots (3 pulsing circles), streaming cursor bar |
+| `MessageList.tsx` | `max-w-4xl mx-auto` container for centered content, `px-6 py-6` padding |
+| `MessageInput.tsx` | Glassmorphism container (`bg-card/80 backdrop-blur-sm`), pill-shaped model/agent selectors, gradient send button, focus glow ring (`ring-primary/30`), keyboard shortcut hint |
+| `ChatArea.tsx` | Gradient `Sparkles` icon in empty state, `font-headline` (Manrope) headings, frosted glass header (`backdrop-blur-md`), refined folder scope selector |
+| `Sidebar.tsx` | **Theme toggle button** (Sun/Moon icons), gradient logo with shadow, left accent line on active thread, `ghost-border` on New Chat button, tonal depth instead of borders |
+| `ChatLayout.tsx` | Imports and passes `useTheme()` → `theme`/`onToggleTheme` to Sidebar; removed explicit border separator |
+| `MarkdownRenderer.tsx` | No changes — markdown styling handled entirely via `index.css` `.markdown` classes |
+
+#### Page Visual Updates
+
+| File | Key Visual Changes |
+|------|--------------------|
+| `AuthPage.tsx` | Gradient background orbs (blurred circles), glassmorphism card (`backdrop-blur-sm`), gradient Sparkles logo, Manrope title |
+| `IngestionPage.tsx` | `font-headline` heading, `ghost-border` folder tree card with `bg-card/50` |
+| `SettingsPage.tsx` | `ghost-border` cards with `bg-card/50`, `.env` pill badges, `divide-border/30` separators, Manrope headings |
+
+#### Color Palette Reference
+
+| Token | Light Mode | Dark Mode |
+|-------|-----------|-----------|
+| `--background` | `hsl(220 20% 97%)` soft blue-grey | `hsl(216 45% 4%)` deep navy |
+| `--foreground` | `hsl(222 47% 11%)` near-black | `hsl(226 60% 97%)` near-white |
+| `--primary` | `hsl(239 84% 67%)` indigo | `hsl(239 100% 82%)` bright indigo |
+| `--card` | `hsl(0 0% 100%)` white | `hsl(220 30% 7%)` dark navy |
+| `--muted` | `hsl(220 14% 94%)` light grey | `hsl(220 30% 11%)` charcoal |
+| `--border` | `hsl(220 13% 89%)` silver | `hsl(220 20% 16%)` dark border |
+| `--success` | `hsl(142 71% 45%)` green | `hsl(142 71% 45%)` green |
+| `--sidebar` | `hsl(220 15% 95%)` off-white | `hsl(220 40% 5%)` darker navy |
+
+#### Typography
+
+- **Headlines** (`font-headline`): Manrope 500–800 weight
+- **Body/labels** (`font-sans`): Inter 400–700 weight
+- **Code** (`font-mono`): JetBrains Mono (system fallback)
+- Loaded via Google Fonts `<link>` in `index.html`
+
+#### Critical Notes for Other Agents
+
+1. **Theme mechanism**: Dark mode uses `.dark` class on `<html>`. All colors use CSS variables — never hardcode `text-white` or `bg-gray-900`. Use semantic tokens (`text-foreground`, `bg-background`, `bg-card`, `text-muted-foreground`, etc.).
+2. **New components should follow the pattern**: Use `ghost-border` for subtle borders, `bg-card/50` for card backgrounds, `font-headline` for headings, `gradient-primary` for accent elements.
+3. **Animations**: Use `animate-fadeSlideUp` for entrance animations, `animate-pulseGlow` for active/running states.
+4. **The `useTheme` hook** lives in `src/hooks/useTheme.ts` and is consumed in `ChatLayout.tsx` → passed to `Sidebar.tsx`. If you add a new layout that needs theme awareness, import `useTheme` directly.
+5. **Test files** (`src/__tests__/components/MessageItem.test.tsx`) check old CSS class names (e.g., `.bg-primary.text-primary-foreground`) that no longer exist. These tests need updating if you run `tsc -b` (Vite build passes fine since tests are runtime-only).
+6. **No functionality was changed.** All hooks (`useAuth`, `useMessages`, `useThreads`, `useDocuments`, `useFolders`), API functions (`api.ts`), types (`types/index.ts`), and backend endpoints remain identical.
