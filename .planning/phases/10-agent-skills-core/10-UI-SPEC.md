@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: true
 preset: default/slate/cssVariables
 created: 2026-03-29
+revised: 2026-03-29
 ---
 
 # Phase 10 — UI Design Contract
@@ -62,8 +63,12 @@ Declared values (multiples of 4):
 
 Exceptions:
 - Touch targets for icon-only buttons: minimum 44px height (accessibility requirement)
-- Active indicator stripe on selected sidebar items: 2px width (existing pattern — `w-0.5`)
-- Thread list item vertical padding: 6px top/bottom (existing pattern — `py-1.5`)
+
+Legacy frozen values (do not replicate in new work):
+- `w-0.5` (2px) — active indicator stripe on selected sidebar items: inherited v1.0 pattern, frozen.
+- `py-1.5` (6px) — thread list item vertical padding: inherited v1.0 pattern, frozen.
+
+Note: New elements in Phases 11–12 must use 4px multiples only. `w-0.5` and `py-1.5` are frozen legacy patterns — do not replicate.
 
 Source: existing spacing patterns in `frontend/src/components/layout/Sidebar.tsx` and `frontend/src/components/ingestion/FolderDetail.tsx`.
 
@@ -71,16 +76,21 @@ Source: existing spacing patterns in `frontend/src/components/layout/Sidebar.tsx
 
 ## Typography
 
-| Role | Size | Weight | Line Height | Font | Source |
-|------|------|--------|-------------|------|--------|
-| Body | 14px (text-sm) | 400 (regular) | 1.5 | Inter | Existing pattern across all components |
-| Label / meta | 12px (text-xs) | 400 (regular) | 1.4 | Inter | Folder detail info bar, thread section labels |
-| Heading / section label | 16px (text-base) | 600 (semibold) | 1.3 | Manrope (font-headline) | Sidebar logo, page section headings |
-| Display / card title | 20px (text-xl) | 700 (bold) | 1.2 | Manrope (font-headline) | Page titles, modal headings |
+Maximum 4 sizes, 2 weights.
 
-Overline labels (section dividers like "Recent"): 10px, 600, `tracking-widest`, `uppercase` — existing sidebar pattern, reuse for skill section dividers.
+| Role | Size | Weight | Line Height | Font |
+|------|------|--------|-------------|------|
+| Label / meta / overline | 12px (text-xs) | 400 (regular) | 1.4 | Inter |
+| Body | 14px (text-sm) | 400 (regular) | 1.5 | Inter |
+| Heading / section label | 16px (text-base) | 600 (semibold) | 1.3 | Manrope (font-headline) |
+| Display / card title | 20px (text-xl) | 600 (semibold) | 1.2 | Manrope (font-headline) |
 
-Code/instructions preview: 12.8px (0.8rem), 400, JetBrains Mono, line-height 1.6 — matches `.markdown pre` pattern.
+Notes:
+- Overline section dividers (e.g. "Recent", skill section dividers): use the 12px label/meta row with `tracking-widest uppercase` utility classes — no separate size needed.
+- Code/instructions textarea: `font-mono text-sm` (JetBrains Mono, 14px, weight 400) — uses the body size row with `font-mono` applied, no bespoke 0.8rem value.
+- Font-weight 700 (bold) is not used. 600 (semibold) is the maximum weight throughout, including display/card titles.
+
+Source: existing patterns across `frontend/src/components/`.
 
 ---
 
@@ -121,14 +131,14 @@ These contracts are defined now (Phase 10) so Phase 12 can implement without amb
 | Hover | `hover:border-border/60 hover:bg-accent/20 transition-all duration-150` |
 | Disabled | `opacity-50` on skill name + description; toggle shows off state |
 | Global badge | `inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium` — exact pattern from FolderDetail Globe badge |
-| Selected / active | Left border stripe `w-0.5 bg-primary` — same as sidebar thread selection |
+| Selected / active | Left border stripe using frozen legacy `w-0.5 bg-primary` — inherited sidebar thread selection pattern; do not introduce new non-4px values |
 
 ### Enabled / Disabled Toggle
 
 - Use shadcn `Switch` component
 - Enabled state: `--primary` fill
 - Disabled state: `--muted` fill
-- Label: "Enabled" / "Disabled" at 12px text-muted-foreground to the right of the switch
+- Label: "Enabled" / "Disabled" at `text-xs text-muted-foreground` to the right of the switch
 - Touch target: minimum 44px height wrapper
 
 ### Skill Instructions Field
@@ -145,7 +155,7 @@ These contracts are defined now (Phase 10) so Phase 12 can implement without amb
 | File listed | `flex items-center gap-2 px-3 py-2 rounded-md bg-muted/40 text-sm` |
 | Filename | `text-foreground font-medium truncate` |
 | File size | `text-xs text-muted-foreground ml-auto` |
-| Delete button | Lucide `Trash2` icon, `h-3.5 w-3.5 text-muted-foreground hover:text-destructive transition-colors` |
+| Delete button | Lucide `Trash2` icon, `h-3.5 w-3.5 text-muted-foreground hover:text-destructive transition-colors`, `aria-label="Remove file"` |
 | Upload button | Variant `outline`, size `sm`, Lucide `Paperclip` icon |
 
 ### Destructive Confirmation Pattern
@@ -153,6 +163,7 @@ These contracts are defined now (Phase 10) so Phase 12 can implement without amb
 Matches existing thread delete pattern (inline dropdown, no modal):
 - Inline confirmation in dropdown: first click shows "Delete Skill" in destructive color; inline re-confirm with "Are you sure?" text is shown in the same dropdown
 - No modal dialog for single-skill delete
+- Confirm button label: "Delete Skill" (destructive variant)
 - File delete: direct action (no confirmation) — files can be re-uploaded; match existing document list delete pattern
 
 ---
@@ -177,7 +188,7 @@ Matches existing thread delete pattern (inline dropdown, no modal):
 | Private badge label | (no badge — private is default, unlabeled) |
 | Share CTA | "Share Globally" |
 | Unshare CTA | "Make Private" |
-| Delete skill confirmation | "Delete Skill" → "This will permanently delete the skill and all attached files. This action cannot be undone." → confirm button: "Delete" (destructive) |
+| Delete skill confirmation | "Delete Skill" → "This will permanently delete the skill and all attached files. This action cannot be undone." → confirm button: "Delete Skill" (destructive) |
 | Skill instructions field label | "Instructions" |
 | Skill description field label | "Description" |
 | Skill name field label | "Name" |
