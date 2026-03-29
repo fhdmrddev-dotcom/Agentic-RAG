@@ -64,11 +64,11 @@ Declared values (multiples of 4):
 Exceptions:
 - Touch targets for icon-only buttons: minimum 44px height (accessibility requirement)
 
-Legacy frozen values (do not replicate in new work):
-- `w-0.5` (2px) — active indicator stripe on selected sidebar items: inherited v1.0 pattern, frozen.
-- `py-1.5` (6px) — thread list item vertical padding: inherited v1.0 pattern, frozen.
+Legacy frozen values (existing Sidebar and thread list components only — do not replicate in any new component work):
+- `w-0.5` (2px) — active indicator stripe on selected sidebar items: inherited v1.0 pattern in `Sidebar.tsx`, frozen in place. Not authorized for new components.
+- `py-1.5` (6px) — thread list item vertical padding: inherited v1.0 pattern in `Sidebar.tsx`, frozen in place. Not authorized for new components.
 
-Note: New elements in Phases 11–12 must use 4px multiples only. `w-0.5` and `py-1.5` are frozen legacy patterns — do not replicate.
+Note: New elements in Phases 11–15 must use 4px multiples only. The `w-0.5` and `py-1.5` frozen-legacy exemption is scoped exclusively to the existing production Sidebar and thread list components — it does not extend to any new component built in these phases.
 
 Source: existing spacing patterns in `frontend/src/components/layout/Sidebar.tsx` and `frontend/src/components/ingestion/FolderDetail.tsx`.
 
@@ -112,6 +112,7 @@ Accent (`--primary`) reserved for:
 - Primary action button background (`gradient-primary` for create/save CTA)
 - Focus ring (`ring-primary/30`)
 - Skill name link hover underline
+- Selected skill card left border stripe (`border-l-[4px] border-primary`)
 
 Accent is NOT used for: disabled skills, file size labels, dates, metadata labels, secondary buttons.
 
@@ -131,7 +132,7 @@ These contracts are defined now (Phase 10) so Phase 12 can implement without amb
 | Hover | `hover:border-border/60 hover:bg-accent/20 transition-all duration-150` |
 | Disabled | `opacity-50` on skill name + description; toggle shows off state |
 | Global badge | `inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium` — exact pattern from FolderDetail Globe badge |
-| Selected / active | Left border stripe using frozen legacy `w-0.5 bg-primary` — inherited sidebar thread selection pattern; do not introduce new non-4px values |
+| Selected / active | `border-l-[4px] border-primary` — 4px left border using the standard 4px spacing token; do not use `w-0.5` (frozen legacy, Sidebar only) |
 
 ### Enabled / Disabled Toggle
 
@@ -173,7 +174,7 @@ Matches existing thread delete pattern (inline dropdown, no modal):
 | Element | Copy |
 |---------|------|
 | Primary CTA — create skill | "Create Skill" |
-| Primary CTA — save changes | "Save Changes" |
+| Primary CTA — save changes | "Save Skill" |
 | Empty state heading | "No skills yet" |
 | Empty state body | "Create your first skill to give the agent reusable behaviors. Skills appear in every chat automatically." |
 | Enabled skill catalog label | "Active Skills" |
