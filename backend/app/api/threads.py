@@ -169,6 +169,62 @@ async def get_messages(
     return response.data
 
 
+def _reconstruct_history(history_rows: list[dict]) -> list[dict]:
+    """
+    Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
+
+    For assistant messages that have tool_calls with tool_call_id:
+      Emits 3 entries: (1) assistant+tool_calls, (2) tool result(s), (3) assistant text.
+    For old assistant messages without tool_call_id (backward compat) or with no
+    tool_calls: emits a plain {"role": "assistant", "content": ...}.
+    User messages pass through unchanged.
+    """
+    messages: list[dict] = []
+    for msg in history_rows:
+        tool_calls_data = msg.get("tool_calls")
+        if (
+            msg["role"] == "assistant"
+            and tool_calls_data
+            and isinstance(tool_calls_data, list)
+            and len(tool_calls_data) > 0
+        ):
+            # Only reconstruct if all entries have tool_call_id (new format)
+            if all(tc.get("tool_call_id") for tc in tool_calls_data):
+                # 1. Assistant message announcing tool calls
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": tc["tool_call_id"],
+                            "type": "function",
+                            "function": {
+                                "name": tc["name"],
+                                "arguments": json.dumps(tc.get("args", {})),
+                            },
+                        }
+                        for tc in tool_calls_data
+                    ],
+                })
+                # 2. Tool result messages (one per tool call)
+                for tc in tool_calls_data:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc["tool_call_id"],
+                        "content": tc.get("result") or "",
+                    })
+                # 3. Assistant text response (only if content is non-empty)
+                if msg.get("content"):
+                    messages.append({"role": "assistant", "content": msg["content"]})
+            else:
+                # Old message without tool_call_id — emit as plain assistant message
+                messages.append({"role": msg["role"], "content": msg.get("content") or ""})
+        else:
+            # User messages, plain assistant messages, or messages with null/empty tool_calls
+            messages.append({"role": msg["role"], "content": msg.get("content") or ""})
+    return messages
+
+
 @router.post("/{thread_id}/messages")
 async def send_message(
     thread_id: str,
@@ -247,7 +303,7 @@ async def send_message(
         # Load full message history (includes just-inserted user message)
         history_resp = (
             supabase.table("messages")
-            .select("role, content")
+            .select("role, content, tool_calls")
             .eq("thread_id", thread_id)
             .eq("user_id", current_user["id"])
             .order("created_at")
@@ -277,8 +333,7 @@ async def send_message(
             active_system_prompt = active_system_prompt + folder_scope_note
 
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-        for msg in history_resp.data:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.extend(_reconstruct_history(history_resp.data))
 
         full_content = ""
         persisted_tool_calls: list[dict] = []
