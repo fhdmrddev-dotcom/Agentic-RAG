@@ -44,7 +44,7 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 **Requirements**: TMEM-01, TMEM-02, TMEM-03, TMEM-04
 **Success Criteria** (what must be TRUE):
   1. After a tool call in turn N, the LLM in turn N+1 can answer follow-up questions referencing the tool result without calling the tool again
-  2. Conversation history loaded for a new turn contains proper multi-turn sequences: `assistant (tool_calls)` → `tool (result)` → `assistant (text)` for every prior tool-using turn
+  2. Conversation history loaded for a new turn contains proper multi-turn sequences: `assistant (tool_calls)` -> `tool (result)` -> `assistant (text)` for every prior tool-using turn
   3. Persisted tool results in the `tool_calls` JSONB column include `tool_call_id` alongside name, args, result, and status
   4. Tool results persisted in JSONB are capped at 2000 characters (existing cap preserved)
 **Plans:** 1/1 plans complete
@@ -61,7 +61,11 @@ Plans:
   3. User can share a skill globally and unshare it; global skills are visible to all authenticated users
   4. User can upload files to a skill and delete them; files are stored in the `skill-files` Supabase Storage bucket
   5. RLS is enforced: users can only access their own skill files (and files on global skills)
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 10-01-PLAN.md — SQL migration, Pydantic models, test scaffold
+- [ ] 10-02-PLAN.md — Skills CRUD router (list, create, update, delete, toggle-enabled, toggle-global)
+- [ ] 10-03-PLAN.md — File attachment endpoints (upload, list, delete) + full suite validation
 
 ### Phase 11: Skills LLM Integration
 **Goal**: The LLM discovers enabled skills from the system prompt catalog and loads full instructions on demand
@@ -137,7 +141,7 @@ Plans:
 | 7. Explorer Sub-Agent | v1.0 | 2/2 | Complete | 2026-03-22 |
 | 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
 | 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
-| 10. Agent Skills Core | v2.0 | 0/? | Pending | — |
+| 10. Agent Skills Core | v2.0 | 0/3 | Pending | — |
 | 11. Skills LLM Integration | v2.0 | 0/? | Pending | — |
 | 12. Skills UI | v2.0 | 0/? | Pending | — |
 | 13. Skills Open Standard | v2.0 | 0/? | Pending | — |
