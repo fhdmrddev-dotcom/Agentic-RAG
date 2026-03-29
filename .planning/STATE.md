@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Skills & Code Execution
-status: defining_requirements
+status: ready_to_plan
 stopped_at: —
 last_updated: "2026-03-29T00:00:00.000Z"
 last_activity: 2026-03-29
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Defining requirements for v2.0 — Agent Skills & Code Execution
+**Current focus:** Phase 9 — Persistent Tool Memory (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 9 (Persistent Tool Memory — not yet started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-03-29 — Milestone v2.0 started
+Status: Ready to plan
+Last activity: 2026-03-29 — v2.0 roadmap approved, 7 phases (9–15) defined
 
 ## Performance Metrics
 
