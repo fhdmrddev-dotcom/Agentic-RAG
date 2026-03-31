@@ -78,7 +78,11 @@ Plans:
   4. LLM calls `read_skill_file(skill_name, filename)` to read a building-block file attached to a skill
   5. Explorer Mode does not receive any skill tools — only General Mode gets them
   6. A `skill_activated` SSE event is emitted when `load_skill` dispatches
-**Plans**: TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 11-01-PLAN.md — Test scaffold, tool definitions, skill catalog injection + Explorer Mode gating
+- [ ] 11-02-PLAN.md — Tool dispatch handlers (load_skill, save_skill, read_skill_file) + full test coverage
+- [ ] 11-03-PLAN.md — Frontend skill_activated SSE handler + end-to-end verification
 
 ### Phase 12: Skills UI
 **Goal**: A dedicated Skills tab provides full skill management and a seed skill-creator global skill is pre-loaded
@@ -142,7 +146,7 @@ Plans:
 | 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
 | 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
 | 10. Agent Skills Core | v2.0 | 3/3 | Complete    | 2026-03-31 |
-| 11. Skills LLM Integration | v2.0 | 0/? | Pending | — |
+| 11. Skills LLM Integration | v2.0 | 0/3 | Planned | — |
 | 12. Skills UI | v2.0 | 0/? | Pending | — |
 | 13. Skills Open Standard | v2.0 | 0/? | Pending | — |
 | 14. Code Execution Sandbox | v2.0 | 0/? | Pending | — |
