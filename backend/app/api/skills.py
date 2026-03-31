@@ -126,7 +126,9 @@ async def toggle_enabled(
         )
 
     # Step 2: Compute new value and update
-    new_value = not current.data["is_enabled"]
+    # current.data is a list (select returns list); maybe_single behaviour varies by client version
+    skill_row = current.data[0] if isinstance(current.data, list) else current.data
+    new_value = not skill_row["is_enabled"]
     result = (
         supabase.table("skills")
         .update({"is_enabled": new_value})
@@ -160,7 +162,9 @@ async def toggle_global(
         )
 
     # Step 2: Compute new value and update
-    new_value = not current.data["is_global"]
+    # current.data is a list (select returns list); maybe_single behaviour varies by client version
+    skill_row = current.data[0] if isinstance(current.data, list) else current.data
+    new_value = not skill_row["is_global"]
     result = (
         supabase.table("skills")
         .update({"is_global": new_value})
