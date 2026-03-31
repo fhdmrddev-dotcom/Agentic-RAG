@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-03-29T14:54:15.287Z"
-last_activity: 2026-03-29
+stopped_at: Completed 10-02-PLAN.md
+last_updated: "2026-03-31T03:34:22.494Z"
+last_activity: 2026-03-31
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  total_plans: 4
+  completed_plans: 3
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 09 — persistent-tool-memory
+**Current focus:** Phase 10 — agent-skills-core
 
 ## Current Position
 
-Phase: 10
-Plan: Not started
+Phase: 10 (agent-skills-core) — EXECUTING
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -64,6 +64,7 @@ Plan: Not started
 | Phase 08-folder-system-enhancements P02 | 3min 18sec | 2 tasks | 9 files |
 | Phase 08-folder-system-enhancements P03 | 1min | 1 tasks | 2 files |
 | Phase 09-persistent-tool-memory P01 | 4min | 2 tasks | 2 files |
+| Phase 10-agent-skills-core P02 | 16min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ Recent decisions affecting current work:
 - [Phase 08-folder-system-enhancements]: All folder stats derived from existing hook state — no new backend API endpoints needed for FolderDetail info bar
 - [Phase 09-persistent-tool-memory]: _reconstruct_history extracted as module-level function so tests can import it directly without HTTP setup
 - [Phase 09-persistent-tool-memory]: all(tc.get('tool_call_id') guard ensures backward compat — any entry missing the field falls back to plain assistant message
+- [Phase 10-agent-skills-core]: Toggle endpoints use isinstance(current.data, list) guard for maybe_single() mock compatibility — real supabase returns dict, test mock returns list
+- [Phase 10-agent-skills-core]: DELETE cascade pattern: fetch skill_files, remove each from skill-files storage bucket (silent exception swallow), then delete skill row
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-29
-Stopped at: Completed 09-01-PLAN.md
+Last activity: 2026-03-31
+Stopped at: Completed 10-02-PLAN.md
 Resume file: None

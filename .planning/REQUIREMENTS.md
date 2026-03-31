@@ -9,12 +9,12 @@
 
 ### Agent Skills — Core
 
-- [ ] **SKIL-01**: User can create a skill with a name, description, and instructions
-- [ ] **SKIL-02**: User can edit an existing skill's name, description, or instructions
-- [ ] **SKIL-03**: User can delete a skill they own
-- [ ] **SKIL-04**: User can toggle a skill enabled/disabled (only enabled skills appear in the LLM catalog)
-- [ ] **SKIL-05**: User can share a skill globally so all authenticated users can see and load it
-- [ ] **SKIL-06**: User can unshare a global skill (reverts to private)
+- [x] **SKIL-01**: User can create a skill with a name, description, and instructions
+- [x] **SKIL-02**: User can edit an existing skill's name, description, or instructions
+- [x] **SKIL-03**: User can delete a skill they own
+- [x] **SKIL-04**: User can toggle a skill enabled/disabled (only enabled skills appear in the LLM catalog)
+- [x] **SKIL-05**: User can share a skill globally so all authenticated users can see and load it
+- [x] **SKIL-06**: User can unshare a global skill (reverts to private)
 - [ ] **SKIL-07**: Skills tab in the frontend shows all user-owned and global skills with CRUD actions
 - [ ] **SKIL-08**: A seed "skill-creator" global skill is pre-loaded, enabling the LLM to guide users through creating new skills via conversation
 
@@ -116,12 +116,12 @@
 | TMEM-02 | Phase 1 | Complete |
 | TMEM-03 | Phase 1 | Complete |
 | TMEM-04 | Phase 1 | Complete |
-| SKIL-01 | Phase 2 | Pending |
-| SKIL-02 | Phase 2 | Pending |
-| SKIL-03 | Phase 2 | Pending |
-| SKIL-04 | Phase 2 | Pending |
-| SKIL-05 | Phase 2 | Pending |
-| SKIL-06 | Phase 2 | Pending |
+| SKIL-01 | Phase 2 | Complete |
+| SKIL-02 | Phase 2 | Complete |
+| SKIL-03 | Phase 2 | Complete |
+| SKIL-04 | Phase 2 | Complete |
+| SKIL-05 | Phase 2 | Complete |
+| SKIL-06 | Phase 2 | Complete |
 | FILE-01 | Phase 2 | Pending |
 | FILE-02 | Phase 2 | Pending |
 | FILE-03 | Phase 2 | Pending |

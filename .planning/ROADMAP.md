@@ -61,10 +61,10 @@ Plans:
   3. User can share a skill globally and unshare it; global skills are visible to all authenticated users
   4. User can upload files to a skill and delete them; files are stored in the `skill-files` Supabase Storage bucket
   5. RLS is enforced: users can only access their own skill files (and files on global skills)
-**Plans:** 3 plans
+**Plans:** 2/3 plans executed
 Plans:
-- [ ] 10-01-PLAN.md — SQL migration, Pydantic models, test scaffold
-- [ ] 10-02-PLAN.md — Skills CRUD router (list, create, update, delete, toggle-enabled, toggle-global)
+- [x] 10-01-PLAN.md — SQL migration, Pydantic models, test scaffold
+- [x] 10-02-PLAN.md — Skills CRUD router (list, create, update, delete, toggle-enabled, toggle-global)
 - [ ] 10-03-PLAN.md — File attachment endpoints (upload, list, delete) + full suite validation
 
 ### Phase 11: Skills LLM Integration
@@ -141,7 +141,7 @@ Plans:
 | 7. Explorer Sub-Agent | v1.0 | 2/2 | Complete | 2026-03-22 |
 | 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
 | 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
-| 10. Agent Skills Core | v2.0 | 0/3 | Pending | — |
+| 10. Agent Skills Core | v2.0 | 2/3 | In Progress|  |
 | 11. Skills LLM Integration | v2.0 | 0/? | Pending | — |
 | 12. Skills UI | v2.0 | 0/? | Pending | — |
 | 13. Skills Open Standard | v2.0 | 0/? | Pending | — |
