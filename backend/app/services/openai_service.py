@@ -266,6 +266,68 @@ ANALYZE_DOCUMENT_TOOL = {
 }
 
 
+LOAD_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "load_skill",
+        "description": (
+            "Load the full instructions and attached file list for a skill by name. "
+            "Use when the user's request matches a skill in the catalog. "
+            "After loading, follow the skill instructions to fulfil the request."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {
+                    "type": "string",
+                    "description": "The exact name of the skill to load, as shown in the catalog.",
+                }
+            },
+            "required": ["skill_name"],
+        },
+    },
+}
+
+SAVE_SKILL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "save_skill",
+        "description": (
+            "Create or update a skill with the given name, description, and instructions. "
+            "Use when the user wants to save a new skill or update an existing one."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Skill name (unique per user)."},
+                "description": {"type": "string", "description": "One-sentence summary shown in the catalog."},
+                "instructions": {"type": "string", "description": "Full markdown instructions for the skill."},
+            },
+            "required": ["name", "description", "instructions"],
+        },
+    },
+}
+
+READ_SKILL_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "read_skill_file",
+        "description": (
+            "Read the content of a file attached to a skill. "
+            "Use after load_skill returns a file list to inspect building-block files."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "skill_name": {"type": "string", "description": "Name of the skill that owns the file."},
+                "filename": {"type": "string", "description": "Exact filename as returned by load_skill."},
+            },
+            "required": ["skill_name", "filename"],
+        },
+    },
+}
+
+
 EXPLORER_SYSTEM_PROMPT = (
     "You are a Knowledge Base Explorer. You navigate the user's document library "
     "using filesystem-like tools to find and synthesize information.\n\n"
@@ -294,7 +356,8 @@ EXPLORER_SYSTEM_PROMPT = (
 
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
+    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
+             LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     return tools

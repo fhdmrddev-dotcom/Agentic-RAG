@@ -22,7 +22,7 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant. You have nine tools — use the RIGHT one for each question:\n\n"
+    "You are a helpful AI assistant. You have twelve tools — use the RIGHT one for each question:\n\n"
     "1. ls — List the immediate contents (subfolders and documents) at a folder path. "
     "Use for browsing and navigation: 'what folders do I have?', 'what's in my Reports folder?', "
     "'list documents in /Finance/Q1', 'show me the subfolders of Research'. "
@@ -55,6 +55,12 @@ SYSTEM_PROMPT = (
     "Do NOT use search_documents for whole-document analysis tasks.\n\n"
     "9. web_search — Search the web for current events, software versions, news, or general world "
     "knowledge UNLIKELY to be in the user's uploaded documents. Always include the source URL.\n\n"
+    "10. load_skill — Load full instructions for a skill from your skill catalog. "
+    "Use when the user's request matches a skill description shown in the Available Skills section.\n\n"
+    "11. save_skill — Create or update a skill with a name, description, and instructions. "
+    "Use when the user asks to save, create, or define a new skill.\n\n"
+    "12. read_skill_file — Read the content of a building-block file attached to a skill. "
+    "Use after load_skill shows available files.\n\n"
     "Key rules:\n"
     "- Browse/navigate folders → ls or tree\n"
     "- Find documents by content pattern → grep\n"
@@ -64,6 +70,9 @@ SYSTEM_PROMPT = (
     "- Find information inside documents → search_documents\n"
     "- Deep analysis/summary of a whole document → analyze_document\n"
     "- World/internet knowledge → web_search\n"
+    "- Load/use a skill from the catalog → load_skill\n"
+    "- Create or update a skill → save_skill\n"
+    "- Read a file attached to a skill → read_skill_file\n"
     "- Always say where the information came from."
 )
 
@@ -331,6 +340,28 @@ async def send_message(
                 f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
             )
             active_system_prompt = active_system_prompt + folder_scope_note
+
+        # Inject enabled skills catalog (General Mode only) — SKIL-09
+        if body.agent_mode != "explorer":
+            enabled_skills = (
+                supabase.table("skills")
+                .select("name, description")
+                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .eq("is_enabled", True)
+                .order("name")
+                .execute()
+            ).data or []
+
+            if enabled_skills:
+                catalog_lines = "\n".join(
+                    f"- **{s['name']}**: {s['description']}" for s in enabled_skills
+                )
+                catalog_note = (
+                    f"\n\n## Available Skills\n"
+                    f"The following skills are enabled. Call `load_skill(skill_name)` when the user's "
+                    f"request matches a skill description:\n{catalog_lines}"
+                )
+                active_system_prompt = active_system_prompt + catalog_note
 
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         messages.extend(_reconstruct_history(history_resp.data))
