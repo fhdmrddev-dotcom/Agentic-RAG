@@ -21,9 +21,9 @@
 ### Agent Skills — LLM Integration
 
 - [x] **SKIL-09**: Enabled skills catalog (name + description only, no full instructions) is injected into the system prompt on every General Mode chat turn
-- [ ] **SKIL-10**: LLM can call `load_skill(skill_name)` to retrieve full instructions and file list for a skill
-- [ ] **SKIL-11**: LLM can call `save_skill(name, description, instructions)` to create or update a skill from within a conversation
-- [ ] **SKIL-12**: A `skill_activated` SSE event is emitted when `load_skill` is dispatched, so the UI can display a visual indicator
+- [x] **SKIL-10**: LLM can call `load_skill(skill_name)` to retrieve full instructions and file list for a skill
+- [x] **SKIL-11**: LLM can call `save_skill(name, description, instructions)` to create or update a skill from within a conversation
+- [x] **SKIL-12**: A `skill_activated` SSE event is emitted when `load_skill` is dispatched, so the UI can display a visual indicator
 - [x] **SKIL-13**: Skills tools (`load_skill`, `save_skill`, `read_skill_file`) are available in General Mode only — Explorer Mode does not receive them
 
 ### Skill Building-Block Files
@@ -31,8 +31,8 @@
 - [x] **FILE-01**: User can upload files to a skill (Python scripts, templates, reference data)
 - [x] **FILE-02**: User can delete a file from a skill
 - [x] **FILE-03**: Files are stored in the private `skill-files` Supabase Storage bucket scoped by `user_id/skill_id/filename`
-- [ ] **FILE-04**: `load_skill` response includes the list of attached file names so the LLM knows what files are available
-- [ ] **FILE-05**: LLM can call `read_skill_file(skill_name, filename)` to retrieve the content of a building-block file
+- [x] **FILE-04**: `load_skill` response includes the list of attached file names so the LLM knows what files are available
+- [x] **FILE-05**: LLM can call `read_skill_file(skill_name, filename)` to retrieve the content of a building-block file
 - [x] **FILE-06**: RLS ensures users can only access files belonging to their own skills or global skills
 
 ### Code Execution Sandbox
@@ -127,12 +127,12 @@
 | FILE-03 | Phase 2 | Complete |
 | FILE-06 | Phase 2 | Complete |
 | SKIL-09 | Phase 3 | Complete |
-| SKIL-10 | Phase 3 | Pending |
-| SKIL-11 | Phase 3 | Pending |
-| SKIL-12 | Phase 3 | Pending |
+| SKIL-10 | Phase 3 | Complete |
+| SKIL-11 | Phase 3 | Complete |
+| SKIL-12 | Phase 3 | Complete |
 | SKIL-13 | Phase 3 | Complete |
-| FILE-04 | Phase 3 | Pending |
-| FILE-05 | Phase 3 | Pending |
+| FILE-04 | Phase 3 | Complete |
+| FILE-05 | Phase 3 | Complete |
 | SKIL-07 | Phase 4 | Pending |
 | SKIL-08 | Phase 4 | Pending |
 | OPEN-01 | Phase 5 | Pending |
