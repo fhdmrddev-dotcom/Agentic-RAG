@@ -83,6 +83,7 @@ export async function streamMessage(
   onSubAgentStart?: (filename: string, task: string) => void,
   onSubAgentDelta?: (text: string) => void,
   onSubAgentDone?: () => void,
+  onSkillActivated?: (skillName: string) => void,
   agentMode?: string,
 ): Promise<void> {
   const headers = await getAuthHeaders()
@@ -130,6 +131,8 @@ export async function streamMessage(
           onSubAgentDelta(parsed.content as string)
         } else if (parsed.type === "sub_agent_done" && onSubAgentDone) {
           onSubAgentDone()
+        } else if (parsed.type === "skill_activated" && onSkillActivated) {
+          onSkillActivated(parsed.skill_name as string)
         }
       } catch {
         // ignore malformed lines

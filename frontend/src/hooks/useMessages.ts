@@ -113,6 +113,10 @@ export function useMessages(): UseMessages {
           }),
         )
       },
+      // onSkillActivated (Phase 12 will add UI indicator)
+      (_skillName) => {
+        // No-op for Phase 11 — event is handled without error
+      },
       agentMode,
     )
   }, [])
