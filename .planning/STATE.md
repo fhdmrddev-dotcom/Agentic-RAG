@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 10-03-PLAN.md
-last_updated: "2026-03-31T03:45:28.903Z"
-last_activity: 2026-03-31
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-04-01T03:07:11.918Z"
+last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 7
+  completed_plans: 5
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 10 — agent-skills-core
+**Current focus:** Phase 11 — skills-llm-integration
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
+Phase: 11 (skills-llm-integration) — EXECUTING
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Plan: Not started
 | Phase 09-persistent-tool-memory P01 | 4min | 2 tasks | 2 files |
 | Phase 10-agent-skills-core P02 | 16min | 2 tasks | 2 files |
 | Phase 10-agent-skills-core P03 | 3min | 2 tasks | 1 files |
+| Phase 11-skills-llm-integration P01 | 15min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -119,6 +120,8 @@ Recent decisions affecting current work:
 - [Phase 10-agent-skills-core]: DELETE cascade pattern: fetch skill_files, remove each from skill-files storage bucket (silent exception swallow), then delete skill row
 - [Phase 10-agent-skills-core]: Read file bytes before ownership DB check in upload endpoint — size rejection (413) requires zero DB calls
 - [Phase 10-agent-skills-core]: Duplicate filename handling via storage path overwrite only — explicit delete+reinsert removed to match 2-call test mock expectation
+- [Phase 11-skills-llm-integration]: Catalog injection wrapped in if agent_mode != explorer placed after folder scope augmentation and before messages list construction
+- [Phase 11-skills-llm-integration]: Test side_effect list must include auto-title execute() call (8th call) when history has exactly 1 user message
 
 ### Pending Todos
 
@@ -139,6 +142,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-03-31
-Stopped at: Completed 10-03-PLAN.md
+Last activity: 2026-04-01
+Stopped at: Completed 11-01-PLAN.md
 Resume file: None

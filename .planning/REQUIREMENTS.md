@@ -20,11 +20,11 @@
 
 ### Agent Skills — LLM Integration
 
-- [ ] **SKIL-09**: Enabled skills catalog (name + description only, no full instructions) is injected into the system prompt on every General Mode chat turn
+- [x] **SKIL-09**: Enabled skills catalog (name + description only, no full instructions) is injected into the system prompt on every General Mode chat turn
 - [ ] **SKIL-10**: LLM can call `load_skill(skill_name)` to retrieve full instructions and file list for a skill
 - [ ] **SKIL-11**: LLM can call `save_skill(name, description, instructions)` to create or update a skill from within a conversation
 - [ ] **SKIL-12**: A `skill_activated` SSE event is emitted when `load_skill` is dispatched, so the UI can display a visual indicator
-- [ ] **SKIL-13**: Skills tools (`load_skill`, `save_skill`, `read_skill_file`) are available in General Mode only — Explorer Mode does not receive them
+- [x] **SKIL-13**: Skills tools (`load_skill`, `save_skill`, `read_skill_file`) are available in General Mode only — Explorer Mode does not receive them
 
 ### Skill Building-Block Files
 
@@ -126,11 +126,11 @@
 | FILE-02 | Phase 2 | Complete |
 | FILE-03 | Phase 2 | Complete |
 | FILE-06 | Phase 2 | Complete |
-| SKIL-09 | Phase 3 | Pending |
+| SKIL-09 | Phase 3 | Complete |
 | SKIL-10 | Phase 3 | Pending |
 | SKIL-11 | Phase 3 | Pending |
 | SKIL-12 | Phase 3 | Pending |
-| SKIL-13 | Phase 3 | Pending |
+| SKIL-13 | Phase 3 | Complete |
 | FILE-04 | Phase 3 | Pending |
 | FILE-05 | Phase 3 | Pending |
 | SKIL-07 | Phase 4 | Pending |
