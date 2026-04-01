@@ -146,7 +146,7 @@ Plans:
 | 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
 | 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
 | 10. Agent Skills Core | v2.0 | 3/3 | Complete    | 2026-03-31 |
-| 11. Skills LLM Integration | v2.0 | 3/3 | Complete   | 2026-04-01 |
+| 11. Skills LLM Integration | v2.0 | 3/3 | Complete    | 2026-04-01 |
 | 12. Skills UI | v2.0 | 0/? | Pending | — |
 | 13. Skills Open Standard | v2.0 | 0/? | Pending | — |
 | 14. Code Execution Sandbox | v2.0 | 0/? | Pending | — |
