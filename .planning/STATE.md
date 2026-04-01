@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-04-01T03:07:11.918Z"
+stopped_at: Completed 11-02-PLAN.md
+last_updated: "2026-04-01T03:22:46.577Z"
 last_activity: 2026-04-01
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 11 (skills-llm-integration) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Plan: 2 of 3
 | Phase 10-agent-skills-core P02 | 16min | 2 tasks | 2 files |
 | Phase 10-agent-skills-core P03 | 3min | 2 tasks | 1 files |
 | Phase 11-skills-llm-integration P01 | 15min | 1 tasks | 3 files |
+| Phase 11-skills-llm-integration P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,8 @@ Recent decisions affecting current work:
 - [Phase 10-agent-skills-core]: Duplicate filename handling via storage path overwrite only — explicit delete+reinsert removed to match 2-call test mock expectation
 - [Phase 11-skills-llm-integration]: Catalog injection wrapped in if agent_mode != explorer placed after folder scope augmentation and before messages list construction
 - [Phase 11-skills-llm-integration]: Test side_effect list must include auto-title execute() call (8th call) when history has exactly 1 user message
+- [Phase 11-skills-llm-integration]: load_skill uses .order('is_global') ascending so user-owned skills sort before global when names conflict
+- [Phase 11-skills-llm-integration]: read_skill_file storage path uses row['user_id'] not current_user['id'] — critical for global skills where reader is not the owner
 
 ### Pending Todos
 
@@ -143,5 +146,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-01
-Stopped at: Completed 11-01-PLAN.md
+Stopped at: Completed 11-02-PLAN.md
 Resume file: None
