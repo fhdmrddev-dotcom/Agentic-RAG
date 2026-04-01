@@ -46,7 +46,7 @@ Declared values (multiples of 4 — standard 8-point scale):
 | 3xl | 64px | Not used in this phase |
 
 Exceptions:
-- Global badge pill: `px-1.5 py-0.5` (6px / 2px) — matches existing FolderNode global pill pattern (RESEARCH.md Pattern 7, source: PROGRESS.md)
+- Global badge pill: `px-2 py-1` (8px / 4px) — matches existing FolderNode global pill pattern (RESEARCH.md Pattern 7, source: PROGRESS.md)
 - Disabled skill opacity: `opacity-50` — applied at wrapper level, not spacing
 - Touch targets for icon-only action buttons: minimum 32px (`h-8 w-8`) per Button `size="icon"` default
 
@@ -56,14 +56,17 @@ Exceptions:
 
 | Role | Font | Size | Weight | Line Height | Class |
 |------|------|------|--------|-------------|-------|
-| Page heading | Manrope | 24px (text-2xl) | 700 (bold) | 1.2 | `font-headline font-bold` |
+| Page heading | Manrope | 24px (text-2xl) | 600 (semibold) | 1.2 | `font-headline font-semibold` |
 | Page subheading / description | Inter | 14px (text-sm) | 400 (regular) | 1.5 | `text-muted-foreground` |
 | Card title (skill name) | Inter | 14px (text-sm) | 600 (semibold) | 1.4 | `font-semibold text-foreground` |
 | Body / description text | Inter | 14px (text-sm) | 400 (regular) | 1.5 | `text-muted-foreground` |
 | Badge / pill label | Inter | 10px (text-[10px]) | 400 (regular) | 1.0 | `text-[10px] text-muted-foreground` |
 | Dialog heading | Manrope | 18px (text-lg) | 600 (semibold) | 1.2 | `font-headline font-semibold` |
-| Form field label | Inter | 14px (text-sm) | 500 (medium) | 1.4 | `font-medium` |
-| Instructions textarea | JetBrains Mono | 13px (text-[13px]) | 400 (regular) | 1.6 | `font-mono` |
+| Form field label | Inter | 14px (text-sm) | 600 (semibold) | 1.4 | `font-semibold` |
+| Instructions textarea | JetBrains Mono | 14px (text-sm) | 400 (regular) | 1.6 | `font-mono text-sm` |
+
+Font scale: 10px (badge), 14px (body / card / form / mono), 18px (dialog heading), 24px (page heading) — 4 sizes total.
+Font weights: 400 (regular) and 600 (semibold) — 2 weights total.
 
 Source: PROGRESS.md Aether Design System Typography section + codebase inspection of IngestionPage.tsx heading pattern.
 
@@ -85,7 +88,7 @@ All values use CSS variables. Both light and dark modes are declared in `index.c
 | Border | `hsl(220 13% 89%)` silver | `hsl(220 20% 16%)` dark border | `border-border` | All borders |
 
 **Accent (`primary`) reserved for:**
-1. Active Sidebar nav button background (`variant="secondary"`) and label (`text-primary font-medium`)
+1. Active Sidebar nav button background (`variant="secondary"`) and label (`text-primary font-semibold`)
 2. The "New Skill" primary CTA button background
 3. The send/confirm button in dialogs
 4. The `skill_activated` inline badge text color
@@ -115,7 +118,7 @@ All components are already installed. No new shadcn installs required for Phase 
 
 **Badge decision:** Do not install `shadcn/ui badge`. Use the established inline pill pattern:
 ```tsx
-<span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+<span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full">
   Global
 </span>
 ```
@@ -170,9 +173,9 @@ Dialog title: "New Skill" (create mode) / "Edit Skill" (edit mode)
 Fields:
 1. **Name** — `Input` — required — placeholder: "e.g. SQL Writer"
 2. **Description** — `Textarea` — optional — 2 rows — placeholder: "One sentence describing what this skill does"
-3. **Instructions** — `Textarea` — optional — 8 rows — `font-mono text-[13px]` — placeholder: "Step-by-step instructions the agent follows when this skill is loaded..."
+3. **Instructions** — `Textarea` — optional — 8 rows — `font-mono text-sm` — placeholder: "Step-by-step instructions the agent follows when this skill is loaded..."
 
-Footer: `[Cancel]` (ghost) + `[Save Skill]` / `[Update Skill]` (primary)
+Footer: `[Discard Changes]` (ghost) + `[Save Skill]` / `[Update Skill]` (primary)
 
 ### skill_activated indicator — anatomy
 
@@ -196,7 +199,7 @@ This is an inline badge, not a toast. It appears per-message and persists in the
 | Interaction | Behavior |
 |-------------|----------|
 | Click "Skills" in sidebar | Sets `activeView = "skills"`, renders `SkillsPage` in main content area |
-| Active state | `variant="secondary"` + `text-primary font-medium` on sidebar button |
+| Active state | `variant="secondary"` + `text-primary font-semibold` on sidebar button |
 | Inactive state | `variant="ghost"` + `text-muted-foreground hover:text-sidebar-foreground` |
 
 ### Skill CRUD
@@ -207,7 +210,7 @@ This is an inline badge, not a toast. It appears per-message and persists in the
 | Click pencil icon | Opens `SkillFormDialog` in edit mode, pre-populated |
 | Click "Save Skill" | POST `/skills` → optimistic prepend to skills list → dialog closes |
 | Click "Update Skill" | PATCH `/skills/{id}` → optimistic update in place → dialog closes |
-| Click trash icon | Inline confirmation replaces the card footer (no separate modal) — shows "Delete skill?" + [Cancel] [Delete] buttons |
+| Click trash icon | Inline confirmation replaces the card footer (no separate modal) — shows "Delete skill?" + [Keep Skill] [Delete Skill] buttons |
 | Confirm delete | DELETE `/skills/{id}` → optimistic removal from list |
 | Cancel delete | Restores normal card footer |
 
@@ -251,7 +254,7 @@ This is an inline badge, not a toast. It appears per-message and persists in the
 | Dialog title — edit | Edit Skill |
 | Dialog save button — create | Save Skill |
 | Dialog save button — edit | Update Skill |
-| Dialog cancel button | Cancel |
+| Dialog cancel button | Discard Changes |
 | Name field label | Name |
 | Name field placeholder | e.g. SQL Writer |
 | Description field label | Description |
@@ -271,8 +274,8 @@ This is an inline badge, not a toast. It appears per-message and persists in the
 | Empty state CTA | + New Skill |
 | Delete confirmation heading | Delete skill? |
 | Delete confirmation body | "{Skill Name}" will be permanently deleted. |
-| Delete confirm button | Delete |
-| Delete cancel button | Cancel |
+| Delete confirm button | Delete Skill |
+| Delete cancel button | Keep Skill |
 | Error — create failed | Failed to save skill. Please try again. |
 | Error — update failed | Failed to update skill. Please try again. |
 | Error — delete failed | Failed to delete skill. Please try again. |
