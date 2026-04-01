@@ -507,6 +507,91 @@ async def send_message(
                                     yield f"data: {json.dumps({'type': 'sub_agent_done'})}\n\n"
                                     tool_result = sub_agent_content
                                     sub_agent_record = {"filename": doc["filename"], "task": args["task"], "content": sub_agent_content}
+                        elif tool_name == "load_skill":
+                            skill_name = args.get("skill_name", "")
+                            # Emit skill_activated SSE event immediately (SKIL-12)
+                            yield f"data: {json.dumps({'type': 'skill_activated', 'skill_name': skill_name})}\n\n"
+                            # Resolve skill — prefer user-owned over global when names conflict
+                            skill_row = (
+                                supabase.table("skills")
+                                .select("id, name, description, instructions, user_id")
+                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                .eq("name", skill_name)
+                                .eq("is_enabled", True)
+                                .order("is_global")
+                                .execute()
+                            ).data
+                            if not skill_row:
+                                tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
+                            else:
+                                row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                # Fetch attached filenames (FILE-04)
+                                files_data = (
+                                    supabase.table("skill_files")
+                                    .select("filename")
+                                    .eq("skill_id", row["id"])
+                                    .order("filename")
+                                    .execute()
+                                ).data or []
+                                file_names = [f["filename"] for f in files_data]
+                                tool_result = json.dumps({
+                                    "name": row["name"],
+                                    "instructions": row["instructions"],
+                                    "files": file_names,
+                                })
+                        elif tool_name == "save_skill":
+                            name = args.get("name", "").strip()
+                            description = args.get("description", "")
+                            instructions = args.get("instructions", "")
+                            if not name:
+                                tool_result = json.dumps({"error": "Skill name is required."})
+                            else:
+                                # Check if user already owns a skill with this name
+                                existing = (
+                                    supabase.table("skills")
+                                    .select("id")
+                                    .eq("user_id", current_user["id"])
+                                    .eq("name", name)
+                                    .maybe_single()
+                                    .execute()
+                                ).data
+                                if existing:
+                                    row = existing[0] if isinstance(existing, list) else existing
+                                    supabase.table("skills").update({
+                                        "description": description,
+                                        "instructions": instructions,
+                                    }).eq("id", row["id"]).eq("user_id", current_user["id"]).execute()
+                                    tool_result = json.dumps({"status": "updated", "name": name})
+                                else:
+                                    supabase.table("skills").insert({
+                                        "user_id": current_user["id"],
+                                        "name": name,
+                                        "description": description,
+                                        "instructions": instructions,
+                                    }).execute()
+                                    tool_result = json.dumps({"status": "created", "name": name})
+                        elif tool_name == "read_skill_file":
+                            skill_name = args.get("skill_name", "")
+                            filename = args.get("filename", "")
+                            # Resolve skill to get owner's user_id for storage path
+                            skill_row = (
+                                supabase.table("skills")
+                                .select("id, user_id")
+                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                .eq("name", skill_name)
+                                .maybe_single()
+                                .execute()
+                            ).data
+                            if not skill_row:
+                                tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
+                            else:
+                                row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                storage_path = f"{row['user_id']}/{row['id']}/{filename}"
+                                try:
+                                    raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
+                                    tool_result = raw_bytes.decode("utf-8", errors="replace")
+                                except Exception as e:
+                                    tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
                         else:
                             tool_result = f"Unknown tool: {tool_name}"
                     except json.JSONDecodeError:
