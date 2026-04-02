@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-04-02T00:35:04.443Z"
+stopped_at: Completed 12-02-PLAN.md — awaiting human verification checkpoint
+last_updated: "2026-04-02T00:39:03.920Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 9
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -70,6 +70,7 @@ Plan: 2 of 2
 | Phase 11-skills-llm-integration P02 | 3min | 2 tasks | 2 files |
 | Phase 11-skills-llm-integration P03 | 5min | 1 tasks | 2 files |
 | Phase 12-skills-ui P01 | 2min 12sec | 2 tasks | 8 files |
+| Phase 12-skills-ui P02 | 2min 1sec | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,8 @@ Recent decisions affecting current work:
 - [Phase 11-skills-llm-integration]: E2E browser test deferred to Phase 12 by user decision — live testing requires Skills UI to be meaningful
 - [Phase 12-skills-ui]: useSkills has no Supabase Realtime subscription — skills table not in realtime publication, optimistic updates only
 - [Phase 12-skills-ui]: prefillMessage state lifted to App.tsx so ChatLayout can set it from SkillsPage and pass it down to ChatArea
+- [Phase 12-skills-ui]: SkillCard toggle-enabled visibility rule — hidden only when skill.user_id !== currentUserId AND skill.is_global (seed global skills)
+- [Phase 12-skills-ui]: activatedSkill field added to Message interface and set via setMessages in useMessages onSkillActivated callback using assistantId closure
 
 ### Pending Todos
 
@@ -151,5 +154,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-02
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 12-02-PLAN.md — awaiting human verification checkpoint
 Resume file: None
