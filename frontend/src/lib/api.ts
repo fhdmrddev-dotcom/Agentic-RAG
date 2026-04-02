@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate } from "../types"
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
@@ -79,7 +79,7 @@ export async function streamMessage(
   model?: string,
   onTitleUpdate?: (title: string) => void,
   onToolStart?: (name: string, args: Record<string, string>) => void,
-  onToolEnd?: (name: string) => void,
+  onToolEnd?: (name: string, result?: string) => void,
   onSubAgentStart?: (filename: string, task: string) => void,
   onSubAgentDelta?: (text: string) => void,
   onSubAgentDone?: () => void,
@@ -124,7 +124,7 @@ export async function streamMessage(
         } else if (parsed.type === "tool_start" && onToolStart) {
           onToolStart(parsed.name as string, parsed.args as Record<string, string>)
         } else if (parsed.type === "tool_end" && onToolEnd) {
-          onToolEnd(parsed.name as string)
+          onToolEnd(parsed.name as string, parsed.result as string | undefined)
         } else if (parsed.type === "sub_agent_start" && onSubAgentStart) {
           onSubAgentStart(parsed.filename as string, parsed.task as string)
         } else if (parsed.type === "sub_agent_delta" && onSubAgentDelta) {
@@ -226,6 +226,67 @@ export async function toggleFolderGlobal(id: string): Promise<Folder> {
     throw new Error("Failed to toggle folder global status")
   }
   return res.json() as Promise<Folder>
+}
+
+export async function listSkills(): Promise<Skill[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills`, { headers })
+  if (!res.ok) throw new Error("Failed to list skills")
+  return res.json() as Promise<Skill[]>
+}
+
+export async function createSkill(body: SkillCreate): Promise<Skill> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to save skill. Please try again.")
+  return res.json() as Promise<Skill>
+}
+
+export async function updateSkill(id: string, body: SkillUpdate): Promise<Skill> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update skill. Please try again.")
+  return res.json() as Promise<Skill>
+}
+
+export async function deleteSkill(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete skill. Please try again.")
+}
+
+export async function toggleSkillEnabled(id: string): Promise<Skill> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${id}/toggle-enabled`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to update skill.")
+  return res.json() as Promise<Skill>
+}
+
+export async function toggleSkillGlobal(id: string): Promise<Skill> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${id}/toggle-global`, {
+    method: "PATCH",
+    headers,
+  })
+  if (!res.ok) {
+    if (res.status === 403) throw new Error("Only the skill owner can toggle global status")
+    throw new Error("Failed to update skill.")
+  }
+  return res.json() as Promise<Skill>
 }
 
 export interface FullAppSettings {

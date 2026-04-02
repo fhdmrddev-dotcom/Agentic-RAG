@@ -20,6 +20,8 @@ export interface ToolCall {
   status: "running" | "done"
   result?: string
   sub_agent?: SubAgentState
+  startedAt?: number   // Date.now() when tool_start received
+  endedAt?: number     // Date.now() when tool_end received
 }
 
 export interface Message {
@@ -69,4 +71,29 @@ export interface Document {
   metadata: DocumentMetadata | null
   created_at: string
   updated_at: string
+}
+
+export interface Skill {
+  id: string
+  user_id: string
+  name: string
+  description: string
+  instructions: string
+  is_enabled: boolean
+  is_global: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface SkillCreate {
+  name: string
+  description?: string
+  instructions?: string
+  is_global?: boolean
+}
+
+export interface SkillUpdate {
+  name?: string
+  description?: string
+  instructions?: string
 }
