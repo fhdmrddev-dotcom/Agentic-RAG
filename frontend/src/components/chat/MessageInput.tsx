@@ -18,9 +18,11 @@ interface Props {
   onModelChange?: (model: string) => void
   agentMode?: "default" | "explorer"
   onAgentModeChange?: (mode: "default" | "explorer") => void
+  prefillMessage?: string | null
+  onClearPrefill?: () => void
 }
 
-export function MessageInput({ onSend, disabled, models = [], selectedModel, onModelChange, agentMode = "default", onAgentModeChange }: Props) {
+export function MessageInput({ onSend, disabled, models = [], selectedModel, onModelChange, agentMode = "default", onAgentModeChange, prefillMessage, onClearPrefill }: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -30,6 +32,13 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
     el.style.height = "auto"
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }, [value])
+
+  useEffect(() => {
+    if (prefillMessage) {
+      setValue(prefillMessage)
+      onClearPrefill?.()
+    }
+  }, [prefillMessage, onClearPrefill])
 
   const handleSend = () => {
     const trimmed = value.trim()

@@ -34,6 +34,7 @@ export interface Message {
   updated_at: string
   tool_calls?: ToolCall[]
   sub_agent?: SubAgentState
+  activatedSkill?: string  // Set by skill_activated SSE event
 }
 
 export interface DocumentMetadata {

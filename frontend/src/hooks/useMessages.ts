@@ -68,18 +68,20 @@ export function useMessages(): UseMessages {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
-            const newTool: ToolCall = { name, args, status: "running" }
+            const newTool: ToolCall = { name, args, status: "running", startedAt: Date.now() }
             return { ...m, tool_calls: [...(m.tool_calls ?? []), newTool] }
           }),
         )
       },
       // onToolEnd
-      (name) => {
+      (name, result) => {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
             const updated = (m.tool_calls ?? []).map((tc) =>
-              tc.name === name && tc.status === "running" ? { ...tc, status: "done" as const } : tc,
+              tc.name === name && tc.status === "running"
+                ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
+                : tc,
             )
             return { ...m, tool_calls: updated }
           }),
@@ -113,9 +115,15 @@ export function useMessages(): UseMessages {
           }),
         )
       },
-      // onSkillActivated (Phase 12 will add UI indicator)
-      (_skillName) => {
-        // No-op for Phase 11 — event is handled without error
+      // onSkillActivated
+      (skillName) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, activatedSkill: skillName }
+              : m,
+          ),
+        )
       },
       agentMode,
     )

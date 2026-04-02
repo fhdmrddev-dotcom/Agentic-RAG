@@ -15,7 +15,7 @@ interface Props {
   onClearPrefill?: () => void
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage: _prefillMessage, onClearPrefill: _onClearPrefill }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
@@ -59,6 +59,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onModelChange={setSelectedModel}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
+      prefillMessage={prefillMessage}
+      onClearPrefill={onClearPrefill}
     />
   )
 

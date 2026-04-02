@@ -1,4 +1,4 @@
-import { Bot, Loader2, User } from "lucide-react"
+import { Bot, Loader2, User, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
@@ -36,24 +36,30 @@ export function MessageItem({ message, isStreaming }: Props) {
         {message.tool_calls && message.tool_calls.length > 0 && (
           <ToolCallPanel toolCalls={message.tool_calls} subAgent={message.sub_agent} />
         )}
+        {message.activatedSkill && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-primary animate-fadeSlideUp">
+            <Zap className="h-3 w-3" />
+            <span>Skill activated: {message.activatedSkill}</span>
+          </div>
+        )}
         {isStreaming && message.content === "" && (!message.tool_calls || message.tool_calls.length === 0) ? (
-          <span className="flex items-center gap-2 text-muted-foreground text-sm">
+          <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
             <span className="italic">Thinking</span>
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0ms" }} />
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "200ms" }} />
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "400ms" }} />
+            <span className="flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
             </span>
           </span>
         ) : isStreaming && message.content === "" && message.tool_calls && message.tool_calls.length > 0 && message.tool_calls.every((tc) => tc.status === "done") ? (
-          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5">
+          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
             <span className="italic">Generating response</span>
-            <span className="flex gap-0.5">
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0ms" }} />
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "200ms" }} />
-              <span className="w-1 h-1 rounded-full bg-primary animate-pulse" style={{ animationDelay: "400ms" }} />
+            <span className="flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
             </span>
           </span>
         ) : message.content ? (
