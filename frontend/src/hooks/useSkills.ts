@@ -12,6 +12,7 @@ import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 interface UseSkills {
   skills: Skill[]
   loading: boolean
+  loadSkills: () => Promise<void>
   createSkill: (body: SkillCreate) => Promise<Skill>
   updateSkill: (id: string, body: SkillUpdate) => Promise<Skill>
   deleteSkill: (id: string) => Promise<void>
@@ -64,5 +65,5 @@ export function useSkills(): UseSkills {
     setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, is_global: updated.is_global } : s)))
   }, [])
 
-  return { skills, loading, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal }
+  return { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal }
 }

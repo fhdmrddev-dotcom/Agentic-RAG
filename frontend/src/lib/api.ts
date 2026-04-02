@@ -1,6 +1,11 @@
 import { supabase } from "./supabase"
 import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate } from "../types"
 
+export interface SkillImportResult {
+  created: Skill[]
+  errors: Array<{ skill: string; error: string }>
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
 async function getAuthHeaders(): Promise<HeadersInit> {
@@ -317,4 +322,37 @@ export async function getSettings(): Promise<FullAppSettings> {
   const res = await fetch(`${API_BASE}/settings`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get settings")
   return res.json() as Promise<FullAppSettings>
+}
+
+export async function exportSkill(id: string, name: string): Promise<void> {
+  const token = await getAuthToken()
+  const res = await fetch(`${API_BASE}/skills/${id}/export`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Failed to export skill")
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${name.replace(/\s+/g, "-").toLowerCase()}.zip`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export async function importSkillZip(file: File): Promise<SkillImportResult> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  const res = await fetch(`${API_BASE}/skills/import`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: "Import failed" }))
+    throw new Error((body as { detail?: string }).detail || "Import failed")
+  }
+  return res.json() as Promise<SkillImportResult>
 }

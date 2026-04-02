@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Zap, Eye, EyeOff, Pencil, Globe, Trash2, MessageSquare } from "lucide-react"
+import { Zap, Eye, EyeOff, Pencil, Globe, Trash2, MessageSquare, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -13,6 +13,7 @@ interface Props {
   onToggleEnabled: (id: string) => Promise<void>
   onToggleGlobal: (id: string) => Promise<void>
   onTryInChat: (skillName: string) => void
+  onExport: (id: string, name: string) => Promise<void>
 }
 
 export function SkillCard({
@@ -23,10 +24,12 @@ export function SkillCard({
   onToggleEnabled,
   onToggleGlobal,
   onTryInChat,
+  onExport,
 }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
   const [localEnabled, setLocalEnabled] = useState(skill.is_enabled)
+  const [exporting, setExporting] = useState(false)
 
   const isOwner = skill.user_id === currentUserId
 
@@ -56,6 +59,18 @@ export function SkillCard({
     } catch {
       setToggleError("Failed to update skill.")
       setTimeout(() => setToggleError(null), 3000)
+    }
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      await onExport(skill.id, skill.name)
+    } catch {
+      setToggleError("Export failed. Try again.")
+      setTimeout(() => setToggleError(null), 3000)
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -151,6 +166,25 @@ export function SkillCard({
             {/* Owner-only actions */}
             {isOwner && (
               <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={exporting}
+                      onClick={handleExport}
+                    >
+                      {exporting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{exporting ? "Exporting..." : "Export skill"}</TooltipContent>
+                </Tooltip>
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
