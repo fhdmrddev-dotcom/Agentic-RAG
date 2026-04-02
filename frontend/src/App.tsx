@@ -5,11 +5,12 @@ import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-export type ActiveView = "chat" | "documents" | "settings"
+export type ActiveView = "chat" | "documents" | "skills" | "settings"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
   const [activeView, setActiveView] = useState<ActiveView>("chat")
+  const [prefillMessage, setPrefillMessage] = useState<string | null>(null)
 
   if (loading) {
     return (
@@ -29,6 +30,8 @@ function App() {
         onSignOut={signOut}
         activeView={activeView}
         onNavigate={setActiveView}
+        prefillMessage={prefillMessage}
+        onSetPrefillMessage={setPrefillMessage}
       />
     </TooltipProvider>
   )

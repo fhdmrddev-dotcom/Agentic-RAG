@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
+import { SkillsPage } from "@/pages/SkillsPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -12,9 +13,11 @@ interface Props {
   onSignOut: () => void
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
+  prefillMessage: string | null
+  onSetPrefillMessage: (msg: string | null) => void
 }
 
-export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
+export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, onSetPrefillMessage }: Props) {
   const {
     threads,
     selectedThread,
@@ -43,6 +46,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
     [updateThreadTitle],
   )
 
+  const handleTryInChat = useCallback((skillName: string) => {
+    onSetPrefillMessage(`Use the ${skillName} skill`)
+    onNavigate("chat")
+  }, [onSetPrefillMessage, onNavigate])
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar
@@ -63,10 +71,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate }: Props) {
       <main className="flex-1 overflow-hidden">
         {activeView === "documents" ? (
           <IngestionPage />
+        ) : activeView === "skills" ? (
+          <SkillsPage onTryInChat={handleTryInChat} />
         ) : activeView === "settings" ? (
           <SettingsPage />
         ) : (
-          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} />
+          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} prefillMessage={prefillMessage} onClearPrefill={() => onSetPrefillMessage(null)} />
         )}
       </main>
     </div>

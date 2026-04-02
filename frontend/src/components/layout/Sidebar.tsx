@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon, Moon, Sun } from "lucide-react"
+import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon, Moon, Sun, Zap } from "lucide-react"
 import type { Folder, Thread } from "@/types"
 import type { ActiveView } from "@/App"
 
@@ -210,6 +210,20 @@ export function Sidebar({
         >
           <FileText className="h-4 w-4" />
           Documents
+        </Button>
+        <Button
+          onClick={() => onNavigate("skills")}
+          variant={activeView === "skills" ? "secondary" : "ghost"}
+          size="sm"
+          className={cn(
+            "w-full justify-start gap-2 transition-all",
+            activeView === "skills"
+              ? "text-primary font-medium"
+              : "text-muted-foreground hover:text-sidebar-foreground",
+          )}
+        >
+          <Zap className="h-4 w-4" />
+          Skills
         </Button>
         <Button
           onClick={() => onNavigate("settings")}

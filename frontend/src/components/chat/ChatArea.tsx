@@ -11,9 +11,11 @@ interface Props {
   onCreateThread: (folderId?: string | null) => Promise<Thread>
   onTitleUpdate?: (title: string) => void
   folders: Folder[]
+  prefillMessage?: string | null
+  onClearPrefill?: () => void
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage: _prefillMessage, onClearPrefill: _onClearPrefill }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
