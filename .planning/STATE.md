@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 13-skills-open-standard Plan 01 (export/import endpoints)
-last_updated: "2026-04-02T18:36:07.724Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 13-02-PLAN.md — awaiting human verify checkpoint (Task 2)
+last_updated: "2026-04-02T18:42:28.271Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -73,6 +73,7 @@ Plan: 2 of 2
 | Phase 12-skills-ui P02 | 2min 1sec | 2 tasks | 8 files |
 | Phase 12-skills-ui P02 | 15min | 3 tasks | 8 files |
 | Phase 13-skills-open-standard P01 | 4min 10sec | 2 tasks | 4 files |
+| Phase 13-skills-open-standard P02 | 2min 27sec | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -139,6 +140,9 @@ Recent decisions affecting current work:
 - [Phase 13-skills-open-standard]: POST /import registered before PATCH /{skill_id} — FastAPI matches routes top-down, /import would match /{skill_id} path parameter if placed after
 - [Phase 13-skills-open-standard]: Two-phase import: parse all SKILL.md entries before any DB inserts for OPEN-05 atomicity; per-skill parse errors collected in errors[] without blocking other skills
 - [Phase 13-skills-open-standard]: Path traversal check uses normpath(name.replace('\', '/')) then startswith('..') OR isabs() to handle both relative traversal and absolute paths
+- [Phase 13-skills-open-standard]: exportSkill uses getAuthToken() not getAuthHeaders() — must not set Content-Type: application/json on blob download request
+- [Phase 13-skills-open-standard]: importSkillZip uses getAuthToken() not getAuthHeaders() — FormData sets its own Content-Type with multipart boundary; explicit header would break it
+- [Phase 13-skills-open-standard]: loadSkills exposed from useSkills return value so SkillsPage can re-fetch after import
 
 ### Pending Todos
 
@@ -160,5 +164,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-02
-Stopped at: Completed 13-skills-open-standard Plan 01 (export/import endpoints)
+Stopped at: Completed 13-02-PLAN.md — awaiting human verify checkpoint (Task 2)
 Resume file: None

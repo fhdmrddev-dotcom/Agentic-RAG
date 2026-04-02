@@ -148,6 +148,6 @@ Plans:
 | 10. Agent Skills Core | v2.0 | 3/3 | Complete    | 2026-03-31 |
 | 11. Skills LLM Integration | v2.0 | 3/3 | Complete    | 2026-04-01 |
 | 12. Skills UI | v2.0 | 3/3 | Complete    | 2026-04-02 |
-| 13. Skills Open Standard | v2.0 | 1/2 | In Progress|  |
+| 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
 | 14. Code Execution Sandbox | v2.0 | 0/? | Pending | — |
 | 15. Code Output UI | v2.0 | 0/? | Pending | — |
