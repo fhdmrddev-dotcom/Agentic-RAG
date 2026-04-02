@@ -147,7 +147,7 @@ Plans:
 | 9. Persistent Tool Memory | v2.0 | 1/1 | Complete   | 2026-03-29 |
 | 10. Agent Skills Core | v2.0 | 3/3 | Complete    | 2026-03-31 |
 | 11. Skills LLM Integration | v2.0 | 3/3 | Complete    | 2026-04-01 |
-| 12. Skills UI | v2.0 | 0/? | Pending | — |
+| 12. Skills UI | v2.0 | 1/2 | In Progress|  |
 | 13. Skills Open Standard | v2.0 | 0/? | Pending | — |
 | 14. Code Execution Sandbox | v2.0 | 0/? | Pending | — |
 | 15. Code Output UI | v2.0 | 0/? | Pending | — |

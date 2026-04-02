@@ -15,7 +15,7 @@
 - [x] **SKIL-04**: User can toggle a skill enabled/disabled (only enabled skills appear in the LLM catalog)
 - [x] **SKIL-05**: User can share a skill globally so all authenticated users can see and load it
 - [x] **SKIL-06**: User can unshare a global skill (reverts to private)
-- [ ] **SKIL-07**: Skills tab in the frontend shows all user-owned and global skills with CRUD actions
+- [x] **SKIL-07**: Skills tab in the frontend shows all user-owned and global skills with CRUD actions
 - [ ] **SKIL-08**: A seed "skill-creator" global skill is pre-loaded, enabling the LLM to guide users through creating new skills via conversation
 
 ### Agent Skills — LLM Integration
@@ -133,7 +133,7 @@
 | SKIL-13 | Phase 3 | Complete |
 | FILE-04 | Phase 3 | Complete |
 | FILE-05 | Phase 3 | Complete |
-| SKIL-07 | Phase 4 | Pending |
+| SKIL-07 | Phase 4 | Complete |
 | SKIL-08 | Phase 4 | Pending |
 | OPEN-01 | Phase 5 | Pending |
 | OPEN-02 | Phase 5 | Pending |
