@@ -547,16 +547,17 @@ async def send_message(
                                 tool_result = json.dumps({"error": "Skill name is required."})
                             else:
                                 # Check if user already owns a skill with this name
-                                existing = (
+                                existing_resp = (
                                     supabase.table("skills")
                                     .select("id")
                                     .eq("user_id", current_user["id"])
                                     .eq("name", name)
-                                    .maybe_single()
+                                    .limit(1)
                                     .execute()
-                                ).data
+                                )
+                                existing = existing_resp.data[0] if existing_resp.data else None
                                 if existing:
-                                    row = existing[0] if isinstance(existing, list) else existing
+                                    row = existing
                                     supabase.table("skills").update({
                                         "description": description,
                                         "instructions": instructions,
@@ -604,7 +605,7 @@ async def send_message(
                         logger.error("Tool %s unexpected error: %s", tool_name, e)
                         tool_result = f"Tool execution failed: {e}"
 
-                    yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name})}\n\n"
+                    yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name, 'result': tool_result[:2000]})}\n\n"
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
