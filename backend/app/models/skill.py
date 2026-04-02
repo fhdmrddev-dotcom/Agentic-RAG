@@ -38,3 +38,13 @@ class SkillFileResponse(BaseModel):
     file_size: int
     mime_type: str
     created_at: datetime
+
+
+class SkillImportError(BaseModel):
+    skill: str
+    error: str
+
+
+class SkillImportResult(BaseModel):
+    created: list[SkillResponse]
+    errors: list[SkillImportError]

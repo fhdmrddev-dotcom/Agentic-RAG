@@ -56,6 +56,7 @@ def _make_supabase(builder, execute_result):
     storage_bucket = MagicMock()
     storage_bucket.upload.return_value = MagicMock()
     storage_bucket.remove.return_value = MagicMock()
+    storage_bucket.download.return_value = b"test-file-content"
     sb.storage.from_.return_value = storage_bucket
     return sb
 
@@ -111,6 +112,7 @@ def reset_mocks():
     _supabase.reset_mock()
     _supabase.table.return_value = _builder
     _supabase.rpc.return_value = _builder
+    _supabase.storage.from_.return_value.download.return_value = b"test-file-content"
 
     yield
 
