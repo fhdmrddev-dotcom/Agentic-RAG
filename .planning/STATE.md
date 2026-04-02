@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 12-02-PLAN.md — awaiting human verification checkpoint
-last_updated: "2026-04-02T00:39:03.920Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-04-02T00:49:04.945Z"
 last_activity: 2026-04-02
 progress:
   total_phases: 7
@@ -71,6 +71,7 @@ Plan: 2 of 2
 | Phase 11-skills-llm-integration P03 | 5min | 1 tasks | 2 files |
 | Phase 12-skills-ui P01 | 2min 12sec | 2 tasks | 8 files |
 | Phase 12-skills-ui P02 | 2min 1sec | 2 tasks | 8 files |
+| Phase 12-skills-ui P02 | 15min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,7 @@ Recent decisions affecting current work:
 - [Phase 12-skills-ui]: prefillMessage state lifted to App.tsx so ChatLayout can set it from SkillsPage and pass it down to ChatArea
 - [Phase 12-skills-ui]: SkillCard toggle-enabled visibility rule — hidden only when skill.user_id !== currentUserId AND skill.is_global (seed global skills)
 - [Phase 12-skills-ui]: activatedSkill field added to Message interface and set via setMessages in useMessages onSkillActivated callback using assistantId closure
+- [Phase 12-skills-ui]: SkillCard uses optimistic localEnabled state for toggle-enabled — flips immediately on click, reverts on API failure — avoids waiting for round-trip before dimming the card
 
 ### Pending Todos
 
@@ -154,5 +156,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-02
-Stopped at: Completed 12-02-PLAN.md — awaiting human verification checkpoint
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None

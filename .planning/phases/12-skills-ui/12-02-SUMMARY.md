@@ -34,9 +34,9 @@ decisions:
   - prefillMessage wired as useEffect dependency — fires on truthy value, clears immediately via onClearPrefill
   - activatedSkill field added to Message interface and set via setMessages in useMessages onSkillActivated callback using assistantId closure
 metrics:
-  duration: "2min 1sec"
+  duration: "~15min (including human verification + bug fix)"
   completed_date: "2026-04-02"
-  tasks_completed: 2
+  tasks_completed: 3
   files_changed: 8
 ---
 
@@ -50,6 +50,7 @@ Full Skills UI with card grid CRUD actions, SkillCard (global badge, opacity dim
 |---|------|--------|-----------|
 | 1 | SkillCard + SkillFormDialog + SkillsPage | 9d41897 | skills/SkillCard.tsx, skills/SkillFormDialog.tsx, pages/SkillsPage.tsx |
 | 2 | skill_activated indicator + prefill wiring | 232059e | types/index.ts, hooks/useMessages.ts, chat/MessageItem.tsx, chat/MessageInput.tsx, chat/ChatArea.tsx |
+| 3 | Bug fix: optimistic localEnabled for opacity-50 dimming | b72ed7c | skills/SkillCard.tsx |
 
 ## What Was Built
 
@@ -67,7 +68,20 @@ Full Skills UI with card grid CRUD actions, SkillCard (global badge, opacity dim
 
 ## Deviations from Plan
 
-None — plan executed exactly as written.
+### Auto-fixed Issues
+
+**1. [Rule 1 - Bug] Card opacity-50 not applied on disable toggle**
+- **Found during:** Task 3 checkpoint — human verification
+- **Issue:** SkillCard used `skill.is_enabled` prop directly for the `opacity-50` class. The class only flipped after the API call resolved and the parent re-rendered with updated skill data. In practice, the card showed the EyeOff icon (icon was derived from `skill.is_enabled` via same prop) but did not dim, indicating a React rendering inconsistency during the async toggle.
+- **Fix:** Added `localEnabled` state initialized from the prop. `handleToggleEnabled` flips it optimistically before awaiting the API, and reverts on failure. The wrapper `div` and eye icon both use `localEnabled`.
+- **Files modified:** `frontend/src/components/skills/SkillCard.tsx`
+- **Verification:** TypeScript compiles cleanly (`npx tsc --noEmit` exits 0). Human-approved all other items — this fix resolves the one reported issue.
+- **Committed in:** `b72ed7c`
+
+---
+
+**Total deviations:** 1 auto-fixed (Rule 1 - bug)
+**Impact on plan:** Essential correctness fix for the must_have truth "Disabled skills appear dimmed with opacity-50". No scope creep.
 
 ## Known Stubs
 
@@ -79,7 +93,7 @@ None. All functionality is fully wired:
 
 ## Self-Check: PASSED
 
-- frontend/src/components/skills/SkillCard.tsx — FOUND
+- frontend/src/components/skills/SkillCard.tsx — FOUND (with optimistic localEnabled fix)
 - frontend/src/components/skills/SkillFormDialog.tsx — FOUND
 - frontend/src/pages/SkillsPage.tsx — FOUND (full implementation)
 - frontend/src/types/index.ts — activatedSkill field present
@@ -89,3 +103,4 @@ None. All functionality is fully wired:
 - frontend/src/components/chat/ChatArea.tsx — prefillMessage passed to MessageInput
 - Commit 9d41897 (Task 1) — FOUND
 - Commit 232059e (Task 2) — FOUND
+- Commit b72ed7c (Bug fix) — FOUND
