@@ -26,12 +26,33 @@ export function SkillCard({
 }: Props) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [toggleError, setToggleError] = useState<string | null>(null)
+  const [localEnabled, setLocalEnabled] = useState(skill.is_enabled)
 
   const isOwner = skill.user_id === currentUserId
 
-  const handleToggle = async (toggleFn: (id: string) => Promise<void>) => {
+  // Keep local state in sync if the skill prop changes from outside
+  // (e.g. parent re-fetches or bulk updates)
+  if (localEnabled !== skill.is_enabled && !toggleError) {
+    setLocalEnabled(skill.is_enabled)
+  }
+
+  const handleToggleEnabled = async () => {
+    // Optimistically flip local state immediately for instant feedback
+    const nextEnabled = !localEnabled
+    setLocalEnabled(nextEnabled)
     try {
-      await toggleFn(skill.id)
+      await onToggleEnabled(skill.id)
+    } catch {
+      // Revert on failure
+      setLocalEnabled(!nextEnabled)
+      setToggleError("Failed to update skill.")
+      setTimeout(() => setToggleError(null), 3000)
+    }
+  }
+
+  const handleToggleGlobal = async () => {
+    try {
+      await onToggleGlobal(skill.id)
     } catch {
       setToggleError("Failed to update skill.")
       setTimeout(() => setToggleError(null), 3000)
@@ -42,7 +63,7 @@ export function SkillCard({
     <div
       className={cn(
         "rounded-xl bg-card ghost-border p-4 transition-all animate-fadeSlideUp",
-        !skill.is_enabled && "opacity-50",
+        !localEnabled && "opacity-50",
       )}
     >
       {/* Header row */}
@@ -112,9 +133,9 @@ export function SkillCard({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => handleToggle(onToggleEnabled)}
+                    onClick={handleToggleEnabled}
                   >
-                    {skill.is_enabled ? (
+                    {localEnabled ? (
                       <Eye className="h-3.5 w-3.5" />
                     ) : (
                       <EyeOff className="h-3.5 w-3.5" />
@@ -122,7 +143,7 @@ export function SkillCard({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {skill.is_enabled ? "Disable skill" : "Enable skill"}
+                  {localEnabled ? "Disable skill" : "Enable skill"}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -150,7 +171,7 @@ export function SkillCard({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => handleToggle(onToggleGlobal)}
+                      onClick={handleToggleGlobal}
                     >
                       <Globe className="h-3.5 w-3.5" />
                     </Button>
