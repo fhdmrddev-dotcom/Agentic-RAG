@@ -53,12 +53,12 @@
 
 ### Skills Open Standard (Import / Export)
 
-- [ ] **OPEN-01**: User can export any skill they own as a ZIP file (agentskills.io format)
-- [ ] **OPEN-02**: Exported ZIP contains `SKILL.md` with YAML frontmatter (name, description, license, compatibility) and skill instructions body
-- [ ] **OPEN-03**: Exported ZIP includes building-block files in categorized subdirectories (`scripts/`, `references/`, `assets/`)
-- [ ] **OPEN-04**: User can import a skill from a ZIP file; a new skill is created from the ZIP contents
-- [ ] **OPEN-05**: Bulk import from ZIP is atomic — if SKILL.md parsing fails, no partial skill is created
-- [ ] **OPEN-06**: ZIP import is safe against path traversal attacks (filenames sanitized before extraction)
+- [x] **OPEN-01**: User can export any skill they own as a ZIP file (agentskills.io format)
+- [x] **OPEN-02**: Exported ZIP contains `SKILL.md` with YAML frontmatter (name, description, license, compatibility) and skill instructions body
+- [x] **OPEN-03**: Exported ZIP includes building-block files in categorized subdirectories (`scripts/`, `references/`, `assets/`)
+- [x] **OPEN-04**: User can import a skill from a ZIP file; a new skill is created from the ZIP contents
+- [x] **OPEN-05**: Bulk import from ZIP is atomic — if SKILL.md parsing fails, no partial skill is created
+- [x] **OPEN-06**: ZIP import is safe against path traversal attacks (filenames sanitized before extraction)
 
 ### Persistent Tool Memory
 
@@ -135,12 +135,12 @@
 | FILE-05 | Phase 3 | Complete |
 | SKIL-07 | Phase 4 | Complete |
 | SKIL-08 | Phase 4 | Pending |
-| OPEN-01 | Phase 5 | Pending |
-| OPEN-02 | Phase 5 | Pending |
-| OPEN-03 | Phase 5 | Pending |
-| OPEN-04 | Phase 5 | Pending |
-| OPEN-05 | Phase 5 | Pending |
-| OPEN-06 | Phase 5 | Pending |
+| OPEN-01 | Phase 5 | Complete |
+| OPEN-02 | Phase 5 | Complete |
+| OPEN-03 | Phase 5 | Complete |
+| OPEN-04 | Phase 5 | Complete |
+| OPEN-05 | Phase 5 | Complete |
+| OPEN-06 | Phase 5 | Complete |
 | SAND-01 | Phase 6 | Pending |
 | SAND-02 | Phase 6 | Pending |
 | SAND-03 | Phase 6 | Pending |
