@@ -99,21 +99,28 @@ class TestGetTools:
         names = [t["function"]["name"] for t in tools]
         assert "web_search" in names
 
-    def test_returns_two_tools_without_tavily(self):
+    def test_returns_base_tools_without_tavily_or_sandbox(self):
+        """get_tools() returns 11 base tools when web_search and sandbox are both disabled."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.web_search_enabled = False
+            mock_settings.sandbox_enabled = False
             tools = get_tools()
-        assert len(tools) == 2
+        assert len(tools) == 11
 
-    def test_returns_three_tools_with_tavily(self):
+    def test_returns_one_more_tool_with_tavily(self):
+        """Adding web_search gives 12 tools (11 base + web_search)."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.web_search_enabled = True
+            mock_settings.sandbox_enabled = False
             tools = get_tools()
-        assert len(tools) == 3
+        assert len(tools) == 12
 
-    def test_tool_order_is_search_query_web(self):
+    def test_search_and_query_are_first_two_tools(self):
+        """search_documents and query_documents remain first two tools regardless of config."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.web_search_enabled = True
+            mock_settings.sandbox_enabled = False
             tools = get_tools()
         names = [t["function"]["name"] for t in tools]
-        assert names == ["search_documents", "query_documents", "web_search"]
+        assert names[0] == "search_documents"
+        assert names[1] == "query_documents"

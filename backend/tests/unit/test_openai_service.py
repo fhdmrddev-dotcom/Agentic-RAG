@@ -87,9 +87,10 @@ class TestGetEmbeddingClient:
                 assert call_kwargs["base_url"] == "https://custom-embed.example.com/v1"
 
     def test_no_base_url_when_embedding_base_url_empty(self):
-        """When embedding_base_url is empty, base_url is not passed."""
+        """When embedding_base_url is empty and no LLM base_url, base_url is not passed."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.llm_api_key = "sk-llm"
+            mock_settings.llm_base_url = ""
             mock_settings.embedding_api_key = ""
             mock_settings.embedding_base_url = ""
 

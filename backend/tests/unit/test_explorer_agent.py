@@ -161,16 +161,18 @@ def _make_simple_stream_chunk(content="Hello", finish_reason="stop"):
     return chunk
 
 
-def _setup_thread_mocks(mock_builder, mock_execute_result):
+def _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="explorer"):
     """Set up mock_builder side_effect for send_message's Supabase calls.
 
-    send_message makes these sequential execute() calls:
+    send_message + event_stream make these sequential execute() calls:
     1. thread select (single) — thread lookup
     2. messages insert (user msg) — returns nothing meaningful
-    3. messages select (history) — returns message list
-    4. messages insert (assistant msg) — returns nothing meaningful
-    5. threads update (touch updated_at) — returns nothing meaningful
-    6. threads update (set title) — fires when history had exactly 1 user msg
+    3. threads select folder_id (single) — thread folder scope query (inside event_stream)
+    4. skills catalog select — only for general/default mode (agent_mode != 'explorer')
+    5. messages select (history) — returns message list
+    6. messages insert (assistant msg) — returns nothing meaningful
+    7. threads update (touch updated_at) — returns nothing meaningful
+    8. threads update (set title) — fires when history had exactly 1 user msg
        (generate_thread_title is also patched to avoid real LLM call)
     """
     thread_result = MagicMock()
@@ -178,6 +180,10 @@ def _setup_thread_mocks(mock_builder, mock_execute_result):
 
     insert_result = MagicMock()
     insert_result.data = [{}]
+
+    # Thread folder scope query result — single() returns dict; folder_id=None means unscoped
+    thread_folder_result = MagicMock()
+    thread_folder_result.data = {"folder_id": None}
 
     # Return 2 messages so auto-title does NOT fire (requires len==1 to trigger)
     history_result = MagicMock()
@@ -192,13 +198,25 @@ def _setup_thread_mocks(mock_builder, mock_execute_result):
     touch_result = MagicMock()
     touch_result.data = [{}]
 
-    mock_builder.execute.side_effect = [
+    side_effects = [
         thread_result,
         insert_result,
+        thread_folder_result,
         history_result,
+    ]
+
+    # Skills catalog query fires for general/default mode only (after history in event_stream)
+    if agent_mode != "explorer":
+        skills_result = MagicMock()
+        skills_result.data = []  # No enabled skills — catalog not appended
+        side_effects.append(skills_result)
+
+    side_effects.extend([
         assistant_insert_result,
         touch_result,
-    ]
+    ])
+
+    mock_builder.execute.side_effect = side_effects
 
 
 class TestSendMessageAgentModeBranching:
@@ -287,7 +305,7 @@ class TestSendMessageAgentModeBranching:
     ):
         """POST without agent_mode (defaults to 'default') uses SYSTEM_PROMPT."""
         from app.api.threads import SYSTEM_PROMPT
-        _setup_thread_mocks(mock_builder, mock_execute_result)
+        _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="default")
 
         captured_messages = []
 
@@ -311,7 +329,7 @@ class TestSendMessageAgentModeBranching:
         self, client, auth_headers, mock_builder, mock_execute_result
     ):
         """POST without agent_mode uses tools_override=None (falling back to get_tools())."""
-        _setup_thread_mocks(mock_builder, mock_execute_result)
+        _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="default")
 
         captured_kwargs = {}
 
@@ -335,7 +353,7 @@ class TestSendMessageAgentModeBranching:
     ):
         """POST with agent_mode='default' explicitly behaves identically to omitting it."""
         from app.api.threads import SYSTEM_PROMPT
-        _setup_thread_mocks(mock_builder, mock_execute_result)
+        _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="default")
 
         captured_messages = []
 

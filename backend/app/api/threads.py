@@ -1,4 +1,6 @@
+import asyncio
 import json
+import time as time_mod
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 
@@ -13,6 +15,10 @@ from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.models.user_settings import load_user_settings
 from app.config import settings
 from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT
+
+# Lazy sandbox import — only if enabled
+if settings.sandbox_enabled:
+    from app.services.sandbox_service import sandbox_manager
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
@@ -597,6 +603,83 @@ async def send_message(
                                     tool_result = raw_bytes.decode("utf-8", errors="replace")
                                 except Exception as e:
                                     tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
+                        elif tool_name == "execute_code":
+                            code = args.get("code", "")
+                            libraries = args.get("libraries") or []
+                            # Emit start event (SAND-04)
+                            yield f"data: {json.dumps({'type': 'code_execution_start', 'code_preview': code[:200]})}\n\n"
+
+                            try:
+                                session = sandbox_manager.get_or_create(thread_id)
+                                loop = asyncio.get_event_loop()
+                                queue: asyncio.Queue = asyncio.Queue()
+
+                                def on_stdout(chunk: str):
+                                    loop.call_soon_threadsafe(
+                                        queue.put_nowait,
+                                        {"type": "code_stdout", "content": chunk}
+                                    )
+
+                                def on_stderr(chunk: str):
+                                    loop.call_soon_threadsafe(
+                                        queue.put_nowait,
+                                        {"type": "code_stderr", "content": chunk}
+                                    )
+
+                                # Prepend output dir creation to avoid FileNotFoundError (Pitfall 5)
+                                wrapped_code = "import os; os.makedirs('/sandbox/output', exist_ok=True)\n" + code
+
+                                start_time = time_mod.time()
+
+                                def _run_sync():
+                                    exec_result = session.run(
+                                        wrapped_code,
+                                        libraries=libraries,
+                                        on_stdout=on_stdout,
+                                        on_stderr=on_stderr,
+                                    )
+                                    loop.call_soon_threadsafe(
+                                        queue.put_nowait,
+                                        {"type": "_done", "result": exec_result}
+                                    )
+                                    return exec_result
+
+                                fut = loop.run_in_executor(None, _run_sync)
+
+                                # Drain queue, streaming SSE events (SAND-05)
+                                while True:
+                                    item = await queue.get()
+                                    if item["type"] == "_done":
+                                        break
+                                    yield f"data: {json.dumps(item)}\n\n"
+
+                                exec_result = await fut
+                                end_time = time_mod.time()
+                                duration_ms = int((end_time - start_time) * 1000)
+
+                                # Log execution to DB (SAND-09)
+                                exec_row = supabase.table("code_executions").insert({
+                                    "thread_id": thread_id,
+                                    "user_id": current_user["id"],
+                                    "code": code,
+                                    "exit_code": 0,
+                                    "duration_ms": duration_ms,
+                                }).execute()
+                                execution_id = exec_row.data[0]["id"] if exec_row.data else None
+
+                                # Emit completion event (SAND-06)
+                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 0, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': []})}\n\n"
+
+                                tool_result = json.dumps({
+                                    "status": "completed",
+                                    "exit_code": 0,
+                                    "duration_ms": duration_ms,
+                                    "execution_id": execution_id,
+                                })
+                            except Exception as exec_err:
+                                logger.error("execute_code failed: %s", exec_err)
+                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
+                                tool_result = json.dumps({"status": "error", "error": str(exec_err)})
                         else:
                             tool_result = f"Unknown tool: {tool_name}"
                     except json.JSONDecodeError:
