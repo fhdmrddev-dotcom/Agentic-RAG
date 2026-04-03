@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,17 @@ if settings.langsmith_api_key:
     os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
 
 
-app = FastAPI(title="Agentic RAG API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app_instance):
+    # Startup: nothing to do — sandbox sessions created on demand
+    yield
+    # Shutdown: close all open sandbox sessions to free Docker containers
+    if settings.sandbox_enabled:
+        from app.services.sandbox_service import sandbox_manager
+        sandbox_manager.close_all()
+
+
+app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
