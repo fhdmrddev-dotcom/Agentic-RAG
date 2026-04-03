@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import type { Message, ToolCall } from "../types"
+import type { Message, ToolCall, OutputLine, OutputFile } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
 
 interface UseMessages {
@@ -123,6 +123,50 @@ export function useMessages(): UseMessages {
               ? { ...m, activatedSkill: skillName }
               : m,
           ),
+        )
+      },
+      // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
+      undefined,
+      // onCodeStdout
+      (content: string) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const updated = (m.tool_calls ?? []).map((tc) =>
+              tc.name === "execute_code" && tc.status === "running"
+                ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stdout" as const, content }] }
+                : tc
+            )
+            return { ...m, tool_calls: updated }
+          })
+        )
+      },
+      // onCodeStderr
+      (content: string) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const updated = (m.tool_calls ?? []).map((tc) =>
+              tc.name === "execute_code" && tc.status === "running"
+                ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stderr" as const, content }] }
+                : tc
+            )
+            return { ...m, tool_calls: updated }
+          })
+        )
+      },
+      // onCodeExecutionComplete — sets data fields only; tool_end will set status="done"
+      (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const updated = (m.tool_calls ?? []).map((tc) =>
+              tc.name === "execute_code" && tc.status === "running"
+                ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
+                : tc
+            )
+            return { ...m, tool_calls: updated }
+          })
         )
       },
       agentMode,

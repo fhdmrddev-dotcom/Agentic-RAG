@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, OutputFile } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -89,6 +89,10 @@ export async function streamMessage(
   onSubAgentDelta?: (text: string) => void,
   onSubAgentDone?: () => void,
   onSkillActivated?: (skillName: string) => void,
+  onCodeExecutionStart?: (codePreview: string) => void,
+  onCodeStdout?: (content: string) => void,
+  onCodeStderr?: (content: string) => void,
+  onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
   agentMode?: string,
 ): Promise<void> {
   const headers = await getAuthHeaders()
@@ -138,6 +142,19 @@ export async function streamMessage(
           onSubAgentDone()
         } else if (parsed.type === "skill_activated" && onSkillActivated) {
           onSkillActivated(parsed.skill_name as string)
+        } else if (parsed.type === "code_execution_start" && onCodeExecutionStart) {
+          onCodeExecutionStart(parsed.code_preview as string)
+        } else if (parsed.type === "code_stdout" && onCodeStdout) {
+          onCodeStdout(parsed.content as string)
+        } else if (parsed.type === "code_stderr" && onCodeStderr) {
+          onCodeStderr(parsed.content as string)
+        } else if (parsed.type === "code_execution_complete" && onCodeExecutionComplete) {
+          onCodeExecutionComplete(
+            parsed.exit_code as number,
+            parsed.duration_ms as number,
+            (parsed.output_files ?? []) as OutputFile[],
+            parsed.error as string | undefined,
+          )
         }
       } catch {
         // ignore malformed lines
