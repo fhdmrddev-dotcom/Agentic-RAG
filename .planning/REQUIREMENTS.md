@@ -38,8 +38,8 @@
 ### Code Execution Sandbox
 
 - [ ] **SAND-01**: When `SANDBOX_ENABLED=true`, the `execute_code` LLM tool is available in General Mode
-- [ ] **SAND-02**: Each chat thread maintains a persistent Docker sandbox session (keyed by `thread_id`, TTL 30 min)
-- [ ] **SAND-03**: Python sandbox runs via `llm-sandbox`, variables and installed packages persist across tool calls within the same thread
+- [x] **SAND-02**: Each chat thread maintains a persistent Docker sandbox session (keyed by `thread_id`, TTL 30 min)
+- [x] **SAND-03**: Python sandbox runs via `llm-sandbox`, variables and installed packages persist across tool calls within the same thread
 - [ ] **SAND-04**: `execute_code` supports specifying additional PyPI packages to install before execution
 - [ ] **SAND-05**: Stdout and stderr are streamed in real time via SSE (`code_stdout`, `code_stderr` events) while Docker executes
 - [ ] **SAND-06**: `code_execution_start` SSE event fires when execution begins; `code_execution_complete` fires with exit code, duration, and file list
@@ -47,9 +47,9 @@
 - [ ] **SAND-08**: Sandbox-generated file metadata is stored in the `sandbox_files` table with signed download URLs accessible to the user
 - [ ] **SAND-09**: Each execution is logged to the `code_executions` table (thread_id, code, exit_code, duration, created_at)
 - [ ] **SAND-10**: Docker sandbox session is closed and resources released when the associated thread is deleted
-- [ ] **SAND-11**: Sandbox session manager starts/stops with FastAPI application lifecycle (lifespan handler)
+- [x] **SAND-11**: Sandbox session manager starts/stops with FastAPI application lifecycle (lifespan handler)
 - [ ] **SAND-12**: Frontend displays a Code Output panel that renders stdout/stderr stream and shows download links for output files
-- [ ] **SAND-13**: When `SANDBOX_ENABLED=false` (default), `execute_code` tool is not registered — no Docker dependency at startup
+- [x] **SAND-13**: When `SANDBOX_ENABLED=false` (default), `execute_code` tool is not registered — no Docker dependency at startup
 
 ### Skills Open Standard (Import / Export)
 
@@ -142,8 +142,8 @@
 | OPEN-05 | Phase 5 | Complete |
 | OPEN-06 | Phase 5 | Complete |
 | SAND-01 | Phase 6 | Pending |
-| SAND-02 | Phase 6 | Pending |
-| SAND-03 | Phase 6 | Pending |
+| SAND-02 | Phase 6 | Complete |
+| SAND-03 | Phase 6 | Complete |
 | SAND-04 | Phase 6 | Pending |
 | SAND-05 | Phase 6 | Pending |
 | SAND-06 | Phase 6 | Pending |
@@ -151,9 +151,9 @@
 | SAND-08 | Phase 6 | Pending |
 | SAND-09 | Phase 6 | Pending |
 | SAND-10 | Phase 6 | Pending |
-| SAND-11 | Phase 6 | Pending |
+| SAND-11 | Phase 6 | Complete |
 | SAND-12 | Phase 7 | Pending |
-| SAND-13 | Phase 6 | Pending |
+| SAND-13 | Phase 6 | Complete |
 
 **Coverage:**
 - v2.0 requirements: 37 total
