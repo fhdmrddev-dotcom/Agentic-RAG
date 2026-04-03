@@ -74,7 +74,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Every General Mode chat turn injects the skill catalog (name + description only) into the system prompt
   2. LLM calls `load_skill(skill_name)` when the user's request matches a skill description; full instructions and file list are returned
-  3. LLM calls `save_skill(name, description, instructions)` to create a skill from within a conversation
+  3. LLM calls `save_skill(name, description, instructions)` to create or update a skill from within a conversation
   4. LLM calls `read_skill_file(skill_name, filename)` to read a building-block file attached to a skill
   5. Explorer Mode does not receive any skill tools — only General Mode gets them
   6. A `skill_activated` SSE event is emitted when `load_skill` dispatches
@@ -118,7 +118,13 @@ Plans:
   4. Files written to `/sandbox/output/` are uploaded to `sandbox-outputs` storage and download links returned in `code_execution_complete` event
   5. When a thread is deleted, its Docker session is closed and resources released
   6. When `SANDBOX_ENABLED=false` (default), `execute_code` tool is not registered and Docker is never contacted
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 14-01-PLAN.md — Foundation: SQL migration, config settings, SandboxSessionManager service
+- [ ] 14-02-PLAN.md — execute_code tool definition + conditional registration in get_tools()
+- [ ] 14-03-PLAN.md — execute_code dispatch handler with asyncio.Queue SSE streaming bridge
+- [ ] 14-04-PLAN.md — Output file harvesting: copy from container, upload to storage, insert DB rows
+- [ ] 14-05-PLAN.md — Lifecycle: FastAPI lifespan handler, thread-delete cleanup, file harvest wiring
 
 ### Phase 15: Code Output UI
 **Goal**: The chat interface displays a rich Code Output panel with real-time streaming output and downloadable files
@@ -149,5 +155,5 @@ Plans:
 | 11. Skills LLM Integration | v2.0 | 3/3 | Complete    | 2026-04-01 |
 | 12. Skills UI | v2.0 | 3/3 | Complete    | 2026-04-02 |
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
-| 14. Code Execution Sandbox | v2.0 | 0/? | Pending | — |
+| 14. Code Execution Sandbox | v2.0 | 0/5 | Planned | — |
 | 15. Code Output UI | v2.0 | 0/? | Pending | — |
