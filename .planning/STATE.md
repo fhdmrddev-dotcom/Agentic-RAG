@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-stopped_at: Completed 14-05-PLAN.md
-last_updated: "2026-04-03T12:42:05.490Z"
+status: Ready to execute
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-04-03T14:58:19.385Z"
 last_activity: 2026-04-03
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 19
+  completed_plans: 18
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 14 — code-execution-sandbox
+**Current focus:** Phase 15 — code-output-ui
 
 ## Current Position
 
-Phase: 14 (code-execution-sandbox) — EXECUTING
-Plan: 5 of 5
+Phase: 15 (code-output-ui) — EXECUTING
+Plan: 2 of 2
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Plan: 5 of 5
 | Phase 14-code-execution-sandbox P03 | 20min | 1 tasks | 4 files |
 | Phase 14-code-execution-sandbox P04 | 2min | 1 tasks | 2 files |
 | Phase 14-code-execution-sandbox P05 | 3min | 2 tasks | 2 files |
+| Phase 15-code-output-ui P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,8 @@ Recent decisions affecting current work:
 - [Phase 14-code-execution-sandbox]: Lifespan sandbox import is inline inside if settings.sandbox_enabled — no Docker SDK import when disabled
 - [Phase 14-code-execution-sandbox]: delete_thread uses inline import to avoid module-level sandbox dependency when SANDBOX_ENABLED=false
 - [Phase 14-code-execution-sandbox]: output_files included in tool_result JSON so LLM knows about downloadable artifacts
+- [Phase 15-code-output-ui]: Single outputLines array (not separate stdout/stderr arrays) preserves interleaved arrival order
+- [Phase 15-code-output-ui]: onCodeExecutionComplete sets metadata fields only; tool_end fires after and sets status=done via onToolEnd
 
 ### Pending Todos
 
@@ -184,5 +187,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-03
-Stopped at: Completed 14-05-PLAN.md
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None

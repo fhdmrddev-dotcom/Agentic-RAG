@@ -48,7 +48,7 @@
 - [x] **SAND-09**: Each execution is logged to the `code_executions` table (thread_id, code, exit_code, duration, created_at)
 - [x] **SAND-10**: Docker sandbox session is closed and resources released when the associated thread is deleted
 - [x] **SAND-11**: Sandbox session manager starts/stops with FastAPI application lifecycle (lifespan handler)
-- [ ] **SAND-12**: Frontend displays a Code Output panel that renders stdout/stderr stream and shows download links for output files
+- [x] **SAND-12**: Frontend displays a Code Output panel that renders stdout/stderr stream and shows download links for output files
 - [x] **SAND-13**: When `SANDBOX_ENABLED=false` (default), `execute_code` tool is not registered — no Docker dependency at startup
 
 ### Skills Open Standard (Import / Export)
@@ -152,7 +152,7 @@
 | SAND-09 | Phase 6 | Complete |
 | SAND-10 | Phase 6 | Complete |
 | SAND-11 | Phase 6 | Complete |
-| SAND-12 | Phase 7 | Pending |
+| SAND-12 | Phase 7 | Complete |
 | SAND-13 | Phase 6 | Complete |
 
 **Coverage:**
