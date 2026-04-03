@@ -136,7 +136,10 @@ Plans:
   3. Stdout (green) and stderr (red) lines stream in real time as Docker executes — not buffered until completion
   4. Completed executions show download cards for each generated file with filename, size, and working download link
   5. Error state shows a clear error message with red styling
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 15-01-PLAN.md — Types + SSE parsing + useMessages wiring for code execution events
+- [ ] 15-02-PLAN.md — ExecuteCodeBlock component + ToolCallPanel dispatch + visual verification
 
 ## Progress
 
@@ -156,4 +159,4 @@ Plans:
 | 12. Skills UI | v2.0 | 3/3 | Complete    | 2026-04-02 |
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
 | 14. Code Execution Sandbox | v2.0 | 5/5 | Complete   | 2026-04-03 |
-| 15. Code Output UI | v2.0 | 0/? | Pending | — |
+| 15. Code Output UI | v2.0 | 0/2 | Planned | — |
