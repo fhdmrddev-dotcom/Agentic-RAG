@@ -630,8 +630,9 @@ async def send_message(
                                         {"type": "code_stderr", "content": chunk}
                                     )
 
-                                # Prepend output dir creation to avoid FileNotFoundError (Pitfall 5)
-                                wrapped_code = "import os; os.makedirs('/sandbox/output', exist_ok=True)\n" + code
+                                # Prepend output dir creation and chdir so relative file writes
+                                # land in /sandbox/output/ and get harvested (Pitfall 5)
+                                wrapped_code = "import os; os.makedirs('/sandbox/output', exist_ok=True); os.chdir('/sandbox/output')\n" + code
 
                                 start_time = time_mod.time()
 
@@ -660,6 +661,16 @@ async def send_message(
                                 exec_result = await fut
                                 end_time = time_mod.time()
                                 duration_ms = int((end_time - start_time) * 1000)
+
+                                # Emit stdout/stderr lines from result (on_stdout callbacks
+                                # are no-ops in InteractiveSandboxSession — output only
+                                # available after execution completes)
+                                if exec_result.stdout:
+                                    for line in exec_result.stdout.splitlines():
+                                        yield f"data: {json.dumps({'type': 'code_stdout', 'content': line})}\n\n"
+                                if exec_result.stderr:
+                                    for line in exec_result.stderr.splitlines():
+                                        yield f"data: {json.dumps({'type': 'code_stderr', 'content': line})}\n\n"
 
                                 # Log execution to DB (SAND-09)
                                 exec_row = supabase.table("code_executions").insert({
