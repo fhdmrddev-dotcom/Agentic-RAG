@@ -6,6 +6,8 @@ when SANDBOX_ENABLED=false the Docker SDK is never loaded.
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 import time
 
 logger = logging.getLogger(__name__)
@@ -60,3 +62,63 @@ class SandboxSessionManager:
 
 
 sandbox_manager = SandboxSessionManager()
+
+
+def harvest_output_files(
+    session: object,
+    execution_id: str,
+    user_id: str,
+    supabase,
+) -> list[dict]:
+    """Copy files from /sandbox/output/ in the container, upload to Supabase Storage,
+    insert sandbox_files rows, and return file metadata with signed URLs.
+
+    Returns a list of dicts: [{"filename": str, "url": str, "size": int}, ...]
+    Returns empty list if /sandbox/output/ is empty or inaccessible.
+    """
+    output_files: list[dict] = []
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Copy output directory from container to local temp dir
+            session.copy_from_runtime("/sandbox/output/", tmpdir)
+
+            # Walk the temp dir for files (copy_from_runtime may create subdirs)
+            for root, _dirs, files in os.walk(tmpdir):
+                for fname in files:
+                    fpath = os.path.join(root, fname)
+                    file_size = os.path.getsize(fpath)
+
+                    with open(fpath, "rb") as f:
+                        data = f.read()
+
+                    storage_path = f"{user_id}/{execution_id}/{fname}"
+
+                    # Upload to sandbox-outputs bucket
+                    supabase.storage.from_("sandbox-outputs").upload(
+                        storage_path, data
+                    )
+
+                    # Insert sandbox_files row
+                    supabase.table("sandbox_files").insert({
+                        "execution_id": execution_id,
+                        "user_id": user_id,
+                        "filename": fname,
+                        "storage_path": storage_path,
+                        "file_size": file_size,
+                    }).execute()
+
+                    # Generate signed download URL (1 hour expiry)
+                    signed = supabase.storage.from_(
+                        "sandbox-outputs"
+                    ).create_signed_url(storage_path, 3600)
+                    url = signed.get("signedURL") or signed.get("signedUrl", "")
+
+                    output_files.append({
+                        "filename": fname,
+                        "url": url,
+                        "size": file_size,
+                    })
+    except Exception as e:
+        logger.warning("Failed to harvest output files: %s", e)
+
+    return output_files
