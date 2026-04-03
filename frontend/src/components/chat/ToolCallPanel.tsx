@@ -3,12 +3,13 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  Folder, BookOpen, Zap,
+  Folder, BookOpen, Zap, Clock, Code2, Terminal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ToolCall, SubAgentState } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -26,6 +27,7 @@ function toolIcon(name: string) {
   if (name === "grep") return <TextSearch className={cls} />
   if (name === "glob") return <FileSearch className={cls} />
   if (name === "read_document") return <BookOpen className={cls} />
+  if (name === "execute_code") return <Terminal className={cls} />
   return <Wrench className={cls} />
 }
 
@@ -35,6 +37,7 @@ function toolIconColor(name: string, status: string) {
   if (name === "query_documents") return "text-emerald-400"
   if (name === "search_documents") return "text-primary"
   if (name === "analyze_document") return "text-violet-400"
+  if (name === "execute_code") return "text-blue-400"
   return "text-muted-foreground"
 }
 
@@ -48,6 +51,7 @@ function toolLabel(name: string) {
   if (name === "grep") return "Searching file contents"
   if (name === "glob") return "Finding files by pattern"
   if (name === "read_document") return "Reading document"
+  if (name === "execute_code") return "Executing code"
   return name
 }
 
@@ -60,6 +64,63 @@ function toolSummary(tc: ToolCall) {
   if (tc.args.query) return tc.args.query
   if (tc.args.filename) return tc.args.filename
   return null
+}
+
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  return `${(ms / 1000).toFixed(1)}s`
+}
+
+function formatTotalDuration(toolCalls: ToolCall[]): string | null {
+  const starts = toolCalls.filter(tc => tc.startedAt).map(tc => tc.startedAt!)
+  const ends = toolCalls.filter(tc => tc.endedAt).map(tc => tc.endedAt!)
+  if (starts.length === 0 || ends.length === 0) return null
+  const total = Math.max(...ends) - Math.min(...starts)
+  return formatDuration(total)
+}
+
+// ---- Execution time badge ----
+
+function TimeBadge({ tc }: { tc: ToolCall }) {
+  if (!tc.startedAt || !tc.endedAt) return null
+  const duration = tc.endedAt - tc.startedAt
+  return (
+    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
+      <Clock className="w-2.5 h-2.5" />
+      {formatDuration(duration)}
+    </span>
+  )
+}
+
+// ---- Full args expandable ----
+
+function ToolArgsBlock({ tc }: { tc: ToolCall }) {
+  const [open, setOpen] = useState(false)
+  const entries = Object.entries(tc.args).filter(([, v]) => v !== undefined && v !== "")
+  if (entries.length === 0) return null
+
+  return (
+    <div className="mt-1.5 ml-8">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+      >
+        <Code2 className="w-2.5 h-2.5" />
+        <span>{open ? "Hide" : "Show"} parameters</span>
+        {open ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
+      </button>
+      {open && (
+        <div className="mt-1 rounded-md bg-muted/30 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-foreground/60 space-y-0.5 overflow-x-auto">
+          {entries.map(([key, val]) => (
+            <div key={key} className="flex gap-2 min-w-0">
+              <span className="text-primary/60 flex-shrink-0">{key}:</span>
+              <span className="truncate text-foreground/70">{String(val)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ---- Result rendering helpers ----
@@ -88,6 +149,18 @@ function resultSummary(name: string, parsed: any): string {
   if (name === "grep" || name === "glob") {
     const total = parsed.total ?? parsed.matches?.length ?? 0
     return `${total} match${total !== 1 ? "es" : ""}`
+  }
+  if (name === "search_documents") {
+    if (Array.isArray(parsed)) return `${parsed.length} chunk${parsed.length !== 1 ? "s" : ""} found`
+    return "View results"
+  }
+  if (name === "query_documents") {
+    if (typeof parsed === "string") return parsed.length > 60 ? parsed.slice(0, 60) + "…" : parsed
+    if (Array.isArray(parsed)) return `${parsed.length} row${parsed.length !== 1 ? "s" : ""}`
+    return "View results"
+  }
+  if (name === "web_search") {
+    return "View search results"
   }
   return "View results"
 }
@@ -261,12 +334,84 @@ function ReadDocumentResult({ parsed }: { parsed: any }) {
   )
 }
 
-function renderResult(name: string, parsed: any): React.ReactNode {
+// ---- Search documents result ----
+
+function SearchDocumentsResult({ parsed }: { parsed: any }) {
+  if (!Array.isArray(parsed) || parsed.length === 0) return null
+  return (
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1.5">
+      {parsed.map((chunk: any, i: number) => (
+        <div key={i} className="rounded-md bg-muted/20 px-2.5 py-2 space-y-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileText className="w-3 h-3 text-primary/60 flex-shrink-0" />
+            <span className="text-[11px] font-mono text-foreground/80 truncate">
+              {chunk.metadata?.filename ?? chunk.filename ?? `Chunk ${i + 1}`}
+            </span>
+            {chunk.similarity != null && (
+              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 flex-shrink-0">
+                {(chunk.similarity * 100).toFixed(0)}% match
+              </span>
+            )}
+          </div>
+          {chunk.content && (
+            <p className="text-[10px] text-foreground/50 leading-relaxed line-clamp-2 pl-5">
+              {chunk.content.slice(0, 200)}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---- Query documents result (SQL) ----
+
+function QueryDocumentsResult({ result }: { result: string }) {
+  // query_documents returns a plain string, not JSON
+  return (
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+      <pre className="text-[11px] font-mono text-foreground/70 whitespace-pre-wrap break-words leading-relaxed">
+        {result}
+      </pre>
+    </div>
+  )
+}
+
+// ---- Web search result ----
+
+function WebSearchResult({ result }: { result: string }) {
+  return (
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+      <div className="text-[11px] text-foreground/70 leading-relaxed space-y-1">
+        <MarkdownRenderer content={result} className="text-[11px]" />
+      </div>
+    </div>
+  )
+}
+
+// ---- Generic JSON result fallback ----
+
+function GenericResult({ result }: { result: string }) {
+  return (
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+      <pre className="text-[10px] font-mono text-foreground/50 whitespace-pre-wrap break-words leading-relaxed">
+        {result.slice(0, 1500)}{result.length > 1500 ? "\n…" : ""}
+      </pre>
+    </div>
+  )
+}
+
+function renderResult(name: string, parsed: any, rawResult?: string): React.ReactNode {
   if (name === "ls") return <LsResult parsed={parsed} />
   if (name === "tree") return <TreeResult parsed={parsed} />
   if (name === "grep") return <GrepResult parsed={parsed} />
   if (name === "glob") return <GlobResult parsed={parsed} />
   if (name === "read_document") return <ReadDocumentResult parsed={parsed} />
+  if (name === "search_documents" && Array.isArray(parsed)) return <SearchDocumentsResult parsed={parsed} />
+  if (name === "query_documents" && rawResult) return <QueryDocumentsResult result={rawResult} />
+  if (name === "web_search" && rawResult) return <WebSearchResult result={rawResult} />
+  // Fallback: show raw result for any other tool
+  if (rawResult) return <GenericResult result={rawResult} />
   return null
 }
 
@@ -277,34 +422,33 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
   try {
     parsed = tc.result ? JSON.parse(tc.result) : null
   } catch {
-    // ignore parse errors
+    // result is not JSON — that's ok for query_documents, web_search, etc.
   }
 
-  if (!parsed) return null
-
-  if (parsed.error) {
+  // Check for JSON error
+  if (parsed?.error) {
     return (
-      <div className="mt-1.5 text-xs text-destructive italic">{parsed.error}</div>
+      <div className="mt-1.5 ml-8 text-xs text-destructive italic">{parsed.error}</div>
     )
   }
 
-  const summary = resultSummary(tc.name, parsed)
-  const content = renderResult(tc.name, parsed)
-  if (!content) return null
+  const summary = parsed ? resultSummary(tc.name, parsed) : (tc.result ? "View results" : null)
+  const content = renderResult(tc.name, parsed, tc.result ?? undefined)
+  if (!summary && !content) return null
 
   return (
-    <div className="mt-2">
+    <div className="mt-1.5 ml-8">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
       >
         {open
-          ? <ChevronDown className="w-3.5 h-3.5" />
-          : <ChevronRight className="w-3.5 h-3.5" />}
+          ? <ChevronDown className="w-3 h-3" />
+          : <ChevronRight className="w-3 h-3" />}
         <span className="font-medium">{summary}</span>
       </button>
-      {open && (
-        <div className="mt-2 ml-5">
+      {open && content && (
+        <div className="mt-1.5 ml-4.5 rounded-lg bg-muted/15 p-2.5 ghost-border">
           {content}
         </div>
       )}
@@ -361,6 +505,7 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
   const [expanded, setExpanded] = useState(!allDone)
 
   const isExpanded = expanded
+  const totalTime = allDone ? formatTotalDuration(toolCalls) : null
 
   if (!toolCalls || toolCalls.length === 0) return null
 
@@ -377,7 +522,7 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
         onClick={() => setExpanded((v) => !v)}
       >
         {allDone ? (
-          <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0" />
+          <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
         ) : (
           <div className="flex-shrink-0 animate-pulseGlow rounded-full">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -391,10 +536,20 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
             ? `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
             : "Working…"}
         </span>
+        {/* Total execution time */}
+        {totalTime && (
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-mono tabular-nums flex-shrink-0">
+            <Clock className="w-3 h-3" />
+            {totalTime}
+          </span>
+        )}
         {isExpanded
           ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
           : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       </button>
+
+      {/* Shimmer progress bar while tools are running */}
+      {!allDone && <div className="tool-progress-bar" />}
 
       {/* Body */}
       {isExpanded && (
@@ -406,38 +561,49 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
               tc.sub_agent ?? (tc.name === "analyze_document" ? subAgent : undefined)
 
             return (
-              <div key={i} className="pt-2.5">
+              <div key={i} className="pt-2.5 animate-toolSlideIn" style={{ animationDelay: `${i * 80}ms` }}>
                 {/* Connecting line between tools */}
                 {i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
-                {/* Tool row */}
-                <div className="flex items-center gap-2.5">
-                  <span className={cn("flex-shrink-0 p-1 rounded-md bg-muted/50", toolIconColor(tc.name, tc.status))}>
-                    {toolIcon(tc.name)}
-                  </span>
-                  <span className="flex-1 min-w-0 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-                    {summary && (
-                      <span className="ml-1.5 opacity-50 truncate block sm:inline">"{summary}"</span>
-                    )}
-                  </span>
-                  <span className="flex-shrink-0">
-                    {tc.status === "running" ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                    ) : (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                    )}
-                  </span>
-                </div>
+                {tc.name === "execute_code" ? (
+                  <ExecuteCodeBlock tc={tc} />
+                ) : (
+                  <>
+                    {/* Tool row */}
+                    <div className="flex items-center gap-2.5">
+                      <span className={cn("flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300", toolIconColor(tc.name, tc.status))}>
+                        {toolIcon(tc.name)}
+                      </span>
+                      <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
+                        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+                        {summary && (
+                          <span className="ml-1.5 opacity-50">"{summary}"</span>
+                        )}
+                      </span>
+                      {/* Duration badge */}
+                      <TimeBadge tc={tc} />
+                      <span className="flex-shrink-0">
+                        {tc.status === "running" ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
+                        )}
+                      </span>
+                    </div>
 
-                {/* Result block (ls, tree, grep, glob) */}
-                {tc.status === "done" && tc.result && !agentState && (
-                  <ToolResultBlock tc={tc} />
+                    {/* Expandable parameters */}
+                    {tc.status === "done" && <ToolArgsBlock tc={tc} />}
+
+                    {/* Result block (all tools) */}
+                    {tc.status === "done" && tc.result && !agentState && (
+                      <ToolResultBlock tc={tc} />
+                    )}
+
+                    {/* Sub-agent block (live or restored) */}
+                    {agentState && <SubAgentBlock agent={agentState} />}
+                  </>
                 )}
-
-                {/* Sub-agent block (live or restored) */}
-                {agentState && <SubAgentBlock agent={agentState} />}
               </div>
             )
           })}
