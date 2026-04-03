@@ -631,9 +631,13 @@ async def send_message(
                                         {"type": "code_stderr", "content": chunk}
                                     )
 
-                                # Prepend output dir creation and chdir so relative file writes
-                                # land in /sandbox/output/ and get harvested (Pitfall 5)
-                                wrapped_code = "import os; os.makedirs('/sandbox/output', exist_ok=True); os.chdir('/sandbox/output')\n" + code
+                                # Ensure /sandbox/output exists via shell (reliable across container
+                                # environments) and chdir so relative writes land there
+                                try:
+                                    session.execute_command("mkdir -p /sandbox/output")
+                                except Exception:
+                                    pass
+                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + code
 
                                 start_time = time_mod.time()
 

@@ -78,9 +78,18 @@ def harvest_output_files(
     """
     output_files: list[dict] = []
     try:
+        # Ensure /sandbox/output exists in the container before trying to copy
+        # (os.makedirs inside the Python interpreter doesn't always persist to
+        # the Docker filesystem layer that copy_from_runtime/get_archive reads)
+        try:
+            session.execute_command("mkdir -p /sandbox/output")
+        except Exception:
+            pass  # best-effort; copy_from_runtime will 404 if it truly doesn't exist
+
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Copy output directory from container to local temp dir
-            session.copy_from_runtime("/sandbox/output/", tmpdir)
+            # Copy output directory from container to local temp dir.
+            # No trailing slash — Docker's get_archive is strict about this.
+            session.copy_from_runtime("/sandbox/output", tmpdir)
 
             # Walk the temp dir for files (copy_from_runtime may create subdirs)
             for root, _dirs, files in os.walk(tmpdir):
