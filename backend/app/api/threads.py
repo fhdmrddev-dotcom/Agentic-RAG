@@ -61,6 +61,9 @@ SYSTEM_PROMPT = (
     "Use when the user asks to save, create, or define a new skill.\n\n"
     "12. read_skill_file — Read the content of a building-block file attached to a skill. "
     "Use after load_skill shows available files.\n\n"
+    "13. execute_code - Execute Python code in a sandboxed Docker container. "
+    "Variables and packages persist within the same thread. Write files to /sandbox/output/ "
+    "for download links. Use for calculations, data analysis, chart generation, or any coding task.\n\n"
     "Key rules:\n"
     "- Browse/navigate folders → ls or tree\n"
     "- Find documents by content pattern → grep\n"
@@ -73,6 +76,7 @@ SYSTEM_PROMPT = (
     "- Load/use a skill from the catalog → load_skill\n"
     "- Create or update a skill → save_skill\n"
     "- Read a file attached to a skill → read_skill_file\n"
+    "- Run Python code, generate charts, do calculations -> execute_code\n"
     "- Always say where the information came from."
 )
 

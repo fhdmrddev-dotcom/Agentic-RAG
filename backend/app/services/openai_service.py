@@ -327,6 +327,40 @@ READ_SKILL_FILE_TOOL = {
     },
 }
 
+EXECUTE_CODE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "execute_code",
+        "description": (
+            "Execute Python code in a sandboxed Docker container. "
+            "Variables and installed packages persist across calls within the same conversation thread. "
+            "Write output files to /sandbox/output/ and they will be returned as download links. "
+            "Use this for data analysis, calculations, generating charts, processing files, "
+            "or any task that benefits from running actual Python code."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code to execute.",
+                },
+                "libraries": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of PyPI packages to install before execution (e.g. ['pandas', 'matplotlib']).",
+                },
+                "output_files": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional list of expected output filenames in /sandbox/output/ to return as download links.",
+                },
+            },
+            "required": ["code"],
+        },
+    },
+}
+
 
 EXPLORER_SYSTEM_PROMPT = (
     "You are a Knowledge Base Explorer. You navigate the user's document library "
@@ -360,6 +394,8 @@ def get_tools() -> list[dict]:
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
+    if settings.sandbox_enabled:
+        tools.append(EXECUTE_CODE_TOOL)
     return tools
 
 
