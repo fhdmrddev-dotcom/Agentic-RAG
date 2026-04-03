@@ -118,11 +118,11 @@ Plans:
   4. Files written to `/sandbox/output/` are uploaded to `sandbox-outputs` storage and download links returned in `code_execution_complete` event
   5. When a thread is deleted, its Docker session is closed and resources released
   6. When `SANDBOX_ENABLED=false` (default), `execute_code` tool is not registered and Docker is never contacted
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 Plans:
 - [x] 14-01-PLAN.md — Foundation: SQL migration, config settings, SandboxSessionManager service
 - [x] 14-02-PLAN.md — execute_code tool definition + conditional registration in get_tools()
-- [ ] 14-03-PLAN.md — execute_code dispatch handler with asyncio.Queue SSE streaming bridge
+- [x] 14-03-PLAN.md — execute_code dispatch handler with asyncio.Queue SSE streaming bridge
 - [ ] 14-04-PLAN.md — Output file harvesting: copy from container, upload to storage, insert DB rows
 - [ ] 14-05-PLAN.md — Lifecycle: FastAPI lifespan handler, thread-delete cleanup, file harvest wiring
 
@@ -155,5 +155,5 @@ Plans:
 | 11. Skills LLM Integration | v2.0 | 3/3 | Complete    | 2026-04-01 |
 | 12. Skills UI | v2.0 | 3/3 | Complete    | 2026-04-02 |
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
-| 14. Code Execution Sandbox | v2.0 | 2/5 | In Progress|  |
+| 14. Code Execution Sandbox | v2.0 | 3/5 | In Progress|  |
 | 15. Code Output UI | v2.0 | 0/? | Pending | — |
