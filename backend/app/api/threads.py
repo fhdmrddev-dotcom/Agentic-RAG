@@ -18,7 +18,7 @@ from app.services.openai_service import create_streaming_chat, get_llm_client, g
 
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
-    from app.services.sandbox_service import sandbox_manager
+    from app.services.sandbox_service import sandbox_manager, harvest_output_files
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
@@ -135,6 +135,10 @@ async def delete_thread(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
+    # Close sandbox session if sandbox is enabled (SAND-10)
+    if settings.sandbox_enabled:
+        from app.services.sandbox_service import sandbox_manager
+        sandbox_manager.close_session(thread_id)
     supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
 
 
@@ -667,14 +671,22 @@ async def send_message(
                                 }).execute()
                                 execution_id = exec_row.data[0]["id"] if exec_row.data else None
 
-                                # Emit completion event (SAND-06)
-                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 0, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': []})}\n\n"
+                                # Harvest output files from container (SAND-07, SAND-08)
+                                output_file_list = []
+                                if execution_id:
+                                    output_file_list = harvest_output_files(
+                                        session, execution_id, current_user["id"], supabase
+                                    )
+
+                                # Emit completion event (SAND-06) with file list
+                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 0, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': output_file_list})}\n\n"
 
                                 tool_result = json.dumps({
                                     "status": "completed",
                                     "exit_code": 0,
                                     "duration_ms": duration_ms,
                                     "execution_id": execution_id,
+                                    "output_files": output_file_list,
                                 })
                             except Exception as exec_err:
                                 logger.error("execute_code failed: %s", exec_err)
