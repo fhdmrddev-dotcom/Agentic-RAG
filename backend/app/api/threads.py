@@ -698,6 +698,8 @@ async def send_message(
                                     "duration_ms": duration_ms,
                                     "execution_id": execution_id,
                                     "output_files": output_file_list,
+                                    "stdout": exec_result.stdout or "",
+                                    "stderr": exec_result.stderr or "",
                                 })
                             except Exception as exec_err:
                                 logger.error("execute_code failed: %s", exec_err)

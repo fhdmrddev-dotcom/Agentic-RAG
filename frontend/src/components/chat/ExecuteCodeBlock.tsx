@@ -96,7 +96,17 @@ export function ExecuteCodeBlock({ tc }: ExecuteCodeBlockProps) {
   })()
 
   const isRunning = tc.status === "running"
-  const lines = tc.outputLines ?? []
+  // Use live outputLines if present; on reload reconstruct from persisted stdout/stderr
+  const lines: OutputLine[] = tc.outputLines ?? (() => {
+    try {
+      const r = tc.result ? JSON.parse(tc.result) : null
+      if (!r) return []
+      const out: OutputLine[] = []
+      if (r.stdout) r.stdout.split("\n").filter(Boolean).forEach((l: string) => out.push({ kind: "stdout", content: l }))
+      if (r.stderr) r.stderr.split("\n").filter(Boolean).forEach((l: string) => out.push({ kind: "stderr", content: l }))
+      return out
+    } catch { return [] }
+  })()
   const hasOutput = lines.length > 0
   const isComplete = exitCode !== undefined
   const isError = isComplete && exitCode !== 0

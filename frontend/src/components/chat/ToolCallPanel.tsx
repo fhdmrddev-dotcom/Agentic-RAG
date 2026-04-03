@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  Folder, BookOpen, Zap, Clock, Code2, Terminal,
+  Folder, BookOpen, Zap, Clock, Terminal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -92,35 +92,17 @@ function TimeBadge({ tc }: { tc: ToolCall }) {
   )
 }
 
-// ---- Full args expandable ----
+// ---- Inline args preview ----
 
-function ToolArgsBlock({ tc }: { tc: ToolCall }) {
-  const [open, setOpen] = useState(false)
-  const entries = Object.entries(tc.args).filter(([, v]) => v !== undefined && v !== "")
-  if (entries.length === 0) return null
-
-  return (
-    <div className="mt-1.5 ml-8">
-      <button
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-      >
-        <Code2 className="w-2.5 h-2.5" />
-        <span>{open ? "Hide" : "Show"} parameters</span>
-        {open ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
-      </button>
-      {open && (
-        <div className="mt-1 rounded-md bg-muted/30 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-foreground/60 space-y-0.5 overflow-x-auto">
-          {entries.map(([key, val]) => (
-            <div key={key} className="flex gap-2 min-w-0">
-              <span className="text-primary/60 flex-shrink-0">{key}:</span>
-              <span className="truncate text-foreground/70">{String(val)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+function formatArgsInline(args: Record<string, string>): string {
+  const entries = Object.entries(args).filter(([, v]) => v !== undefined && v !== "")
+  if (entries.length === 0) return ""
+  const parts = entries.map(([k, v]) => {
+    const val = String(v)
+    const truncated = val.length > 72 ? val.slice(0, 72) + "…" : val
+    return `"${k}": "${truncated}"`
+  })
+  return `{${parts.join(", ")}}`
 }
 
 // ---- Result rendering helpers ----
@@ -422,13 +404,12 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
   try {
     parsed = tc.result ? JSON.parse(tc.result) : null
   } catch {
-    // result is not JSON — that's ok for query_documents, web_search, etc.
+    // result is not JSON — ok for query_documents, web_search, etc.
   }
 
-  // Check for JSON error
   if (parsed?.error) {
     return (
-      <div className="mt-1.5 ml-8 text-xs text-destructive italic">{parsed.error}</div>
+      <div className="mt-1 text-[10px] text-destructive/80 italic">{parsed.error}</div>
     )
   }
 
@@ -436,19 +417,28 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
   const content = renderResult(tc.name, parsed, tc.result ?? undefined)
   if (!summary && !content) return null
 
+  // For tools whose detail content is just a repeat of the summary (no extra value), skip the toggle
+  const hasExpandableDetail = content !== null && !["ls", "tree", "grep", "glob"].includes(tc.name)
+
   return (
-    <div className="mt-1.5 ml-8">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
-      >
-        {open
-          ? <ChevronDown className="w-3 h-3" />
-          : <ChevronRight className="w-3 h-3" />}
-        <span className="font-medium">{summary}</span>
-      </button>
+    <div className="mt-1">
+      {hasExpandableDetail ? (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground/80 transition-colors"
+        >
+          <span className="text-success/70">✓</span>
+          <span>{summary}</span>
+          {open ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
+        </button>
+      ) : (
+        <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50">
+          <span className="text-success/70">✓</span>
+          <span>{summary}</span>
+        </span>
+      )}
       {open && content && (
-        <div className="mt-1.5 ml-4.5 rounded-lg bg-muted/15 p-2.5 ghost-border">
+        <div className="mt-1.5 rounded-lg bg-muted/15 p-2.5 ghost-border">
           {content}
         </div>
       )}
@@ -518,34 +508,29 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
     )}>
       {/* Header */}
       <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-accent/30 transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        {allDone ? (
-          <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
-        ) : (
-          <div className="flex-shrink-0 animate-pulseGlow rounded-full">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        {isExpanded
+          ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
+          : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />}
+        <span className="text-xs text-muted-foreground/70 font-medium">
+          {isExpanded ? "Hide steps" : "Show steps"}
+        </span>
+        <div className="flex-1" />
+        {!allDone && (
+          <div className="flex items-center gap-1.5 text-[10px] text-primary">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Working…</span>
           </div>
         )}
-        <span className={cn(
-          "flex-1 text-xs font-semibold tracking-wide",
-          allDone ? "text-muted-foreground" : "text-primary"
-        )}>
-          {allDone
-            ? `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
-            : "Working…"}
-        </span>
-        {/* Total execution time */}
-        {totalTime && (
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-mono tabular-nums flex-shrink-0">
-            <Clock className="w-3 h-3" />
-            {totalTime}
+        {allDone && (
+          <span className="flex items-center gap-1 text-[10px] font-medium bg-success/12 text-success px-2 py-0.5 rounded-full">
+            <CheckCircle2 className="w-2.5 h-2.5" />
+            {toolCalls.length} step{toolCalls.length !== 1 ? "s" : ""} completed
+            {totalTime && <span className="opacity-60 ml-1">· {totalTime}</span>}
           </span>
         )}
-        {isExpanded
-          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       </button>
 
       {/* Shimmer progress bar while tools are running */}
@@ -569,40 +554,49 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
                 {tc.name === "execute_code" ? (
                   <ExecuteCodeBlock tc={tc} />
                 ) : (
-                  <>
-                    {/* Tool row */}
-                    <div className="flex items-center gap-2.5">
-                      <span className={cn("flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300", toolIconColor(tc.name, tc.status))}>
-                        {toolIcon(tc.name)}
-                      </span>
-                      <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
-                        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-                        {summary && (
-                          <span className="ml-1.5 opacity-50">"{summary}"</span>
-                        )}
-                      </span>
-                      {/* Duration badge */}
-                      <TimeBadge tc={tc} />
-                      <span className="flex-shrink-0">
+                  <div className="flex items-start gap-2.5">
+                    {/* Icon */}
+                    <span className={cn(
+                      "mt-0.5 flex-shrink-0 p-1 rounded-md bg-muted/40 transition-colors duration-300",
+                      toolIconColor(tc.name, tc.status)
+                    )}>
+                      {toolIcon(tc.name)}
+                    </span>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Label row */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-semibold text-foreground/80 truncate">
+                          {toolLabel(tc.name)}
+                        </span>
+                        <div className="flex-1" />
                         {tc.status === "running" ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                          <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
                         ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
+                          <span className="flex items-center gap-0.5 text-[10px] text-success flex-shrink-0">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            Complete
+                          </span>
                         )}
-                      </span>
+                      </div>
+
+                      {/* Inline args preview */}
+                      {Object.keys(tc.args).length > 0 && (
+                        <p className="text-[10px] font-mono text-muted-foreground/50 truncate mt-0.5 leading-relaxed">
+                          {formatArgsInline(tc.args)}
+                        </p>
+                      )}
+
+                      {/* Inline result summary + optional expandable detail */}
+                      {tc.status === "done" && tc.result && !agentState && (
+                        <ToolResultBlock tc={tc} />
+                      )}
+
+                      {/* Sub-agent block (live or restored) */}
+                      {agentState && <SubAgentBlock agent={agentState} />}
                     </div>
-
-                    {/* Expandable parameters */}
-                    {tc.status === "done" && <ToolArgsBlock tc={tc} />}
-
-                    {/* Result block (all tools) */}
-                    {tc.status === "done" && tc.result && !agentState && (
-                      <ToolResultBlock tc={tc} />
-                    )}
-
-                    {/* Sub-agent block (live or restored) */}
-                    {agentState && <SubAgentBlock agent={agentState} />}
-                  </>
+                  </div>
                 )}
               </div>
             )
