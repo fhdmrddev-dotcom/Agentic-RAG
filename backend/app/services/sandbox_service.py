@@ -93,10 +93,24 @@ def harvest_output_files(
 
                     storage_path = f"{user_id}/{execution_id}/{fname}"
 
+                    # Detect content-type by extension
+                    ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+                    content_type_map = {
+                        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                        "gif": "image/gif", "svg": "image/svg+xml", "pdf": "application/pdf",
+                        "csv": "text/csv", "txt": "text/plain", "json": "application/json",
+                        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "zip": "application/zip",
+                    }
+                    content_type = content_type_map.get(ext, "application/octet-stream")
+
                     # Upload to sandbox-outputs bucket
                     supabase.storage.from_("sandbox-outputs").upload(
-                        storage_path, data
+                        storage_path, data,
+                        file_options={"content-type": content_type, "upsert": "true"},
                     )
+                    logger.info("Uploaded sandbox file %s (%d bytes) to %s", fname, file_size, storage_path)
 
                     # Insert sandbox_files row
                     supabase.table("sandbox_files").insert({
@@ -111,7 +125,7 @@ def harvest_output_files(
                     signed = supabase.storage.from_(
                         "sandbox-outputs"
                     ).create_signed_url(storage_path, 3600)
-                    url = signed.get("signedURL") or signed.get("signedUrl", "")
+                    url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url", "")
 
                     output_files.append({
                         "filename": fname,
@@ -119,6 +133,6 @@ def harvest_output_files(
                         "size": file_size,
                     })
     except Exception as e:
-        logger.warning("Failed to harvest output files: %s", e)
+        logger.error("Failed to harvest output files: %s", e, exc_info=True)
 
     return output_files
