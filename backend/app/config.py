@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     web_search_max_results: int = 5
 
+    # Code execution sandbox
+    sandbox_enabled: bool = False
+    sandbox_ttl_minutes: int = 30
+
     @property
     def web_search_enabled(self) -> bool:
         return bool(self.tavily_api_key)
