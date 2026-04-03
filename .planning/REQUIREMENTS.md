@@ -43,8 +43,8 @@
 - [x] **SAND-04**: `execute_code` supports specifying additional PyPI packages to install before execution
 - [x] **SAND-05**: Stdout and stderr are streamed in real time via SSE (`code_stdout`, `code_stderr` events) while Docker executes
 - [x] **SAND-06**: `code_execution_start` SSE event fires when execution begins; `code_execution_complete` fires with exit code, duration, and file list
-- [ ] **SAND-07**: Files written to `/sandbox/output/` inside the container are uploaded to the `sandbox-outputs` Supabase Storage bucket after execution
-- [ ] **SAND-08**: Sandbox-generated file metadata is stored in the `sandbox_files` table with signed download URLs accessible to the user
+- [x] **SAND-07**: Files written to `/sandbox/output/` inside the container are uploaded to the `sandbox-outputs` Supabase Storage bucket after execution
+- [x] **SAND-08**: Sandbox-generated file metadata is stored in the `sandbox_files` table with signed download URLs accessible to the user
 - [x] **SAND-09**: Each execution is logged to the `code_executions` table (thread_id, code, exit_code, duration, created_at)
 - [ ] **SAND-10**: Docker sandbox session is closed and resources released when the associated thread is deleted
 - [x] **SAND-11**: Sandbox session manager starts/stops with FastAPI application lifecycle (lifespan handler)
@@ -147,8 +147,8 @@
 | SAND-04 | Phase 6 | Complete |
 | SAND-05 | Phase 6 | Complete |
 | SAND-06 | Phase 6 | Complete |
-| SAND-07 | Phase 6 | Pending |
-| SAND-08 | Phase 6 | Pending |
+| SAND-07 | Phase 6 | Complete |
+| SAND-08 | Phase 6 | Complete |
 | SAND-09 | Phase 6 | Complete |
 | SAND-10 | Phase 6 | Pending |
 | SAND-11 | Phase 6 | Complete |
