@@ -14,6 +14,17 @@ export interface SubAgentState {
   status: "running" | "done"
 }
 
+export interface OutputLine {
+  kind: "stdout" | "stderr"
+  content: string
+}
+
+export interface OutputFile {
+  filename: string
+  url: string
+  size: number
+}
+
 export interface ToolCall {
   name: string
   args: Record<string, string>
@@ -22,6 +33,12 @@ export interface ToolCall {
   sub_agent?: SubAgentState
   startedAt?: number   // Date.now() when tool_start received
   endedAt?: number     // Date.now() when tool_end received
+  // Code execution fields (execute_code tool only)
+  outputLines?: OutputLine[]
+  outputFiles?: OutputFile[]
+  executionDurationMs?: number
+  exitCode?: number
+  errorMessage?: string
 }
 
 export interface Message {
