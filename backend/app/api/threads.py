@@ -452,6 +452,7 @@ async def send_message(
                 for tc in tool_calls:
                     tool_name = tc["name"]
                     sub_agent_record: dict | None = None
+                    llm_tool_content: str | None = None  # overridden per-tool to strip URLs from LLM context
                     try:
                         args = json.loads(tc["arguments"])
                         yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args})}\n\n"
@@ -701,6 +702,15 @@ async def send_message(
                                     "stdout": exec_result.stdout or "",
                                     "stderr": exec_result.stderr or "",
                                 })
+                                # Strip signed URLs from LLM context — frontend shows download cards
+                                llm_tool_content = json.dumps({
+                                    "status": "completed",
+                                    "exit_code": 0,
+                                    "duration_ms": duration_ms,
+                                    "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
+                                    "stdout": exec_result.stdout or "",
+                                    "stderr": exec_result.stderr or "",
+                                })
                             except Exception as exec_err:
                                 logger.error("execute_code failed: %s", exec_err)
                                 yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
@@ -721,7 +731,7 @@ async def send_message(
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": tool_result,
+                        "content": llm_tool_content if llm_tool_content is not None else tool_result,
                     })
                     persisted_tool_calls.append({
                         "tool_call_id": tc["id"],
