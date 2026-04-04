@@ -16,7 +16,7 @@
 - [x] **SKIL-05**: User can share a skill globally so all authenticated users can see and load it
 - [x] **SKIL-06**: User can unshare a global skill (reverts to private)
 - [x] **SKIL-07**: Skills tab in the frontend shows all user-owned and global skills with CRUD actions
-- [ ] **SKIL-08**: A seed "skill-creator" global skill is pre-loaded, enabling the LLM to guide users through creating new skills via conversation
+- [x] **SKIL-08**: A seed "skill-creator" global skill is pre-loaded, enabling the LLM to guide users through creating new skills via conversation
 
 ### Agent Skills — LLM Integration
 
@@ -37,7 +37,7 @@
 
 ### Code Execution Sandbox
 
-- [ ] **SAND-01**: When `SANDBOX_ENABLED=true`, the `execute_code` LLM tool is available in General Mode
+- [x] **SAND-01**: When `SANDBOX_ENABLED=true`, the `execute_code` LLM tool is available in General Mode
 - [x] **SAND-02**: Each chat thread maintains a persistent Docker sandbox session (keyed by `thread_id`, TTL 30 min)
 - [x] **SAND-03**: Python sandbox runs via `llm-sandbox`, variables and installed packages persist across tool calls within the same thread
 - [x] **SAND-04**: `execute_code` supports specifying additional PyPI packages to install before execution
@@ -134,14 +134,14 @@
 | FILE-04 | Phase 3 | Complete |
 | FILE-05 | Phase 3 | Complete |
 | SKIL-07 | Phase 4 | Complete |
-| SKIL-08 | Phase 17 | Pending |
+| SKIL-08 | Phase 12 | Complete |
 | OPEN-01 | Phase 5 | Complete |
 | OPEN-02 | Phase 5 | Complete |
 | OPEN-03 | Phase 5 | Complete |
 | OPEN-04 | Phase 5 | Complete |
 | OPEN-05 | Phase 5 | Complete |
 | OPEN-06 | Phase 5 | Complete |
-| SAND-01 | Phase 17 | Pending |
+| SAND-01 | Phase 14 | Complete |
 | SAND-02 | Phase 6 | Complete |
 | SAND-03 | Phase 6 | Complete |
 | SAND-04 | Phase 6 | Complete |
@@ -159,7 +159,7 @@
 - v2.0 requirements: 37 total
 - Mapped to phases: 37
 - Unmapped: 0 ✓
-- Pending (gap closure phases 16–17): FILE-01, FILE-02, SKIL-08, SAND-01
+- Pending: none
 
 ---
 *Requirements defined: 2026-03-29*
