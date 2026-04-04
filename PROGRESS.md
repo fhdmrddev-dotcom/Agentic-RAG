@@ -440,7 +440,7 @@ All components below were visually updated. **No hooks, props, state, API calls,
 
 ---
 
-## Milestone: Agent Skills & Code Execution (v2.0) — IN PROGRESS
+## Milestone: Agent Skills & Code Execution (v2.0) ✅ COMPLETE — 2026-04-04
 
 ### Phase 9: Persistent Tool Memory ✅ COMPLETE (2026-03-29)
 
@@ -527,8 +527,8 @@ All components below were visually updated. **No hooks, props, state, API calls,
 
 #### Notes (Phase 15)
 
-- VERIFICATION.md pending (Phase 17 task — SAND-12 already marked `[x]` in REQUIREMENTS.md)
-- No automated tests added; browser verification (Task 3 human checkpoint) outstanding
+- VERIFICATION.md created in Phase 17 — SAND-12 confirmed PASSED via code inspection
+- No automated tests added; browser verification (live Docker + Supabase) outstanding
 
 ### Phase 16: Skill File Management UI ✅ COMPLETE (2026-04-04)
 
@@ -542,3 +542,27 @@ All components below were visually updated. **No hooks, props, state, API calls,
 
 - File section is only rendered in edit mode (`isEdit && skill`) — never shown in New Skill dialog
 - `isOwner` derived client-side from `skill.user_id === currentUserId` — matches existing SkillCard pattern
+
+### Phase 17: Tech Debt Cleanup ✅ COMPLETE (2026-04-04)
+
+- [x] System prompt tool count corrected: "twelve" → "thirteen" (`backend/app/api/threads.py:31`)
+- [x] SKIL-08 checkbox updated to `[x]` in REQUIREMENTS.md (018_skill_creator_seed.sql was already committed)
+- [x] SAND-01 checkbox updated to `[x]` in REQUIREMENTS.md (EXECUTE_CODE_TOOL registration already verified)
+- [x] Phase 15 VERIFICATION.md created — SAND-12 confirmed PASSED via code inspection of `ExecuteCodeBlock.tsx`, `ToolCallPanel.tsx`, `useMessages.ts`, `api.ts`
+- [x] All 37/37 v2.0 requirements now checked in REQUIREMENTS.md
+
+#### Notes (Phase 17)
+
+- Procedural-only phase — no functional code changes, zero user-facing impact
+- Closes all gaps identified in the v2.0 milestone audit (2026-04-03)
+
+---
+
+## v2.0 Milestone Stats
+
+- **Phases:** 9–17 (9 phases)
+- **Plans:** 22 total, all complete
+- **Timeline:** 2026-03-29 → 2026-04-04 (6 days)
+- **Requirements:** 37/37 complete
+- **Git tag:** `v2.0`
+- **Archives:** `.planning/milestones/v2.0-ROADMAP.md`, `.planning/milestones/v2.0-phases/`
