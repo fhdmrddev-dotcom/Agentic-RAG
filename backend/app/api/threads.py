@@ -12,7 +12,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
-from app.models.user_settings import load_user_settings
+from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings
 from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT
 
@@ -68,8 +68,12 @@ SYSTEM_PROMPT = (
     "12. read_skill_file — Read the content of a building-block file attached to a skill. "
     "Use after load_skill shows available files.\n\n"
     "13. execute_code - Execute Python code in a sandboxed Docker container. "
-    "Variables and packages persist within the same thread. Write files to /sandbox/output/ "
-    "for download links. Use for calculations, data analysis, chart generation, or any coding task.\n\n"
+    "ALWAYS pass the `libraries` parameter for any package not in the Python standard library "
+    "(e.g. matplotlib, numpy, pandas, seaborn, scipy, python-docx, openpyxl, pillow, requests, "
+    "beautifulsoup4). Do NOT assume any third-party package is pre-installed — always list it. "
+    "Variables and installed packages persist within the same thread once installed. "
+    "Write output files to /sandbox/output/ for download links. "
+    "Use for calculations, data analysis, chart generation, file creation, or any coding task.\n\n"
     "Key rules:\n"
     "- Browse/navigate folders → ls or tree\n"
     "- Find documents by content pattern → grep\n"
@@ -82,7 +86,7 @@ SYSTEM_PROMPT = (
     "- Load/use a skill from the catalog → load_skill\n"
     "- Create or update a skill → save_skill\n"
     "- Read a file attached to a skill → read_skill_file\n"
-    "- Run Python code, generate charts, do calculations -> execute_code\n"
+    "- Run Python code, generate charts, do calculations -> execute_code (always pass `libraries` for non-stdlib packages)\n"
     "- Always say where the information came from."
 )
 
@@ -278,8 +282,10 @@ async def send_message(
         import logging
         logger = logging.getLogger(__name__)
 
-        # Load user settings for this request
+        # Load user settings for this request (apply per-request provider override if sent)
         user_settings = load_user_settings(current_user["id"])
+        if body.provider and body.provider != user_settings.active_provider:
+            user_settings = override_provider(user_settings, body.provider)
 
         # Load thread's folder scope
         thread_data = (
@@ -677,29 +683,55 @@ async def send_message(
                                     for line in exec_result.stderr.splitlines():
                                         yield f"data: {json.dumps({'type': 'code_stderr', 'content': line})}\n\n"
 
+                                # Derive actual exit code — InteractiveSandboxSession may
+                                # return 0 even when Python raises an exception.
+                                # Check exec_result.exit_code first; if it's 0/None,
+                                # scan stdout for Python error signatures.
+                                actual_exit_code = getattr(exec_result, "exit_code", None) or 0
+                                if actual_exit_code == 0:
+                                    stdout_text = exec_result.stdout or ""
+                                    _error_markers = (
+                                        "Traceback (most recent call last)",
+                                        "Error:",
+                                        "Exception:",
+                                        "ModuleNotFoundError",
+                                        "ImportError",
+                                        "SyntaxError",
+                                        "NameError",
+                                        "TypeError",
+                                        "ValueError",
+                                        "RuntimeError",
+                                        "AttributeError",
+                                        "KeyError",
+                                        "IndexError",
+                                    )
+                                    if any(m in stdout_text for m in _error_markers):
+                                        actual_exit_code = 1
+
                                 # Log execution to DB (SAND-09)
                                 exec_row = supabase.table("code_executions").insert({
                                     "thread_id": thread_id,
                                     "user_id": current_user["id"],
                                     "code": code,
-                                    "exit_code": 0,
+                                    "exit_code": actual_exit_code,
                                     "duration_ms": duration_ms,
                                 }).execute()
                                 execution_id = exec_row.data[0]["id"] if exec_row.data else None
 
                                 # Harvest output files from container (SAND-07, SAND-08)
                                 output_file_list = []
-                                if execution_id:
+                                if execution_id and actual_exit_code == 0:
                                     output_file_list = harvest_output_files(
                                         session, execution_id, current_user["id"], supabase
                                     )
 
                                 # Emit completion event (SAND-06) with file list
-                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 0, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': output_file_list})}\n\n"
+                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': actual_exit_code, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': output_file_list})}\n\n"
 
+                                exec_status = "completed" if actual_exit_code == 0 else "error"
                                 tool_result = json.dumps({
-                                    "status": "completed",
-                                    "exit_code": 0,
+                                    "status": exec_status,
+                                    "exit_code": actual_exit_code,
                                     "duration_ms": duration_ms,
                                     "execution_id": execution_id,
                                     "output_files": output_file_list,
@@ -708,8 +740,8 @@ async def send_message(
                                 })
                                 # Strip signed URLs from LLM context — frontend shows download cards
                                 llm_tool_content = json.dumps({
-                                    "status": "completed",
-                                    "exit_code": 0,
+                                    "status": exec_status,
+                                    "exit_code": actual_exit_code,
                                     "duration_ms": duration_ms,
                                     "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
                                     "stdout": exec_result.stdout or "",

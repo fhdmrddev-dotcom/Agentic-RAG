@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import type { Message, ToolCall, OutputLine, OutputFile } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
 
@@ -6,7 +6,7 @@ interface UseMessages {
   messages: Message[]
   isStreaming: boolean
   loadMessages: (threadId: string) => Promise<void>
-  sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string) => Promise<void>
+  sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
 }
 
 function makeTempId() {
@@ -16,13 +16,17 @@ function makeTempId() {
 export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const isSendingRef = useRef(false)
 
   const loadMessages = useCallback(async (threadId: string) => {
     const data = await getMessages(threadId)
     setMessages(data)
   }, [])
 
-  const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string) => {
+  const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
+    if (isSendingRef.current) return
+    isSendingRef.current = true
+
     // Optimistic user message
     const userMsg: Message = {
       id: makeTempId(),
@@ -50,6 +54,7 @@ export function useMessages(): UseMessages {
     setMessages((prev) => [...prev, assistantMsg])
     setIsStreaming(true)
 
+    try {
     await streamMessage(
       threadId,
       content,
@@ -62,6 +67,7 @@ export function useMessages(): UseMessages {
         setIsStreaming(false)
       },
       model,
+      provider,
       onTitleUpdate,
       // onToolStart
       (name, args) => {
@@ -171,6 +177,9 @@ export function useMessages(): UseMessages {
       },
       agentMode,
     )
+    } finally {
+      isSendingRef.current = false
+    }
   }, [])
 
   return { messages, isStreaming, loadMessages, sendMessage }

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from langsmith import traceable
 from openai import OpenAI
 
 from app.config import settings
@@ -333,9 +332,12 @@ EXECUTE_CODE_TOOL = {
         "name": "execute_code",
         "description": (
             "Execute Python code in a sandboxed Docker container. "
+            "IMPORTANT: The sandbox has only the Python standard library pre-installed. "
+            "You MUST pass the `libraries` parameter for every third-party package your code uses "
+            "(e.g. matplotlib, numpy, pandas, seaborn, scipy, python-docx, openpyxl, pillow, requests). "
             "Variables and installed packages persist across calls within the same conversation thread. "
             "Write output files to /sandbox/output/ and they will be returned as download links. "
-            "Use this for data analysis, calculations, generating charts, processing files, "
+            "Use this for data analysis, calculations, generating charts, creating documents, "
             "or any task that benefits from running actual Python code."
         ),
         "parameters": {
@@ -442,7 +444,6 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     return OpenAI(**kwargs)
 
 
-@traceable(name="chat-completions", run_type="llm")
 def create_streaming_chat(
     messages: list[dict],
     tool_choice: str = "auto",
