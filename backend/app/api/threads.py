@@ -393,6 +393,16 @@ async def send_message(
         full_content = ""
         persisted_tool_calls: list[dict] = []
 
+        def _strip_nul(obj):
+            """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
+            if isinstance(obj, str):
+                return obj.replace('\x00', '')
+            if isinstance(obj, dict):
+                return {k: _strip_nul(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [_strip_nul(item) for item in obj]
+            return obj
+
         # Option B context budget: cap tool result size in the messages array.
         # The LLM consumed the full result in the iteration it ran — subsequent
         # iterations only need a condensed version. This keeps the context window
@@ -623,7 +633,7 @@ async def send_message(
                                 storage_path = f"{row['user_id']}/{row['id']}/{filename}"
                                 try:
                                     raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
-                                    tool_result = raw_bytes.decode("utf-8", errors="replace")
+                                    tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
                                 except Exception as e:
                                     tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
                         elif tool_name == "execute_code":
@@ -835,14 +845,15 @@ async def send_message(
                 "thread_id": thread_id,
                 "user_id": current_user["id"],
                 "role": "assistant",
-                "content": full_content,
+                "content": _strip_nul(full_content),
             }
             if persisted_tool_calls:
-                row["tool_calls"] = persisted_tool_calls
+                row["tool_calls"] = _strip_nul(persisted_tool_calls)
             try:
                 supabase.table("messages").insert(row).execute()
             except Exception as e:
                 logger.error("Failed to persist assistant message: %s", e)
+                yield f"data: {json.dumps({'type': 'error', 'message': f'[persist error] {e}'})}\n\n"
 
         # Touch thread so it rises in updated_at ordering
         try:
