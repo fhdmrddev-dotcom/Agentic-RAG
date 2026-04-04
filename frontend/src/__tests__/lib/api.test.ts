@@ -32,6 +32,9 @@ import {
   createFolder,
   renameFolder,
   deleteFolder,
+  listSkillFiles,
+  uploadSkillFile,
+  deleteSkillFile,
 } from "@/lib/api"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -417,5 +420,96 @@ describe("uploadDocument with folderId", () => {
     expect(appendCalls).not.toContain("folder_id")
 
     appendSpy.mockRestore()
+  })
+})
+
+describe("listSkillFiles", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("sends GET to /skills/{id}/files with auth headers", async () => {
+    const files = [{ id: "f1", skill_id: "s1", user_id: "u1", filename: "data.csv", file_path: "u1/s1/data.csv", file_size: 1024, mime_type: "text/csv", created_at: "2026-01-01T00:00:00Z" }]
+    globalThis.fetch = mockFetch(files)
+    const result = await listSkillFiles("s1")
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `${API_BASE}/skills/s1/files`,
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) })
+    )
+    expect(result).toEqual(files)
+  })
+
+  it("throws on non-ok response", async () => {
+    globalThis.fetch = mockFetch({}, 500)
+    await expect(listSkillFiles("s1")).rejects.toThrow("Failed to list skill files")
+  })
+})
+
+describe("uploadSkillFile", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("sends POST with FormData and token-only auth (no Content-Type header)", async () => {
+    const created = { id: "f1", skill_id: "s1", user_id: "u1", filename: "script.py", file_path: "u1/s1/script.py", file_size: 256, mime_type: "text/x-python", created_at: "2026-01-01T00:00:00Z" }
+    globalThis.fetch = mockFetch(created, 201)
+    const file = new File(["print('hello')"], "script.py", { type: "text/x-python" })
+    const result = await uploadSkillFile("s1", file)
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `${API_BASE}/skills/s1/files`,
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer mock-token" },
+        body: expect.any(FormData),
+      })
+    )
+    // Verify NO Content-Type header (critical for multipart)
+    const callArgs = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit
+    expect(callArgs.headers).not.toHaveProperty("Content-Type")
+    expect(result).toEqual(created)
+  })
+
+  it("throws backend detail message on error", async () => {
+    globalThis.fetch = mockFetch({ detail: "File too large. Maximum size is 10 MB." }, 413)
+    const file = new File(["x".repeat(100)], "big.bin")
+    await expect(uploadSkillFile("s1", file)).rejects.toThrow("File too large. Maximum size is 10 MB.")
+  })
+})
+
+describe("deleteSkillFile", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("sends DELETE to /skills/{id}/files/{fid} with auth headers", async () => {
+    globalThis.fetch = mockFetch(null, 204)
+    await deleteSkillFile("s1", "f1")
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `${API_BASE}/skills/s1/files/f1`,
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({ Authorization: "Bearer mock-token" }),
+      })
+    )
+  })
+
+  it("throws on non-ok response", async () => {
+    globalThis.fetch = mockFetch({}, 404)
+    await expect(deleteSkillFile("s1", "f1")).rejects.toThrow("Failed to delete skill file")
   })
 })
