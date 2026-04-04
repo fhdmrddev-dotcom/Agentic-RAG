@@ -28,8 +28,8 @@
 
 ### Skill Building-Block Files
 
-- [ ] **FILE-01**: User can upload files to a skill (Python scripts, templates, reference data)
-- [ ] **FILE-02**: User can delete a file from a skill
+- [x] **FILE-01**: User can upload files to a skill (Python scripts, templates, reference data)
+- [x] **FILE-02**: User can delete a file from a skill
 - [x] **FILE-03**: Files are stored in the private `skill-files` Supabase Storage bucket scoped by `user_id/skill_id/filename`
 - [x] **FILE-04**: `load_skill` response includes the list of attached file names so the LLM knows what files are available
 - [x] **FILE-05**: LLM can call `read_skill_file(skill_name, filename)` to retrieve the content of a building-block file
@@ -122,8 +122,8 @@
 | SKIL-04 | Phase 2 | Complete |
 | SKIL-05 | Phase 2 | Complete |
 | SKIL-06 | Phase 2 | Complete |
-| FILE-01 | Phase 16 | Pending |
-| FILE-02 | Phase 16 | Pending |
+| FILE-01 | Phase 16 | Complete |
+| FILE-02 | Phase 16 | Complete |
 | FILE-03 | Phase 2 | Complete |
 | FILE-06 | Phase 2 | Complete |
 | SKIL-09 | Phase 3 | Complete |
