@@ -168,9 +168,9 @@ Plans:
   1. System prompt in `threads.py` refers to "thirteen tools" (not "twelve")
   2. SKIL-08 and SAND-01 checkboxes in REQUIREMENTS.md are `[x]`
   3. Phase 15 has a VERIFICATION.md confirming SAND-12 is satisfied
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
-- [ ] 17-01-PLAN.md — Fix tool count, mark SKIL-08/SAND-01 complete, create Phase 15 VERIFICATION.md
+- [x] 17-01-PLAN.md — Fix tool count, mark SKIL-08/SAND-01 complete, create Phase 15 VERIFICATION.md
 
 ## Progress
 
@@ -192,4 +192,4 @@ Plans:
 | 14. Code Execution Sandbox | v2.0 | 5/5 | Complete   | 2026-04-03 |
 | 15. Code Output UI | v2.0 | 2/2 | Complete   | 2026-04-03 |
 | 16. Skill File Management UI | v2.0 | 2/2 | Complete    | 2026-04-04 |
-| 17. Tech Debt Cleanup | v2.0 | 0/? | Pending | — |
+| 17. Tech Debt Cleanup | v2.0 | 1/1 | Complete   | 2026-04-04 |
