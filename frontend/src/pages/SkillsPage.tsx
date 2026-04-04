@@ -144,6 +144,7 @@ export function SkillsPage({ onTryInChat }: Props) {
         onOpenChange={setDialogOpen}
         skill={editingSkill}
         onSave={handleSave}
+        currentUserId={user?.id}
       />
     </div>
   )
