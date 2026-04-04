@@ -347,7 +347,7 @@ async def send_message(
         else:
             active_system_prompt = SYSTEM_PROMPT
             active_tools = None  # None = use default get_tools() in create_streaming_chat
-            max_iterations = 5
+            max_iterations = 12
 
         # Augment system prompt with folder scope context so LLM generates scoped queries
         if scoped_folder_path:
