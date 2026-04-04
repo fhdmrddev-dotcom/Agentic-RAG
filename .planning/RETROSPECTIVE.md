@@ -65,8 +65,65 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.0 — Agent Skills & Code Execution
+
+**Shipped:** 2026-04-04
+**Phases:** 9 (Phases 9–17) | **Plans:** 22 | **Tasks:** 30
+**Timeline:** 2026-03-29 → 2026-04-04 (6 days)
+**Commits:** ~134 (v2.0 work)
+**LOC:** ~11,000 Python + TypeScript (~28,392 total with tests + config)
+
+### What Was Built
+
+- Persistent tool memory — `tool_call_id` in JSONB, full multi-turn history reconstruction for LLM
+- Agent Skills Core — `skills` + `skill_files` Supabase tables, 6 CRUD endpoints, private/global/RLS model
+- Skills LLM integration — catalog injection into system prompt, `load_skill` / `save_skill` / `read_skill_file` dispatch
+- Skills UI — dedicated Skills tab with full CRUD, toggle, share, "Try in Chat", `skill_activated` Zap indicator
+- Skill-creator seed skill pre-loaded as global skill via idempotent SQL migration
+- Skills Open Standard — ZIP import/export with `SKILL.md` YAML frontmatter, MIME-type file categorization, path traversal rejection
+- Code Execution Sandbox — Docker/llm-sandbox, asyncio.Queue SSE bridge, `code_executions` + `sandbox_files` tables, TTL eviction, thread lifecycle cleanup
+- Code Output UI — `ExecuteCodeBlock` component with streaming terminal, file download cards, `ToolCallPanel` dispatch
+- Skill File Management UI — upload/list/delete files in `SkillFormDialog` with ownership gating and optimistic state
+
+### What Worked
+
+- **Audit-driven gap closure** — Running `/gsd:audit-milestone` before completing caught two missing frontend features (FILE-01/FILE-02) that would have shipped as known-broken flows. Phase 16 closed them cleanly.
+- **TDD scaffold → implement** pattern (Phase 10) — writing the test scaffold with failing stubs first made each phase's success criteria concrete and unambiguous
+- **asyncio.Queue bridge** — decoupling Docker blocking I/O from FastAPI's async event loop was the right architecture; real-time streaming worked first try
+- **Lazy llm-sandbox import** — `SANDBOX_ENABLED=false` (default) has zero Docker overhead; clean feature flag pattern
+- **Tech Debt phase** — dedicating Phase 17 to closing procedural gaps (stale checkboxes, missing VERIFICATION.md, cosmetic count string) gave the milestone a clean finish without rushing fixes into functional phases
+
+### What Was Inefficient
+
+- **Phase 12 plans field in ROADMAP** — Initial phase plans were listed as "TBD" in ROADMAP.md; the detail wasn't filled in until after completion, causing roadmap analyze to flag incomplete status
+- **Audit timing** — Audit was run at Phase 15 but Phase 16/17 were needed to close gaps; could have audited later to avoid a stale `gaps_found` status
+- **Multiple post-phase fix commits** — Several phases (15, 16) required fix commits after the main execution (SSE wiring, URL stripping, UX tweaks); these were handled cleanly but added churn
+
+### Patterns Established
+
+- **asyncio.Queue for SSE bridging** — Use this pattern whenever bridging blocking I/O into FastAPI SSE streams
+- **Gap closure as named phases** — When an audit finds gaps, create explicit numbered phases (X.Y or sequential) to close them; don't patch into existing phases
+- **VERIFICATION.md as execution artifact** — Each phase that doesn't auto-generate a VERIFICATION.md should have one created manually from code inspection before milestone close
+- **Decimal phase for tech debt** — Phase 17 "tech debt cleanup" pattern is reusable: one plan, 3–5 tasks, close audit findings procedurally
+
+### Key Lessons
+
+- Run `/gsd:audit-milestone` before planning gap-closure phases so the scope is known upfront
+- `skill_activated` SSE event wired across 3 phases (10→11→12) — multi-phase SSE features need a dedicated integration test that spans the full chain
+- Docker sandbox requires explicit session cleanup on both thread-delete AND FastAPI lifespan — don't rely on one path alone
+- When SUMMARY.md one-liners are auto-extracted, review for placeholder text ("Task 1 — Data Layer:") before they become milestone accomplishments
+
+### Cost Observations
+
+- Model: claude-sonnet-4-6 throughout (all phases)
+- Sessions: multiple across 6 days (fast pace)
+- Notable: Phases with Docker/async complexity (14, 15) required the most fix iterations; skill phases (10–13) were cleanest execution
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
 |-----------|--------|-------|-----------------|----------|
 | v1.0 KB Explorer | 8 | 18 | 2.25 | 13 days |
+| v2.0 Agent Skills | 9 | 22 | 2.44 | 6 days |
