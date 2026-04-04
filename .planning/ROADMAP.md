@@ -157,7 +157,7 @@ Plans:
 **Plans:** 1/2 plans executed
 Plans:
 - [x] 16-01-PLAN.md — SkillFile type + API functions (listSkillFiles, uploadSkillFile, deleteSkillFile) + unit tests
-- [ ] 16-02-PLAN.md — File management UI section in SkillFormDialog + visual verification checkpoint
+- [x] 16-02-PLAN.md — File management UI section in SkillFormDialog + visual verification checkpoint
 
 ### Phase 17: Tech Debt Cleanup
 **Goal**: Close procedural and cosmetic gaps flagged in the v2.0 audit — correct stale data and add missing verification artifacts
@@ -189,5 +189,5 @@ Plans:
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
 | 14. Code Execution Sandbox | v2.0 | 5/5 | Complete   | 2026-04-03 |
 | 15. Code Output UI | v2.0 | 2/2 | Complete   | 2026-04-03 |
-| 16. Skill File Management UI | v2.0 | 1/2 | In Progress|  |
+| 16. Skill File Management UI | v2.0 | 2/2 | Complete|  |
 | 17. Tech Debt Cleanup | v2.0 | 0/? | Pending | — |
