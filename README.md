@@ -97,4 +97,3 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 - [CLAUDE.md](./CLAUDE.md) — Context and rules for Claude Code
 - [PRD.md](./PRD.md) — Original product requirements (Modules 1–8)
 
-(https://www.theaiautomators.com/). Share your progress, get help when you're stuck, and see what others are building.
