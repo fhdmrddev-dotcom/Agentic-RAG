@@ -115,3 +115,14 @@ export interface SkillUpdate {
   description?: string
   instructions?: string
 }
+
+export interface SkillFile {
+  id: string
+  skill_id: string
+  user_id: string
+  filename: string
+  file_path: string
+  file_size: number
+  mime_type: string
+  created_at: string
+}

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, OutputFile } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -82,6 +82,7 @@ export async function streamMessage(
   onDelta: (text: string) => void,
   onDone: () => void,
   model?: string,
+  provider?: string,
   onTitleUpdate?: (title: string) => void,
   onToolStart?: (name: string, args: Record<string, string>) => void,
   onToolEnd?: (name: string, result?: string) => void,
@@ -99,7 +100,7 @@ export async function streamMessage(
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content, model, agent_mode: agentMode ?? "default" }),
+    body: JSON.stringify({ content, model, provider, agent_mode: agentMode ?? "default" }),
   })
 
   if (!res.ok) throw new Error("Failed to send message")
@@ -311,9 +312,20 @@ export async function toggleSkillGlobal(id: string): Promise<Skill> {
   return res.json() as Promise<Skill>
 }
 
+export interface ProviderInfo {
+  id: string
+  name: string
+  base_url: string
+  has_key: boolean
+  is_active: boolean
+  models: string[]
+}
+
 export interface FullAppSettings {
+  active_provider: string
   llm_model: string
   available_models: string[]
+  providers: ProviderInfo[]
   embedding_model: string
   embedding_base_url: string
   embedding_dimensions: number
@@ -330,15 +342,68 @@ export interface FullAppSettings {
   vector_search_weight: number
   keyword_search_weight: number
   rrf_k: number
+  web_search_enabled: boolean
+  web_search_max_results: number
+  sandbox_enabled: boolean
 }
 
 export type AppSettings = FullAppSettings
+
+export interface ProviderUpdate {
+  id: string
+  api_key?: string
+  models?: string[]
+  base_url?: string
+}
+
+export interface SettingsUpdate {
+  active_provider?: string
+  llm_model?: string
+  providers?: ProviderUpdate[]
+  embedding_model?: string
+  embedding_api_key?: string
+  embedding_base_url?: string
+  embedding_dimensions?: number
+  rerank_enabled?: boolean
+  rerank_provider?: string
+  rerank_api_key?: string
+  rerank_model?: string
+  rerank_top_n?: number
+  retrieval_top_k?: number
+  retrieval_match_threshold?: number
+  hybrid_search_enabled?: boolean
+  hybrid_candidate_count?: number
+  vector_search_weight?: number
+  keyword_search_weight?: number
+  rrf_k?: number
+  tavily_api_key?: string
+  web_search_max_results?: number
+  sandbox_enabled?: boolean
+}
 
 export async function getSettings(): Promise<FullAppSettings> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get settings")
   return res.json() as Promise<FullAppSettings>
+}
+
+export async function updateSettings(body: SettingsUpdate): Promise<FullAppSettings> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to save settings")
+  return res.json() as Promise<FullAppSettings>
+}
+
+export async function getProviders(): Promise<{ active: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to get providers")
+  return res.json()
 }
 
 export async function exportSkill(id: string, name: string): Promise<void> {
@@ -372,4 +437,36 @@ export async function importSkillZip(file: File): Promise<SkillImportResult> {
     throw new Error((body as { detail?: string }).detail || "Import failed")
   }
   return res.json() as Promise<SkillImportResult>
+}
+
+export async function listSkillFiles(skillId: string): Promise<SkillFile[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/files`, { headers })
+  if (!res.ok) throw new Error("Failed to list skill files")
+  return res.json() as Promise<SkillFile[]>
+}
+
+export async function uploadSkillFile(skillId: string, file: File): Promise<SkillFile> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  const res = await fetch(`${API_BASE}/skills/${skillId}/files`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }))
+    throw new Error((err as { detail: string }).detail ?? "Upload failed")
+  }
+  return res.json() as Promise<SkillFile>
+}
+
+export async function deleteSkillFile(skillId: string, fileId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/skills/${skillId}/files/${fileId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to delete skill file")
 }
