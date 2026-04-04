@@ -401,3 +401,144 @@ All components below were visually updated. **No hooks, props, state, API calls,
 4. **The `useTheme` hook** lives in `src/hooks/useTheme.ts` and is consumed in `ChatLayout.tsx` → passed to `Sidebar.tsx`. If you add a new layout that needs theme awareness, import `useTheme` directly.
 5. **Test files** (`src/__tests__/components/MessageItem.test.tsx`) check old CSS class names (e.g., `.bg-primary.text-primary-foreground`) that no longer exist. These tests need updating if you run `tsc -b` (Vite build passes fine since tests are runtime-only).
 6. **No functionality was changed.** All hooks (`useAuth`, `useMessages`, `useThreads`, `useDocuments`, `useFolders`), API functions (`api.ts`), types (`types/index.ts`), and backend endpoints remain identical.
+---
+
+### Module 9: Enhanced Transparency ✅ COMPLETE
+
+- [x] **Execution Timing** — `startedAt`/`endedAt` timestamps on tool calls; frontend calculates and displays duration (e.g. "1.2s") per tool
+- [x] **Total Duration** — aggregate duration shown in ToolCallPanel header (e.g. "Used 3 tools • 4.5s")
+- [x] **Recursive Result Capture** — SSE `tool_end` event now carries the tool result payload (truncated to 2000 chars); frontend captures and displays without extra API calls
+- [x] **Parameter Visibility** — collapsible "parameters" block (`Code2` icon) reveals exact arguments sent to the tool
+- [x] **Rich Result Renderers**:
+  - [x] `search_documents` — shows top chunks, filenames, and similarity scores
+  - [x] `query_documents` — displays raw SQL result text
+  - [x] `web_search` — renders markdown search summaries
+  - [x] Fallback — generic JSON/text preview for custom tools
+
+#### Notes (Module 9)
+
+- **Zero Token Cost** — all transparency data is derived from existing SSE stream events; no additional LLM calls or tokens consumed
+- **Persistence** — tool results and timestamps are stored in the message state; they persist through the current session but are not saved to the DB (v1.0 behavior)
+- **Truncation** — backend truncates results to 2000 chars to keep SSE message sizes manageable while providing enough context for debugging
+- **UI Alignment** — long tool summaries and results use `truncate` and `ScrollArea` to prevent layout breaking on mobile/narrow screens
+
+---
+
+### Module 10: UI & Navigation Refinement ✅ COMPLETE
+
+- [x] **Document Type Column** — Added "Type" column to the Document Library table with beautiful, color-coded `lucide-react` icons (Red PDF, Blue Word, Emerald Excel, etc.).
+- [x] **Sidebar Reorganization** — Restructured sidebar into distinct "Chat" and "Knowledge Base" sections for better mental mapping.
+- [x] **Premium New Chat Button** — Styled the "New Chat" button with a `gradient-primary` background, white text, and a subtle shadow to make it the primary call-to-action.
+- [x] **Consistent Spacing** — Standardized line heights and padding across sidebar items for a more premium, "Aether" feel.
+
+#### Notes (Module 10)
+
+- **Icons** — Uses a lookup table based on file extension to assign icons and colors.
+- **Sectioning** — "Chat" contains the thread list; "Knowledge Base" group Documents, Skills, and Settings.
+- **Mobile Friendly** — All new elements use `truncate` to prevent horizontal overflow on narrow sidebars.
+- **Visual Only** — No changes to backend APIs or frontend state management logic.
+
+---
+
+## Milestone: Agent Skills & Code Execution (v2.0) — IN PROGRESS
+
+### Phase 9: Persistent Tool Memory ✅ COMPLETE (2026-03-29)
+
+- [x] `tool_call_id` persisted in `tool_calls` JSONB alongside name, args, result, status
+- [x] `_reconstruct_history()` emits proper multi-turn sequences: `assistant (tool_calls)` → `tool (result)` → `assistant (text)`
+- [x] Backward-compatible: old messages without `tool_call_id` fall back to plain assistant emission
+- [x] Tool results capped at 2000 chars (existing cap preserved)
+
+### Phase 10: Agent Skills Core ✅ COMPLETE (2026-03-31)
+
+- [x] DB migration `017_skills.sql` — `skills` + `skill_files` tables, RLS, indexes, `skill-files` Storage bucket
+- [x] Pydantic models: `SkillCreate`, `SkillUpdate`, `SkillResponse`, `SkillFileResponse`
+- [x] `backend/app/api/skills.py` — full CRUD: list, create, update, delete, toggle-enabled, toggle-global
+- [x] File attachment endpoints: upload, list, delete (stored in `skill-files` Supabase Storage bucket)
+- [x] RLS: users can only access their own skills and files (global skills visible to all authenticated users)
+
+#### Notes (Phase 10)
+
+- Run `017_skills.sql` in Supabase SQL editor before using Skills endpoints
+- Create a `skill-files` Storage bucket in Supabase dashboard
+- 28 pre-existing test failures noted in `deferred-items.md` (existed before Phase 10, unrelated to skills)
+
+### Phase 11: Skills LLM Integration ✅ COMPLETE (2026-04-01)
+
+- [x] Skill catalog (name + description) injected into General Mode system prompt each turn
+- [x] `LOAD_SKILL_TOOL`, `SAVE_SKILL_TOOL`, `READ_SKILL_FILE_TOOL` constants in `openai_service.py`
+- [x] `load_skill` dispatch: returns full instructions + file list
+- [x] `save_skill` dispatch: create or update skill from conversation
+- [x] `read_skill_file` dispatch: resolves owner `user_id`, reads from storage
+- [x] `skill_activated` SSE event emitted before DB query in `load_skill` handler
+- [x] Explorer Mode excludes all skill tools (unchanged: 6 KB tools only)
+
+### Phase 12: Skills UI ✅ COMPLETE (2026-04-02)
+
+- [x] Skills tab in sidebar (Zap icon) — routes to `SkillsPage`
+- [x] `useSkills` hook: list, create, update, delete, toggle-enabled, toggle-global (optimistic updates)
+- [x] `SkillCard` component: enabled/disabled dimming, Global badge, Try in Chat, Edit, Delete
+- [x] `SkillFormDialog`: create/edit modal with name, description, instructions fields
+- [x] "Try in Chat" prefills MessageInput with "Use the [Skill Name] skill" (state lifted to `App.tsx`)
+- [x] `skill_activated` SSE indicator in chat: "Skill activated: {name}" with Zap icon
+- [x] Seed migration `018_seed_skill_creator.sql` — global "skill-creator" skill pre-loaded for all users
+
+#### Notes (Phase 12)
+
+- Run `018_seed_skill_creator.sql` in Supabase SQL editor to seed the skill-creator global skill
+- `useSkills` has no Realtime subscription — skills table not in realtime publication; optimistic updates only
+
+### Phase 13: Skills Open Standard ✅ COMPLETE (2026-04-02)
+
+- [x] `POST /skills/import` — ZIP import: parses `SKILL.md` manifest, bulk-inserts skills (atomicity via two-phase parse)
+- [x] `GET /skills/{id}/export` — ZIP export: generates `SKILL.md` + attached files in ZIP
+- [x] Frontend: `exportSkill` + `importSkillZip` in `api.ts`; Import/Export buttons on `SkillsPage`
+- [x] Path traversal protection on file entries (`normpath` + `startswith('..')` + `isabs()` guards)
+- [x] `POST /import` registered before `PATCH /{skill_id}` — avoids FastAPI route shadowing
+
+#### Notes (Phase 13)
+
+- Import endpoint uses `getAuthToken()` not `getAuthHeaders()` — FormData sets its own Content-Type
+- Export endpoint uses `getAuthToken()` not `getAuthHeaders()` — must not set `Content-Type: application/json` on blob download
+
+### Phase 14: Code Execution Sandbox ✅ COMPLETE (2026-04-03)
+
+- [x] DB migration `019_sandbox_sessions.sql` — `sandbox_sessions` table + RLS
+- [x] `SandboxManager` (`sandbox_service.py`) — Docker session manager, lazy `llm_sandbox` import, module-level `_sessions`/`_last_used` dicts
+- [x] `EXECUTE_CODE_TOOL` in `openai_service.py`; added to `get_tools()` when `SANDBOX_ENABLED=true`
+- [x] SSE streaming via `asyncio.Queue` bridge (thread pool → coroutine): `code_execution_start`, `code_execution_stdout`, `code_execution_stderr`, `code_execution_complete` events
+- [x] `harvest_output_files` — copies files written to `/output` in container to temp dir, returns download metadata
+- [x] `DELETE /threads/{id}` cleanup extended to terminate sandbox sessions
+- [x] `sandbox_enabled` defaults to `False` — opt-in, never breaks existing deployments
+
+#### Notes (Phase 14)
+
+- Run `019_sandbox_sessions.sql` in Supabase SQL editor
+- Set `SANDBOX_ENABLED=true` in `backend/.env` to enable (requires Docker running)
+- Default session timeout: `SANDBOX_SESSION_TIMEOUT_SECONDS=300`; max iterations raised to 12
+
+### Phase 15: Code Output UI ✅ COMPLETE (2026-04-03)
+
+- [x] `OutputLine` and `OutputFile` interfaces + 5 code execution fields on `ToolCall` type (`types/index.ts`)
+- [x] Four SSE callbacks wired in `streamMessage()`: `onCodeExecutionStart/Stdout/Stderr/Complete`
+- [x] Live stdout/stderr accumulation in `useMessages.ts` via functional `setMessages` updater (interleaved `outputLines` array)
+- [x] `ExecuteCodeBlock.tsx` — streaming terminal panel: `TerminalOutput` (auto-scroll, green/red lines), `OutputFileCard` (download link), 4 execution states (running/success/error/connecting)
+- [x] `ToolCallPanel.tsx` — execute_code routes to `ExecuteCodeBlock`; reload fallback parses `tc.result` JSON for ephemeral fields
+
+#### Notes (Phase 15)
+
+- VERIFICATION.md pending (Phase 17 task — SAND-12 already marked `[x]` in REQUIREMENTS.md)
+- No automated tests added; browser verification (Task 3 human checkpoint) outstanding
+
+### Phase 16: Skill File Management UI ✅ COMPLETE (2026-04-04)
+
+- [x] `SkillFile` interface in `types/index.ts`
+- [x] `listSkillFiles`, `uploadSkillFile`, `deleteSkillFile` in `api.ts` (uses `getAuthToken()` for multipart)
+- [x] `SkillFormDialog.tsx` — "Attached Files" section in edit mode: list files, Attach File button (file picker), delete per-file; gated by `isOwner` for global skills
+- [x] Optimistic state: upload appends immediately, delete filters immediately — no re-fetch needed
+- [x] 6 automated tests for the 3 new API functions (28 suite tests pass)
+
+#### Notes (Phase 16)
+
+- File section is only rendered in edit mode (`isEdit && skill`) — never shown in New Skill dialog
+- `isOwner` derived client-side from `skill.user_id === currentUserId` — matches existing SkillCard pattern
