@@ -130,11 +130,16 @@ def harvest_output_files(
                         "file_size": file_size,
                     }).execute()
 
-                    # Generate signed download URL (1 hour expiry)
+                    # Generate signed download URL (1 hour expiry).
+                    # storage3 2.x returns a SignedUrlResponse dataclass, not a dict —
+                    # use attribute access; fall back to dict .get() for older versions.
                     signed = supabase.storage.from_(
                         "sandbox-outputs"
                     ).create_signed_url(storage_path, 3600)
-                    url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url", "")
+                    if isinstance(signed, dict):
+                        url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url", "")
+                    else:
+                        url = getattr(signed, "signedURL", None) or getattr(signed, "signedUrl", None) or ""
 
                     output_files.append({
                         "filename": fname,

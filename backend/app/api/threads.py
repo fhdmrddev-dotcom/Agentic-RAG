@@ -389,6 +389,14 @@ async def send_message(
         full_content = ""
         persisted_tool_calls: list[dict] = []
 
+        # Option B context budget: cap tool result size in the messages array.
+        # The LLM consumed the full result in the iteration it ran — subsequent
+        # iterations only need a condensed version. This keeps the context window
+        # from growing unbounded across many tool calls.
+        # analyze_document results are longer by nature; everything else caps lower.
+        _CTX_LIMIT_DEFAULT = 3000   # chars in messages[] for most tools
+        _CTX_LIMIT_SUBAGENT = 6000  # chars for analyze_document (rich synthesis)
+
         try:
             for iteration in range(max_iterations):
                 # On the final iteration force a text response to avoid an infinite loop
@@ -764,16 +772,44 @@ async def send_message(
                         tool_result = f"Tool execution failed: {e}"
 
                     yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name, 'result': tool_result[:2000]})}\n\n"
+
+                    # --- Option B: cap tool result size added to the LLM messages array ---
+                    # Use the URL-stripped version for execute_code; raw result otherwise.
+                    ctx_content = llm_tool_content if llm_tool_content is not None else tool_result
+                    ctx_limit = _CTX_LIMIT_SUBAGENT if tool_name == "analyze_document" else _CTX_LIMIT_DEFAULT
+                    if len(ctx_content) > ctx_limit:
+                        ctx_content = ctx_content[:ctx_limit] + f"\n[... truncated for context — {len(ctx_content) - ctx_limit} chars omitted]"
+
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": llm_tool_content if llm_tool_content is not None else tool_result,
+                        "content": ctx_content,
                     })
+
+                    # Persist tool call — for execute_code rebuild from tool_result
+                    # so output_files (with signed URLs) are never lost by string truncation.
+                    # Stdout/stderr are truncated since they're not needed for reload.
+                    if tool_name == "execute_code":
+                        try:
+                            _r = json.loads(tool_result)
+                            persisted_result = json.dumps({
+                                "status": _r.get("status", "done"),
+                                "exit_code": _r.get("exit_code", 0),
+                                "duration_ms": _r.get("duration_ms", 0),
+                                "output_files": _r.get("output_files", []),
+                                "stdout": (_r.get("stdout", ""))[:800],
+                                "stderr": (_r.get("stderr", ""))[:200],
+                            })
+                        except (json.JSONDecodeError, AttributeError):
+                            persisted_result = tool_result[:2000]
+                    else:
+                        persisted_result = tool_result[:2000]
+
                     persisted_tool_calls.append({
                         "tool_call_id": tc["id"],
                         "name": tool_name,
                         "args": args,
-                        "result": tool_result[:2000],  # trim large results
+                        "result": persisted_result,
                         "status": "done",
                         **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
                     })
