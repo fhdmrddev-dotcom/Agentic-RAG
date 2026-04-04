@@ -43,10 +43,10 @@ Declared values (must be multiples of 4):
 
 Exceptions:
 - File row vertical padding: 4px top + 4px bottom (`py-1`) — compact list rows to keep dialog height manageable
-- Label-to-input gap: 6px (`gap-1.5`) — matches existing SkillFormDialog field pattern
+- Label-to-input gap: 8px (`gap-2`) — replaces the pre-existing `gap-1.5` (6px) pattern in SkillFormDialog; 6px is not a multiple of 4 and is not introduced by this phase, but this phase standardises it to the nearest grid value
 - Dialog container: `sm:max-w-lg` — matches existing dialog, no change
 
-Source: established pattern in `SkillFormDialog.tsx` (`gap-4`, `gap-1.5`, `py-2`)
+Source: established pattern in `SkillFormDialog.tsx` (`gap-4`, `py-2`)
 
 ---
 
@@ -104,7 +104,7 @@ All components are already installed. No new shadcn components are required for 
 | `Loader2` (lucide) | `lucide-react` | Spinner on Attach File button during upload |
 | `Paperclip` (lucide) | `lucide-react` | Icon on "Attach File" button at rest state |
 | `FileText` (lucide) | `lucide-react` | Icon prefix on each file row |
-| `Trash2` (lucide) | `lucide-react` | Delete button per file row |
+| `Trash2` (lucide) | `lucide-react` | Delete button per file row — must include `aria-label="Delete file"` |
 | `<input type="file" className="hidden">` | native HTML | Hidden file picker triggered by Attach File button |
 
 ---
@@ -122,10 +122,12 @@ All components are already installed. No new shadcn components are required for 
 ### Delete File Button (per row)
 | State | Visual |
 |-------|--------|
-| Rest | Ghost icon button `h-5 w-5`, Trash2 `h-3 w-3`, color inherits (`text-muted-foreground` via parent) |
+| Rest | Ghost icon button `h-5 w-5`, Trash2 `h-3 w-3`, color inherits (`text-muted-foreground` via parent), `aria-label="Delete file"` |
 | Hover | `hover:text-destructive` |
 | In-flight | No spinner — delete is fast; optimistic removal is immediate |
 | Delete error | Error message appears below file list in `text-xs text-destructive` |
+
+Accessibility: The Trash2 button is icon-only. It must carry `aria-label="Delete file"` on the `<Button>` element so screen readers announce the action. No visible tooltip is required — the icon is in direct context of a file row.
 
 ### File Row
 | State | Visual |
@@ -173,7 +175,7 @@ DialogContent (sm:max-w-lg)
         ul (flex flex-col gap-1)
           li per file (flex items-center justify-between text-xs bg-muted rounded px-2 py-1)
             span: FileText icon + filename + size (text-foreground truncate)
-            [Owner only] Button: Trash2 (variant=ghost size=icon h-5 w-5 hover:text-destructive)
+            [Owner only] Button: Trash2 (variant=ghost size=icon h-5 w-5 hover:text-destructive aria-label="Delete file")
       [fileError]
         p: error message (text-xs text-destructive)
     ─────────────────────────────────────────────────
@@ -196,9 +198,9 @@ DialogContent (sm:max-w-lg)
 | Upload error — generic | Upload failed. Try again. |
 | Upload error — from backend | Propagate backend detail message verbatim (e.g. "File too large. Maximum size is 10 MB.") |
 | Delete error | Failed to delete file. Try again. |
-| File load error | Failed to load files. |
+| File load error | Failed to load files. Close and reopen to retry. |
 | Attach File tooltip | Not required — button has visible text label |
-| Delete file tooltip | Not required — icon is in context of file row; Trash2 is universally understood |
+| Delete file tooltip | Not required — icon is in context of file row; Trash2 is universally understood; `aria-label` handles screen reader requirement |
 | Delete file confirmation | None — file delete is immediate with inline error fallback (no confirmation dialog). Files are recoverable by re-uploading. |
 | Dialog title (edit mode) | Edit Skill (unchanged from Phase 12) |
 | Save button (edit mode) | Update Skill (unchanged from Phase 12) |
