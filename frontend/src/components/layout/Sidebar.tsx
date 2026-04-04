@@ -75,192 +75,201 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* New Chat */}
-      <div className="px-3 py-2">
-        <Button
-          onClick={() => { onNavigate("chat"); onNewThread() }}
-          className="w-full justify-start gap-2 ghost-border bg-transparent hover:bg-accent/50 text-sidebar-foreground transition-all"
-          variant="outline"
-          size="sm"
-        >
-          <Plus className="h-4 w-4" />
-          New Chat
-        </Button>
-      </div>
-
-      {/* Thread list */}
-      <div className="flex-1 px-2 overflow-y-auto overflow-x-hidden mt-1">
-        {threads.length > 0 && (
-          <p className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/50">
-            Recent
+      {/* Chat Section — This part scrolls */}
+      <div className="flex-1 px-2 overflow-y-auto overflow-x-hidden pt-2">
+        <div>
+          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            Chat
           </p>
-        )}
-        <div className="space-y-0.5 pb-2">
-          {threads.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-8 opacity-60">No chats yet</p>
-          )}
-          {threads.map((thread) => {
-            const isSelected = activeView === "chat" && selectedThread?.id === thread.id
-            const isEditing = editingId === thread.id
-            const isMenuOpen = menuOpenId === thread.id
-            const isHovered = hoveredId === thread.id
-            const showActions = isHovered || isMenuOpen
+          <div className="px-1 mb-2">
+            <Button
+              onClick={() => { onNavigate("chat"); onNewThread() }}
+              className="w-full justify-center gap-2 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
+              size="sm"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </Button>
+          </div>
+          
+          {/* Thread list */}
+          <div className="space-y-0.5 mt-2">
+            {threads.length === 0 && (
+              <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
+            )}
+            {threads.map((thread) => {
+              const isSelected = activeView === "chat" && selectedThread?.id === thread.id
+              const isEditing = editingId === thread.id
+              const isMenuOpen = menuOpenId === thread.id
+              const isHovered = hoveredId === thread.id
+              const showActions = isHovered || isMenuOpen
 
-            return (
-              <div
-                key={thread.id}
-                className="relative"
-                onMouseEnter={() => setHoveredId(thread.id)}
-                onMouseLeave={() => { if (!isMenuOpen) setHoveredId(null) }}
-              >
-                {isEditing ? (
-                  <input
-                    ref={editInputRef}
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={() => commitRename(thread.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitRename(thread.id)
-                      if (e.key === "Escape") setEditingId(null)
-                    }}
-                    className="w-full px-3 py-1.5 text-sm bg-card border border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
-                  />
-                ) : (
-                  <div
-                    className={cn(
-                      "relative rounded-lg cursor-pointer transition-all duration-150",
-                      isSelected
-                        ? "bg-accent text-sidebar-foreground"
-                        : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
-                    )}
-                    onClick={() => { onNavigate("chat"); onSelectThread(thread) }}
-                  >
-                    {/* Active indicator */}
-                    {isSelected && (
-                      <div className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-full bg-primary" />
-                    )}
-                    {/* Title row */}
-                    <div className="px-3 py-2 flex items-center gap-2 overflow-hidden whitespace-nowrap">
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
-                      <span className="text-sm truncate" title={thread.title}>
-                        {thread.title}
-                      </span>
-                      {thread.folder_id && (
-                        <FolderIcon className="h-3 w-3 shrink-0 text-primary/50" />
+              return (
+                <div
+                  key={thread.id}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredId(thread.id)}
+                  onMouseLeave={() => { if (!isMenuOpen) setHoveredId(null) }}
+                >
+                  {isEditing ? (
+                    <input
+                      ref={editInputRef}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => commitRename(thread.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename(thread.id)
+                        if (e.key === "Escape") setEditingId(null)
+                      }}
+                      className="w-full px-3 py-1.5 text-xs bg-card border border-border/30 rounded-lg outline-none focus:ring-2 focus:ring-primary/30 text-foreground"
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
+                        isSelected
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
+                      )}
+                      onClick={() => { onNavigate("chat"); onSelectThread(thread) }}
+                    >
+                      {/* Active indicator */}
+                      {isSelected && (
+                        <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary" />
+                      )}
+                      {/* Title row */}
+                      <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                        <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                        <span className="text-sm truncate" title={thread.title}>
+                          {thread.title}
+                        </span>
+                        {thread.folder_id && (
+                          <FolderIcon className="h-3 w-3 shrink-0 text-primary/40" />
+                        )}
+                      </div>
+
+                      {/* Dots button overlaid on right */}
+                      {showActions && (
+                        <div
+                          className="absolute inset-y-0 right-0 flex items-center pr-1.5"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuOpenId(isMenuOpen ? null : thread.id)
+                          }}
+                        >
+                          <span className="p-0.5 rounded-md bg-accent hover:bg-muted inline-flex transition-colors">
+                            <MoreHorizontal className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
                       )}
                     </div>
+                  )}
 
-                    {/* Dots button overlaid on right */}
-                    {showActions && (
-                      <div
-                        className="absolute inset-y-0 right-0 flex items-center pr-1.5"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setMenuOpenId(isMenuOpen ? null : thread.id)
-                        }}
+                  {/* Dropdown menu */}
+                  {isMenuOpen && (
+                    <div
+                      className="absolute right-2 top-full mt-0.5 z-50 w-36 rounded-lg ghost-border bg-popover shadow-lg shadow-black/20 py-1"
+                      onMouseLeave={() => setMenuOpenId(null)}
+                    >
+                      <button
+                        onClick={() => startRename(thread)}
+                        className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent transition-colors"
                       >
-                        <span className="p-1 rounded-md bg-accent hover:bg-muted inline-flex transition-colors">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Dropdown menu */}
-                {isMenuOpen && (
-                  <div
-                    className="absolute right-2 top-full mt-0.5 z-50 w-36 rounded-lg ghost-border bg-popover shadow-lg shadow-black/20 py-1"
-                    onMouseLeave={() => setMenuOpenId(null)}
-                  >
-                    <button
-                      onClick={() => startRename(thread)}
-                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-accent transition-colors"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Rename
-                    </button>
-                    <button
-                      onClick={async () => { setMenuOpenId(null); await onDeleteThread(thread.id) }}
-                      className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                        <Pencil className="h-3.5 w-3.5" />
+                        Rename
+                      </button>
+                      <button
+                        onClick={async () => { setMenuOpenId(null); await onDeleteThread(thread.id) }}
+                        className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Bottom nav */}
-      <div className="border-t border-border/20 px-2 py-3 space-y-0.5">
-        <Button
-          onClick={() => onNavigate("documents")}
-          variant={activeView === "documents" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn(
-            "w-full justify-start gap-2 transition-all",
-            activeView === "documents"
-              ? "text-primary font-medium"
-              : "text-muted-foreground hover:text-sidebar-foreground",
-          )}
-        >
-          <FileText className="h-4 w-4" />
-          Documents
-        </Button>
-        <Button
-          onClick={() => onNavigate("skills")}
-          variant={activeView === "skills" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn(
-            "w-full justify-start gap-2 transition-all",
-            activeView === "skills"
-              ? "text-primary font-medium"
-              : "text-muted-foreground hover:text-sidebar-foreground",
-          )}
-        >
-          <Zap className="h-4 w-4" />
-          Skills
-        </Button>
-        <Button
-          onClick={() => onNavigate("settings")}
-          variant={activeView === "settings" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn(
-            "w-full justify-start gap-2 transition-all",
-            activeView === "settings"
-              ? "text-primary font-medium"
-              : "text-muted-foreground hover:text-sidebar-foreground",
-          )}
-        >
-          <Settings className="h-4 w-4" />
-          Settings
-        </Button>
+      {/* Fixed Area — Knowledge Base + Footer */}
+      <div className="border-t border-border/10">
+        <div className="px-2 py-3 space-y-4">
+          {/* Knowledge Base Section */}
+          <div>
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              Knowledge Base
+            </p>
+            <div className="space-y-0.5">
+              <Button
+                onClick={() => onNavigate("documents")}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start gap-2 transition-all py-2",
+                  activeView === "documents"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
+                )}
+              >
+                <FileText className="h-4 w-4" />
+                Documents
+              </Button>
+              <Button
+                onClick={() => onNavigate("skills")}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start gap-2 transition-all py-2",
+                  activeView === "skills"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
+                )}
+              >
+                <Zap className="h-4 w-4" />
+                Skills
+              </Button>
+              <Button
+                onClick={() => onNavigate("settings")}
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start gap-2 transition-all py-2",
+                  activeView === "settings"
+                    ? "bg-primary/10 text-primary font-medium"
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
+                )}
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </Button>
+            </div>
+          </div>
 
-        {/* Theme toggle + Sign out row */}
-        <div className="flex items-center gap-1 pt-1">
-          <Button
-            onClick={onToggleTheme}
-            variant="ghost"
-            size="sm"
-            className="flex-1 justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </Button>
+          {/* User/System row */}
+          <div className="space-y-0.5">
+            <Button
+              onClick={onToggleTheme}
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all py-2"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </Button>
+            <Button
+              onClick={onSignOut}
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-all py-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign Out
+            </Button>
+          </div>
         </div>
-        <Button
-          onClick={onSignOut}
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-all"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
       </div>
     </div>
   )

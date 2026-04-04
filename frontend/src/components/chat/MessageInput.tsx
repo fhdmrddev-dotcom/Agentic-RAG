@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, Layers } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,9 +10,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
+interface Provider {
+  id: string
+  name: string
+  models: string[]
+  is_active: boolean
+}
+
 interface Props {
   onSend: (content: string) => void
   disabled: boolean
+  providers?: Provider[]
+  selectedProvider?: string
+  onProviderChange?: (providerId: string) => void
   models?: string[]
   selectedModel?: string
   onModelChange?: (model: string) => void
@@ -22,7 +32,28 @@ interface Props {
   onClearPrefill?: () => void
 }
 
-export function MessageInput({ onSend, disabled, models = [], selectedModel, onModelChange, agentMode = "default", onAgentModeChange, prefillMessage, onClearPrefill }: Props) {
+const PROVIDER_LABELS: Record<string, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  google: "Google",
+  openrouter: "OpenRouter",
+  ollama: "Ollama",
+}
+
+export function MessageInput({
+  onSend,
+  disabled,
+  providers = [],
+  selectedProvider,
+  onProviderChange,
+  models = [],
+  selectedModel,
+  onModelChange,
+  agentMode = "default",
+  onAgentModeChange,
+  prefillMessage,
+  onClearPrefill,
+}: Props) {
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -45,7 +76,6 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
     if (!trimmed || disabled) return
     onSend(trimmed)
     setValue("")
-    // Reset height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
@@ -59,13 +89,17 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
   }
 
   const canSend = !disabled && value.trim().length > 0
+  const showProviderSelector = providers.length > 1 && selectedProvider && onProviderChange
   const showModelSelector = models.length > 1 && selectedModel && onModelChange
 
-  // Shorten long model names for display
   const displayName = (model: string) => {
     if (model.length <= 32) return model
     return model.slice(0, 30) + "…"
   }
+
+  const activeProviderLabel = selectedProvider
+    ? (PROVIDER_LABELS[selectedProvider] ?? selectedProvider)
+    : null
 
   return (
     <div className="bg-background/80 backdrop-blur-sm px-6 py-4">
@@ -92,8 +126,52 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
 
           {/* Bottom toolbar */}
           <div className="flex items-center justify-between px-2 pb-2 pt-1">
-            {/* Left: model selector + agent mode selector */}
+            {/* Left: provider + model + agent mode */}
             <div className="flex items-center gap-0.5">
+
+              {/* Provider selector */}
+              {showProviderSelector ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium",
+                        "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                        "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      )}
+                    >
+                      <Layers className="h-3 w-3 shrink-0" />
+                      <span>{activeProviderLabel}</span>
+                      <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
+                    {providers.map((p) => (
+                      <DropdownMenuItem
+                        key={p.id}
+                        onSelect={() => onProviderChange!(p.id)}
+                        className={cn(
+                          "text-xs cursor-pointer gap-2",
+                          p.id === selectedProvider && "font-medium bg-accent",
+                        )}
+                      >
+                        <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        {PROVIDER_LABELS[p.id] ?? p.id}
+                        {p.id === selectedProvider && (
+                          <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : activeProviderLabel ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/50">
+                  <Layers className="h-3 w-3" />
+                  {activeProviderLabel}
+                </span>
+              ) : null}
+
+              {/* Model selector */}
               {showModelSelector ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -136,6 +214,8 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
                   </span>
                 )
               )}
+
+              {/* Agent mode selector */}
               {onAgentModeChange && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -175,7 +255,7 @@ export function MessageInput({ onSend, disabled, models = [], selectedModel, onM
               )}
             </div>
 
-            {/* Right: send button + hint */}
+            {/* Right: send button */}
             <div className="flex items-center gap-2.5">
               <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
                 Enter ↵ · Shift+Enter for newline

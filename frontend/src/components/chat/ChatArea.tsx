@@ -2,9 +2,16 @@ import { useEffect, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
-import { getSettings } from "@/lib/api"
+import { getProviders } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
 import { Folder as FolderIcon, Sparkles } from "lucide-react"
+
+interface Provider {
+  id: string
+  name: string
+  models: string[]
+  is_active: boolean
+}
 
 interface Props {
   thread: Thread | null
@@ -17,6 +24,8 @@ interface Props {
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
+  const [providers, setProviders] = useState<Provider[]>([])
+  const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
@@ -28,13 +37,28 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   }, [thread?.id])
 
   useEffect(() => {
-    getSettings()
-      .then((s) => {
-        setModels(s.available_models)
-        setSelectedModel(s.llm_model)
+    getProviders()
+      .then(({ active, providers: list }) => {
+        setProviders(list)
+        const activeProvider = list.find((p) => p.id === active) ?? list[0]
+        if (activeProvider) {
+          setSelectedProvider(activeProvider.id)
+          setModels(activeProvider.models)
+          setSelectedModel(activeProvider.models[0] ?? "")
+        }
       })
       .catch(console.error)
   }, [])
+
+  // Update model list when provider changes
+  const handleProviderChange = (providerId: string) => {
+    setSelectedProvider(providerId)
+    const p = providers.find((x) => x.id === providerId)
+    if (p) {
+      setModels(p.models)
+      setSelectedModel(p.models[0] ?? "")
+    }
+  }
 
   useEffect(() => {
     if (thread) {
@@ -47,13 +71,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
     }
-    await sendMessage(activeThread.id, content, selectedModel || undefined, onTitleUpdate, agentMode)
+    await sendMessage(
+      activeThread.id,
+      content,
+      selectedModel || undefined,
+      onTitleUpdate,
+      agentMode,
+      selectedProvider || undefined,
+    )
   }
 
   const inputBar = (
     <MessageInput
       onSend={handleSend}
       disabled={isStreaming}
+      providers={providers}
+      selectedProvider={selectedProvider}
+      onProviderChange={handleProviderChange}
       models={models}
       selectedModel={selectedModel}
       onModelChange={setSelectedModel}

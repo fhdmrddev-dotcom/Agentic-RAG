@@ -47,7 +47,7 @@ export function IngestionPage() {
 
         <div className="flex flex-row gap-6 flex-1 min-h-0">
           {/* Left panel: Folder Tree */}
-          <div className="w-64 shrink-0 flex flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border p-3">
+          <div className="w-72 shrink-0 flex flex-col overflow-y-auto rounded-xl bg-card/50 ghost-border p-3">
             <FolderTree
               folders={folders}
               selectedFolderId={selectedFolderId}

@@ -825,11 +825,12 @@ async def send_message(
 
         except APIError as e:
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-            yield "data: [DONE]\n\n"
-            return
+        except Exception as e:
+            logger.error("Unexpected error in event stream: %s", e)
+            yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
 
-        # Persist assistant message
-        if full_content:
+        # Persist assistant message — always attempt, even after errors
+        if full_content or persisted_tool_calls:
             row: dict = {
                 "thread_id": thread_id,
                 "user_id": current_user["id"],
@@ -838,17 +839,26 @@ async def send_message(
             }
             if persisted_tool_calls:
                 row["tool_calls"] = persisted_tool_calls
-            supabase.table("messages").insert(row).execute()
+            try:
+                supabase.table("messages").insert(row).execute()
+            except Exception as e:
+                logger.error("Failed to persist assistant message: %s", e)
 
         # Touch thread so it rises in updated_at ordering
-        supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
+        try:
+            supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
+        except Exception:
+            pass
 
         # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
         if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
             first_user_msg = history_resp.data[0]["content"]
             title = generate_thread_title(first_user_msg, user_settings=user_settings)
-            supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
-            yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
+            try:
+                supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
+                yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
+            except Exception:
+                pass
 
         yield "data: [DONE]\n\n"
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class MessageCreate(BaseModel):
     content: str
     model: str | None = None
+    provider: str | None = None   # override active provider for this request
     agent_mode: str = "default"   # "default" | "explorer"
 
 

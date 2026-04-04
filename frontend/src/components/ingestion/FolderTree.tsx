@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Plus, Folder as FolderIcon } from "lucide-react"
+import { Plus, Folder as FolderIcon, FolderOpen } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { buildFolderTree } from "@/lib/folderTree"
 import { FolderNode } from "./FolderNode"
@@ -102,6 +102,9 @@ export function FolderTree({
     setCreatingInParentId(null)
   }
 
+  const isRootSelected = selectedFolderId === null
+  const RootIcon = isRootSelected ? FolderOpen : FolderIcon
+
   return (
     <div className="flex flex-col">
       {/* Header */}
@@ -112,7 +115,7 @@ export function FolderTree({
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               onClick={() =>
                 setCreatingInParentId(selectedFolderId ?? "root")
               }
@@ -127,15 +130,15 @@ export function FolderTree({
       {/* Root node */}
       <div
         className={[
-          "flex items-center gap-1.5 py-1 px-2 rounded-md cursor-pointer",
-          selectedFolderId === null
-            ? "bg-primary/10 text-primary font-medium border-l-2 border-primary"
-            : "hover:bg-accent",
+          "flex items-center gap-2 py-1.5 px-2 rounded-lg cursor-pointer transition-colors duration-150",
+          isRootSelected
+            ? "bg-primary/10 text-primary font-medium shadow-sm shadow-primary/5"
+            : "hover:bg-accent/60",
         ].join(" ")}
         onClick={() => onSelectFolder(null)}
       >
         <div className="h-4 w-4 shrink-0" />
-        <FolderIcon className="h-4 w-4 shrink-0" />
+        <RootIcon className={isRootSelected ? "h-4 w-4 shrink-0 text-primary" : "h-4 w-4 shrink-0 text-amber-500/70"} />
         <span className="text-sm truncate flex-1">Root</span>
       </div>
 

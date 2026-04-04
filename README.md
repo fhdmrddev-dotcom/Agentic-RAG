@@ -7,6 +7,7 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 ## What You'll Build
 
 **v1.0 — Knowledge Base Explorer**
+
 - **Chat interface** with threaded conversations, streaming, tool calls, and subagent reasoning
 - **Document ingestion** with drag-and-drop upload and processing status
 - **Full RAG pipeline**: chunking, embedding, hybrid search, reranking
@@ -15,6 +16,7 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 - **Explorer mode**: dedicated KB-focused agent that navigates your documents like a codebase
 
 **v2.0 — Agent Skills & Code Execution**
+
 - **Agent Skills**: define reusable AI behaviors (name, description, instructions) — the agent discovers and loads them automatically from a catalog injected into every chat
 - **Skill file attachments**: attach reference files (templates, scripts, data) to skills; the LLM reads them on demand via `read_skill_file`
 - **Skills UI**: full CRUD tab — create, edit, enable/disable, share globally, import/export
@@ -25,15 +27,15 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 
 ## Tech Stack
 
-| Layer          | Tech                                                             |
-| -------------- | ---------------------------------------------------------------- |
-| Frontend       | React, TypeScript, Tailwind, shadcn/ui, Vite                    |
-| Backend        | Python, FastAPI                                                  |
-| Database       | Supabase (Postgres + pgvector + Auth + Storage + Realtime)       |
-| Doc Processing | pypdf, python-docx (PDF, DOCX, HTML, Markdown)                  |
-| AI Models      | Local (LM Studio / Ollama) or Cloud (OpenAI, OpenRouter)        |
-| Code Sandbox   | Docker + llm-sandbox (opt-in via `SANDBOX_ENABLED=true`)        |
-| Observability  | LangSmith                                                        |
+| Layer          | Tech                                                                   |
+| -------------- | ---------------------------------------------------------------------- |
+| Frontend       | React, TypeScript, Tailwind, shadcn/ui, Vite                           |
+| Backend        | Python, FastAPI                                                        |
+| Database       | Supabase (Postgres + pgvector + Auth + Storage + Realtime)             |
+| Doc Processing | pypdf, python-docx (PDF, DOCX, HTML, Markdown)                         |
+| AI Models      | Local (LM Studio / Ollama) or Cloud (OpenAI, OpenRouter)               |
+| Code Sandbox   | Docker + llm-sandbox (opt-in via `SANDBOX_ENABLED=true`)             |
+| Observability  | LangSmith                                                              |
 | Design System  | Aether Intelligence — dark/light mode, Inter + Manrope, glassmorphism |
 
 ## The Modules
@@ -51,30 +53,30 @@ A hands-on course where you collaborate with Claude Code to build a full-feature
 
 ### v1.0 Milestone: Knowledge Base Explorer (Phases 1–8)
 
-| Phase | What it builds |
-|-------|---------------|
-| 1 | Folder schema + CRUD API (adjacency list, RLS, global/private) |
-| 2 | Document-folder integration (`folder_id` FK, `full_markdown` storage, move endpoints) |
-| 3 | Ingestion UI with folder tree, targeting, and folder CRUD |
-| 4 | `ls` + `tree` navigation tools |
-| 5 | `grep` (content search) + `glob` (filename pattern) tools |
-| 6 | `read_document` tool (full doc or line-range) |
-| 7 | Explorer mode — KB-only agent with dedicated system prompt |
-| 8 | Global folders, folder-scoped chat threads, folder detail info bar |
+| Phase | What it builds                                                                            |
+| ----- | ----------------------------------------------------------------------------------------- |
+| 1     | Folder schema + CRUD API (adjacency list, RLS, global/private)                            |
+| 2     | Document-folder integration (`folder_id` FK, `full_markdown` storage, move endpoints) |
+| 3     | Ingestion UI with folder tree, targeting, and folder CRUD                                 |
+| 4     | `ls` + `tree` navigation tools                                                        |
+| 5     | `grep` (content search) + `glob` (filename pattern) tools                             |
+| 6     | `read_document` tool (full doc or line-range)                                           |
+| 7     | Explorer mode — KB-only agent with dedicated system prompt                               |
+| 8     | Global folders, folder-scoped chat threads, folder detail info bar                        |
 
 ### v2.0 Milestone: Agent Skills & Code Execution (Phases 9–17)
 
-| Phase | What it builds |
-|-------|---------------|
-| 9  | Persistent Tool Memory — `tool_call_id` in JSONB, multi-turn history reconstruction |
-| 10 | Agent Skills Core — DB schema, RLS, CRUD API, Supabase Storage bucket |
-| 11 | Skills LLM Integration — catalog injection, `load_skill` / `save_skill` / `read_skill_file` |
-| 12 | Skills UI — Skills tab, SkillCard, SkillFormDialog, seed skill-creator global skill |
-| 13 | Skills Open Standard — ZIP import/export (agentskills.io format) |
-| 14 | Code Execution Sandbox — Docker, SSE streaming, file harvesting, DB tables |
-| 15 | Code Output UI — `ExecuteCodeBlock` panel, streaming terminal, download cards |
-| 16 | Skill File Management UI — upload/list/delete files on skills |
-| 17 | Tech Debt Cleanup — stale checkboxes, missing VERIFICATION.md, tool count fix |
+| Phase | What it builds                                                                                    |
+| ----- | ------------------------------------------------------------------------------------------------- |
+| 9     | Persistent Tool Memory —`tool_call_id` in JSONB, multi-turn history reconstruction             |
+| 10    | Agent Skills Core — DB schema, RLS, CRUD API, Supabase Storage bucket                            |
+| 11    | Skills LLM Integration — catalog injection,`load_skill` / `save_skill` / `read_skill_file` |
+| 12    | Skills UI — Skills tab, SkillCard, SkillFormDialog, seed skill-creator global skill              |
+| 13    | Skills Open Standard — ZIP import/export (agentskills.io format)                                 |
+| 14    | Code Execution Sandbox — Docker, SSE streaming, file harvesting, DB tables                       |
+| 15    | Code Output UI —`ExecuteCodeBlock` panel, streaming terminal, download cards                   |
+| 16    | Skill File Management UI — upload/list/delete files on skills                                    |
+| 17    | Tech Debt Cleanup — stale checkboxes, missing VERIFICATION.md, tool count fix                    |
 
 ## Getting Started
 

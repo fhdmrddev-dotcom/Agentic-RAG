@@ -1,4 +1,13 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PROVIDER_BASE_URLS: dict[str, str] = {
+    "openai": "",
+    "anthropic": "https://api.anthropic.com/v1",
+    "google": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "openrouter": "https://openrouter.ai/api/v1",
+    "ollama": "",  # resolved dynamically from ollama_base_url
+}
 
 
 class Settings(BaseSettings):
@@ -7,12 +16,62 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_service_role_key: str
 
-    # LLM provider (OpenAI-compatible)
-    llm_api_key: str
+    # Active provider — set this to switch between providers
+    # Options: openai | anthropic | google | openrouter | ollama
+    # Leave blank to use the legacy LLM_API_KEY / LLM_BASE_URL directly.
+    llm_provider: str = ""
+
+    # Per-provider keys (add the ones you have; unused providers are ignored)
+    openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    google_api_key: str = ""
+    openrouter_api_key: str = ""
+    ollama_base_url: str = "http://localhost:11434"
+
+    # Resolved credentials — set directly only in legacy mode (no LLM_PROVIDER).
+    # When LLM_PROVIDER is set these are overwritten by the validator below.
+    llm_api_key: str = ""
     llm_base_url: str = ""
     llm_model: str = "gpt-4o"
     # Comma-separated list of models to expose in UI (defaults to llm_model if empty)
     available_models: str = ""
+
+    # Per-provider model lists (comma-separated; empty = not configured)
+    openai_models: str = ""
+    anthropic_models: str = ""
+    google_models: str = ""
+    openrouter_models: str = ""
+    ollama_models: str = ""
+
+    @model_validator(mode="after")
+    def resolve_llm_provider(self) -> "Settings":
+        provider = self.llm_provider.strip().lower()
+        if not provider:
+            return self  # legacy mode: LLM_API_KEY / LLM_BASE_URL used as-is
+
+        key_map: dict[str, str] = {
+            "openai": self.openai_api_key,
+            "anthropic": self.anthropic_api_key,
+            "google": self.google_api_key,
+            "openrouter": self.openrouter_api_key,
+            "ollama": "ollama",  # Ollama doesn't require a real key
+        }
+        if provider not in key_map:
+            raise ValueError(
+                f"Unknown LLM_PROVIDER '{provider}'. "
+                f"Must be one of: {', '.join(key_map)}"
+            )
+
+        resolved_key = key_map[provider]
+        if resolved_key:
+            self.llm_api_key = resolved_key
+
+        if provider == "ollama":
+            self.llm_base_url = f"{self.ollama_base_url.rstrip('/')}/v1"
+        else:
+            self.llm_base_url = _PROVIDER_BASE_URLS[provider]
+
+        return self
 
     # Embedding provider (falls back to LLM key if not set)
     embedding_api_key: str = ""
