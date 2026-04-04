@@ -87,7 +87,11 @@ SYSTEM_PROMPT = (
     "- Create or update a skill → save_skill\n"
     "- Read a file attached to a skill → read_skill_file\n"
     "- Run Python code, generate charts, do calculations -> execute_code (always pass `libraries` for non-stdlib packages)\n"
-    "- Always say where the information came from."
+    "- Always say where the information came from.\n\n"
+    "Output file rule: when execute_code produces output files (e.g. .pptx, .docx, .pdf, .png), "
+    "they are automatically shown as download cards in the UI — do NOT write markdown links or URLs "
+    "for them in your text response. Just mention the filename naturally, e.g. "
+    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'."
 )
 
 
@@ -394,8 +398,8 @@ async def send_message(
         # iterations only need a condensed version. This keeps the context window
         # from growing unbounded across many tool calls.
         # analyze_document results are longer by nature; everything else caps lower.
-        _CTX_LIMIT_DEFAULT = 3000   # chars in messages[] for most tools
-        _CTX_LIMIT_SUBAGENT = 6000  # chars for analyze_document (rich synthesis)
+        _CTX_LIMIT_DEFAULT = 3000    # chars in messages[] for most tools
+        _CTX_LIMIT_SUBAGENT = 10000  # chars for analyze_document (rich synthesis)
 
         try:
             for iteration in range(max_iterations):
@@ -776,7 +780,11 @@ async def send_message(
                     # --- Option B: cap tool result size added to the LLM messages array ---
                     # Use the URL-stripped version for execute_code; raw result otherwise.
                     ctx_content = llm_tool_content if llm_tool_content is not None else tool_result
-                    ctx_limit = _CTX_LIMIT_SUBAGENT if tool_name == "analyze_document" else _CTX_LIMIT_DEFAULT
+                    ctx_limit = (
+                        _CTX_LIMIT_SUBAGENT if tool_name == "analyze_document"
+                        else len(ctx_content) if tool_name == "read_document"  # never truncate full reads
+                        else _CTX_LIMIT_DEFAULT
+                    )
                     if len(ctx_content) > ctx_limit:
                         ctx_content = ctx_content[:ctx_limit] + f"\n[... truncated for context — {len(ctx_content) - ctx_limit} chars omitted]"
 
