@@ -22,10 +22,10 @@ The agent can explore the knowledge base the same way Claude Code explores codeb
 ## Current State
 
 **Shipped:** v1.0 Knowledge Base Explorer — 2026-03-29
-**Active:** v2.0 Agent Skills & Code Execution — Phase 11 complete (2026-04-01)
+**Active:** v2.0 Agent Skills & Code Execution — Phase 17 complete (2026-04-04) — all phases done
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector)
 **Codebase:** ~9,200 LOC (Python + TypeScript)
-**Phases shipped:** 11 phases (8 v1.0 + 3 v2.0), 25 plans, 30 tasks
+**Phases shipped:** 17 phases (8 v1.0 + 9 v2.0), all v2.0 requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 
 ## Requirements
@@ -149,4 +149,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 — Phase 10 complete (Agent Skills Core backend API)*
+*Last updated: 2026-04-04 — Phase 17 complete (tech debt cleanup, all v2.0 requirements verified)*
