@@ -28,7 +28,7 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant. You have twelve tools — use the RIGHT one for each question:\n\n"
+    "You are a helpful AI assistant. You have thirteen tools — use the RIGHT one for each question:\n\n"
     "1. ls — List the immediate contents (subfolders and documents) at a folder path. "
     "Use for browsing and navigation: 'what folders do I have?', 'what's in my Reports folder?', "
     "'list documents in /Finance/Q1', 'show me the subfolders of Research'. "
