@@ -33,6 +33,8 @@ Full details: `.planning/milestones/v1.0-ROADMAP.md`
 - [ ] Phase 13: Skills Open Standard — ZIP import/export (agentskills.io format)
 - [ ] Phase 14: Code Execution Sandbox — Docker session manager, execute_code tool, SSE streaming, DB tables
 - [ ] Phase 15: Code Output UI — streaming output panel, file download links
+- [ ] Phase 16: Skill File Management UI — upload/list/delete files on skills (closes FILE-01, FILE-02)
+- [ ] Phase 17: Tech Debt Cleanup — fix system prompt tool count, stale checkboxes, Phase 15 verification
 
 </details>
 
@@ -141,6 +143,30 @@ Plans:
 - [x] 15-01-PLAN.md — Types + SSE parsing + useMessages wiring for code execution events
 - [x] 15-02-PLAN.md — ExecuteCodeBlock component + ToolCallPanel dispatch + visual verification
 
+### Phase 16: Skill File Management UI
+**Goal**: Users can upload, view, and delete files attached to a skill via the frontend — completing the Skill File E2E flow
+**Depends on**: Phase 12 (Skills UI), Phase 10 (backend file APIs)
+**Requirements**: FILE-01, FILE-02
+**Gap Closure:** Closes gaps from v2.0 audit — FILE-01/FILE-02 frontend UI missing; Skill File Flow broken at step 1
+**Success Criteria** (what must be TRUE):
+  1. User can select and upload a file to a skill from the skill edit UI
+  2. Attached files are listed within the skill card/form (name visible)
+  3. User can delete an attached file and it is removed from the list
+  4. `api.ts` contains `uploadSkillFile`, `listSkillFiles`, and `deleteSkillFile` functions wired to the Phase 10 backend routes
+  5. The full Skill File E2E flow works: upload file → LLM `load_skill` returns it in `files[]` → LLM can call `read_skill_file` to read it
+**Plans:** TBD
+
+### Phase 17: Tech Debt Cleanup
+**Goal**: Close procedural and cosmetic gaps flagged in the v2.0 audit — correct stale data and add missing verification artifacts
+**Depends on**: Phase 15
+**Requirements**: SKIL-08, SAND-01 (stale checkbox fixes only — already implemented)
+**Gap Closure:** Closes tech debt from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. System prompt in `threads.py` refers to "thirteen tools" (not "twelve")
+  2. SKIL-08 and SAND-01 checkboxes in REQUIREMENTS.md are `[x]`
+  3. Phase 15 has a VERIFICATION.md confirming SAND-12 is satisfied
+**Plans:** TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -160,3 +186,5 @@ Plans:
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
 | 14. Code Execution Sandbox | v2.0 | 5/5 | Complete   | 2026-04-03 |
 | 15. Code Output UI | v2.0 | 2/2 | Complete   | 2026-04-03 |
+| 16. Skill File Management UI | v2.0 | 0/? | Pending | — |
+| 17. Tech Debt Cleanup | v2.0 | 0/? | Pending | — |

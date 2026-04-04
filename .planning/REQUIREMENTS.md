@@ -28,8 +28,8 @@
 
 ### Skill Building-Block Files
 
-- [x] **FILE-01**: User can upload files to a skill (Python scripts, templates, reference data)
-- [x] **FILE-02**: User can delete a file from a skill
+- [ ] **FILE-01**: User can upload files to a skill (Python scripts, templates, reference data)
+- [ ] **FILE-02**: User can delete a file from a skill
 - [x] **FILE-03**: Files are stored in the private `skill-files` Supabase Storage bucket scoped by `user_id/skill_id/filename`
 - [x] **FILE-04**: `load_skill` response includes the list of attached file names so the LLM knows what files are available
 - [x] **FILE-05**: LLM can call `read_skill_file(skill_name, filename)` to retrieve the content of a building-block file
@@ -122,8 +122,8 @@
 | SKIL-04 | Phase 2 | Complete |
 | SKIL-05 | Phase 2 | Complete |
 | SKIL-06 | Phase 2 | Complete |
-| FILE-01 | Phase 2 | Complete |
-| FILE-02 | Phase 2 | Complete |
+| FILE-01 | Phase 16 | Pending |
+| FILE-02 | Phase 16 | Pending |
 | FILE-03 | Phase 2 | Complete |
 | FILE-06 | Phase 2 | Complete |
 | SKIL-09 | Phase 3 | Complete |
@@ -134,14 +134,14 @@
 | FILE-04 | Phase 3 | Complete |
 | FILE-05 | Phase 3 | Complete |
 | SKIL-07 | Phase 4 | Complete |
-| SKIL-08 | Phase 4 | Pending |
+| SKIL-08 | Phase 17 | Pending |
 | OPEN-01 | Phase 5 | Complete |
 | OPEN-02 | Phase 5 | Complete |
 | OPEN-03 | Phase 5 | Complete |
 | OPEN-04 | Phase 5 | Complete |
 | OPEN-05 | Phase 5 | Complete |
 | OPEN-06 | Phase 5 | Complete |
-| SAND-01 | Phase 6 | Pending |
+| SAND-01 | Phase 17 | Pending |
 | SAND-02 | Phase 6 | Complete |
 | SAND-03 | Phase 6 | Complete |
 | SAND-04 | Phase 6 | Complete |
@@ -159,7 +159,8 @@
 - v2.0 requirements: 37 total
 - Mapped to phases: 37
 - Unmapped: 0 ✓
+- Pending (gap closure phases 16–17): FILE-01, FILE-02, SKIL-08, SAND-01
 
 ---
 *Requirements defined: 2026-03-29*
-*Last updated: 2026-03-29 — initial definition for v2.0 milestone*
+*Last updated: 2026-04-04 — reset FILE-01/FILE-02 to pending (frontend gap); assigned to Phase 16. SKIL-08/SAND-01 assigned to Phase 17 (tech debt)*
