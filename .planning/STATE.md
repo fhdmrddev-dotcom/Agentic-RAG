@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-04-04T13:23:17.785Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-04-04T16:32:09.637Z"
 last_activity: 2026-04-04
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -83,6 +83,7 @@ Plan: 2 of 2
 | Phase 15-code-output-ui P01 | 2min | 2 tasks | 3 files |
 | Phase 15-code-output-ui P02 | 2min 1sec | 2 tasks | 2 files |
 | Phase 16-skill-file-management-ui P01 | 2min | 2 tasks | 3 files |
+| Phase 16-skill-file-management-ui P02 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,9 @@ Recent decisions affecting current work:
 - [Phase 15-code-output-ui]: Reload fallback parses tc.result JSON for exitCode/executionDurationMs/outputFiles when live ephemeral fields are absent — supports reloaded conversation messages
 - [Phase 15-code-output-ui]: execute_code dispatch uses ternary inside map loop to share connecting line divider between ExecuteCodeBlock and generic rendering path
 - [Phase 16-skill-file-management-ui]: uploadSkillFile uses getAuthToken() not getAuthHeaders() — FormData sets its own Content-Type with multipart boundary; explicit application/json header would corrupt it
+- [Phase 16-skill-file-management-ui]: File section gated by isEdit && skill — never rendered in New Skill dialog
+- [Phase 16-skill-file-management-ui]: isOwner derived client-side from skill.user_id === currentUserId, matching existing SkillCard ownership pattern
+- [Phase 16-skill-file-management-ui]: Optimistic state for upload (append) and delete (filter) — no re-fetch needed, list reflects mutations immediately
 
 ### Pending Todos
 
@@ -192,5 +196,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-04
-Stopped at: Completed 16-01-PLAN.md
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None

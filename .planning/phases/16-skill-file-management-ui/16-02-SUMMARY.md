@@ -31,6 +31,8 @@ key-decisions:
   - "isOwner derived client-side from skill.user_id === currentUserId, matching existing SkillCard pattern"
   - "Optimistic state for upload (append) and delete (filter) — no re-fetch needed after mutations"
 
+requirements-completed: [FILE-01, FILE-02]
+
 # Metrics
 duration: 1min 25sec
 completed: 2026-04-04
@@ -45,7 +47,7 @@ completed: 2026-04-04
 - **Duration:** ~1 min 25 sec
 - **Started:** 2026-04-04T13:24:15Z
 - **Completed:** 2026-04-04T13:25:40Z
-- **Tasks:** 1 executed (Task 2 is checkpoint:human-verify — paused for user verification)
+- **Tasks:** 2 (Task 1 auto, Task 2 checkpoint:human-verify — approved by user)
 - **Files modified:** 2
 
 ## Accomplishments
@@ -65,8 +67,7 @@ completed: 2026-04-04
 Each task was committed atomically:
 
 1. **Task 1: Add file management section to SkillFormDialog and pass currentUserId** - `f337dac` (feat)
-
-Task 2 (checkpoint:human-verify) — awaiting user verification
+2. **Task 2: Verify file management UI works end-to-end** - human-approved (checkpoint:human-verify passed)
 
 ## Files Created/Modified
 - `frontend/src/components/skills/SkillFormDialog.tsx` — Added file management section, file state, handlers, currentUserId prop
