@@ -189,5 +189,5 @@ Plans:
 | 13. Skills Open Standard | v2.0 | 2/2 | Complete   | 2026-04-02 |
 | 14. Code Execution Sandbox | v2.0 | 5/5 | Complete   | 2026-04-03 |
 | 15. Code Output UI | v2.0 | 2/2 | Complete   | 2026-04-03 |
-| 16. Skill File Management UI | v2.0 | 2/2 | Complete   | 2026-04-04 |
+| 16. Skill File Management UI | v2.0 | 2/2 | Complete    | 2026-04-04 |
 | 17. Tech Debt Cleanup | v2.0 | 0/? | Pending | — |
