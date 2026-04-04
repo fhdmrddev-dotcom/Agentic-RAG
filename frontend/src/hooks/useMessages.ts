@@ -55,7 +55,7 @@ export function useMessages(): UseMessages {
     setIsStreaming(true)
 
     try {
-    await streamMessage(
+      await streamMessage(
       threadId,
       content,
       (delta) => {
@@ -177,6 +177,8 @@ export function useMessages(): UseMessages {
       },
       agentMode,
     )
+    } catch {
+      setIsStreaming(false)
     } finally {
       isSendingRef.current = false
     }

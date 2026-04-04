@@ -27,6 +27,8 @@ export function MessageItem({ message, isStreaming }: Props) {
     )
   }
 
+  const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
+
   return (
     <div className="flex gap-3 py-3 animate-fadeSlideUp">
       <div className="flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20">
@@ -65,11 +67,21 @@ export function MessageItem({ message, isStreaming }: Props) {
         ) : message.content ? (
           <div className="text-sm text-foreground">
             <MarkdownRenderer content={message.content} />
-            {isStreaming && (
+            {isStreaming && !hasRunningTools && (
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
           </div>
         ) : null}
+        {isStreaming && hasRunningTools && message.content && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
+            <span className="flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "160ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "320ms" }} />
+            </span>
+            <span className="italic">Agent is working</span>
+          </div>
+        )}
       </div>
     </div>
   )

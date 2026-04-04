@@ -5,7 +5,7 @@ milestone_name: milestone
 status: v2.0 milestone complete
 stopped_at: Completed 17-01-PLAN.md
 last_updated: "2026-04-04T17:58:06.091Z"
-last_activity: 2026-04-04
+last_activity: 2026-04-04 - Completed quick task 260404-vel: Fix streaming cursor bug and add meaningful agent-working indicator
 progress:
   total_phases: 9
   completed_phases: 9
@@ -193,6 +193,7 @@ None yet.
 | 260328-v6n | Fix 6 bugs (folder-aware dedup, duplicate folder names, tool call state indicator, overflow, delete confirm, breadcrumb) + design doc for Issues 7-9 | 2026-03-28 | 8c4e352 | [260328-v6n-investigate-and-plan-fixes-for-duplicate](./quick/260328-v6n-investigate-and-plan-fixes-for-duplicate/) |
 | 260328-wqj | Fix folder-scoped chat returning results from all folders — scope query_documents SQL, glob, and system prompt to folder subtree | 2026-03-28 | eaf7848 | [260328-wqj-fix-folder-scoped-chat-returning-results](./quick/260328-wqj-fix-folder-scoped-chat-returning-results/) |
 | 260328-x6n | Fix bug: folder not created when pressing Enter in folder input | 2026-03-29 | 2852601 | [260328-x6n-fix-bug-folder-not-created-when-pressing](./quick/260328-x6n-fix-bug-folder-not-created-when-pressing/) |
+| 260404-vel | Fix streaming cursor bug and add meaningful agent-working indicator | 2026-04-04 | 1bd9576 | [260404-vel-fix-streaming-cursor-bug-and-add-meaning](./quick/260404-vel-fix-streaming-cursor-bug-and-add-meaning/) |
 
 ## Session Continuity
 
