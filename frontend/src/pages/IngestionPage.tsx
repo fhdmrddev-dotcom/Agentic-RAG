@@ -6,9 +6,11 @@ import { FolderDetail } from "@/components/ingestion/FolderDetail"
 import { FolderTree } from "@/components/ingestion/FolderTree"
 import { useDocuments } from "@/hooks/useDocuments"
 import { useFolders } from "@/hooks/useFolders"
+import { useAuth } from "@/hooks/useAuth"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
 export function IngestionPage() {
+  const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
@@ -24,6 +26,8 @@ export function IngestionPage() {
     if (selectedFolderId === null) return null
     return folders.find((f) => f.id === selectedFolderId) ?? null
   }, [selectedFolderId, folders])
+
+  const canUploadToFolder = !selectedFolderId || !selectedFolder || selectedFolder.user_id === user?.id
 
   const folderDocuments = useMemo(() => {
     if (selectedFolderId === null) return []
@@ -51,6 +55,7 @@ export function IngestionPage() {
             <FolderTree
               folders={folders}
               selectedFolderId={selectedFolderId}
+              currentUserId={user?.id ?? ""}
               onSelectFolder={setSelectedFolderId}
               onCreateFolder={createFolder}
               onRenameFolder={renameFolder}
@@ -83,6 +88,7 @@ export function IngestionPage() {
               uploadingCount={uploadingCount}
               folderId={selectedFolderId}
               folderName={selectedFolderName}
+              disabled={!canUploadToFolder}
             />
 
             <DocumentList
