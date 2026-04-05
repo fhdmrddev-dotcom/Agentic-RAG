@@ -6,11 +6,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from supabase import Client
 
+from app.utils.folder_utils import get_globally_visible_folder_ids
 
 import re
 
 
-def _inject_user_id(sql: str, user_id: str) -> str:
+def _inject_user_id(sql: str, user_id: str, global_folder_ids: list[str] | None = None) -> str:
     """
     Inject a user_id WHERE clause into the query.
     The service role client bypasses RLS, so we must scope manually.
@@ -24,7 +25,11 @@ def _inject_user_id(sql: str, user_id: str) -> str:
     has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
 
     if has_folders and not has_documents:
-        condition = f"(folders.user_id = '{user_id}' OR folders.is_global = true)"
+        if global_folder_ids:
+            ids_list = ", ".join(f"'{fid}'" for fid in global_folder_ids)
+            condition = f"(folders.user_id = '{user_id}' OR folders.id IN ({ids_list}))"
+        else:
+            condition = f"folders.user_id = '{user_id}'"
     else:
         # documents-only or JOIN — scope via documents table
         condition = f"documents.user_id = '{user_id}'"
@@ -77,7 +82,8 @@ def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: 
         raise ValueError("Query must be a single statement (no semicolons).")
 
     # Scope to current user (service role bypasses RLS)
-    scoped = _inject_user_id(clean, user_id)
+    global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+    scoped = _inject_user_id(clean, user_id, global_folder_ids)
 
     # Scope to folder subtree if provided
     if folder_ids:

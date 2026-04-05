@@ -12,6 +12,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings
 from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT
@@ -305,12 +306,7 @@ async def send_message(
         folder_subtree_ids: list[str] | None = None
         scoped_folder_path: str | None = None
         if thread_folder_id:
-            all_folders = (
-                supabase.table("folders")
-                .select("id, parent_id, name")
-                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                .execute()
-            ).data or []
+            all_folders = fetch_visible_folders(supabase, current_user["id"])
 
             def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
                 result = [root_id]
