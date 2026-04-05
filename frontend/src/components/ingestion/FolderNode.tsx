@@ -30,6 +30,7 @@ interface FolderNodeProps {
   editingId: string | null
   deletingId: string | null
   creatingInParentId: string | "root" | null
+  currentUserId: string
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
   onStartRename: (id: string, currentName: string) => void
@@ -52,6 +53,7 @@ export function FolderNode({
   editingId,
   deletingId,
   creatingInParentId,
+  currentUserId,
   onSelect,
   onToggleExpand,
   onStartRename,
@@ -70,6 +72,7 @@ export function FolderNode({
   const isEditing = editingId === node.id
   const isDeleting = deletingId === node.id
   const hasChildren = node.children.length > 0
+  const isOwner = node.user_id === currentUserId
 
   const [editValue, setEditValue] = useState(node.name)
   const editInputRef = useRef<HTMLInputElement>(null)
@@ -224,15 +227,17 @@ export function FolderNode({
                     <Pencil className="h-3.5 w-3.5 mr-2" />
                     Rename
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onToggleGlobal(node.id)
-                    }}
-                  >
-                    <Globe className="h-3.5 w-3.5 mr-2" />
-                    {node.is_global ? "Make private" : "Make global"}
-                  </DropdownMenuItem>
+                  {isOwner && (
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleGlobal(node.id)
+                      }}
+                    >
+                      <Globe className="h-3.5 w-3.5 mr-2" />
+                      {node.is_global ? "Make private" : "Make global"}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
@@ -300,6 +305,7 @@ export function FolderNode({
             editingId={editingId}
             deletingId={deletingId}
             creatingInParentId={creatingInParentId}
+            currentUserId={currentUserId}
             onSelect={onSelect}
             onToggleExpand={onToggleExpand}
             onStartRename={onStartRename}
