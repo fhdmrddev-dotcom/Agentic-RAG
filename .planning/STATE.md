@@ -196,9 +196,10 @@ None yet.
 | 260404-vel | Fix streaming cursor bug and add meaningful agent-working indicator | 2026-04-04 | 1bd9576 | [260404-vel-fix-streaming-cursor-bug-and-add-meaning](./quick/260404-vel-fix-streaming-cursor-bug-and-add-meaning/) |
 | 260405-rgy | Fix folder public visibility — files and subfolders not appearing to other users (ancestry-based global subtree check) | 2026-04-05 | 6742041 | [260405-rgy-fix-folder-public-visibility-files-and-s](./quick/260405-rgy-fix-folder-public-visibility-files-and-s/) |
 | 260405-s1e | Hide toggle-global from non-owners and block uploads into other users' global folders | 2026-04-05 | 62f9897 | [260405-s1e-hide-toggle-global-from-non-owners-and-b](./quick/260405-s1e-hide-toggle-global-from-non-owners-and-b/) |
+| 260405-stg | Add chat source references, cascade deletions, and sandbox file cleanup | 2026-04-05 | e26ccb1 | [260405-stg-add-chat-references-cascade-deletions-an](./quick/260405-stg-add-chat-references-cascade-deletions-an/) |
 
 ## Session Continuity
 
 Last activity: 2026-04-05
-Stopped at: Completed quick task 260405-s1e: Hide toggle-global from non-owners and block uploads into other users' global folders
+Stopped at: Completed quick task 260405-stg: Add chat source references, cascade deletions, and sandbox file cleanup
 Resume file: None
