@@ -1,271 +1,245 @@
 # Codebase Structure
-_Generated: 2026-03-21_
+_Last updated: 2026-04-05_
 
-## Summary
-
-The project is a monorepo with three top-level workspaces: `frontend/` (React/Vite SPA), `backend/` (FastAPI Python app), and `supabase/` (migrations and DB config). An `e2e/` directory contains Playwright tests. Configuration, planning documents, and agent instructions live at the repo root.
-
----
-
-## Directory Layout
+## Top-Level Directory Layout
 
 ```
 Agentic RAG/
-├── frontend/                   # React + Vite SPA
-│   ├── src/
-│   │   ├── App.tsx             # Root component, auth gate, view routing
-│   │   ├── main.tsx            # Vite entry point
-│   │   ├── index.css           # Tailwind base styles
-│   │   ├── types/
-│   │   │   └── index.ts        # Shared TypeScript interfaces (Thread, Message, Document, ToolCall, SubAgentState)
-│   │   ├── lib/
-│   │   │   ├── api.ts          # All fetch calls to FastAPI backend (auth headers, SSE parsing)
-│   │   │   ├── supabase.ts     # Supabase JS client singleton
-│   │   │   └── utils.ts        # Tailwind cn() utility
-│   │   ├── hooks/
-│   │   │   ├── useAuth.ts      # Auth state, signIn/signUp/signOut
-│   │   │   ├── useMessages.ts  # Message list state, streaming, tool/sub-agent callbacks
-│   │   │   ├── useThreads.ts   # Thread list state, CRUD
-│   │   │   └── useDocuments.ts # Document list state, upload, delete
-│   │   ├── pages/
-│   │   │   ├── AuthPage.tsx    # Sign in / sign up toggle page
-│   │   │   ├── IngestionPage.tsx  # Document management page
-│   │   │   └── SettingsPage.tsx   # Settings display page
-│   │   └── components/
-│   │       ├── layout/
-│   │       │   ├── ChatLayout.tsx  # Full app shell (sidebar + content area)
-│   │       │   └── Sidebar.tsx     # Navigation, thread list, rename/delete menus
-│   │       ├── chat/
-│   │       │   ├── ChatArea.tsx        # Chat view with model selector + message pane
-│   │       │   ├── MessageList.tsx     # Scrolling message history
-│   │       │   ├── MessageItem.tsx     # Single message bubble (user or assistant)
-│   │       │   ├── MessageInput.tsx    # Textarea + send button + model picker
-│   │       │   ├── MarkdownRenderer.tsx  # react-markdown with syntax highlighting
-│   │       │   └── ToolCallPanel.tsx   # Inline tool call + sub-agent status/output
-│   │       ├── auth/
-│   │       │   ├── SignInForm.tsx
-│   │       │   └── SignUpForm.tsx
-│   │       ├── ingestion/
-│   │       │   ├── DocumentUpload.tsx   # Drag-and-drop / file picker upload area
-│   │       │   ├── DocumentList.tsx     # Table of uploaded documents with status
-│   │       │   └── DocumentStatusBadge.tsx
-│   │       └── ui/                     # shadcn/ui primitives (button, card, badge, etc.)
-│   ├── public/                 # Static assets
-│   ├── dist/                   # Vite build output (not committed)
-│   ├── @/components/ui/        # Alias target for shadcn components (mirrors src/components/ui)
-│   ├── package.json
-│   ├── vite.config.ts
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-│
-├── backend/
-│   ├── app/
-│   │   ├── main.py             # FastAPI app factory, CORS middleware, router registration
-│   │   ├── config.py           # pydantic-settings Settings class (all env vars)
-│   │   ├── dependencies.py     # get_supabase() singleton, get_current_user() JWT guard
-│   │   ├── api/
-│   │   │   ├── threads.py      # /threads routes + agentic SSE stream handler
-│   │   │   ├── documents.py    # /documents routes + ingest_document background task
-│   │   │   └── settings.py     # /settings read-only config endpoint
-│   │   ├── services/
-│   │   │   ├── openai_service.py    # LLM + embedding clients, tool definitions, streaming chat
-│   │   │   ├── retrieval_service.py # search_documents() — vector, hybrid, RRF, rerank pipeline
-│   │   │   ├── embedding_service.py # chunk_text(), embed_chunks(), extract_metadata()
-│   │   │   ├── rerank_service.py    # Cohere API + local CrossEncoder reranking
-│   │   │   ├── sql_service.py       # query_documents() — LLM-generated SELECT via RPC
-│   │   │   ├── sub_agent_service.py # run_sub_agent() — full-document streaming analysis
-│   │   │   └── web_search_service.py  # Tavily web search integration
-│   │   └── models/
-│   │       ├── document.py      # DocumentMetadata, DocumentResponse
-│   │       ├── message.py       # MessageCreate, MessageResponse
-│   │       ├── thread.py        # ThreadCreate, ThreadResponse, ThreadUpdate
-│   │       └── user_settings.py # UserEffectiveSettings, load_user_settings(), load_app_settings()
-│   ├── supabase/
-│   │   └── migrations/          # Backend-local copy of some migration files
-│   ├── tests/
-│   │   ├── unit/               # Unit tests for services
-│   │   └── integration/        # Integration tests
-│   ├── scripts/                # One-off utility scripts
-│   ├── requirements.txt
-│   ├── pytest.ini
-│   └── venv/                   # Python virtual environment (not committed)
-│
-├── supabase/
-│   ├── migrations/              # Canonical DB migration files (applied to Supabase)
-│   │   ├── 001_initial_schema.sql       # profiles, threads, messages tables + RLS
-│   │   ├── 002_module2_byo_retrieval.sql  # documents, document_chunks, pgvector, match_document_chunks RPC
-│   │   ├── 006_record_manager.sql
-│   │   ├── 007_document_metadata.sql    # metadata JSONB column on documents
-│   │   ├── 008_hybrid_search.sql        # keyword_search_chunks RPC (full-text search)
-│   │   ├── 008b_dynamic_vector_match.sql  # parameterised vector match for configurable dimensions
-│   │   ├── 009_user_settings_extended.sql
-│   │   ├── 010_app_settings.sql
-│   │   ├── 011_cleanup_user_settings.sql
-│   │   ├── 012_query_documents_fn.sql   # query_user_documents RPC for Text-to-SQL tool
-│   │   └── 013_messages_tool_calls.sql  # tool_calls JSONB column on messages
-│   └── snippets/
-│
-├── e2e/
-│   ├── tests/                  # Playwright test specs
-│   └── fixtures/               # Test fixture files
-│
-├── .agent/
-│   └── plans/                  # Agent implementation plans (*.md)
-│       └── Completed_Plans/    # Archived completed plans
-│
-├── .planning/
-│   └── codebase/               # GSD codebase analysis documents (this directory)
-│
-├── CLAUDE.md                   # Project instructions and rules for AI agents
-├── PROGRESS.md                 # Module completion status
-├── PRD.md                      # Product requirements document
-└── README.md
+├── backend/                  # Python FastAPI backend
+├── frontend/                 # React + Vite frontend
+├── supabase/                 # Supabase config + migrations
+│   └── migrations/           # SQL migration files (run in order)
+├── e2e/                      # End-to-end tests
+├── test-cases/               # Manual test case documentation
+├── .agent/plans/             # Agent execution plans
+├── .planning/codebase/       # GSD codebase analysis documents (this file)
+├── CLAUDE.md                 # Project rules and conventions for Claude Code
+├── PROGRESS.md               # Module completion tracking
+├── CONTEXT-MANAGEMENT.md     # Notes on context window management
+├── SKILLS_GUIDE.md           # Guide for creating and using skills
+└── start_supabase.bat        # Windows dev startup helper
 ```
 
----
+## Backend Structure (`backend/`)
 
-## Directory Purposes
+```
+backend/
+├── app/
+│   ├── main.py               # FastAPI app factory, CORS, router registration
+│   ├── config.py             # Pydantic-settings: all env var config + LLM provider resolution
+│   ├── dependencies.py       # FastAPI dependencies: get_supabase(), get_current_user()
+│   ├── api/
+│   │   ├── threads.py        # POST /threads/{id}/messages (SSE), CRUD threads
+│   │   ├── documents.py      # POST /documents/upload, GET/DELETE/PATCH documents
+│   │   ├── folders.py        # CRUD folders + move operations
+│   │   ├── kb.py             # GET /kb/ls|tree|grep|glob|read + callable ls_path() etc.
+│   │   ├── skills.py         # CRUD skills + skill files, ZIP import/export
+│   │   └── settings.py       # GET /settings (read-only dashboard)
+│   ├── models/
+│   │   ├── thread.py         # ThreadCreate, ThreadResponse, ThreadUpdate
+│   │   ├── message.py        # MessageCreate, MessageResponse
+│   │   ├── document.py       # DocumentResponse, DocumentMetadata, DocumentMoveRequest
+│   │   ├── folder.py         # FolderCreate, FolderRename, FolderResponse, FolderMoveRequest
+│   │   ├── kb.py             # LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
+│   │   ├── skill.py          # SkillCreate, SkillResponse, SkillFileResponse, SkillImportResult
+│   │   └── user_settings.py  # LLMProvider, UserEffectiveSettings, load_user_settings()
+│   ├── services/
+│   │   ├── openai_service.py # LLM client factory, tool schemas, create_streaming_chat(), embed_texts()
+│   │   ├── embedding_service.py  # chunk_text(), embed_chunks(), extract_metadata()
+│   │   ├── retrieval_service.py  # search_documents(), hybrid RRF, resolve_document_id(), fetch_full_document()
+│   │   ├── rerank_service.py     # rerank() — Cohere API or local CrossEncoder
+│   │   ├── sql_service.py        # query_documents() — Text-to-SQL via Supabase RPC
+│   │   ├── web_search_service.py # web_search() — Tavily API
+│   │   ├── sub_agent_service.py  # run_sub_agent() — isolated streaming LLM call
+│   │   └── sandbox_service.py    # SandboxSessionManager, Docker-based Python execution
+│   └── utils/
+│       └── folder_utils.py   # fetch_visible_folders(), is_in_global_subtree(), get_globally_visible_folder_ids()
+├── scripts/                  # Utility scripts (e.g. setup_vector_store.py)
+├── tests/                    # Backend integration tests (pytest)
+├── requirements.txt          # Python dependencies
+├── pytest.ini                # pytest configuration
+├── settings_override.json    # Runtime settings override (gitignored, overrides .env)
+└── venv/                     # Python virtual environment (gitignored)
+```
 
-**`frontend/src/hooks/`:**
-- Purpose: All stateful data management, decoupled from rendering
-- One hook per data domain: auth, messages (with SSE callbacks), threads, documents
-- Hooks call `lib/api.ts` functions and manage local React state
-- Key files: `useMessages.ts` (most complex — handles streaming, tool state, sub-agent state)
+### Key Backend Files
 
-**`frontend/src/lib/`:**
-- Purpose: Side-effect utilities shared across hooks
-- `api.ts` — all backend fetch calls; `streamMessage()` is the SSE parser entry point
-- `supabase.ts` — single JS client instance (used only for auth in frontend; data goes via FastAPI)
-- `utils.ts` — Tailwind `cn()` helper
+- `backend/app/main.py` — FastAPI app, CORS middleware, lifespan (sandbox cleanup on shutdown), router registration, `/health` and `/models` endpoints.
+- `backend/app/config.py` — Single `Settings` object (pydantic-settings). All env vars documented here. `LLM_PROVIDER` validator resolves to `llm_api_key`/`llm_base_url`.
+- `backend/app/dependencies.py` — Singleton Supabase service-role client; `get_current_user()` JWT validation dependency.
+- `backend/app/api/threads.py` — Largest file. Contains `SYSTEM_PROMPT` (full 13-tool prompt), `_reconstruct_history()`, `event_stream()` generator with the agentic loop and all tool dispatch logic.
+- `backend/app/services/openai_service.py` — All LLM and embedding tool schemas defined as dicts. `get_llm_client()`, `get_embedding_client()`, `create_streaming_chat()`, `get_tools()`, `get_explorer_tools()`.
 
-**`frontend/src/types/`:**
-- Purpose: Single source of truth for shared TypeScript interfaces
-- `index.ts` exports: `Thread`, `Message`, `Document`, `ToolCall`, `SubAgentState`, `DocumentMetadata`
+## Frontend Structure (`frontend/src/`)
 
-**`backend/app/services/`:**
-- Purpose: All business logic; each file is a standalone module with no circular dependencies
-- Services receive all dependencies (Supabase client, user settings) as arguments — no global state
-- LangSmith `@traceable` decorators on: `create_streaming_chat`, `search_documents`, `rerank`, `run_sub_agent`
+```
+frontend/src/
+├── main.tsx                  # Vite entry point — renders <App />
+├── App.tsx                   # Root: auth gate, view router (chat/documents/skills/settings)
+├── App.css                   # Global app styles
+├── index.css                 # Tailwind base + custom CSS variables
+├── setupTests.ts             # Vitest global test setup
+├── pages/
+│   ├── AuthPage.tsx          # Sign in / sign up page
+│   ├── IngestionPage.tsx     # Two-panel: FolderTree (left) + upload/list (right)
+│   ├── SkillsPage.tsx        # Skills management grid
+│   └── SettingsPage.tsx      # Read-only settings dashboard
+├── components/
+│   ├── auth/
+│   │   ├── SignInForm.tsx
+│   │   └── SignUpForm.tsx
+│   ├── chat/
+│   │   ├── ChatArea.tsx      # Main chat panel: thread header, model selector, message list, input
+│   │   ├── MessageList.tsx   # Scrollable message list
+│   │   ├── MessageItem.tsx   # Single message bubble (user/assistant) with ToolCallPanel
+│   │   ├── MessageInput.tsx  # Text input + send button
+│   │   ├── ToolCallPanel.tsx # Collapsible tool call display with sub-agent streaming
+│   │   ├── ExecuteCodeBlock.tsx  # Code execution output: stdout/stderr/files/timing
+│   │   └── MarkdownRenderer.tsx  # react-markdown with syntax highlighting
+│   ├── ingestion/
+│   │   ├── FolderTree.tsx        # Left panel: recursive folder tree
+│   │   ├── FolderNode.tsx        # Single folder row with context menu
+│   │   ├── FolderCreateInput.tsx # Inline folder creation input
+│   │   ├── FolderBreadcrumb.tsx  # Path breadcrumb for selected folder
+│   │   ├── FolderDetail.tsx      # Folder metadata/actions panel
+│   │   ├── DocumentUpload.tsx    # Drag-and-drop / file picker upload zone
+│   │   ├── DocumentList.tsx      # Document rows with metadata expansion
+│   │   └── DocumentStatusBadge.tsx  # Status pill: pending/processing/completed/failed
+│   ├── layout/
+│   │   ├── ChatLayout.tsx    # Main shell: Sidebar + view switcher
+│   │   └── Sidebar.tsx       # Thread list, folder grouping, nav buttons, theme toggle
+│   ├── skills/
+│   │   ├── SkillCard.tsx     # Skill display card with enable/disable toggle
+│   │   └── SkillFormDialog.tsx  # Create/edit skill modal
+│   └── ui/                  # shadcn/ui components (do not edit manually)
+│       ├── avatar.tsx
+│       ├── button.tsx
+│       ├── card.tsx
+│       ├── dialog.tsx
+│       ├── dropdown-menu.tsx
+│       ├── input.tsx
+│       ├── label.tsx
+│       ├── scroll-area.tsx
+│       ├── select.tsx
+│       ├── separator.tsx
+│       ├── textarea.tsx
+│       └── tooltip.tsx
+├── hooks/
+│   ├── useAuth.ts        # Session management via supabase.auth.*
+│   ├── useThreads.ts     # Thread CRUD + selection state
+│   ├── useMessages.ts    # Message list + SSE stream handler
+│   ├── useDocuments.ts   # Document list + Realtime subscription + upload/delete
+│   ├── useFolders.ts     # Folder list + Realtime subscription + CRUD
+│   ├── useSkills.ts      # Skills CRUD
+│   └── useTheme.ts       # Dark/light mode toggle (localStorage)
+├── lib/
+│   ├── api.ts            # All fetch() calls to the backend API + streamMessage() SSE parser
+│   ├── supabase.ts       # Supabase browser client singleton
+│   ├── folderTree.ts     # buildFolderTree() utility: flat list → nested tree structure
+│   └── utils.ts          # shadcn cn() classname utility
+├── types/
+│   └── index.ts          # All TypeScript interfaces: Thread, Message, Document, Folder, Skill, ToolCall, etc.
+└── __tests__/            # Vitest unit tests (co-located by concern)
+    ├── components/
+    │   ├── DocumentStatusBadge.test.tsx
+    │   ├── FolderNode.test.tsx
+    │   ├── FolderTree.test.tsx
+    │   ├── IngestionPage.test.tsx
+    │   └── MessageItem.test.tsx
+    ├── hooks/
+    │   ├── useDocuments.test.ts
+    │   └── useFolders.test.ts
+    └── lib/
+        ├── api.test.ts
+        └── buildFolderTree.test.ts
+```
 
-**`backend/app/models/`:**
-- Purpose: Pydantic request/response schemas only — no DB queries
-- `user_settings.py` is the exception — also contains `load_user_settings()` factory function
+### Key Frontend Files
 
-**`supabase/migrations/`:**
-- Purpose: Ordered SQL migration files applied to Supabase (canonical source of truth for DB schema)
-- Naming convention: `{NNN}_{description}.sql` where NNN is a zero-padded sequence number
-- Note: `backend/supabase/migrations/` is a subset copy used for local development
+- `frontend/src/App.tsx` — Auth gate + top-level `activeView` state. Views: `"chat" | "documents" | "skills" | "settings"`.
+- `frontend/src/lib/api.ts` — Central HTTP client. `streamMessage()` implements the SSE parsing loop. All backend endpoints called here.
+- `frontend/src/types/index.ts` — Single source of truth for TypeScript types. Add new types here.
+- `frontend/src/lib/supabase.ts` — Single Supabase browser client (uses `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`).
+- `frontend/src/hooks/useMessages.ts` — Manages message list and dispatches all SSE event types from `streamMessage()` callbacks.
 
----
+## Supabase Migrations (`supabase/migrations/`)
 
-## Key File Locations
+Migrations run sequentially (prefix = order). Apply via Supabase dashboard SQL editor or `supabase db push`.
 
-**Entry Points:**
-- `frontend/src/main.tsx` — Vite/React app mount point
-- `frontend/src/App.tsx` — Auth gate; routes to `AuthPage` or `ChatLayout` based on session
-- `backend/app/main.py` — FastAPI app creation, middleware, router inclusion
+```
+001_initial_schema.sql           # profiles, threads, messages tables + RLS + triggers
+002_module2_byo_retrieval.sql    # documents, document_chunks, pgvector, match_document_chunks RPC, Realtime
+006_record_manager.sql           # content_hash column on documents
+007_document_metadata.sql        # metadata JSONB + GIN index + updated match_document_chunks RPC
+007b_fix_match_document_chunks_overload.sql  # Fixes RPC overload conflict
+008_hybrid_search.sql            # search_vector tsvector + GIN index + trigger + keyword_search_chunks RPC
+008b_dynamic_vector_match.sql    # Dimension-agnostic match_document_chunks (removes hardcoded vector(1536))
+009_user_settings_extended.sql   # user_settings table (legacy — columns cleaned up in 011)
+010_app_settings.sql             # global app_settings table (single row id='global')
+011_cleanup_user_settings.sql    # Drops env-related columns from user_settings, adds preferences JSONB
+012_query_documents_fn.sql       # query_documents RPC for Text-to-SQL tool
+013_messages_tool_calls.sql      # tool_calls JSONB column on messages
+014_folders.sql                  # folders table + folder_id on documents + Realtime
+015_global_folder_document_rls.sql  # RLS for documents in global folders
+016_thread_folder_scope.sql      # folder_id on threads table
+017_skills.sql                   # skills + skill_files tables + RLS + storage bucket
+018_skill_creator_seed.sql       # Seeds the built-in skill creator skill
+019_global_folder_subtree_visibility.sql  # Global folder subtree visibility rule
+```
 
-**Configuration:**
-- `backend/app/config.py` — All env var definitions with defaults (`Settings` class)
-- `backend/.env` — Actual secrets (not committed)
-- `frontend/.env` or `frontend/.env.local` — `VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+## Key Config Files
 
-**Core Logic:**
-- `backend/app/api/threads.py` — `send_message()` contains the full agentic loop (lines 151–359)
-- `backend/app/services/retrieval_service.py` — `search_documents()` orchestrates hybrid retrieval
-- `backend/app/services/openai_service.py` — `get_tools()`, `create_streaming_chat()`, `embed_texts()`
-- `frontend/src/lib/api.ts` — `streamMessage()` is the SSE consumer that maps server events to callbacks
-
-**Database Schema (via migrations):**
-- Tables: `profiles`, `threads`, `messages`, `documents`, `document_chunks`
-- Supabase RPCs: `match_document_chunks`, `keyword_search_chunks`, `query_user_documents`
-- Key columns: `document_chunks.embedding` (vector), `documents.metadata` (JSONB), `messages.tool_calls` (JSONB)
-
-**Testing:**
-- `backend/tests/unit/` — Unit tests for service functions
-- `backend/tests/integration/` — Integration tests (require live Supabase)
-- `e2e/tests/` — Playwright end-to-end tests
-- `backend/pytest.ini` — pytest configuration
-
----
-
-## Naming Conventions
-
-**Frontend Files:**
-- React components: PascalCase `.tsx` (e.g., `ChatArea.tsx`, `MessageItem.tsx`)
-- Hooks: camelCase with `use` prefix `.ts` (e.g., `useMessages.ts`)
-- Utilities/lib: camelCase `.ts` (e.g., `api.ts`, `supabase.ts`)
-- Pages: PascalCase `Page` suffix `.tsx` (e.g., `AuthPage.tsx`, `IngestionPage.tsx`)
-
-**Backend Files:**
-- Python modules: snake_case (e.g., `embedding_service.py`, `retrieval_service.py`)
-- Pydantic models: PascalCase classes (e.g., `DocumentResponse`, `UserEffectiveSettings`)
-
-**Database Migrations:**
-- Pattern: `{NNN}_{description}.sql` with sequential numeric prefix
-
----
+| File | Purpose |
+|------|---------|
+| `backend/.env` | Runtime secrets and settings (gitignored). Source of truth for all config. |
+| `backend/settings_override.json` | Runtime settings override (gitignored). Takes priority over `.env`. |
+| `backend/app/config.py` | Pydantic-settings class documenting all supported env vars with defaults. |
+| `backend/requirements.txt` | Python dependencies (pinned versions). |
+| `backend/pytest.ini` | pytest config: asyncio mode, test paths. |
+| `frontend/.env` | Frontend env (gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL`. |
+| `frontend/vite.config.ts` | Vite build config with `@` alias for `src/`. |
+| `frontend/vitest.config.ts` | Vitest test config with jsdom environment. |
+| `frontend/tailwind.config.js` | Tailwind + shadcn/ui theme config. |
+| `frontend/tsconfig.app.json` | TypeScript config with `@/*` path alias. |
+| `frontend/components.json` | shadcn/ui component registry config. |
+| `supabase/config.toml` | Supabase local dev config. |
+| `CLAUDE.md` | Project rules for Claude Code (stack, no-LangChain rule, planning conventions). |
+| `PROGRESS.md` | Module completion status — checked by Claude to understand current state. |
 
 ## Where to Add New Code
 
-**New API endpoint:**
-- Create or extend a router in `backend/app/api/` (use existing `threads.py` or `documents.py` as pattern)
-- Register router in `backend/app/main.py` via `app.include_router()`
-- Add corresponding fetch function in `frontend/src/lib/api.ts`
+**New backend API endpoint:**
+- Add router to `backend/app/api/<feature>.py`
+- Register router in `backend/app/main.py` with `app.include_router(...)`
+- Add Pydantic request/response models to `backend/app/models/<feature>.py`
 
-**New tool for the LLM agent:**
-- Define tool schema dict in `backend/app/services/openai_service.py` alongside existing tool constants
-- Add to `get_tools()` function (conditionally if it requires an API key)
-- Add dispatch case in `send_message()` event loop in `backend/app/api/threads.py`
+**New backend service:**
+- Add to `backend/app/services/<service>.py`
+- Import lazily in `threads.py` if gated by a config flag (see `sandbox_service` pattern)
 
-**New service / integration:**
-- Create `backend/app/services/{name}_service.py`
-- Follow the pattern: pure functions, receive all dependencies as arguments, use `@traceable` for observability
+**New LLM tool:**
+- Define tool schema dict in `backend/app/services/openai_service.py`
+- Add tool to `get_tools()` return list (and/or `get_explorer_tools()` for explorer mode)
+- Add tool name to `SYSTEM_PROMPT` in `backend/app/api/threads.py`
+- Add dispatch branch in the tool execution section of `event_stream()`
 
 **New frontend page:**
-- Create `frontend/src/pages/{Name}Page.tsx`
-- Add view type to `ActiveView` union in `frontend/src/App.tsx`
-- Add navigation button to `frontend/src/components/layout/Sidebar.tsx`
-- Wire into `frontend/src/components/layout/ChatLayout.tsx` render switch
+- Add page component to `frontend/src/pages/<Page>.tsx`
+- Add view name to `ActiveView` type in `frontend/src/App.tsx`
+- Add navigation case in `frontend/src/components/layout/ChatLayout.tsx`
+- Add nav button to `frontend/src/components/layout/Sidebar.tsx`
 
-**New React hook:**
-- Create `frontend/src/hooks/use{Name}.ts`
-- Call `lib/api.ts` functions; manage state with `useState`/`useCallback`
+**New frontend hook:**
+- Add to `frontend/src/hooks/use<Feature>.ts`
+- Follow pattern: useState + useEffect for initial load + Realtime subscription + useCallback for mutations
 
-**New database table or function:**
-- Add `supabase/migrations/{NNN}_{description}.sql`
-- Apply RLS policies — all tables must have `enable row level security` and user-scoped policies
-- If table needs Realtime updates, add `REPLICA IDENTITY FULL` (see `005_documents_replica_identity.sql` pattern)
+**New TypeScript type:**
+- Add interface to `frontend/src/types/index.ts`
 
----
+**New database table:**
+- Create numbered migration SQL file in `supabase/migrations/`
+- Enable RLS and add policies
+- If needs Realtime: `ALTER PUBLICATION supabase_realtime ADD TABLE public.<table>`
 
-## Special Directories
-
-**`backend/venv/`:**
-- Purpose: Python virtual environment
-- Generated: Yes
-- Committed: No
-
-**`frontend/dist/`:**
-- Purpose: Vite production build output
-- Generated: Yes
-- Committed: No
-
-**`frontend/node_modules/`:**
-- Purpose: NPM dependencies
-- Generated: Yes
-- Committed: No
-
-**`supabase/.temp/` and `supabase/.branches/`:**
-- Purpose: Supabase CLI internal state
-- Generated: Yes
-- Committed: No (`.gitignore`)
-
-**`.agent/plans/`:**
-- Purpose: Implementation plan markdown files written by AI agents before executing changes
-- Naming: `{N}.{plan-name}.md` (e.g., `1.auth-setup.md`)
-- Committed: Yes
-
-**`.planning/codebase/`:**
-- Purpose: GSD codebase analysis documents consumed by `/gsd:plan-phase` and `/gsd:execute-phase`
-- Committed: Yes
+**New shadcn/ui component:**
+- Install via `npx shadcn@latest add <component>` (note: on Windows, files may appear in literal `@/` dir — copy manually to `frontend/src/components/ui/`)

@@ -1,366 +1,326 @@
 # Testing Patterns
-
-_Generated: 2026-03-21_
-
-## Summary
-
-The project has three distinct test tiers: Python unit/integration tests (pytest), frontend unit tests (Vitest + Testing Library), and full-stack E2E tests (Playwright). Backend tests use a shared `conftest.py` that mocks the entire Supabase client and injects a test auth user. Frontend tests mock the `@/lib/api` and `@/lib/supabase` modules wholesale. E2E tests require live infrastructure and are credential-gated.
-
----
+_Last updated: 2026-04-05_
 
 ## Test Frameworks
 
-### Backend
-- **Runner:** pytest `>=8.0.0`
-- **Async support:** pytest-asyncio `>=0.24.0`, configured `asyncio_mode = auto` in `pytest.ini`
-- **HTTP client:** httpx `>=0.27.0` + FastAPI `TestClient` (from `starlette.testclient`)
-- **Mocking:** Python standard library `unittest.mock` (`MagicMock`, `patch`)
-- **Config:** `backend/pytest.ini` — `testpaths = tests`, `asyncio_mode = auto`
+### Backend: pytest
+- Framework: `pytest >= 8.0.0` with `pytest-asyncio >= 0.24.0`
+- Config: `backend/pytest.ini` — `asyncio_mode = auto`, `testpaths = tests`
+- HTTP client for route tests: `fastapi.testclient.TestClient` (sync wrapper around ASGI)
+- Mocking: `unittest.mock` (stdlib `MagicMock`, `patch`)
+- No coverage tool configured
 
-### Frontend
-- **Runner:** Vitest `^4.1.0`
-- **DOM environment:** jsdom `^29.0.0`
-- **Component rendering:** `@testing-library/react` `^16.3.2`
-- **User interaction:** `@testing-library/user-event` `^14.6.1`
-- **DOM assertions:** `@testing-library/jest-dom` `^6.9.1`
-- **Config:** `frontend/vitest.config.ts` — `environment: "jsdom"`, `globals: true`, `setupFiles: ["./src/setupTests.ts"]`
-- **Path alias:** `@/` → `src/` resolved in vitest config
+### Frontend: Vitest
+- Framework: `vitest ^4.1.0`
+- Config: `frontend/vitest.config.ts` — `environment: "jsdom"`, `globals: true`, `setupFiles: ["./src/setupTests.ts"]`
+- DOM assertions: `@testing-library/jest-dom ^6.9.1` (imported in `frontend/src/setupTests.ts`)
+- Component rendering: `@testing-library/react ^16.3.2`
+- User events: `@testing-library/user-event ^14.6.1`
+- Path alias `@/` resolved via vitest config to match the app config
 
-### E2E
-- **Runner:** Playwright (config in `e2e/`)
-- **Language:** TypeScript
-
----
+### E2E: Playwright
+- Framework: `@playwright/test` (Chromium only)
+- Config: `e2e/playwright.config.ts` — `baseURL: "http://localhost:5173"`, `timeout: 30_000`, `retries: 1`
+- Screenshot on failure, video on first retry, trace on first retry
+- **Does NOT auto-start servers** — requires frontend and backend already running
 
 ## Run Commands
 
+### Backend tests
 ```bash
-# Backend (from backend/ with venv activated)
+cd backend
+source venv/bin/activate        # activate virtualenv
 pytest                          # run all tests
 pytest tests/unit/              # unit tests only
 pytest tests/integration/       # integration tests only
-pytest -v                       # verbose
-
-# Frontend (from frontend/)
-npm test                        # vitest run (single pass)
-npm run test:watch              # vitest (watch mode)
-
-# E2E (from e2e/)
-npx playwright test             # all specs (requires live app + TEST_USER_EMAIL/PASSWORD)
+pytest tests/unit/test_embedding_service.py  # single file
+pytest -v                       # verbose output
 ```
 
----
+### Frontend tests
+```bash
+cd frontend
+npm run test          # vitest run (single pass, CI mode)
+npm run test:watch    # vitest (watch mode for development)
+```
+
+### E2E tests
+```bash
+cd e2e
+# Requires: frontend at :5173, backend at :8000, and env vars set
+TEST_USER_EMAIL=user@example.com TEST_USER_PASSWORD=secret npx playwright test
+npx playwright test --ui          # Playwright UI mode
+npx playwright show-report        # view last run report
+```
 
 ## Test File Organization
 
 ### Backend
-
 ```
-backend/tests/
-├── conftest.py                  # shared fixtures, Supabase mock, FastAPI TestClient
-├── unit/
-│   ├── test_embedding_service.py
-│   ├── test_module7_tools.py
-│   ├── test_openai_service.py
-│   ├── test_retrieval_service.py
-│   ├── test_sql_service.py
-│   └── test_web_search_service.py
-└── integration/
-    ├── test_documents.py
-    ├── test_health.py
-    └── test_threads.py
+backend/
+  pytest.ini
+  tests/
+    conftest.py                          # shared fixtures, mock setup, app overrides
+    __init__.py
+    unit/
+      test_embedding_service.py          # chunk_text pure-logic tests
+      test_retrieval_service.py          # search_documents with mocked OpenAI + Supabase
+      test_openai_service.py             # LLM client / streaming chat logic
+      test_explorer_agent.py             # explorer agent tool dispatch
+      test_module7_tools.py              # kb tool functions
+      test_sql_service.py                # query_documents service
+      test_web_search_service.py         # Tavily web search service
+      test_sandbox_service.py            # SandboxSessionManager lifecycle
+      test_sandbox_tools.py              # code execution tool wrapper
+      test_tool_memory.py                # tool memory / context management
+    integration/
+      test_health.py                     # GET /health
+      test_threads.py                    # /threads CRUD + SSE streaming
+      test_documents.py                  # /documents upload, list, delete
+      test_folders.py                    # /folders CRUD, move, toggle-global
+      test_kb.py                         # /kb ls, tree, grep, glob, read_document
+      test_skills.py                     # /skills CRUD, toggle-enabled, toggle-global
+      test_skills_import_export.py       # skill import/export endpoints
+      test_threads_skills.py             # skill activation during chat
 ```
-
-- Unit tests: pure logic, all external calls mocked with `patch`
-- Integration tests: full HTTP request/response via `TestClient`, Supabase mocked at fixture level
 
 ### Frontend
-
 ```
-frontend/src/__tests__/
-├── components/
-│   ├── DocumentStatusBadge.test.tsx
-│   └── MessageItem.test.tsx
-├── hooks/
-│   └── useDocuments.test.ts
-└── lib/
-    └── api.test.ts
+frontend/src/
+  setupTests.ts                          # jest-dom import
+  __tests__/
+    components/
+      DocumentStatusBadge.test.tsx       # status badge rendering
+      FolderNode.test.tsx                # folder tree node interactions
+      FolderTree.test.tsx                # full tree rendering
+      IngestionPage.test.tsx             # ingestion page integration
+      MessageItem.test.tsx               # message rendering (user/assistant)
+    hooks/
+      useDocuments.test.ts               # useDocuments hook behavior
+      useFolders.test.ts                 # useFolders hook + Realtime mock
+    lib/
+      api.test.ts                        # API client (fetch mocking)
+      buildFolderTree.test.ts            # buildFolderTree pure-function tests
 ```
-
-Test files are NOT co-located with source. They live in `src/__tests__/` mirroring the `src/` directory structure.
 
 ### E2E
-
 ```
 e2e/
-├── fixtures/
-│   └── test-document.txt        # document used in upload/retrieval tests
-└── tests/
-    ├── auth.spec.ts
-    ├── documents.spec.ts
-    ├── rag-retrieval.spec.ts
-    └── threads.spec.ts
+  playwright.config.ts
+  tests/
+    auth.spec.ts                         # sign-in, sign-up, invalid credentials
+    documents.spec.ts                    # document upload, list, delete
+    threads.spec.ts                      # create/rename/delete chat threads
+    rag-retrieval.spec.ts                # RAG query produces a response
 ```
 
----
+## Backend Test Structure
 
-## Test Structure
+### Shared Fixtures (`backend/tests/conftest.py`)
 
-### Backend Unit Tests (pytest class style)
+The conftest wires up a full mock Supabase client and overrides FastAPI's dependency injection for all tests:
 
 ```python
-class TestChunkTextEdgeCases:
-    def test_empty_string_returns_empty_list(self):
-        assert chunk_text("") == []
+# Env vars patched before any app import (pydantic-settings reads at class init time)
+os.environ.setdefault("SUPABASE_URL", "https://test.supabase.co")
+os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 
-    def test_long_text_returns_multiple_chunks(self):
-        text = "x" * 300
-        result = chunk_text(text, chunk_size=100, overlap=20)
-        assert len(result) >= 3
+# Dependency overrides applied to the app object
+app.dependency_overrides[get_current_user] = lambda: mock_user_data
+app.dependency_overrides[get_supabase] = lambda: _supabase
 ```
 
-Test classes group related cases by subject. No `unittest.TestCase` inheritance — plain classes with `pytest` collection.
+Key fixtures:
+- `client` — `TestClient(app)` for HTTP route tests
+- `auth_headers` — `{"Authorization": "Bearer test-token"}`
+- `mock_user` — `{"id": "00000000-0000-0000-0000-000000000001", "email": "test@example.com"}`
+- `mock_execute_result` — the shared Supabase query result mock (set `.data` per test)
+- `mock_builder` — the shared fluent query builder mock (configure `side_effect` per test)
+- `reset_mocks` — **autouse** fixture that resets all mock state before each test to prevent leakage
 
-### Backend Integration Tests
+### Supabase Builder Mock Pattern
+
+The mock replicates Supabase's fluent query builder:
 
 ```python
-class TestUploadDocument:
-    def test_valid_txt_upload_returns_201(self, client, auth_headers, mock_execute_result):
-        mock_execute_result.data = [_doc_row()]
-        with patch("app.api.documents.ingest_document"):
-            response = client.post(
-                "/documents/upload",
-                headers=auth_headers,
-                files={"file": ("test.txt", b"Hello world content", "text/plain")},
-            )
+# All chained methods return the builder itself
+builder.select.return_value = builder
+builder.eq.return_value = builder
+builder.in_.return_value = builder
+builder.execute.return_value = execute_result
+```
+
+Per-test data is set by assigning to `mock_execute_result.data`:
+```python
+def test_list_folders(self, client, auth_headers, mock_execute_result):
+    mock_execute_result.data = [_folder_row()]
+    response = client.get("/folders", headers=auth_headers)
+    assert response.status_code == 200
+```
+
+### Integration Test Structure
+
+```python
+# Pattern used in all integration test files
+USER_ID = "00000000-0000-0000-0000-000000000001"
+
+def _folder_row(folder_id=None, name="Reports", ...):
+    """Helper that returns a realistic DB row dict."""
+    return {"id": folder_id or FOLDER_ID, "user_id": USER_ID, ...}
+
+class TestCreateFolder:
+    def test_create_root_folder(self, client, auth_headers, mock_execute_result):
+        mock_execute_result.data = [_folder_row()]
+        response = client.post("/folders", headers=auth_headers, json={"name": "Reports"})
         assert response.status_code == 201
+        assert response.json()["name"] == "Reports"
 ```
 
-### Frontend Unit Tests (Vitest)
+Tests are organized into classes by endpoint group (e.g., `TestCreateFolder`, `TestRenameFolder`, `TestDeleteFolder`).
+
+### Unit Test Structure
+
+Unit tests import the service function directly and mock its external dependencies:
+
+```python
+# backend/tests/unit/test_retrieval_service.py
+from app.services.retrieval_service import search_documents
+
+class TestSearchDocuments:
+    def test_calls_embed_texts_with_query(self):
+        sb = _make_supabase()
+        with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]) as mock_embed:
+            search_documents("test query", USER_ID, sb)
+            mock_embed.assert_called_once_with(["test query"])
+```
+
+Pure-logic functions (e.g., `chunk_text`, `buildFolderTree`) are tested without any mocking.
+
+## Frontend Test Structure
+
+### Component Tests
+
+Use `render` from `@testing-library/react`, query via accessible roles and text, fire events with `fireEvent` or `userEvent`:
 
 ```typescript
-describe("MessageItem – streaming state", () => {
-  it("shows thinking indicator when streaming with empty content", () => {
-    render(
-      <MessageItem
-        message={makeMessage({ role: "assistant", content: "" })}
-        isStreaming={true}
-      />,
-    )
-    expect(screen.getByText(/thinking/i)).toBeInTheDocument()
+// frontend/src/__tests__/components/FolderNode.test.tsx
+import { describe, it, expect, vi } from "vitest"
+import { render, screen, fireEvent } from "@testing-library/react"
+
+function makeNode(overrides: Partial<FolderNode> = {}): FolderNode { ... }
+
+describe("FolderNode", () => {
+  it("renders folder name", () => {
+    renderWithTooltip(<FolderNodeComponent node={makeNode()} {...defaultProps} />)
+    expect(screen.getByText("My Folder")).toBeInTheDocument()
   })
 })
 ```
 
-### E2E Tests (Playwright)
+Components that use Radix `Tooltip` require a `TooltipProvider` wrapper — a local `renderWithTooltip` helper handles this.
+
+### Hook Tests
+
+Use `renderHook` and `waitFor` from `@testing-library/react`. All external dependencies are mocked via `vi.mock`:
 
 ```typescript
-test.describe("Authentication", () => {
-  test("sign in with valid credentials shows chat interface", async ({ page }) => {
-    if (!hasCredentials) { test.skip(); return }
-    await page.goto("/")
-    // ... interaction
-    await expect(page.getByText(/new chat/i)).toBeVisible({ timeout: 15_000 })
-  })
-})
-```
-
----
-
-## Mocking
-
-### Backend — Shared Supabase Fixture (`backend/tests/conftest.py`)
-
-A fluent chainable `MagicMock` is built once and reset before each test via `autouse=True` fixture:
-
-```python
-def _make_builder(execute_result):
-    b = MagicMock()
-    b.select.return_value = b
-    b.insert.return_value = b
-    b.update.return_value = b
-    b.delete.return_value = b
-    b.eq.return_value = b
-    b.order.return_value = b
-    b.single.return_value = b
-    b.execute.return_value = execute_result
-    return b
-```
-
-The entire `get_supabase` dependency is overridden at app level: `app.dependency_overrides[get_supabase] = lambda: _supabase`.
-
-Auth is similarly overridden: `app.dependency_overrides[get_current_user] = lambda: mock_user_data`.
-
-To configure specific test data, fixtures accept `mock_execute_result` and set `.data`:
-```python
-def test_returns_list(self, client, auth_headers, mock_execute_result):
-    mock_execute_result.data = [_doc_row()]
-    response = client.get("/documents", headers=auth_headers)
-```
-
-For tests needing call-by-call control, `mock_builder.execute.side_effect = [result1, result2, ...]` is used.
-
-### Backend — Service Unit Test Mocking
-
-Service tests use `patch` as a context manager to mock external dependencies:
-
-```python
-def test_calls_embed_texts_with_query(self):
-    sb = _make_supabase()
-    with patch("app.services.retrieval_service.embed_texts", return_value=[FAKE_EMBEDDING]) as mock_embed:
-        search_documents("test query", USER_ID, sb)
-        mock_embed.assert_called_once_with(["test query"])
-```
-
-Settings are patched at the module level: `with patch("app.services.openai_service.settings") as mock_settings`.
-
-### Frontend — Module Mocking (Vitest)
-
-Uses `vi.mock()` with `vi.hoisted()` to ensure mocks are available before module imports:
-
-```typescript
-const { mockListDocuments, mockUploadDocument, mockDeleteDocument } = vi.hoisted(() => ({
-  mockListDocuments: vi.fn(),
-  mockUploadDocument: vi.fn(),
-  mockDeleteDocument: vi.fn(),
-}))
-
+// frontend/src/__tests__/hooks/useFolders.test.ts
 vi.mock("@/lib/api", () => ({
-  listDocuments: mockListDocuments,
-  uploadDocument: mockUploadDocument,
-  deleteDocument: mockDeleteDocument,
+  listFolders: mockListFolders,
+  createFolder: mockCreateFolder,
+  // ...
 }))
-```
 
-Supabase client is mocked to return a fake channel:
-```typescript
 vi.mock("@/lib/supabase", () => ({
-  supabase: {
-    auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { user: { id: "user-1" }, access_token: "token" } } }) },
-    channel: vi.fn().mockReturnValue(mockChannel),
-    removeChannel: mockRemoveChannel,
-  },
+  supabase: { auth: { getSession: vi.fn()... }, channel: vi.fn()... }
 }))
+
+it("loads folders on mount", async () => {
+  mockListFolders.mockResolvedValueOnce([makeFolder({ id: "f1", name: "Alpha" })])
+  const { result } = renderHook(() => useFolders())
+  await waitFor(() => expect(result.current.folders).toHaveLength(1))
+})
 ```
 
-`fetch` is mocked globally per-test:
-```typescript
-vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: vi.fn().mockResolvedValue(body) }))
-```
+`vi.hoisted()` is used to define mocks before module imports (required when `vi.mock` factory references external variables).
 
----
+### API Client Tests
 
-## Test Data Helpers
-
-### Backend — Row Factory Functions
-
-Tests define module-level factory functions that produce fixture dicts:
-```python
-def _doc_row(doc_id=None, status="pending"):
-    return {
-        "id": doc_id or DOC_ID,
-        "user_id": USER_ID,
-        "filename": "test.txt",
-        "status": status,
-        # ... all required fields
-    }
-```
-
-Fixed UUIDs used: `USER_ID = "00000000-0000-0000-0000-000000000001"`, `DOC_ID = str(uuid4())`.
-
-### Frontend — Object Factory Functions
+Mocks the global `fetch` function and the Supabase auth session:
 
 ```typescript
-function makeMessage(overrides: Partial<Message> = {}): Message {
-  return {
-    id: "msg-1",
-    thread_id: "thread-1",
-    user_id: "user-1",
-    role: "user",
-    content: "Hello world",
-    created_at: NOW,
-    updated_at: NOW,
-    ...overrides,
-  }
+function mockFetch(body: unknown, status = 200) {
+  return vi.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    json: vi.fn().mockResolvedValue(body),
+  })
 }
+
+it("listFolders calls /folders with auth header", async () => {
+  global.fetch = mockFetch([])
+  await listFolders()
+  expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining("/folders"),
+    expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer mock-token" }) })
+  )
+})
 ```
 
----
+### Pure Function Tests
 
-## Parametrize
+No mocking needed. Call the function and assert on the output:
 
-Backend tests use `@pytest.mark.parametrize` for testing the same assertion across multiple inputs:
+```typescript
+// frontend/src/__tests__/lib/buildFolderTree.test.ts
+it("returns empty array for empty input", () => {
+  expect(buildFolderTree([])).toEqual([])
+})
 
-```python
-@pytest.mark.parametrize("tool", [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, WEB_SEARCH_TOOL])
-def test_tool_has_type_function(self, tool):
-    assert tool["type"] == "function"
+it("puts children under their parent", () => {
+  const folders = [makeFolder({ id: "p1", name: "Parent" }), makeFolder({ id: "c1", name: "Child", parent_id: "p1" })]
+  const tree = buildFolderTree(folders)
+  expect(tree[0].children[0].name).toBe("Child")
+})
 ```
 
----
+## E2E Test Patterns
 
-## Coverage
+E2E tests use Playwright's `test` and `expect`. Tests are resilient to the user being already signed in:
 
-**No coverage enforcement configured.** Neither `pytest-cov` nor a coverage threshold is present in `pytest.ini`, `requirements.txt`, or `package.json`.
+```typescript
+// frontend/e2e/tests/auth.spec.ts
+const hasCredentials = Boolean(TEST_EMAIL && TEST_PASSWORD)
 
-**Rough estimate by area:**
+test("invalid login shows error message", async ({ page }) => {
+  await page.goto("/")
+  const emailInput = page.getByRole("textbox", { name: /email/i })
+  if ((await emailInput.count()) === 0) {
+    test.skip()  // already logged in
+    return
+  }
+  // ... test body
+})
+```
 
-| Area | Coverage | Notes |
-|------|----------|-------|
-| `embedding_service.chunk_text` | High | 11 dedicated unit tests for edge cases |
-| `retrieval_service.search_documents` | High | 8 unit tests with full mock control |
-| `openai_service` client factories | High | 7 unit tests for LLM + embedding client config |
-| `openai_service` tool schemas / `get_tools()` | High | 15 parametrized + dedicated tests |
-| `documents` API endpoints | Medium-High | Integration tests for list, upload (7 cases), delete |
-| `threads` API endpoints | Medium | Integration tests exist (`test_threads.py`) |
-| `MessageItem` component | Medium | 12 tests covering user/assistant/streaming states |
-| `DocumentStatusBadge` component | High | All 4 status variants tested |
-| `api.ts` library | Medium | 6 describe blocks covering main CRUD operations |
-| `useDocuments` hook | Medium | Initial state, fetch, upload lifecycle, delete |
-| `retrieval_service` hybrid path | Low | Unit tests cover vector-only path; hybrid/RRF not tested |
-| `sub_agent_service` | Low | No unit tests found |
-| `web_search_service` / `sql_service` | Low | Test files exist but focus on tool schema, not service logic |
-| `useMessages` hook | None | No test file found |
-| `useThreads` / `useAuth` hooks | None | No test files found |
-| E2E — auth flow | Medium | 4 scenarios, credential-gated for 3 |
-| E2E — document upload/management | Medium | 5 scenarios, all credential-gated |
-| E2E — RAG retrieval | Low | 3 scenarios, credential-gated, requires live Supabase |
+## Current Coverage Gaps
 
----
+**Backend — not covered by existing tests:**
+- `backend/app/api/documents.py` — the `ingest_document` background task (text extraction, chunking, embedding, metadata extraction) has no unit or integration test coverage. This is the most complex code path in the system.
+- `backend/app/api/threads.py` — the full SSE streaming path with tool calls (multi-turn, tool loop, sandbox execution) is partially covered in `test_threads.py` but tool call dispatch for most individual tools (grep, glob, read_document, analyze_document, web_search, execute_code) is not tested end-to-end
+- `backend/app/api/kb.py` — `ls_path`, `tree_path`, `grep_path`, `glob_path`, `read_path` covered in `test_kb.py` but actual Supabase RPC call shapes not deeply asserted
+- `backend/app/models/user_settings.py` — settings override loading/saving logic has no dedicated tests
+- `backend/app/utils/folder_utils.py` — `is_in_global_subtree` recursive logic has no dedicated unit tests
 
-## Test Types
+**Frontend — not covered:**
+- `frontend/src/hooks/useMessages.ts` — the SSE streaming handler and tool call state machine are not tested; this is the most complex frontend code
+- `frontend/src/hooks/useThreads.ts` — no tests
+- `frontend/src/hooks/useAuth.ts` — no tests
+- `frontend/src/hooks/useSkills.ts` — no tests
+- `frontend/src/components/chat/*` — only `MessageItem` has a test; `ChatArea`, `ToolCallPanel`, `ExecuteCodeBlock`, `MessageInput`, `MarkdownRenderer` have no tests
+- `frontend/src/components/skills/*` — no tests
+- `frontend/src/pages/*` — `SkillsPage`, `SettingsPage` have no tests
 
-### Unit Tests
-- **Backend:** `backend/tests/unit/` — test pure service functions with all I/O mocked; no FastAPI app involved
-- **Frontend:** `frontend/src/__tests__/` — test React components with `@testing-library/react` and hook logic with `renderHook`
-
-### Integration Tests
-- **Backend:** `backend/tests/integration/` — test full HTTP request/response cycle through FastAPI `TestClient`; Supabase mocked at fixture level but all FastAPI middleware, routing, and Pydantic validation are exercised
-
-### E2E Tests
-- **Location:** `e2e/tests/`
-- **Scope:** Full browser automation against a live running app (frontend + backend + Supabase)
-- **Credential gating:** Most tests call `if (!hasCredentials) { test.skip(); return }` so they pass in CI without secrets
-
----
-
-## Testing Gaps
-
-**Backend:**
-- `sub_agent_service.py` — no tests; logic for streaming LLM sub-agent is untested
-- `rerank_service.py` — no tests found
-- Hybrid search path in `retrieval_service.search_documents` — RRF fusion and reranking logic not unit-tested
-- `ingest_document` background function in `backend/app/api/documents.py` — the integration tests mock it away; the chunking + embedding + status update flow is not tested end-to-end
-- SSE streaming logic in `backend/app/api/threads.py` — the `event_stream` generator, tool dispatch loop, and `MAX_ITERATIONS` guard have no test coverage
-
-**Frontend:**
-- `useMessages` hook — no tests; most complex hook in the codebase (optimistic UI, streaming delta, tool call tracking, sub-agent state)
-- `useThreads` hook — no tests
-- `useAuth` hook — no tests
-- `ChatArea`, `MessageList`, `MessageInput`, `ToolCallPanel`, `MarkdownRenderer` components — no tests
-- `streamMessage` function in `api.ts` — SSE parsing logic not tested (only CRUD methods are tested)
-
-**E2E:**
-- Thread creation and rename flows — `e2e/tests/threads.spec.ts` exists but content not reviewed; assumed credential-gated
-- Tool call UI (tool call panel rendering during streaming) — no E2E coverage found
-- Sub-agent streaming UI — no E2E coverage found
+**E2E — practical limitations:**
+- E2E tests require a live Supabase project and real credentials via env vars (`TEST_USER_EMAIL`, `TEST_USER_PASSWORD`). In the absence of those vars, most tests are skipped or weakly asserted. They are not suitable for CI without a dedicated test Supabase project.
+- No E2E coverage for: skills management, settings page, folder tree interactions, document ingestion status tracking
