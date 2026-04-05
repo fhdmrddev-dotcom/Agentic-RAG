@@ -5,7 +5,7 @@ milestone_name: milestone
 status: v2.0 milestone complete
 stopped_at: Completed 17-01-PLAN.md
 last_updated: "2026-04-04T17:58:06.091Z"
-last_activity: 2026-04-05 - Completed quick task 260405-s1e: Hide toggle-global from non-owners and block uploads into other users' global folders
+last_activity: 2026-04-05 - Completed quick task 260405-stg: add chat references, cascade deletions, and sandbox file cleanup
 progress:
   total_phases: 9
   completed_phases: 9
