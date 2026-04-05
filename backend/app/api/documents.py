@@ -64,18 +64,22 @@ async def upload_document(
             detail="File is empty",
         )
 
-    # Validate folder_id if provided (per DOC-01)
+    # Validate folder ownership: only the folder owner may upload into it
     if folder_id:
         folder_check = (
             supabase.table("folders")
-            .select("id")
+            .select("id, user_id")
             .eq("id", folder_id)
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
             .maybe_single()
             .execute()
         )
         if not folder_check.data:
             raise HTTPException(status_code=404, detail="Folder not found")
+        if folder_check.data["user_id"] != current_user["id"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot upload to a folder you do not own",
+            )
 
     content_hash = hashlib.sha256(raw).hexdigest()
 
