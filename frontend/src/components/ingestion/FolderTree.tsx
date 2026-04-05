@@ -9,6 +9,7 @@ import type { Folder } from "@/types"
 interface FolderTreeProps {
   folders: Folder[]
   selectedFolderId: string | null
+  currentUserId: string
   onSelectFolder: (id: string | null) => void
   onCreateFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
   onRenameFolder: (id: string, name: string) => Promise<void>
@@ -19,6 +20,7 @@ interface FolderTreeProps {
 export function FolderTree({
   folders,
   selectedFolderId,
+  currentUserId,
   onSelectFolder,
   onCreateFolder,
   onRenameFolder,
@@ -170,6 +172,7 @@ export function FolderTree({
             editingId={editingId}
             deletingId={deletingId}
             creatingInParentId={creatingInParentId}
+            currentUserId={currentUserId}
             onSelect={onSelectFolder}
             onToggleExpand={handleToggleExpand}
             onStartRename={handleStartRename}
