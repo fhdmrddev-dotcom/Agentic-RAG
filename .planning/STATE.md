@@ -5,7 +5,7 @@ milestone_name: milestone
 status: v2.0 milestone complete
 stopped_at: Completed 17-01-PLAN.md
 last_updated: "2026-04-04T17:58:06.091Z"
-last_activity: 2026-04-04 - Completed quick task 260404-vel: Fix streaming cursor bug and add meaningful agent-working indicator
+last_activity: 2026-04-05 - Completed quick task 260405-s1e: Hide toggle-global from non-owners and block uploads into other users' global folders
 progress:
   total_phases: 9
   completed_phases: 9
@@ -195,9 +195,10 @@ None yet.
 | 260328-x6n | Fix bug: folder not created when pressing Enter in folder input | 2026-03-29 | 2852601 | [260328-x6n-fix-bug-folder-not-created-when-pressing](./quick/260328-x6n-fix-bug-folder-not-created-when-pressing/) |
 | 260404-vel | Fix streaming cursor bug and add meaningful agent-working indicator | 2026-04-04 | 1bd9576 | [260404-vel-fix-streaming-cursor-bug-and-add-meaning](./quick/260404-vel-fix-streaming-cursor-bug-and-add-meaning/) |
 | 260405-rgy | Fix folder public visibility — files and subfolders not appearing to other users (ancestry-based global subtree check) | 2026-04-05 | 6742041 | [260405-rgy-fix-folder-public-visibility-files-and-s](./quick/260405-rgy-fix-folder-public-visibility-files-and-s/) |
+| 260405-s1e | Hide toggle-global from non-owners and block uploads into other users' global folders | 2026-04-05 | 62f9897 | [260405-s1e-hide-toggle-global-from-non-owners-and-b](./quick/260405-s1e-hide-toggle-global-from-non-owners-and-b/) |
 
 ## Session Continuity
 
 Last activity: 2026-04-05
-Stopped at: Completed quick task 260405-rgy: Fix folder public visibility
+Stopped at: Completed quick task 260405-s1e: Hide toggle-global from non-owners and block uploads into other users' global folders
 Resume file: None
