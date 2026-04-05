@@ -3,6 +3,7 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
+from app.utils.folder_utils import fetch_visible_folders
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -12,21 +13,9 @@ async def list_folders(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """List all folders visible to the current user (owned + global)."""
-    result = (
-        supabase.table("folders")
-        .select("*")
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-        .order("name")
-        .execute()
-    )
-    # Deduplicate by id in case user owns a global folder
-    seen = set()
-    folders = []
-    for row in result.data:
-        if row["id"] not in seen:
-            seen.add(row["id"])
-            folders.append(row)
+    """List all folders visible to the current user (owned + global subtree)."""
+    folders = fetch_visible_folders(supabase, current_user["id"])
+    folders.sort(key=lambda f: f["name"])
     return folders
 
 
@@ -37,21 +26,10 @@ async def list_children(
     supabase: Client = Depends(get_supabase),
 ):
     """List direct children of a folder that are visible to the current user."""
-    result = (
-        supabase.table("folders")
-        .select("*")
-        .eq("parent_id", folder_id)
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-        .order("name")
-        .execute()
-    )
-    seen = set()
-    folders = []
-    for row in result.data:
-        if row["id"] not in seen:
-            seen.add(row["id"])
-            folders.append(row)
-    return folders
+    visible = fetch_visible_folders(supabase, current_user["id"])
+    children = [f for f in visible if f["parent_id"] == folder_id]
+    children.sort(key=lambda f: f["name"])
+    return children
 
 
 @router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
@@ -62,15 +40,9 @@ async def create_folder(
 ):
     """Create a new folder. Validates parent_id ownership if provided."""
     if body.parent_id:
-        parent = (
-            supabase.table("folders")
-            .select("id, user_id, is_global")
-            .eq("id", str(body.parent_id))
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-            .maybe_single()
-            .execute()
-        )
-        if not parent.data:
+        visible = fetch_visible_folders(supabase, current_user["id"])
+        visible_ids = {f["id"] for f in visible}
+        if str(body.parent_id) not in visible_ids:
             raise HTTPException(status_code=404, detail="Parent folder not found")
 
     # Check for duplicate folder name under same parent for same user
@@ -241,15 +213,9 @@ async def move_folder(
     """Move a folder to a different parent. parent_id=null moves to root."""
     # 1. Validate new parent accessibility (if not moving to root)
     if body.parent_id:
-        parent = (
-            supabase.table("folders")
-            .select("id")
-            .eq("id", str(body.parent_id))
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-            .maybe_single()
-            .execute()
-        )
-        if not parent.data:
+        visible = fetch_visible_folders(supabase, current_user["id"])
+        visible_ids = {f["id"] for f in visible}
+        if str(body.parent_id) not in visible_ids:
             raise HTTPException(status_code=404, detail="Parent folder not found")
 
     # 2. Perform move (ownership enforced via user_id filter)
