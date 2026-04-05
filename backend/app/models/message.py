@@ -21,3 +21,4 @@ class MessageResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     tool_calls: list[dict] | None = None
+    source_refs: list[dict] | None = None

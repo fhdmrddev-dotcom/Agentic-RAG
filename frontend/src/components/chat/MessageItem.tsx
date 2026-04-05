@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
+import { SourceReferences } from "./SourceReferences"
 
 interface Props {
   message: Message
@@ -69,6 +70,9 @@ export function MessageItem({ message, isStreaming }: Props) {
             <MarkdownRenderer content={message.content} />
             {isStreaming && !hasRunningTools && (
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
+            )}
+            {message.sources && message.sources.length > 0 && (
+              <SourceReferences sources={message.sources} />
             )}
           </div>
         ) : null}

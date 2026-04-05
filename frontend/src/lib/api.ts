@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -49,7 +49,12 @@ export async function getMessages(threadId: string): Promise<Message[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers })
   if (!res.ok) throw new Error("Failed to get messages")
-  return res.json() as Promise<Message[]>
+  const data = await res.json() as Array<Message & { source_refs?: SourceReference[] }>
+  // Map source_refs (DB column name) -> sources (frontend field name)
+  return data.map((m) => {
+    const { source_refs, ...rest } = m
+    return { ...rest, sources: source_refs ?? rest.sources }
+  })
 }
 
 export async function listModels(): Promise<{ models: string[]; default: string }> {
@@ -95,6 +100,7 @@ export async function streamMessage(
   onCodeStderr?: (content: string) => void,
   onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
   agentMode?: string,
+  onSources?: (sources: SourceReference[]) => void,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
@@ -156,6 +162,8 @@ export async function streamMessage(
             (parsed.output_files ?? []) as OutputFile[],
             parsed.error as string | undefined,
           )
+        } else if (parsed.type === "sources" && onSources) {
+          onSources((parsed.sources ?? []) as SourceReference[])
         }
       } catch {
         // ignore malformed lines

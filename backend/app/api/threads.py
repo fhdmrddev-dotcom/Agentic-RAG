@@ -388,6 +388,7 @@ async def send_message(
 
         full_content = ""
         persisted_tool_calls: list[dict] = []
+        source_refs: list[dict] = []  # {"document_id": str, "filename": str}
 
         def _strip_nul(obj):
             """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
@@ -520,6 +521,13 @@ async def send_message(
                                 folder_ids=folder_subtree_ids,
                             )
                             tool_result = json.dumps(results) if results else "No relevant documents found."
+                            # Collect unique source document references from search results
+                            if results and isinstance(results, list):
+                                for hit in results:
+                                    doc_id = hit.get("document_id") or hit.get("id")
+                                    filename = hit.get("filename") or hit.get("document_name")
+                                    if doc_id and filename:
+                                        source_refs.append({"document_id": doc_id, "filename": filename})
                         elif tool_name == "query_documents":
                             tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
@@ -533,6 +541,8 @@ async def send_message(
                                 if not doc:
                                     tool_result = f"Could not retrieve content for '{args['filename']}'."
                                 else:
+                                    # Track this document as a source reference
+                                    source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
                                     yield f"data: {json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']})}\n\n"
                                     sub_agent_content = ""
                                     try:
@@ -835,6 +845,13 @@ async def send_message(
             logger.error("Unexpected error in event stream: %s", e)
             yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
 
+        # Emit sources SSE event (deduplicated by document_id)
+        if source_refs:
+            unique_sources = list({s["document_id"]: s for s in source_refs}.values())
+            yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
+        else:
+            unique_sources = []
+
         # Persist assistant message — always attempt, even after errors
         if full_content or persisted_tool_calls:
             row: dict = {
@@ -845,6 +862,8 @@ async def send_message(
             }
             if persisted_tool_calls:
                 row["tool_calls"] = _strip_nul(persisted_tool_calls)
+            if unique_sources:
+                row["source_refs"] = unique_sources
             try:
                 supabase.table("messages").insert(row).execute()
             except Exception as e:

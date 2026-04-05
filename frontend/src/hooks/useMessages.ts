@@ -176,6 +176,12 @@ export function useMessages(): UseMessages {
         )
       },
       agentMode,
+      // onSources
+      (sources) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
+        )
+      },
     )
     } catch {
       setIsStreaming(false)

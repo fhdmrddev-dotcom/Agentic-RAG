@@ -41,6 +41,11 @@ export interface ToolCall {
   errorMessage?: string
 }
 
+export interface SourceReference {
+  document_id: string
+  filename: string
+}
+
 export interface Message {
   id: string
   thread_id: string
@@ -52,6 +57,7 @@ export interface Message {
   tool_calls?: ToolCall[]
   sub_agent?: SubAgentState
   activatedSkill?: string  // Set by skill_activated SSE event
+  sources?: SourceReference[]  // Set by sources SSE event; persisted in source_refs column
 }
 
 export interface DocumentMetadata {
