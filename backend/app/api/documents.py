@@ -11,6 +11,7 @@ from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
+from app.utils.folder_utils import get_globally_visible_folder_ids
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -157,14 +158,36 @@ async def list_documents(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = (
+    # Own documents
+    own_result = (
         supabase.table("documents")
         .select("*")
         .eq("user_id", current_user["id"])
-        .order("created_at", desc=True)
         .execute()
     )
-    return result.data
+    own_docs = own_result.data or []
+
+    # Documents in globally visible folders (not owned by current user)
+    global_folder_ids = get_globally_visible_folder_ids(supabase, current_user["id"])
+    global_docs = []
+    if global_folder_ids:
+        global_result = (
+            supabase.table("documents")
+            .select("*")
+            .in_("folder_id", global_folder_ids)
+            .execute()
+        )
+        global_docs = global_result.data or []
+
+    # Merge, deduplicate by id, sort by created_at desc
+    seen: set[str] = set()
+    merged: list[dict] = []
+    for doc in own_docs + global_docs:
+        if doc["id"] not in seen:
+            seen.add(doc["id"])
+            merged.append(doc)
+    merged.sort(key=lambda d: d["created_at"], reverse=True)
+    return merged
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

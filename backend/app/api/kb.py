@@ -5,25 +5,14 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
+from app.utils.folder_utils import fetch_visible_folders as _fetch_all_visible_folders, get_globally_visible_folder_ids
 
 router = APIRouter(prefix="/kb", tags=["kb"])
 
 
 def _fetch_visible_folders(supabase: Client, user_id: str) -> list[dict]:
-    """Fetch all folders visible to user (owned + global), deduplicated."""
-    result = (
-        supabase.table("folders")
-        .select("id, user_id, name, parent_id, is_global")
-        .or_(f"user_id.eq.{user_id},is_global.eq.true")
-        .execute()
-    )
-    seen = set()
-    folders = []
-    for row in result.data:
-        if row["id"] not in seen:
-            seen.add(row["id"])
-            folders.append(row)
-    return folders
+    """Fetch all folders visible to user (owned + in global subtree), deduplicated."""
+    return _fetch_all_visible_folders(supabase, user_id)
 
 
 def _build_tree_map(folders: list[dict]) -> tuple[dict[str, dict], list[dict]]:
@@ -85,14 +74,31 @@ def ls_path(path: str, user_id: str, supabase: Client) -> dict:
         {"id": c["id"], "name": c["name"], "is_global": c["is_global"]}
         for c in target["children"]
     ]
-    doc_result = (
+    # Docs in the target folder visible to this user
+    own_docs_in_folder = (
         supabase.table("documents")
         .select("id, filename, status, created_at")
         .eq("folder_id", target["id"])
         .eq("user_id", user_id)
         .execute()
-    )
-    return {"path": path, "folders": folder_entries, "documents": doc_result.data}
+    ).data or []
+    global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+    global_docs_in_folder = []
+    if target["id"] in global_folder_ids:
+        global_docs_in_folder = (
+            supabase.table("documents")
+            .select("id, filename, status, created_at")
+            .eq("folder_id", target["id"])
+            .execute()
+        ).data or []
+    # Merge, dedup
+    seen_ids: set[str] = set()
+    doc_data: list[dict] = []
+    for d in own_docs_in_folder + global_docs_in_folder:
+        if d["id"] not in seen_ids:
+            seen_ids.add(d["id"])
+            doc_data.append(d)
+    return {"path": path, "folders": folder_entries, "documents": doc_data}
 
 
 def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> dict:
@@ -113,15 +119,34 @@ def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> d
         all_ids.extend(_collect_folder_ids(tn))
 
     if all_ids:
-        doc_result = (
+        global_folder_ids_set = set(get_globally_visible_folder_ids(supabase, user_id))
+        # Fetch own docs in subtree
+        own_docs = (
             supabase.table("documents")
             .select("id, filename, folder_id, status, created_at")
             .in_("folder_id", all_ids)
             .eq("user_id", user_id)
             .execute()
-        )
+        ).data or []
+        # Fetch docs in globally visible folders within subtree
+        global_ids_in_subtree = [fid for fid in all_ids if fid in global_folder_ids_set]
+        global_docs: list[dict] = []
+        if global_ids_in_subtree:
+            global_docs = (
+                supabase.table("documents")
+                .select("id, filename, folder_id, status, created_at")
+                .in_("folder_id", global_ids_in_subtree)
+                .execute()
+            ).data or []
+        # Merge, dedup
+        seen_ids: set[str] = set()
+        all_docs: list[dict] = []
+        for d in own_docs + global_docs:
+            if d["id"] not in seen_ids:
+                seen_ids.add(d["id"])
+                all_docs.append(d)
         docs_by_folder: dict[str, list[dict]] = {}
-        for doc in doc_result.data:
+        for doc in all_docs:
             fid = doc["folder_id"]
             if fid not in docs_by_folder:
                 docs_by_folder[fid] = []
@@ -293,14 +318,28 @@ def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
     nodes, roots = _build_tree_map(all_folders)
     folder_paths = _build_folder_path_map(nodes, roots)
 
-    # Fetch all user's documents
-    result = (
+    # Fetch all visible documents (own + in globally visible folders)
+    own_docs = (
         supabase.table("documents")
         .select("id, filename, folder_id")
         .eq("user_id", user_id)
         .execute()
-    )
-    docs = result.data or []
+    ).data or []
+    global_folder_ids_set = set(get_globally_visible_folder_ids(supabase, user_id))
+    global_docs: list[dict] = []
+    if global_folder_ids_set:
+        global_docs = (
+            supabase.table("documents")
+            .select("id, filename, folder_id")
+            .in_("folder_id", list(global_folder_ids_set))
+            .execute()
+        ).data or []
+    seen_ids: set[str] = set()
+    docs: list[dict] = []
+    for d in own_docs + global_docs:
+        if d["id"] not in seen_ids:
+            seen_ids.add(d["id"])
+            docs.append(d)
 
     compiled = _glob_pattern_to_regex(pattern)
 
@@ -345,18 +384,30 @@ def read_path(
 ) -> dict:
     """Fetch full_markdown for a document, optionally sliced to a line range."""
     try:
+        # Try fetching as owner first
         result = (
             supabase.table("documents")
             .select("id, filename, full_markdown")
             .eq("id", document_id)
             .eq("user_id", user_id)
-            .single()
+            .maybe_single()
             .execute()
         )
+        if not result.data:
+            # Check if document is in a globally visible folder
+            global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+            if global_folder_ids:
+                result = (
+                    supabase.table("documents")
+                    .select("id, filename, full_markdown")
+                    .eq("id", document_id)
+                    .in_("folder_id", global_folder_ids)
+                    .maybe_single()
+                    .execute()
+                )
+        if not result.data:
+            return {"error": f"Document '{document_id}' not found or access denied."}
     except Exception:
-        return {"error": f"Document '{document_id}' not found or access denied."}
-
-    if not result.data:
         return {"error": f"Document '{document_id}' not found or access denied."}
 
     doc = result.data
