@@ -148,6 +148,30 @@ async def delete_thread(
     if settings.sandbox_enabled:
         from app.services.sandbox_service import sandbox_manager
         sandbox_manager.close_session(thread_id)
+
+    # Clean up sandbox output files from storage before cascade deletes DB rows
+    try:
+        exec_rows = (
+            supabase.table("code_executions")
+            .select("id")
+            .eq("thread_id", thread_id)
+            .eq("user_id", current_user["id"])
+            .execute()
+        ).data or []
+        if exec_rows:
+            exec_ids = [r["id"] for r in exec_rows]
+            file_rows = (
+                supabase.table("sandbox_files")
+                .select("storage_path")
+                .in_("execution_id", exec_ids)
+                .execute()
+            ).data or []
+            if file_rows:
+                paths = [f["storage_path"] for f in file_rows]
+                supabase.storage.from_("sandbox-outputs").remove(paths)
+    except Exception:
+        pass  # Best-effort cleanup — don't block thread deletion
+
     supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
 
 
