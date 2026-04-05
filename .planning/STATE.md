@@ -194,9 +194,10 @@ None yet.
 | 260328-wqj | Fix folder-scoped chat returning results from all folders — scope query_documents SQL, glob, and system prompt to folder subtree | 2026-03-28 | eaf7848 | [260328-wqj-fix-folder-scoped-chat-returning-results](./quick/260328-wqj-fix-folder-scoped-chat-returning-results/) |
 | 260328-x6n | Fix bug: folder not created when pressing Enter in folder input | 2026-03-29 | 2852601 | [260328-x6n-fix-bug-folder-not-created-when-pressing](./quick/260328-x6n-fix-bug-folder-not-created-when-pressing/) |
 | 260404-vel | Fix streaming cursor bug and add meaningful agent-working indicator | 2026-04-04 | 1bd9576 | [260404-vel-fix-streaming-cursor-bug-and-add-meaning](./quick/260404-vel-fix-streaming-cursor-bug-and-add-meaning/) |
+| 260405-rgy | Fix folder public visibility — files and subfolders not appearing to other users (ancestry-based global subtree check) | 2026-04-05 | 6742041 | [260405-rgy-fix-folder-public-visibility-files-and-s](./quick/260405-rgy-fix-folder-public-visibility-files-and-s/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-04
-Stopped at: Completed 17-01-PLAN.md
+Last activity: 2026-04-05
+Stopped at: Completed quick task 260405-rgy: Fix folder public visibility
 Resume file: None
