@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     def web_search_enabled(self) -> bool:
         return bool(self.tavily_api_key)
 
+    # Context window management
+    context_window_max_tokens: int = 100000  # safe default for gpt-4o 128k; leaves room for response
+    context_window_reserve_recent: int = 10  # minimum recent messages to always preserve
+
     # Sub-agent settings
     sub_agent_max_chars: int = 100000
 
