@@ -20,6 +20,7 @@ from app.services.openai_service import create_streaming_chat, get_llm_client, g
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
     from app.services.sandbox_service import sandbox_manager, harvest_output_files
+from app.services.context_window import trim_messages_to_fit, estimate_messages_tokens
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
@@ -410,6 +411,13 @@ async def send_message(
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         messages.extend(_reconstruct_history(history_resp.data))
 
+        # Trim conversation history to fit context window before the first LLM call
+        messages = trim_messages_to_fit(
+            messages,
+            max_tokens=settings.context_window_max_tokens,
+            reserve_recent=settings.context_window_reserve_recent,
+        )
+
         full_content = ""
         persisted_tool_calls: list[dict] = []
         source_refs: list[dict] = []  # {"document_id": str, "filename": str}
@@ -434,6 +442,19 @@ async def send_message(
 
         try:
             for iteration in range(max_iterations):
+                # Re-trim after tool results have been appended (context grows each iteration)
+                messages = trim_messages_to_fit(
+                    messages,
+                    max_tokens=settings.context_window_max_tokens,
+                    reserve_recent=settings.context_window_reserve_recent,
+                )
+                logger.debug(
+                    "Agent iteration %d: ~%d tokens in %d messages",
+                    iteration,
+                    estimate_messages_tokens(messages),
+                    len(messages),
+                )
+
                 # On the final iteration force a text response to avoid an infinite loop
                 force_no_tools = (iteration == max_iterations - 1)
                 tool_choice = "none" if force_no_tools else "auto"
