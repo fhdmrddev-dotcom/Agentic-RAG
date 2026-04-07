@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generator
 from langsmith import traceable
 
 from app.config import settings
-from app.services.openai_service import get_llm_client
+from app.services.openai_service import get_llm_client, _resolve_max_tokens
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -42,6 +42,7 @@ def run_sub_agent(
         model=effective_model,
         messages=messages,
         stream=True,
+        max_tokens=_resolve_max_tokens(None, user_settings),
     )
 
     for chunk in stream:

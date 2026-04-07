@@ -444,6 +444,56 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     return OpenAI(**kwargs)
 
 
+# Per-provider safe max output token defaults.
+#
+# Anthropic's compat layer silently defaults to 1024 tokens if max_tokens is
+# unset — always override it. Other providers are lenient but explicit is better.
+#
+# Values chosen as practical ceilings for RAG chat responses. Users needing
+# longer outputs (e.g. full-document rewrites) can raise LLM_MAX_OUTPUT_TOKENS
+# in .env — that value wins when it differs from the 8192 package default.
+#
+# Provider limits (as of 2025-10):
+#   anthropic  — Haiku 4.5: 8192 | Sonnet 4.6: 64k | Opus 4.6: 32k
+#   google     — Gemini 2.5 Pro/Flash: 65k
+#   openai     — GPT-4o / GPT-4.1 family: 16k–32k
+#   openrouter — depends on underlying model; 16k is safe for most
+#   ollama     — local; conservative 4k avoids OOM on small machines
+_PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
+    "anthropic":  8192,   # Haiku ceiling; Sonnet/Opus accept more but 8k covers most RAG needs
+    "google":     16384,  # Gemini 2.5 can do 65k; 16k is plenty and avoids runaway outputs
+    "openai":     16384,  # GPT-4o / GPT-4.1 support 16k+ safely
+    "openrouter": 16384,  # passes through; most hosted models support 16k
+    "ollama":     4096,   # local hardware varies; keep conservative
+}
+_FALLBACK_MAX_TOKENS = 8192  # used when provider is unknown / legacy mode
+
+
+def _resolve_max_tokens(
+    explicit: int | None,
+    user_settings: "UserEffectiveSettings | None",
+) -> int:
+    """Pick the right max_tokens for this call.
+
+    Priority:
+    1. Caller-supplied explicit value (rare — used by sub-agents etc.)
+    2. LLM_MAX_OUTPUT_TOKENS env var, IF the user changed it from the package default.
+    3. Per-provider sensible default from _PROVIDER_DEFAULT_MAX_TOKENS.
+    4. _FALLBACK_MAX_TOKENS for unknown/legacy providers.
+    """
+    if explicit is not None:
+        return explicit
+
+    env_val = settings.llm_max_output_tokens
+    env_default = 8192  # matches the default in config.py
+    if env_val != env_default:
+        # User deliberately set LLM_MAX_OUTPUT_TOKENS — respect it for all providers
+        return env_val
+
+    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+    return _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
+
+
 def create_streaming_chat(
     messages: list[dict],
     tool_choice: str = "auto",
@@ -458,9 +508,9 @@ def create_streaming_chat(
         "model": effective_model,
         "messages": messages,
         "stream": True,
-        # Always set max_tokens — Anthropic's compat layer defaults to 1024 which truncates
-        # complex responses mid-stream. 8192 covers all current providers safely.
-        "max_tokens": max_tokens or settings.llm_max_output_tokens,
+        # Always set max_tokens — Anthropic compat defaults to 1024, which silently
+        # truncates complex responses. Other providers are forgiving but explicit wins.
+        "max_tokens": _resolve_max_tokens(max_tokens, user_settings),
     }
     if tool_choice == "auto":
         kwargs["tools"] = tools_override if tools_override is not None else get_tools()

@@ -120,8 +120,11 @@ class Settings(BaseSettings):
     context_window_max_tokens: int = 100000  # safe default for gpt-4o 128k; leaves room for response
     context_window_reserve_recent: int = 10  # minimum recent messages to always preserve
 
-    # Max tokens for LLM output — Anthropic compat defaults to 1024 if unset, which is too low.
-    # 8192 covers complex multi-tool responses for all current providers.
+    # Global max tokens override for LLM output.
+    # When left at the default (8192), per-provider smart defaults apply instead
+    # (see _PROVIDER_DEFAULT_MAX_TOKENS in openai_service.py).
+    # Set this explicitly in .env only when you need a universal cap or want to
+    # override the per-provider defaults (e.g. LLM_MAX_OUTPUT_TOKENS=32768).
     llm_max_output_tokens: int = 8192
 
     # Sub-agent settings
