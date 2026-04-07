@@ -197,9 +197,10 @@ None yet.
 | 260405-rgy | Fix folder public visibility — files and subfolders not appearing to other users (ancestry-based global subtree check) | 2026-04-05 | 6742041 | [260405-rgy-fix-folder-public-visibility-files-and-s](./quick/260405-rgy-fix-folder-public-visibility-files-and-s/) |
 | 260405-s1e | Hide toggle-global from non-owners and block uploads into other users' global folders | 2026-04-05 | 62f9897 | [260405-s1e-hide-toggle-global-from-non-owners-and-b](./quick/260405-s1e-hide-toggle-global-from-non-owners-and-b/) |
 | 260405-stg | Add chat source references, cascade deletions, and sandbox file cleanup | 2026-04-05 | e26ccb1 | [260405-stg-add-chat-references-cascade-deletions-an](./quick/260405-stg-add-chat-references-cascade-deletions-an/) |
+| 260407-vqw | Implement context window management — sliding-window trimming with atomic tool-call removal to prevent silent agent failures on long conversations | 2026-04-07 | 1e5977d | [260407-vqw-review-and-fix-context-window-management](./quick/260407-vqw-review-and-fix-context-window-management/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-05
-Stopped at: Completed quick task 260405-stg: Add chat source references, cascade deletions, and sandbox file cleanup
+Last activity: 2026-04-07
+Stopped at: Completed quick task 260407-vqw: Context window management — sliding-window trimming with atomic tool-call removal
 Resume file: None
