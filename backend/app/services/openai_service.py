@@ -450,6 +450,7 @@ def create_streaming_chat(
     model: str | None = None,
     user_settings: UserEffectiveSettings | None = None,
     tools_override: list[dict] | None = None,
+    max_tokens: int | None = None,
 ):
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
@@ -457,6 +458,9 @@ def create_streaming_chat(
         "model": effective_model,
         "messages": messages,
         "stream": True,
+        # Always set max_tokens — Anthropic's compat layer defaults to 1024 which truncates
+        # complex responses mid-stream. 8192 covers all current providers safely.
+        "max_tokens": max_tokens or settings.llm_max_output_tokens,
     }
     if tool_choice == "auto":
         kwargs["tools"] = tools_override if tools_override is not None else get_tools()

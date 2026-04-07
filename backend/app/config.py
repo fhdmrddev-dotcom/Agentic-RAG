@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     context_window_max_tokens: int = 100000  # safe default for gpt-4o 128k; leaves room for response
     context_window_reserve_recent: int = 10  # minimum recent messages to always preserve
 
+    # Max tokens for LLM output — Anthropic compat defaults to 1024 if unset, which is too low.
+    # 8192 covers complex multi-tool responses for all current providers.
+    llm_max_output_tokens: int = 8192
+
     # Sub-agent settings
     sub_agent_max_chars: int = 100000
 

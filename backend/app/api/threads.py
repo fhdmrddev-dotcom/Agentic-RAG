@@ -494,14 +494,24 @@ async def send_message(
                             if tc.function and tc.function.arguments:
                                 tool_calls_buffer[idx]["arguments"] += tc.function.arguments
 
+                logger.debug(
+                    "Iteration %d finish_reason=%r tool_calls_buffered=%d",
+                    iteration, finish_reason, len(tool_calls_buffer),
+                )
+
                 if finish_reason == "length":
-                    truncation_note = "\n\n*[Response truncated due to length limit]*"
+                    truncation_note = "\n\n*[Response truncated — output token limit reached. Try a shorter request or increase LLM_MAX_OUTPUT_TOKENS.]*"
                     full_content += truncation_note
                     yield f"data: {json.dumps({'type': 'delta', 'content': truncation_note})}\n\n"
                     break
 
-                # No tool calls → natural stop, we're done
+                # No tool calls → natural stop (stop / end_turn / None), we're done
                 if finish_reason != "tool_calls" or not tool_calls_buffer:
+                    if finish_reason not in ("tool_calls", "stop", "end_turn", None):
+                        logger.warning(
+                            "Unexpected finish_reason %r on iteration %d — treating as stop",
+                            finish_reason, iteration,
+                        )
                     break
 
                 # --- Tool execution round ---
@@ -897,23 +907,31 @@ async def send_message(
         else:
             unique_sources = []
 
-        # Persist assistant message — always attempt, even after errors
-        if full_content or persisted_tool_calls:
-            row: dict = {
-                "thread_id": thread_id,
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "content": _strip_nul(full_content),
-            }
-            if persisted_tool_calls:
-                row["tool_calls"] = _strip_nul(persisted_tool_calls)
-            if unique_sources:
-                row["source_refs"] = unique_sources
-            try:
-                supabase.table("messages").insert(row).execute()
-            except Exception as e:
-                logger.error("Failed to persist assistant message: %s", e)
-                yield f"data: {json.dumps({'type': 'error', 'message': f'[persist error] {e}'})}\n\n"
+        # Always persist assistant message — every user message must have a paired
+        # assistant row so history reconstruction stays consistent. If the agent
+        # produced nothing (API error, bad model name, 1024-token truncation on
+        # Anthropic compat, client disconnect), we still write an empty row so the
+        # conversation doesn't desync.
+        if not full_content and not persisted_tool_calls:
+            logger.warning(
+                "Agent loop produced no content for thread %s — persisting empty assistant message",
+                thread_id,
+            )
+        row: dict = {
+            "thread_id": thread_id,
+            "user_id": current_user["id"],
+            "role": "assistant",
+            "content": _strip_nul(full_content),
+        }
+        if persisted_tool_calls:
+            row["tool_calls"] = _strip_nul(persisted_tool_calls)
+        if unique_sources:
+            row["source_refs"] = unique_sources
+        try:
+            supabase.table("messages").insert(row).execute()
+        except Exception as e:
+            logger.error("Failed to persist assistant message: %s", e)
+            yield f"data: {json.dumps({'type': 'error', 'message': f'[persist error] {e}'})}\n\n"
 
         # Touch thread so it rises in updated_at ordering
         try:
