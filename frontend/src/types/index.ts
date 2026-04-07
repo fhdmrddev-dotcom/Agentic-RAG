@@ -58,6 +58,8 @@ export interface Message {
   sub_agent?: SubAgentState
   activatedSkill?: string  // Set by skill_activated SSE event
   sources?: SourceReference[]  // Set by sources SSE event; persisted in source_refs column
+  /** True while the agent has finished one tool-call round and is deciding its next action. */
+  isPlanning?: boolean
 }
 
 export interface DocumentMetadata {

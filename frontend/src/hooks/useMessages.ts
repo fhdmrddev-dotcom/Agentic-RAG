@@ -60,7 +60,7 @@ export function useMessages(): UseMessages {
       content,
       (delta) => {
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
+          prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m)),
         )
       },
       () => {
@@ -69,13 +69,13 @@ export function useMessages(): UseMessages {
       model,
       provider,
       onTitleUpdate,
-      // onToolStart
+      // onToolStart — clear planning flag when a new tool fires
       (name, args) => {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
             const newTool: ToolCall = { name, args, status: "running", startedAt: Date.now() }
-            return { ...m, tool_calls: [...(m.tool_calls ?? []), newTool] }
+            return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), newTool] }
           }),
         )
       },
@@ -180,6 +180,12 @@ export function useMessages(): UseMessages {
       (sources) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
+        )
+      },
+      // onPlanning — agent finished one tool-call round, deciding next action
+      () => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
         )
       },
     )

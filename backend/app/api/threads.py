@@ -442,6 +442,11 @@ async def send_message(
 
         try:
             for iteration in range(max_iterations):
+                # Between tool-call rounds: signal to the frontend that the agent
+                # is deciding its next action (all prior tools are done).
+                if iteration > 0:
+                    yield f"data: {json.dumps({'type': 'planning', 'iteration': iteration})}\n\n"
+
                 # Re-trim after tool results have been appended (context grows each iteration)
                 messages = trim_messages_to_fit(
                     messages,

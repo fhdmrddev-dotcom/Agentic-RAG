@@ -101,6 +101,7 @@ export async function streamMessage(
   onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
   agentMode?: string,
   onSources?: (sources: SourceReference[]) => void,
+  onPlanning?: (iteration: number) => void,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
@@ -164,6 +165,8 @@ export async function streamMessage(
           )
         } else if (parsed.type === "sources" && onSources) {
           onSources((parsed.sources ?? []) as SourceReference[])
+        } else if (parsed.type === "planning" && onPlanning) {
+          onPlanning(parsed.iteration as number)
         }
       } catch {
         // ignore malformed lines

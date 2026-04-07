@@ -4,6 +4,7 @@ import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { SourceReferences } from "./SourceReferences"
+import { toolLabel, toolSummary } from "@/lib/toolMeta"
 
 interface Props {
   message: Message
@@ -29,6 +30,17 @@ export function MessageItem({ message, isStreaming }: Props) {
   }
 
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
+  const activeTool = message.tool_calls?.find((tc) => tc.status === "running")
+
+  // Label shown when the agent is actively running a tool alongside existing content
+  const activeToolLabel = activeTool
+    ? (() => {
+        const summary = toolSummary(activeTool.name, activeTool.args)
+        return summary
+          ? `${toolLabel(activeTool.name)} — "${summary}"`
+          : `${toolLabel(activeTool.name)}…`
+      })()
+    : null
 
   return (
     <div className="flex gap-3 py-3 animate-fadeSlideUp">
@@ -37,7 +49,11 @@ export function MessageItem({ message, isStreaming }: Props) {
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         {message.tool_calls && message.tool_calls.length > 0 && (
-          <ToolCallPanel toolCalls={message.tool_calls} subAgent={message.sub_agent} />
+          <ToolCallPanel
+            toolCalls={message.tool_calls}
+            subAgent={message.sub_agent}
+            isPlanning={message.isPlanning}
+          />
         )}
         {message.activatedSkill && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-primary animate-fadeSlideUp">
@@ -76,14 +92,18 @@ export function MessageItem({ message, isStreaming }: Props) {
             )}
           </div>
         ) : null}
+        {/* Active tool indicator — shown below content when a tool is running */}
         {isStreaming && hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
-            <span className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "160ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-dotBounce" style={{ animationDelay: "320ms" }} />
-            </span>
-            <span className="italic">Agent is working</span>
+            <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
+            <span className="italic truncate">{activeToolLabel ?? "Working…"}</span>
+          </div>
+        )}
+        {/* Between-round planning indicator — shown when agent finished tools, deciding next step */}
+        {isStreaming && message.isPlanning && !hasRunningTools && message.content && (
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
+            <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
+            <span className="italic">Planning next action…</span>
           </div>
         )}
       </div>

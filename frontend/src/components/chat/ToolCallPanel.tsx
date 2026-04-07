@@ -10,10 +10,12 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ToolCall, SubAgentState } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
+import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 
 interface Props {
   toolCalls: ToolCall[]
   subAgent?: SubAgentState  // live sub-agent state during streaming
+  isPlanning?: boolean      // agent finished tool round, deciding next action
 }
 
 function toolIcon(name: string) {
@@ -41,30 +43,10 @@ function toolIconColor(name: string, status: string) {
   return "text-muted-foreground"
 }
 
-function toolLabel(name: string) {
-  if (name === "search_documents") return "Searching documents"
-  if (name === "query_documents") return "Querying documents"
-  if (name === "web_search") return "Searching the web"
-  if (name === "analyze_document") return "Analyzing document"
-  if (name === "ls") return "Listing folder"
-  if (name === "tree") return "Browsing folder tree"
-  if (name === "grep") return "Searching file contents"
-  if (name === "glob") return "Finding files by pattern"
-  if (name === "read_document") return "Reading document"
-  if (name === "execute_code") return "Executing code"
-  return name
-}
+// toolLabel and toolSummary are imported from @/lib/toolMeta
 
 function toolSummary(tc: ToolCall) {
-  if (tc.name === "read_document" && tc.args.filename) return tc.args.filename
-  if (tc.name === "read_document") return null  // don't show raw UUID
-  if (tc.name === "ls" && tc.args.path) return tc.args.path
-  if (tc.name === "tree" && tc.args.path) return tc.args.path
-  if (tc.name === "grep" && tc.args.pattern) return tc.args.pattern
-  if (tc.name === "glob" && tc.args.pattern) return tc.args.pattern
-  if (tc.args.query) return tc.args.query
-  if (tc.args.filename) return tc.args.filename
-  return null
+  return getToolSummary(tc.name, tc.args)
 }
 
 function formatDuration(ms: number): string {
@@ -499,30 +481,47 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
 
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent }: Props) {
+export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
   const allDone = toolCalls.every((tc) => tc.status === "done") &&
     (!subAgent || subAgent.status === "done")
 
   const [expanded, setExpanded] = useState(!allDone)
 
   const isExpanded = expanded
-  const totalTime = allDone ? formatTotalDuration(toolCalls) : null
+  const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
+
+  // Find the currently active tool for the header label
+  const activeTool = toolCalls.find((tc) => tc.status === "running")
+
+  const headerLabel = (() => {
+    if (allDone && !isPlanning) return `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
+    if (isPlanning) return "Planning next action…"
+    if (activeTool) {
+      const summary = toolSummary(activeTool)
+      return summary
+        ? `${toolLabel(activeTool.name)} — ${summary}`
+        : `${toolLabel(activeTool.name)}…`
+    }
+    return "Working…"
+  })()
 
   if (!toolCalls || toolCalls.length === 0) return null
+
+  const isActivelyWorking = !allDone || isPlanning
 
   return (
     <div className={cn(
       "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
-      allDone
-        ? "bg-muted/30 ghost-border"
-        : "bg-primary/5 border border-primary/20 shadow-[0_0_20px_-4px_hsl(239_84%_67%/0.15)]"
+      isActivelyWorking
+        ? "bg-primary/5 border border-primary/20 shadow-[0_0_20px_-4px_hsl(239_84%_67%/0.15)]"
+        : "bg-muted/30 ghost-border"
     )}>
       {/* Header */}
       <button
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        {allDone ? (
+        {!isActivelyWorking ? (
           <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
         ) : (
           <div className="flex-shrink-0 animate-pulseGlow rounded-full">
@@ -530,12 +529,10 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
           </div>
         )}
         <span className={cn(
-          "flex-1 text-xs font-semibold tracking-wide",
-          allDone ? "text-muted-foreground" : "text-primary"
+          "flex-1 text-xs font-semibold tracking-wide truncate",
+          isActivelyWorking ? "text-primary" : "text-muted-foreground"
         )}>
-          {allDone
-            ? `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
-            : "Working…"}
+          {headerLabel}
         </span>
         {/* Total execution time */}
         {totalTime && (
@@ -549,8 +546,8 @@ export function ToolCallPanel({ toolCalls, subAgent }: Props) {
           : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       </button>
 
-      {/* Shimmer progress bar while tools are running */}
-      {!allDone && <div className="tool-progress-bar" />}
+      {/* Shimmer progress bar while tools are running or planning */}
+      {isActivelyWorking && <div className="tool-progress-bar" />}
 
       {/* Body */}
       {isExpanded && (
