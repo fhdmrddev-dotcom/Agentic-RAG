@@ -421,6 +421,34 @@ async def send_message(
         full_content = ""
         persisted_tool_calls: list[dict] = []
         source_refs: list[dict] = []  # {"document_id": str, "filename": str}
+        unique_sources: list[dict] = []
+        _message_persisted = False  # guard against double-insert
+
+        def _persist_assistant_message() -> None:
+            """Insert the assistant message row. Idempotent — only runs once."""
+            nonlocal _message_persisted
+            if _message_persisted:
+                return
+            _message_persisted = True
+            if not full_content and not persisted_tool_calls:
+                logger.warning(
+                    "Agent loop produced no content for thread %s — persisting empty assistant message",
+                    thread_id,
+                )
+            row: dict = {
+                "thread_id": thread_id,
+                "user_id": current_user["id"],
+                "role": "assistant",
+                "content": _strip_nul(full_content),
+            }
+            if persisted_tool_calls:
+                row["tool_calls"] = _strip_nul(persisted_tool_calls)
+            if unique_sources:
+                row["source_refs"] = unique_sources
+            try:
+                supabase.table("messages").insert(row).execute()
+            except Exception as e:
+                logger.error("Failed to persist assistant message: %s", e)
 
         def _strip_nul(obj):
             """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
@@ -440,7 +468,8 @@ async def send_message(
         _CTX_LIMIT_DEFAULT = 3000    # chars in messages[] for most tools
         _CTX_LIMIT_SUBAGENT = 10000  # chars for analyze_document (rich synthesis)
 
-        try:
+        try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
+          try:
             for iteration in range(max_iterations):
                 # Between tool-call rounds: signal to the frontend that the agent
                 # is deciding its next action (all prior tools are done).
@@ -899,61 +928,42 @@ async def send_message(
                     })
                 # Continue to next iteration to let LLM respond with tool results in context
 
-        except APIError as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-        except Exception as e:
-            logger.error("Unexpected error in event stream: %s", e)
-            yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
+          except APIError as e:
+              yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+          except Exception as e:
+              logger.error("Unexpected error in event stream: %s", e)
+              yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
 
-        # Emit sources SSE event (deduplicated by document_id)
-        if source_refs:
-            unique_sources = list({s["document_id"]: s for s in source_refs}.values())
-            yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
-        else:
-            unique_sources = []
+          # Emit sources SSE event (deduplicated by document_id)
+          if source_refs:
+              unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
+              yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
 
-        # Always persist assistant message — every user message must have a paired
-        # assistant row so history reconstruction stays consistent. If the agent
-        # produced nothing (API error, bad model name, 1024-token truncation on
-        # Anthropic compat, client disconnect), we still write an empty row so the
-        # conversation doesn't desync.
-        if not full_content and not persisted_tool_calls:
-            logger.warning(
-                "Agent loop produced no content for thread %s — persisting empty assistant message",
-                thread_id,
-            )
-        row: dict = {
-            "thread_id": thread_id,
-            "user_id": current_user["id"],
-            "role": "assistant",
-            "content": _strip_nul(full_content),
-        }
-        if persisted_tool_calls:
-            row["tool_calls"] = _strip_nul(persisted_tool_calls)
-        if unique_sources:
-            row["source_refs"] = unique_sources
-        try:
-            supabase.table("messages").insert(row).execute()
-        except Exception as e:
-            logger.error("Failed to persist assistant message: %s", e)
-            yield f"data: {json.dumps({'type': 'error', 'message': f'[persist error] {e}'})}\n\n"
+          # Persist assistant message (normal path — before [DONE])
+          _persist_assistant_message()
 
-        # Touch thread so it rises in updated_at ordering
-        try:
-            supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
-        except Exception:
-            pass
+          # Touch thread so it rises in updated_at ordering
+          try:
+              supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
+          except Exception:
+              pass
 
-        # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
-        if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
-            first_user_msg = history_resp.data[0]["content"]
-            title = generate_thread_title(first_user_msg, user_settings=user_settings)
-            try:
-                supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
-                yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
-            except Exception:
-                pass
+          # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
+          if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
+              first_user_msg = history_resp.data[0]["content"]
+              title = generate_thread_title(first_user_msg, user_settings=user_settings)
+              try:
+                  supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
+                  yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
+              except Exception:
+                  pass
 
-        yield "data: [DONE]\n\n"
+          yield "data: [DONE]\n\n"
+
+        finally:
+            # Safety net: runs on GeneratorExit (client disconnect) or any
+            # unhandled BaseException. The guard inside _persist_assistant_message
+            # prevents a double-insert when the normal path already persisted.
+            _persist_assistant_message()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
