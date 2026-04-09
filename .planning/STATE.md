@@ -1,31 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: v2.0 milestone complete
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-04-04T17:58:06.091Z"
-last_activity: 2026-04-05 - Completed quick task 260405-stg: add chat references, cascade deletions, and sandbox file cleanup
+milestone: v2.1
+milestone_name: Stability & RAG Correctness
+status: verifying
+stopped_at: "Completed Phase 18-01: context-window-hardening unit tests"
+last_updated: "2026-04-09T16:42:20.327Z"
+last_activity: 2026-04-09
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 22
-  completed_plans: 22
+  total_phases: 7
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-29)
+See: .planning/PROJECT.md (updated 2026-04-09)
 
-**Core value:** The agent can explore the knowledge base the same way Claude Code explores codebases
-**Current focus:** Phase 17 — tech-debt-cleanup
+**Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
+**Current focus:** Phase 18 — context-window-hardening
 
 ## Current Position
 
-Phase: 17
-Plan: Not started
+Phase: 18 (context-window-hardening) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-04-09
 
 ## Performance Metrics
 
@@ -85,6 +87,7 @@ Plan: Not started
 | Phase 16-skill-file-management-ui P01 | 2min | 2 tasks | 3 files |
 | Phase 16-skill-file-management-ui P02 | 5min | 2 tasks | 2 files |
 | Phase 17-tech-debt-cleanup P01 | 2min | 3 tasks | 3 files |
+| Phase 18-context-window-hardening P01 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -154,9 +157,6 @@ Recent decisions affecting current work:
 - [Phase 13-skills-open-standard]: exportSkill uses getAuthToken() not getAuthHeaders() — must not set Content-Type: application/json on blob download request
 - [Phase 13-skills-open-standard]: importSkillZip uses getAuthToken() not getAuthHeaders() — FormData sets its own Content-Type with multipart boundary; explicit header would break it
 - [Phase 13-skills-open-standard]: loadSkills exposed from useSkills return value so SkillsPage can re-fetch after import
-- [Phase 13-skills-open-standard]: exportSkill uses getAuthToken() not getAuthHeaders() — must not set Content-Type: application/json on blob download request
-- [Phase 13-skills-open-standard]: importSkillZip uses getAuthToken() not getAuthHeaders() — FormData sets its own Content-Type with multipart boundary; explicit header would break it
-- [Phase 13-skills-open-standard]: loadSkills exposed from useSkills return value so SkillsPage can re-fetch after import
 - [Phase 14-code-execution-sandbox]: Lazy import of llm_sandbox inside get_or_create() — Docker SDK never loads when SANDBOX_ENABLED=false
 - [Phase 14-code-execution-sandbox]: sandbox_enabled defaults to False — opt-in flag, never breaks existing deployments
 - [Phase 14-code-execution-sandbox]: Module-level _sessions/_last_used dicts enable test state clearing without reinstantiating manager
@@ -176,6 +176,8 @@ Recent decisions affecting current work:
 - [Phase 16-skill-file-management-ui]: File section gated by isEdit && skill — never rendered in New Skill dialog
 - [Phase 16-skill-file-management-ui]: isOwner derived client-side from skill.user_id === currentUserId, matching existing SkillCard ownership pattern
 - [Phase 16-skill-file-management-ui]: Optimistic state for upload (append) and delete (filter) — no re-fetch needed, list reflects mutations immediately
+- [Phase 18-context-window-hardening]: Test file placed in backend/tests/unit/ to match existing project layout (plan spec had wrong path)
+- [Phase 18-context-window-hardening]: Inter-iteration growth test asserts no-orphan invariant rather than exact token count — reserve_recent=10 correctly protects all recent tool pairs
 
 ### Pending Todos
 
@@ -201,6 +203,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-07
-Stopped at: Completed quick task 260407-vqw: Context window management — sliding-window trimming with atomic tool-call removal
+Last activity: 2026-04-09
+Stopped at: Completed Phase 18-01: context-window-hardening unit tests
 Resume file: None
