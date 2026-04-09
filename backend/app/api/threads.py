@@ -417,6 +417,11 @@ async def send_message(
             max_tokens=settings.context_window_max_tokens,
             reserve_recent=settings.context_window_reserve_recent,
         )
+        logger.debug(
+            "Pre-loop trim: ~%d tokens in %d messages",
+            estimate_messages_tokens(messages),
+            len(messages),
+        )
 
         full_content = ""
         persisted_tool_calls: list[dict] = []
@@ -546,6 +551,14 @@ async def send_message(
                             "Unexpected finish_reason %r on iteration %d — treating as stop",
                             finish_reason, iteration,
                         )
+                    # Guard: if LLM returned stop with no content and no tools on the
+                    # first iteration, retry once — this is a transient model hiccup.
+                    if iteration == 0 and not full_content and not tool_calls_buffer:
+                        logger.warning(
+                            "LLM returned empty response on first iteration (thread %s) — retrying once",
+                            thread_id,
+                        )
+                        continue
                     break
 
                 # --- Tool execution round ---
@@ -929,9 +942,26 @@ async def send_message(
                 # Continue to next iteration to let LLM respond with tool results in context
 
           except APIError as e:
-              yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+              logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
+              err_str = str(e)
+              # Detect context-window errors and give a helpful user message
+              if any(kw in err_str.lower() for kw in ("context", "too long", "too large", "max_tokens", "token limit", "overloaded")):
+                  user_msg = (
+                      "*The conversation has grown too long for this model's context window. "
+                      "Please start a new chat or reduce the amount of history.*"
+                  )
+              else:
+                  user_msg = f"*LLM error: {err_str}*"
+              if not full_content:
+                  full_content += user_msg
+                  yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
+              yield f"data: {json.dumps({'type': 'error', 'message': err_str})}\n\n"
           except Exception as e:
-              logger.error("Unexpected error in event stream: %s", e)
+              logger.error("Unexpected error in event stream (thread %s): %s", thread_id, e, exc_info=True)
+              user_msg = "*An unexpected error occurred. Please try again.*"
+              if not full_content:
+                  full_content += user_msg
+                  yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
               yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
 
           # Emit sources SSE event (deduplicated by document_id)
