@@ -44,12 +44,13 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 ### v2.1 Stability & RAG Correctness (Phases 18–24)
 
 - [x] **Phase 18: Context Window Hardening** — Rolling token budget trimming before each LLM call + atomic inter-iteration trim (completed 2026-04-09)
-- [ ] **Phase 19: Sub-Agent Guards & API Error Visibility** — Document content cap on sub-agent input + APIError surfaced as readable UI message
-- [ ] **Phase 20: Blank Response Guards** — Force-no-tools empty content fallback + length finish_reason error event + maybe_single hardening
-- [ ] **Phase 21: Keyword Search Folder Scope** — `_keyword_search` and `keyword_search_chunks` RPC accept and apply folder_ids
-- [ ] **Phase 22: RAG Correctness Fixes** — read_document 3k cap + metadata case normalization at ingest and search
-- [ ] **Phase 23: System Prompt Quality** — Similarity confidence hedging + citation format guidance
-- [ ] **Phase 24: Infrastructure Hardening** — Settings file 5s TTL cache + sentence boundary punctuation fix
+- [x] **Phase 19: Sub-Agent Guards & API Error Visibility** — "maximum" keyword added to APIError detection; sub-agent content cap confirmed (completed 2026-04-10)
+- [x] **Phase 20: Blank Response Guards** — Force-no-tools empty content fallback + length finish_reason error event + maybe_single hardening (completed 2026-04-10)
+- [x] **Phase 21: Keyword Search Folder Scope** — `_keyword_search` and `keyword_search_chunks` RPC accept and apply folder_ids (completed 2026-04-10)
+- [x] **Phase 22: RAG Correctness Fixes** — read_document 3k cap + metadata case normalization at ingest and search (completed 2026-04-10)
+- [x] **Phase 23: System Prompt Quality** — Similarity confidence hedging + citation format guidance (completed 2026-04-10)
+- [x] **Phase 24: Infrastructure Hardening** — Settings file 5s TTL cache + sentence boundary punctuation fix (completed 2026-04-10)
+- [ ] **Phase 25: Sub-Agent Intelligence & Model-Aware Context** — Auto sub-agent model per provider + provider-aware context budgets + JSON token estimation fix
 
 ---
 
