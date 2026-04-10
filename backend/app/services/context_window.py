@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import logging
 
+from app.config import settings, PROVIDER_CONTEXT_DEFAULTS
+
 logger = logging.getLogger(__name__)
 
 # Marker inserted after the system prompt when history is trimmed
@@ -15,6 +17,19 @@ _TRIM_MARKER = (
     "[Earlier conversation history was trimmed to fit context window. "
     "Some prior context may be missing.]"
 )
+
+
+def resolve_context_budget(active_provider: str) -> int:
+    """Return context budget for main agent based on active provider.
+
+    Priority:
+    1. CONTEXT_WINDOW_MAX_TOKENS env var if set (non-zero)
+    2. Per-provider default from PROVIDER_CONTEXT_DEFAULTS
+    3. 100,000 fallback
+    """
+    if settings.context_window_max_tokens > 0:
+        return settings.context_window_max_tokens
+    return PROVIDER_CONTEXT_DEFAULTS.get(active_provider, 100_000)
 
 
 def estimate_tokens(text: str | None) -> int:
@@ -50,9 +65,10 @@ def estimate_messages_tokens(messages: list[dict]) -> int:
             total += estimate_tokens(content)
 
         # Tool calls (serialized to JSON for estimation)
+        # JSON is punctuation-heavy ({, ", :, [) so tokenises at ~3 chars/token not 4
         tool_calls = msg.get("tool_calls")
         if tool_calls:
-            total += estimate_tokens(json.dumps(tool_calls))
+            total += max(1, len(json.dumps(tool_calls)) // 3)
 
     return total
 
