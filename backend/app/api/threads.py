@@ -20,7 +20,7 @@ from app.services.openai_service import create_streaming_chat, get_llm_client, g
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
     from app.services.sandbox_service import sandbox_manager, harvest_output_files
-from app.services.context_window import trim_messages_to_fit, estimate_messages_tokens
+from app.services.context_window import trim_messages_to_fit, estimate_messages_tokens, resolve_context_budget
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
@@ -397,7 +397,7 @@ async def send_message(
         # Trim conversation history to fit context window before the first LLM call
         messages = trim_messages_to_fit(
             messages,
-            max_tokens=settings.context_window_max_tokens,
+            max_tokens=resolve_context_budget(user_settings.active_provider),
             reserve_recent=settings.context_window_reserve_recent,
         )
         logger.debug(
@@ -467,7 +467,7 @@ async def send_message(
                 # Re-trim after tool results have been appended (context grows each iteration)
                 messages = trim_messages_to_fit(
                     messages,
-                    max_tokens=settings.context_window_max_tokens,
+                    max_tokens=resolve_context_budget(user_settings.active_provider),
                     reserve_recent=settings.context_window_reserve_recent,
                 )
                 logger.debug(
