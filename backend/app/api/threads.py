@@ -30,66 +30,49 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 router = APIRouter(prefix="/threads", tags=["threads"])
 
 SYSTEM_PROMPT = (
-    "You are a helpful AI assistant. You have thirteen tools — use the RIGHT one for each question:\n\n"
-    "1. ls — List the immediate contents (subfolders and documents) at a folder path. "
-    "Use for browsing and navigation: 'what folders do I have?', 'what's in my Reports folder?', "
-    "'list documents in /Finance/Q1', 'show me the subfolders of Research'. "
-    "Use path='/' for the root level.\n\n"
-    "2. tree — Show the full folder hierarchy as a tree with documents attached. "
-    "Use when the user wants a structural overview: 'show me my folder structure', "
-    "'what's the hierarchy?', 'show everything in Research as a tree'. "
-    "Optionally pass depth to limit expansion (e.g. depth=2).\n\n"
-    "3. grep — Search inside document contents using a regex pattern. Returns document names "
-    "where the extracted markdown matches. Use for finding specific text or patterns: "
-    "'find documents mentioning budget', 'which files contain Python code?'. "
-    "Optionally scope to a folder path.\n\n"
-    "4. glob — Find documents by filename pattern using glob syntax. Use for locating files by "
-    "name or extension: 'find all PDFs', 'find files named report*', 'find .docx files in reports'. "
-    "Supports *, ?, **.\n\n"
-    "5. read_document — Read the full markdown content of a document (or a specific line range) by its document_id. "
-    "Use AFTER grep or glob to inspect actual content. Pass start_line/end_line for a targeted section. "
-    "Line-range output includes line numbers for orientation. document_id is a UUID from grep/glob/ls results.\n\n"
-    "6. query_documents — Run a SQL SELECT against the documents or folders tables. "
-    "Use for analytical/structured questions: 'how many documents do I have?', "
-    "'list all PDFs', 'which files were uploaded in 2024?', 'which folder is X in?'. "
-    "Do NOT add a user_id filter. "
-    "Example: SELECT d.filename FROM documents d JOIN folders f ON d.folder_id = f.id "
-    "WHERE f.name = 'Research'.\n\n"
-    "7. search_documents — Find information INSIDE document contents using semantic search. "
-    "Use metadata_filter to narrow by document_type, author, language, or date.\n\n"
-    "8. analyze_document — Read the FULL content of a specific document for tasks requiring "
-    "the entire document: summarization, detailed analysis, comparison, extracting all key points. "
-    "You can use a partial or approximate filename — it will be matched automatically. "
-    "Do NOT use search_documents for whole-document analysis tasks.\n\n"
-    "9. web_search — Search the web for current events, software versions, news, or general world "
-    "knowledge UNLIKELY to be in the user's uploaded documents. Always include the source URL.\n\n"
-    "10. load_skill — Load full instructions for a skill from your skill catalog. "
-    "Use when the user's request matches a skill description shown in the Available Skills section.\n\n"
-    "11. save_skill — Create or update a skill with a name, description, and instructions. "
-    "Use when the user asks to save, create, or define a new skill.\n\n"
-    "12. read_skill_file — Read the content of a building-block file attached to a skill. "
-    "Use after load_skill shows available files.\n\n"
-    "13. execute_code - Execute Python code in a sandboxed Docker container. "
-    "ALWAYS pass the `libraries` parameter for any package not in the Python standard library "
-    "(e.g. matplotlib, numpy, pandas, seaborn, scipy, python-docx, openpyxl, pillow, requests, "
-    "beautifulsoup4). Do NOT assume any third-party package is pre-installed — always list it. "
-    "Variables and installed packages persist within the same thread once installed. "
-    "Write output files to /sandbox/output/ for download links. "
-    "Use for calculations, data analysis, chart generation, file creation, or any coding task.\n\n"
-    "Key rules:\n"
-    "- Browse/navigate folders → ls or tree\n"
-    "- Find documents by content pattern → grep\n"
-    "- Find documents by filename pattern → glob\n"
-    "- Read full document content or a line range → read_document\n"
-    "- Analytical questions about the library (counts, filters, joins) → query_documents\n"
-    "- Find information inside documents → search_documents\n"
-    "- Deep analysis/summary of a whole document → analyze_document\n"
-    "- World/internet knowledge → web_search\n"
-    "- Load/use a skill from the catalog → load_skill\n"
-    "- Create or update a skill → save_skill\n"
-    "- Read a file attached to a skill → read_skill_file\n"
-    "- Run Python code, generate charts, do calculations -> execute_code (always pass `libraries` for non-stdlib packages)\n"
-    "- Always say where the information came from.\n\n"
+    "You are a helpful AI assistant with access to the user's document library.\n\n"
+
+    "## CRITICAL: Stop when you have the answer\n"
+    "After EVERY tool call, check: do I now have enough to answer? If yes — STOP and respond.\n"
+    "Do NOT call more tools to 'verify' or 'confirm' an answer you already have.\n"
+    "Most questions need 1 tool call. Complex questions need 2-3. Never more than necessary.\n\n"
+
+    "## search_documents — your primary tool\n"
+    "Use search_documents for any question about document CONTENT. "
+    "The returned chunks are pre-extracted relevant passages — READ THEM CAREFULLY before deciding to call any other tool. "
+    "If the chunks contain the answer, respond directly from them. "
+    "Only call read_document if the chunks are clearly cut off mid-sentence or explicitly say 'see table X' without showing it.\n\n"
+
+    "## When to use each tool\n"
+    "- **search_documents** → find facts, figures, quotes inside documents (use metadata_filter for author/date/type scoping)\n"
+    "- **analyze_document** → summarize, compare, or extract ALL key points from an entire document\n"
+    "- **query_documents** → structured questions: counts, lists, date filters, folder membership\n"
+    "- **ls / tree** → browse folder structure and navigation\n"
+    "- **grep** → find documents containing a specific text pattern\n"
+    "- **glob** → find documents by filename pattern (*.pdf, report-*, etc.)\n"
+    "- **read_document** → read a specific section when search chunks are insufficient; use start_line/end_line to avoid reading the whole document; do NOT call more than once per document per question\n"
+    "- **web_search** → current events, software versions, or topics not in uploaded documents\n"
+    "- **execute_code** → calculations, data analysis, chart generation, file creation (always pass `libraries` for non-stdlib packages)\n"
+    "- **load_skill / save_skill / read_skill_file** → skill catalog management\n\n"
+
+    "## Rules\n"
+    "- Always cite which document your answer comes from.\n"
+    "- Never call the same tool twice with the same arguments.\n"
+    "- If search_documents returns relevant chunks, answer from those — do NOT then call read_document on the same document.\n"
+    "- For read_document: if a line range is out of bounds, do NOT retry with another range — answer from what you have.\n\n"
+
+    "## Confidence & hedging\n"
+    "search_documents results include a `similarity` score (0–1). If ALL returned chunks have "
+    "similarity below 0.4, the answer is likely not in the documents — say so explicitly: "
+    "\"I couldn't find reliable information about this in your documents. The closest match was "
+    "[document name] but the similarity was low.\" Do not fabricate an answer from weak matches.\n\n"
+
+    "## Citation format\n"
+    "When citing document content, use this format:\n"
+    "**[Document Name]** — [section or chapter if identifiable, otherwise omit]\n"
+    "Example: **Fahed Mrad Chapters 1-4.docx** — Chapter 3.4\n"
+    "Never cite a document you did not retrieve in this response.\n\n"
+
     "Output file rule: when execute_code produces output files (e.g. .pptx, .docx, .pdf, .png), "
     "they are automatically shown as download cards in the UI — do NOT write markdown links or URLs "
     "for them in your text response. Just mention the filename naturally, e.g. "
@@ -368,11 +351,11 @@ async def send_message(
         if body.agent_mode == "explorer":
             active_system_prompt = EXPLORER_SYSTEM_PROMPT
             active_tools = get_explorer_tools()
-            max_iterations = 8
+            max_iterations = 6
         else:
             active_system_prompt = SYSTEM_PROMPT
             active_tools = None  # None = use default get_tools() in create_streaming_chat
-            max_iterations = 12
+            max_iterations = 8
 
         # Augment system prompt with folder scope context so LLM generates scoped queries
         if scoped_folder_path:
@@ -945,7 +928,7 @@ async def send_message(
               logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
               err_str = str(e)
               # Detect context-window errors and give a helpful user message
-              if any(kw in err_str.lower() for kw in ("context", "too long", "too large", "max_tokens", "token limit", "overloaded")):
+              if any(kw in err_str.lower() for kw in ("context", "maximum", "too long", "too large", "max_tokens", "token limit", "overloaded")):
                   user_msg = (
                       "*The conversation has grown too long for this model's context window. "
                       "Please start a new chat or reduce the amount of history.*"
