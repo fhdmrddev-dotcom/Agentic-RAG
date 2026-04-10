@@ -295,6 +295,12 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
         # Extract metadata — best-effort, never blocks completion
         metadata = extract_metadata(text)
         metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+        # Normalize case-sensitive filter fields for consistent retrieval
+        if metadata_dict:
+            if metadata_dict.get("document_type"):
+                metadata_dict["document_type"] = metadata_dict["document_type"].lower()
+            if metadata_dict.get("language"):
+                metadata_dict["language"] = metadata_dict["language"].lower()
 
         supabase.table("documents").update({
             "status": "completed",

@@ -8,6 +8,7 @@ The override file is never committed (gitignored like .env).
 from __future__ import annotations
 
 import json
+import time as _time
 from pathlib import Path
 from typing import Any
 
@@ -81,15 +82,28 @@ class UserEffectiveSettings(BaseModel):
 
 # ── Override file I/O ─────────────────────────────────────────────────────────
 
+# Module-level cache for settings override file
+_override_cache: dict = {}
+_override_cache_time: float = 0.0
+_OVERRIDE_CACHE_TTL: float = 5.0
+
+
 def _load_override() -> dict[str, Any]:
+    global _override_cache, _override_cache_time
+    now = _time.time()
+    if now - _override_cache_time < _OVERRIDE_CACHE_TTL:
+        return _override_cache
     try:
-        return json.loads(_OVERRIDE_FILE.read_text(encoding="utf-8"))
+        _override_cache = json.loads(_OVERRIDE_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        _override_cache = {}
+    _override_cache_time = now
+    return _override_cache
 
 
 def save_override(updates: dict[str, Any]) -> None:
     """Merge `updates` into the override file. Skips KEY_PLACEHOLDER values."""
+    global _override_cache_time
     current = _load_override()
     for k, v in updates.items():
         if v == KEY_PLACEHOLDER:
@@ -99,6 +113,7 @@ def save_override(updates: dict[str, Any]) -> None:
         else:
             current[k] = v
     _OVERRIDE_FILE.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    _override_cache_time = 0.0  # invalidate cache after write
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

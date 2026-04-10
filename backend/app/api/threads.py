@@ -521,6 +521,14 @@ async def send_message(
                     iteration, finish_reason, len(tool_calls_buffer),
                 )
 
+                if finish_reason == "length" and tool_calls_buffer:
+                    # length limit hit while streaming tool arguments — discard partial call
+                    err_msg = "*Response cut off mid-tool-call (output length limit). Please try a shorter request.*"
+                    full_content += err_msg
+                    yield f"data: {json.dumps({'type': 'delta', 'content': err_msg})}\n\n"
+                    yield f"data: {json.dumps({'type': 'error', 'message': 'finish_reason=length during tool streaming'})}\n\n"
+                    break
+
                 if finish_reason == "length":
                     truncation_note = "\n\n*[Response truncated — output token limit reached. Try a shorter request or increase LLM_MAX_OUTPUT_TOKENS.]*"
                     full_content += truncation_note
@@ -883,8 +891,7 @@ async def send_message(
                     ctx_content = llm_tool_content if llm_tool_content is not None else tool_result
                     ctx_limit = (
                         _CTX_LIMIT_SUBAGENT if tool_name == "analyze_document"
-                        else len(ctx_content) if tool_name == "read_document"  # never truncate full reads
-                        else _CTX_LIMIT_DEFAULT
+                        else _CTX_LIMIT_DEFAULT  # cap read_document — use start_line/end_line for large docs
                     )
                     if len(ctx_content) > ctx_limit:
                         ctx_content = ctx_content[:ctx_limit] + f"\n[... truncated for context — {len(ctx_content) - ctx_limit} chars omitted]"
@@ -923,6 +930,12 @@ async def send_message(
                         **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
                     })
                 # Continue to next iteration to let LLM respond with tool results in context
+
+            # Fallback: if the loop ended with no content produced, emit a safe message
+            if not full_content:
+                fallback = "*I wasn't able to generate a response. Please try rephrasing your question.*"
+                full_content += fallback
+                yield f"data: {json.dumps({'type': 'delta', 'content': fallback})}\n\n"
 
           except APIError as e:
               logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)

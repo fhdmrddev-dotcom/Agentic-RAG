@@ -25,7 +25,8 @@ def chunk_text(text: str, chunk_size: int | None = None, overlap: int | None = N
         if end < text_len:
             search_start = max(start + overlap, end - overlap)
             for i in range(end, search_start, -1):
-                if text[i - 1] in ".!?":
+                # Only split on sentence-ending punctuation followed by whitespace or end-of-string
+                if text[i - 1] in ".!?" and (i >= text_len or text[i] in " \n\r\t"):
                     end = i
                     break
 

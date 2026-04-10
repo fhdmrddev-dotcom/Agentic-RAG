@@ -52,6 +52,7 @@ def _keyword_search(
     supabase: Client,
     metadata_filter: dict | None,
     top_n: int,
+    folder_ids: list[str] | None = None,
 ) -> list[dict]:
     params: dict = {
         "search_query": query,
@@ -60,6 +61,8 @@ def _keyword_search(
     }
     if metadata_filter:
         params["metadata_filter"] = metadata_filter
+    if folder_ids:
+        params["p_folder_ids"] = folder_ids
 
     result = supabase.rpc("keyword_search_chunks", params).execute()
     return result.data or []
@@ -188,6 +191,10 @@ def search_documents(
     user_settings: UserEffectiveSettings | None = None,
     folder_ids: list[str] | None = None,
 ) -> list[dict]:
+    # Normalize metadata_filter values to lowercase for case-insensitive matching
+    if metadata_filter:
+        metadata_filter = {k: v.lower() if isinstance(v, str) else v for k, v in metadata_filter.items()}
+
     # Resolve effective config values
     hybrid_enabled = user_settings.hybrid_search_enabled if user_settings else settings.hybrid_search_enabled
     top_k = user_settings.retrieval_top_k if user_settings else settings.retrieval_top_k
@@ -215,7 +222,7 @@ def search_documents(
         user_settings=user_settings,
         folder_ids=folder_ids,
     )
-    keyword_rows = _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count)
+    keyword_rows = _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
 
     if not vector_rows and not keyword_rows:
         return []
