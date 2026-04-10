@@ -460,7 +460,7 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
 #   openrouter — depends on underlying model; 16k is safe for most
 #   ollama     — local; conservative 4k avoids OOM on small machines
 _PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
-    "anthropic":  8192,   # Haiku ceiling; Sonnet/Opus accept more but 8k covers most RAG needs
+    "anthropic":  16384,  # Sonnet/Opus support 32k-64k; 16k covers code gen without runaway
     "google":     16384,  # Gemini 2.5 can do 65k; 16k is plenty and avoids runaway outputs
     "openai":     16384,  # GPT-4o / GPT-4.1 support 16k+ safely
     "openrouter": 16384,  # passes through; most hosted models support 16k

@@ -68,7 +68,7 @@ def run_sub_agent(
         model=effective_model,
         messages=messages,
         stream=True,
-        max_tokens=_resolve_max_tokens(None, user_settings),
+        max_tokens=_resolve_max_tokens(8192, user_settings),  # Haiku 4.5 ceiling
     )
 
     for chunk in stream:
