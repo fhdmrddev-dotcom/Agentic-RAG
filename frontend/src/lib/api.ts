@@ -102,12 +102,14 @@ export async function streamMessage(
   agentMode?: string,
   onSources?: (sources: SourceReference[]) => void,
   onPlanning?: (iteration: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
     method: "POST",
     headers,
     body: JSON.stringify({ content, model, provider, agent_mode: agentMode ?? "default" }),
+    signal,
   })
 
   if (!res.ok) throw new Error("Failed to send message")
@@ -118,7 +120,14 @@ export async function streamMessage(
   let buffer = ""
 
   while (true) {
-    const { done, value } = await reader.read()
+    let done: boolean, value: Uint8Array | undefined
+    try {
+      ;({ done, value } = await reader.read())
+    } catch (err) {
+      // AbortError means user stopped — not a real error
+      if (err instanceof Error && err.name === "AbortError") return
+      throw err
+    }
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })

@@ -125,12 +125,14 @@ export function ExecuteCodeBlock({ tc }: ExecuteCodeBlockProps) {
           <span className="font-semibold text-foreground/80">
             {isRunning ? "Executing code" : isError ? "Execution failed" : "Code executed"}
           </span>
-          {/* Code preview from args if available */}
-          {tc.args.code && (
+          {/* Description (preferred) or raw code preview */}
+          {tc.args.description ? (
+            <span className="ml-1.5 opacity-60 italic">{tc.args.description}</span>
+          ) : tc.args.code ? (
             <span className="ml-1.5 opacity-50">
               &ldquo;{tc.args.code.slice(0, 60)}{tc.args.code.length > 60 ? "..." : ""}&rdquo;
             </span>
-          )}
+          ) : null}
         </span>
         {/* Duration badge — use executionDurationMs from backend, not startedAt/endedAt */}
         {isComplete && executionDurationMs != null && executionDurationMs > 0 && (

@@ -7,6 +7,7 @@ interface UseMessages {
   isStreaming: boolean
   loadMessages: (threadId: string) => Promise<void>
   sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
+  stopStreaming: () => void
 }
 
 function makeTempId() {
@@ -17,6 +18,11 @@ export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const isSendingRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  const stopStreaming = useCallback(() => {
+    abortControllerRef.current?.abort()
+  }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
     const data = await getMessages(threadId)
@@ -53,6 +59,8 @@ export function useMessages(): UseMessages {
     }
     setMessages((prev) => [...prev, assistantMsg])
     setIsStreaming(true)
+    const controller = new AbortController()
+    abortControllerRef.current = controller
 
     try {
       await streamMessage(
@@ -188,13 +196,19 @@ export function useMessages(): UseMessages {
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
         )
       },
+      controller.signal,
     )
-    } catch {
-      setIsStreaming(false)
+    } catch (err) {
+      // Swallow abort errors — user intentionally stopped
+      if (!(err instanceof Error && err.name === "AbortError")) {
+        console.error(err)
+      }
     } finally {
+      abortControllerRef.current = null
       isSendingRef.current = false
+      setIsStreaming(false)
     }
   }, [])
 
-  return { messages, isStreaming, loadMessages, sendMessage }
+  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming }
 }

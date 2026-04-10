@@ -66,7 +66,7 @@ def rerank(
     rerank_model = user_settings.rerank_model if user_settings is not None else settings.rerank_model
 
     try:
-        if rerank_provider == "api":
+        if rerank_provider in ("api", "cohere"):
             return _rerank_api(query, documents, n, rerank_api_key, rerank_model)
         elif rerank_provider == "local":
             return _rerank_local(query, documents, n, rerank_model)

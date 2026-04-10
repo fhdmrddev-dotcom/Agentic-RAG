@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, Layers } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, Layers, Square } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ interface Provider {
 
 interface Props {
   onSend: (content: string) => void
+  onStop?: () => void
   disabled: boolean
   providers?: Provider[]
   selectedProvider?: string
@@ -42,6 +43,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 export function MessageInput({
   onSend,
+  onStop,
   disabled,
   providers = [],
   selectedProvider,
@@ -255,22 +257,35 @@ export function MessageInput({
               )}
             </div>
 
-            {/* Right: send button */}
+            {/* Right: stop (while streaming) or send button */}
             <div className="flex items-center gap-2.5">
-              <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
-                Enter ↵ · Shift+Enter for newline
-              </span>
-              <Button
-                onClick={handleSend}
-                disabled={!canSend}
-                size="icon"
-                className={cn(
-                  "h-8 w-8 rounded-lg shrink-0 transition-all",
-                  canSend && "gradient-primary hover:opacity-90 shadow-sm shadow-primary/20",
-                )}
-              >
-                <ArrowUp className="h-4 w-4" />
-              </Button>
+              {!disabled && (
+                <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
+                  Enter ↵ · Shift+Enter for newline
+                </span>
+              )}
+              {disabled ? (
+                <Button
+                  onClick={onStop}
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8 rounded-lg shrink-0 transition-all border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 rounded-lg shrink-0 transition-all",
+                    canSend && "gradient-primary hover:opacity-90 shadow-sm shadow-primary/20",
+                  )}
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>

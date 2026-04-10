@@ -72,9 +72,28 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ Code Output UI — ExecuteCodeBlock with streaming terminal + file download cards — v2.0 Phase 15
 - ✓ Skill File Management UI — upload/list/delete files on skills via SkillFormDialog — v2.0 Phase 16
 
+## Current Milestone: v2.1 Stability & RAG Correctness
+
+**Goal:** Eliminate silent failures, blank responses, and correctness bugs found in post-v2.0 review.
+
+**Target features:**
+- Rolling context window with inter-iteration trimming (P0)
+- Sub-agent size guard to prevent silent overflow on large documents (P0)
+- APIError context overflow surfaced as visible UI error message (P0)
+- Blank response guards: force-no-tools empty content + length mid-tool-call (P0)
+- `load_skill`/`save_skill` `maybe_single()` hardening (P0)
+- Keyword search folder scope fix — `_keyword_search` + `keyword_search_chunks` RPC (P1)
+- `read_document` context cap — remove exemption, apply 3k cap with truncation note (P1)
+- Metadata filter case normalization at ingest and search path (P1)
+- Document-level RAG deduplication (P2)
+- Similarity confidence hedging in system prompt (P2)
+- Citation format guidance in system prompt (P2)
+- Sentence boundary chunking edge case fix (P2)
+- Settings file caching with 5s TTL (P2)
+
 ### Active
 
-*(No active requirements — planning next milestone)*
+*(See Current Milestone above — requirements being defined)*
 
 ### Out of Scope
 
@@ -163,4 +182,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-04 — v2.0 milestone complete (Agent Skills & Code Execution, 9 phases, 37/37 requirements)*
+*Last updated: 2026-04-09 — v2.1 milestone started (Stability & RAG Correctness)*

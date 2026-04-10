@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill }: Props) {
-  const { messages, isStreaming, loadMessages, sendMessage } = useMessages()
+  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -84,6 +84,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const inputBar = (
     <MessageInput
       onSend={handleSend}
+      onStop={stopStreaming}
       disabled={isStreaming}
       providers={providers}
       selectedProvider={selectedProvider}

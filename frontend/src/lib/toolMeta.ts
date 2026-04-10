@@ -21,6 +21,7 @@ export function toolLabel(name: string): string {
 }
 
 export function toolSummary(name: string, args: Record<string, unknown>): string | null {
+  if (name === "execute_code" && args.description) return args.description as string
   if (name === "read_document" && args.filename) return args.filename as string
   if (name === "read_document") return null // don't show raw UUID
   if (name === "ls" && args.path) return args.path as string
