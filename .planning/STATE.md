@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Stability & RAG Correctness
 status: verifying
-stopped_at: "Completed Phase 18-01: context-window-hardening unit tests"
-last_updated: "2026-04-09T16:42:20.327Z"
-last_activity: 2026-04-09
+stopped_at: "Completed Phase 25-01: sub-agent-intelligence"
+last_updated: "2026-04-10T20:55:22.804Z"
+last_activity: 2026-04-10
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 1
-  completed_plans: 1
+  completed_phases: 7
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 18 — context-window-hardening
+**Current focus:** Phase 25 — sub-agent-intelligence
 
 ## Current Position
 
-Phase: 18 (context-window-hardening) — EXECUTING
+Phase: 25 (sub-agent-intelligence) — EXECUTING
 Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-04-09
+Last activity: 2026-04-10
 
 ## Performance Metrics
 
@@ -88,6 +88,7 @@ Last activity: 2026-04-09
 | Phase 16-skill-file-management-ui P02 | 5min | 2 tasks | 2 files |
 | Phase 17-tech-debt-cleanup P01 | 2min | 3 tasks | 3 files |
 | Phase 18-context-window-hardening P01 | 8min | 2 tasks | 2 files |
+| Phase 25-sub-agent-intelligence P01 | 2m 46s | 5 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -178,6 +179,9 @@ Recent decisions affecting current work:
 - [Phase 16-skill-file-management-ui]: Optimistic state for upload (append) and delete (filter) — no re-fetch needed, list reflects mutations immediately
 - [Phase 18-context-window-hardening]: Test file placed in backend/tests/unit/ to match existing project layout (plan spec had wrong path)
 - [Phase 18-context-window-hardening]: Inter-iteration growth test asserts no-orphan invariant rather than exact token count — reserve_recent=10 correctly protects all recent tool pairs
+- [Phase 25-sub-agent-intelligence]: Sub-agent model defaults keyed by provider; openrouter/ollama fall back to user model (routing unknown / local)
+- [Phase 25-sub-agent-intelligence]: context_window_max_tokens=0 means auto-select from PROVIDER_CONTEXT_DEFAULTS; non-zero env var overrides all providers
+- [Phase 25-sub-agent-intelligence]: tool_calls JSON token estimate changed from chars/4 to chars/3 — JSON punctuation overhead makes tokens denser than plain prose
 
 ### Pending Todos
 
@@ -204,5 +208,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-09
-Stopped at: Completed Phase 18-01: context-window-hardening unit tests
+Stopped at: Completed Phase 25-01: sub-agent-intelligence
 Resume file: None

@@ -50,7 +50,7 @@ Full details: `.planning/milestones/v2.0-ROADMAP.md`
 - [x] **Phase 22: RAG Correctness Fixes** — read_document 3k cap + metadata case normalization at ingest and search (completed 2026-04-10)
 - [x] **Phase 23: System Prompt Quality** — Similarity confidence hedging + citation format guidance (completed 2026-04-10)
 - [x] **Phase 24: Infrastructure Hardening** — Settings file 5s TTL cache + sentence boundary punctuation fix (completed 2026-04-10)
-- [ ] **Phase 25: Sub-Agent Intelligence & Model-Aware Context** — Auto sub-agent model per provider + provider-aware context budgets + JSON token estimation fix
+- [x] **Phase 25: Sub-Agent Intelligence & Model-Aware Context** — Auto sub-agent model per provider + provider-aware context budgets + JSON token estimation fix (completed 2026-04-10)
 
 ---
 
