@@ -9,6 +9,16 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "ollama": "",  # resolved dynamically from ollama_base_url
 }
 
+# Main-agent context budget by provider. Balances cost vs history retention.
+# Stays below tiered-pricing thresholds: GPT-5.4 tiers at 272k, Gemini Pro at 200k.
+PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
+    "anthropic":  120_000,  # $3-5/1M — cap to control costs on long conversations
+    "openai":     200_000,  # GPT-5.4 tiers at 272k — stay well below
+    "google":     180_000,  # Gemini Pro tiers at 200k — stay just below
+    "openrouter": 100_000,  # Unknown underlying model — stay conservative
+    "ollama":      80_000,  # Local hardware — stay conservative
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -117,7 +127,9 @@ class Settings(BaseSettings):
         return bool(self.tavily_api_key)
 
     # Context window management
-    context_window_max_tokens: int = 100000  # safe default for gpt-4o 128k; leaves room for response
+    context_window_max_tokens: int = 0
+    # 0 = auto-select from PROVIDER_CONTEXT_DEFAULTS based on active provider.
+    # Set CONTEXT_WINDOW_MAX_TOKENS=<n> in .env to override for any model/provider.
     context_window_reserve_recent: int = 10  # minimum recent messages to always preserve
 
     # Global max tokens override for LLM output.
@@ -128,7 +140,13 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = 8192
 
     # Sub-agent settings
-    sub_agent_max_chars: int = 100000
+    sub_agent_model: str = ""
+    # Empty = auto-select cheapest model for active provider (see sub_agent_service.py).
+    # Set SUB_AGENT_MODEL=<model-id> in .env to override for all providers.
+    sub_agent_max_chars: int = 600_000
+    # Sub-agents have their own independent context window — this cap is NOT protecting
+    # the main agent's budget. 600k chars ≈ 150k tokens, which fits any 200k+ model
+    # (Haiku 4.5: 200k, GPT-5.4-nano: 400k, Gemini Flash: 1M) with headroom for output.
 
     # Observability
     langsmith_api_key: str = ""
