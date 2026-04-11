@@ -121,9 +121,69 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.1 — Stability & RAG Correctness
+
+**Shipped:** 2026-04-11
+**Phases:** 8 (Phases 18–25) | **Plans:** 8 | **Tasks:** ~28
+**Timeline:** 2026-04-09 → 2026-04-11 (3 days)
+**Commits:** 23
+**LOC delta:** +4,445 / -253 across 54 files (~15,000 total)
+
+### What Was Built
+
+- Rolling context window trimming with atomic tool-pair removal — long conversations never overflow silently
+- Inter-iteration trim: tool result messages removed as atomic pairs between agent loop iterations
+- Sub-agent content cap (600k chars) enforced before API call; "maximum" keyword added to APIError detection
+- Three blank response guards: empty content fallback, finish_reason=length error event, maybe_single() hardening
+- Keyword search folder scope — `_keyword_search` + `keyword_search_chunks` RPC now accept and apply `folder_ids`
+- `read_document` context capped at 3,000 chars with truncation note
+- Metadata case normalization: `document_type`/`language` lowercased at ingest; all filter values at search
+- System prompt confidence hedging (similarity < 0.4) + structured citation format guidance
+- Settings file TTL cache (5s) on `_load_override()` — reduces per-message disk reads
+- Sentence boundary chunking fix: `.!?` followed by non-space no longer triggers split
+- Sub-agent model auto-selection per provider (Haiku / GPT-4o-mini / Gemini Flash / fallback)
+- Provider-aware context budgets (Anthropic 120k, OpenAI 200k, Google 180k, OpenRouter 100k, Ollama 80k)
+- JSON token estimation corrected to chars/3 (from chars/4) for tool call JSON density
+
+### What Worked
+
+- **Batch execution for straightforward phases** — Phases 20–24 were executed in a single commit (d996f9f); this worked well because each phase was narrowly scoped and non-overlapping. Saved significant overhead for simple hardening work.
+- **Integration checker as verification substitute** — With no VERIFICATION.md for phases 18–24, the integration checker (6/6 pass, 5/5 E2E flows) gave high confidence that code is correctly wired. Faster than formal verification for stable codebases.
+- **Audit before close** — Running `/gsd:audit-milestone` caught 3 orphaned requirement IDs (CTX-06/07/08) and stale progress table entries. Fixed in 5 minutes rather than shipping with documentation gaps.
+- **Phase 25 as the capstone** — Grouping provider-aware budgets + sub-agent model selection + token estimation fix into one phase kept related config changes together and made testing cohesive.
+
+### What Was Inefficient
+
+- **No VERIFICATION.md for 7 of 8 phases** — The fast execution cadence skipped formal verification passes. Code is correct per integration check, but traceability is weaker than it could be.
+- **Two test files lost** — `test_blank_response_guards.py` and `test_rag_correctness.py` cited in SUMMARYs but absent from disk. Likely fell out of a batch commit. Would have been caught by a post-phase VERIFICATION.md.
+- **CTX-06/07/08 coined in plan but not in REQUIREMENTS.md** — Phase 25 plan created new requirement IDs without adding them to the canonical file. Small admin gap but required cleanup at milestone close.
+- **Phase details in ROADMAP.md had stale `18-01-PLAN.md` plan references** for phases 19–24 — was copy-paste artifact from rapid drafting.
+
+### Patterns Established
+
+- **Batch commit for cohesive non-overlapping phases** — When 3–5 phases share a single commit, write a mega-commit message that summarizes all phases. Good for stability/hardening sprints where phases are narrow and deterministic.
+- **Integration checker as tier-2 verification** — For phases without VERIFICATION.md, run the integration checker and record results in the audit file. Sufficient for simple backend hardening.
+- **Provider string as config key** — Keying defaults by `llm_provider` setting value (matching what the user sets) is clean and extensible. Empty string sentinel for unknown providers falls back gracefully.
+
+### Key Lessons
+
+- Write test files to disk before committing — don't cite them in SUMMARY if they aren't committed. The audit has no way to verify claimed test files exist.
+- When a plan coins new requirement IDs, add them to REQUIREMENTS.md immediately (not just in plan frontmatter). The plan frontmatter is ephemeral; REQUIREMENTS.md is canonical.
+- "Simple" phases don't need VERIFICATION.md, but they DO need their test files committed. A SUMMARY that says "unit tests cover X" is only meaningful if the test file is on disk.
+- Provider-aware defaults are a better pattern than a single global cap — allows tuning per provider without breaking others.
+
+### Cost Observations
+
+- Model: claude-sonnet-4-6 throughout
+- Sessions: 2–3 across 3 days (very fast pace for a stability milestone)
+- Notable: Phases 20–24 executed in a single session with a single batch commit; Phase 25 was the most complex (~3 min execution per the SUMMARY) and the only one with a VERIFICATION.md
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
 |-----------|--------|-------|-----------------|----------|
 | v1.0 KB Explorer | 8 | 18 | 2.25 | 13 days |
 | v2.0 Agent Skills | 9 | 22 | 2.44 | 6 days |
+| v2.1 Stability | 8 | 8 | 1.0 | 3 days |

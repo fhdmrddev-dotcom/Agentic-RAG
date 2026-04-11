@@ -2,32 +2,32 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Stability & RAG Correctness
-status: verifying
-stopped_at: "Completed Phase 25-01: sub-agent-intelligence"
-last_updated: "2026-04-10T20:59:32.798Z"
-last_activity: 2026-04-10
+status: shipped
+stopped_at: "Milestone v2.1 archived — ready for /gsd:new-milestone"
+last_updated: "2026-04-11T00:00:00.000Z"
+last_activity: 2026-04-11
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
+  total_phases: 8
+  completed_phases: 8
+  total_plans: 8
+  completed_plans: 8
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-09)
+See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 25 — sub-agent-intelligence
+**Current focus:** Planning next milestone — run `/gsd:new-milestone` to define v2.2
 
 ## Current Position
 
-Phase: 25
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-10
+Phase: —
+Plan: —
+Status: Milestone v2.1 complete — archived 2026-04-11
+Last activity: 2026-04-11
 
 ## Performance Metrics
 
