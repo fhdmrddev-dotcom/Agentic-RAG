@@ -389,12 +389,21 @@ async def upload_skill_file(
     # 3. Storage path: user_id/skill_id/filename (FILE-03)
     storage_path = f"{current_user['id']}/{skill_id}/{file.filename}"
 
-    # 4. Upload to storage (overwrites if path already exists)
-    supabase.storage.from_("skill-files").upload(
-        path=storage_path,
-        file=raw,
-        file_options={"content-type": file.content_type or "application/octet-stream"},
-    )
+    # 4. Upload to storage — use upsert to handle re-upload of same filename
+    try:
+        supabase.storage.from_("skill-files").upload(
+            path=storage_path,
+            file=raw,
+            file_options={
+                "content-type": file.content_type or "application/octet-stream",
+                "upsert": "true",
+            },
+        )
+    except Exception as upload_err:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Storage upload failed: {upload_err}",
+        )
 
     # 5. Insert metadata row (upsert via delete+insert handled at DB level via unique constraint)
     result = (
