@@ -47,8 +47,8 @@ async def upload_document(
     # Normalize mime type (strip charset suffix)
     mime_type = (file.content_type or "").split(";")[0].strip()
 
-    # Some browsers send .md files as text/plain — treat by extension
-    if mime_type == "text/plain" and (file.filename or "").endswith(".md"):
+    # Some browsers/OS combos send .md files as text/plain or application/octet-stream
+    if mime_type in ("text/plain", "application/octet-stream") and (file.filename or "").endswith(".md"):
         mime_type = "text/markdown"
 
     if mime_type not in ALLOWED_MIME_TYPES:
