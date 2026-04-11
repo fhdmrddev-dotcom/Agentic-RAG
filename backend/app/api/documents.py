@@ -1,5 +1,7 @@
+import csv
 import hashlib
 import io
+import zipfile
 from uuid import uuid4
 
 from docx import Document as DocxDocument
@@ -19,8 +21,23 @@ ALLOWED_MIME_TYPES = {
     "text/plain",
     "text/markdown",
     "text/html",
+    "text/csv",
+    "application/csv",
     "application/pdf",
+    "application/epub+zip",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+}
+
+# Extension → canonical MIME type for formats browsers misreport
+_EXT_MIME_OVERRIDES: dict[str, str] = {
+    ".md":   "text/markdown",
+    ".csv":  "text/csv",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".epub": "application/epub+zip",
 }
 
 
@@ -28,9 +45,83 @@ def extract_text(raw: bytes, mime_type: str) -> str:
     if mime_type == "application/pdf":
         reader = PdfReader(io.BytesIO(raw))
         return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+
     if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         doc = DocxDocument(io.BytesIO(raw))
         return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+
+    if mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+        from pptx import Presentation  # noqa: PLC0415
+        prs = Presentation(io.BytesIO(raw))
+        lines: list[str] = []
+        for slide_num, slide in enumerate(prs.slides, 1):
+            slide_lines = [f"## Slide {slide_num}"]
+            for shape in slide.shapes:
+                if not shape.has_text_frame:
+                    continue
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        slide_lines.append(text)
+            if len(slide_lines) > 1:  # skip blank slides
+                lines.append("\n".join(slide_lines))
+        return "\n\n".join(lines)
+
+    if mime_type in (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel",
+    ):
+        from openpyxl import load_workbook  # noqa: PLC0415
+        wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        sheets: list[str] = []
+        for sheet in wb.worksheets:
+            rows: list[str] = [f"## Sheet: {sheet.title}"]
+            for row in sheet.iter_rows(values_only=True):
+                cells = [str(c) if c is not None else "" for c in row]
+                if any(cells):
+                    rows.append("\t".join(cells))
+            if len(rows) > 1:
+                sheets.append("\n".join(rows))
+        return "\n\n".join(sheets)
+
+    if mime_type in ("text/csv", "application/csv"):
+        text = raw.decode("utf-8-sig")  # strip BOM if present
+        reader = csv.reader(io.StringIO(text))
+        return "\n".join("\t".join(row) for row in reader)
+
+    if mime_type == "application/epub+zip":
+        import ebooklib  # noqa: PLC0415
+        from ebooklib import epub
+        from html.parser import HTMLParser
+
+        class _StripHTML(HTMLParser):
+            def __init__(self) -> None:
+                super().__init__()
+                self._chunks: list[str] = []
+            def handle_data(self, data: str) -> None:
+                self._chunks.append(data)
+            def get_text(self) -> str:
+                return "".join(self._chunks)
+
+        # ebooklib requires a file path — write to a temp file
+        import tempfile, os  # noqa: PLC0415
+        with tempfile.NamedTemporaryFile(suffix=".epub", delete=False) as tmp:
+            tmp.write(raw)
+            tmp_path = tmp.name
+        try:
+            book = epub.read_epub(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
+        chapters: list[str] = []
+        for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+            parser = _StripHTML()
+            parser.feed(item.get_content().decode("utf-8", errors="ignore"))
+            text = parser.get_text().strip()
+            if text:
+                chapters.append(text)
+        return "\n\n".join(chapters)
+
     # plain text, markdown, html — decode as UTF-8
     return raw.decode("utf-8")
 
@@ -47,9 +138,11 @@ async def upload_document(
     # Normalize mime type (strip charset suffix)
     mime_type = (file.content_type or "").split(";")[0].strip()
 
-    # Some browsers/OS combos send .md files as text/plain or application/octet-stream
-    if mime_type in ("text/plain", "application/octet-stream") and (file.filename or "").endswith(".md"):
-        mime_type = "text/markdown"
+    # Browsers / OS often misreport MIME types for these formats — normalise by extension
+    filename = file.filename or ""
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if mime_type in ("text/plain", "application/octet-stream", "application/zip") and ext in _EXT_MIME_OVERRIDES:
+        mime_type = _EXT_MIME_OVERRIDES[ext]
 
     if mime_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
