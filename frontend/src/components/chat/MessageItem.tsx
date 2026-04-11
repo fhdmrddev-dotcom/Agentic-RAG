@@ -30,6 +30,8 @@ export function MessageItem({ message, isStreaming }: Props) {
   }
 
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
+  const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
+  const allToolsDone = hasAnyTools && !hasRunningTools
   const activeTool = message.tool_calls?.find((tc) => tc.status === "running")
 
   // Label shown when the agent is actively running a tool alongside existing content
@@ -61,27 +63,7 @@ export function MessageItem({ message, isStreaming }: Props) {
             <span>Skill activated: {message.activatedSkill}</span>
           </div>
         )}
-        {isStreaming && message.content === "" && (!message.tool_calls || message.tool_calls.length === 0) ? (
-          <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">Thinking</span>
-            <span className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
-            </span>
-          </span>
-        ) : isStreaming && message.content === "" && message.tool_calls && message.tool_calls.length > 0 && message.tool_calls.every((tc) => tc.status === "done") ? (
-          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-            <span className="italic">Generating response</span>
-            <span className="flex gap-1 items-center">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
-            </span>
-          </span>
-        ) : message.content ? (
+        {message.content ? (
           <div className="text-sm text-foreground">
             <MarkdownRenderer content={message.content} />
             {isStreaming && !hasRunningTools && (
@@ -91,15 +73,44 @@ export function MessageItem({ message, isStreaming }: Props) {
               <SourceReferences sources={message.sources} />
             )}
           </div>
+        ) : isStreaming && !hasAnyTools ? (
+          // No tools yet — first LLM call is thinking
+          <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="italic">Thinking</span>
+            <span className="flex gap-1 items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
+            </span>
+          </span>
+        ) : hasAnyTools ? (
+          // Tools ran but no text yet — show whether we're still working or waiting
+          // Shown regardless of isStreaming so SSE drops don't cause a blank
+          <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
+            {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
+            <span className="italic">
+              {isStreaming
+                ? (allToolsDone ? "Generating response" : "Working")
+                : "Saving response…"}
+            </span>
+            {isStreaming && (
+              <span className="flex gap-1 items-center">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "320ms" }} />
+              </span>
+            )}
+          </span>
         ) : null}
-        {/* Active tool indicator — shown below content when a tool is running */}
+        {/* Active tool indicator — shown below content when a tool is running alongside text */}
         {isStreaming && hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
             <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
             <span className="italic truncate">{activeToolLabel ?? "Working…"}</span>
           </div>
         )}
-        {/* Between-round planning indicator — shown when agent finished tools, deciding next step */}
+        {/* Between-round planning indicator */}
         {isStreaming && message.isPlanning && !hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
             <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />

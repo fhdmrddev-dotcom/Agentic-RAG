@@ -442,7 +442,8 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
 // ---- Sub-agent block ----
 
 function SubAgentBlock({ agent }: { agent: SubAgentState }) {
-  const [open, setOpen] = useState(agent.status === "running")
+  // Always start open — sub-agent analysis is the main content; never auto-collapse it
+  const [open, setOpen] = useState(true)
   return (
     <div className="mt-3 rounded-lg overflow-hidden bg-card/40 ghost-border relative">
       {/* Gradient left accent */}
@@ -485,7 +486,9 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
   const allDone = toolCalls.every((tc) => tc.status === "done") &&
     (!subAgent || subAgent.status === "done")
 
-  const [expanded, setExpanded] = useState(!allDone)
+  // Always start expanded — never auto-collapse, even when all tools finish or the
+  // message is reloaded from DB. The user can manually collapse if they want.
+  const [expanded, setExpanded] = useState(true)
 
   const isExpanded = expanded
   const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null

@@ -207,8 +207,21 @@ export function useMessages(): UseMessages {
       abortControllerRef.current = null
       isSendingRef.current = false
       setIsStreaming(false)
+
+      // Safety net: if the stream ended but the assistant message has no text content
+      // (SSE connection dropped before final delta events arrived), reload from DB after
+      // a short delay so the persisted response becomes visible without requiring a refresh.
+      setMessages((prev) => {
+        const lastMsg = prev[prev.length - 1]
+        if (lastMsg?.id === assistantId && !lastMsg.content) {
+          setTimeout(() => {
+            loadMessages(threadId).catch(console.error)
+          }, 1500)
+        }
+        return prev
+      })
     }
-  }, [])
+  }, [loadMessages])
 
   return { messages, isStreaming, loadMessages, sendMessage, stopStreaming }
 }
