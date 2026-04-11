@@ -15,7 +15,7 @@ from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings
-from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT
+from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens
 
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
@@ -164,6 +164,7 @@ def generate_thread_title(first_user_message: str, user_settings=None) -> str:
     try:
         client = get_llm_client(user_settings)
         model = user_settings.llm_model if user_settings else settings.llm_model
+        token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -173,8 +174,8 @@ def generate_thread_title(first_user_message: str, user_settings=None) -> str:
                 },
                 {"role": "user", "content": first_user_message[:500]},
             ],
-            max_tokens=20,
             stream=False,
+            **{token_param: 20},
         )
         return response.choices[0].message.content.strip() or "New Chat"
     except Exception:
@@ -783,9 +784,15 @@ async def send_message(
 
                                 fut = loop.run_in_executor(None, _run_sync)
 
-                                # Drain queue, streaming SSE events (SAND-05)
+                                # Drain queue, streaming SSE events (SAND-05).
+                                # Emit keepalives every 10 s when sandbox produces no output
+                                # to prevent SSE connection timeouts on long executions.
                                 while True:
-                                    item = await queue.get()
+                                    try:
+                                        item = await asyncio.wait_for(queue.get(), timeout=10.0)
+                                    except asyncio.TimeoutError:
+                                        yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
+                                        continue
                                     if item["type"] == "_done":
                                         break
                                     yield f"data: {json.dumps(item)}\n\n"
@@ -940,14 +947,30 @@ async def send_message(
           except APIError as e:
               logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
               err_str = str(e)
-              # Detect context-window errors and give a helpful user message
-              if any(kw in err_str.lower() for kw in ("context", "maximum", "too long", "too large", "max_tokens", "token limit", "overloaded")):
+              err_lower = err_str.lower()
+              # Map common API errors to actionable user messages
+              if any(kw in err_lower for kw in ("credit balance", "billing", "quota", "insufficient_quota", "rate limit", "rate_limit")):
+                  user_msg = (
+                      "*API billing or rate-limit error: your account has insufficient credits "
+                      "or has hit a usage limit. Please check your provider's billing dashboard.*"
+                  )
+              elif any(kw in err_lower for kw in ("invalid api key", "invalid_api_key", "authentication", "unauthorized", "401")):
+                  user_msg = (
+                      "*Authentication error: the API key for this provider is invalid or expired. "
+                      "Please check your API key in Settings.*"
+                  )
+              elif any(kw in err_lower for kw in ("unsupported parameter", "unsupported_parameter")):
+                  user_msg = (
+                      f"*Model parameter error: {err_str}. "
+                      "This model may not support the current configuration.*"
+                  )
+              elif any(kw in err_lower for kw in ("context", "maximum", "too long", "too large", "token limit", "overloaded")):
                   user_msg = (
                       "*The conversation has grown too long for this model's context window. "
                       "Please start a new chat or reduce the amount of history.*"
                   )
               else:
-                  user_msg = f"*LLM error: {err_str}*"
+                  user_msg = f"*LLM API error: {err_str}*"
               if not full_content:
                   full_content += user_msg
                   yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"

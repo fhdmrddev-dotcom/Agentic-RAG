@@ -415,7 +415,16 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
         kwargs = {"api_key": settings.llm_api_key}
         if settings.llm_base_url:
             kwargs["base_url"] = settings.llm_base_url
-    return OpenAI(**kwargs)
+    client = OpenAI(**kwargs)
+    # Auto-trace all LLM calls (inputs, system prompt, tools, outputs) via LangSmith
+    # when a LangSmith API key is configured. Best-effort — never blocks startup.
+    if settings.langsmith_api_key:
+        try:
+            from langsmith.wrappers import wrap_openai
+            client = wrap_openai(client)  # type: ignore[assignment]
+        except Exception:
+            pass
+    return client
 
 
 def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
@@ -494,6 +503,22 @@ def _resolve_max_tokens(
     return _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
 
 
+def _uses_max_completion_tokens(model: str) -> bool:
+    """Return True for models that require max_completion_tokens instead of max_tokens.
+
+    OpenAI o-series and GPT-5+ family dropped max_tokens in favour of
+    max_completion_tokens. Sending max_tokens to these models returns a 400.
+    """
+    m = model.lower()
+    # o1 / o3 / o4 reasoning models
+    if m.startswith(("o1", "o3", "o4")):
+        return True
+    # GPT-5 family: gpt-5, gpt-5.1, gpt-5.2, gpt-5.4, gpt-5.4-mini, etc.
+    if m.startswith("gpt-5"):
+        return True
+    return False
+
+
 def create_streaming_chat(
     messages: list[dict],
     tool_choice: str = "auto",
@@ -504,13 +529,15 @@ def create_streaming_chat(
 ):
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
+    resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
+    # GPT-5 / o-series use max_completion_tokens; everything else uses max_tokens.
+    # Anthropic compat defaults to 1024 if unset — always be explicit.
+    token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     kwargs: dict = {
         "model": effective_model,
         "messages": messages,
         "stream": True,
-        # Always set max_tokens — Anthropic compat defaults to 1024, which silently
-        # truncates complex responses. Other providers are forgiving but explicit wins.
-        "max_tokens": _resolve_max_tokens(max_tokens, user_settings),
+        token_param: resolved_tokens,
     }
     if tool_choice == "auto":
         kwargs["tools"] = tools_override if tools_override is not None else get_tools()

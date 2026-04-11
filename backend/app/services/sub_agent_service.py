@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generator
 from langsmith import traceable
 
 from app.config import settings
-from app.services.openai_service import get_llm_client, _resolve_max_tokens
+from app.services.openai_service import get_llm_client, _resolve_max_tokens, _uses_max_completion_tokens
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -64,11 +64,13 @@ def run_sub_agent(
             or settings.llm_model
         )
 
+    resolved_tokens = _resolve_max_tokens(8192, user_settings)  # Haiku 4.5 ceiling
+    token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     stream = client.chat.completions.create(
         model=effective_model,
         messages=messages,
         stream=True,
-        max_tokens=_resolve_max_tokens(8192, user_settings),  # Haiku 4.5 ceiling
+        **{token_param: resolved_tokens},
     )
 
     for chunk in stream:
