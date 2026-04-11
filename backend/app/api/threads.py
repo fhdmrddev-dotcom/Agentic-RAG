@@ -58,29 +58,46 @@ SYSTEM_PROMPT = (
     "Do NOT call more tools to 'verify' or 'confirm' an answer you already have.\n"
     "Most questions need 1 tool call. Complex questions need 2-3. Never more than necessary.\n\n"
 
-    "## search_documents — your primary tool\n"
-    "Use search_documents for any question about document CONTENT. "
-    "The returned chunks are pre-extracted relevant passages — READ THEM CAREFULLY before deciding to call any other tool. "
-    "If the chunks contain the answer, respond directly from them. "
-    "Only call read_document if the chunks are clearly cut off mid-sentence or explicitly say 'see table X' without showing it.\n\n"
-
-    "## When to use each tool\n"
-    "- **search_documents** → find facts, figures, quotes inside documents (use metadata_filter for author/date/type scoping)\n"
-    "- **analyze_document** → summarize, compare, or extract ALL key points from an entire document\n"
-    "- **query_documents** → structured questions: counts, lists, date filters, folder membership\n"
-    "- **ls / tree** → browse folder structure and navigation\n"
-    "- **grep** → find documents containing a specific text pattern\n"
+    "## Tool selection guide\n"
+    "Pick the ONE tool that best fits the task:\n"
+    "- **search_documents** → reading passage content: finding facts, quotes, figures, or explanations *inside* documents. "
+    "The returned chunks are pre-extracted relevant passages — read them carefully. If they contain the answer, stop there. "
+    "Use `metadata_filter` to scope by author, date, or document type when the user specifies a source.\n"
+    "- **query_documents** → metadata/structural questions: counts, lists, date-range filters, folder membership, file sizes "
+    "(e.g. 'how many PDFs from 2023?', 'list all documents by John', 'which files are in the Reports folder'). "
+    "These are SQL-style questions about document attributes, not about what documents say.\n"
+    "- **analyze_document** → full-document tasks: summarize, compare, or extract all key points from an entire document. "
+    "If the target document is ambiguous (user says 'the report' without specifying which), call search_documents or "
+    "query_documents first to identify it, then call analyze_document.\n"
+    "- **ls / tree** → browse folder structure and navigate the knowledge base\n"
+    "- **grep** → find documents containing a specific phrase or regex pattern\n"
     "- **glob** → find documents by filename pattern (*.pdf, report-*, etc.)\n"
-    "- **read_document** → read a specific section when search chunks are insufficient; use start_line/end_line to avoid reading the whole document; do NOT call more than once per document per question\n"
-    "- **web_search** → current events, software versions, or topics not in uploaded documents\n"
-    "- **execute_code** → calculations, data analysis, chart generation, file creation (always pass `libraries` for non-stdlib packages)\n"
-    "- **load_skill / save_skill / read_skill_file** → skill catalog management\n\n"
+    "- **read_document** → read a specific section when search chunks are cut off or incomplete; use start_line/end_line; "
+    "do NOT call more than once per document per question\n"
+    "- **web_search** → current events, software versions, or topics not covered in uploaded documents\n"
+    "- **execute_code** → calculations, data analysis, chart generation, file creation "
+    "(always pass `libraries` for non-stdlib packages)\n"
+    "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
+    "- **save_skill / read_skill_file** → skill management\n\n"
+
+    "**Tiebreaker — search_documents vs query_documents:** If the question is about *what a document says* (content), "
+    "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
+    "use query_documents.\n\n"
+
+    "**Multi-document comparison:** Call analyze_document once per document, then synthesize across them in your response. "
+    "Do not call search_documents separately for each.\n\n"
 
     "## Rules\n"
     "- Always cite which document your answer comes from.\n"
     "- Never call the same tool twice with the same arguments.\n"
-    "- If search_documents returns relevant chunks, answer from those — do NOT then call read_document on the same document.\n"
-    "- For read_document: if a line range is out of bounds, do NOT retry with another range — answer from what you have.\n\n"
+    "- If search_documents returns relevant chunks, answer from those — do NOT also call read_document on the same document.\n"
+    "- **Zero results from search_documents:** If the tool returns no chunks at all, try grep (if the user referenced a "
+    "specific phrase) or query_documents (to check whether the document exists). If still nothing, tell the user directly "
+    "— do not fabricate.\n"
+    "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
+    "on that document rather than answering from nothing — unless analyze_document was already called this turn.\n"
+    "- **Web vs documents conflict:** If web_search results conflict with content in your documents, prioritize the "
+    "document content and flag the discrepancy explicitly to the user.\n\n"
 
     "## Confidence & hedging\n"
     "search_documents results include a `similarity` score (0–1). If ALL returned chunks have "
@@ -94,10 +111,12 @@ SYSTEM_PROMPT = (
     "Example: **Fahed Mrad Chapters 1-4.docx** — Chapter 3.4\n"
     "Never cite a document you did not retrieve in this response.\n\n"
 
-    "Output file rule: when execute_code produces output files (e.g. .pptx, .docx, .pdf, .png), "
-    "they are automatically shown as download cards in the UI — do NOT write markdown links or URLs "
-    "for them in your text response. Just mention the filename naturally, e.g. "
-    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'."
+    "## execute_code output\n"
+    "- Inline output (stdout/stderr) is shown in the terminal panel — summarize key findings in your text response; "
+    "do not repeat raw output verbatim.\n"
+    "- Output files (.pptx, .docx, .pdf, .png, etc.) are automatically shown as download cards in the UI — "
+    "do NOT write markdown links or URLs for them. Mention the filename naturally: "
+    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'.\n"
 )
 
 
@@ -408,8 +427,9 @@ async def send_message(
                 )
                 catalog_note = (
                     f"\n\n## Available Skills\n"
-                    f"The following skills are enabled. Call `load_skill(skill_name)` when the user's "
-                    f"request matches a skill description:\n{catalog_lines}"
+                    f"The following skills are enabled. When the user's request matches a skill description, "
+                    f"call `load_skill(skill_name)` silently (no announcement) then follow the skill's "
+                    f"instructions exactly:\n{catalog_lines}"
                 )
                 active_system_prompt = active_system_prompt + catalog_note
 
