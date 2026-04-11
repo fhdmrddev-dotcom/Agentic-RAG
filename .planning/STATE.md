@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Stability & RAG Correctness
-status: shipped
-stopped_at: "Milestone v2.1 archived — ready for /gsd:new-milestone"
+milestone: v2.2
+milestone_name: Trust & Compliance
+status: ready_to_plan
+stopped_at: "Roadmap created — ready to plan Phase 26"
 last_updated: "2026-04-11T00:00:00.000Z"
 last_activity: 2026-04-11
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 8
-  completed_plans: 8
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -20,14 +20,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Planning next milestone — run `/gsd:new-milestone` to define v2.2
+**Current focus:** v2.2 Trust & Compliance — roadmap created, Phase 26 ready to plan
 
 ## Current Position
 
-Phase: —
+Phase: Phase 26 — Citations & Confidence — Backend (not started)
 Plan: —
-Status: Milestone v2.1 complete — archived 2026-04-11
-Last activity: 2026-04-11
+Status: Ready to plan
+Last activity: 2026-04-11 — Roadmap created for v2.2
+
+```
+Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
+```
 
 ## Performance Metrics
 
@@ -204,9 +208,10 @@ None yet.
 | 260405-s1e | Hide toggle-global from non-owners and block uploads into other users' global folders | 2026-04-05 | 62f9897 | [260405-s1e-hide-toggle-global-from-non-owners-and-b](./quick/260405-s1e-hide-toggle-global-from-non-owners-and-b/) |
 | 260405-stg | Add chat source references, cascade deletions, and sandbox file cleanup | 2026-04-05 | e26ccb1 | [260405-stg-add-chat-references-cascade-deletions-an](./quick/260405-stg-add-chat-references-cascade-deletions-an/) |
 | 260407-vqw | Implement context window management — sliding-window trimming with atomic tool-call removal to prevent silent agent failures on long conversations | 2026-04-07 | 1e5977d | [260407-vqw-review-and-fix-context-window-management](./quick/260407-vqw-review-and-fix-context-window-management/) |
+| 260411-wj5 | Fix skill file upload (storage upsert + error guard) and binary file reading in read_skill_file | 2026-04-11 | f69e171 | [260411-wj5-fix-skill-file-upload-bug-files-not-save](./quick/260411-wj5-fix-skill-file-upload-bug-files-not-save/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-09
-Stopped at: Completed Phase 25-01: sub-agent-intelligence
+Last activity: 2026-04-11
+Stopped at: Roadmap created for v2.2 Trust & Compliance — Phase 26 ready to plan
 Resume file: None
