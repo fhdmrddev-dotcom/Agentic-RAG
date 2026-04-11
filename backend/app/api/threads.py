@@ -1,4 +1,5 @@
 import asyncio
+import io
 import json
 import time as time_mod
 from datetime import datetime, timezone
@@ -801,7 +802,39 @@ async def send_message(
                                 storage_path = f"{row['user_id']}/{row['id']}/{filename}"
                                 try:
                                     raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
-                                    tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+                                    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+                                    if ext == "docx":
+                                        import docx as _docx  # python-docx
+                                        doc = _docx.Document(io.BytesIO(raw_bytes))
+                                        tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                                    elif ext == "xlsx":
+                                        import openpyxl as _openpyxl
+                                        wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+                                        rows = []
+                                        for sheet in wb.worksheets:
+                                            for row in sheet.iter_rows(values_only=True):
+                                                line = "\t".join(str(c) if c is not None else "" for c in row)
+                                                if line.strip():
+                                                    rows.append(line)
+                                        tool_result = "\n".join(rows)
+                                    elif ext == "pptx":
+                                        from pptx import Presentation as _Presentation  # python-pptx
+                                        prs = _Presentation(io.BytesIO(raw_bytes))
+                                        slides = []
+                                        for slide in prs.slides:
+                                            for shape in slide.shapes:
+                                                if hasattr(shape, "text") and shape.text.strip():
+                                                    slides.append(shape.text)
+                                        tool_result = "\n".join(slides)
+                                    elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
+                                        tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+                                    else:
+                                        # Unrecognized or binary type
+                                        tool_result = json.dumps({
+                                            "error": f"File '{filename}' is a binary file that cannot be read as text. "
+                                                     "Upload a text-based version instead."
+                                        })
                                 except Exception as e:
                                     tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
                         elif tool_name == "execute_code":
