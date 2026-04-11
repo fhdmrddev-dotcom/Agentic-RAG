@@ -1,8 +1,8 @@
 import asyncio
+import base64
 import io
 import json
 import os
-import tempfile
 import time as time_mod
 from datetime import datetime, timezone
 from typing import AsyncGenerator
@@ -869,8 +869,11 @@ async def send_message(
                                 except Exception:
                                     pass
 
-                                # Inject skill files into sandbox at /sandbox/{filename}
+                                # Inject skill files into sandbox by embedding bytes as base64
+                                # in a preamble that runs before user code. More reliable than
+                                # copy_to_runtime which can fail silently on Windows Docker setups.
                                 skill_files_req = args.get("skill_files") or []
+                                file_preamble = ""
                                 for sf in skill_files_req:
                                     sf_skill_name = sf.get("skill_name", "")
                                     sf_filename = sf.get("filename", "")
@@ -885,20 +888,25 @@ async def send_message(
                                         .execute()
                                     ).data
                                     if not sf_skill:
+                                        logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
                                         continue
                                     sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
                                     sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
                                     try:
                                         sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
-                                        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{sf_filename}") as tmp:
-                                            tmp.write(sf_bytes)
-                                            tmp_path = tmp.name
-                                        session.copy_to_runtime(tmp_path, f"/sandbox/{sf_filename}")
-                                        os.unlink(tmp_path)
+                                        b64 = base64.b64encode(sf_bytes).decode("ascii")
+                                        safe_name = sf_filename.replace("'", "\\'")
+                                        file_preamble += (
+                                            f"import base64 as _b64, os as _os\n"
+                                            f"_os.makedirs('/sandbox', exist_ok=True)\n"
+                                            f"with open('/sandbox/{safe_name}', 'wb') as _f:\n"
+                                            f"    _f.write(_b64.b64decode('{b64}'))\n"
+                                            f"print('Injected skill file: {safe_name}')\n"
+                                        )
                                     except Exception as sf_err:
                                         logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
 
-                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + code
+                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
 
                                 start_time = time_mod.time()
 
