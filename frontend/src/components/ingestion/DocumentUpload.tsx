@@ -92,7 +92,7 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
                 {folderName ? `Upload to ${folderName}` : "Upload to Root"}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">Drop files here or click to browse</p>
-              <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx · Multiple files allowed</p>
+              <p className="text-xs text-muted-foreground mt-1">Supported: .txt, .md, .pdf, .docx, .pptx, .xlsx, .csv, .epub · Multiple files allowed</p>
             </div>
             {uploading && (
               <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export function DocumentUpload({ onUpload, uploading, uploadingCount = 0, folder
         ref={inputRef}
         type="file"
         multiple
-        accept=".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        accept=".txt,.md,.pdf,.docx,.pptx,.xlsx,.csv,.epub,text/plain,text/markdown,text/csv,application/pdf,application/epub+zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="hidden"
         onChange={onInputChange}
       />
