@@ -9,14 +9,43 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "ollama": "",  # resolved dynamically from ollama_base_url
 }
 
-# Main-agent context budget by provider. Balances cost vs history retention.
-# Stays below tiered-pricing thresholds: GPT-5.4 tiers at 272k, Gemini Pro at 200k.
+# Main-agent context budget by provider. Used as fallback when no model-specific
+# entry exists in MODEL_CONTEXT_DEFAULTS or MODEL_CONTEXT_LIMITS.
 PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
     "anthropic":  120_000,  # $3-5/1M — cap to control costs on long conversations
     "openai":     200_000,  # GPT-5.4 tiers at 272k — stay well below
     "google":     180_000,  # Gemini Pro tiers at 200k — stay just below
     "openrouter": 100_000,  # Unknown underlying model — stay conservative
     "ollama":      80_000,  # Local hardware — stay conservative
+}
+
+# Per-model context budgets (practical input limits, not theoretical maximums).
+# Leaves headroom for system prompt, tool results, and output tokens.
+# Override any entry via MODEL_CONTEXT_LIMITS in .env (format: model-id=tokens,...)
+MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
+    # ── OpenAI ──────────────────────────────────────────────────────────────
+    "gpt-4o":                               100_000,  # actual 128k
+    "gpt-4o-mini":                          100_000,  # actual 128k
+    "gpt-4.1":                              400_000,  # actual 1M — practical cap
+    "gpt-4.1-mini":                         400_000,  # actual 1M — practical cap
+    "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap
+    # ── Anthropic ───────────────────────────────────────────────────────────
+    "claude-opus-4-6":                      150_000,  # actual 200k
+    "claude-sonnet-4-6":                    150_000,  # actual 200k
+    "claude-haiku-4-5-20251001":            150_000,  # actual 200k
+    # ── Google ──────────────────────────────────────────────────────────────
+    "gemini-2.5-pro":                       600_000,  # actual 1M — practical cap
+    "gemini-2.5-flash":                     600_000,  # actual 1M — practical cap
+    "gemini-2.5-flash-lite":                600_000,  # actual 1M — practical cap
+    # ── OpenRouter ──────────────────────────────────────────────────────────
+    "meta-llama/llama-3.3-70b-instruct":    100_000,  # actual 128k
+    "deepseek/deepseek-r1":                 100_000,  # actual 128k via OpenRouter
+    "moonshotai/kimi-k2.5":                 200_000,  # actual 262k
+    "minimax/minimax-m2.7":                 160_000,  # actual 204k
+    "minimax/minimax-m2.5:free":            150_000,  # actual 196k
+    "nvidia/nemotron-3-super-120b-a12b:free": 200_000,  # actual 262k
+    "google/gemma-4-26b-a4b-it":             200_000,  # actual 262k
+    "google/gemma-4-31b-it:free":            200_000,  # actual 262k — free tier
 }
 
 
@@ -128,16 +157,26 @@ class Settings(BaseSettings):
 
     # Context window management
     context_window_max_tokens: int = 0
-    # 0 = auto-select from PROVIDER_CONTEXT_DEFAULTS based on active provider.
-    # Set CONTEXT_WINDOW_MAX_TOKENS=<n> in .env to override for any model/provider.
+    # 0 = auto-select from MODEL_CONTEXT_DEFAULTS / PROVIDER_CONTEXT_DEFAULTS.
+    # Set CONTEXT_WINDOW_MAX_TOKENS=<n> in .env to override for ALL models globally.
     context_window_reserve_recent: int = 10  # minimum recent messages to always preserve
 
+    # Per-model context window overrides. Syntax: model-id=tokens,model-id=tokens
+    # Use = not : as separator (model IDs like minimax-m2.5:free already contain colons).
+    # Example: MODEL_CONTEXT_LIMITS=gpt-4o=128000,moonshotai/kimi-k2.5=250000
+    # Overrides MODEL_CONTEXT_DEFAULTS for the listed models; others keep their defaults.
+    model_context_limits: str = ""
+
     # Global max tokens override for LLM output.
-    # When left at the default (8192), per-provider smart defaults apply instead
-    # (see _PROVIDER_DEFAULT_MAX_TOKENS in openai_service.py).
-    # Set this explicitly in .env only when you need a universal cap or want to
-    # override the per-provider defaults (e.g. LLM_MAX_OUTPUT_TOKENS=32768).
+    # When left at the default (8192), per-model/provider smart defaults apply instead
+    # (see _MODEL_OUTPUT_DEFAULTS / _PROVIDER_DEFAULT_MAX_TOKENS in openai_service.py).
+    # Set this explicitly in .env only when you need a universal cap (e.g. LLM_MAX_OUTPUT_TOKENS=32768).
     llm_max_output_tokens: int = 8192
+
+    # Per-model output token overrides. Syntax: model-id=tokens,model-id=tokens
+    # Example: MODEL_OUTPUT_LIMITS=claude-sonnet-4-6=32768,minimax/minimax-m2.7=32768
+    # Overrides _MODEL_OUTPUT_DEFAULTS for the listed models.
+    model_output_limits: str = ""
 
     # Sub-agent settings
     sub_agent_model: str = ""

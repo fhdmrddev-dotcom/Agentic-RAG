@@ -43,7 +43,10 @@ export function Sidebar({
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    loadThreads().catch(console.error)
+    loadThreads().catch(() => {
+      // Auth may not be ready yet on page refresh — retry once after 2s
+      setTimeout(() => loadThreads().catch(console.error), 2000)
+    })
   }, [loadThreads])
 
   useEffect(() => {

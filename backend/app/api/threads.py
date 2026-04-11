@@ -29,6 +29,27 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 
+
+def _is_transient_provider_error(e: APIError) -> bool:
+    """Return True if this is a transient provider failure safe to retry.
+
+    Checks status code, structured body (OpenRouter puts real code in e.body),
+    and message text. Never retries auth, billing, or parameter errors.
+    """
+    if e.status_code in (502, 503, 529):
+        return True
+    try:
+        code = e.body.get("error", {}).get("code")
+        if code in (502, 503, 529):
+            return True
+    except (AttributeError, TypeError):
+        pass
+    msg_lower = str(getattr(e, "message", "") or e).lower()
+    return any(kw in msg_lower for kw in (
+        "provider returned error", "upstream", "bad gateway", "service unavailable",
+    ))
+
+
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant with access to the user's document library.\n\n"
 
@@ -398,7 +419,7 @@ async def send_message(
         # Trim conversation history to fit context window before the first LLM call
         messages = trim_messages_to_fit(
             messages,
-            max_tokens=resolve_context_budget(user_settings.active_provider),
+            max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
             reserve_recent=settings.context_window_reserve_recent,
         )
         logger.debug(
@@ -412,6 +433,7 @@ async def send_message(
         source_refs: list[dict] = []  # {"document_id": str, "filename": str}
         unique_sources: list[dict] = []
         _message_persisted = False  # guard against double-insert
+        _empty_retries = 0  # tracks empty-response retries across all iterations
 
         def _persist_assistant_message() -> None:
             """Insert the assistant message row. Idempotent — only runs once."""
@@ -468,7 +490,7 @@ async def send_message(
                 # Re-trim after tool results have been appended (context grows each iteration)
                 messages = trim_messages_to_fit(
                     messages,
-                    max_tokens=resolve_context_budget(user_settings.active_provider),
+                    max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
                     reserve_recent=settings.context_window_reserve_recent,
                 )
                 logger.debug(
@@ -481,41 +503,64 @@ async def send_message(
                 # On the final iteration force a text response to avoid an infinite loop
                 force_no_tools = (iteration == max_iterations - 1)
                 tool_choice = "none" if force_no_tools else "auto"
-                stream = create_streaming_chat(
-                    messages,
-                    model=body.model,
-                    user_settings=user_settings,
-                    tool_choice=tool_choice,
-                    tools_override=active_tools,
-                )
+                _provider_retries = 0
+                _MAX_PROVIDER_RETRIES = 2
+                _retry_delays = [0.5, 1.5]
 
-                tool_calls_buffer: dict = {}
-                finish_reason: str | None = None
+                while True:
+                    try:
+                        stream = create_streaming_chat(
+                            messages,
+                            model=body.model,
+                            user_settings=user_settings,
+                            tool_choice=tool_choice,
+                            tools_override=active_tools,
+                        )
 
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    choice = chunk.choices[0]
-                    delta = choice.delta
+                        tool_calls_buffer: dict = {}
+                        finish_reason: str | None = None
 
-                    if choice.finish_reason:
-                        finish_reason = choice.finish_reason
+                        for chunk in stream:
+                            if not chunk.choices:
+                                continue
+                            choice = chunk.choices[0]
+                            delta = choice.delta
 
-                    if delta.content:
-                        full_content += delta.content
-                        yield f"data: {json.dumps({'type': 'delta', 'content': delta.content})}\n\n"
+                            if choice.finish_reason:
+                                finish_reason = choice.finish_reason
 
-                    if delta.tool_calls:
-                        for tc in delta.tool_calls:
-                            idx = tc.index
-                            if idx not in tool_calls_buffer:
-                                tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                            if tc.id:
-                                tool_calls_buffer[idx]["id"] = tc.id
-                            if tc.function and tc.function.name:
-                                tool_calls_buffer[idx]["name"] = tc.function.name
-                            if tc.function and tc.function.arguments:
-                                tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+                            if delta.content:
+                                full_content += delta.content
+                                yield f"data: {json.dumps({'type': 'delta', 'content': delta.content})}\n\n"
+
+                            if delta.tool_calls:
+                                for tc in delta.tool_calls:
+                                    idx = tc.index
+                                    if idx not in tool_calls_buffer:
+                                        tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
+                                    if tc.id:
+                                        tool_calls_buffer[idx]["id"] = tc.id
+                                    if tc.function and tc.function.name:
+                                        tool_calls_buffer[idx]["name"] = tc.function.name
+                                    if tc.function and tc.function.arguments:
+                                        tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+                        break  # stream completed successfully
+
+                    except APIError as provider_err:
+                        if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
+                            _provider_retries += 1
+                            delay = _retry_delays[_provider_retries - 1]
+                            logger.warning(
+                                "Transient provider error on iteration %d (thread %s), "
+                                "attempt %d/%d — retrying in %.1fs. status=%s",
+                                iteration, thread_id,
+                                _provider_retries, _MAX_PROVIDER_RETRIES + 1,
+                                delay, provider_err.status_code,
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        raise  # non-retryable or retries exhausted → caught by outer except APIError
 
                 logger.debug(
                     "Iteration %d finish_reason=%r tool_calls_buffered=%d",
@@ -543,12 +588,15 @@ async def send_message(
                             "Unexpected finish_reason %r on iteration %d — treating as stop",
                             finish_reason, iteration,
                         )
-                    # Guard: if LLM returned stop with no content and no tools on the
-                    # first iteration, retry once — this is a transient model hiccup.
-                    if iteration == 0 and not full_content and not tool_calls_buffer:
+                    # Guard: if LLM returned stop with no content and no tools at any
+                    # iteration, retry once — handles transient hiccups and reasoning
+                    # models (e.g. Kimi K2.5) that exhaust output budget on thinking
+                    # tokens and return empty content after a tool call.
+                    if not full_content and not tool_calls_buffer and _empty_retries < 1:
+                        _empty_retries += 1
                         logger.warning(
-                            "LLM returned empty response on first iteration (thread %s) — retrying once",
-                            thread_id,
+                            "LLM returned empty response on iteration %d (thread %s) — retrying once",
+                            iteration, thread_id,
                         )
                         continue
                     break
@@ -968,6 +1016,10 @@ async def send_message(
                   user_msg = (
                       "*The conversation has grown too long for this model's context window. "
                       "Please start a new chat or reduce the amount of history.*"
+                  )
+              elif _is_transient_provider_error(e):
+                  user_msg = (
+                      "*The AI provider is temporarily unavailable. Please try again in a moment.*"
                   )
               else:
                   user_msg = f"*LLM API error: {err_str}*"

@@ -8,9 +8,29 @@ from __future__ import annotations
 import json
 import logging
 
-from app.config import settings, PROVIDER_CONTEXT_DEFAULTS
+from app.config import settings, PROVIDER_CONTEXT_DEFAULTS, MODEL_CONTEXT_DEFAULTS
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_model_limits(raw: str) -> dict[str, int]:
+    """Parse 'model-id=tokens,model-id=tokens' into a dict.
+
+    Uses = as separator to avoid ambiguity with model IDs that contain colons
+    (e.g. minimax/minimax-m2.5:free).
+    """
+    result: dict[str, int] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if "=" not in entry:
+            continue
+        model, _, raw_tokens = entry.partition("=")
+        model = model.strip()
+        try:
+            result[model] = int(raw_tokens.strip())
+        except ValueError:
+            pass
+    return result
 
 # Marker inserted after the system prompt when history is trimmed
 _TRIM_MARKER = (
@@ -19,16 +39,26 @@ _TRIM_MARKER = (
 )
 
 
-def resolve_context_budget(active_provider: str) -> int:
-    """Return context budget for main agent based on active provider.
+def resolve_context_budget(active_provider: str, model: str = "") -> int:
+    """Return context budget for main agent based on active model and provider.
 
     Priority:
-    1. CONTEXT_WINDOW_MAX_TOKENS env var if set (non-zero)
-    2. Per-provider default from PROVIDER_CONTEXT_DEFAULTS
-    3. 100,000 fallback
+    1. CONTEXT_WINDOW_MAX_TOKENS env var if set (non-zero) — global override
+    2. MODEL_CONTEXT_LIMITS env var — per-model override (format: model-id=tokens,...)
+    3. MODEL_CONTEXT_DEFAULTS — hardcoded per-model practical limits
+    4. PROVIDER_CONTEXT_DEFAULTS — per-provider fallback
+    5. 100,000 absolute fallback
     """
     if settings.context_window_max_tokens > 0:
         return settings.context_window_max_tokens
+
+    if model:
+        env_overrides = _parse_model_limits(settings.model_context_limits)
+        if model in env_overrides:
+            return env_overrides[model]
+        if model in MODEL_CONTEXT_DEFAULTS:
+            return MODEL_CONTEXT_DEFAULTS[model]
+
     return PROVIDER_CONTEXT_DEFAULTS.get(active_provider, 100_000)
 
 

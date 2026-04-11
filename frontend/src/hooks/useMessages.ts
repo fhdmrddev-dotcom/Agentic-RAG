@@ -26,7 +26,11 @@ export function useMessages(): UseMessages {
 
   const loadMessages = useCallback(async (threadId: string) => {
     const data = await getMessages(threadId)
-    setMessages(data)
+    setMessages((prev) => {
+      // Don't wipe optimistic messages if sendMessage is in flight
+      if (isSendingRef.current) return prev
+      return data
+    })
   }, [])
 
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
@@ -213,7 +217,9 @@ export function useMessages(): UseMessages {
       // a short delay so the persisted response becomes visible without requiring a refresh.
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
-        if (lastMsg?.id === assistantId && !lastMsg.content) {
+        const sseDrop = lastMsg?.id === assistantId && !lastMsg.content
+        const racedEmpty = prev.length === 0  // race condition wiped messages
+        if (sseDrop || racedEmpty) {
           setTimeout(() => {
             loadMessages(threadId).catch(console.error)
           }, 1500)

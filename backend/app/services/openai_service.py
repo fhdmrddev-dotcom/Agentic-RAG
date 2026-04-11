@@ -453,21 +453,14 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
     return OpenAI(**kwargs)
 
 
-# Per-provider safe max output token defaults.
+# Per-provider safe max output token defaults (fallback when no model entry exists).
 #
 # Anthropic's compat layer silently defaults to 1024 tokens if max_tokens is
 # unset — always override it. Other providers are lenient but explicit is better.
 #
 # Values chosen as practical ceilings for RAG chat responses. Users needing
-# longer outputs (e.g. full-document rewrites) can raise LLM_MAX_OUTPUT_TOKENS
-# in .env — that value wins when it differs from the 8192 package default.
-#
-# Provider limits (as of 2025-10):
-#   anthropic  — Haiku 4.5: 8192 | Sonnet 4.6: 64k | Opus 4.6: 32k
-#   google     — Gemini 2.5 Pro/Flash: 65k
-#   openai     — GPT-4o / GPT-4.1 family: 16k–32k
-#   openrouter — depends on underlying model; 16k is safe for most
-#   ollama     — local; conservative 4k avoids OOM on small machines
+# longer outputs (e.g. full-document rewrites) can override via MODEL_OUTPUT_LIMITS
+# or LLM_MAX_OUTPUT_TOKENS in .env.
 _PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
     "anthropic":  16384,  # Sonnet/Opus support 32k-64k; 16k covers code gen without runaway
     "google":     16384,  # Gemini 2.5 can do 65k; 16k is plenty and avoids runaway outputs
@@ -476,6 +469,53 @@ _PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
     "ollama":     4096,   # local hardware varies; keep conservative
 }
 _FALLBACK_MAX_TOKENS = 8192  # used when provider is unknown / legacy mode
+
+# Per-model output token defaults. Tuned to each model's real ceiling vs practical need.
+# Override any entry via MODEL_OUTPUT_LIMITS in .env (format: model-id=tokens,...)
+_MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
+    # ── OpenAI ──────────────────────────────────────────────────────────────
+    "gpt-4o":                                16384,  # supports 16k
+    "gpt-4o-mini":                           16384,  # supports 16k
+    "gpt-4.1":                               32768,  # supports 32k
+    "gpt-4.1-mini":                          32768,  # supports 32k
+    "gpt-4.1-nano":                          16384,  # nano — keep conservative
+    # ── Anthropic ───────────────────────────────────────────────────────────
+    "claude-haiku-4-5-20251001":              8192,  # hard ceiling 8k
+    "claude-sonnet-4-6":                     32768,  # supports 64k; 32k practical
+    "claude-opus-4-6":                       16384,  # supports 32k; 16k conservative
+    # ── Google ──────────────────────────────────────────────────────────────
+    "gemini-2.5-pro":                        32768,  # supports 65k; 32k practical
+    "gemini-2.5-flash":                      32768,  # supports 65k; 32k practical
+    "gemini-2.5-flash-lite":                 16384,  # lite — keep conservative
+    # ── OpenRouter ──────────────────────────────────────────────────────────
+    "meta-llama/llama-3.3-70b-instruct":     16384,  # standard
+    "deepseek/deepseek-r1":                  16384,  # standard via OpenRouter
+    "moonshotai/kimi-k2.5":                  65536,  # supports 65.5k output; use full ceiling
+    "minimax/minimax-m2.7":                  65536,  # supports 131k output; 64k practical
+    "minimax/minimax-m2.5:free":             16384,  # free tier — conservative
+    "nvidia/nemotron-3-super-120b-a12b:free": 16384,  # free tier — conservative
+    "google/gemma-4-26b-a4b-it":             32768,  # supports 262k output; 32k practical
+    "google/gemma-4-31b-it:free":            32768,  # supports 32.8k output
+}
+
+
+def _parse_model_output_limits(raw: str) -> dict[str, int]:
+    """Parse 'model-id=tokens,model-id=tokens' into a dict.
+
+    Uses = as separator to avoid ambiguity with model IDs containing colons.
+    """
+    result: dict[str, int] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if "=" not in entry:
+            continue
+        model, _, raw_tokens = entry.partition("=")
+        model = model.strip()
+        try:
+            result[model] = int(raw_tokens.strip())
+        except ValueError:
+            pass
+    return result
 
 
 def _resolve_max_tokens(
@@ -487,8 +527,10 @@ def _resolve_max_tokens(
     Priority:
     1. Caller-supplied explicit value (rare — used by sub-agents etc.)
     2. LLM_MAX_OUTPUT_TOKENS env var, IF the user changed it from the package default.
-    3. Per-provider sensible default from _PROVIDER_DEFAULT_MAX_TOKENS.
-    4. _FALLBACK_MAX_TOKENS for unknown/legacy providers.
+    3. MODEL_OUTPUT_LIMITS env var — per-model override.
+    4. _MODEL_OUTPUT_DEFAULTS — hardcoded per-model practical limits.
+    5. _PROVIDER_DEFAULT_MAX_TOKENS — per-provider fallback.
+    6. _FALLBACK_MAX_TOKENS for unknown/legacy providers.
     """
     if explicit is not None:
         return explicit
@@ -498,6 +540,14 @@ def _resolve_max_tokens(
     if env_val != env_default:
         # User deliberately set LLM_MAX_OUTPUT_TOKENS — respect it for all providers
         return env_val
+
+    model = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
+    if model:
+        env_overrides = _parse_model_output_limits(settings.model_output_limits)
+        if model in env_overrides:
+            return env_overrides[model]
+        if model in _MODEL_OUTPUT_DEFAULTS:
+            return _MODEL_OUTPUT_DEFAULTS[model]
 
     provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
     return _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
