@@ -1,6 +1,8 @@
 import asyncio
 import io
 import json
+import os
+import tempfile
 import time as time_mod
 from datetime import datetime, timezone
 from typing import AsyncGenerator
@@ -77,7 +79,7 @@ SYSTEM_PROMPT = (
     "do NOT call more than once per document per question\n"
     "- **web_search** → current events, software versions, or topics not covered in uploaded documents\n"
     "- **execute_code** → calculations, data analysis, chart generation, file creation "
-    "(always pass `libraries` for non-stdlib packages)\n"
+    "(always pass `libraries` for non-stdlib packages; pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename})\n"
     "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
     "- **save_skill / read_skill_file** → skill management\n\n"
 
@@ -866,6 +868,36 @@ async def send_message(
                                     session.execute_command("mkdir -p /sandbox/output")
                                 except Exception:
                                     pass
+
+                                # Inject skill files into sandbox at /sandbox/{filename}
+                                skill_files_req = args.get("skill_files") or []
+                                for sf in skill_files_req:
+                                    sf_skill_name = sf.get("skill_name", "")
+                                    sf_filename = sf.get("filename", "")
+                                    if not sf_skill_name or not sf_filename:
+                                        continue
+                                    sf_skill = (
+                                        supabase.table("skills")
+                                        .select("id, user_id")
+                                        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                        .eq("name", sf_skill_name)
+                                        .maybe_single()
+                                        .execute()
+                                    ).data
+                                    if not sf_skill:
+                                        continue
+                                    sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
+                                    sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
+                                    try:
+                                        sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{sf_filename}") as tmp:
+                                            tmp.write(sf_bytes)
+                                            tmp_path = tmp.name
+                                        session.copy_to_runtime(tmp_path, f"/sandbox/{sf_filename}")
+                                        os.unlink(tmp_path)
+                                    except Exception as sf_err:
+                                        logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
+
                                 wrapped_code = "import os; os.chdir('/sandbox/output')\n" + code
 
                                 start_time = time_mod.time()
