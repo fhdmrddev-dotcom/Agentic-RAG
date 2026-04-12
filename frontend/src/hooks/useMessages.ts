@@ -194,6 +194,18 @@ export function useMessages(): UseMessages {
           prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
         )
       },
+      // onCitations
+      (citations) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, citations } : m)
+        )
+      },
+      // onConfidence
+      (level, avgSimilarity, disclaimer) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
+        )
+      },
       // onPlanning — agent finished one tool-call round, deciding next action
       () => {
         setMessages((prev) =>

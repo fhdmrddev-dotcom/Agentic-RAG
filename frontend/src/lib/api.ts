@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, ConfidenceResult } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -49,11 +49,11 @@ export async function getMessages(threadId: string): Promise<Message[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers })
   if (!res.ok) throw new Error("Failed to get messages")
-  const data = await res.json() as Array<Message & { source_refs?: SourceReference[] }>
-  // Map source_refs (DB column name) -> sources (frontend field name)
+  const data = await res.json() as Array<Message & { source_refs?: Citation[] }>
+  // Map source_refs (DB column name) -> citations (frontend field name for Phase 27+)
   return data.map((m) => {
     const { source_refs, ...rest } = m
-    return { ...rest, sources: source_refs ?? rest.sources }
+    return { ...rest, citations: (source_refs ?? []) as Citation[] }
   })
 }
 
@@ -101,6 +101,8 @@ export async function streamMessage(
   onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
   agentMode?: string,
   onSources?: (sources: SourceReference[]) => void,
+  onCitations?: (citations: Citation[]) => void,
+  onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
   onPlanning?: (iteration: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -174,6 +176,14 @@ export async function streamMessage(
           )
         } else if (parsed.type === "sources" && onSources) {
           onSources((parsed.sources ?? []) as SourceReference[])
+        } else if (parsed.type === "citations" && onCitations) {
+          onCitations((parsed.citations ?? []) as Citation[])
+        } else if (parsed.type === "confidence" && onConfidence) {
+          onConfidence(
+            parsed.level as "high" | "medium" | "low",
+            parsed.avg_similarity as number,
+            parsed.disclaimer as string | null,
+          )
         } else if (parsed.type === "planning" && onPlanning) {
           onPlanning(parsed.iteration as number)
         }
