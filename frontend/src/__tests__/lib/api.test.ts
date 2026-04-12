@@ -135,11 +135,12 @@ describe("getMessages", () => {
     expect(url).toContain("/threads/thread-42/messages")
   })
 
-  it("returns parsed message array", async () => {
+  it("returns parsed message array with citations mapped from source_refs", async () => {
     const messages = [{ id: "m1", role: "user", content: "Hello" }]
     vi.stubGlobal("fetch", mockFetch(messages))
     const result = await getMessages("thread-42")
-    expect(result).toEqual(messages)
+    // source_refs is absent, so citations should be an empty array (Phase 27: source_refs -> citations)
+    expect(result).toEqual([{ id: "m1", role: "user", content: "Hello", citations: [] }])
   })
 })
 

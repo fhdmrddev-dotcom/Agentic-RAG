@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
-import { SourceReferences } from "./SourceReferences"
+import { ConfidenceBadge } from "./ConfidenceBadge"
+import { CitationList } from "./CitationList"
 import { toolLabel, toolSummary } from "@/lib/toolMeta"
 
 interface Props {
@@ -69,8 +70,9 @@ export function MessageItem({ message, isStreaming }: Props) {
             {isStreaming && !hasRunningTools && (
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}
-            {message.sources && message.sources.length > 0 && (
-              <SourceReferences sources={message.sources} />
+            {message.confidence && <ConfidenceBadge confidence={message.confidence} />}
+            {message.citations && message.citations.length > 0 && (
+              <CitationList citations={message.citations} />
             )}
           </div>
         ) : isStreaming && !hasAnyTools ? (
