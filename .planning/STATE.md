@@ -218,9 +218,10 @@ None yet.
 | 260407-vqw | Implement context window management — sliding-window trimming with atomic tool-call removal to prevent silent agent failures on long conversations | 2026-04-07 | 1e5977d | [260407-vqw-review-and-fix-context-window-management](./quick/260407-vqw-review-and-fix-context-window-management/) |
 | 260411-wj5 | Fix skill file upload (storage upsert + error guard) and binary file reading in read_skill_file | 2026-04-11 | f69e171 | [260411-wj5-fix-skill-file-upload-bug-files-not-save](./quick/260411-wj5-fix-skill-file-upload-bug-files-not-save/) |
 | 260412-dqu | Fix four issues in skills.py: expand _mime_to_subdir MIME routing, URL-safe slug, frontmatter metadata block, ZIP root folder wrapper | 2026-04-12 | 785e23f | [260412-dqu-fix-four-issues-in-backend-app-api-skill](./quick/260412-dqu-fix-four-issues-in-backend-app-api-skill/) |
+| 260412-jnc | ZIP skill imports >20 files return 202 via BackgroundTasks; edit skill modal file list scrolls (max-h-48) | 2026-04-12 | e1ec617 | [260412-jnc-import-skill-return-202-backgroundtask-f](./quick/260412-jnc-import-skill-return-202-backgroundtask-f/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-12 - Completed quick task 260412-dqu: Fix four issues in backend/app/api/skills.py
+Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
 Stopped at: Completed 26-citations-confidence-backend 26-02-PLAN.md
 Resume file: None
