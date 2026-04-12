@@ -209,6 +209,7 @@ None yet.
 | 260405-stg | Add chat source references, cascade deletions, and sandbox file cleanup | 2026-04-05 | e26ccb1 | [260405-stg-add-chat-references-cascade-deletions-an](./quick/260405-stg-add-chat-references-cascade-deletions-an/) |
 | 260407-vqw | Implement context window management — sliding-window trimming with atomic tool-call removal to prevent silent agent failures on long conversations | 2026-04-07 | 1e5977d | [260407-vqw-review-and-fix-context-window-management](./quick/260407-vqw-review-and-fix-context-window-management/) |
 | 260411-wj5 | Fix skill file upload (storage upsert + error guard) and binary file reading in read_skill_file | 2026-04-11 | f69e171 | [260411-wj5-fix-skill-file-upload-bug-files-not-save](./quick/260411-wj5-fix-skill-file-upload-bug-files-not-save/) |
+| 260412-dqu | Fix four issues in skills.py: expand _mime_to_subdir MIME routing, URL-safe slug, frontmatter metadata block, ZIP root folder wrapper | 2026-04-12 | 785e23f | [260412-dqu-fix-four-issues-in-backend-app-api-skill](./quick/260412-dqu-fix-four-issues-in-backend-app-api-skill/) |
 
 ## Session Continuity
 
