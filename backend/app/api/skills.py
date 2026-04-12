@@ -1,5 +1,6 @@
 import io
 import os
+import re
 import zipfile
 
 import yaml
@@ -27,6 +28,11 @@ def _mime_to_subdir(mime_type: str) -> str:
     if mime_type.startswith("text/x-python") or mime_type.endswith("+python") or mime_type == "application/x-python-code":
         return "scripts"
     if mime_type.startswith("image/") or mime_type.startswith("audio/") or mime_type.startswith("video/"):
+        return "assets"
+    if (
+        mime_type.startswith("application/vnd.openxmlformats-officedocument")
+        or mime_type in ("application/pdf", "application/zip", "application/octet-stream")
+    ):
         return "assets"
     return "references"
 
