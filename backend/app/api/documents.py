@@ -176,7 +176,8 @@ async def upload_document(
 
     content_hash = hashlib.sha256(raw).hexdigest()
 
-    # Case 1: exact duplicate already completed in the same folder — skip re-ingestion
+    # Case 1: exact duplicate already completed (is_latest=True) in the same folder — skip re-ingestion
+    # Dedup only matches the current latest version; stale versions do not short-circuit upload.
     # Duplicate check is folder-scoped: same file in different folders creates separate entries.
     dedup_query = (
         supabase.table("documents")
@@ -184,6 +185,7 @@ async def upload_document(
         .eq("user_id", current_user["id"])
         .eq("content_hash", content_hash)
         .eq("status", "completed")
+        .eq("is_latest", True)
     )
     if folder_id:
         dedup_query = dedup_query.eq("folder_id", folder_id)
@@ -194,22 +196,29 @@ async def upload_document(
         response.status_code = status.HTTP_200_OK
         return existing.data[0]
 
-    # Case 2: same filename, different content → delete old and re-ingest
-    stale = (
+    # Case 2: same filename → create new version instead of deleting stale document.
+    # Old files are retained in storage for future restore (Phase 29).
+    existing_versions = (
         supabase.table("documents")
-        .select("id, file_path")
+        .select("id, version_number")
         .eq("user_id", current_user["id"])
         .eq("filename", file.filename)
-        .neq("content_hash", content_hash)
+        .order("version_number", desc=True)
         .limit(1)
         .execute()
     )
-    if stale.data:
-        try:
-            supabase.storage.from_("documents").remove([stale.data[0]["file_path"]])
-        except Exception:
-            pass
-        supabase.table("documents").delete().eq("id", stale.data[0]["id"]).execute()
+    if existing_versions.data:
+        next_version = existing_versions.data[0]["version_number"] + 1
+        # Retire all previous versions from retrieval (user-scoped, not folder-scoped)
+        (
+            supabase.table("documents")
+            .update({"is_latest": False})
+            .eq("user_id", current_user["id"])
+            .eq("filename", file.filename)
+            .execute()
+        )
+    else:
+        next_version = 1
 
     try:
         text = extract_text(raw, mime_type)
@@ -232,6 +241,8 @@ async def upload_document(
         "status": "pending",
         "content_hash": content_hash,
         "folder_id": folder_id,
+        "version_number": next_version,
+        "is_latest": True,
     }
     result = supabase.table("documents").insert(doc_data).execute()
     doc = result.data[0]

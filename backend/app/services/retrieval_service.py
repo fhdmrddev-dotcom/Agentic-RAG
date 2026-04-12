@@ -132,12 +132,13 @@ def _avg_cosine(rows: list[dict]) -> float:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
-    """Case-insensitive filename lookup for a user's document. Tries exact match then partial match."""
-    # Exact case-insensitive match
+    """Case-insensitive filename lookup for a user's document (latest version only). Tries exact match then partial match."""
+    # Exact case-insensitive match — only resolve to the latest version
     result = (
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
+        .eq("is_latest", True)
         .ilike("filename", filename)
         .limit(1)
         .execute()
@@ -149,6 +150,7 @@ def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | 
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
+        .eq("is_latest", True)
         .ilike("filename", f"%{filename}%")
         .limit(1)
         .execute()
@@ -162,7 +164,7 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
     """Fetch complete document content by concatenating all ordered chunks."""
     doc_result = (
         supabase.table("documents")
-        .select("id, filename, metadata")
+        .select("id, filename, metadata, version_number")
         .eq("id", document_id)
         .eq("user_id", user_id)
         .single()
