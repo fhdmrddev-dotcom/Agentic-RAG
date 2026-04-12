@@ -29,7 +29,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [ ] **VER-03**: User can see a version badge (e.g. "v3") on documents that have been updated in the document library
 - [ ] **VER-04**: User can expand a document row to view its full version history (version number, upload date, file size)
 - [ ] **VER-05**: User can restore an older version as the active version (re-ingest from stored file or re-upload)
-- [ ] **VER-06**: Answers citing a versioned document include the version number in the citation (e.g. "Report.pdf (v2) — Section 3")
+- [x] **VER-06**: Answers citing a versioned document include the version number in the citation (e.g. "Report.pdf (v2) — Section 3")
 
 ### Audit Log (F-06)
 
@@ -99,7 +99,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 | VER-03 | Phase 29 | Pending |
 | VER-04 | Phase 29 | Pending |
 | VER-05 | Phase 29 | Pending |
-| VER-06 | Phase 28 | Pending |
+| VER-06 | Phase 28 | Complete |
 | AUDIT-01 | Phase 30 | Pending |
 | AUDIT-02 | Phase 30 | Pending |
 | AUDIT-03 | Phase 30 | Pending |

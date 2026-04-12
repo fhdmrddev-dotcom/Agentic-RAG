@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: executing
-stopped_at: Completed 28-document-versioning-schema-ingestion 28-01-PLAN.md
-last_updated: "2026-04-12T18:33:05.098Z"
+status: verifying
+stopped_at: Completed 28-document-versioning-schema-ingestion 28-02-PLAN.md
+last_updated: "2026-04-12T18:37:52.945Z"
 last_activity: 2026-04-12
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-11)
 
 Phase: 28 (document-versioning-schema-ingestion) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-12
 
 ```
@@ -97,6 +97,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 26-citations-confidence-backend P02 | 122s | 2 tasks | 2 files |
 | Phase 27-citations-confidence-frontend P01 | 231s | 4 tasks | 10 files |
 | Phase 28-document-versioning-schema-ingestion P01 | 258s | 2 tasks | 5 files |
+| Phase 28-document-versioning-schema-ingestion P02 | 150s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -201,6 +202,8 @@ Recent decisions affecting current work:
 - [Phase 28-document-versioning-schema-ingestion]: Re-upload creates new version row (version_number incremented); old row retires via is_latest=False — no delete, storage retained for Phase 29 restore
 - [Phase 28-document-versioning-schema-ingestion]: Dedup check scoped to is_latest=True so stale hash matches do not short-circuit re-upload
 - [Phase 28-document-versioning-schema-ingestion]: resolve_document_id always resolves to is_latest=True document to prevent agent analyze_document using stale versions
+- [Phase 28-document-versioning-schema-ingestion]: version_number defaults to 1 in all enrichment and citation paths — safe for pre-migration document rows
+- [Phase 28-document-versioning-schema-ingestion]: CitationCard shows no version suffix for v1; renders (vN) only when N > 1 for clean default UX
 
 ### Pending Todos
 
@@ -230,5 +233,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 28-document-versioning-schema-ingestion 28-01-PLAN.md
+Stopped at: Completed 28-document-versioning-schema-ingestion 28-02-PLAN.md
 Resume file: None
