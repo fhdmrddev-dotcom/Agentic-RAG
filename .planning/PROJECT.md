@@ -21,10 +21,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 26 (citations/confidence backend) complete 2026-04-12
+**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 27 (citations/confidence frontend) complete 2026-04-12
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~15,000 LOC (Python + TypeScript)
-**Phases shipped:** 26 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 1 v2.2), all requirements complete
+**Phases shipped:** 27 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 2 v2.2), all requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
 **Known tech debt:** Missing test files for phases 20 and 22 (test_blank_response_guards.py, test_rag_correctness.py); metadata ingest normalization covers only document_type/language; live LangSmith sub-agent trace not yet performed
@@ -108,8 +108,8 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 - [x] F-01 (backend): citations SSE event with passage text, chunk_index, filename per retrieved chunk — validated Phase 26
 - [x] F-05 (backend): confidence SSE event with high/medium/low level + avg_similarity + disclaimer for low — validated Phase 26
-- [ ] F-01 (frontend): collapsible citation cards showing exact retrieved passages beneath each answer
-- [ ] F-05 (frontend): Answer Confidence Score badge — colour-coded, Low adds disclaimer
+- [x] F-01 (frontend): collapsible citation cards showing exact retrieved passages beneath each answer — validated Phase 27
+- [x] F-05 (frontend): Answer Confidence Score badge — colour-coded, Low adds disclaimer — validated Phase 27
 - [ ] F-02: Document Versioning & Change Detection — version tracking on re-upload, stale chunk retirement, version badges + history in library UI
 - [ ] F-06: Audit Log — immutable append-only audit trail (uploads, searches, deletions, code execution, skill loads); admin view in Settings
 - [ ] F-08: Suggested Follow-Up Questions — 2–3 clickable follow-up pill buttons after each assistant response, non-blocking cheap model generation
@@ -207,4 +207,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-12 — Phase 26 complete: citations + confidence backend shipped*
+*Last updated: 2026-04-12 — Phase 27 complete: citations + confidence frontend shipped (F-01 + F-05 fully delivered end-to-end)*
