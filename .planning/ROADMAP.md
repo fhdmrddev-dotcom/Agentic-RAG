@@ -60,7 +60,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 ---
 
-### 🚧 v2.2 Trust & Compliance (In Progress)
+### v2.2 Trust & Compliance (In Progress)
 
 **Milestone Goal:** Make answers verifiable and auditable — surface retrieved evidence, confidence signals, document version provenance, usage trails, and contextual follow-up suggestions.
 
@@ -110,7 +110,10 @@ Plans:
   1. Uploading a file whose name matches an existing document succeeds and creates a new version record rather than being rejected as a duplicate
   2. Chunks from the previous version are excluded from all vector and keyword retrieval immediately after the new version finishes ingesting
   3. Citation cards for answers citing a versioned document display the version number alongside the document name (e.g., "Report.pdf (v2)")
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 28-01-PLAN.md — SQL migration (version_number, is_latest, RPC filters) + upload endpoint versioning logic
+- [ ] 28-02-PLAN.md — version_number propagation through retrieval pipeline + CitationCard rendering
 
 ### Phase 29: Document Versioning — UI
 **Goal**: Users can see which documents have been updated, browse their version history, and restore an older version as active
@@ -190,7 +193,7 @@ Plans:
 | 25. Sub-Agent Intelligence & Model-Aware Context | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete    | 2026-04-12 |
-| 28. Document Versioning — Schema & Ingestion | v2.2 | 0/? | Not started | - |
+| 28. Document Versioning — Schema & Ingestion | v2.2 | 0/2 | Planning | - |
 | 29. Document Versioning — UI | v2.2 | 0/? | Not started | - |
 | 30. Audit Log — Backend | v2.2 | 0/? | Not started | - |
 | 31. Audit Log — Settings UI | v2.2 | 0/? | Not started | - |
