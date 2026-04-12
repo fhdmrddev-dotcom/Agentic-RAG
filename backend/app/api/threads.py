@@ -406,7 +406,9 @@ async def send_message(
                     break
                 path_parts.append(f.get("name", ""))
                 current_fid = f.get("parent_id")
-            scoped_folder_path = "/" + "/".join(reversed(path_parts))
+            # Only set a meaningful path — if traversal found nothing, leave as None
+            # so the scope note is not injected with a confusing "/" root path.
+            scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
         # Load full message history (includes just-inserted user message)
         history_resp = (
