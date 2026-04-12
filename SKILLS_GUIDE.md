@@ -76,8 +76,8 @@ Navigate to the **Skills** tab (third tab in the sidebar).
 The imported skill starts **disabled** and **private** — enable it by toggling the switch on its card before it appears in the agent's catalog.
 
 **ZIP format rules:**
-- Must contain a `SKILL.md` file at the root (or one per subfolder for bulk imports)
-- `SKILL.md` must start with YAML frontmatter (`---`) containing at least `name:`
+- Must contain a `SKILL.md` file inside a root folder named after the skill slug (e.g. `weekly-report/SKILL.md`)
+- `SKILL.md` must start with YAML frontmatter (`---`) containing at least `name:` (lowercase slug format)
 - Max ZIP size: **10 MB**
 - Path traversal filenames are rejected for security
 
@@ -316,30 +316,43 @@ If you want to create a skill ZIP file by hand (to share with teammates):
 
 ```
 weekly-report.zip
-└── SKILL.md
+└── weekly-report/
+    └── SKILL.md
 ```
 
 `SKILL.md` contents:
 ```markdown
 ---
-name: Weekly Report
+name: weekly-report
 description: Generates a formatted Word document weekly status report from uploaded project files
-version: "1.0"
-author: Your Name
+license: MIT
+metadata:
+  version: "1.0"
+  original_name: Weekly Report
+compatibility: Requires execute_code tool with Docker sandbox and python-docx
 ---
 
 [Full instructions text here]
 ```
 
-For a skill with an attached reference file:
+For a skill with attached files:
 ```
 weekly-report.zip
-├── SKILL.md
-└── references/
-    └── weekly_template.docx
+└── weekly-report/
+    ├── SKILL.md
+    ├── assets/
+    │   └── weekly_template.docx
+    └── references/
+        └── style_guide.md
 ```
 
-Files in `scripts/` subdirectory are treated as Python scripts, `assets/` for images/media, and `references/` for everything else.
+**File placement rules:**
+
+| Directory | File types |
+|-----------|-----------|
+| `scripts/` | Python files (`.py`) |
+| `assets/` | Images, audio, video, Office documents (`.docx`, `.xlsx`, `.pptx`), PDFs, ZIPs, binary files |
+| `references/` | Plain text documentation (`.md`, `.txt`, `.csv`, `.html`) |
 
 ---
 
@@ -351,5 +364,5 @@ Files in `scripts/` subdirectory are treated as Python scripts, `assets/` for im
 | Skill doesn't activate | Description is too vague | Make description match how users will phrase requests |
 | "Skill not found" error | Name mismatch | Ensure skill name in instructions matches exactly |
 | No Word file generated | `SANDBOX_ENABLED=false` | Set `SANDBOX_ENABLED=true` in `.env` and start Docker |
-| Import fails | Invalid ZIP structure | Ensure `SKILL.md` is at the root of the ZIP |
+| Import fails | Invalid ZIP structure | Ensure ZIP has a root folder containing `SKILL.md` (e.g. `my-skill/SKILL.md`) |
 | Skill activates in wrong mode | Using Explorer mode | Switch to General mode — skills are General-only |
