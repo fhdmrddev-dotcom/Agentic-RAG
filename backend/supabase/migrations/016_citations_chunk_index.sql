@@ -1,4 +1,6 @@
 -- Migration 016: Add chunk_index to match_document_chunks RPC for Phase 26 citations
+-- Must DROP first because RETURNS TABLE shape changed (added chunk_index column)
+DROP FUNCTION IF EXISTS match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[]);
 
 CREATE OR REPLACE FUNCTION match_document_chunks(
   query_embedding vector(1536),
