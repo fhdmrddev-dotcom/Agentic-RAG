@@ -16,7 +16,12 @@ export function CitationCard({ citation }: Props) {
       {/* Header */}
       <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
         <FileText className="w-3 h-3 flex-shrink-0" />
-        <span className="truncate">{citation.filename}</span>
+        <span className="truncate">
+          {citation.filename}
+          {citation.version_number != null && citation.version_number > 1
+            ? ` (v${citation.version_number})`
+            : ""}
+        </span>
         <span className="text-muted-foreground/50 shrink-0">
           {citation.is_full_doc
             ? "Full document"
