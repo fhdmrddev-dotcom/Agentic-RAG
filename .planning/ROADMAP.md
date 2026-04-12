@@ -64,7 +64,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 
 **Milestone Goal:** Make answers verifiable and auditable — surface retrieved evidence, confidence signals, document version provenance, usage trails, and contextual follow-up suggestions.
 
-- [ ] **Phase 26: Citations & Confidence — Backend** — Enrich SSE stream with citation passages and confidence scores; extend data model
+- [x] **Phase 26: Citations & Confidence — Backend** — Enrich SSE stream with citation passages and confidence scores; extend data model (completed 2026-04-12)
 - [ ] **Phase 27: Citations & Confidence — Frontend** — Render citation cards and confidence badge in chat UI
 - [ ] **Phase 28: Document Versioning — Schema & Ingestion** — Migration for version tracking, re-upload creates new version, stale chunks retired, citation includes version number
 - [ ] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library
@@ -84,10 +84,10 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
   3. For `analyze_document` responses the citation payload contains document name only (no chunk anchor)
   4. A `confidence` field is included in the SSE stream with one of three values (high/medium/low) derived from average retrieval similarity scores
   5. Low-confidence responses include the standard disclaimer text in the SSE payload
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 26-01-PLAN.md — SQL migration + retrieval_service return type change (chunk_index, avg_similarity)
-- [ ] 26-02-PLAN.md — Citation accumulation, confidence scoring, SSE events in threads.py
+- [x] 26-02-PLAN.md — Citation accumulation, confidence scoring, SSE events in threads.py
 **UI hint**: yes
 
 ### Phase 27: Citations & Confidence — Frontend
@@ -188,7 +188,7 @@ Plans:
 | 23. System Prompt Quality | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 24. Infrastructure Hardening | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 25. Sub-Agent Intelligence & Model-Aware Context | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 26. Citations & Confidence — Backend | v2.2 | 1/2 | In Progress|  |
+| 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete   | 2026-04-12 |
 | 27. Citations & Confidence — Frontend | v2.2 | 0/? | Not started | - |
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 0/? | Not started | - |
 | 29. Document Versioning — UI | v2.2 | 0/? | Not started | - |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: executing
-stopped_at: Completed 26-citations-confidence-backend 26-01-PLAN.md
-last_updated: "2026-04-12T06:05:49.976Z"
+status: verifying
+stopped_at: Completed 26-citations-confidence-backend 26-02-PLAN.md
+last_updated: "2026-04-12T06:10:00.224Z"
 last_activity: 2026-04-12
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-11)
 
 Phase: 26 (citations-confidence-backend) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-12
 
 ```
@@ -94,6 +94,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 18-context-window-hardening P01 | 8min | 2 tasks | 2 files |
 | Phase 25-sub-agent-intelligence P01 | 2m 46s | 5 tasks | 5 files |
 | Phase 26-citations-confidence-backend P01 | 132s | 2 tasks | 3 files |
+| Phase 26-citations-confidence-backend P02 | 122s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,9 @@ Recent decisions affecting current work:
 - [Phase 26-citations-confidence-backend]: search_documents returns tuple[list[dict], float] — (enriched_results, avg_vector_similarity) to enable citations and confidence scoring in Plan 02
 - [Phase 26-citations-confidence-backend]: _avg_cosine uses only vector_rows in hybrid path — keyword rows have no real cosine similarity; if vector_rows empty, returns 0.0
 - [Phase 26-citations-confidence-backend]: chunk_index passed through via row.get('chunk_index') — returns None for backward compat if RPC does not supply it
+- [Phase 26-citations-confidence-backend]: unique_citations uses slice assignment (unique_citations[:] = ...) so _persist_assistant_message closure captures the populated list without needing nonlocal declaration
+- [Phase 26-citations-confidence-backend]: SSE citations payload truncates passage at 400 chars; full passage stored in source_refs for message reload (D-04/D-13)
+- [Phase 26-citations-confidence-backend]: similarity_scores accumulates only from search_documents calls (not analyze_document) per D-16; confidence event absent when no search_documents occurred this turn
 
 ### Pending Todos
 
@@ -218,5 +222,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-dqu: Fix four issues in backend/app/api/skills.py
-Stopped at: Completed 26-citations-confidence-backend 26-01-PLAN.md
+Stopped at: Completed 26-citations-confidence-backend 26-02-PLAN.md
 Resume file: None

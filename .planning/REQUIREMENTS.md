@@ -12,15 +12,15 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **CITE-01**: User can see exact retrieved passage text for each search result as a collapsible card beneath the assistant response
 - [x] **CITE-02**: Each citation card displays document name, section/location (if identifiable), and passage text (≤400 chars, expandable to full)
 - [ ] **CITE-03**: Citation card text is visually distinct from the AI-generated response (quoted block style with different background)
-- [ ] **CITE-04**: Citation cards appear only for passages retrieved in that response turn — never for documents not retrieved
-- [ ] **CITE-05**: For `analyze_document` results, user sees document name attribution only (no chunk anchor available for full-doc analysis)
+- [x] **CITE-04**: Citation cards appear only for passages retrieved in that response turn — never for documents not retrieved
+- [x] **CITE-05**: For `analyze_document` results, user sees document name attribution only (no chunk anchor available for full-doc analysis)
 
 ### Answer Confidence Score (F-05)
 
 - [x] **CONF-01**: User can see a High/Medium/Low confidence badge on every document-grounded assistant message
 - [x] **CONF-02**: Confidence badge is colour-coded: green (High ≥ 0.7 avg similarity), amber (Medium 0.5–0.7), red (Low < 0.5 or zero results)
-- [ ] **CONF-03**: Low-confidence responses include a standard disclaimer: "This answer is based on limited or weakly-matched evidence. Please verify with the source documents."
-- [ ] **CONF-04**: Confidence badge does not appear on web_search, execute_code, or skill-only responses
+- [x] **CONF-03**: Low-confidence responses include a standard disclaimer: "This answer is based on limited or weakly-matched evidence. Please verify with the source documents."
+- [x] **CONF-04**: Confidence badge does not appear on web_search, execute_code, or skill-only responses
 
 ### Document Versioning & Change Detection (F-02)
 
@@ -88,12 +88,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 | CITE-01 | Phase 26 | Complete |
 | CITE-02 | Phase 26 | Complete |
 | CITE-03 | Phase 27 | Pending |
-| CITE-04 | Phase 26 | Pending |
-| CITE-05 | Phase 26 | Pending |
+| CITE-04 | Phase 26 | Complete |
+| CITE-05 | Phase 26 | Complete |
 | CONF-01 | Phase 26 | Complete |
 | CONF-02 | Phase 26 | Complete |
-| CONF-03 | Phase 26 | Pending |
-| CONF-04 | Phase 26 | Pending |
+| CONF-03 | Phase 26 | Complete |
+| CONF-04 | Phase 26 | Complete |
 | VER-01 | Phase 28 | Pending |
 | VER-02 | Phase 28 | Pending |
 | VER-03 | Phase 29 | Pending |
