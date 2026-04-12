@@ -4,8 +4,8 @@ import re
 import zipfile
 
 import yaml
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import JSONResponse, StreamingResponse
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -75,6 +75,33 @@ def _find_skill_entries(zf: zipfile.ZipFile) -> list[tuple[str, bytes]]:
     return entries
 
 
+def _upload_skill_files(
+    files_to_upload: list[dict],
+    skill_id: str,
+    user_id: str,
+    supabase: Client,
+) -> None:
+    """Upload companion files to storage and insert metadata rows.
+
+    Each dict in files_to_upload must contain:
+      file_bytes, filename, storage_path, mime_type
+    """
+    for entry in files_to_upload:
+        supabase.storage.from_("skill-files").upload(
+            path=entry["storage_path"],
+            file=entry["file_bytes"],
+            file_options={"content-type": entry["mime_type"]},
+        )
+        supabase.table("skill_files").insert({
+            "skill_id": skill_id,
+            "user_id": user_id,
+            "filename": entry["filename"],
+            "file_path": entry["storage_path"],
+            "file_size": len(entry["file_bytes"]),
+            "mime_type": entry["mime_type"],
+        }).execute()
+
+
 @router.get("", response_model=list[SkillResponse])
 async def list_skills(
     current_user: dict = Depends(get_current_user),
@@ -121,6 +148,7 @@ async def create_skill(
 @router.post("/import", status_code=status.HTTP_201_CREATED)
 async def import_skill(
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -169,6 +197,7 @@ async def import_skill(
             raise HTTPException(status_code=400, detail=errors[0]["error"])
 
         # 6. Create DB rows for successfully parsed skills
+        has_background = False
         for prefix, fm, instructions in parsed:
             skill_row = (
                 supabase.table("skills")
@@ -183,7 +212,8 @@ async def import_skill(
             ).data[0]
             results.append(skill_row)
 
-            # Upload companion files
+            # Build list of companion file dicts
+            files_to_upload: list[dict] = []
             for entry_name in zf.namelist():
                 if not entry_name.startswith(prefix):
                     continue
@@ -195,20 +225,35 @@ async def import_skill(
                     continue
                 file_bytes = zf.read(entry_name)
                 storage_path = f"{current_user['id']}/{skill_row['id']}/{filename}"
-                supabase.storage.from_("skill-files").upload(
-                    path=storage_path,
-                    file=file_bytes,
-                    file_options={"content-type": "application/octet-stream"},
-                )
-                supabase.table("skill_files").insert({
-                    "skill_id": skill_row["id"],
-                    "user_id": current_user["id"],
+                files_to_upload.append({
+                    "file_bytes": file_bytes,
                     "filename": filename,
-                    "file_path": storage_path,
-                    "file_size": len(file_bytes),
+                    "storage_path": storage_path,
                     "mime_type": "application/octet-stream",
-                }).execute()
+                })
 
+            file_count = len(files_to_upload)
+            if file_count > 20:
+                background_tasks.add_task(
+                    _upload_skill_files,
+                    files_to_upload,
+                    skill_row["id"],
+                    current_user["id"],
+                    supabase,
+                )
+                has_background = True
+            else:
+                _upload_skill_files(files_to_upload, skill_row["id"], current_user["id"], supabase)
+
+    if has_background:
+        return JSONResponse(
+            status_code=202,
+            content={
+                "created": results,
+                "errors": errors,
+                "message": "Skill imported — files uploading in background",
+            },
+        )
     return {"created": results, "errors": errors}
 
 
