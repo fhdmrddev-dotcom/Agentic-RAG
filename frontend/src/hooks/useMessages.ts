@@ -18,6 +18,7 @@ export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const isSendingRef = useRef(false)
+  const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const stopStreaming = useCallback(() => {
@@ -25,17 +26,25 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
+    const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
     setMessages((prev) => {
-      // Don't wipe optimistic messages if sendMessage is in flight
+      // Don't wipe optimistic messages or live-only fields (confidence) if a send is in flight
+      // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
-      return data
+      if (sendGenerationRef.current !== generation) return prev
+      // Preserve live-only confidence from in-memory messages — confidence is not persisted to DB
+      return data.map((dbMsg) => {
+        const inMem = prev.find((m) => m.id === dbMsg.id)
+        return inMem?.confidence ? { ...dbMsg, confidence: inMem.confidence } : dbMsg
+      })
     })
   }, [])
 
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
     if (isSendingRef.current) return
     isSendingRef.current = true
+    sendGenerationRef.current += 1
 
     // Optimistic user message
     const userMsg: Message = {
