@@ -65,7 +65,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 **Milestone Goal:** Make answers verifiable and auditable — surface retrieved evidence, confidence signals, document version provenance, usage trails, and contextual follow-up suggestions.
 
 - [x] **Phase 26: Citations & Confidence — Backend** — Enrich SSE stream with citation passages and confidence scores; extend data model (completed 2026-04-12)
-- [ ] **Phase 27: Citations & Confidence — Frontend** — Render citation cards and confidence badge in chat UI
+- [x] **Phase 27: Citations & Confidence — Frontend** — Render citation cards and confidence badge in chat UI (completed 2026-04-12)
 - [ ] **Phase 28: Document Versioning — Schema & Ingestion** — Migration for version tracking, re-upload creates new version, stale chunks retired, citation includes version number
 - [ ] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library
 - [ ] **Phase 30: Audit Log — Backend** — `audit_log` table with RLS, async fire-and-forget writes for all significant actions
@@ -189,7 +189,7 @@ Plans:
 | 24. Infrastructure Hardening | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 25. Sub-Agent Intelligence & Model-Aware Context | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete    | 2026-04-12 |
-| 27. Citations & Confidence — Frontend | v2.2 | 0/? | Not started | - |
+| 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete   | 2026-04-12 |
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 0/? | Not started | - |
 | 29. Document Versioning — UI | v2.2 | 0/? | Not started | - |
 | 30. Audit Log — Backend | v2.2 | 0/? | Not started | - |

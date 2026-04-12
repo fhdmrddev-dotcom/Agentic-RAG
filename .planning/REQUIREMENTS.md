@@ -11,7 +11,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **CITE-01**: User can see exact retrieved passage text for each search result as a collapsible card beneath the assistant response
 - [x] **CITE-02**: Each citation card displays document name, section/location (if identifiable), and passage text (≤400 chars, expandable to full)
-- [ ] **CITE-03**: Citation card text is visually distinct from the AI-generated response (quoted block style with different background)
+- [x] **CITE-03**: Citation card text is visually distinct from the AI-generated response (quoted block style with different background)
 - [x] **CITE-04**: Citation cards appear only for passages retrieved in that response turn — never for documents not retrieved
 - [x] **CITE-05**: For `analyze_document` results, user sees document name attribution only (no chunk anchor available for full-doc analysis)
 
@@ -87,7 +87,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 |-------------|-------|--------|
 | CITE-01 | Phase 26 | Complete |
 | CITE-02 | Phase 26 | Complete |
-| CITE-03 | Phase 27 | Pending |
+| CITE-03 | Phase 27 | Complete |
 | CITE-04 | Phase 26 | Complete |
 | CITE-05 | Phase 26 | Complete |
 | CONF-01 | Phase 26 | Complete |

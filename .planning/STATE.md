@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
 status: verifying
-stopped_at: Completed 26-citations-confidence-backend 26-02-PLAN.md
-last_updated: "2026-04-12T10:10:27.846Z"
+stopped_at: Completed 27-citations-confidence-frontend 27-01-PLAN.md
+last_updated: "2026-04-12T15:24:41.266Z"
 last_activity: 2026-04-12
 progress:
   total_phases: 7
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 26 — citations-confidence-backend
+**Current focus:** Phase 27 — citations-confidence-frontend
 
 ## Current Position
 
-Phase: 27
-Plan: Not started
+Phase: 27 (citations-confidence-frontend) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-12
 
@@ -95,6 +95,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 25-sub-agent-intelligence P01 | 2m 46s | 5 tasks | 5 files |
 | Phase 26-citations-confidence-backend P01 | 132s | 2 tasks | 3 files |
 | Phase 26-citations-confidence-backend P02 | 122s | 2 tasks | 2 files |
+| Phase 27-citations-confidence-frontend P01 | 231s | 4 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -194,6 +195,8 @@ Recent decisions affecting current work:
 - [Phase 26-citations-confidence-backend]: unique_citations uses slice assignment (unique_citations[:] = ...) so _persist_assistant_message closure captures the populated list without needing nonlocal declaration
 - [Phase 26-citations-confidence-backend]: SSE citations payload truncates passage at 400 chars; full passage stored in source_refs for message reload (D-04/D-13)
 - [Phase 26-citations-confidence-backend]: similarity_scores accumulates only from search_documents calls (not analyze_document) per D-16; confidence event absent when no search_documents occurred this turn
+- [Phase 27-citations-confidence-frontend]: SourceReferences pill badges retired — citation cards replace them entirely (D-01)
+- [Phase 27-citations-confidence-frontend]: source_refs mapped to citations on DB load; confidence is live-only SSE signal, not persisted (D-09)
 
 ### Pending Todos
 
@@ -223,5 +226,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 26-citations-confidence-backend 26-02-PLAN.md
+Stopped at: Completed 27-citations-confidence-frontend 27-01-PLAN.md
 Resume file: None
