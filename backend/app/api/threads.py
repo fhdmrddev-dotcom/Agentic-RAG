@@ -123,6 +123,33 @@ SYSTEM_PROMPT = (
 )
 
 
+CONFIDENCE_DISCLAIMER = (
+    "This answer is based on limited or weakly-matched evidence. "
+    "Please verify with the source documents."
+)
+
+
+def _compute_confidence(avg_similarity: float) -> str:
+    """Map average cosine similarity to confidence level (D-10)."""
+    if avg_similarity >= 0.7:
+        return "high"
+    elif avg_similarity >= 0.5:
+        return "medium"
+    return "low"
+
+
+def _deduplicate_citations(citations: list[dict]) -> list[dict]:
+    """Deduplicate citations by (document_id, chunk_index), preserving order (D-14)."""
+    seen: set[tuple] = set()
+    unique: list[dict] = []
+    for c in citations:
+        key = (c["document_id"], c.get("chunk_index"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+    return unique
+
+
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
     current_user: dict = Depends(get_current_user),
@@ -455,6 +482,9 @@ async def send_message(
         persisted_tool_calls: list[dict] = []
         source_refs: list[dict] = []  # {"document_id": str, "filename": str}
         unique_sources: list[dict] = []
+        retrieved_citations: list[dict] = []    # Full citation objects per D-04
+        similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
+        unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
         _message_persisted = False  # guard against double-insert
         _empty_retries = 0  # tracks empty-response retries across all iterations
 
@@ -477,8 +507,10 @@ async def send_message(
             }
             if persisted_tool_calls:
                 row["tool_calls"] = _strip_nul(persisted_tool_calls)
-            if unique_sources:
-                row["source_refs"] = unique_sources
+            if unique_citations:
+                row["source_refs"] = unique_citations   # Full citation objects (D-13)
+            elif unique_sources:
+                row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
             try:
                 supabase.table("messages").insert(row).execute()
             except Exception as e:
@@ -679,20 +711,30 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
-                            results = search_documents(
+                            results, avg_sim = search_documents(
                                 args["query"], current_user["id"], supabase,
                                 metadata_filter=metadata_filter,
                                 user_settings=user_settings,
                                 folder_ids=folder_subtree_ids,
                             )
                             tool_result = json.dumps(results) if results else "No relevant documents found."
-                            # Collect unique source document references from search results
+                            # Accumulate full citation objects for citations event (D-04, D-14)
                             if results and isinstance(results, list):
                                 for hit in results:
                                     doc_id = hit.get("document_id") or hit.get("id")
                                     filename = hit.get("filename") or hit.get("document_name")
                                     if doc_id and filename:
                                         source_refs.append({"document_id": doc_id, "filename": filename})
+                                        retrieved_citations.append({
+                                            "document_id": doc_id,
+                                            "filename": filename,
+                                            "chunk_index": hit.get("chunk_index"),
+                                            "passage": hit.get("content"),  # Full text for persistence
+                                            "similarity": hit.get("similarity"),
+                                            "is_full_doc": False,
+                                        })
+                                if avg_sim > 0.0:
+                                    similarity_scores.append(avg_sim)
                         elif tool_name == "query_documents":
                             tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
@@ -708,6 +750,14 @@ async def send_message(
                                 else:
                                     # Track this document as a source reference
                                     source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
+                                    retrieved_citations.append({
+                                        "document_id": doc_id,
+                                        "filename": doc["filename"],
+                                        "chunk_index": None,
+                                        "passage": None,
+                                        "similarity": None,
+                                        "is_full_doc": True,
+                                    })
                                     yield f"data: {json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']})}\n\n"
                                     sub_agent_content = ""
                                     try:
@@ -1132,6 +1182,25 @@ async def send_message(
           if source_refs:
               unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
               yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
+
+          # Emit citations event (D-03, D-07: after sources, before confidence)
+          unique_citations[:] = _deduplicate_citations(retrieved_citations)
+          if unique_citations:
+              # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
+              sse_citations = []
+              for c in unique_citations:
+                  sse_c = dict(c)
+                  if sse_c.get("passage") and len(sse_c["passage"]) > 400:
+                      sse_c["passage"] = sse_c["passage"][:400]
+                  sse_citations.append(sse_c)
+              yield f"data: {json.dumps({'type': 'citations', 'citations': sse_citations})}\n\n"
+
+          # Emit confidence event (D-05, D-07: after citations, before title)
+          if similarity_scores:
+              final_avg = sum(similarity_scores) / len(similarity_scores)
+              level = _compute_confidence(final_avg)
+              disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
+              yield f"data: {json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer})}\n\n"
 
           # Persist assistant message (normal path — before [DONE])
           _persist_assistant_message()
