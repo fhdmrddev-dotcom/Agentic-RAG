@@ -193,7 +193,7 @@ Plans:
 | 25. Sub-Agent Intelligence & Model-Aware Context | v2.1 | 1/1 | Complete | 2026-04-10 |
 | 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete    | 2026-04-12 |
-| 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete   | 2026-04-12 |
+| 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 29. Document Versioning — UI | v2.2 | 0/? | Not started | - |
 | 30. Audit Log — Backend | v2.2 | 0/? | Not started | - |
 | 31. Audit Log — Settings UI | v2.2 | 0/? | Not started | - |

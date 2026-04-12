@@ -21,10 +21,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 27 (citations/confidence frontend) complete 2026-04-12
+**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 28 (document versioning schema & ingestion) complete 2026-04-12
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~15,000 LOC (Python + TypeScript)
-**Phases shipped:** 27 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 2 v2.2), all requirements complete
+**Phases shipped:** 28 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 3 v2.2), all requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
 **Known tech debt:** Missing test files for phases 20 and 22 (test_blank_response_guards.py, test_rag_correctness.py); metadata ingest normalization covers only document_type/language; live LangSmith sub-agent trace not yet performed
@@ -110,7 +110,8 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - [x] F-05 (backend): confidence SSE event with high/medium/low level + avg_similarity + disclaimer for low — validated Phase 26
 - [x] F-01 (frontend): collapsible citation cards showing exact retrieved passages beneath each answer — validated Phase 27
 - [x] F-05 (frontend): Answer Confidence Score badge — colour-coded, Low adds disclaimer — validated Phase 27
-- [ ] F-02: Document Versioning & Change Detection — version tracking on re-upload, stale chunk retirement, version badges + history in library UI
+- [x] F-02 (backend): document versioning — version_number + is_latest columns, re-upload creates new version, old chunks retired from all retrieval RPCs, citation cards show "(vN)" badge — validated Phase 28
+- [ ] F-02 (frontend): version history UI — version badges in document library, history drawer, restore button
 - [ ] F-06: Audit Log — immutable append-only audit trail (uploads, searches, deletions, code execution, skill loads); admin view in Settings
 - [ ] F-08: Suggested Follow-Up Questions — 2–3 clickable follow-up pill buttons after each assistant response, non-blocking cheap model generation
 
