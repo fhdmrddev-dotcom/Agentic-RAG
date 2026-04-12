@@ -477,6 +477,7 @@ async def export_skill(
     if not skill.data:
         raise HTTPException(status_code=404, detail="Skill not found")
     skill_row = skill.data[0] if isinstance(skill.data, list) else skill.data
+    slug = re.sub(r'[^a-z0-9-]+', '-', skill_row["name"].lower()).strip('-')
 
     # 2. Fetch attached files
     files = (
@@ -490,22 +491,25 @@ async def export_skill(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         fm = {
-            "name": skill_row["name"],
+            "name": slug,
             "description": skill_row["description"],
             "license": "MIT",
-            "compatibility": "1.0",
+            "metadata": {
+                "version": "1.0",
+                "original_name": skill_row["name"],
+            },
+            "compatibility": "Requires execute_code tool with Docker sandbox and python-docx",
         }
         skill_md = f"---\n{yaml.dump(fm, default_flow_style=False)}---\n\n{skill_row['instructions']}"
-        zf.writestr("SKILL.md", skill_md)
+        zf.writestr(f"{slug}/SKILL.md", skill_md)
 
         for f in files.data:
             subdir = _mime_to_subdir(f["mime_type"])
             raw = supabase.storage.from_("skill-files").download(f["file_path"])
             safe_name = os.path.basename(f["filename"])
-            zf.writestr(f"{subdir}/{safe_name}", raw)
+            zf.writestr(f"{slug}/{subdir}/{safe_name}", raw)
 
     buf.seek(0)
-    slug = skill_row["name"].replace(" ", "-").lower()
     return StreamingResponse(
         buf,
         media_type="application/zip",
