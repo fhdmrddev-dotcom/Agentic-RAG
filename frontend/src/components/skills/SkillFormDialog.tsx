@@ -159,7 +159,7 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
               {files.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No files attached.</p>
               ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-1 overflow-y-auto max-h-48">
                   {files.map((f) => (
                     <li key={f.id} className="flex items-center justify-between text-xs bg-muted rounded px-2 py-1">
                       <span className="flex items-center gap-1 text-foreground truncate">
