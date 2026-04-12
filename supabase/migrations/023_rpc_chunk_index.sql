@@ -2,6 +2,9 @@
 -- The document_chunks table has chunk_index since migration 002 but both RPCs omitted it.
 -- Without it, retrieval_service._enrich_with_filenames always gets chunk_index=None,
 -- and citation cards always show "Full document" instead of "Chunk N".
+-- Must DROP before recreating — PostgreSQL forbids changing return type via CREATE OR REPLACE.
+
+DROP FUNCTION IF EXISTS public.match_document_chunks(vector, uuid, integer, double precision, jsonb, uuid[]);
 
 CREATE OR REPLACE FUNCTION public.match_document_chunks(
   query_embedding vector,
@@ -32,6 +35,8 @@ BEGIN
 END;
 $$;
 
+
+DROP FUNCTION IF EXISTS public.keyword_search_chunks(text, uuid, integer, jsonb, uuid[]);
 
 CREATE OR REPLACE FUNCTION public.keyword_search_chunks(
   search_query    text,
