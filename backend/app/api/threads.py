@@ -487,6 +487,7 @@ async def send_message(
         retrieved_citations: list[dict] = []    # Full citation objects per D-04
         similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
         unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
+        _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
         _message_persisted = False  # guard against double-insert
         _empty_retries = 0  # tracks empty-response retries across all iterations
 
@@ -513,6 +514,11 @@ async def send_message(
                 row["source_refs"] = unique_citations   # Full citation objects (D-13)
             elif unique_sources:
                 row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
+            if _confidence_slot:
+                c = _confidence_slot[0]
+                row["confidence_level"] = c["level"]
+                row["confidence_avg_similarity"] = c["avg_similarity"]
+                row["confidence_disclaimer"] = c["disclaimer"]
             try:
                 supabase.table("messages").insert(row).execute()
             except Exception as e:
@@ -734,6 +740,7 @@ async def send_message(
                                             "passage": hit.get("content"),  # Full text for persistence
                                             "similarity": hit.get("similarity"),
                                             "is_full_doc": False,
+                                            "version_number": hit.get("version_number", 1),
                                         })
                                 if avg_sim > 0.0:
                                     similarity_scores.append(avg_sim)
@@ -759,6 +766,7 @@ async def send_message(
                                         "passage": None,
                                         "similarity": None,
                                         "is_full_doc": True,
+                                        "version_number": doc.get("version_number", 1),
                                     })
                                     yield f"data: {json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']})}\n\n"
                                     sub_agent_content = ""
@@ -1202,6 +1210,7 @@ async def send_message(
               final_avg = sum(similarity_scores) / len(similarity_scores)
               level = _compute_confidence(final_avg)
               disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
+              _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
               yield f"data: {json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer})}\n\n"
 
           # Persist assistant message (normal path — before [DONE])

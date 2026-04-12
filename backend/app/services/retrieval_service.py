@@ -103,7 +103,7 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
     if not rows:
         return []
     doc_ids = list({row["document_id"] for row in rows})
-    docs_result = supabase.table("documents").select("id, filename, metadata").in_("id", doc_ids).execute()
+    docs_result = supabase.table("documents").select("id, filename, metadata, version_number").in_("id", doc_ids).execute()
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
     enriched = []
     for row in rows:
@@ -114,6 +114,7 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
             "filename": doc.get("filename", "Unknown"),
             "chunk_index": row.get("chunk_index"),
             "similarity": row.get("similarity") or row.get("rrf_score") or row.get("rank") or 0.0,
+            "version_number": doc.get("version_number", 1),
         }
         if doc.get("metadata"):
             entry["metadata"] = doc["metadata"]

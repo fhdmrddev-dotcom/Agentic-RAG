@@ -10,7 +10,7 @@ import pytest
 # but since conftest already imported app.main the module is already loaded.
 # Use patch as a context manager / decorator inside each test.
 
-from app.services.retrieval_service import search_documents
+from app.services.retrieval_service import search_documents, _enrich_with_filenames
 
 
 FAKE_EMBEDDING = [0.1, 0.2, 0.3]
@@ -242,3 +242,48 @@ class TestSearchDocumentsPhase26:
 
         assert len(result) == 1
         assert result[0]["chunk_index"] is None
+
+
+class TestEnrichWithFilenamesPhase28:
+    """Phase 28 VER-06: Tests for version_number propagation through enrichment."""
+
+    def _make_enrich_supabase(self, docs_data=None):
+        """Build a supabase mock for _enrich_with_filenames tests."""
+        sb = MagicMock()
+        docs_result = MagicMock()
+        docs_result.data = docs_data if docs_data is not None else []
+        table_builder = MagicMock()
+        table_builder.select.return_value = table_builder
+        table_builder.in_.return_value = table_builder
+        table_builder.execute.return_value = docs_result
+        sb.table.return_value = table_builder
+        return sb
+
+    def test_enrich_with_filenames_includes_version_number(self):
+        """VER-06: enriched results carry version_number from documents table."""
+        doc_id = "doc-ver-1"
+        rows = [
+            {"document_id": doc_id, "content": "Some text.", "similarity": 0.85, "chunk_index": 0},
+        ]
+        docs_data = [{"id": doc_id, "filename": "report_v3.pdf", "metadata": None, "version_number": 3}]
+        sb = self._make_enrich_supabase(docs_data=docs_data)
+
+        result = _enrich_with_filenames(rows, sb)
+
+        assert len(result) == 1
+        assert result[0]["version_number"] == 3
+
+    def test_enrich_with_filenames_defaults_version_number_to_1(self):
+        """VER-06: enriched results default version_number to 1 when field absent from documents row."""
+        doc_id = "doc-ver-2"
+        rows = [
+            {"document_id": doc_id, "content": "Legacy text.", "similarity": 0.70, "chunk_index": 1},
+        ]
+        # Doc row has no version_number (pre-migration data)
+        docs_data = [{"id": doc_id, "filename": "legacy.pdf", "metadata": None}]
+        sb = self._make_enrich_supabase(docs_data=docs_data)
+
+        result = _enrich_with_filenames(rows, sb)
+
+        assert len(result) == 1
+        assert result[0]["version_number"] == 1
