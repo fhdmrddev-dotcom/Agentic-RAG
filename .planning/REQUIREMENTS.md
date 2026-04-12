@@ -24,8 +24,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Document Versioning & Change Detection (F-02)
 
-- [ ] **VER-01**: User uploading a file with the same filename as an existing document creates a new version rather than being rejected as a duplicate
-- [ ] **VER-02**: Old document chunks are immediately excluded from all retrieval and search after a new version finishes ingesting
+- [x] **VER-01**: User uploading a file with the same filename as an existing document creates a new version rather than being rejected as a duplicate
+- [x] **VER-02**: Old document chunks are immediately excluded from all retrieval and search after a new version finishes ingesting
 - [ ] **VER-03**: User can see a version badge (e.g. "v3") on documents that have been updated in the document library
 - [ ] **VER-04**: User can expand a document row to view its full version history (version number, upload date, file size)
 - [ ] **VER-05**: User can restore an older version as the active version (re-ingest from stored file or re-upload)
@@ -94,8 +94,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 | CONF-02 | Phase 26 | Complete |
 | CONF-03 | Phase 26 | Complete |
 | CONF-04 | Phase 26 | Complete |
-| VER-01 | Phase 28 | Pending |
-| VER-02 | Phase 28 | Pending |
+| VER-01 | Phase 28 | Complete |
+| VER-02 | Phase 28 | Complete |
 | VER-03 | Phase 29 | Pending |
 | VER-04 | Phase 29 | Pending |
 | VER-05 | Phase 29 | Pending |

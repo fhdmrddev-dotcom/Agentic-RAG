@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: verifying
-stopped_at: Completed 27-citations-confidence-frontend 27-01-PLAN.md
-last_updated: "2026-04-12T15:29:22.027Z"
+status: executing
+stopped_at: Completed 28-document-versioning-schema-ingestion 28-01-PLAN.md
+last_updated: "2026-04-12T18:33:05.098Z"
 last_activity: 2026-04-12
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
 ---
 
 # Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 27 — citations-confidence-frontend
+**Current focus:** Phase 28 — document-versioning-schema-ingestion
 
 ## Current Position
 
-Phase: 28
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 28 (document-versioning-schema-ingestion) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-12
 
 ```
@@ -96,6 +96,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 26-citations-confidence-backend P01 | 132s | 2 tasks | 3 files |
 | Phase 26-citations-confidence-backend P02 | 122s | 2 tasks | 2 files |
 | Phase 27-citations-confidence-frontend P01 | 231s | 4 tasks | 10 files |
+| Phase 28-document-versioning-schema-ingestion P01 | 258s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,9 @@ Recent decisions affecting current work:
 - [Phase 26-citations-confidence-backend]: similarity_scores accumulates only from search_documents calls (not analyze_document) per D-16; confidence event absent when no search_documents occurred this turn
 - [Phase 27-citations-confidence-frontend]: SourceReferences pill badges retired — citation cards replace them entirely (D-01)
 - [Phase 27-citations-confidence-frontend]: source_refs mapped to citations on DB load; confidence is live-only SSE signal, not persisted (D-09)
+- [Phase 28-document-versioning-schema-ingestion]: Re-upload creates new version row (version_number incremented); old row retires via is_latest=False — no delete, storage retained for Phase 29 restore
+- [Phase 28-document-versioning-schema-ingestion]: Dedup check scoped to is_latest=True so stale hash matches do not short-circuit re-upload
+- [Phase 28-document-versioning-schema-ingestion]: resolve_document_id always resolves to is_latest=True document to prevent agent analyze_document using stale versions
 
 ### Pending Todos
 
@@ -226,5 +230,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 27-citations-confidence-frontend 27-01-PLAN.md
+Stopped at: Completed 28-document-versioning-schema-ingestion 28-01-PLAN.md
 Resume file: None
