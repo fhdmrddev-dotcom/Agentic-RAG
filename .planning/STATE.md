@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: ready_to_plan
-stopped_at: "Roadmap created — ready to plan Phase 26"
-last_updated: "2026-04-11T00:00:00.000Z"
-last_activity: 2026-04-11
+status: executing
+stopped_at: Completed 26-citations-confidence-backend 26-01-PLAN.md
+last_updated: "2026-04-12T06:05:49.976Z"
+last_activity: 2026-04-12
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.2 Trust & Compliance — roadmap created, Phase 26 ready to plan
+**Current focus:** Phase 26 — citations-confidence-backend
 
 ## Current Position
 
-Phase: Phase 26 — Citations & Confidence — Backend (not started)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-04-11 — Roadmap created for v2.2
+Phase: 26 (citations-confidence-backend) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-12
 
 ```
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
@@ -93,6 +93,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 17-tech-debt-cleanup P01 | 2min | 3 tasks | 3 files |
 | Phase 18-context-window-hardening P01 | 8min | 2 tasks | 2 files |
 | Phase 25-sub-agent-intelligence P01 | 2m 46s | 5 tasks | 5 files |
+| Phase 26-citations-confidence-backend P01 | 132s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,9 @@ Recent decisions affecting current work:
 - [Phase 25-sub-agent-intelligence]: Sub-agent model defaults keyed by provider; openrouter/ollama fall back to user model (routing unknown / local)
 - [Phase 25-sub-agent-intelligence]: context_window_max_tokens=0 means auto-select from PROVIDER_CONTEXT_DEFAULTS; non-zero env var overrides all providers
 - [Phase 25-sub-agent-intelligence]: tool_calls JSON token estimate changed from chars/4 to chars/3 — JSON punctuation overhead makes tokens denser than plain prose
+- [Phase 26-citations-confidence-backend]: search_documents returns tuple[list[dict], float] — (enriched_results, avg_vector_similarity) to enable citations and confidence scoring in Plan 02
+- [Phase 26-citations-confidence-backend]: _avg_cosine uses only vector_rows in hybrid path — keyword rows have no real cosine similarity; if vector_rows empty, returns 0.0
+- [Phase 26-citations-confidence-backend]: chunk_index passed through via row.get('chunk_index') — returns None for backward compat if RPC does not supply it
 
 ### Pending Todos
 
@@ -214,5 +218,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-dqu: Fix four issues in backend/app/api/skills.py
-Stopped at: Roadmap created for v2.2 Trust & Compliance — Phase 26 ready to plan
+Stopped at: Completed 26-citations-confidence-backend 26-01-PLAN.md
 Resume file: None

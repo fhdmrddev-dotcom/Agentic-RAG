@@ -1,72 +1,121 @@
-# Requirements — v2.1 Stability & RAG Correctness
+# Requirements: Agentic RAG — v2.2 Trust & Compliance
 
-## Milestone Goal
+**Defined:** 2026-04-11
+**Core Value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-Eliminate silent failures, blank responses, and correctness bugs found in post-v2.0 review.
+## v2.2 Requirements
 
----
+Requirements for this milestone. Each maps to roadmap phases.
 
-## v2.1 Requirements
+### Citation & Source Highlighting (F-01)
 
-### Context Management (CTX)
+- [x] **CITE-01**: User can see exact retrieved passage text for each search result as a collapsible card beneath the assistant response
+- [x] **CITE-02**: Each citation card displays document name, section/location (if identifiable), and passage text (≤400 chars, expandable to full)
+- [ ] **CITE-03**: Citation card text is visually distinct from the AI-generated response (quoted block style with different background)
+- [ ] **CITE-04**: Citation cards appear only for passages retrieved in that response turn — never for documents not retrieved
+- [ ] **CITE-05**: For `analyze_document` results, user sees document name attribution only (no chunk anchor available for full-doc analysis)
 
-- [x] **CTX-01**: User's conversation history is trimmed to a token budget before each LLM call, preventing context overflow on long threads
-- [x] **CTX-02**: Tool result messages added during the iteration loop are trimmed atomically between iterations when total token estimate exceeds threshold
-- [ ] **CTX-03**: Sub-agent document content is capped before being sent to `run_sub_agent`, preventing silent overflow on large documents with small-context models
-- [ ] **CTX-04**: When the LLM returns an empty response on the force-no-tools final iteration, a fallback message is yielded to the user instead of a blank response
-- [ ] **CTX-05**: When `finish_reason == "length"` occurs while assembling a tool call, an error event is emitted instead of silently abandoning the partial tool call
+### Answer Confidence Score (F-05)
 
-### RAG Correctness (RAG)
+- [x] **CONF-01**: User can see a High/Medium/Low confidence badge on every document-grounded assistant message
+- [x] **CONF-02**: Confidence badge is colour-coded: green (High ≥ 0.7 avg similarity), amber (Medium 0.5–0.7), red (Low < 0.5 or zero results)
+- [ ] **CONF-03**: Low-confidence responses include a standard disclaimer: "This answer is based on limited or weakly-matched evidence. Please verify with the source documents."
+- [ ] **CONF-04**: Confidence badge does not appear on web_search, execute_code, or skill-only responses
 
-- [ ] **RAG-01**: Keyword search respects the thread's folder scope — `_keyword_search` and `keyword_search_chunks` RPC accept and apply `folder_ids`
-- [ ] **RAG-02**: `read_document` tool results are subject to the same 3,000-char context cap as other tools, with a truncation note directing users to use `start_line`/`end_line`
-- [ ] **RAG-03**: Document metadata (`document_type`, `language`) is lowercased at ingest time; `metadata_filter` values are lowercased before passing to the RPC
+### Document Versioning & Change Detection (F-02)
 
-### Error Visibility (ERR)
+- [ ] **VER-01**: User uploading a file with the same filename as an existing document creates a new version rather than being rejected as a duplicate
+- [ ] **VER-02**: Old document chunks are immediately excluded from all retrieval and search after a new version finishes ingesting
+- [ ] **VER-03**: User can see a version badge (e.g. "v3") on documents that have been updated in the document library
+- [ ] **VER-04**: User can expand a document row to view its full version history (version number, upload date, file size)
+- [ ] **VER-05**: User can restore an older version as the active version (re-ingest from stored file or re-upload)
+- [ ] **VER-06**: Answers citing a versioned document include the version number in the citation (e.g. "Report.pdf (v2) — Section 3")
 
-- [ ] **ERR-01**: `APIError` responses indicating context length exceeded (status 400, message containing "context"/"maximum"/"too long") are surfaced as a clear, user-readable message rather than a silent blank response
-- [ ] **ERR-02**: `load_skill` and `save_skill` tool handlers are hardened against `maybe_single()` returning `None` — errors produce an informative tool result rather than an exception
+### Audit Log (F-06)
 
-### System Prompt Quality (PROMPT)
+- [ ] **AUDIT-01**: All significant user actions are automatically logged: document upload, document delete, search query, code execution, skill load, thread create, thread delete, settings change
+- [ ] **AUDIT-02**: Search query audit entries include the query text and the IDs of documents retrieved in the result
+- [ ] **AUDIT-03**: Audit entries cannot be deleted or modified through any user-accessible API endpoint
+- [ ] **AUDIT-04**: User can view their own audit log in Settings, filterable by date range and action type, paginated
+- [ ] **AUDIT-05**: User can export their audit log as a CSV file
+- [ ] **AUDIT-06**: Audit entries are written asynchronously (fire-and-forget) and never delay a chat response or document operation
 
-- [ ] **PROMPT-01**: System prompt instructs the LLM to hedge confidence when `search_documents` returns results with similarity below 0.4
-- [ ] **PROMPT-02**: System prompt provides structured citation guidance (document name + section) to prevent hallucinated source references
+### Suggested Follow-Up Questions (F-08)
 
-### Infrastructure (INFRA)
+- [ ] **SUG-01**: User sees 2–3 suggested follow-up questions as clickable pill buttons below each assistant response
+- [ ] **SUG-02**: Clicking a suggestion populates the chat input with that question and immediately submits it
+- [ ] **SUG-03**: Suggestions appear within 2 seconds of the main response completing, generated by the cheapest available model for the active provider
+- [ ] **SUG-04**: If suggestion generation fails for any reason, the main response is unaffected and no pills appear (non-blocking)
 
-- [ ] **INFRA-01**: `_load_override()` caches its result with a 5-second TTL, reducing disk reads per message
-- [ ] **INFRA-02**: Sentence boundary detection in `chunk_text` verifies the character following `.`/`!`/`?` is a space or end-of-string, preventing splits on abbreviations and decimals
+## Future Requirements (v2.3+)
 
----
+### Cross-Thread Memory (F-03)
 
-## Future Requirements
+- **MEM-01**: User's stated preferences (e.g. "respond in bullet points") persist across conversation threads via a `remember` tool
+- **MEM-02**: User can view, edit, and delete memory entries from Settings
+- **MEM-03**: Memory summary is injected at the start of each turn (capped to limit context window cost)
 
-- Document-level deduplication in RAG results — deferred; low user impact relative to P0/P1 fixes
-- Structured citation enforcement via Pydantic output model — deferred; requires API contract change
+### Group-Level Access Control (F-04)
+
+- **GROUP-01**: User can create groups and invite members by email
+- **GROUP-02**: Documents and folders can be scoped to a specific group (private / group / global)
+- **GROUP-03**: All KB tools and retrieval respect group-scoped RLS
+- **GROUP-04**: Removing a user from a group immediately revokes access to group-scoped documents
+
+### Multi-Modal Table & Image Extraction (F-07)
+
+- **MODAL-01**: Tables extracted from PDF/DOCX during ingestion and stored as structured JSON
+- **MODAL-02**: Embedded images described via vision LLM and indexed for vector search
+- **MODAL-03**: Table data queryable via extended query_documents or new query_tables tool
 
 ## Out of Scope
 
-- Dynamic model context limit mapping — hardcoded caps are sufficient for now; dynamic mapping adds complexity
-- Tiktoken integration for exact token counts — char/4 heuristic is fast and accurate enough for trimming decisions
-- Supabase Realtime for settings changes — polling or restart sufficient; real-time config reload adds infra complexity
-
----
+| Feature | Reason |
+|---------|--------|
+| In-document PDF highlighting (F-01 v2) | Requires PDF renderer integration; citation cards sufficient for v2.2 |
+| Citation export / cross-thread citation linking | Complexity vs. value; defer |
+| Diff view between document versions | Nice-to-have; version history + restore covers core need |
+| Per-claim confidence scoring | Too granular for v2.2; response-level confidence sufficient |
+| Organisation-level audit view / SIEM integration | Single-user audit sufficient; no multi-tenant in v2.2 |
+| Suggestions in Explorer mode | Explorer is KB-focused tool mode; follow-ups add noise |
+| Knowledge Health Dashboard (F-09) | Depends on Audit Log; defer to v2.3 after F-06 is stable |
+| User Feedback Loop (F-10) | Also depends on Audit Log; defer to v2.3 |
 
 ## Traceability
 
-| REQ-ID | Phase | Plan |
-|--------|-------|------|
-| CTX-01 | Phase 18 | — |
-| CTX-02 | Phase 18 | — |
-| CTX-03 | Phase 19 | — |
-| CTX-04 | Phase 20 | — |
-| CTX-05 | Phase 20 | — |
-| RAG-01 | Phase 21 | — |
-| RAG-02 | Phase 22 | — |
-| RAG-03 | Phase 22 | — |
-| ERR-01 | Phase 19 | — |
-| ERR-02 | Phase 20 | — |
-| PROMPT-01 | Phase 23 | — |
-| PROMPT-02 | Phase 23 | — |
-| INFRA-01 | Phase 24 | — |
-| INFRA-02 | Phase 24 | — |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CITE-01 | Phase 26 | Complete |
+| CITE-02 | Phase 26 | Complete |
+| CITE-03 | Phase 27 | Pending |
+| CITE-04 | Phase 26 | Pending |
+| CITE-05 | Phase 26 | Pending |
+| CONF-01 | Phase 26 | Complete |
+| CONF-02 | Phase 26 | Complete |
+| CONF-03 | Phase 26 | Pending |
+| CONF-04 | Phase 26 | Pending |
+| VER-01 | Phase 28 | Pending |
+| VER-02 | Phase 28 | Pending |
+| VER-03 | Phase 29 | Pending |
+| VER-04 | Phase 29 | Pending |
+| VER-05 | Phase 29 | Pending |
+| VER-06 | Phase 28 | Pending |
+| AUDIT-01 | Phase 30 | Pending |
+| AUDIT-02 | Phase 30 | Pending |
+| AUDIT-03 | Phase 30 | Pending |
+| AUDIT-04 | Phase 31 | Pending |
+| AUDIT-05 | Phase 31 | Pending |
+| AUDIT-06 | Phase 30 | Pending |
+| SUG-01 | Phase 32 | Pending |
+| SUG-02 | Phase 32 | Pending |
+| SUG-03 | Phase 32 | Pending |
+| SUG-04 | Phase 32 | Pending |
+
+**Coverage:**
+- v2.2 requirements: 25 total
+- Mapped to phases: 25
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-11*
+*Last updated: 2026-04-11 — traceability populated after roadmap creation*
