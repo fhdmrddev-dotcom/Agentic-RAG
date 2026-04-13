@@ -266,11 +266,12 @@ async def list_documents(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    # Own documents
+    # Own documents — only show latest versions (VER-03)
     own_result = (
         supabase.table("documents")
         .select("*")
         .eq("user_id", current_user["id"])
+        .eq("is_latest", True)
         .execute()
     )
     own_docs = own_result.data or []
@@ -283,6 +284,7 @@ async def list_documents(
             supabase.table("documents")
             .select("*")
             .in_("folder_id", global_folder_ids)
+            .eq("is_latest", True)
             .execute()
         )
         global_docs = global_result.data or []
@@ -296,6 +298,78 @@ async def list_documents(
             merged.append(doc)
     merged.sort(key=lambda d: d["created_at"], reverse=True)
     return merged
+
+
+@router.get("/{document_id}/versions", response_model=list[DocumentResponse])
+async def list_document_versions(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return all versions of a document ordered by version_number descending."""
+    # 1. Verify doc exists and user has access
+    doc = (
+        supabase.table("documents")
+        .select("filename, user_id, folder_id")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    # 2. Fetch all sibling versions
+    result = (
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", current_user["id"])
+        .eq("filename", doc.data["filename"])
+        .order("version_number", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+@router.post("/{document_id}/restore", response_model=DocumentResponse)
+async def restore_document_version(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Restore a historical document version, making it the current latest."""
+    # 1. Validate ownership
+    doc = (
+        supabase.table("documents")
+        .select("*")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    target = doc.data
+    folder_id = target["folder_id"]
+    # 2. Retire all siblings
+    siblings_q = (
+        supabase.table("documents")
+        .update({"is_latest": False})
+        .eq("user_id", current_user["id"])
+        .eq("filename", target["filename"])
+    )
+    if folder_id is None:
+        siblings_q = siblings_q.is_("folder_id", "null")
+    else:
+        siblings_q = siblings_q.eq("folder_id", folder_id)
+    siblings_q.execute()
+    # 3. Promote target
+    result = (
+        supabase.table("documents")
+        .update({"is_latest": True})
+        .eq("id", document_id)
+        .execute()
+    )
+    return result.data[0]
 
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)

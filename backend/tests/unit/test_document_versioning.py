@@ -310,3 +310,205 @@ class TestDocumentVersioning:
         assert len(insert_calls) == 0, (
             f"Expected no insert when dedup matches latest, got {len(insert_calls)} insert calls"
         )
+
+
+# ---------------------------------------------------------------------------
+# New tests for versioning UI endpoints (Plan 29-01)
+# ---------------------------------------------------------------------------
+
+class TestDocumentVersioningUI:
+    """Tests for list is_latest filter, GET /{id}/versions, and POST /{id}/restore."""
+
+    DOC_ID = "00000000-0000-0000-0000-000000000050"
+    DOC_ID2 = "00000000-0000-0000-0000-000000000051"
+
+    def _base_doc(self, **overrides):
+        base = {
+            "id": self.DOC_ID,
+            "user_id": USER_ID,
+            "filename": FILENAME,
+            "file_path": f"{USER_ID}/{self.DOC_ID}/{FILENAME}",
+            "file_size": 100,
+            "mime_type": "text/plain",
+            "status": "completed",
+            "content_hash": "abc123",
+            "folder_id": None,
+            "version_number": 2,
+            "is_latest": True,
+            "error_message": None,
+            "chunk_count": 3,
+            "metadata": None,
+            "created_at": "2026-04-13T00:00:00",
+            "updated_at": "2026-04-13T00:00:00",
+        }
+        base.update(overrides)
+        return base
+
+    def test_list_documents_filters_is_latest(self):
+        """GET /documents returns only is_latest=True documents; eq('is_latest', True) called."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        latest_doc = self._base_doc()
+
+        # list_documents makes 1 own_docs query (no global folders patched away)
+        builder.execute.return_value = _make_result([latest_doc])
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with patch(
+            "app.api.documents.get_globally_visible_folder_ids",
+            return_value=[],
+        ):
+            with TestClient(app) as client:
+                resp = client.get(
+                    "/documents",
+                    headers={"Authorization": "Bearer test-token"},
+                )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert len(data) == 1, f"Expected 1 document, got {len(data)}"
+
+        # Verify .eq("is_latest", True) was called at least once
+        eq_calls = builder.eq.call_args_list
+        assert any(
+            args == (("is_latest", True),) or args == call("is_latest", True).args
+            for args in [c.args for c in eq_calls]
+        ), f"Expected eq('is_latest', True) call, got: {eq_calls}"
+
+    def test_list_document_versions_returns_all(self):
+        """GET /documents/{id}/versions returns all sibling versions ordered desc."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        doc_v2 = self._base_doc(version_number=2, is_latest=True)
+        doc_v1 = self._base_doc(id=self.DOC_ID2, version_number=1, is_latest=False)
+
+        # Sequential calls: ownership check, then sibling fetch
+        builder.execute.side_effect = [
+            _make_result({"filename": FILENAME, "user_id": USER_ID, "folder_id": None}),  # maybe_single ownership
+            _make_result([doc_v2, doc_v1]),  # sibling versions
+        ]
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with TestClient(app) as client:
+            resp = client.get(
+                f"/documents/{self.DOC_ID}/versions",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+        data = resp.json()
+        assert len(data) == 2, f"Expected 2 versions, got {len(data)}"
+        assert data[0]["version_number"] == 2, f"Expected first item version_number=2, got {data[0]}"
+
+    def test_list_document_versions_not_found(self):
+        """GET /documents/{id}/versions returns 404 when document not owned by user."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        # maybe_single returns None (not found or not owned)
+        builder.execute.return_value = _make_result(None)
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with TestClient(app) as client:
+            resp = client.get(
+                "/documents/nonexistent-id/versions",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
+
+    def test_restore_promotes_target(self):
+        """POST /documents/{id}/restore sets is_latest=True on target and is_latest=False on siblings."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        folder_uuid = "00000000-0000-0000-0000-000000000099"
+        target_doc = self._base_doc(folder_id=folder_uuid, is_latest=False, version_number=1)
+        restored_doc = self._base_doc(folder_id=folder_uuid, is_latest=True, version_number=1)
+
+        # Sequential calls: ownership check, siblings update, target promote
+        builder.execute.side_effect = [
+            _make_result(target_doc),       # maybe_single ownership/doc fetch
+            _make_result([]),               # update siblings is_latest=False
+            _make_result([restored_doc]),   # update target is_latest=True
+        ]
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with TestClient(app) as client:
+            resp = client.post(
+                f"/documents/{self.DOC_ID}/restore",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
+        update_calls = builder.update.call_args_list
+        update_args = [c.args[0] for c in update_calls]
+        assert {"is_latest": False} in update_args, f"Expected update({{is_latest: False}}) call, got: {update_calls}"
+        assert {"is_latest": True} in update_args, f"Expected update({{is_latest: True}}) call, got: {update_calls}"
+
+        # Verify False update comes before True update
+        false_idx = next(i for i, a in enumerate(update_args) if a == {"is_latest": False})
+        true_idx = next(i for i, a in enumerate(update_args) if a == {"is_latest": True})
+        assert false_idx < true_idx, "Expected is_latest=False update before is_latest=True update"
+
+    def test_restore_null_folder_uses_is_null(self):
+        """POST /documents/{id}/restore with folder_id=None uses .is_('folder_id', 'null')."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        target_doc = self._base_doc(folder_id=None, is_latest=False, version_number=1)
+        restored_doc = self._base_doc(folder_id=None, is_latest=True, version_number=1)
+
+        builder.execute.side_effect = [
+            _make_result(target_doc),       # ownership check
+            _make_result([]),               # siblings update
+            _make_result([restored_doc]),   # target promote
+        ]
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with TestClient(app) as client:
+            resp = client.post(
+                f"/documents/{self.DOC_ID}/restore",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
+
+        is_calls = builder.is_.call_args_list
+        assert any(
+            args == ("folder_id", "null")
+            for c in is_calls
+            for args in [c.args]
+        ), f"Expected is_('folder_id', 'null') call for null folder, got: {is_calls}"
+
+    def test_restore_unauthorized_returns_404(self):
+        """POST /documents/{id}/restore by non-owner returns 404."""
+        builder = _make_builder()
+        supabase = _make_supabase(builder)
+
+        # maybe_single returns None — doc not found or not owned
+        builder.execute.return_value = _make_result(None)
+
+        app.dependency_overrides[get_current_user] = lambda: MOCK_USER
+        app.dependency_overrides[get_supabase] = lambda: supabase
+
+        with TestClient(app) as client:
+            resp = client.post(
+                f"/documents/{self.DOC_ID}/restore",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}: {resp.text}"
