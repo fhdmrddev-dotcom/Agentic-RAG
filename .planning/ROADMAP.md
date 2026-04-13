@@ -67,7 +67,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 - [x] **Phase 26: Citations & Confidence — Backend** — Enrich SSE stream with citation passages and confidence scores; extend data model (completed 2026-04-12)
 - [x] **Phase 27: Citations & Confidence — Frontend** — Render citation cards and confidence badge in chat UI (completed 2026-04-12)
 - [x] **Phase 28: Document Versioning — Schema & Ingestion** — Migration for version tracking, re-upload creates new version, stale chunks retired, citation includes version number (completed 2026-04-12)
-- [ ] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library
+- [x] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library (completed 2026-04-13)
 - [ ] **Phase 30: Audit Log — Backend** — `audit_log` table with RLS, async fire-and-forget writes for all significant actions
 - [ ] **Phase 31: Audit Log — Settings UI** — Audit log viewer in Settings with filters, pagination, and CSV export
 - [ ] **Phase 32: Suggested Follow-Up Questions** — Cheap-model generation post-response, new SSE event type, clickable pill buttons in chat
@@ -194,7 +194,7 @@ Plans:
 | 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete    | 2026-04-12 |
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
-| 29. Document Versioning — UI | v2.2 | 1/2 | In Progress|  |
+| 29. Document Versioning — UI | v2.2 | 1/2 | Complete    | 2026-04-13 |
 | 30. Audit Log — Backend | v2.2 | 0/? | Not started | - |
 | 31. Audit Log — Settings UI | v2.2 | 0/? | Not started | - |
 | 32. Suggested Follow-Up Questions | v2.2 | 0/? | Not started | - |
