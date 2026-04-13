@@ -49,11 +49,24 @@ export async function getMessages(threadId: string): Promise<Message[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers })
   if (!res.ok) throw new Error("Failed to get messages")
-  const data = await res.json() as Array<Message & { source_refs?: Citation[] }>
-  // Map source_refs (DB column name) -> citations (frontend field name for Phase 27+)
+  const data = await res.json() as Array<Message & {
+    source_refs?: Citation[]
+    confidence_level?: string
+    confidence_avg_similarity?: number
+    confidence_disclaimer?: string | null
+  }>
+  // Map DB column names to frontend field names
   return data.map((m) => {
-    const { source_refs, ...rest } = m
-    return { ...rest, citations: (source_refs ?? []) as Citation[] }
+    const { source_refs, confidence_level, confidence_avg_similarity, confidence_disclaimer, ...rest } = m
+    const mapped: Message = { ...rest, citations: (source_refs ?? []) as Citation[] }
+    if (confidence_level) {
+      mapped.confidence = {
+        level: confidence_level as "high" | "medium" | "low",
+        avg_similarity: confidence_avg_similarity ?? 0,
+        disclaimer: confidence_disclaimer ?? null,
+      }
+    }
+    return mapped
   })
 }
 
@@ -228,6 +241,23 @@ export async function deleteDocument(id: string): Promise<void> {
     headers,
   })
   if (!res.ok) throw new Error("Failed to delete document")
+}
+
+export async function fetchDocumentVersions(documentId: string): Promise<Document[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${documentId}/versions`, { headers })
+  if (!res.ok) throw new Error("Failed to fetch document versions")
+  return res.json() as Promise<Document[]>
+}
+
+export async function restoreDocumentVersion(documentId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${documentId}/restore`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to restore version. Please try again.")
+  return res.json() as Promise<Document>
 }
 
 export async function listFolders(): Promise<Folder[]> {

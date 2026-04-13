@@ -112,6 +112,8 @@ export interface Document {
   error_message: string | null
   chunk_count: number | null
   content_hash: string | null
+  version_number?: number
+  is_latest?: boolean
   metadata: DocumentMetadata | null
   created_at: string
   updated_at: string
