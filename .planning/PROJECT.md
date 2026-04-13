@@ -21,10 +21,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 28 (document versioning schema & ingestion) complete 2026-04-12
+**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 29 (document versioning UI) complete 2026-04-13
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~15,000 LOC (Python + TypeScript)
-**Phases shipped:** 28 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 3 v2.2), all requirements complete
+**Phases shipped:** 29 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 4 v2.2), all requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
 **Known tech debt:** Missing test files for phases 20 and 22 (test_blank_response_guards.py, test_rag_correctness.py); metadata ingest normalization covers only document_type/language; live LangSmith sub-agent trace not yet performed
@@ -111,7 +111,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - [x] F-01 (frontend): collapsible citation cards showing exact retrieved passages beneath each answer — validated Phase 27
 - [x] F-05 (frontend): Answer Confidence Score badge — colour-coded, Low adds disclaimer — validated Phase 27
 - [x] F-02 (backend): document versioning — version_number + is_latest columns, re-upload creates new version, old chunks retired from all retrieval RPCs, citation cards show "(vN)" badge — validated Phase 28
-- [ ] F-02 (frontend): version history UI — version badges in document library, history drawer, restore button
+- [x] F-02 (frontend): version history UI — version badge (vN chip), expandable VersionHistoryPanel, restore confirmation dialog, owner-only restore, is_latest-filtered document list — validated Phase 29
 - [ ] F-06: Audit Log — immutable append-only audit trail (uploads, searches, deletions, code execution, skill loads); admin view in Settings
 - [ ] F-08: Suggested Follow-Up Questions — 2–3 clickable follow-up pill buttons after each assistant response, non-blocking cheap model generation
 
@@ -123,6 +123,28 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - Folder-level permissions — Global folders visible to all, per-user folders private
 - Switching to Docling — Existing pypdf + python-docx pipeline is working; full markdown stored from existing extraction
 - Nyquist VALIDATION.md compliance — Phase-level validation files exist in draft state; full compliance deferred
+
+### Deferred Architectural Decisions
+
+#### Multi-Tenancy / Org-Level Transform (deferred to future milestone — clarity needed)
+
+The current architecture is single-tenant per user. To support organizations (multiple users sharing a document library), the following changes are required:
+
+**Schema additions:**
+- `organizations` (id, name, slug, created_at)
+- `org_memberships` (org_id, user_id, role: owner/admin/member, created_at)
+- `documents` gains `org_id` (nullable FK) and `uploaded_by` (user_id) — ownership shifts from user to org
+- `folders` gains `org_id` (nullable FK) — replaces the app-wide `is_global` flag with org-scoped visibility
+- `document_chunks` gains `org_id` for RLS performance
+
+**Behavioral changes:**
+- Dedup scope: currently per-user (content_hash + user_id). At org level: per-org (content_hash + org_id) — same file uploaded by any member = one shared entry
+- Version chain scope: currently per-user-per-filename. At org level: per-org-per-filename
+- Global folders: retire `is_global` flag; replace with org-scoped folders visible to all org members
+- RLS: all policies change from `user_id = auth.uid()` to `org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid())`
+- Delete permissions: org admin or uploader (not just owner)
+
+**Why deferred:** Need clarity on whether orgs are isolated tenants (separate Supabase projects) or co-tenant (shared schema with org_id partitioning), and what the auth/billing model looks like before committing to a schema direction.
 
 ## Context
 
