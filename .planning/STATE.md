@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: verifying
-stopped_at: Completed 28-document-versioning-schema-ingestion 28-02-PLAN.md
-last_updated: "2026-04-12T18:44:08.611Z"
-last_activity: 2026-04-12
+status: executing
+stopped_at: Completed 29-01-PLAN.md
+last_updated: "2026-04-13T14:07:33.107Z"
+last_activity: 2026-04-13
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 28 — document-versioning-schema-ingestion
+**Current focus:** Phase 29 — document-versioning-ui
 
 ## Current Position
 
-Phase: 29
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-12
+Phase: 29 (document-versioning-ui) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-13
 
 ```
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
@@ -98,6 +98,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 27-citations-confidence-frontend P01 | 231s | 4 tasks | 10 files |
 | Phase 28-document-versioning-schema-ingestion P01 | 258s | 2 tasks | 5 files |
 | Phase 28-document-versioning-schema-ingestion P02 | 150s | 2 tasks | 5 files |
+| Phase 29-document-versioning-ui P01 | 8min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -204,6 +205,8 @@ Recent decisions affecting current work:
 - [Phase 28-document-versioning-schema-ingestion]: resolve_document_id always resolves to is_latest=True document to prevent agent analyze_document using stale versions
 - [Phase 28-document-versioning-schema-ingestion]: version_number defaults to 1 in all enrichment and citation paths — safe for pre-migration document rows
 - [Phase 28-document-versioning-schema-ingestion]: CitationCard shows no version suffix for v1; renders (vN) only when N > 1 for clean default UX
+- [Phase 29-document-versioning-ui]: Route ordering: /{document_id}/versions and /{document_id}/restore placed before DELETE /{document_id} to prevent FastAPI path parameter shadowing of 'versions'/'restore'
+- [Phase 29-document-versioning-ui]: restore endpoint uses .is_('folder_id', 'null') for NULL folder_id siblings query — Supabase requires explicit IS NULL syntax
 
 ### Pending Todos
 
@@ -233,5 +236,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 28-document-versioning-schema-ingestion 28-02-PLAN.md
+Stopped at: Completed 29-01-PLAN.md
 Resume file: None
