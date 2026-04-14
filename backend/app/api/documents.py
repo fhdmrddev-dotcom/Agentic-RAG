@@ -12,6 +12,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
+from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -257,6 +258,13 @@ async def upload_document(
         pass  # Storage upload failure doesn't block ingestion
 
     background_tasks.add_task(ingest_document, document_id, text, current_user["id"], supabase)
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="document.upload",
+        metadata={"document_id": doc["id"], "filename": doc["filename"], "folder_id": folder_id},
+        supabase=supabase,
+    )
 
     return doc
 
@@ -375,6 +383,7 @@ async def restore_document_version(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -395,6 +404,13 @@ async def delete_document(
         pass
 
     supabase.table("documents").delete().eq("id", document_id).execute()
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="document.delete",
+        metadata={"document_id": document_id, "filename": doc_resp.data.get("filename", "")},
+        supabase=supabase,
+    )
 
 
 @router.patch("/{document_id}/move", response_model=DocumentResponse)

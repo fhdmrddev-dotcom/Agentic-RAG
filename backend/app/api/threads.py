@@ -7,7 +7,7 @@ import time as time_mod
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from openai import APIError
 from supabase import Client
@@ -15,6 +15,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.services.audit_service import write_audit_entry
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings
@@ -167,6 +168,7 @@ async def list_threads(
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
 async def create_thread(
+    background_tasks: BackgroundTasks,
     body: ThreadCreate = ThreadCreate(),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
@@ -175,7 +177,15 @@ async def create_thread(
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
     response = supabase.table("threads").insert(insert_data).execute()
-    return response.data[0]
+    new_thread = response.data[0]
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="thread.create",
+        metadata={"thread_id": new_thread["id"]},
+        supabase=supabase,
+    )
+    return new_thread
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
@@ -195,6 +205,7 @@ async def rename_thread(
 @router.delete("/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_thread(
     thread_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -227,6 +238,13 @@ async def delete_thread(
         pass  # Best-effort cleanup — don't block thread deletion
 
     supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="thread.delete",
+        metadata={"thread_id": thread_id},
+        supabase=supabase,
+    )
 
 
 def generate_thread_title(first_user_message: str, user_settings=None) -> str:

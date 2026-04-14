@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
+from supabase import Client
 
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_supabase
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
     load_app_settings,
     save_override,
 )
+from app.services.audit_service import write_audit_entry
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -145,7 +147,9 @@ async def get_settings(current_user: dict = Depends(get_current_user)):
 @router.put("", response_model=FullSettingsResponse)
 async def update_settings(
     body: SettingsUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
 ):
     updates: dict = {}
 
@@ -205,6 +209,14 @@ async def update_settings(
         updates["sandbox_enabled"] = body.sandbox_enabled
 
     save_override(updates)
+    sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="settings.update",
+        metadata={"new_settings": sanitized},
+        supabase=supabase,
+    )
     return _build_response()
 
 

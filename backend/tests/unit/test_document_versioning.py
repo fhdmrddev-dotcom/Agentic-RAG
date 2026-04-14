@@ -141,12 +141,17 @@ class TestDocumentVersioning:
         # by verifying version_number appears in the insert call args
         insert_calls = builder.insert.call_args_list
         assert len(insert_calls) >= 1, "Expected at least one insert call"
-        insert_data = insert_calls[-1][0][0]  # positional arg of last insert call
-        assert insert_data.get("version_number") == 2, (
-            f"Expected version_number=2 in insert, got: {insert_data}"
+        # Find the document insert (has version_number) — audit insert does not
+        doc_insert_data = next(
+            (c[0][0] for c in insert_calls if c[0][0].get("version_number") is not None),
+            None,
         )
-        assert insert_data.get("is_latest") is True, (
-            f"Expected is_latest=True in insert, got: {insert_data}"
+        assert doc_insert_data is not None, f"No document insert found. Calls: {insert_calls}"
+        assert doc_insert_data.get("version_number") == 2, (
+            f"Expected version_number=2 in insert, got: {doc_insert_data}"
+        )
+        assert doc_insert_data.get("is_latest") is True, (
+            f"Expected is_latest=True in insert, got: {doc_insert_data}"
         )
 
         # Assert update was called with is_latest=False
@@ -206,12 +211,17 @@ class TestDocumentVersioning:
 
         insert_calls = builder.insert.call_args_list
         assert len(insert_calls) >= 1, "Expected at least one insert call"
-        insert_data = insert_calls[-1][0][0]
-        assert insert_data.get("version_number") == 1, (
-            f"Expected version_number=1 in insert, got: {insert_data}"
+        # Find the document insert (has version_number) — audit insert does not
+        doc_insert_data = next(
+            (c[0][0] for c in insert_calls if c[0][0].get("version_number") is not None),
+            None,
         )
-        assert insert_data.get("is_latest") is True, (
-            f"Expected is_latest=True in insert, got: {insert_data}"
+        assert doc_insert_data is not None, f"No document insert found. Calls: {insert_calls}"
+        assert doc_insert_data.get("version_number") == 1, (
+            f"Expected version_number=1 in insert, got: {doc_insert_data}"
+        )
+        assert doc_insert_data.get("is_latest") is True, (
+            f"Expected is_latest=True in insert, got: {doc_insert_data}"
         )
 
     def test_dedup_ignores_stale_version(self):
@@ -264,8 +274,13 @@ class TestDocumentVersioning:
         # Verify insert was called (upload proceeded)
         insert_calls = builder.insert.call_args_list
         assert len(insert_calls) >= 1, "Expected insert call — upload should proceed past dedup"
-        insert_data = insert_calls[-1][0][0]
-        assert insert_data.get("version_number") == 2
+        # Find the document insert (has version_number) — audit insert does not
+        doc_insert_data = next(
+            (c[0][0] for c in insert_calls if c[0][0].get("version_number") is not None),
+            None,
+        )
+        assert doc_insert_data is not None, f"No document insert found. Calls: {insert_calls}"
+        assert doc_insert_data.get("version_number") == 2
 
     def test_dedup_matches_latest_version(self):
         """Exact-hash dedup against is_latest=True row returns 200 early without re-ingesting."""
