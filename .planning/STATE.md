@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
 status: executing
-stopped_at: Completed 29-01-PLAN.md
-last_updated: "2026-04-13T16:12:04.780Z"
-last_activity: 2026-04-13
+stopped_at: Completed 30-01-PLAN.md
+last_updated: "2026-04-14T14:21:01.137Z"
+last_activity: 2026-04-14
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 29 — document-versioning-ui
+**Current focus:** Phase 30 — audit-log-backend
 
 ## Current Position
 
-Phase: 30
-Plan: Not started
+Phase: 30 (audit-log-backend) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-04-13
+Last activity: 2026-04-14
 
 ```
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
@@ -99,6 +99,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 28-document-versioning-schema-ingestion P01 | 258s | 2 tasks | 5 files |
 | Phase 28-document-versioning-schema-ingestion P02 | 150s | 2 tasks | 5 files |
 | Phase 29-document-versioning-ui P01 | 8min | 1 tasks | 2 files |
+| Phase 30-audit-log-backend P01 | 123s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -207,6 +208,9 @@ Recent decisions affecting current work:
 - [Phase 28-document-versioning-schema-ingestion]: CitationCard shows no version suffix for v1; renders (vN) only when N > 1 for clean default UX
 - [Phase 29-document-versioning-ui]: Route ordering: /{document_id}/versions and /{document_id}/restore placed before DELETE /{document_id} to prevent FastAPI path parameter shadowing of 'versions'/'restore'
 - [Phase 29-document-versioning-ui]: restore endpoint uses .is_('folder_id', 'null') for NULL folder_id siblings query — Supabase requires explicit IS NULL syntax
+- [Phase 30-audit-log-backend]: audit_log uses INSERT-only RLS (no SELECT for users) — log immutability enforced at DB layer
+- [Phase 30-audit-log-backend]: write_audit_entry swallows all exceptions to prevent audit failures from impacting request flow
+- [Phase 30-audit-log-backend]: VALID_ACTION_TYPES frozenset in service layer mirrors CHECK constraint — dual validation point for Plan 02 callers
 
 ### Pending Todos
 
@@ -236,5 +240,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 29-01-PLAN.md
+Stopped at: Completed 30-01-PLAN.md
 Resume file: None

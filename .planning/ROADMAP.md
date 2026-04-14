@@ -67,7 +67,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 - [x] **Phase 26: Citations & Confidence — Backend** — Enrich SSE stream with citation passages and confidence scores; extend data model (completed 2026-04-12)
 - [x] **Phase 27: Citations & Confidence — Frontend** — Render citation cards and confidence badge in chat UI (completed 2026-04-12)
 - [x] **Phase 28: Document Versioning — Schema & Ingestion** — Migration for version tracking, re-upload creates new version, stale chunks retired, citation includes version number (completed 2026-04-12)
-- [x] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library (completed 2026-04-13)
+- [x] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library (completed 2026-04-13)
 - [ ] **Phase 30: Audit Log — Backend** — `audit_log` table with RLS, async fire-and-forget writes for all significant actions
 - [ ] **Phase 31: Audit Log — Settings UI** — Audit log viewer in Settings with filters, pagination, and CSV export
 - [ ] **Phase 32: Suggested Follow-Up Questions** — Cheap-model generation post-response, new SSE event type, clickable pill buttons in chat
@@ -135,7 +135,10 @@ Plans:
   2. Search query audit entries include the query text and the IDs of documents returned in the result set
   3. No API endpoint allows a user to delete or modify their own audit entries — the RLS policy permits INSERT only
   4. Audit writes never block a chat response or ingestion operation — they fire asynchronously with no awaited result
-**Plans**: TBD
+**Plans:** 1/2 plans executed
+Plans:
+- [x] 30-01-PLAN.md — SQL migration (audit_log table, CHECK constraint, RLS) + audit_service.py + unit tests
+- [ ] 30-02-PLAN.md — Instrument 8 action types across documents.py, threads.py, settings.py
 
 ### Phase 31: Audit Log — Settings UI
 **Goal**: Users can review and export their own audit history from the Settings page
@@ -195,6 +198,6 @@ Plans:
 | 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete    | 2026-04-12 |
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 29. Document Versioning — UI | v2.2 | 1/2 | Complete    | 2026-04-13 |
-| 30. Audit Log — Backend | v2.2 | 0/? | Not started | - |
+| 30. Audit Log — Backend | v2.2 | 1/2 | In Progress|  |
 | 31. Audit Log — Settings UI | v2.2 | 0/? | Not started | - |
 | 32. Suggested Follow-Up Questions | v2.2 | 0/? | Not started | - |
