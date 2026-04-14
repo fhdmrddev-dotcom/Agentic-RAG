@@ -21,7 +21,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 29 (document versioning UI) complete 2026-04-13; Phase 30 (audit log backend) complete 2026-04-14
+**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 29 (document versioning UI) complete 2026-04-13; Phase 30 (audit log backend) complete 2026-04-14; Phase 31 (audit log settings UI) complete 2026-04-14
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~15,000 LOC (Python + TypeScript)
 **Phases shipped:** 30 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 5 v2.2), all requirements complete
@@ -113,7 +113,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - [x] F-02 (backend): document versioning — version_number + is_latest columns, re-upload creates new version, old chunks retired from all retrieval RPCs, citation cards show "(vN)" badge — validated Phase 28
 - [x] F-02 (frontend): version history UI — version badge (vN chip), expandable VersionHistoryPanel, restore confirmation dialog, owner-only restore, is_latest-filtered document list — validated Phase 29
 - [x] F-06 (backend): audit_log table with INSERT-only RLS, write_audit_entry service, all 8 action types instrumented across routers — validated Phase 30
-- [ ] F-06 (frontend): admin view in Settings showing audit log entries with pagination and filters
+- [x] F-06 (frontend): Audit Log section in Settings — date pills, action type filter, paginated table, CSV export — validated Phase 31
 - [ ] F-08: Suggested Follow-Up Questions — 2–3 clickable follow-up pill buttons after each assistant response, non-blocking cheap model generation
 
 ### Out of Scope
@@ -231,4 +231,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 — Phase 30 complete: audit log backend shipped (F-06 backend — INSERT-only RLS table + write service + 8 action types instrumented)*
+*Last updated: 2026-04-14 — Phase 31 complete: audit log settings UI shipped (F-06 frontend — date pills, action type filter, paginated table, CSV export in Settings page)*
