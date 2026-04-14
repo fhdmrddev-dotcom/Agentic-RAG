@@ -762,6 +762,18 @@ async def send_message(
                                         })
                                 if avg_sim > 0.0:
                                     similarity_scores.append(avg_sim)
+                            # Audit: fire-and-forget inside async generator (AUDIT-02)
+                            _audit_doc_ids = list({
+                                h.get("document_id") or h.get("id")
+                                for h in (results or [])
+                                if h.get("document_id") or h.get("id")
+                            })
+                            asyncio.create_task(write_audit_entry(
+                                user_id=current_user["id"],
+                                action_type="search.query",
+                                metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
+                                supabase=supabase,
+                            ))
                         elif tool_name == "query_documents":
                             tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
@@ -817,6 +829,12 @@ async def send_message(
                                 tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                             else:
                                 row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="skill.load",
+                                    metadata={"skill_id": row["id"], "skill_name": row["name"]},
+                                    supabase=supabase,
+                                ))
                                 # Fetch attached filenames (FILE-04)
                                 files_data = (
                                     supabase.table("skill_files")
@@ -1094,6 +1112,12 @@ async def send_message(
                                     "stdout": exec_result.stdout or "",
                                     "stderr": exec_result.stderr or "",
                                 })
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="code.execute",
+                                    metadata={"thread_id": thread_id, "language": args.get("language", "python")},
+                                    supabase=supabase,
+                                ))
                             except Exception as exec_err:
                                 logger.error("execute_code failed: %s", exec_err)
                                 yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
