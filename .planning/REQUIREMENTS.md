@@ -33,12 +33,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Audit Log (F-06)
 
-- [ ] **AUDIT-01**: All significant user actions are automatically logged: document upload, document delete, search query, code execution, skill load, thread create, thread delete, settings change
-- [ ] **AUDIT-02**: Search query audit entries include the query text and the IDs of documents retrieved in the result
-- [ ] **AUDIT-03**: Audit entries cannot be deleted or modified through any user-accessible API endpoint
+- [x] **AUDIT-01**: All significant user actions are automatically logged: document upload, document delete, search query, code execution, skill load, thread create, thread delete, settings change
+- [x] **AUDIT-02**: Search query audit entries include the query text and the IDs of documents retrieved in the result
+- [x] **AUDIT-03**: Audit entries cannot be deleted or modified through any user-accessible API endpoint
 - [ ] **AUDIT-04**: User can view their own audit log in Settings, filterable by date range and action type, paginated
 - [ ] **AUDIT-05**: User can export their audit log as a CSV file
-- [ ] **AUDIT-06**: Audit entries are written asynchronously (fire-and-forget) and never delay a chat response or document operation
+- [x] **AUDIT-06**: Audit entries are written asynchronously (fire-and-forget) and never delay a chat response or document operation
 
 ### Suggested Follow-Up Questions (F-08)
 
@@ -100,12 +100,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 | VER-04 | Phase 29 | Complete |
 | VER-05 | Phase 29 | Complete |
 | VER-06 | Phase 28 | Complete |
-| AUDIT-01 | Phase 30 | Pending |
-| AUDIT-02 | Phase 30 | Pending |
-| AUDIT-03 | Phase 30 | Pending |
+| AUDIT-01 | Phase 30 | Complete |
+| AUDIT-02 | Phase 30 | Complete |
+| AUDIT-03 | Phase 30 | Complete |
 | AUDIT-04 | Phase 31 | Pending |
 | AUDIT-05 | Phase 31 | Pending |
-| AUDIT-06 | Phase 30 | Pending |
+| AUDIT-06 | Phase 30 | Complete |
 | SUG-01 | Phase 32 | Pending |
 | SUG-02 | Phase 32 | Pending |
 | SUG-03 | Phase 32 | Pending |
