@@ -148,7 +148,10 @@ Plans:
   1. A new Audit Log section in Settings displays the user's audit entries in a paginated table
   2. The table can be filtered by date range and by action type
   3. An Export CSV button downloads the currently filtered audit log as a well-formed CSV file
-**Plans**: TBD
+**Plans:** 1/2 plans executed
+Plans:
+- [x] 31-01-PLAN.md — Backend audit router (GET /audit-logs + GET /audit-logs/export) with tests
+- [ ] 31-02-PLAN.md — Frontend AuditLogSection component with filters, pagination, CSV export
 **UI hint**: yes
 
 ### Phase 32: Suggested Follow-Up Questions
@@ -199,5 +202,5 @@ Plans:
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 29. Document Versioning — UI | v2.2 | 1/2 | Complete    | 2026-04-13 |
 | 30. Audit Log — Backend | v2.2 | 2/2 | Complete    | 2026-04-14 |
-| 31. Audit Log — Settings UI | v2.2 | 0/? | Not started | - |
+| 31. Audit Log — Settings UI | v2.2 | 1/2 | In Progress|  |
 | 32. Suggested Follow-Up Questions | v2.2 | 0/? | Not started | - |
