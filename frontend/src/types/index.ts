@@ -46,6 +46,22 @@ export interface SourceReference {
   filename: string
 }
 
+export interface Citation {
+  document_id: string
+  filename: string
+  chunk_index: number | null
+  passage: string | null
+  similarity: number | null
+  is_full_doc: boolean
+  version_number?: number
+}
+
+export interface ConfidenceResult {
+  level: "high" | "medium" | "low"
+  avg_similarity: number
+  disclaimer: string | null
+}
+
 export interface Message {
   id: string
   thread_id: string
@@ -58,6 +74,8 @@ export interface Message {
   sub_agent?: SubAgentState
   activatedSkill?: string  // Set by skill_activated SSE event
   sources?: SourceReference[]  // Set by sources SSE event; persisted in source_refs column
+  citations?: Citation[]       // Set by citations SSE event; loaded from source_refs on DB load
+  confidence?: ConfidenceResult // Set by confidence SSE event; persisted in confidence_* columns
   /** True while the agent has finished one tool-call round and is deciding its next action. */
   isPlanning?: boolean
 }
@@ -94,6 +112,8 @@ export interface Document {
   error_message: string | null
   chunk_count: number | null
   content_hash: string | null
+  version_number?: number
+  is_latest?: boolean
   metadata: DocumentMetadata | null
   created_at: string
   updated_at: string

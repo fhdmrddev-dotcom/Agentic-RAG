@@ -12,6 +12,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
+from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
@@ -176,7 +177,8 @@ async def upload_document(
 
     content_hash = hashlib.sha256(raw).hexdigest()
 
-    # Case 1: exact duplicate already completed in the same folder — skip re-ingestion
+    # Case 1: exact duplicate already completed (is_latest=True) in the same folder — skip re-ingestion
+    # Dedup only matches the current latest version; stale versions do not short-circuit upload.
     # Duplicate check is folder-scoped: same file in different folders creates separate entries.
     dedup_query = (
         supabase.table("documents")
@@ -184,6 +186,7 @@ async def upload_document(
         .eq("user_id", current_user["id"])
         .eq("content_hash", content_hash)
         .eq("status", "completed")
+        .eq("is_latest", True)
     )
     if folder_id:
         dedup_query = dedup_query.eq("folder_id", folder_id)
@@ -194,22 +197,29 @@ async def upload_document(
         response.status_code = status.HTTP_200_OK
         return existing.data[0]
 
-    # Case 2: same filename, different content → delete old and re-ingest
-    stale = (
+    # Case 2: same filename → create new version instead of deleting stale document.
+    # Old files are retained in storage for future restore (Phase 29).
+    existing_versions = (
         supabase.table("documents")
-        .select("id, file_path")
+        .select("id, version_number")
         .eq("user_id", current_user["id"])
         .eq("filename", file.filename)
-        .neq("content_hash", content_hash)
+        .order("version_number", desc=True)
         .limit(1)
         .execute()
     )
-    if stale.data:
-        try:
-            supabase.storage.from_("documents").remove([stale.data[0]["file_path"]])
-        except Exception:
-            pass
-        supabase.table("documents").delete().eq("id", stale.data[0]["id"]).execute()
+    if existing_versions.data:
+        next_version = existing_versions.data[0]["version_number"] + 1
+        # Retire all previous versions from retrieval (user-scoped, not folder-scoped)
+        (
+            supabase.table("documents")
+            .update({"is_latest": False})
+            .eq("user_id", current_user["id"])
+            .eq("filename", file.filename)
+            .execute()
+        )
+    else:
+        next_version = 1
 
     try:
         text = extract_text(raw, mime_type)
@@ -232,6 +242,8 @@ async def upload_document(
         "status": "pending",
         "content_hash": content_hash,
         "folder_id": folder_id,
+        "version_number": next_version,
+        "is_latest": True,
     }
     result = supabase.table("documents").insert(doc_data).execute()
     doc = result.data[0]
@@ -246,6 +258,13 @@ async def upload_document(
         pass  # Storage upload failure doesn't block ingestion
 
     background_tasks.add_task(ingest_document, document_id, text, current_user["id"], supabase)
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="document.upload",
+        metadata={"document_id": doc["id"], "filename": doc["filename"], "folder_id": folder_id},
+        supabase=supabase,
+    )
 
     return doc
 
@@ -255,11 +274,12 @@ async def list_documents(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    # Own documents
+    # Own documents — only show latest versions (VER-03)
     own_result = (
         supabase.table("documents")
         .select("*")
         .eq("user_id", current_user["id"])
+        .eq("is_latest", True)
         .execute()
     )
     own_docs = own_result.data or []
@@ -272,6 +292,7 @@ async def list_documents(
             supabase.table("documents")
             .select("*")
             .in_("folder_id", global_folder_ids)
+            .eq("is_latest", True)
             .execute()
         )
         global_docs = global_result.data or []
@@ -287,9 +308,82 @@ async def list_documents(
     return merged
 
 
+@router.get("/{document_id}/versions", response_model=list[DocumentResponse])
+async def list_document_versions(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Return all versions of a document ordered by version_number descending."""
+    # 1. Verify doc exists and user has access
+    doc = (
+        supabase.table("documents")
+        .select("filename, user_id, folder_id")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    # 2. Fetch all sibling versions
+    result = (
+        supabase.table("documents")
+        .select("*")
+        .eq("user_id", current_user["id"])
+        .eq("filename", doc.data["filename"])
+        .order("version_number", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+@router.post("/{document_id}/restore", response_model=DocumentResponse)
+async def restore_document_version(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Restore a historical document version, making it the current latest."""
+    # 1. Validate ownership
+    doc = (
+        supabase.table("documents")
+        .select("*")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    target = doc.data
+    folder_id = target["folder_id"]
+    # 2. Retire all siblings
+    siblings_q = (
+        supabase.table("documents")
+        .update({"is_latest": False})
+        .eq("user_id", current_user["id"])
+        .eq("filename", target["filename"])
+    )
+    if folder_id is None:
+        siblings_q = siblings_q.is_("folder_id", "null")
+    else:
+        siblings_q = siblings_q.eq("folder_id", folder_id)
+    siblings_q.execute()
+    # 3. Promote target
+    result = (
+        supabase.table("documents")
+        .update({"is_latest": True})
+        .eq("id", document_id)
+        .execute()
+    )
+    return result.data[0]
+
+
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -310,6 +404,13 @@ async def delete_document(
         pass
 
     supabase.table("documents").delete().eq("id", document_id).execute()
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="document.delete",
+        metadata={"document_id": document_id, "filename": doc_resp.data.get("filename", "")},
+        supabase=supabase,
+    )
 
 
 @router.patch("/{document_id}/move", response_model=DocumentResponse)

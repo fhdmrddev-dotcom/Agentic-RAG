@@ -1,5 +1,16 @@
 # Milestones
 
+## v2.1 Stability & RAG Correctness (Shipped: 2026-04-11)
+
+**Phases completed:** 8 phases, 8 plans, 3 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- Added similarity confidence hedging (< 0.4 threshold) and structured citation format guidance to SYSTEM_PROMPT, preventing fabricated answers from weak matches and standardizing document reference format
+
+---
+
 ## v2.0 Agent Skills & Code Execution (Shipped: 2026-04-04)
 
 **Phases completed:** 9 phases, 22 plans, 30 tasks

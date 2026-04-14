@@ -11,7 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 
 export function IngestionPage() {
   const { user } = useAuth()
-  const { documents, uploading, uploadingCount, upload, deleteDoc } = useDocuments()
+  const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
   const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
 
@@ -94,7 +94,9 @@ export function IngestionPage() {
             <DocumentList
               documents={documents}
               onDelete={deleteDoc}
+              onRefresh={loadDocuments}
               folderId={selectedFolderId}
+              currentUserId={user?.id ?? ""}
             />
           </div>
         </div>

@@ -1,10 +1,13 @@
 import asyncio
+import base64
+import io
 import json
+import os
 import time as time_mod
 from datetime import datetime, timezone
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from openai import APIError
 from supabase import Client
@@ -12,6 +15,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.services.audit_service import write_audit_entry
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings
@@ -76,7 +80,7 @@ SYSTEM_PROMPT = (
     "do NOT call more than once per document per question\n"
     "- **web_search** → current events, software versions, or topics not covered in uploaded documents\n"
     "- **execute_code** → calculations, data analysis, chart generation, file creation "
-    "(always pass `libraries` for non-stdlib packages)\n"
+    "(always pass `libraries` for non-stdlib packages; pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename})\n"
     "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
     "- **save_skill / read_skill_file** → skill management\n\n"
 
@@ -120,6 +124,33 @@ SYSTEM_PROMPT = (
 )
 
 
+CONFIDENCE_DISCLAIMER = (
+    "This answer is based on limited or weakly-matched evidence. "
+    "Please verify with the source documents."
+)
+
+
+def _compute_confidence(avg_similarity: float) -> str:
+    """Map average cosine similarity to confidence level (D-10)."""
+    if avg_similarity >= 0.7:
+        return "high"
+    elif avg_similarity >= 0.5:
+        return "medium"
+    return "low"
+
+
+def _deduplicate_citations(citations: list[dict]) -> list[dict]:
+    """Deduplicate citations by (document_id, chunk_index), preserving order (D-14)."""
+    seen: set[tuple] = set()
+    unique: list[dict] = []
+    for c in citations:
+        key = (c["document_id"], c.get("chunk_index"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+    return unique
+
+
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
     current_user: dict = Depends(get_current_user),
@@ -137,6 +168,7 @@ async def list_threads(
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
 async def create_thread(
+    background_tasks: BackgroundTasks,
     body: ThreadCreate = ThreadCreate(),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
@@ -145,7 +177,15 @@ async def create_thread(
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
     response = supabase.table("threads").insert(insert_data).execute()
-    return response.data[0]
+    new_thread = response.data[0]
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="thread.create",
+        metadata={"thread_id": new_thread["id"]},
+        supabase=supabase,
+    )
+    return new_thread
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
@@ -165,6 +205,7 @@ async def rename_thread(
 @router.delete("/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_thread(
     thread_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -197,6 +238,13 @@ async def delete_thread(
         pass  # Best-effort cleanup — don't block thread deletion
 
     supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
+    background_tasks.add_task(
+        write_audit_entry,
+        user_id=current_user["id"],
+        action_type="thread.delete",
+        metadata={"thread_id": thread_id},
+        supabase=supabase,
+    )
 
 
 def generate_thread_title(first_user_message: str, user_settings=None) -> str:
@@ -376,7 +424,9 @@ async def send_message(
                     break
                 path_parts.append(f.get("name", ""))
                 current_fid = f.get("parent_id")
-            scoped_folder_path = "/" + "/".join(reversed(path_parts))
+            # Only set a meaningful path — if traversal found nothing, leave as None
+            # so the scope note is not injected with a confusing "/" root path.
+            scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
         # Load full message history (includes just-inserted user message)
         history_resp = (
@@ -452,6 +502,10 @@ async def send_message(
         persisted_tool_calls: list[dict] = []
         source_refs: list[dict] = []  # {"document_id": str, "filename": str}
         unique_sources: list[dict] = []
+        retrieved_citations: list[dict] = []    # Full citation objects per D-04
+        similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
+        unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
+        _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
         _message_persisted = False  # guard against double-insert
         _empty_retries = 0  # tracks empty-response retries across all iterations
 
@@ -474,8 +528,15 @@ async def send_message(
             }
             if persisted_tool_calls:
                 row["tool_calls"] = _strip_nul(persisted_tool_calls)
-            if unique_sources:
-                row["source_refs"] = unique_sources
+            if unique_citations:
+                row["source_refs"] = unique_citations   # Full citation objects (D-13)
+            elif unique_sources:
+                row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
+            if _confidence_slot:
+                c = _confidence_slot[0]
+                row["confidence_level"] = c["level"]
+                row["confidence_avg_similarity"] = c["avg_similarity"]
+                row["confidence_disclaimer"] = c["disclaimer"]
             try:
                 supabase.table("messages").insert(row).execute()
             except Exception as e:
@@ -676,20 +737,43 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
-                            results = search_documents(
+                            results, avg_sim = search_documents(
                                 args["query"], current_user["id"], supabase,
                                 metadata_filter=metadata_filter,
                                 user_settings=user_settings,
                                 folder_ids=folder_subtree_ids,
                             )
                             tool_result = json.dumps(results) if results else "No relevant documents found."
-                            # Collect unique source document references from search results
+                            # Accumulate full citation objects for citations event (D-04, D-14)
                             if results and isinstance(results, list):
                                 for hit in results:
                                     doc_id = hit.get("document_id") or hit.get("id")
                                     filename = hit.get("filename") or hit.get("document_name")
                                     if doc_id and filename:
                                         source_refs.append({"document_id": doc_id, "filename": filename})
+                                        retrieved_citations.append({
+                                            "document_id": doc_id,
+                                            "filename": filename,
+                                            "chunk_index": hit.get("chunk_index"),
+                                            "passage": hit.get("content"),  # Full text for persistence
+                                            "similarity": hit.get("similarity"),
+                                            "is_full_doc": False,
+                                            "version_number": hit.get("version_number", 1),
+                                        })
+                                if avg_sim > 0.0:
+                                    similarity_scores.append(avg_sim)
+                            # Audit: fire-and-forget inside async generator (AUDIT-02)
+                            _audit_doc_ids = list({
+                                h.get("document_id") or h.get("id")
+                                for h in (results or [])
+                                if h.get("document_id") or h.get("id")
+                            })
+                            asyncio.create_task(write_audit_entry(
+                                user_id=current_user["id"],
+                                action_type="search.query",
+                                metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
+                                supabase=supabase,
+                            ))
                         elif tool_name == "query_documents":
                             tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
@@ -705,6 +789,15 @@ async def send_message(
                                 else:
                                     # Track this document as a source reference
                                     source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
+                                    retrieved_citations.append({
+                                        "document_id": doc_id,
+                                        "filename": doc["filename"],
+                                        "chunk_index": None,
+                                        "passage": None,
+                                        "similarity": None,
+                                        "is_full_doc": True,
+                                        "version_number": doc.get("version_number", 1),
+                                    })
                                     yield f"data: {json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']})}\n\n"
                                     sub_agent_content = ""
                                     try:
@@ -736,6 +829,12 @@ async def send_message(
                                 tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                             else:
                                 row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="skill.load",
+                                    metadata={"skill_id": row["id"], "skill_name": row["name"]},
+                                    supabase=supabase,
+                                ))
                                 # Fetch attached filenames (FILE-04)
                                 files_data = (
                                     supabase.table("skill_files")
@@ -801,7 +900,39 @@ async def send_message(
                                 storage_path = f"{row['user_id']}/{row['id']}/{filename}"
                                 try:
                                     raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
-                                    tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+                                    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+                                    if ext == "docx":
+                                        import docx as _docx  # python-docx
+                                        doc = _docx.Document(io.BytesIO(raw_bytes))
+                                        tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                                    elif ext == "xlsx":
+                                        import openpyxl as _openpyxl
+                                        wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+                                        rows = []
+                                        for sheet in wb.worksheets:
+                                            for row in sheet.iter_rows(values_only=True):
+                                                line = "\t".join(str(c) if c is not None else "" for c in row)
+                                                if line.strip():
+                                                    rows.append(line)
+                                        tool_result = "\n".join(rows)
+                                    elif ext == "pptx":
+                                        from pptx import Presentation as _Presentation  # python-pptx
+                                        prs = _Presentation(io.BytesIO(raw_bytes))
+                                        slides = []
+                                        for slide in prs.slides:
+                                            for shape in slide.shapes:
+                                                if hasattr(shape, "text") and shape.text.strip():
+                                                    slides.append(shape.text)
+                                        tool_result = "\n".join(slides)
+                                    elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
+                                        tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+                                    else:
+                                        # Unrecognized or binary type
+                                        tool_result = json.dumps({
+                                            "error": f"File '{filename}' is a binary file that cannot be read as text. "
+                                                     "Upload a text-based version instead."
+                                        })
                                 except Exception as e:
                                     tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
                         elif tool_name == "execute_code":
@@ -833,7 +964,45 @@ async def send_message(
                                     session.execute_command("mkdir -p /sandbox/output")
                                 except Exception:
                                     pass
-                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + code
+
+                                # Inject skill files into sandbox by embedding bytes as base64
+                                # in a preamble that runs before user code. More reliable than
+                                # copy_to_runtime which can fail silently on Windows Docker setups.
+                                skill_files_req = args.get("skill_files") or []
+                                file_preamble = ""
+                                for sf in skill_files_req:
+                                    sf_skill_name = sf.get("skill_name", "")
+                                    sf_filename = sf.get("filename", "")
+                                    if not sf_skill_name or not sf_filename:
+                                        continue
+                                    sf_skill = (
+                                        supabase.table("skills")
+                                        .select("id, user_id")
+                                        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                        .eq("name", sf_skill_name)
+                                        .maybe_single()
+                                        .execute()
+                                    ).data
+                                    if not sf_skill:
+                                        logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
+                                        continue
+                                    sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
+                                    sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
+                                    try:
+                                        sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
+                                        b64 = base64.b64encode(sf_bytes).decode("ascii")
+                                        safe_name = sf_filename.replace("'", "\\'")
+                                        file_preamble += (
+                                            f"import base64 as _b64, os as _os\n"
+                                            f"_os.makedirs('/sandbox', exist_ok=True)\n"
+                                            f"with open('/sandbox/{safe_name}', 'wb') as _f:\n"
+                                            f"    _f.write(_b64.b64decode('{b64}'))\n"
+                                            f"print('Injected skill file: {safe_name}')\n"
+                                        )
+                                    except Exception as sf_err:
+                                        logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
+
+                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
 
                                 start_time = time_mod.time()
 
@@ -943,6 +1112,12 @@ async def send_message(
                                     "stdout": exec_result.stdout or "",
                                     "stderr": exec_result.stderr or "",
                                 })
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="code.execute",
+                                    metadata={"thread_id": thread_id, "language": args.get("language", "python")},
+                                    supabase=supabase,
+                                ))
                             except Exception as exec_err:
                                 logger.error("execute_code failed: %s", exec_err)
                                 yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
@@ -1059,6 +1234,26 @@ async def send_message(
           if source_refs:
               unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
               yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
+
+          # Emit citations event (D-03, D-07: after sources, before confidence)
+          unique_citations[:] = _deduplicate_citations(retrieved_citations)
+          if unique_citations:
+              # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
+              sse_citations = []
+              for c in unique_citations:
+                  sse_c = dict(c)
+                  if sse_c.get("passage") and len(sse_c["passage"]) > 400:
+                      sse_c["passage"] = sse_c["passage"][:400]
+                  sse_citations.append(sse_c)
+              yield f"data: {json.dumps({'type': 'citations', 'citations': sse_citations})}\n\n"
+
+          # Emit confidence event (D-05, D-07: after citations, before title)
+          if similarity_scores:
+              final_avg = sum(similarity_scores) / len(similarity_scores)
+              level = _compute_confidence(final_avg)
+              disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
+              _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
+              yield f"data: {json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer})}\n\n"
 
           # Persist assistant message (normal path — before [DONE])
           _persist_assistant_message()

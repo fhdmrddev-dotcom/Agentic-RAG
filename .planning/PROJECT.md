@@ -8,14 +8,26 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
+## Current Milestone: v2.2 Trust & Compliance
+
+**Goal:** Make answers verifiable and auditable — surface retrieved evidence, confidence signals, and usage trails.
+
+**Target features:**
+- F-01 Citation with Source Passage Highlighting
+- F-05 Answer Confidence Score (High/Medium/Low badge)
+- F-02 Document Versioning & Change Detection
+- F-06 Audit Log (immutable, append-only)
+- F-08 Suggested Follow-Up Questions
+
 ## Current State
 
-**Shipped:** v2.0 Agent Skills & Code Execution — 2026-04-04
+**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 29 (document versioning UI) complete 2026-04-13; Phase 30 (audit log backend) complete 2026-04-14; Phase 31 (audit log settings UI) complete 2026-04-14
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
-**Codebase:** ~11,000 LOC (Python + TypeScript)
-**Phases shipped:** 17 phases (8 v1.0 + 9 v2.0), all requirements complete
+**Codebase:** ~15,000 LOC (Python + TypeScript)
+**Phases shipped:** 30 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 5 v2.2), all requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
+**Known tech debt:** Missing test files for phases 20 and 22 (test_blank_response_guards.py, test_rag_correctness.py); metadata ingest normalization covers only document_type/language; live LangSmith sub-agent trace not yet performed
 
 ## Requirements
 
@@ -60,6 +72,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 *v2.0 milestone:*
 
 - ✓ Persistent Tool Memory — store tool results in JSONB, reconstruct full tool call history on conversation load — v2.0 Phase 9
+
 - ✓ Agent Skills Core — skills table with CRUD, global/private ownership, RLS, Supabase Storage bucket — v2.0 Phase 10
 - ✓ Skill File Attachments — upload/list/delete files on skills (backend); file list returned in load_skill — v2.0 Phase 10
 - ✓ Skill tool dispatch (`load_skill`, `save_skill`, `read_skill_file`) wired into LLM chat loop — v2.0 Phase 11
@@ -72,28 +85,36 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ Code Output UI — ExecuteCodeBlock with streaming terminal + file download cards — v2.0 Phase 15
 - ✓ Skill File Management UI — upload/list/delete files on skills via SkillFormDialog — v2.0 Phase 16
 
-## Current Milestone: v2.1 Stability & RAG Correctness
+*v2.1 milestone:*
 
-**Goal:** Eliminate silent failures, blank responses, and correctness bugs found in post-v2.0 review.
-
-**Target features:**
-- Rolling context window with inter-iteration trimming (P0)
-- Sub-agent size guard to prevent silent overflow on large documents (P0)
-- APIError context overflow surfaced as visible UI error message (P0)
-- Blank response guards: force-no-tools empty content + length mid-tool-call (P0)
-- `load_skill`/`save_skill` `maybe_single()` hardening (P0)
-- Keyword search folder scope fix — `_keyword_search` + `keyword_search_chunks` RPC (P1)
-- `read_document` context cap — remove exemption, apply 3k cap with truncation note (P1)
-- Metadata filter case normalization at ingest and search path (P1)
-- Document-level RAG deduplication (P2)
-- Similarity confidence hedging in system prompt (P2)
-- Citation format guidance in system prompt (P2)
-- Sentence boundary chunking edge case fix (P2)
-- Settings file caching with 5s TTL (P2)
+- ✓ Rolling context window trimming with atomic tool-pair removal — prevents overflow on long conversations — v2.1 Phase 18
+- ✓ Inter-iteration trim: tool result messages removed atomically between agent loop iterations — v2.1 Phase 18
+- ✓ Sub-agent content cap (600k chars) enforced before API call; APIError "maximum" keyword detected — v2.1 Phase 19
+- ✓ Blank response guards: force-no-tools empty content fallback + finish_reason=length error event — v2.1 Phase 20
+- ✓ `load_skill`/`save_skill` `maybe_single()` hardening — informative tool result on None — v2.1 Phase 20
+- ✓ Keyword search folder scope: `_keyword_search` + `keyword_search_chunks` RPC accept `folder_ids` — v2.1 Phase 21
+- ✓ `read_document` context capped at 3,000 chars with truncation note — v2.1 Phase 22
+- ✓ Metadata case normalization: `document_type`/`language` lowercased at ingest; all filter values lowercased at search — v2.1 Phase 22
+- ✓ System prompt confidence hedging (similarity < 0.4) + structured citation format guidance — v2.1 Phase 23
+- ✓ Settings file TTL cache (5s) on `_load_override()` — reduces per-message disk reads — v2.1 Phase 24
+- ✓ Sentence boundary chunking fix: splits only when `.!?` followed by space or end-of-string — v2.1 Phase 24
+- ✓ Sub-agent model auto-selection per provider (Haiku / GPT-4o-mini / Gemini Flash) — v2.1 Phase 25
+- ✓ Provider-aware context budgets (Anthropic 120k, OpenAI 200k, Google 180k, OpenRouter 100k, Ollama 80k) — v2.1 Phase 25
+- ✓ JSON token estimation corrected to chars/3 (from chars/4) for tool call JSON density — v2.1 Phase 25
 
 ### Active
 
-*(See Current Milestone above — requirements being defined)*
+*v2.2 milestone:*
+
+- [x] F-01 (backend): citations SSE event with passage text, chunk_index, filename per retrieved chunk — validated Phase 26
+- [x] F-05 (backend): confidence SSE event with high/medium/low level + avg_similarity + disclaimer for low — validated Phase 26
+- [x] F-01 (frontend): collapsible citation cards showing exact retrieved passages beneath each answer — validated Phase 27
+- [x] F-05 (frontend): Answer Confidence Score badge — colour-coded, Low adds disclaimer — validated Phase 27
+- [x] F-02 (backend): document versioning — version_number + is_latest columns, re-upload creates new version, old chunks retired from all retrieval RPCs, citation cards show "(vN)" badge — validated Phase 28
+- [x] F-02 (frontend): version history UI — version badge (vN chip), expandable VersionHistoryPanel, restore confirmation dialog, owner-only restore, is_latest-filtered document list — validated Phase 29
+- [x] F-06 (backend): audit_log table with INSERT-only RLS, write_audit_entry service, all 8 action types instrumented across routers — validated Phase 30
+- [x] F-06 (frontend): Audit Log section in Settings — date pills, action type filter, paginated table, CSV export — validated Phase 31
+- [ ] F-08: Suggested Follow-Up Questions — 2–3 clickable follow-up pill buttons after each assistant response, non-blocking cheap model generation
 
 ### Out of Scope
 
@@ -103,6 +124,28 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - Folder-level permissions — Global folders visible to all, per-user folders private
 - Switching to Docling — Existing pypdf + python-docx pipeline is working; full markdown stored from existing extraction
 - Nyquist VALIDATION.md compliance — Phase-level validation files exist in draft state; full compliance deferred
+
+### Deferred Architectural Decisions
+
+#### Multi-Tenancy / Org-Level Transform (deferred to future milestone — clarity needed)
+
+The current architecture is single-tenant per user. To support organizations (multiple users sharing a document library), the following changes are required:
+
+**Schema additions:**
+- `organizations` (id, name, slug, created_at)
+- `org_memberships` (org_id, user_id, role: owner/admin/member, created_at)
+- `documents` gains `org_id` (nullable FK) and `uploaded_by` (user_id) — ownership shifts from user to org
+- `folders` gains `org_id` (nullable FK) — replaces the app-wide `is_global` flag with org-scoped visibility
+- `document_chunks` gains `org_id` for RLS performance
+
+**Behavioral changes:**
+- Dedup scope: currently per-user (content_hash + user_id). At org level: per-org (content_hash + org_id) — same file uploaded by any member = one shared entry
+- Version chain scope: currently per-user-per-filename. At org level: per-org-per-filename
+- Global folders: retire `is_global` flag; replace with org-scoped folders visible to all org members
+- RLS: all policies change from `user_id = auth.uid()` to `org_id IN (SELECT org_id FROM org_memberships WHERE user_id = auth.uid())`
+- Delete permissions: org admin or uploader (not just owner)
+
+**Why deferred:** Need clarity on whether orgs are isolated tenants (separate Supabase projects) or co-tenant (shared schema with org_id partitioning), and what the auth/billing model looks like before committing to a schema direction.
 
 ## Context
 
@@ -153,6 +196,12 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 | harvest_output_files() copies to /sandbox/output | Files generated by code accessible via signed URLs | ✓ Good — clean separation of sandbox and storage |
 | SKILL.md frontmatter YAML + agentskills.io format | Open standard for skill portability | ✓ Good — ZIP round-trip works, path traversal rejected |
 | FILE-01/FILE-02 deferred to Phase 16 | Audit found frontend file UI missing; gap closure phase added | ✓ Good — clean gap closure, no tech debt carried |
+| chars/3 for JSON token estimation | JSON punctuation overhead (~33% more tokens than content estimate) means chars/4 underestimates tool call sizes | ✓ Good — existing trim tests pass, more accurate budget calculation |
+| Provider-aware context budgets (hardcoded) | Dynamic context limit mapping adds complexity; hardcoded caps per provider are sufficient and reviewed at each model update | ✓ Good — avoids tiktoken dependency, covers all current providers |
+| Sub-agent model auto-selection keyed by provider string | Match on `llm_provider` setting value; openrouter/ollama fall back to user model (routing unknown / local) | ✓ Good — 4-level resolution chain; backwards-compatible sentinel (0 = auto) |
+| 3k char cap on read_document context injection | Large documents were flooding main agent context; 3k + truncation note preserves usefulness while protecting budget | ✓ Good — agents follow up with start_line/end_line for deeper reads |
+| Ingest normalization covers only document_type/language | Other metadata fields (author, title, topics) stored as-is; search filter normalizes all strings at query time | — Pending — asymmetry is a known gap; full normalization deferred |
+| Phases 18–24 executed without VERIFICATION.md | Fast execution cadence; integration checker substituted for formal verification pass | ⚠ Revisit — consider running /gsd:validate-phase retroactively for critical phases |
 
 ## Constraints
 
@@ -182,4 +231,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 — v2.1 milestone started (Stability & RAG Correctness)*
+*Last updated: 2026-04-14 — Phase 31 complete: audit log settings UI shipped (F-06 frontend — date pills, action type filter, paginated table, CSV export in Settings page)*

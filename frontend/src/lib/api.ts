@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, ConfidenceResult } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -49,11 +49,24 @@ export async function getMessages(threadId: string): Promise<Message[]> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers })
   if (!res.ok) throw new Error("Failed to get messages")
-  const data = await res.json() as Array<Message & { source_refs?: SourceReference[] }>
-  // Map source_refs (DB column name) -> sources (frontend field name)
+  const data = await res.json() as Array<Message & {
+    source_refs?: Citation[]
+    confidence_level?: string
+    confidence_avg_similarity?: number
+    confidence_disclaimer?: string | null
+  }>
+  // Map DB column names to frontend field names
   return data.map((m) => {
-    const { source_refs, ...rest } = m
-    return { ...rest, sources: source_refs ?? rest.sources }
+    const { source_refs, confidence_level, confidence_avg_similarity, confidence_disclaimer, ...rest } = m
+    const mapped: Message = { ...rest, citations: (source_refs ?? []) as Citation[] }
+    if (confidence_level) {
+      mapped.confidence = {
+        level: confidence_level as "high" | "medium" | "low",
+        avg_similarity: confidence_avg_similarity ?? 0,
+        disclaimer: confidence_disclaimer ?? null,
+      }
+    }
+    return mapped
   })
 }
 
@@ -101,6 +114,8 @@ export async function streamMessage(
   onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
   agentMode?: string,
   onSources?: (sources: SourceReference[]) => void,
+  onCitations?: (citations: Citation[]) => void,
+  onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
   onPlanning?: (iteration: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -174,6 +189,14 @@ export async function streamMessage(
           )
         } else if (parsed.type === "sources" && onSources) {
           onSources((parsed.sources ?? []) as SourceReference[])
+        } else if (parsed.type === "citations" && onCitations) {
+          onCitations((parsed.citations ?? []) as Citation[])
+        } else if (parsed.type === "confidence" && onConfidence) {
+          onConfidence(
+            parsed.level as "high" | "medium" | "low",
+            parsed.avg_similarity as number,
+            parsed.disclaimer as string | null,
+          )
         } else if (parsed.type === "planning" && onPlanning) {
           onPlanning(parsed.iteration as number)
         }
@@ -218,6 +241,23 @@ export async function deleteDocument(id: string): Promise<void> {
     headers,
   })
   if (!res.ok) throw new Error("Failed to delete document")
+}
+
+export async function fetchDocumentVersions(documentId: string): Promise<Document[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${documentId}/versions`, { headers })
+  if (!res.ok) throw new Error("Failed to fetch document versions")
+  return res.json() as Promise<Document[]>
+}
+
+export async function restoreDocumentVersion(documentId: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${documentId}/restore`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to restore version. Please try again.")
+  return res.json() as Promise<Document>
 }
 
 export async function listFolders(): Promise<Folder[]> {
@@ -489,4 +529,54 @@ export async function deleteSkillFile(skillId: string, fileId: string): Promise<
     headers,
   })
   if (!res.ok) throw new Error("Failed to delete skill file")
+}
+
+// ── Audit Log (Phase 31) ────────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string
+  action_type: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  entries: AuditEntry[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export async function getAuditLogs(
+  page = 1,
+  since?: string,
+  actionType?: string,
+): Promise<AuditLogsResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({ page: String(page), page_size: "50" })
+  if (since) params.set("since", since)
+  if (actionType) params.set("action_type", actionType)
+  const res = await fetch(`${API_BASE}/audit-logs?${params}`, { headers })
+  if (!res.ok) throw new Error("Failed to load audit log")
+  return res.json() as Promise<AuditLogsResponse>
+}
+
+export async function exportAuditLogs(since?: string, actionType?: string): Promise<void> {
+  const token = await getAuthToken()
+  const params = new URLSearchParams()
+  if (since) params.set("since", since)
+  if (actionType) params.set("action_type", actionType)
+  const res = await fetch(`${API_BASE}/audit-logs/export?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Failed to export audit log")
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "audit-log.csv"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }

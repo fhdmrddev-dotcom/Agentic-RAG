@@ -18,6 +18,7 @@ export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const isSendingRef = useRef(false)
+  const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const stopStreaming = useCallback(() => {
@@ -25,10 +26,13 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
+    const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
     setMessages((prev) => {
-      // Don't wipe optimistic messages if sendMessage is in flight
+      // Don't wipe optimistic messages or live-only fields (confidence) if a send is in flight
+      // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
+      if (sendGenerationRef.current !== generation) return prev
       return data
     })
   }, [])
@@ -36,6 +40,7 @@ export function useMessages(): UseMessages {
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
     if (isSendingRef.current) return
     isSendingRef.current = true
+    sendGenerationRef.current += 1
 
     // Optimistic user message
     const userMsg: Message = {
@@ -192,6 +197,18 @@ export function useMessages(): UseMessages {
       (sources) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
+        )
+      },
+      // onCitations
+      (citations) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, citations } : m)
+        )
+      },
+      // onConfidence
+      (level, avgSimilarity, disclaimer) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
         )
       },
       // onPlanning — agent finished one tool-call round, deciding next action

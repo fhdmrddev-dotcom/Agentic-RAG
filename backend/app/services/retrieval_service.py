@@ -103,7 +103,7 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
     if not rows:
         return []
     doc_ids = list({row["document_id"] for row in rows})
-    docs_result = supabase.table("documents").select("id, filename, metadata").in_("id", doc_ids).execute()
+    docs_result = supabase.table("documents").select("id, filename, metadata, version_number").in_("id", doc_ids).execute()
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
     enriched = []
     for row in rows:
@@ -112,7 +112,9 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
             "content": row["content"],
             "document_id": row["document_id"],
             "filename": doc.get("filename", "Unknown"),
+            "chunk_index": row.get("chunk_index"),
             "similarity": row.get("similarity") or row.get("rrf_score") or row.get("rank") or 0.0,
+            "version_number": doc.get("version_number", 1),
         }
         if doc.get("metadata"):
             entry["metadata"] = doc["metadata"]
@@ -120,17 +122,24 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
     return enriched
 
 
+def _avg_cosine(rows: list[dict]) -> float:
+    """Average cosine similarity from vector search rows. Returns 0.0 if no rows."""
+    sims = [row["similarity"] for row in rows if row.get("similarity") and row["similarity"] > 0]
+    return sum(sims) / len(sims) if sims else 0.0
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
 def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
-    """Case-insensitive filename lookup for a user's document. Tries exact match then partial match."""
-    # Exact case-insensitive match
+    """Case-insensitive filename lookup for a user's document (latest version only). Tries exact match then partial match."""
+    # Exact case-insensitive match — only resolve to the latest version
     result = (
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
+        .eq("is_latest", True)
         .ilike("filename", filename)
         .limit(1)
         .execute()
@@ -142,6 +151,7 @@ def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | 
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
+        .eq("is_latest", True)
         .ilike("filename", f"%{filename}%")
         .limit(1)
         .execute()
@@ -155,7 +165,7 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
     """Fetch complete document content by concatenating all ordered chunks."""
     doc_result = (
         supabase.table("documents")
-        .select("id, filename, metadata")
+        .select("id, filename, metadata, version_number")
         .eq("id", document_id)
         .eq("user_id", user_id)
         .single()
@@ -190,7 +200,7 @@ def search_documents(
     metadata_filter: dict | None = None,
     user_settings: UserEffectiveSettings | None = None,
     folder_ids: list[str] | None = None,
-) -> list[dict]:
+) -> tuple[list[dict], float]:
     # Normalize metadata_filter values to lowercase for case-insensitive matching
     if metadata_filter:
         metadata_filter = {k: v.lower() if isinstance(v, str) else v for k, v in metadata_filter.items()}
@@ -213,7 +223,8 @@ def search_documents(
             user_settings=user_settings,
             folder_ids=folder_ids,
         )
-        return _enrich_with_filenames(rows, supabase)
+        avg_sim = _avg_cosine(rows)
+        return _enrich_with_filenames(rows, supabase), avg_sim
 
     # Hybrid path: vector + keyword → RRF fusion → optional reranking
     vector_rows = _vector_search(
@@ -225,7 +236,9 @@ def search_documents(
     keyword_rows = _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
 
     if not vector_rows and not keyword_rows:
-        return []
+        return [], 0.0
+
+    avg_sim = _avg_cosine(vector_rows)
 
     fused = _rrf_fuse(
         vector_rows, keyword_rows,
@@ -243,4 +256,4 @@ def search_documents(
     else:
         candidates = candidates[:top_k]
 
-    return _enrich_with_filenames(candidates, supabase)
+    return _enrich_with_filenames(candidates, supabase), avg_sim

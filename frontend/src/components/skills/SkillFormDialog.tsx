@@ -104,12 +104,12 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{isEdit ? "Edit Skill" : "New Skill"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 py-2">
+        <div className="flex flex-col gap-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
           {/* Name */}
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-foreground">Name</label>
@@ -138,7 +138,7 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
-              rows={8}
+              rows={6}
               className="font-mono text-sm"
             />
           </div>
@@ -159,7 +159,7 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
               {files.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No files attached.</p>
               ) : (
-                <ul className="flex flex-col gap-1">
+                <ul className="flex flex-col gap-1 overflow-y-auto max-h-48">
                   {files.map((f) => (
                     <li key={f.id} className="flex items-center justify-between text-xs bg-muted rounded px-2 py-1">
                       <span className="flex items-center gap-1 text-foreground truncate">
@@ -181,7 +181,7 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
           )}
         </div>
 
-        <DialogFooter className="flex-col items-stretch gap-2">
+        <DialogFooter className="flex-col items-stretch gap-2 shrink-0">
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}

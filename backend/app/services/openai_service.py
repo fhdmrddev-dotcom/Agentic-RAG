@@ -337,6 +337,8 @@ EXECUTE_CODE_TOOL = {
             "(e.g. matplotlib, numpy, pandas, seaborn, scipy, python-docx, openpyxl, pillow, requests). "
             "Variables and installed packages persist across calls within the same conversation thread. "
             "Write output files to /sandbox/output/ and they will be returned as download links. "
+            "Use skill_files to inject skill attachment files (templates, assets) into the sandbox "
+            "at /sandbox/{filename} before your code runs — reference them with that path in code. "
             "Use this for data analysis, calculations, generating charts, creating documents, "
             "or any task that benefits from running actual Python code."
         ),
@@ -360,6 +362,18 @@ EXECUTE_CODE_TOOL = {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Optional list of expected output filenames in /sandbox/output/ to return as download links.",
+                },
+                "skill_files": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "skill_name": {"type": "string", "description": "Name of the skill that owns the file."},
+                            "filename": {"type": "string", "description": "Exact filename as returned by load_skill."},
+                        },
+                        "required": ["skill_name", "filename"],
+                    },
+                    "description": "Optional list of skill attachment files to inject into the sandbox before execution. Each file is written to /sandbox/{filename} and can be opened in code using that path (e.g. open('/sandbox/template.docx', 'rb')).",
                 },
             },
             "required": ["code"],

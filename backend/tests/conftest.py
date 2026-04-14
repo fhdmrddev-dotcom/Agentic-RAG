@@ -42,6 +42,8 @@ def _make_builder(execute_result):
     b.maybe_single.return_value = b
     b.is_.return_value = b
     b.or_.return_value = b
+    b.gte.return_value = b
+    b.range.return_value = b
     b.execute.return_value = execute_result
     b.execute.side_effect = None
     return b
@@ -105,6 +107,8 @@ def reset_mocks():
     _builder.maybe_single.return_value = _builder
     _builder.is_.return_value = _builder
     _builder.or_.return_value = _builder
+    _builder.gte.return_value = _builder
+    _builder.range.return_value = _builder
     _builder.execute.side_effect = None
     _builder.execute.return_value = _execute_result
 

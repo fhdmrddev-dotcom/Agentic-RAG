@@ -31,6 +31,8 @@ class DocumentResponse(BaseModel):
     error_message: str | None
     chunk_count: int | None
     content_hash: str | None
+    version_number: int = 1
+    is_latest: bool = True
     metadata: DocumentMetadata | None = None
     created_at: datetime
     updated_at: datetime

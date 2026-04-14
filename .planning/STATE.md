@@ -1,33 +1,37 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.1
-milestone_name: Stability & RAG Correctness
+milestone: v2.2
+milestone_name: Trust & Compliance
 status: verifying
-stopped_at: "Completed Phase 25-01: sub-agent-intelligence"
-last_updated: "2026-04-10T20:59:32.798Z"
-last_activity: 2026-04-10
+stopped_at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
+last_updated: "2026-04-14T19:53:36.941Z"
+last_activity: 2026-04-14
 progress:
   total_phases: 7
-  completed_phases: 7
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 6
+  total_plans: 11
+  completed_plans: 11
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-09)
+See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 25 — sub-agent-intelligence
+**Current focus:** Phase 31 — audit-log-settings-ui
 
 ## Current Position
 
-Phase: 25
+Phase: 32
 Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-04-10
+Last activity: 2026-04-14
+
+```
+Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
+```
 
 ## Performance Metrics
 
@@ -89,6 +93,16 @@ Last activity: 2026-04-10
 | Phase 17-tech-debt-cleanup P01 | 2min | 3 tasks | 3 files |
 | Phase 18-context-window-hardening P01 | 8min | 2 tasks | 2 files |
 | Phase 25-sub-agent-intelligence P01 | 2m 46s | 5 tasks | 5 files |
+| Phase 26-citations-confidence-backend P01 | 132s | 2 tasks | 3 files |
+| Phase 26-citations-confidence-backend P02 | 122s | 2 tasks | 2 files |
+| Phase 27-citations-confidence-frontend P01 | 231s | 4 tasks | 10 files |
+| Phase 28-document-versioning-schema-ingestion P01 | 258s | 2 tasks | 5 files |
+| Phase 28-document-versioning-schema-ingestion P02 | 150s | 2 tasks | 5 files |
+| Phase 29-document-versioning-ui P01 | 8min | 1 tasks | 2 files |
+| Phase 30-audit-log-backend P01 | 123s | 2 tasks | 3 files |
+| Phase 30-audit-log-backend P02 | 273s | 2 tasks | 4 files |
+| Phase 31-audit-log-settings-ui P01 | 160s | 2 tasks | 4 files |
+| Phase 31-audit-log-settings-ui P02 | checkpoint-resumed | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -182,6 +196,30 @@ Recent decisions affecting current work:
 - [Phase 25-sub-agent-intelligence]: Sub-agent model defaults keyed by provider; openrouter/ollama fall back to user model (routing unknown / local)
 - [Phase 25-sub-agent-intelligence]: context_window_max_tokens=0 means auto-select from PROVIDER_CONTEXT_DEFAULTS; non-zero env var overrides all providers
 - [Phase 25-sub-agent-intelligence]: tool_calls JSON token estimate changed from chars/4 to chars/3 — JSON punctuation overhead makes tokens denser than plain prose
+- [Phase 26-citations-confidence-backend]: search_documents returns tuple[list[dict], float] — (enriched_results, avg_vector_similarity) to enable citations and confidence scoring in Plan 02
+- [Phase 26-citations-confidence-backend]: _avg_cosine uses only vector_rows in hybrid path — keyword rows have no real cosine similarity; if vector_rows empty, returns 0.0
+- [Phase 26-citations-confidence-backend]: chunk_index passed through via row.get('chunk_index') — returns None for backward compat if RPC does not supply it
+- [Phase 26-citations-confidence-backend]: unique_citations uses slice assignment (unique_citations[:] = ...) so _persist_assistant_message closure captures the populated list without needing nonlocal declaration
+- [Phase 26-citations-confidence-backend]: SSE citations payload truncates passage at 400 chars; full passage stored in source_refs for message reload (D-04/D-13)
+- [Phase 26-citations-confidence-backend]: similarity_scores accumulates only from search_documents calls (not analyze_document) per D-16; confidence event absent when no search_documents occurred this turn
+- [Phase 27-citations-confidence-frontend]: SourceReferences pill badges retired — citation cards replace them entirely (D-01)
+- [Phase 27-citations-confidence-frontend]: source_refs mapped to citations on DB load; confidence is live-only SSE signal, not persisted (D-09)
+- [Phase 28-document-versioning-schema-ingestion]: Re-upload creates new version row (version_number incremented); old row retires via is_latest=False — no delete, storage retained for Phase 29 restore
+- [Phase 28-document-versioning-schema-ingestion]: Dedup check scoped to is_latest=True so stale hash matches do not short-circuit re-upload
+- [Phase 28-document-versioning-schema-ingestion]: resolve_document_id always resolves to is_latest=True document to prevent agent analyze_document using stale versions
+- [Phase 28-document-versioning-schema-ingestion]: version_number defaults to 1 in all enrichment and citation paths — safe for pre-migration document rows
+- [Phase 28-document-versioning-schema-ingestion]: CitationCard shows no version suffix for v1; renders (vN) only when N > 1 for clean default UX
+- [Phase 29-document-versioning-ui]: Route ordering: /{document_id}/versions and /{document_id}/restore placed before DELETE /{document_id} to prevent FastAPI path parameter shadowing of 'versions'/'restore'
+- [Phase 29-document-versioning-ui]: restore endpoint uses .is_('folder_id', 'null') for NULL folder_id siblings query — Supabase requires explicit IS NULL syntax
+- [Phase 30-audit-log-backend]: audit_log uses INSERT-only RLS (no SELECT for users) — log immutability enforced at DB layer
+- [Phase 30-audit-log-backend]: write_audit_entry swallows all exceptions to prevent audit failures from impacting request flow
+- [Phase 30-audit-log-backend]: VALID_ACTION_TYPES frozenset in service layer mirrors CHECK constraint — dual validation point for Plan 02 callers
+- [Phase 30-audit-log-backend]: asyncio.create_task() used in SSE generator for audit writes — BackgroundTasks not available inside async generator bodies
+- [Phase 30-audit-log-backend]: Settings API key sanitization via _key/_secret key-name check — prevents provider API keys from appearing in audit logs
+- [Phase 31-audit-log-settings-ui]: C:/Program Files/Git/export route placed before empty route to prevent FastAPI path shadowing by future /{id} routes
+- [Phase 31-audit-log-settings-ui]: lineterminator='\n' in csv.writer for Unix line endings — avoids CRLF test failures on Windows
+- [Phase 31-audit-log-settings-ui]: AuditLogSection renders Card directly (not SectionCard) to support right-aligned Export CSV button in CardHeader
+- [Phase 31-audit-log-settings-ui]: getAuditLogs uses getAuthHeaders() for JSON; exportAuditLogs uses getAuthToken() for blob download — consistent with exportSkill pattern
 
 ### Pending Todos
 
@@ -204,9 +242,12 @@ None yet.
 | 260405-s1e | Hide toggle-global from non-owners and block uploads into other users' global folders | 2026-04-05 | 62f9897 | [260405-s1e-hide-toggle-global-from-non-owners-and-b](./quick/260405-s1e-hide-toggle-global-from-non-owners-and-b/) |
 | 260405-stg | Add chat source references, cascade deletions, and sandbox file cleanup | 2026-04-05 | e26ccb1 | [260405-stg-add-chat-references-cascade-deletions-an](./quick/260405-stg-add-chat-references-cascade-deletions-an/) |
 | 260407-vqw | Implement context window management — sliding-window trimming with atomic tool-call removal to prevent silent agent failures on long conversations | 2026-04-07 | 1e5977d | [260407-vqw-review-and-fix-context-window-management](./quick/260407-vqw-review-and-fix-context-window-management/) |
+| 260411-wj5 | Fix skill file upload (storage upsert + error guard) and binary file reading in read_skill_file | 2026-04-11 | f69e171 | [260411-wj5-fix-skill-file-upload-bug-files-not-save](./quick/260411-wj5-fix-skill-file-upload-bug-files-not-save/) |
+| 260412-dqu | Fix four issues in skills.py: expand _mime_to_subdir MIME routing, URL-safe slug, frontmatter metadata block, ZIP root folder wrapper | 2026-04-12 | 785e23f | [260412-dqu-fix-four-issues-in-backend-app-api-skill](./quick/260412-dqu-fix-four-issues-in-backend-app-api-skill/) |
+| 260412-jnc | ZIP skill imports >20 files return 202 via BackgroundTasks; edit skill modal file list scrolls (max-h-48) | 2026-04-12 | e1ec617 | [260412-jnc-import-skill-return-202-backgroundtask-f](./quick/260412-jnc-import-skill-return-202-backgroundtask-f/) |
 
 ## Session Continuity
 
-Last activity: 2026-04-09
-Stopped at: Completed Phase 25-01: sub-agent-intelligence
+Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
+Stopped at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
 Resume file: None
