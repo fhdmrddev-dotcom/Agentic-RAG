@@ -22,3 +22,6 @@ class MessageResponse(BaseModel):
     updated_at: datetime
     tool_calls: list[dict] | None = None
     source_refs: list[dict] | None = None
+    confidence_level: str | None = None
+    confidence_avg_similarity: float | None = None
+    confidence_disclaimer: str | None = None

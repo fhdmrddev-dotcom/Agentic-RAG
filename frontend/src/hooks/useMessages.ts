@@ -33,11 +33,7 @@ export function useMessages(): UseMessages {
       // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
       if (sendGenerationRef.current !== generation) return prev
-      // Preserve live-only confidence from in-memory messages — confidence is not persisted to DB
-      return data.map((dbMsg) => {
-        const inMem = prev.find((m) => m.id === dbMsg.id)
-        return inMem?.confidence ? { ...dbMsg, confidence: inMem.confidence } : dbMsg
-      })
+      return data
     })
   }, [])
 

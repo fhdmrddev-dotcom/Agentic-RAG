@@ -9,6 +9,7 @@ interface UseDocuments {
   uploadingCount: number
   upload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
   deleteDoc: (id: string) => Promise<void>
+  loadDocuments: () => Promise<void>
 }
 
 export function useDocuments(): UseDocuments {
@@ -94,5 +95,5 @@ export function useDocuments(): UseDocuments {
     setDocuments((prev) => prev.filter((d) => d.id !== id))
   }, [])
 
-  return { documents, uploading: uploadingCount > 0, uploadingCount, upload, deleteDoc }
+  return { documents, uploading: uploadingCount > 0, uploadingCount, upload, deleteDoc, loadDocuments }
 }
