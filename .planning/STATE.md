@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: executing
-stopped_at: Completed 31-audit-log-settings-ui 31-01-PLAN.md
-last_updated: "2026-04-14T19:42:10.206Z"
+status: verifying
+stopped_at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
+last_updated: "2026-04-14T19:49:28.965Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-11)
 
 Phase: 31 (audit-log-settings-ui) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-14
 
 ```
@@ -102,6 +102,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 30-audit-log-backend P01 | 123s | 2 tasks | 3 files |
 | Phase 30-audit-log-backend P02 | 273s | 2 tasks | 4 files |
 | Phase 31-audit-log-settings-ui P01 | 160s | 2 tasks | 4 files |
+| Phase 31-audit-log-settings-ui P02 | checkpoint-resumed | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -217,6 +218,8 @@ Recent decisions affecting current work:
 - [Phase 30-audit-log-backend]: Settings API key sanitization via _key/_secret key-name check — prevents provider API keys from appearing in audit logs
 - [Phase 31-audit-log-settings-ui]: C:/Program Files/Git/export route placed before empty route to prevent FastAPI path shadowing by future /{id} routes
 - [Phase 31-audit-log-settings-ui]: lineterminator='\n' in csv.writer for Unix line endings — avoids CRLF test failures on Windows
+- [Phase 31-audit-log-settings-ui]: AuditLogSection renders Card directly (not SectionCard) to support right-aligned Export CSV button in CardHeader
+- [Phase 31-audit-log-settings-ui]: getAuditLogs uses getAuthHeaders() for JSON; exportAuditLogs uses getAuthToken() for blob download — consistent with exportSkill pattern
 
 ### Pending Todos
 
@@ -246,5 +249,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 31-audit-log-settings-ui 31-01-PLAN.md
+Stopped at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
 Resume file: None

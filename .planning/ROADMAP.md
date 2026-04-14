@@ -69,7 +69,7 @@ Full details: `.planning/milestones/v2.1-ROADMAP.md`
 - [x] **Phase 28: Document Versioning — Schema & Ingestion** — Migration for version tracking, re-upload creates new version, stale chunks retired, citation includes version number (completed 2026-04-12)
 - [x] **Phase 29: Document Versioning — UI** — Version badges, history expansion, restore action in document library (completed 2026-04-13)
 - [x] **Phase 30: Audit Log — Backend** — `audit_log` table with RLS, async fire-and-forget writes for all significant actions (completed 2026-04-14)
-- [ ] **Phase 31: Audit Log — Settings UI** — Audit log viewer in Settings with filters, pagination, and CSV export
+- [x] **Phase 31: Audit Log — Settings UI** — Audit log viewer in Settings with filters, pagination, and CSV export (completed 2026-04-14)
 - [ ] **Phase 32: Suggested Follow-Up Questions** — Cheap-model generation post-response, new SSE event type, clickable pill buttons in chat
 
 ## Phase Details
@@ -148,10 +148,10 @@ Plans:
   1. A new Audit Log section in Settings displays the user's audit entries in a paginated table
   2. The table can be filtered by date range and by action type
   3. An Export CSV button downloads the currently filtered audit log as a well-formed CSV file
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [x] 31-01-PLAN.md — Backend audit router (GET /audit-logs + GET /audit-logs/export) with tests
-- [ ] 31-02-PLAN.md — Frontend AuditLogSection component with filters, pagination, CSV export
+- [x] 31-02-PLAN.md — Frontend AuditLogSection component with filters, pagination, CSV export
 **UI hint**: yes
 
 ### Phase 32: Suggested Follow-Up Questions
@@ -202,5 +202,5 @@ Plans:
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 29. Document Versioning — UI | v2.2 | 1/2 | Complete    | 2026-04-13 |
 | 30. Audit Log — Backend | v2.2 | 2/2 | Complete    | 2026-04-14 |
-| 31. Audit Log — Settings UI | v2.2 | 1/2 | In Progress|  |
+| 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete   | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 0/? | Not started | - |
