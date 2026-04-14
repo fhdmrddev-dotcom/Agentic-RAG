@@ -530,3 +530,53 @@ export async function deleteSkillFile(skillId: string, fileId: string): Promise<
   })
   if (!res.ok) throw new Error("Failed to delete skill file")
 }
+
+// ── Audit Log (Phase 31) ────────────────────────────────────────────────────
+
+export interface AuditEntry {
+  id: string
+  action_type: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface AuditLogsResponse {
+  entries: AuditEntry[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export async function getAuditLogs(
+  page = 1,
+  since?: string,
+  actionType?: string,
+): Promise<AuditLogsResponse> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({ page: String(page), page_size: "50" })
+  if (since) params.set("since", since)
+  if (actionType) params.set("action_type", actionType)
+  const res = await fetch(`${API_BASE}/audit-logs?${params}`, { headers })
+  if (!res.ok) throw new Error("Failed to load audit log")
+  return res.json() as Promise<AuditLogsResponse>
+}
+
+export async function exportAuditLogs(since?: string, actionType?: string): Promise<void> {
+  const token = await getAuthToken()
+  const params = new URLSearchParams()
+  if (since) params.set("since", since)
+  if (actionType) params.set("action_type", actionType)
+  const res = await fetch(`${API_BASE}/audit-logs/export?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) throw new Error("Failed to export audit log")
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "audit-log.csv"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
