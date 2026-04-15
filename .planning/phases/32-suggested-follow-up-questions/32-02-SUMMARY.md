@@ -120,6 +120,17 @@ None - no external service configuration required.
 - v2.2 Trust & Compliance milestone complete — all 5 features shipped (F-01, F-05, F-02, F-06, F-08)
 - Phase 32 complete; ready for milestone close
 
+## Self-Check: PASSED
+
+- FOUND: frontend/src/components/chat/SuggestionPills.tsx
+- FOUND: frontend/src/__tests__/components/SuggestionPills.test.tsx
+- FOUND: .planning/phases/32-suggested-follow-up-questions/32-02-SUMMARY.md
+- FOUND commit: a296845 (test stub)
+- FOUND commit: ef0c13d (types + api)
+- FOUND commit: def8a40 (useMessages)
+- FOUND commit: fc2563b (SuggestionPills component)
+- FOUND commit: 153c8cb (prop threading)
+
 ---
 *Phase: 32-suggested-follow-up-questions*
 *Completed: 2026-04-15*
