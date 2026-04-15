@@ -211,6 +211,12 @@ export function useMessages(): UseMessages {
           prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
         )
       },
+      // onSuggestions — ephemeral, like confidence (not persisted)
+      (questions) => {
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, suggestions: questions } : m)
+        )
+      },
       // onPlanning — agent finished one tool-call round, deciding next action
       () => {
         setMessages((prev) =>
