@@ -116,6 +116,7 @@ export async function streamMessage(
   onSources?: (sources: SourceReference[]) => void,
   onCitations?: (citations: Citation[]) => void,
   onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
+  onSuggestions?: (questions: string[]) => void,
   onPlanning?: (iteration: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -152,10 +153,6 @@ export async function streamMessage(
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue
       const raw = line.slice(6).trim()
-      if (raw === "[DONE]") {
-        onDone()
-        return
-      }
       try {
         const parsed = JSON.parse(raw) as Record<string, unknown>
         if (parsed.type === "delta") {
@@ -197,6 +194,13 @@ export async function streamMessage(
             parsed.avg_similarity as number,
             parsed.disclaimer as string | null,
           )
+        } else if (parsed.type === "done") {
+          onDone()
+          // Do NOT return — stream stays open for suggestions event (Phase 32)
+        } else if (parsed.type === "suggestions" && onSuggestions) {
+          onSuggestions((parsed.questions ?? []) as string[])
+        } else if (parsed.type === "stream_end") {
+          return  // True end of stream after optional suggestions event (Phase 32)
         } else if (parsed.type === "planning" && onPlanning) {
           onPlanning(parsed.iteration as number)
         }
