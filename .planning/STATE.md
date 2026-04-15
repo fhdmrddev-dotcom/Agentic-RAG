@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: Trust & Compliance
-status: verifying
-stopped_at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
-last_updated: "2026-04-14T19:53:36.941Z"
-last_activity: 2026-04-14
+status: executing
+stopped_at: Completed 32-suggested-follow-up-questions 32-01-PLAN.md
+last_updated: "2026-04-15T17:29:13.865Z"
+last_activity: 2026-04-15
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 13
+  completed_plans: 12
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 31 — audit-log-settings-ui
+**Current focus:** Phase 32 — suggested-follow-up-questions
 
 ## Current Position
 
-Phase: 32
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-14
+Phase: 32 (suggested-follow-up-questions) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-15
 
 ```
 Progress: [░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0/7 phases
@@ -103,6 +103,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 30-audit-log-backend P02 | 273s | 2 tasks | 4 files |
 | Phase 31-audit-log-settings-ui P01 | 160s | 2 tasks | 4 files |
 | Phase 31-audit-log-settings-ui P02 | checkpoint-resumed | 2 tasks | 2 files |
+| Phase 32-suggested-follow-up-questions P01 | 8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -220,6 +221,8 @@ Recent decisions affecting current work:
 - [Phase 31-audit-log-settings-ui]: lineterminator='\n' in csv.writer for Unix line endings — avoids CRLF test failures on Windows
 - [Phase 31-audit-log-settings-ui]: AuditLogSection renders Card directly (not SectionCard) to support right-aligned Export CSV button in CardHeader
 - [Phase 31-audit-log-settings-ui]: getAuditLogs uses getAuthHeaders() for JSON; exportAuditLogs uses getAuthToken() for blob download — consistent with exportSkill pattern
+- [Phase 32-suggested-follow-up-questions]: Inline import of suggestion_service inside try block — no module-level dependency, consistent with Phase 14 lazy import pattern for optional features
+- [Phase 32-suggested-follow-up-questions]: stream_end replaces [DONE] as the true end-of-stream sentinel — done now only marks when main response text is complete; frontend can hide streaming cursor at done, then wait for stream_end
 
 ### Pending Todos
 
@@ -249,5 +252,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 31-audit-log-settings-ui 31-02-PLAN.md
+Stopped at: Completed 32-suggested-follow-up-questions 32-01-PLAN.md
 Resume file: None
