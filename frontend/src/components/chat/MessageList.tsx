@@ -6,9 +6,11 @@ import type { Message } from "@/types"
 interface Props {
   messages: Message[]
   isStreaming: boolean
+  onSendMessage?: (content: string) => void
+  showSuggestions?: boolean
 }
 
-export function MessageList({ messages, isStreaming }: Props) {
+export function MessageList({ messages, isStreaming, onSendMessage, showSuggestions }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
   const isNearBottomRef = useRef(true)
@@ -52,6 +54,7 @@ export function MessageList({ messages, isStreaming }: Props) {
               key={msg.id}
               message={msg}
               isStreaming={isStreaming && isLastAssistant}
+              onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
             />
           )
         })}
