@@ -12,6 +12,7 @@ VALID_ACTION_TYPES = frozenset({
     "document.upload", "document.delete", "search.query",
     "code.execute", "skill.load", "thread.create",
     "thread.delete", "settings.update",
+    "memory.remember", "memory.recall",   # Phase 33
 })
 
 
