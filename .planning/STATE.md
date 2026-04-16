@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Memory, Multimodal & Experience
 status: executing
-stopped_at: Completed 32-suggested-follow-up-questions 32-01-PLAN.md
-last_updated: "2026-04-16T14:34:11.337Z"
+stopped_at: Completed 33-01-PLAN.md
+last_updated: "2026-04-16T19:23:00.051Z"
 last_activity: 2026-04-16
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 15
+  completed_plans: 14
 ---
 
 # Project State
@@ -20,11 +20,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 32 — suggested-follow-up-questions
+**Current focus:** Phase 33 — cross-thread-memory-backend
 
 ## Current Position
 
-Phase: 32 (suggested-follow-up-questions) — EXECUTING
+Phase: 33 (cross-thread-memory-backend) — EXECUTING
 Plan: 2 of 2
 Status: Ready to execute
 Last activity: 2026-04-16
@@ -104,6 +104,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 31-audit-log-settings-ui P01 | 160s | 2 tasks | 4 files |
 | Phase 31-audit-log-settings-ui P02 | checkpoint-resumed | 2 tasks | 2 files |
 | Phase 32-suggested-follow-up-questions P01 | 8min | 2 tasks | 3 files |
+| Phase 33-cross-thread-memory-backend P01 | 108s | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -223,6 +224,8 @@ Recent decisions affecting current work:
 - [Phase 31-audit-log-settings-ui]: getAuditLogs uses getAuthHeaders() for JSON; exportAuditLogs uses getAuthToken() for blob download — consistent with exportSkill pattern
 - [Phase 32-suggested-follow-up-questions]: Inline import of suggestion_service inside try block — no module-level dependency, consistent with Phase 14 lazy import pattern for optional features
 - [Phase 32-suggested-follow-up-questions]: stream_end replaces [DONE] as the true end-of-stream sentinel — done now only marks when main response text is complete; frontend can hide streaming cursor at done, then wait for stream_end
+- [Phase 33-cross-thread-memory-backend]: REMEMBER_TOOL and RECALL_TOOL added to get_tools() (General Mode) only — get_explorer_tools() unchanged per D-05 scope
+- [Phase 33-cross-thread-memory-backend]: user_memory UNIQUE(user_id, key) enables ON CONFLICT upsert-by-key; set_updated_at() BEFORE UPDATE trigger ensures updated_at refresh on conflict
 
 ### Pending Todos
 
@@ -252,5 +255,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 32-suggested-follow-up-questions 32-01-PLAN.md
+Stopped at: Completed 33-01-PLAN.md
 Resume file: None

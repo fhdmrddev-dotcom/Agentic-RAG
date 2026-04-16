@@ -106,7 +106,9 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   3. Top 10 most-recently updated memory entries are injected as a concise block at the start of each General Mode turn (capped ~500 tokens)
   4. Memory injection is absent in Explorer Mode
   5. Memory writes are non-blocking and do not delay the chat response
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 33-01-PLAN.md — Migration 026 (user_memory table + RLS + trigger), tool constants (REMEMBER_TOOL/RECALL_TOOL), audit type extension, and 8-test unit scaffold (RED)
+- [ ] 33-02-PLAN.md — Memory injection block in General Mode system prompt, remember/recall tool dispatch handlers (non-blocking + audit), and test GREEN conversion
 **UI hint**: no
 
 ### Phase 34: Cross-Thread Memory — Settings UI
@@ -273,7 +275,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 | 30. Audit Log — Backend | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
-| 33. Cross-Thread Memory — Backend | v2.3 | 0/2 | Planned | |
+| 33. Cross-Thread Memory — Backend | v2.3 | 1/2 | In Progress|  |
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 0/1 | Planned | |
 | 35. Multi-Modal Ingestion | v2.3 | 0/2 | Planned | |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
