@@ -326,6 +326,57 @@ READ_SKILL_FILE_TOOL = {
     },
 }
 
+REMEMBER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "remember",
+        "description": (
+            "Store a fact or preference about the user that should persist across conversations. "
+            "Use when the user states a preference (e.g. 'I prefer bullet points'), "
+            "shares a personal fact (e.g. 'I work in finance'), or explicitly asks you to remember something. "
+            "Key should be a short snake_case label (e.g. 'response_format', 'industry', 'name'). "
+            "Calling remember with an existing key overwrites the previous value — keys are case-insensitive."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": "Short snake_case label for the fact (e.g. 'response_format', 'name', 'industry').",
+                },
+                "value": {
+                    "type": "string",
+                    "description": "The fact or preference to store, in the user's own words.",
+                },
+            },
+            "required": ["key", "value"],
+        },
+    },
+}
+
+RECALL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "recall",
+        "description": (
+            "Retrieve stored memory entries about the user. "
+            "Call with no arguments to list all stored facts and preferences. "
+            "Call with a specific key to retrieve the value for that key. "
+            "If the key is not found, returns a 'No memory entry found' message."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string",
+                    "description": "The key to look up. Omit to retrieve all stored entries.",
+                },
+            },
+            "required": [],
+        },
+    },
+}
+
 EXECUTE_CODE_TOOL = {
     "type": "function",
     "function": {
@@ -408,7 +459,8 @@ EXPLORER_SYSTEM_PROMPT = (
 def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
-             LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL]
+             LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
+             REMEMBER_TOOL, RECALL_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     if settings.sandbox_enabled:
