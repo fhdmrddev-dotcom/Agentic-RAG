@@ -1,5 +1,27 @@
 # Milestones
 
+## v2.2 Trust & Compliance (Shipped: 2026-04-16)
+
+**Phases completed:** 7 phases, 13 plans, 22 tasks
+
+**Key accomplishments:**
+
+- One-liner:
+- One-liner:
+- One-liner:
+- 1. [Rule 1 - Bug] Upload endpoint uses /documents/upload not /documents
+- Task 1 — Backend pipeline:
+- FastAPI document versioning endpoints — is_latest list filter, GET /{id}/versions, and POST /{id}/restore with NULL folder guard and 6 TDD-verified unit tests
+- React frontend — version badge, VersionHistoryPanel, and restore confirmation dialog in DocumentList
+- audit_log Postgres table with INSERT-only RLS, 8-action CHECK constraint, composite index, and write_audit_entry async coroutine with exception swallowing
+- All 8 auditable action types wired to write_audit_entry across documents.py, threads.py, and settings.py using BackgroundTasks (non-SSE) and asyncio.create_task (SSE generator)
+- One-liner:
+- Audit Log section added to Settings page with paginated table, date-range pills (All/7d/30d/90d), action-type dropdown filter, and CSV export button wired to /audit-logs and /audit-logs/export backend endpoints.
+- SSE stream timeline upgraded from literal [DONE] to JSON done -> suggestions (cheap model) -> stream_end, with suggestion failures isolated behind try/except
+- Glassmorphic suggestion pill buttons wired end-to-end: SSE done/suggestions/stream_end event parsing in api.ts, ephemeral questions stored on Message via useMessages, SuggestionPills component rendering below citations, gated on General mode and !isStreaming
+
+---
+
 ## v2.1 Stability & RAG Correctness (Shipped: 2026-04-11)
 
 **Phases completed:** 8 phases, 8 plans, 3 tasks
