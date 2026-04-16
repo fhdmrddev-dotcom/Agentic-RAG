@@ -483,6 +483,27 @@ async def send_message(
                 )
                 active_system_prompt = active_system_prompt + catalog_note
 
+            # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
+            memory_rows = (
+                supabase.table("user_memory")
+                .select("key, value")
+                .eq("user_id", current_user["id"])
+                .order("updated_at", desc=True)
+                .limit(10)
+                .execute()
+            ).data or []
+
+            if memory_rows:
+                memory_lines = "\n".join(
+                    f"- {r['key']}: {r['value']}" for r in memory_rows
+                )
+                memory_note = (
+                    "\n\n## User Memory\n"
+                    "(Preferences and facts you've remembered about this user across conversations)\n"
+                    f"{memory_lines}"
+                )
+                active_system_prompt = active_system_prompt + memory_note
+
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         messages.extend(_reconstruct_history(history_resp.data))
 
