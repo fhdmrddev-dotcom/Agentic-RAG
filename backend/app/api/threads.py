@@ -1274,7 +1274,24 @@ async def send_message(
               except Exception:
                   pass
 
-          yield "data: [DONE]\n\n"
+          # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
+          yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+          # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
+          try:
+              from app.services.suggestion_service import generate_suggestions
+              questions = generate_suggestions(
+                  user_message=body.content,       # the user's message
+                  assistant_response=full_content,  # accumulated full response text
+                  user_settings=user_settings,
+              )
+              if questions:
+                  yield f"data: {json.dumps({'type': 'suggestions', 'questions': questions[:3]})}\n\n"
+          except Exception:
+              pass  # SUG-04: failure never affects main response
+
+          # Phase 32: True stream end — frontend returns from streamMessage
+          yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
 
         finally:
             # Safety net: runs on GeneratorExit (client disconnect) or any

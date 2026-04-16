@@ -152,7 +152,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           </span>
         )}
       </div>
-      <MessageList messages={messages} isStreaming={isStreaming} />
+      <MessageList
+        messages={messages}
+        isStreaming={isStreaming}
+        onSendMessage={handleSend}
+        showSuggestions={agentMode !== "explorer"}
+      />
       {inputBar}
     </div>
   )

@@ -76,6 +76,7 @@ export interface Message {
   sources?: SourceReference[]  // Set by sources SSE event; persisted in source_refs column
   citations?: Citation[]       // Set by citations SSE event; loaded from source_refs on DB load
   confidence?: ConfidenceResult // Set by confidence SSE event; persisted in confidence_* columns
+  suggestions?: string[]   // Set by suggestions SSE event; ephemeral — not persisted, not loaded
   /** True while the agent has finished one tool-call round and is deciding its next action. */
   isPlanning?: boolean
 }

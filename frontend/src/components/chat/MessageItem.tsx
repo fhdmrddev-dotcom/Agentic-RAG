@@ -5,14 +5,16 @@ import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
+import { SuggestionPills } from "./SuggestionPills"
 import { toolLabel, toolSummary } from "@/lib/toolMeta"
 
 interface Props {
   message: Message
   isStreaming?: boolean
+  onSendMessage?: (content: string) => void
 }
 
-export function MessageItem({ message, isStreaming }: Props) {
+export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
   const isUser = message.role === "user"
 
   if (isUser) {
@@ -73,6 +75,12 @@ export function MessageItem({ message, isStreaming }: Props) {
             {message.confidence && <ConfidenceBadge confidence={message.confidence} />}
             {message.citations && message.citations.length > 0 && (
               <CitationList citations={message.citations} />
+            )}
+            {!isStreaming && message.suggestions && message.suggestions.length > 0 && onSendMessage && (
+              <SuggestionPills
+                questions={message.suggestions}
+                onSelect={onSendMessage}
+              />
             )}
           </div>
         ) : isStreaming && !hasAnyTools ? (

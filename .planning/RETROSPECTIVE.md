@@ -180,6 +180,37 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.2 — Trust & Compliance
+
+**Shipped:** 2026-04-16
+**Phases:** 7 | **Plans:** 13 | **Tasks:** 22
+**Timeline:** 2026-04-12 → 2026-04-16 (4 days)
+**Commits:** 72
+
+### What Was Built
+- Citations backend: retrieval_service returns (results, avg_similarity) tuple; SSE `citations` + `confidence` events
+- Citations frontend: collapsible CitationCard, CitationList, colour-coded ConfidenceBadge with Low disclaimer
+- Document versioning: `version_number`/`is_latest` columns, re-upload creates new version, old chunks retired from all RPCs, version badge shown in UI
+- Audit log: INSERT-only `audit_log` table, async BackgroundTask writes across 8 action types, paginated Settings viewer with CSV export
+- Suggested follow-up questions: SSE timeline `done → suggestions → stream_end`, SuggestionPills component gated on General mode
+
+### What Worked
+- TDD (RED → GREEN) pattern applied consistently across all 7 phases — caught integration issues early
+- Splitting backend/frontend into separate phases kept each plan focused and executable
+- `asyncio.create_task` for SSE-path audit writes solved the blocking problem cleanly
+- `slice assignment` trick (`unique_citations[:] = ...`) for closure capture was a neat Python pattern
+
+### What Was Inefficient
+- Several SUMMARY.md files have empty `one_liner:` fields — the template extraction relies on this field
+- No milestone audit performed — proceeding on requirement count alone
+
+### Key Lessons
+- SSE generators require `asyncio.create_task` for fire-and-forget (not `BackgroundTasks`, which doesn't work inside generators)
+- Pydantic `slice assignment` pattern for closure-captured mutable state avoids a class of subtle bugs
+- Per-phase UI-SPEC.md (citations, versioning UI) made frontend phases cleaner — worth continuing
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |

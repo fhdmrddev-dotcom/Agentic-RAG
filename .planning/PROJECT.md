@@ -8,20 +8,20 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: v2.2 Trust & Compliance
+## Current Milestone: v2.3 Memory, Multimodal & Experience
 
-**Goal:** Make answers verifiable and auditable — surface retrieved evidence, confidence signals, and usage trails.
+**Goal:** Deepen agent intelligence with persistent memory and richer document understanding, then elevate the product feel with the Deep Midnight UI redesign.
 
 **Target features:**
-- F-01 Citation with Source Passage Highlighting
-- F-05 Answer Confidence Score (High/Medium/Low badge)
-- F-02 Document Versioning & Change Detection
-- F-06 Audit Log (immutable, append-only)
-- F-08 Suggested Follow-Up Questions
+- F-03 Persistent Cross-Thread Memory
+- F-07 Multi-Modal Table & Image Extraction
+- F-09 Knowledge Health Dashboard
+- F-10 User Feedback Loop
+- UI Deep Midnight redesign (Tool Call Visualizer, Citations, Layout Shell, Mobile)
 
 ## Current State
 
-**Shipped:** v2.1 Stability & RAG Correctness — 2026-04-11; Phase 29 (document versioning UI) complete 2026-04-13; Phase 30 (audit log backend) complete 2026-04-14; Phase 31 (audit log settings UI) complete 2026-04-14
+**Shipped:** v2.2 Trust & Compliance — 2026-04-16 (Phases 26–32: citations, confidence, document versioning, audit log, suggested follow-up questions)
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~15,000 LOC (Python + TypeScript)
 **Phases shipped:** 30 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 5 v2.2), all requirements complete
