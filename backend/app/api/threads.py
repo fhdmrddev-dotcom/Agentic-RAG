@@ -1143,6 +1143,89 @@ async def send_message(
                                 logger.error("execute_code failed: %s", exec_err)
                                 yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
                                 tool_result = json.dumps({"status": "error", "error": str(exec_err)})
+                        elif tool_name == "remember":
+                            # Phase 33 MEM-01: store user preference/fact across threads
+                            # D-01 upsert, D-02 case-insensitive, D-16 non-blocking, D-17 silent fail
+                            key = (args.get("key", "") or "").strip().lower()
+                            value = args.get("value", "") or ""
+
+                            if not key:
+                                # Pitfall 3: empty key must not reach DB
+                                tool_result = json.dumps({"error": "key cannot be empty"})
+                            else:
+                                tool_result = json.dumps({"status": "remembered", "key": key})
+
+                                async def _write_memory(
+                                    _key: str = key,
+                                    _value: str = value,
+                                    _uid: str = current_user["id"],
+                                ) -> None:
+                                    try:
+                                        supabase.table("user_memory").upsert(
+                                            {
+                                                "user_id": _uid,
+                                                "key": _key,
+                                                "value": _value,
+                                            },
+                                            on_conflict="user_id,key",
+                                        ).execute()
+                                    except Exception as exc:
+                                        logger.warning(
+                                            "memory.remember write failed [user=%s key=%s]: %s",
+                                            _uid, _key, exc,
+                                        )
+
+                                asyncio.create_task(_write_memory())
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="memory.remember",
+                                    metadata={"key": key, "value": value, "action": "upsert"},
+                                    supabase=supabase,
+                                ))
+
+                        elif tool_name == "recall":
+                            # Phase 33 MEM-01: retrieve stored memory entries
+                            # D-09 (all), D-10 (specific), D-11 (not found), D-12 (empty)
+                            key = (args.get("key", "") or "").strip().lower()
+
+                            if key:
+                                resp = (
+                                    supabase.table("user_memory")
+                                    .select("value")
+                                    .eq("user_id", current_user["id"])
+                                    .eq("key", key)
+                                    .maybe_single()
+                                    .execute()
+                                )
+                                row = resp.data if resp else None
+                                # Pitfall 5: maybe_single() mock compatibility
+                                if isinstance(row, list):
+                                    row = row[0] if row else None
+                                if row:
+                                    tool_result = row["value"]
+                                else:
+                                    tool_result = f"No memory entry found for key: {key}"
+                            else:
+                                rows = (
+                                    supabase.table("user_memory")
+                                    .select("key, value")
+                                    .eq("user_id", current_user["id"])
+                                    .order("updated_at", desc=True)
+                                    .execute()
+                                ).data or []
+                                if rows:
+                                    tool_result = "\n".join(
+                                        f"- {r['key']}: {r['value']}" for r in rows
+                                    )
+                                else:
+                                    tool_result = "No memories stored yet."
+
+                            asyncio.create_task(write_audit_entry(
+                                user_id=current_user["id"],
+                                action_type="memory.recall",
+                                metadata={"key": key or None},
+                                supabase=supabase,
+                            ))
                         else:
                             tool_result = f"Unknown tool: {tool_name}"
                     except json.JSONDecodeError:
