@@ -83,7 +83,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 **Milestone Goal:** Deepen the agent intelligence with persistent memory and richer document understanding, then elevate the product feel with the Deep Midnight UI redesign across chat, citations, skills, and mobile.
 
-- [ ] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt
+- [x] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt (completed 2026-04-16)
 - [ ] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries
 - [ ] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables
 - [ ] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents
@@ -108,7 +108,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   5. Memory writes are non-blocking and do not delay the chat response
 **Plans**: 2 plans
 - [x] 33-01-PLAN.md — Migration 026 (user_memory table + RLS + trigger), tool constants (REMEMBER_TOOL/RECALL_TOOL), audit type extension, and 8-test unit scaffold (RED)
-- [ ] 33-02-PLAN.md — Memory injection block in General Mode system prompt, remember/recall tool dispatch handlers (non-blocking + audit), and test GREEN conversion
+- [x] 33-02-PLAN.md — Memory injection block in General Mode system prompt, remember/recall tool dispatch handlers (non-blocking + audit), and test GREEN conversion
 **UI hint**: no
 
 ### Phase 34: Cross-Thread Memory — Settings UI
@@ -275,7 +275,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 | 30. Audit Log — Backend | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
-| 33. Cross-Thread Memory — Backend | v2.3 | 1/2 | In Progress|  |
+| 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete   | 2026-04-16 |
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 0/1 | Planned | |
 | 35. Multi-Modal Ingestion | v2.3 | 0/2 | Planned | |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
