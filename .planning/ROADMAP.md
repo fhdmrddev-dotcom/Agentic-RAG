@@ -135,7 +135,11 @@ Plans:
   3. Embedded images above 50x50px are extracted and described by a vision LLM; stored in document_images (document_id, page, image_index, description)
   4. If extraction fails for any reason, ingestion continues without error
   5. Realtime ingestion status updates include extraction step progress
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 035-01-PLAN.md — Migrations 018/019 (document_tables + document_images), pdfplumber install, 6 RED test stubs
+- [ ] 035-02-PLAN.md — Table extraction service (extract_and_store_tables), ingest_document wired, MODAL-01 tests GREEN
+- [ ] 035-03-PLAN.md — Image extraction + vision LLM wired (extract_and_store_images), all 6 tests GREEN
 **UI hint**: no
 
 ### Phase 36: Multi-Modal Query & Library UI
@@ -279,7 +283,7 @@ Plans:
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
 | 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete    | 2026-04-17 |
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete    | 2026-04-17 |
-| 35. Multi-Modal Ingestion | v2.3 | 0/2 | Planned | |
+| 35. Multi-Modal Ingestion | v2.3 | 0/3 | Planned | |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
 | 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
