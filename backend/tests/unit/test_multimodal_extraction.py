@@ -197,3 +197,37 @@ def test_image_description_failure_continues():
     # Row should still be inserted with empty description
     insert_call_args = mock_builder.insert.call_args[0][0]
     assert insert_call_args[0]["description"] == ""
+
+
+def test_extract_pdf_images_reads_stream_bytes(tmp_path):
+    """extract_pdf_images must call stream.get_data() when stream is a PDFStream-like object."""
+    import io, base64
+    from unittest.mock import MagicMock, patch
+    from PIL import Image as PILImage
+
+    # Build a 60x60 white PNG as fake stream data
+    buf = io.BytesIO()
+    PILImage.new("RGB", (60, 60), color=(255, 255, 255)).save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    mock_stream = MagicMock()
+    mock_stream.get_data.return_value = png_bytes
+
+    mock_img = {"width": 60, "height": 60, "stream": mock_stream}
+    mock_page = MagicMock()
+    mock_page.images = [mock_img]
+
+    mock_pdf = MagicMock()
+    mock_pdf.__enter__ = lambda s: s
+    mock_pdf.__exit__ = MagicMock(return_value=False)
+    mock_pdf.pages = [mock_page]
+
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        from app.services.multimodal_service import extract_pdf_images
+        results = extract_pdf_images(b"fake-pdf-bytes")
+
+    assert len(results) == 1
+    assert results[0]["width"] == 60
+    assert results[0]["height"] == 60
+    assert results[0]["b64_png"]  # non-empty base64
+    mock_stream.get_data.assert_called_once()

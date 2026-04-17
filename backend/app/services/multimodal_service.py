@@ -139,7 +139,13 @@ def extract_pdf_images(raw: bytes, min_px: int = 50) -> list[dict]:
                 h = img_obj.get("height", 0)
                 if w < min_px or h < min_px:
                     continue
-                img_bytes = img_obj.get("stream", b"")
+                stream_obj = img_obj.get("stream")
+                if stream_obj is None:
+                    continue
+                try:
+                    img_bytes = stream_obj.get_data() if hasattr(stream_obj, "get_data") else bytes(stream_obj)
+                except Exception:
+                    continue
                 if not img_bytes:
                     continue
                 try:
