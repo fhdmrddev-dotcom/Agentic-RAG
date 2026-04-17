@@ -7,6 +7,7 @@ import { getSettings, updateSettings, getAuditLogs, exportAuditLogs } from "@/li
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { MemorySection } from "@/components/settings/MemorySection"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -736,6 +737,9 @@ export function SettingsPage() {
             <Toggle checked={sandboxEnabled} onChange={setSandboxEnabled} label={sandboxEnabled ? "On" : "Off"} />
           </FieldRow>
         </SectionCard>
+
+        {/* -- Memory -- */}
+        <MemorySection />
 
         {/* ── Audit Log ── */}
         <AuditLogSection />
