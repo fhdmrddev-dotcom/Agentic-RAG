@@ -85,7 +85,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 - [x] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt (completed 2026-04-16)
 - [x] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries (completed 2026-04-17)
-- [ ] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables
+- [x] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables (completed 2026-04-18)
 - [ ] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents
 - [ ] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents
 - [ ] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move)
@@ -135,11 +135,12 @@ Plans:
   3. Embedded images above 50x50px are extracted and described by a vision LLM; stored in document_images (document_id, page, image_index, description)
   4. If extraction fails for any reason, ingestion continues without error
   5. Realtime ingestion status updates include extraction step progress
-**Plans**: 3 plans
+**Plans**: 4 plans
 Plans:
-- [ ] 035-01-PLAN.md — Migrations 018/019 (document_tables + document_images), pdfplumber install, 6 RED test stubs
-- [ ] 035-02-PLAN.md — Table extraction service (extract_and_store_tables), ingest_document wired, MODAL-01 tests GREEN
-- [ ] 035-03-PLAN.md — Image extraction + vision LLM wired (extract_and_store_images), all 6 tests GREEN
+- [x] 035-01-PLAN.md — Migrations 018/019 (document_tables + document_images), pdfplumber install, 6 RED test stubs
+- [x] 035-02-PLAN.md — Table extraction service (extract_and_store_tables), ingest_document wired, MODAL-01 tests GREEN
+- [x] 035-03-PLAN.md — Image extraction + vision LLM wired (extract_and_store_images), all 6 tests GREEN
+- [x] 035-04-PLAN.md — Fix PDF image extraction: PDFStream stream bytes via get_data() (gap closure)
 **UI hint**: no
 
 ### Phase 36: Multi-Modal Query & Library UI
@@ -283,7 +284,7 @@ Plans:
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
 | 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete    | 2026-04-17 |
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete    | 2026-04-17 |
-| 35. Multi-Modal Ingestion | v2.3 | 0/3 | Planned | |
+| 35. Multi-Modal Ingestion | v2.3 | 4/4 | Complete | 2026-04-18 |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
 | 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
