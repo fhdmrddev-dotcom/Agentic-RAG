@@ -278,7 +278,7 @@ Plans:
 | 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
 | 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete    | 2026-04-17 |
-| 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete   | 2026-04-17 |
+| 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete    | 2026-04-17 |
 | 35. Multi-Modal Ingestion | v2.3 | 0/2 | Planned | |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
