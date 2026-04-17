@@ -53,8 +53,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 ### Cross-Thread Memory (F-03)
 
 - [x] **MEM-01**: User's stated preferences (e.g. "respond in bullet points") persist across conversation threads via a `remember` tool
-- [ ] **MEM-02**: User can view, edit, and delete memory entries from Settings
-- [ ] **MEM-03**: Memory summary is injected at the start of each turn (capped to limit context window cost)
+- [x] **MEM-02**: User can view, edit, and delete memory entries from Settings
+- [x] **MEM-03**: Memory summary is injected at the start of each turn (capped to limit context window cost)
 
 ### Multi-Modal Table & Image Extraction (F-07)
 

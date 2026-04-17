@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Memory, Multimodal & Experience
 status: verifying
-stopped_at: Completed 33-02-PLAN.md
-last_updated: "2026-04-17T13:46:42.328Z"
+stopped_at: Completed 34-01-PLAN.md
+last_updated: "2026-04-17T16:53:46.140Z"
 last_activity: 2026-04-17
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 16
+  completed_plans: 16
 ---
 
 # Project State
@@ -20,12 +20,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 33 — cross-thread-memory-backend
+**Current focus:** Phase 34 — cross-thread-memory-settings-ui
 
 ## Current Position
 
-Phase: 33
-Plan: Not started
+Phase: 34 (cross-thread-memory-settings-ui) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
 Last activity: 2026-04-17
 
@@ -106,6 +106,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 32-suggested-follow-up-questions P01 | 8min | 2 tasks | 3 files |
 | Phase 33-cross-thread-memory-backend P01 | 108s | 3 tasks | 4 files |
 | Phase 33-cross-thread-memory-backend P02 | 8min | 3 tasks | 2 files |
+| Phase 34-cross-thread-memory-settings-ui P01 | 91s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -229,6 +230,8 @@ Recent decisions affecting current work:
 - [Phase 33-cross-thread-memory-backend]: user_memory UNIQUE(user_id, key) enables ON CONFLICT upsert-by-key; set_updated_at() BEFORE UPDATE trigger ensures updated_at refresh on conflict
 - [Phase 33-cross-thread-memory-backend]: asyncio.create_task fire-and-forget pattern for non-blocking memory writes; inner _write_memory with default arg capture for closure safety (D-16)
 - [Phase 33-cross-thread-memory-backend]: maybe_single() mock compatibility guard (isinstance(row, list)) required for recall specific-key handler in test environments
+- [Phase 34-cross-thread-memory-settings-ui]: MemorySection uses Card directly (not SectionCard) to avoid double divide-y separator nesting
+- [Phase 34-cross-thread-memory-settings-ui]: No user_id filter on UPDATE/DELETE — RLS policy enforces auth.uid() = user_id, redundant filter removed
 
 ### Pending Todos
 
@@ -258,5 +261,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 33-02-PLAN.md
+Stopped at: Completed 34-01-PLAN.md
 Resume file: None

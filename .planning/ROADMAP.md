@@ -83,8 +83,8 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 **Milestone Goal:** Deepen the agent intelligence with persistent memory and richer document understanding, then elevate the product feel with the Deep Midnight UI redesign across chat, citations, skills, and mobile.
 
-- [x] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt (completed 2026-04-16)
-- [ ] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries
+- [x] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt (completed 2026-04-16)
+- [x] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries (completed 2026-04-17)
 - [ ] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables
 - [ ] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents
 - [ ] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents
@@ -120,7 +120,9 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
   2. User can edit a value inline and save it
   3. User can delete individual entries with confirmation
   4. Empty state shown with guidance when no memories exist
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [x] 34-01-PLAN.md — MemorySection component + SettingsPage integration
 **UI hint**: yes
 
 ### Phase 35: Multi-Modal Ingestion
@@ -276,7 +278,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 | 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
 | 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete    | 2026-04-17 |
-| 34. Cross-Thread Memory — Settings UI | v2.3 | 0/1 | Planned | |
+| 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete   | 2026-04-17 |
 | 35. Multi-Modal Ingestion | v2.3 | 0/2 | Planned | |
 | 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
