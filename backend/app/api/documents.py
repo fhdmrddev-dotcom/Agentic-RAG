@@ -513,9 +513,15 @@ def ingest_document(
 
         # --- Multi-modal extraction (Phase 35) ---
         if raw and mime_type:
-            from app.services.multimodal_service import extract_and_store_tables  # noqa: PLC0415
+            from app.services.multimodal_service import (  # noqa: PLC0415
+                extract_and_store_tables,
+                extract_and_store_images,
+            )
             supabase.table("documents").update({"status": "extracting_tables"}).eq("id", document_id).execute()
             extract_and_store_tables(raw, mime_type, document_id, user_id, supabase)
+
+            supabase.table("documents").update({"status": "extracting_images"}).eq("id", document_id).execute()
+            extract_and_store_images(raw, mime_type, document_id, user_id, supabase, app_settings)
 
         supabase.table("documents").update({
             "status": "completed",
