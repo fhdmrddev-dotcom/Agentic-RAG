@@ -257,7 +257,15 @@ async def upload_document(
     except Exception:
         pass  # Storage upload failure doesn't block ingestion
 
-    background_tasks.add_task(ingest_document, document_id, text, current_user["id"], supabase)
+    background_tasks.add_task(
+        ingest_document,
+        document_id,
+        text,
+        current_user["id"],
+        supabase,
+        raw,
+        mime_type,
+    )
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
@@ -457,7 +465,14 @@ async def move_document(
     return result.data[0]
 
 
-def ingest_document(document_id: str, text: str, user_id: str, supabase: Client) -> None:
+def ingest_document(
+    document_id: str,
+    text: str,
+    user_id: str,
+    supabase: Client,
+    raw: bytes = b"",
+    mime_type: str = "",
+) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
     try:
@@ -495,6 +510,12 @@ def ingest_document(document_id: str, text: str, user_id: str, supabase: Client)
                 metadata_dict["document_type"] = metadata_dict["document_type"].lower()
             if metadata_dict.get("language"):
                 metadata_dict["language"] = metadata_dict["language"].lower()
+
+        # --- Multi-modal extraction (Phase 35) ---
+        if raw and mime_type:
+            from app.services.multimodal_service import extract_and_store_tables  # noqa: PLC0415
+            supabase.table("documents").update({"status": "extracting_tables"}).eq("id", document_id).execute()
+            extract_and_store_tables(raw, mime_type, document_id, user_id, supabase)
 
         supabase.table("documents").update({
             "status": "completed",

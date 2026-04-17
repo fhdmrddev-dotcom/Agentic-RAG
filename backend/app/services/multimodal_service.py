@@ -258,6 +258,9 @@ def extract_and_store_images(
 
         rows: list[dict] = []
         for img in image_dicts[:_MAX_VISION_CALLS]:
+            # Secondary size guard — extraction helpers filter too, but mocks bypass them in tests
+            if img.get("width", 0) < 50 or img.get("height", 0) < 50:
+                continue
             try:
                 description = describe_image(img["b64_png"], app_settings)
             except Exception as exc:
