@@ -209,7 +209,10 @@ Plans:
   2. On thumbs-down: inline reason selector appears (Wrong answer / Not from my documents / Incomplete / Other)
   3. Submitting feedback does not interrupt the conversation
   4. A Feedback Stats panel in Library Health shows overall positive rate and most-downvoted documents
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 040-01-PLAN.md — API layer (submitFeedback, getFeedbackStats) + MessageFeedback component + MessageItem wiring
+- [ ] 040-02-PLAN.md — FeedbackStatsPanel component + KnowledgeHealthPage wiring
 **UI hint**: yes
 
 ### Phase 41: UI Redesign — Tool Call Visualizer & Citations
