@@ -415,6 +415,39 @@ async def restore_document_version(
     return result.data[0]
 
 
+@router.post("/{document_id}/reingest", response_model=DocumentResponse)
+async def reingest_document(
+    document_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Re-queue a document for ingestion by setting status to pending."""
+    # 1. Verify ownership and confirm document is the latest version
+    doc = (
+        supabase.table("documents")
+        .select("*")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .eq("is_latest", True)
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # 2. Reset status to pending to trigger background ingestion
+    result = (
+        supabase.table("documents")
+        .update({"status": "pending"})
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found after update")
+    return result.data[0]
+
+
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
