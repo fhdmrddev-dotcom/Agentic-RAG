@@ -178,6 +178,10 @@ class Settings(BaseSettings):
     # Overrides _MODEL_OUTPUT_DEFAULTS for the listed models.
     model_output_limits: str = ""
 
+    # Vision model for image description during ingestion (must support vision)
+    # Defaults to gpt-4o-mini — override with VISION_MODEL=<model-id> in .env
+    vision_model: str = "gpt-4o-mini"
+
     # Sub-agent settings
     sub_agent_model: str = ""
     # Empty = auto-select cheapest model for active provider (see sub_agent_service.py).

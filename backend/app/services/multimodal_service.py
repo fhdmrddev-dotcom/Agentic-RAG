@@ -222,8 +222,10 @@ def describe_image(b64_png: str, app_settings: "UserEffectiveSettings", client=N
             api_key=app_settings.llm_api_key,
             base_url=app_settings.llm_base_url or None,
         )
+    from app.config import settings as env_settings
+    vision_model = env_settings.vision_model or app_settings.llm_model
     resp = client.chat.completions.create(
-        model=app_settings.llm_model,
+        model=vision_model,
         messages=[{
             "role": "user",
             "content": [
