@@ -194,7 +194,10 @@ Plans:
   2. POST /feedback accepts message_id, rating (positive/negative), optional reason enum
   3. GET /feedback/stats returns overall positive rate and top-5 most-downvoted documents (last 30 days)
   4. Feedback entries visible in the audit log viewer (action_type = message_feedback)
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 039-01-PLAN.md — Migration 028 (message_feedback table + RLS), feedback.py router (POST + GET stats), audit_service update, main.py registration + schema push
+- [ ] 039-02-PLAN.md — Unit tests (7 tests, GREEN) for submit feedback and stats endpoints
 **UI hint**: no
 
 ### Phase 40: User Feedback Loop — Frontend
