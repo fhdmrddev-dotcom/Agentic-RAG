@@ -410,6 +410,8 @@ async def restore_document_version(
         .eq("id", document_id)
         .execute()
     )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found after restore")
     return result.data[0]
 
 
@@ -436,7 +438,7 @@ async def delete_document(
     except Exception:
         pass
 
-    supabase.table("documents").delete().eq("id", document_id).execute()
+    supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
