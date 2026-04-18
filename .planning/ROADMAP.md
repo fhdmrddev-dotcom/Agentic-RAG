@@ -88,7 +88,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables (completed 2026-04-18)
 - [x] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents (completed 2026-04-18)
 - [x] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents (completed 2026-04-18)
-- [ ] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move)
+- [x] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move) + KPI stat bar, retrieval chart, pagination, enhanced chips (completed 2026-04-18)
 - [ ] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard
 - [ ] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health
 - [ ] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput
@@ -179,7 +179,10 @@ Plans:
   2. Four metric panels shown: Most Retrieved, Never Retrieved, Low Confidence, Stale
   3. Each document row has Delete, Re-ingest, and Move to Folder action buttons
   4. Empty state shown per panel when no documents match
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 038-01-PLAN.md — Backend: POST /documents/{id}/reingest endpoint + test stubs
+- [ ] 038-02-PLAN.md — Frontend: api.ts functions, fileIcons utility, health components, routing wiring
 **UI hint**: yes
 
 ### Phase 39: User Feedback Loop — Backend
