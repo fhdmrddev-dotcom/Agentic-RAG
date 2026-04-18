@@ -6,6 +6,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
+import { MessageFeedback } from "./MessageFeedback"
 import { toolLabel, toolSummary } from "@/lib/toolMeta"
 
 interface Props {
@@ -48,7 +49,7 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
     : null
 
   return (
-    <div className="flex gap-3 py-3 animate-fadeSlideUp">
+    <div className="group flex gap-3 py-3 animate-fadeSlideUp">
       <div className="flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20">
         <Bot className="w-4 h-4 text-white" />
       </div>
@@ -81,6 +82,9 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
                 questions={message.suggestions}
                 onSelect={onSendMessage}
               />
+            )}
+            {!isStreaming && message.role === "assistant" && message.content && (
+              <MessageFeedback messageId={message.id} />
             )}
           </div>
         ) : isStreaming && !hasAnyTools ? (
