@@ -21,14 +21,14 @@ const REASONS: Array<{ label: string; value: string }> = [
 export function MessageFeedback({ messageId }: Props) {
   const [ratingState, setRatingState] = useState<RatingState>(null)
   const [showReasonSelector, setShowReasonSelector] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [pendingRating, setPendingRating] = useState<"positive" | "negative" | null>(null)
 
   // Interaction contract (040-UI-SPEC.md): fire-and-forget, never block conversation.
   // Optimistic state set before await. Revert on non-409 error. Silent on 409.
 
   async function handlePositive() {
-    if (ratingState !== null || submitting) return
-    setSubmitting(true)
+    if (ratingState !== null || pendingRating !== null) return
+    setPendingRating("positive")
     setRatingState("positive") // optimistic
     try {
       const res = await submitFeedback({ message_id: messageId, rating: "positive" })
@@ -37,19 +37,19 @@ export function MessageFeedback({ messageId }: Props) {
     } catch {
       setRatingState(null) // network error — revert
     } finally {
-      setSubmitting(false)
+      setPendingRating(null)
     }
   }
 
   function handleNegativeClick() {
-    if (ratingState !== null || submitting) return
+    if (ratingState !== null || pendingRating !== null) return
     // Do NOT submit yet — show reason selector first (040-UI-SPEC.md Reason Selector Flow step 2-3)
     setShowReasonSelector(true)
   }
 
   async function handleReasonSelect(reason: string | null) {
     setShowReasonSelector(false)
-    setSubmitting(true)
+    setPendingRating("negative")
     setRatingState("negative") // optimistic
     try {
       const res = await submitFeedback({
@@ -62,7 +62,7 @@ export function MessageFeedback({ messageId }: Props) {
     } catch {
       setRatingState(null)
     } finally {
-      setSubmitting(false)
+      setPendingRating(null)
     }
   }
 
@@ -92,9 +92,9 @@ export function MessageFeedback({ messageId }: Props) {
                     : "text-muted-foreground hover:text-foreground"
               )}
               onClick={handlePositive}
-              disabled={isRated || submitting}
+              disabled={isRated || pendingRating !== null}
             >
-              {submitting && ratingState === null && !showReasonSelector ? (
+              {pendingRating === "positive" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <ThumbsUp className={cn("h-3.5 w-3.5", ratingState === "positive" && "fill-primary")} />
@@ -119,9 +119,9 @@ export function MessageFeedback({ messageId }: Props) {
                     : "text-muted-foreground hover:text-foreground"
               )}
               onClick={handleNegativeClick}
-              disabled={isRated || submitting}
+              disabled={isRated || pendingRating !== null}
             >
-              {submitting && ratingState === null && showReasonSelector ? (
+              {pendingRating === "negative" ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <ThumbsDown className={cn("h-3.5 w-3.5", ratingState === "negative" && "fill-destructive")} />
