@@ -22,10 +22,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 ## Current State
 
 **Shipped:** v2.2 Trust & Compliance — 2026-04-16 (Phases 26–32: citations, confidence, document versioning, audit log, suggested follow-up questions)
-**In progress:** v2.3 Memory, Multimodal & Experience — Phase 34 complete (2026-04-17): cross-thread memory settings UI (MemorySection component — view, inline-edit, delete entries in Settings page)
+**In progress:** v2.3 Memory, Multimodal & Experience — Phase 36 complete (2026-04-18): multi-modal query & library UI (image chunks in vector search, query_tables tool, document badge counts)
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
-**Codebase:** ~15,000 LOC (Python + TypeScript)
-**Phases shipped:** 32 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 5 v2.2 + 2 v2.3), all requirements complete
+**Codebase:** ~15,500 LOC (Python + TypeScript)
+**Phases shipped:** 36 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 5 v2.2 + 6 v2.3), all requirements complete
 **Design system:** Aether Intelligence — dark/light mode, CSS variables, Inter + Manrope fonts, glassmorphism
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
 **Known tech debt:** Missing test files for phases 20 and 22 (test_blank_response_guards.py, test_rag_correctness.py); metadata ingest normalization covers only document_type/language; live LangSmith sub-agent trace not yet performed
