@@ -253,11 +253,25 @@ async def knowledge_health_summary(
     """Return four library health metric arrays (D-09)."""
     user_id = current_user["id"]
     try:
+        most_retrieved = _fetch_most_retrieved(supabase, user_id)
+        never_retrieved = _fetch_never_retrieved(supabase, user_id)
+        low_confidence = _fetch_low_confidence(supabase, user_id)
+        stale = _fetch_stale(supabase, user_id, stale_days)
+
+        total_res = (
+            supabase.table("documents")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("is_latest", True)
+            .execute()
+        )
+
         return {
-            "most_retrieved": _fetch_most_retrieved(supabase, user_id),
-            "never_retrieved": _fetch_never_retrieved(supabase, user_id),
-            "low_confidence": _fetch_low_confidence(supabase, user_id),
-            "stale": _fetch_stale(supabase, user_id, stale_days),
+            "total_documents": total_res.count or 0,
+            "most_retrieved": most_retrieved,
+            "never_retrieved": never_retrieved,
+            "low_confidence": low_confidence,
+            "stale": stale,
         }
     except Exception as exc:
         raise HTTPException(

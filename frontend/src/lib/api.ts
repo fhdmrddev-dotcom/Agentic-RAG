@@ -624,6 +624,7 @@ export interface StaleDoc {
 }
 
 export interface HealthSummary {
+  total_documents: number
   most_retrieved: MostRetrievedDoc[]
   never_retrieved: NeverRetrievedDoc[]
   low_confidence: LowConfidenceDoc[]

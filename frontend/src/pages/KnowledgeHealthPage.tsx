@@ -1,25 +1,94 @@
-import { useEffect, useState } from "react"
-import { TrendingUp, FileQuestion, AlertTriangle, Clock } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
+import { TrendingUp, FileQuestion, AlertTriangle, Clock, RefreshCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { getKnowledgeHealthSummary } from "@/lib/api"
 import type { HealthSummary, MostRetrievedDoc, NeverRetrievedDoc, LowConfidenceDoc, StaleDoc } from "@/lib/api"
 import { HealthPanel } from "@/components/health/HealthPanel"
+import { HealthStatBar } from "@/components/health/HealthStatBar"
+import { RetrievalChart } from "@/components/health/RetrievalChart"
 
 function formatDaysOld(createdAt: string): string {
   const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
-  return `${days} days old`
+  return `${days}d old`
+}
+
+function ConfidenceChip({ similarity }: { similarity: number }) {
+  const pct = Math.round(similarity * 100)
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full bg-amber-400 rounded-full transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-xs text-amber-400 tabular-nums w-8 text-right">{pct}%</span>
+    </div>
+  )
+}
+
+function StaleChip({ daysStale }: { daysStale: number }) {
+  const colorClass =
+    daysStale > 365
+      ? "bg-red-400/10 text-red-400"
+      : daysStale > 180
+        ? "bg-orange-400/10 text-orange-400"
+        : "bg-amber-400/10 text-amber-400"
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 tabular-nums ${colorClass}`}>
+      {daysStale}d stale
+    </span>
+  )
+}
+
+function StatBarSkeleton() {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="ghost-border bg-card/50 rounded-lg p-4 space-y-2">
+          <div className="animate-pulse bg-muted/30 h-3 w-20 rounded" />
+          <div className="animate-pulse bg-muted/30 h-8 w-12 rounded" />
+          <div className="animate-pulse bg-muted/30 h-3 w-24 rounded" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ChartSkeleton() {
+  return (
+    <div className="ghost-border bg-card/50 rounded-lg p-4 mb-6 space-y-3">
+      <div className="animate-pulse bg-muted/30 h-4 w-56 rounded" />
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <div className="animate-pulse bg-muted/30 h-3 w-32 rounded" />
+          <div className="animate-pulse bg-muted/30 h-5 rounded flex-1" style={{ maxWidth: `${60 - i * 10}%` }} />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export function KnowledgeHealthPage() {
   const [summary, setSummary] = useState<HealthSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback((isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
+    setError(null)
     getKnowledgeHealthSummary()
       .then(setSummary)
       .catch(() => setError("Health metrics could not be loaded. Refresh to try again."))
-      .finally(() => setLoading(false))
+      .finally(() => {
+        setLoading(false)
+        setRefreshing(false)
+      })
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   function removeFromPanel<T extends { document_id: string }>(
     key: keyof HealthSummary,
@@ -37,8 +106,13 @@ export function KnowledgeHealthPage() {
   if (loading) {
     return (
       <div className="p-6 max-w-5xl mx-auto">
-        <span className="sr-only">Loading health metrics...</span>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <header className="mb-6">
+          <div className="animate-pulse bg-muted/30 h-6 w-40 rounded mb-2" />
+          <div className="animate-pulse bg-muted/30 h-4 w-56 rounded" />
+        </header>
+        <StatBarSkeleton />
+        <ChartSkeleton />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="ghost-border bg-card/50 shadow-sm rounded-lg p-4 space-y-3">
               <div className="animate-pulse bg-muted/30 h-5 w-32 rounded" />
@@ -54,83 +128,98 @@ export function KnowledgeHealthPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
-      <header className="mb-2">
-        <h1 className="font-headline font-bold text-xl">Library Health</h1>
-        <p className="text-sm text-muted-foreground">Last 30 days · Stale threshold: 90 days</p>
+      <header className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="font-headline font-bold text-xl">Library Health</h1>
+          <p className="text-sm text-muted-foreground">Last 30 days · Stale threshold: 90 days</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 text-xs text-muted-foreground"
+          onClick={() => load(true)}
+          disabled={refreshing}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
       </header>
 
       {error && (
-        <div className="bg-destructive/10 text-destructive text-sm px-4 py-2 rounded-lg mb-4">
+        <div className="bg-destructive/10 text-destructive text-sm px-4 py-2 rounded-lg mb-6">
           {error}
         </div>
       )}
 
       {summary && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-          <HealthPanel<MostRetrievedDoc>
-            title="Most Retrieved"
-            icon={TrendingUp}
-            iconClassName="text-primary"
-            documents={summary.most_retrieved}
-            emptyHeading="All quiet"
-            emptyBody="No documents were retrieved in the last 30 days."
-            emptyIcon={TrendingUp}
-            renderChip={(doc) => (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-                {doc.retrieval_count} retrievals
-              </span>
-            )}
-            onRemove={(id) => removeFromPanel<MostRetrievedDoc>("most_retrieved", id)}
+        <>
+          <HealthStatBar
+            totalDocuments={summary.total_documents}
+            retrievedCount={summary.most_retrieved.length}
+            flaggedCount={summary.low_confidence.length + summary.stale.length}
+            unusedCount={summary.never_retrieved.length}
           />
 
-          <HealthPanel<NeverRetrievedDoc>
-            title="Never Retrieved"
-            icon={FileQuestion}
-            iconClassName="text-muted-foreground"
-            documents={summary.never_retrieved}
-            emptyHeading="Great coverage"
-            emptyBody="Every document in your library has been retrieved at least once."
-            emptyIcon={FileQuestion}
-            renderChip={(doc) => (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground shrink-0">
-                {formatDaysOld(doc.created_at)}
-              </span>
-            )}
-            onRemove={(id) => removeFromPanel<NeverRetrievedDoc>("never_retrieved", id)}
-          />
+          <RetrievalChart docs={summary.most_retrieved} />
 
-          <HealthPanel<LowConfidenceDoc>
-            title="Low Confidence"
-            icon={AlertTriangle}
-            iconClassName="text-amber-400"
-            documents={summary.low_confidence}
-            emptyHeading="High quality matches"
-            emptyBody="No documents show consistently low similarity scores."
-            emptyIcon={AlertTriangle}
-            renderChip={(doc) => (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 shrink-0">
-                {Math.round(doc.avg_similarity * 100)}% avg
-              </span>
-            )}
-            onRemove={(id) => removeFromPanel<LowConfidenceDoc>("low_confidence", id)}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <HealthPanel<MostRetrievedDoc>
+              title="Most Retrieved"
+              icon={TrendingUp}
+              iconClassName="text-primary"
+              documents={summary.most_retrieved}
+              emptyHeading="All quiet"
+              emptyBody="No documents were retrieved in the last 30 days."
+              emptyIcon={TrendingUp}
+              renderChip={(doc) => (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0 tabular-nums">
+                  {doc.retrieval_count}×
+                </span>
+              )}
+              onRemove={(id) => removeFromPanel<MostRetrievedDoc>("most_retrieved", id)}
+            />
 
-          <HealthPanel<StaleDoc>
-            title="Stale"
-            icon={Clock}
-            iconClassName="text-muted-foreground"
-            documents={summary.stale}
-            emptyHeading="Library is fresh"
-            emptyBody="No documents older than 90 days found."
-            emptyIcon={Clock}
-            renderChip={(doc) => (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground shrink-0">
-                {doc.days_stale} days stale
-              </span>
-            )}
-            onRemove={(id) => removeFromPanel<StaleDoc>("stale", id)}
-          />
-        </div>
+            <HealthPanel<NeverRetrievedDoc>
+              title="Never Retrieved"
+              icon={FileQuestion}
+              iconClassName="text-muted-foreground"
+              documents={summary.never_retrieved}
+              emptyHeading="Great coverage"
+              emptyBody="Every document in your library has been retrieved at least once."
+              emptyIcon={FileQuestion}
+              renderChip={(doc) => (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted/40 text-muted-foreground shrink-0 tabular-nums">
+                  {formatDaysOld(doc.created_at)}
+                </span>
+              )}
+              onRemove={(id) => removeFromPanel<NeverRetrievedDoc>("never_retrieved", id)}
+            />
+
+            <HealthPanel<LowConfidenceDoc>
+              title="Low Confidence"
+              icon={AlertTriangle}
+              iconClassName="text-amber-400"
+              documents={summary.low_confidence}
+              emptyHeading="High quality matches"
+              emptyBody="No documents show consistently low similarity scores."
+              emptyIcon={AlertTriangle}
+              renderChip={(doc) => <ConfidenceChip similarity={doc.avg_similarity} />}
+              onRemove={(id) => removeFromPanel<LowConfidenceDoc>("low_confidence", id)}
+            />
+
+            <HealthPanel<StaleDoc>
+              title="Stale"
+              icon={Clock}
+              iconClassName="text-muted-foreground"
+              documents={summary.stale}
+              emptyHeading="Library is fresh"
+              emptyBody="No documents older than 90 days found."
+              emptyIcon={Clock}
+              renderChip={(doc) => <StaleChip daysStale={doc.days_stale} />}
+              onRemove={(id) => removeFromPanel<StaleDoc>("stale", id)}
+            />
+          </div>
+        </>
       )}
     </div>
   )
