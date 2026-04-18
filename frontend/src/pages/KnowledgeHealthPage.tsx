@@ -105,28 +105,31 @@ export function KnowledgeHealthPage() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
-        <header className="mb-6">
-          <div className="animate-pulse bg-muted/30 h-6 w-40 rounded mb-2" />
-          <div className="animate-pulse bg-muted/30 h-4 w-56 rounded" />
-        </header>
-        <StatBarSkeleton />
-        <ChartSkeleton />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="ghost-border bg-card/50 shadow-sm rounded-lg p-4 space-y-3">
-              <div className="animate-pulse bg-muted/30 h-5 w-32 rounded" />
-              <div className="animate-pulse bg-muted/30 h-10 rounded" />
-              <div className="animate-pulse bg-muted/30 h-10 rounded" />
-              <div className="animate-pulse bg-muted/30 h-10 rounded" />
-            </div>
-          ))}
+      <div className="h-full overflow-y-auto">
+        <div className="p-6 max-w-5xl mx-auto">
+          <header className="mb-6">
+            <div className="animate-pulse bg-muted/30 h-6 w-40 rounded mb-2" />
+            <div className="animate-pulse bg-muted/30 h-4 w-56 rounded" />
+          </header>
+          <StatBarSkeleton />
+          <ChartSkeleton />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="ghost-border bg-card/50 shadow-sm rounded-lg p-4 space-y-3">
+                <div className="animate-pulse bg-muted/30 h-5 w-32 rounded" />
+                <div className="animate-pulse bg-muted/30 h-10 rounded" />
+                <div className="animate-pulse bg-muted/30 h-10 rounded" />
+                <div className="animate-pulse bg-muted/30 h-10 rounded" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="p-6 max-w-5xl mx-auto">
       <header className="flex items-start justify-between mb-6">
         <div>
@@ -221,6 +224,7 @@ export function KnowledgeHealthPage() {
           </div>
         </>
       )}
+    </div>
     </div>
   )
 }
