@@ -89,7 +89,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents (completed 2026-04-18)
 - [x] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents (completed 2026-04-18)
 - [x] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move) + KPI stat bar, retrieval chart, pagination, enhanced chips (completed 2026-04-18)
-- [ ] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard
+- [x] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard (completed 2026-04-18)
 - [x] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health (completed 2026-04-19)
 - [ ] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput
 - [ ] **Phase 42: UI Redesign — Layout Shell & Skills** — Extract AppDock from Sidebar; 3-pane SkillsPage with tonal depth; premium glow toggles; SettingsPage tonal polish
@@ -181,8 +181,8 @@ Plans:
   4. Empty state shown per panel when no documents match
 **Plans**: 2 plans
 Plans:
-- [ ] 038-01-PLAN.md — Backend: POST /documents/{id}/reingest endpoint + test stubs
-- [ ] 038-02-PLAN.md — Frontend: api.ts functions, fileIcons utility, health components, routing wiring
+- [x] 038-01-PLAN.md — Backend: POST /documents/{id}/reingest endpoint + test stubs
+- [x] 038-02-PLAN.md — Frontend: api.ts functions, fileIcons utility, health components, routing wiring
 **UI hint**: yes
 
 ### Phase 39: User Feedback Loop — Backend
@@ -197,7 +197,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 039-01-PLAN.md — Migration 028 (message_feedback table + RLS), feedback.py router (POST + GET stats), audit_service update, main.py registration + schema push
-- [ ] 039-02-PLAN.md — Unit tests (7 tests, GREEN) for submit feedback and stats endpoints
+- [x] 039-02-PLAN.md — Unit tests (7 tests, GREEN) for submit feedback and stats endpoints
 **UI hint**: no
 
 ### Phase 40: User Feedback Loop — Frontend

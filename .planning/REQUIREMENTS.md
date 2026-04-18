@@ -58,8 +58,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Multi-Modal Table & Image Extraction (F-07)
 
-- [ ] **MODAL-01**: Tables extracted from PDF/DOCX during ingestion and stored as structured JSON
-- [ ] **MODAL-02**: Embedded images described via vision LLM and indexed for vector search
+- [x] **MODAL-01**: Tables extracted from PDF/DOCX during ingestion and stored as structured JSON
+- [x] **MODAL-02**: Embedded images described via vision LLM and indexed for vector search
 - [x] **MODAL-03**: Table data queryable via extended query_documents or new query_tables tool
 
 ### Knowledge Health Dashboard (F-09)
@@ -68,15 +68,15 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **HLTH-02**: User can see never-retrieved documents (uploaded but zero retrieval events)
 - [x] **HLTH-03**: User can see low-confidence documents (frequently retrieved with low similarity scores)
 - [x] **HLTH-04**: User can see stale documents (not updated in > 90 days, configurable)
-- [ ] **HLTH-05**: User can act directly from Library Health: delete, re-ingest, or move a document to a folder
+- [x] **HLTH-05**: User can act directly from Library Health: delete, re-ingest, or move a document to a folder
 
 ### User Feedback Loop (F-10)
 
-- [ ] **FB-01**: Each assistant message has thumbs-up / thumbs-down buttons (shown on hover)
-- [ ] **FB-02**: On thumbs-down: optional reason selector appears (Wrong answer / Not from my documents / Incomplete / Other)
-- [ ] **FB-03**: Feedback stored immutably; one rating per message per user; no modification allowed
-- [ ] **FB-04**: Overall positive-rate stat and most-downvoted documents shown in Library Health dashboard
-- [ ] **FB-05**: Submitting feedback does not interrupt the conversation or require confirmation
+- [x] **FB-01**: Each assistant message has thumbs-up / thumbs-down buttons (shown on hover)
+- [x] **FB-02**: On thumbs-down: optional reason selector appears (Wrong answer / Not from my documents / Incomplete / Other)
+- [x] **FB-03**: Feedback stored immutably; one rating per message per user; no modification allowed
+- [x] **FB-04**: Overall positive-rate stat and most-downvoted documents shown in Library Health dashboard
+- [x] **FB-05**: Submitting feedback does not interrupt the conversation or require confirmation
 
 ### UI Redesign — Deep Midnight (UI)
 
@@ -142,22 +142,22 @@ Requirements for this milestone. Each maps to roadmap phases.
 | SUG-02 | Phase 32 | Complete |
 | SUG-03 | Phase 32 | Complete |
 | SUG-04 | Phase 32 | Complete |
-| MEM-01 | Phase 33 | Planned |
-| MEM-02 | Phase 34 | Planned |
-| MEM-03 | Phase 33 | Planned |
-| MODAL-01 | Phase 35 | Planned |
-| MODAL-02 | Phase 35 | Planned |
-| MODAL-03 | Phase 36 | Planned |
-| HLTH-01 | Phase 37 | Planned |
-| HLTH-02 | Phase 37 | Planned |
-| HLTH-03 | Phase 37 | Planned |
-| HLTH-04 | Phase 37 | Planned |
-| HLTH-05 | Phase 38 | Planned |
-| FB-01 | Phase 39 | Planned |
-| FB-02 | Phase 39 | Planned |
-| FB-03 | Phase 39 | Planned |
-| FB-04 | Phase 40 | Planned |
-| FB-05 | Phase 40 | Planned |
+| MEM-01 | Phase 33 | Complete |
+| MEM-02 | Phase 34 | Complete |
+| MEM-03 | Phase 33 | Complete |
+| MODAL-01 | Phase 35 | Complete |
+| MODAL-02 | Phase 35 | Complete |
+| MODAL-03 | Phase 36 | Complete |
+| HLTH-01 | Phase 37 | Complete |
+| HLTH-02 | Phase 37 | Complete |
+| HLTH-03 | Phase 37 | Complete |
+| HLTH-04 | Phase 37 | Complete |
+| HLTH-05 | Phase 38 | Complete |
+| FB-01 | Phase 39 | Complete |
+| FB-02 | Phase 39 | Complete |
+| FB-03 | Phase 39 | Complete |
+| FB-04 | Phase 40 | Complete |
+| FB-05 | Phase 40 | Complete |
 | UI-01 | Phase 41 | Planned |
 | UI-02 | Phase 41 | Planned |
 | UI-03 | Phase 41 | Planned |
