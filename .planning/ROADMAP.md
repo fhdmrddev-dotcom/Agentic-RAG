@@ -87,7 +87,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries (completed 2026-04-17)
 - [x] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables (completed 2026-04-18)
 - [x] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents (completed 2026-04-18)
-- [ ] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents
+- [x] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents (completed 2026-04-18)
 - [ ] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move)
 - [ ] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard
 - [ ] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health
@@ -166,8 +166,8 @@ Plans:
   4. RLS enforced: users only see health data for their own documents
 **Plans**: 2 plans
 Plans:
-- [ ] 037-01-PLAN.md — knowledge_health.py router with four metric queries + main.py registration
-- [ ] 037-02-PLAN.md — Unit tests (7 tests, GREEN) for all four health metrics
+- [x] 037-01-PLAN.md — knowledge_health.py router with four metric queries + main.py registration
+- [x] 037-02-PLAN.md — Unit tests (7 tests, GREEN) for all four health metrics
 **UI hint**: no
 
 ### Phase 38: Knowledge Health Dashboard — Frontend
