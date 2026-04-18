@@ -211,7 +211,7 @@ Plans:
   4. A Feedback Stats panel in Library Health shows overall positive rate and most-downvoted documents
 **Plans**: 2 plans
 Plans:
-- [ ] 040-01-PLAN.md — API layer (submitFeedback, getFeedbackStats) + MessageFeedback component + MessageItem wiring
+- [x] 040-01-PLAN.md — API layer (submitFeedback, getFeedbackStats) + MessageFeedback component + MessageItem wiring
 - [ ] 040-02-PLAN.md — FeedbackStatsPanel component + KnowledgeHealthPage wiring
 **UI hint**: yes
 
