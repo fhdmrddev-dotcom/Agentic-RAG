@@ -348,3 +348,90 @@ def extract_and_store_images(
 
     except Exception as exc:
         log.warning("Image extraction failed for document %s: %s", document_id, exc)
+
+
+# ---------------------------------------------------------------------------
+# query_tables tool service (MODAL-03, Phase 36)
+# ---------------------------------------------------------------------------
+
+def _fetch_document_tables(doc_id: str, user_id: str, page_filter: int | None, supabase: "Client") -> list[dict]:
+    """Query document_tables for a given document_id, optional page filter.
+
+    Extracted as a module-level function so tests can patch it cleanly.
+    Returns list of table dicts from Supabase: [{page, table_index, headers, rows}]
+    """
+    query = (
+        supabase.table("document_tables")
+        .select("page, table_index, headers, rows")
+        .eq("document_id", doc_id)
+        .eq("user_id", user_id)
+    )
+    if page_filter is not None:
+        query = query.eq("page", page_filter)
+    result = query.order("table_index").execute()
+    return result.data or []
+
+
+def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> str:
+    """Service function for the query_tables tool (D-04/D-05/D-06).
+
+    Resolves document_name → document_id, queries document_tables,
+    applies optional column_filter server-side (exact string match),
+    caps at 50 rows per table, returns JSON string.
+
+    Error cases return {"error": "..."} JSON consistent with existing tool patterns.
+    """
+    import json  # noqa: PLC0415
+    from app.services.retrieval_service import resolve_document_id  # noqa: PLC0415
+
+    document_name = (args.get("document_name") or "").strip()
+    column_filter: dict | None = args.get("column_filter") or None
+    page_filter: int | None = args.get("page")
+
+    # Pitfall 7: must resolve document_name → UUID first
+    doc_id = resolve_document_id(document_name, user_id, supabase)
+    if not doc_id:
+        return json.dumps({"error": f"Document '{document_name}' not found."})
+
+    tables = _fetch_document_tables(doc_id, user_id, page_filter, supabase)
+    if not tables:
+        return json.dumps({"error": f"No tables found for document '{document_name}'."})
+
+    output = []
+    for tbl in tables:
+        headers: list[str] = tbl.get("headers") or []
+        rows: list[list] = tbl.get("rows") or []
+
+        # Apply column_filter: keep rows where named column exactly matches value
+        if column_filter:
+            matched: list[list] = []
+            for row in rows:
+                for col_name, col_val in column_filter.items():
+                    try:
+                        col_idx = headers.index(col_name)
+                        if len(row) > col_idx and str(row[col_idx]) == str(col_val):
+                            matched.append(row)
+                    except ValueError:
+                        pass  # column not in this table — skip
+            rows = matched
+
+        # Skip tables with no rows after filter (avoids empty table entries in output)
+        if not rows and column_filter:
+            continue
+
+        truncated = len(rows) > 50
+        output.append({
+            "document": document_name,
+            "page": tbl.get("page"),
+            "table_index": tbl["table_index"],
+            "headers": headers,
+            "rows": rows[:50],
+            "truncated": truncated,
+        })
+
+    if not output:
+        return json.dumps({
+            "error": f"No matching rows found for the given column filter in '{document_name}'."
+        })
+
+    return json.dumps(output)

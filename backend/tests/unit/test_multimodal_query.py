@@ -188,7 +188,8 @@ def test_query_tables_returns_data():
     ]
     mock_supabase = MagicMock()
 
-    with patch("app.services.retrieval_service.resolve_document_id", return_value="doc-uuid-001"):
+    with patch("app.services.retrieval_service.resolve_document_id", return_value="doc-uuid-001"), \
+         patch("app.services.multimodal_service._fetch_document_tables", return_value=tables_data):
         result = handle_query_tables(
             args={"document_name": "Q3 Report.pdf"},
             user_id="user-uuid-001",

@@ -100,20 +100,20 @@ class TestGetTools:
         assert "web_search" in names
 
     def test_returns_base_tools_without_tavily_or_sandbox(self):
-        """get_tools() returns 13 base tools when web_search and sandbox are both disabled."""
+        """get_tools() returns 14 base tools when web_search and sandbox are both disabled."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.web_search_enabled = False
             mock_settings.sandbox_enabled = False
             tools = get_tools()
-        assert len(tools) == 13
+        assert len(tools) == 14
 
     def test_returns_one_more_tool_with_tavily(self):
-        """Adding web_search gives 14 tools (13 base + web_search)."""
+        """Adding web_search gives 15 tools (14 base + web_search)."""
         with patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.web_search_enabled = True
             mock_settings.sandbox_enabled = False
             tools = get_tools()
-        assert len(tools) == 14
+        assert len(tools) == 15
 
     def test_search_and_query_are_first_two_tools(self):
         """search_documents and query_documents remain first two tools regardless of config."""

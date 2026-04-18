@@ -82,7 +82,10 @@ SYSTEM_PROMPT = (
     "- **execute_code** → calculations, data analysis, chart generation, file creation "
     "(always pass `libraries` for non-stdlib packages; pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename})\n"
     "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
-    "- **save_skill / read_skill_file** → skill management\n\n"
+    "- **save_skill / read_skill_file** → skill management\n"
+    "- **query_tables** → structured table data from documents: 'show me the revenue table from Q3 Report', "
+    "'find rows where Region is APAC', 'what are the column headers in the summary table?'. "
+    "Use when the question is about specific values inside a document's tabular data.\n\n"
 
     "**Tiebreaker — search_documents vs query_documents:** If the question is about *what a document says* (content), "
     "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
@@ -131,10 +134,16 @@ CONFIDENCE_DISCLAIMER = (
 
 
 def _compute_confidence(avg_similarity: float) -> str:
-    """Map average cosine similarity to confidence level (D-10)."""
-    if avg_similarity >= 0.7:
+    """Map average cosine similarity to confidence level (D-10).
+
+    Thresholds are calibrated for text-embedding-3-small, where typical
+    top-5 average scores are 0.50–0.70 for prose and 0.35–0.55 for
+    structured/tabular content. The previous 0.7/0.5 thresholds caused
+    almost all correct answers to show as "low" confidence.
+    """
+    if avg_similarity >= 0.55:
         return "high"
-    elif avg_similarity >= 0.5:
+    elif avg_similarity >= 0.40:
         return "medium"
     return "low"
 
@@ -1226,6 +1235,10 @@ async def send_message(
                                 metadata={"key": key or None},
                                 supabase=supabase,
                             ))
+                        elif tool_name == "query_tables":
+                            # MODAL-03 Phase 36: query structured table data from documents
+                            from app.services.multimodal_service import handle_query_tables  # noqa: PLC0415
+                            tool_result = handle_query_tables(args, current_user["id"], supabase)
                         else:
                             tool_result = f"Unknown tool: {tool_name}"
                     except json.JSONDecodeError:
