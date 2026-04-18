@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -252,9 +252,15 @@ async def knowledge_health_summary(
 ):
     """Return four library health metric arrays (D-09)."""
     user_id = current_user["id"]
-    return {
-        "most_retrieved": _fetch_most_retrieved(supabase, user_id),
-        "never_retrieved": _fetch_never_retrieved(supabase, user_id),
-        "low_confidence": _fetch_low_confidence(supabase, user_id),
-        "stale": _fetch_stale(supabase, user_id, stale_days),
-    }
+    try:
+        return {
+            "most_retrieved": _fetch_most_retrieved(supabase, user_id),
+            "never_retrieved": _fetch_never_retrieved(supabase, user_id),
+            "low_confidence": _fetch_low_confidence(supabase, user_id),
+            "stale": _fetch_stale(supabase, user_id, stale_days),
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Health metrics temporarily unavailable",
+        ) from exc
