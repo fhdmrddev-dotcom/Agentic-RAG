@@ -67,17 +67,20 @@ def test_image_chunk_insertion():
     chunks_insert_exec.data = []
 
     # Wire: first table("document_images"), then table("document_chunks")
-    # Use side_effect on table() to route by table name
+    # Use side_effect on table() to route by table name.
+    # Keep a reference to the chunks table mock so we can assert insert was called.
+    chunks_tbl_mock = MagicMock()
+    chunks_tbl_mock.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = max_idx_exec
+    chunks_tbl_mock.insert.return_value.execute.return_value = chunks_insert_exec
+
     def _table(name):
-        tbl = MagicMock()
         if name == "document_images":
+            tbl = MagicMock()
             tbl.insert.return_value.execute.return_value = img_insert_exec
+            return tbl
         elif name == "document_chunks":
-            # .select().eq().order().limit().execute() → max idx
-            tbl.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value = max_idx_exec
-            # .insert().execute() → chunk insert
-            tbl.insert.return_value.execute.return_value = chunks_insert_exec
-        return tbl
+            return chunks_tbl_mock
+        return MagicMock()
 
     mock_supabase.table.side_effect = _table
 
@@ -90,7 +93,8 @@ def test_image_chunk_insertion():
 
     with patch("app.services.multimodal_service.extract_pdf_images", return_value=image_dicts), \
          patch("app.services.multimodal_service.describe_image", return_value="A bar chart showing Q3 revenue."), \
-         patch("app.services.multimodal_service.embed_texts", return_value=fake_embeddings) as mock_embed:
+         patch("app.services.multimodal_service.embed_texts", return_value=fake_embeddings) as mock_embed, \
+         patch("openai.OpenAI"):
 
         extract_and_store_images(
             raw=b"%PDF",
@@ -106,10 +110,15 @@ def test_image_chunk_insertion():
     texts_arg = mock_embed.call_args[0][0]
     assert texts_arg == ["[Image p.2]: A bar chart showing Q3 revenue."]
 
-    # document_chunks insert called with correct row
-    # Find the insert call on the document_chunks table mock
-    # Verify via embed was called — chunk insert happens if embed succeeds
-    assert mock_embed.called
+    # document_chunks insert was called with correctly shaped rows
+    chunks_tbl_mock.insert.assert_called_once()
+    inserted_rows = chunks_tbl_mock.insert.call_args[0][0]
+    assert len(inserted_rows) == 1
+    assert inserted_rows[0]["document_id"] == "doc-uuid-001"
+    assert inserted_rows[0]["user_id"] == "user-uuid-001"
+    assert inserted_rows[0]["content"] == "[Image p.2]: A bar chart showing Q3 revenue."
+    assert inserted_rows[0]["chunk_index"] == 5  # base_idx=4+1=5
+    assert inserted_rows[0]["embedding"] == [0.1] * 1536
 
 
 def test_image_chunk_skips_empty_description():
@@ -141,7 +150,8 @@ def test_image_chunk_skips_empty_description():
 
     with patch("app.services.multimodal_service.extract_pdf_images", return_value=image_dicts), \
          patch("app.services.multimodal_service.describe_image", return_value=""), \
-         patch("app.services.multimodal_service.embed_texts") as mock_embed:
+         patch("app.services.multimodal_service.embed_texts") as mock_embed, \
+         patch("openai.OpenAI"):
 
         extract_and_store_images(
             raw=b"%PDF",
