@@ -35,6 +35,9 @@ import {
   listSkillFiles,
   uploadSkillFile,
   deleteSkillFile,
+  getKnowledgeHealthSummary,
+  moveDocument,
+  reingestDocument,
 } from "@/lib/api"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -512,5 +515,65 @@ describe("deleteSkillFile", () => {
   it("throws on non-ok response", async () => {
     globalThis.fetch = mockFetch({}, 404)
     await expect(deleteSkillFile("s1", "f1")).rejects.toThrow("Failed to delete skill file")
+  })
+})
+
+describe("getKnowledgeHealthSummary", () => {
+  beforeEach(() => { vi.stubEnv("VITE_API_BASE_URL", API_BASE) })
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+
+  it("calls GET /knowledge-health/summary?stale_days=90 by default", async () => {
+    const fetchMock = mockFetch({ most_retrieved: [], never_retrieved: [], low_confidence: [], stale: [] })
+    vi.stubGlobal("fetch", fetchMock)
+    await getKnowledgeHealthSummary()
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/knowledge-health/summary?stale_days=90")
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer mock-token")
+  })
+
+  it("passes custom stale_days param", async () => {
+    const fetchMock = mockFetch({ most_retrieved: [], never_retrieved: [], low_confidence: [], stale: [] })
+    vi.stubGlobal("fetch", fetchMock)
+    await getKnowledgeHealthSummary(30)
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("stale_days=30")
+  })
+})
+
+describe("moveDocument", () => {
+  beforeEach(() => { vi.stubEnv("VITE_API_BASE_URL", API_BASE) })
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+
+  it("calls PATCH /documents/{id}/move with folder_id in body", async () => {
+    const fetchMock = mockFetch({ id: "doc-1" })
+    vi.stubGlobal("fetch", fetchMock)
+    await moveDocument("doc-1", "folder-abc")
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/documents/doc-1/move")
+    expect(options?.method).toBe("PATCH")
+    expect(JSON.parse(options?.body as string)).toEqual({ folder_id: "folder-abc" })
+  })
+
+  it("sends folder_id: null when moving to root", async () => {
+    const fetchMock = mockFetch({ id: "doc-1" })
+    vi.stubGlobal("fetch", fetchMock)
+    await moveDocument("doc-1", null)
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(options?.body as string)).toEqual({ folder_id: null })
+  })
+})
+
+describe("reingestDocument", () => {
+  beforeEach(() => { vi.stubEnv("VITE_API_BASE_URL", API_BASE) })
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals() })
+
+  it("calls POST /documents/{id}/reingest with Authorization header", async () => {
+    const fetchMock = mockFetch({ id: "doc-1", status: "pending" })
+    vi.stubGlobal("fetch", fetchMock)
+    await reingestDocument("doc-1")
+    const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toContain("/documents/doc-1/reingest")
+    expect(options?.method).toBe("POST")
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer mock-token")
   })
 })

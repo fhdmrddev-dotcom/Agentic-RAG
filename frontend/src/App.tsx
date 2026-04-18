@@ -5,7 +5,7 @@ import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()

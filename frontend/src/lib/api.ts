@@ -584,3 +584,78 @@ export async function exportAuditLogs(since?: string, actionType?: string): Prom
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
+
+// ── Knowledge Health types ────────────────────────────────────────────────────
+
+export interface MostRetrievedDoc {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  created_at: string
+  file_size: number
+  retrieval_count: number
+  last_retrieved_at: string
+}
+
+export interface NeverRetrievedDoc {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  created_at: string
+  file_size: number
+}
+
+export interface LowConfidenceDoc {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  created_at: string
+  file_size: number
+  avg_similarity: number
+}
+
+export interface StaleDoc {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  created_at: string
+  file_size: number
+  days_stale: number
+}
+
+export interface HealthSummary {
+  most_retrieved: MostRetrievedDoc[]
+  never_retrieved: NeverRetrievedDoc[]
+  low_confidence: LowConfidenceDoc[]
+  stale: StaleDoc[]
+}
+
+// ── Knowledge Health API functions ────────────────────────────────────────────
+
+export async function getKnowledgeHealthSummary(staleDays = 90): Promise<HealthSummary> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/summary?stale_days=${staleDays}`, { headers })
+  if (!res.ok) throw new Error("Failed to load health summary")
+  return res.json() as Promise<HealthSummary>
+}
+
+export async function moveDocument(id: string, folderId: string | null): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/move`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ folder_id: folderId }),
+  })
+  if (!res.ok) throw new Error("Failed to move document")
+  return res.json() as Promise<Document>
+}
+
+export async function reingestDocument(id: string): Promise<Document> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/documents/${id}/reingest`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new Error("Failed to reingest document")
+  return res.json() as Promise<Document>
+}

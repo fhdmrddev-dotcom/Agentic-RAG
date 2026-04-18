@@ -4,6 +4,7 @@ import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
+import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -75,6 +76,8 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
           <SkillsPage onTryInChat={handleTryInChat} />
         ) : activeView === "settings" ? (
           <SettingsPage />
+        ) : activeView === "library-health" ? (
+          <KnowledgeHealthPage />
         ) : (
           <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} prefillMessage={prefillMessage} onClearPrefill={() => onSetPrefillMessage(null)} />
         )}
