@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Memory, Multimodal & Experience
-status: ready
-last_updated: "2026-04-18T00:00:00.000Z"
+status: Planned
+stopped_at: Completed 036-01-PLAN.md
+last_updated: "2026-04-18T03:02:19.290Z"
 last_activity: 2026-04-18
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
-  total_plans: 19
-  completed_plans: 19
-  percent: 100
+  total_plans: 23
+  completed_plans: 21
+  percent: 91
 ---
 
 # Project State
@@ -25,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-04-11)
 ## Current Position
 
 Phase: 36
-Plan: Not started
-Status: Ready to plan
+Plan: Ready to execute (3 plans, 2 waves)
+Status: Planned
 Last activity: 2026-04-18
 
 ```
@@ -107,6 +108,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░░░░
 | Phase 33-cross-thread-memory-backend P01 | 108s | 3 tasks | 4 files |
 | Phase 33-cross-thread-memory-backend P02 | 8min | 3 tasks | 2 files |
 | Phase 34-cross-thread-memory-settings-ui P01 | 91s | 2 tasks | 2 files |
+| Phase 036-multi-modal-query-library-ui PP01 | 166s | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -232,6 +234,8 @@ Recent decisions affecting current work:
 - [Phase 33-cross-thread-memory-backend]: maybe_single() mock compatibility guard (isinstance(row, list)) required for recall specific-key handler in test environments
 - [Phase 34-cross-thread-memory-settings-ui]: MemorySection uses Card directly (not SectionCard) to avoid double divide-y separator nesting
 - [Phase 34-cross-thread-memory-settings-ui]: No user_id filter on UPDATE/DELETE — RLS policy enforces auth.uid() = user_id, redundant filter removed
+- [Phase 036-multi-modal-query-library-ui]: Module-level embed_texts import in multimodal_service.py (not local import) — required for patch-ability in unit tests
+- [Phase 036-multi-modal-query-library-ui]: Inner try/except for chunk embedding inside outer try/except — embedding failures logged but never block the already-committed document_images rows
 
 ### Pending Todos
 
@@ -261,5 +265,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: context exhaustion at 90% (2026-04-17)
+Stopped at: Completed 036-01-PLAN.md
 Resume file: None

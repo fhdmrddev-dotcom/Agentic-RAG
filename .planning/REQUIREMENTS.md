@@ -60,7 +60,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [ ] **MODAL-01**: Tables extracted from PDF/DOCX during ingestion and stored as structured JSON
 - [ ] **MODAL-02**: Embedded images described via vision LLM and indexed for vector search
-- [ ] **MODAL-03**: Table data queryable via extended query_documents or new query_tables tool
+- [x] **MODAL-03**: Table data queryable via extended query_documents or new query_tables tool
 
 ### Knowledge Health Dashboard (F-09)
 
