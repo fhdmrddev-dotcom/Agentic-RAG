@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Memory, Multimodal & Experience
 status: in_progress
-stopped_at: Completed 040-01-PLAN.md
-last_updated: "2026-04-18T18:57:16Z"
+stopped_at: Completed 040-02-PLAN.md
+last_updated: "2026-04-18T19:00:53Z"
 last_activity: 2026-04-18
 progress:
   total_phases: 14
@@ -114,6 +114,7 @@ Progress: [███████████████████████
 | Phase 037 P02 | 146 | 1 tasks | 2 files |
 | Phase 039-user-feedback-loop-backend P01 | 12min | 3 tasks | 4 files |
 | Phase 039-user-feedback-loop-backend P02 | 5min | 1 tasks | 1 files |
+| Phase 040-user-feedback-loop-frontend P02 | 103s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -251,6 +252,9 @@ Recent decisions affecting current work:
 - [Phase 039-user-feedback-loop-backend]: supabase db push not viable for custom-named migrations; local instance auto-applies all migrations on startup; table verified via REST API
 - [Phase 039-user-feedback-loop-backend]: asyncio.create_task fire-and-forget for audit writes in feedback.py — consistent with Phase 30/33 pattern
 - [Phase 039-user-feedback-loop-backend P02]: POST /feedback RLS test uses insert() not eq() — endpoint embeds user_id in INSERT payload; no .eq() call exists on the POST path
+- [Phase 040-user-feedback-loop-frontend P02]: FeedbackStatsPanel receives stats as prop (pure/testable) — data fetched in KnowledgeHealthPage, matching HealthPanel pattern
+- [Phase 040-user-feedback-loop-frontend P02]: Promise.allSettled used so feedback fetch failure does not block health summary render
+- [Phase 040-user-feedback-loop-frontend P02]: onRemoveDownvoted callback filters downvoted_documents from local state only (client-side optimistic, no DELETE API call)
 
 ### Pending Todos
 
@@ -279,6 +283,6 @@ None yet.
 
 ## Session Continuity
 
-Last activity: 2026-04-18 - Completed 040-01-PLAN.md (MessageFeedback component, submitFeedback/getFeedbackStats API, MessageItem wiring)
-Stopped at: Completed 040-01-PLAN.md
+Last activity: 2026-04-18 - Completed 040-02-PLAN.md (FeedbackStatsPanel component, KnowledgeHealthPage wiring with Promise.allSettled)
+Stopped at: Completed 040-02-PLAN.md
 Resume file: None
