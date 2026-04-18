@@ -86,7 +86,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 33: Cross-Thread Memory — Backend** — user_memory table, remember/recall tools, automatic memory summary injection into system prompt (completed 2026-04-16)
 - [x] **Phase 34: Cross-Thread Memory — Settings UI** — Memory viewer in Settings: list, edit, delete memory entries (completed 2026-04-17)
 - [x] **Phase 35: Multi-Modal Ingestion** — Extract tables (pdfplumber) and describe images (vision LLM) during PDF/DOCX ingestion; store in document_tables and document_images tables (completed 2026-04-18)
-- [ ] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents
+- [x] **Phase 36: Multi-Modal Query & Library UI** — query_tables tool for structured table queries; image descriptions in vector search; Tables/Images badge on documents (completed 2026-04-18)
 - [ ] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents
 - [ ] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move)
 - [ ] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard
@@ -285,7 +285,7 @@ Plans:
 | 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete    | 2026-04-17 |
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete    | 2026-04-17 |
 | 35. Multi-Modal Ingestion | v2.3 | 4/4 | Complete | 2026-04-18 |
-| 36. Multi-Modal Query & Library UI | v2.3 | 0/2 | Planned | |
+| 36. Multi-Modal Query & Library UI | v2.3 | 3/3 | Complete | 2026-04-18 |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
 | 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
 | 39. User Feedback Loop — Backend | v2.3 | 0/2 | Planned | |
