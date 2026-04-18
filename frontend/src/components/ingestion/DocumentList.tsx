@@ -161,6 +161,7 @@ function VersionHistoryPanel({
   const [loading, setLoading] = useState(true)
   const [restoreTarget, setRestoreTarget] = useState<Document | null>(null)
   const [restoring, setRestoring] = useState(false)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchDocumentVersions(documentId)
@@ -171,12 +172,15 @@ function VersionHistoryPanel({
   const handleRestore = async () => {
     if (!restoreTarget) return
     setRestoring(true)
+    setRestoreError(null)
     try {
       await restoreDocumentVersion(restoreTarget.id)
       setRestoreTarget(null)
+      setRestoreError(null)
       onRestored()
     } catch {
-      setRestoreTarget(null)
+      setRestoreError("Restore failed. Please try again.")
+      // Do NOT close dialog — let user retry or cancel
     } finally {
       setRestoring(false)
     }
@@ -241,7 +245,7 @@ function VersionHistoryPanel({
       </div>
 
       {/* Restore confirmation dialog */}
-      <Dialog open={restoreTarget !== null} onOpenChange={(open) => { if (!open) setRestoreTarget(null) }}>
+      <Dialog open={restoreTarget !== null} onOpenChange={(open) => { if (!open) { setRestoreTarget(null); setRestoreError(null) } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Restore version?</DialogTitle>
@@ -249,8 +253,11 @@ function VersionHistoryPanel({
               Restore v{restoreTarget?.version_number ?? 1}? This version will become active for retrieval. The current version remains in history.
             </DialogDescription>
           </DialogHeader>
+          {restoreError && (
+            <p className="text-sm text-destructive px-1">{restoreError}</p>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRestoreTarget(null)} disabled={restoring}>
+            <Button variant="outline" onClick={() => { setRestoreTarget(null); setRestoreError(null) }} disabled={restoring}>
               Cancel
             </Button>
             <Button onClick={handleRestore} disabled={restoring}>
