@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Memory, Multimodal & Experience
 status: verifying
-stopped_at: Completed 037-01-PLAN.md
-last_updated: "2026-04-18T07:04:51.265Z"
+stopped_at: Completed 037-02-PLAN.md
+last_updated: "2026-04-18T07:09:25.520Z"
 last_activity: 2026-04-18
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 25
-  completed_plans: 24
-  percent: 96
+  completed_plans: 25
+  percent: 100
 ---
 
 # Project State
@@ -111,6 +111,7 @@ Progress: [███████████████████████
 | Phase 036-multi-modal-query-library-ui PP01 | 166s | 2 tasks | 3 files |
 | Phase 036-multi-modal-query-library-ui PP02 | 282s | 2 tasks | 6 files |
 | Phase 037-knowledge-health-dashboard-backend P01 | 75s | 2 tasks | 2 files |
+| Phase 037 P02 | 146 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -242,6 +243,7 @@ Recent decisions affecting current work:
 - [Phase 036-multi-modal-query-library-ui]: _fetch_document_tables extracted as module-level function — clean patchability in unit tests
 - [Phase 037-knowledge-health-dashboard-backend]: Python-side JSONB aggregation for most_retrieved and low_confidence (simpler than raw SQL with Supabase client)
 - [Phase 037-knowledge-health-dashboard-backend]: Empty-list guard before .in_() prevents Supabase empty-list query errors
+- [Phase 037]: Added .lt.return_value = b to conftest.py mock builder — required for _fetch_stale Supabase chain through .lt() calls
 
 ### Pending Todos
 
@@ -271,5 +273,5 @@ None yet.
 ## Session Continuity
 
 Last activity: 2026-04-12 - Completed quick task 260412-jnc: ZIP import 202 + modal scroll
-Stopped at: Completed 037-01-PLAN.md
+Stopped at: Completed 037-02-PLAN.md
 Resume file: None
