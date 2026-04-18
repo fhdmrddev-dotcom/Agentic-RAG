@@ -1,8 +1,14 @@
 """Tests for GET /knowledge-health/summary — Phase 37 (HLTH-01–HLTH-04)."""
 import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
 from tests.conftest import mock_user_data
+
+
+def _approx_cutoff(days: int) -> datetime:
+    """Return the expected cutoff datetime for `days` ago (UTC), used for tolerance checks."""
+    return datetime.now(timezone.utc) - timedelta(days=days)
 
 
 # ── Internal helper ───────────────────────────────────────────────────────────
@@ -169,21 +175,35 @@ def test_low_confidence_filters_below_threshold(client, auth_headers, mock_execu
 
 
 def test_stale_applies_days_param(client, auth_headers, mock_execute_result, mock_builder):
-    """stale_days query param is accepted and changes the cutoff (verified via .lt call)."""
+    """stale_days query param is accepted and the cutoff passed to .lt() reflects 180 days."""
     mock_execute_result.data = []
     res = client.get("/knowledge-health/summary?stale_days=180", headers=auth_headers)
     assert res.status_code == 200
-    # .lt should have been called for the stale documents query
-    mock_builder.lt.assert_called()
+    # Verify .lt was called with "created_at" and an ISO timestamp ~180 days ago.
+    call_args = mock_builder.lt.call_args
+    assert call_args is not None, ".lt() was not called"
+    assert call_args[0][0] == "created_at"
+    cutoff = datetime.fromisoformat(call_args[0][1])
+    expected = _approx_cutoff(180)
+    assert abs((cutoff - expected).total_seconds()) < 5, (
+        f"Cutoff {cutoff} not within 5s of expected 180-day cutoff {expected}"
+    )
 
 
 def test_stale_default_90_days(client, auth_headers, mock_execute_result, mock_builder):
-    """stale_days defaults to 90 when not provided."""
+    """stale_days defaults to 90 and the cutoff passed to .lt() reflects 90 days."""
     mock_execute_result.data = []
     res = client.get("/knowledge-health/summary", headers=auth_headers)
     assert res.status_code == 200
-    # Without stale_days param, still uses .lt — default 90d
-    mock_builder.lt.assert_called()
+    # Verify .lt was called with "created_at" and an ISO timestamp ~90 days ago.
+    call_args = mock_builder.lt.call_args
+    assert call_args is not None, ".lt() was not called"
+    assert call_args[0][0] == "created_at"
+    cutoff = datetime.fromisoformat(call_args[0][1])
+    expected = _approx_cutoff(90)
+    assert abs((cutoff - expected).total_seconds()) < 5, (
+        f"Cutoff {cutoff} not within 5s of expected 90-day cutoff {expected}"
+    )
 
 
 def test_rls_user_id_filter_applied(client, auth_headers, mock_execute_result, mock_builder):
