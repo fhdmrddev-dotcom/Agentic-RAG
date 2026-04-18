@@ -188,24 +188,6 @@ export function KnowledgeHealthPage() {
 
           <RetrievalChart docs={summary.most_retrieved} />
 
-          {feedbackError && (
-            <div className="bg-destructive/10 text-destructive text-sm px-4 py-2 rounded-lg mb-6">
-              {feedbackError}
-            </div>
-          )}
-          {feedbackStats && (
-            <FeedbackStatsPanel
-              stats={feedbackStats}
-              onRemoveDownvoted={(id) =>
-                setFeedbackStats((prev) =>
-                  prev
-                    ? { ...prev, downvoted_documents: prev.downvoted_documents.filter((d) => d.document_id !== id) }
-                    : prev
-                )
-              }
-            />
-          )}
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <HealthPanel<MostRetrievedDoc>
               title="Most Retrieved"
@@ -264,6 +246,25 @@ export function KnowledgeHealthPage() {
             />
           </div>
         </>
+      )}
+
+      {/* Feedback section — independent of health summary */}
+      {feedbackError && (
+        <div className="bg-destructive/10 text-destructive text-sm px-4 py-2 rounded-lg mb-6">
+          {feedbackError}
+        </div>
+      )}
+      {feedbackStats && (
+        <FeedbackStatsPanel
+          stats={feedbackStats}
+          onRemoveDownvoted={(id) =>
+            setFeedbackStats((prev) =>
+              prev
+                ? { ...prev, downvoted_documents: prev.downvoted_documents.filter((d) => d.document_id !== id) }
+                : prev
+            )
+          }
+        />
       )}
     </div>
     </div>
