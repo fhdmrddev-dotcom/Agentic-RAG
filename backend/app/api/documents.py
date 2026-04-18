@@ -418,10 +418,11 @@ async def restore_document_version(
 @router.post("/{document_id}/reingest", response_model=DocumentResponse)
 async def reingest_document(
     document_id: str,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Re-queue a document for ingestion by setting status to pending."""
+    """Re-queue a document for ingestion by fetching from storage and scheduling background task."""
     # 1. Verify ownership and confirm document is the latest version
     doc = (
         supabase.table("documents")
@@ -435,7 +436,20 @@ async def reingest_document(
     if not doc.data:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # 2. Reset status to pending to trigger background ingestion
+    target = doc.data
+
+    # 2. Fetch raw bytes from storage so we can re-extract text
+    try:
+        raw = supabase.storage.from_("documents").download(target["file_path"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
+
+    try:
+        text = extract_text(raw, target["mime_type"])
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not extract text: {e}")
+
+    # 3. Reset status to pending
     result = (
         supabase.table("documents")
         .update({"status": "pending"})
@@ -445,6 +459,18 @@ async def reingest_document(
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found after update")
+
+    # 4. Schedule background ingestion
+    background_tasks.add_task(
+        ingest_document,
+        document_id,
+        text,
+        current_user["id"],
+        supabase,
+        raw,
+        target["mime_type"],
+        target["filename"],
+    )
     return result.data[0]
 
 
@@ -522,6 +548,8 @@ async def move_document(
         .eq("user_id", current_user["id"])
         .execute()
     )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
     return result.data[0]
 
 

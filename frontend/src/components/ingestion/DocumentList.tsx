@@ -97,6 +97,7 @@ function VersionHistoryPanel({
 }) {
   const [versions, setVersions] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [restoreTarget, setRestoreTarget] = useState<Document | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [restoreError, setRestoreError] = useState<string | null>(null)
@@ -104,6 +105,7 @@ function VersionHistoryPanel({
   useEffect(() => {
     fetchDocumentVersions(documentId)
       .then(setVersions)
+      .catch(() => setFetchError("Could not load version history."))
       .finally(() => setLoading(false))
   }, [documentId])
 
@@ -128,6 +130,14 @@ function VersionHistoryPanel({
     return (
       <div className="px-4 py-3 bg-muted/30 border-t flex justify-center">
         <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="px-4 py-3 bg-muted/30 border-t text-xs text-destructive">
+        {fetchError}
       </div>
     )
   }

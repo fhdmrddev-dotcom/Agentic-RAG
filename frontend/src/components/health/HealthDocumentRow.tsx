@@ -34,12 +34,21 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
   const [reingestLoading, setReingestLoading] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [rowError, setRowError] = useState<string | null>(null)
+  const [rowSuccess, setRowSuccess] = useState<string | null>(null)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function showRowError(msg: string) {
+    setRowSuccess(null)
     setRowError(msg)
     if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
     errorTimerRef.current = setTimeout(() => setRowError(null), 4000)
+  }
+
+  function showRowSuccess(msg: string) {
+    setRowError(null)
+    setRowSuccess(msg)
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current)
+    errorTimerRef.current = setTimeout(() => setRowSuccess(null), 4000)
   }
 
   useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current) }, [])
@@ -63,6 +72,7 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
     setReingestLoading(true)
     try {
       await reingestDocument(doc.document_id)
+      showRowSuccess("Re-ingestion queued.")
     } catch {
       showRowError("Action failed. Please try again.")
     } finally {
@@ -153,6 +163,9 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
         {rowError && (
           <p className="text-xs text-destructive px-4 pb-2">{rowError}</p>
         )}
+        {rowSuccess && (
+          <p className="text-xs text-primary px-4 pb-2">{rowSuccess}</p>
+        )}
       </div>
 
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -179,7 +192,7 @@ export function HealthDocumentRow({ doc, metricChip, onRemove }: Props) {
         documentId={doc.document_id}
         documentName={doc.filename}
         onClose={() => setMoveOpen(false)}
-        onMoved={() => setMoveOpen(false)}
+        onMoved={(_newFolderId) => setMoveOpen(false)}
       />
     </>
   )
