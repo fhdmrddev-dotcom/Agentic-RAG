@@ -196,7 +196,7 @@ Plans:
   4. Feedback entries visible in the audit log viewer (action_type = message_feedback)
 **Plans**: 2 plans
 Plans:
-- [ ] 039-01-PLAN.md — Migration 028 (message_feedback table + RLS), feedback.py router (POST + GET stats), audit_service update, main.py registration + schema push
+- [x] 039-01-PLAN.md — Migration 028 (message_feedback table + RLS), feedback.py router (POST + GET stats), audit_service update, main.py registration + schema push
 - [ ] 039-02-PLAN.md — Unit tests (7 tests, GREEN) for submit feedback and stats endpoints
 **UI hint**: no
 
@@ -297,7 +297,7 @@ Plans:
 | 36. Multi-Modal Query & Library UI | v2.3 | 3/3 | Complete | 2026-04-18 |
 | 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
 | 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
-| 39. User Feedback Loop — Backend | v2.3 | 0/2 | Planned | |
+| 39. User Feedback Loop — Backend | v2.3 | 1/2 | In Progress | 2026-04-18 |
 | 40. User Feedback Loop — Frontend | v2.3 | 0/2 | Planned | |
 | 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 0/1 | Planned | |
 | 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/1 | Planned | |
