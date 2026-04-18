@@ -84,11 +84,15 @@ def _fetch_most_retrieved(supabase: Client, user_id: str) -> list[dict]:
 
 def _fetch_never_retrieved(supabase: Client, user_id: str) -> list[dict]:
     """Return up to TOP_N active documents never referenced in any search.query audit entry (D-08, D-11)."""
+    # Safety cap: the set-difference logic makes a tight server-side filter
+    # impractical without a Postgres subquery (Rule 4), so we cap at 500 rows
+    # to prevent transferring an unbounded document list over the network.
     docs_res = (
         supabase.table("documents")
         .select("id, filename, folder_id, created_at, file_size")
         .eq("user_id", user_id)
         .eq("is_latest", True)
+        .limit(500)
         .execute()
     )
 
@@ -204,12 +208,16 @@ def _fetch_stale(supabase: Client, user_id: str, stale_days: int) -> list[dict]:
     """Return top-N active documents whose created_at is older than stale_days (D-04, D-05, D-11)."""
     cutoff = _window_cutoff(stale_days)
 
+    # Order by oldest first so that when TOP_N rows are fetched the DB returns
+    # the most stale documents directly; Python-side sort/slice is no longer needed.
     res = (
         supabase.table("documents")
         .select("id, filename, folder_id, created_at, file_size")
         .eq("user_id", user_id)
         .eq("is_latest", True)
         .lt("created_at", cutoff)
+        .order("created_at", desc=False)
+        .limit(TOP_N)
         .execute()
     )
 
@@ -231,8 +239,7 @@ def _fetch_stale(supabase: Client, user_id: str, stale_days: int) -> list[dict]:
             "days_stale": days_stale,
         })
 
-    results.sort(key=lambda x: x["days_stale"], reverse=True)
-    return results[:TOP_N]
+    return results
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
