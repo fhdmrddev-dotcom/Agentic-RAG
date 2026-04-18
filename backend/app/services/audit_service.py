@@ -13,6 +13,7 @@ VALID_ACTION_TYPES = frozenset({
     "code.execute", "skill.load", "thread.create",
     "thread.delete", "settings.update",
     "memory.remember", "memory.recall",   # Phase 33
+    "feedback.submit",                    # Phase 39
 })
 
 
