@@ -64,10 +64,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Knowledge Health Dashboard (F-09)
 
-- [ ] **HLTH-01**: User can see top-10 most-retrieved documents (last 30 days) in a Library Health view
-- [ ] **HLTH-02**: User can see never-retrieved documents (uploaded but zero retrieval events)
-- [ ] **HLTH-03**: User can see low-confidence documents (frequently retrieved with low similarity scores)
-- [ ] **HLTH-04**: User can see stale documents (not updated in > 90 days, configurable)
+- [x] **HLTH-01**: User can see top-10 most-retrieved documents (last 30 days) in a Library Health view
+- [x] **HLTH-02**: User can see never-retrieved documents (uploaded but zero retrieval events)
+- [x] **HLTH-03**: User can see low-confidence documents (frequently retrieved with low similarity scores)
+- [x] **HLTH-04**: User can see stale documents (not updated in > 90 days, configurable)
 - [ ] **HLTH-05**: User can act directly from Library Health: delete, re-ingest, or move a document to a folder
 
 ### User Feedback Loop (F-10)
