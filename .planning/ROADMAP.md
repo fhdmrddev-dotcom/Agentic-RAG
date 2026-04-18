@@ -90,7 +90,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 37: Knowledge Health Dashboard — Backend** — Metrics API from audit log: most-retrieved, never-retrieved, low-confidence, stale documents (completed 2026-04-18)
 - [x] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move) + KPI stat bar, retrieval chart, pagination, enhanced chips (completed 2026-04-18)
 - [ ] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard
-- [ ] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health
+- [x] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health (completed 2026-04-19)
 - [ ] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput
 - [ ] **Phase 42: UI Redesign — Layout Shell & Skills** — Extract AppDock from Sidebar; 3-pane SkillsPage with tonal depth; premium glow toggles; SettingsPage tonal polish
 - [ ] **Phase 43: UI Redesign — Mobile & Responsive** — Frosted overlay drawer for thread list on mobile; responsive breakpoints in ChatLayout; active-thread gradient accent
@@ -212,7 +212,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 040-01-PLAN.md — API layer (submitFeedback, getFeedbackStats) + MessageFeedback component + MessageItem wiring
-- [ ] 040-02-PLAN.md — FeedbackStatsPanel component + KnowledgeHealthPage wiring
+- [x] 040-02-PLAN.md — FeedbackStatsPanel component + KnowledgeHealthPage wiring
 **UI hint**: yes
 
 ### Phase 41: UI Redesign — Tool Call Visualizer & Citations
