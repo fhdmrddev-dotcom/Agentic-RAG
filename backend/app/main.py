@@ -49,7 +49,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, documents, settings as settings_api, folders, kb, skills, audit  # noqa: E402
+from app.api import threads, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(documents.router)
@@ -58,3 +58,4 @@ app.include_router(folders.router)
 app.include_router(kb.router)
 app.include_router(skills.router)
 app.include_router(audit.router)
+app.include_router(knowledge_health.router)
