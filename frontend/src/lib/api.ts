@@ -631,6 +631,27 @@ export interface HealthSummary {
   stale: StaleDoc[]
 }
 
+// -- Feedback types -----------------------------------------------------------
+
+export interface FeedbackRequest {
+  message_id: string
+  rating: "positive" | "negative"
+  reason?: string | null
+}
+
+export interface DownvotedDocument {
+  document_id: string
+  filename: string
+  folder_id: string | null
+  downvote_count: number
+}
+
+export interface FeedbackStats {
+  positive_rate: number
+  total_ratings: number
+  downvoted_documents: DownvotedDocument[]
+}
+
 // ── Knowledge Health API functions ────────────────────────────────────────────
 
 export async function getKnowledgeHealthSummary(staleDays = 90): Promise<HealthSummary> {
@@ -659,4 +680,28 @@ export async function reingestDocument(id: string): Promise<Document> {
   })
   if (!res.ok) throw new Error("Failed to reingest document")
   return res.json() as Promise<Document>
+}
+
+// -- Feedback API functions ---------------------------------------------------
+
+/**
+ * Submit thumbs-up or thumbs-down rating for an assistant message.
+ * Returns raw Response so callers can inspect status 409 (already rated) themselves.
+ * Throws only on network errors, never on HTTP error status codes.
+ */
+export async function submitFeedback(body: FeedbackRequest): Promise<Response> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/feedback`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  return res
+}
+
+export async function getFeedbackStats(): Promise<FeedbackStats> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/feedback/stats`, { headers })
+  if (!res.ok) throw new Error("Failed to load feedback stats")
+  return res.json() as Promise<FeedbackStats>
 }
