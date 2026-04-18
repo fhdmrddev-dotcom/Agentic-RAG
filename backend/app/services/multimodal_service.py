@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 from supabase import Client
 
+from app.services.embedding_service import embed_texts
+
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
@@ -286,6 +288,63 @@ def extract_and_store_images(
 
         supabase.table("document_images").insert(rows).execute()
         log.info("Stored %d image description(s) for document %s", len(rows), document_id)
+
+        # D-01/D-02/D-03: embed image descriptions as document_chunks for vector search
+        # Pitfall 1: offset chunk_index from MAX to avoid collision with text chunks
+        # Pitfall 2: skip rows where description is empty
+        try:
+            # Get current max chunk_index for this document
+            max_idx_result = (
+                supabase.table("document_chunks")
+                .select("chunk_index")
+                .eq("document_id", document_id)
+                .order("chunk_index", desc=True)
+                .limit(1)
+                .execute()
+            )
+            base_idx = (
+                (max_idx_result.data[0]["chunk_index"] + 1)
+                if max_idx_result.data
+                else 0
+            )
+            # Build (offset_index, content) pairs — skip empty descriptions
+            descriptions: list[tuple[int, str]] = []
+            for i, row in enumerate(rows):
+                page = row.get("page")
+                desc = (row.get("description") or "").strip()
+                if not desc:
+                    continue
+                content = (
+                    f"[Image p.{page}]: {desc}"
+                    if page is not None
+                    else f"[Image]: {desc}"
+                )
+                descriptions.append((i, content))
+            if descriptions:
+                texts = [d[1] for d in descriptions]
+                embeddings = embed_texts(texts, user_settings=app_settings)
+                chunk_rows = [
+                    {
+                        "document_id": document_id,
+                        "user_id": user_id,
+                        "content": content,
+                        "chunk_index": base_idx + i,
+                        "embedding": embedding,
+                    }
+                    for (i, content), embedding in zip(descriptions, embeddings)
+                ]
+                supabase.table("document_chunks").insert(chunk_rows).execute()
+                log.info(
+                    "Stored %d image chunk(s) for document %s",
+                    len(chunk_rows),
+                    document_id,
+                )
+        except Exception as exc:
+            log.warning(
+                "Image chunk embedding failed for document %s: %s",
+                document_id,
+                exc,
+            )
 
     except Exception as exc:
         log.warning("Image extraction failed for document %s: %s", document_id, exc)

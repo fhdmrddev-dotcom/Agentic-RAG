@@ -131,10 +131,12 @@ def test_pdf_images_stored():
             app_settings=mock_settings,
         )
 
-    mock_supabase.table.assert_called_with("document_images")
-    insert_call_args = mock_builder.insert.call_args[0][0]
-    assert isinstance(insert_call_args, list)
-    row = insert_call_args[0]
+    mock_supabase.table.assert_any_call("document_images")
+    # Find the document_images insert call (first insert; chunk insert may follow)
+    all_insert_calls = mock_builder.insert.call_args_list
+    img_insert_args = all_insert_calls[0][0][0]
+    assert isinstance(img_insert_args, list)
+    row = img_insert_args[0]
     assert row["document_id"] == "doc-uuid-004"
     assert row["description"] == "A bar chart showing quarterly revenue."
     assert row["page"] == 1
