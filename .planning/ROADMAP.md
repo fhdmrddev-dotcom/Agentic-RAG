@@ -164,7 +164,10 @@ Plans:
   2. All metrics derived from audit_log table
   3. Returns in < 2s for libraries up to 10,000 documents
   4. RLS enforced: users only see health data for their own documents
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 037-01-PLAN.md — knowledge_health.py router with four metric queries + main.py registration
+- [ ] 037-02-PLAN.md — Unit tests (7 tests, GREEN) for all four health metrics
 **UI hint**: no
 
 ### Phase 38: Knowledge Health Dashboard — Frontend
