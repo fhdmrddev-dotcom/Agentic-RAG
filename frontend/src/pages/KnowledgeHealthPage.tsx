@@ -3,9 +3,12 @@ import { TrendingUp, FileQuestion, AlertTriangle, Clock, RefreshCw } from "lucid
 import { Button } from "@/components/ui/button"
 import { getKnowledgeHealthSummary } from "@/lib/api"
 import type { HealthSummary, MostRetrievedDoc, NeverRetrievedDoc, LowConfidenceDoc, StaleDoc } from "@/lib/api"
+import { getFeedbackStats } from "@/lib/api"
+import type { FeedbackStats } from "@/lib/api"
 import { HealthPanel } from "@/components/health/HealthPanel"
 import { HealthStatBar } from "@/components/health/HealthStatBar"
 import { RetrievalChart } from "@/components/health/RetrievalChart"
+import { FeedbackStatsPanel } from "@/components/health/FeedbackStatsPanel"
 
 function formatDaysOld(createdAt: string): string {
   const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
@@ -74,18 +77,32 @@ export function KnowledgeHealthPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     setError(null)
-    getKnowledgeHealthSummary()
-      .then(setSummary)
-      .catch(() => setError("Health metrics could not be loaded. Refresh to try again."))
-      .finally(() => {
-        setLoading(false)
-        setRefreshing(false)
-      })
+    setFeedbackError(null)
+    Promise.allSettled([
+      getKnowledgeHealthSummary(),
+      getFeedbackStats(),
+    ]).then(([healthResult, feedbackResult]) => {
+      if (healthResult.status === "fulfilled") {
+        setSummary(healthResult.value)
+      } else {
+        setError("Health metrics could not be loaded. Refresh to try again.")
+      }
+      if (feedbackResult.status === "fulfilled") {
+        setFeedbackStats(feedbackResult.value)
+      } else {
+        setFeedbackError("Feedback stats could not be loaded. Refresh to try again.")
+      }
+    }).finally(() => {
+      setLoading(false)
+      setRefreshing(false)
+    })
   }, [])
 
   useEffect(() => { load() }, [load])
@@ -113,6 +130,12 @@ export function KnowledgeHealthPage() {
           </header>
           <StatBarSkeleton />
           <ChartSkeleton />
+          <div className="ghost-border bg-card/50 rounded-lg p-4 mb-6 space-y-3">
+            <div className="animate-pulse bg-muted/30 h-4 w-40 rounded" />
+            <div className="animate-pulse bg-muted/30 h-8 w-20 rounded" />
+            <div className="animate-pulse bg-muted/30 h-10 rounded" />
+            <div className="animate-pulse bg-muted/30 h-10 rounded" />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="ghost-border bg-card/50 shadow-sm rounded-lg p-4 space-y-3">
@@ -164,6 +187,24 @@ export function KnowledgeHealthPage() {
           />
 
           <RetrievalChart docs={summary.most_retrieved} />
+
+          {feedbackError && (
+            <div className="bg-destructive/10 text-destructive text-sm px-4 py-2 rounded-lg mb-6">
+              {feedbackError}
+            </div>
+          )}
+          {feedbackStats && (
+            <FeedbackStatsPanel
+              stats={feedbackStats}
+              onRemoveDownvoted={(id) =>
+                setFeedbackStats((prev) =>
+                  prev
+                    ? { ...prev, downvoted_documents: prev.downvoted_documents.filter((d) => d.document_id !== id) }
+                    : prev
+                )
+              }
+            />
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <HealthPanel<MostRetrievedDoc>
