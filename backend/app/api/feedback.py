@@ -1,10 +1,10 @@
 """User feedback endpoints — Phase 39 (FB-01–FB-03)."""
-import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from supabase import Client
 
@@ -28,13 +28,14 @@ def _window_cutoff(days: int) -> str:
 
 class FeedbackRequest(BaseModel):
     message_id: UUID
-    rating: str   # "positive" or "negative"
-    reason: str | None = None   # one of: wrong_answer, not_from_documents, incomplete, other
+    rating: Literal["positive", "negative"]
+    reason: Literal["wrong_answer", "not_from_documents", "incomplete", "other"] | None = None
 
 
 @router.post("", status_code=201)
 async def submit_feedback(
     body: FeedbackRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -63,7 +64,8 @@ async def submit_feedback(
         raise HTTPException(status_code=502, detail="Failed to save feedback") from exc
 
     # D-07: fire-and-forget audit write — never await
-    asyncio.create_task(write_audit_entry(
+    background_tasks.add_task(
+        write_audit_entry,
         user_id=user_id,
         action_type="feedback.submit",
         metadata={
@@ -72,7 +74,7 @@ async def submit_feedback(
             "reason": body.reason,
         },
         supabase=supabase,
-    ))
+    )
 
     return {"status": "ok"}
 
@@ -96,19 +98,24 @@ async def get_feedback_stats(
     user_id = current_user["id"]
     try:
         # ── Overall positive rate (all-time, D-03) ────────────────────────────
-        all_ratings_res = (
+        total_res = (
             supabase.table("message_feedback")
-            .select("rating")
+            .select("id", count="exact")
             .eq("user_id", user_id)
             .execute()
         )
-        all_ratings = all_ratings_res.data or []
-        total_ratings = len(all_ratings)
-        if total_ratings == 0:
-            positive_rate = 0.0
-        else:
-            positive_count = sum(1 for r in all_ratings if r.get("rating") == "positive")
-            positive_rate = positive_count / total_ratings
+        total_ratings = total_res.count or 0
+
+        positive_res = (
+            supabase.table("message_feedback")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+            .eq("rating", "positive")
+            .execute()
+        )
+        positive_count = positive_res.count or 0
+
+        positive_rate = (positive_count / total_ratings) if total_ratings > 0 else 0.0
 
         # ── Most-downvoted documents — last 30 days (D-04, D-08–D-10) ────────
         cutoff = _window_cutoff(DOWNVOTE_WINDOW_DAYS)
