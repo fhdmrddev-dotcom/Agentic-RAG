@@ -92,11 +92,17 @@ def _fetch_never_retrieved(supabase: Client, user_id: str) -> list[dict]:
         .execute()
     )
 
+    # Intentionally all-time (no date window) so documents are only surfaced as
+    # "never retrieved" if they have truly never appeared in any search — not
+    # just in the recent window. The .limit(5000) cap prevents runaway memory
+    # use for users with long search histories; a Postgres-side subquery would
+    # be more efficient long-term but requires a DB migration (Rule 4).
     audit_res = (
         supabase.table("audit_log")
         .select("metadata")
         .eq("user_id", user_id)
         .eq("action_type", "search.query")
+        .limit(5000)
         .execute()
     )
 
