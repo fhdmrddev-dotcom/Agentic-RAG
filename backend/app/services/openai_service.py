@@ -377,6 +377,45 @@ RECALL_TOOL = {
     },
 }
 
+QUERY_TABLES_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "query_tables",
+        "description": (
+            "Query structured tables extracted from a specific document. "
+            "Use when the user asks for data from a document's tables: "
+            "'show me all rows in the revenue table', "
+            "'what are the column headers in the financial summary?', "
+            "'find rows where Region is APAC in Q3 Report'. "
+            "Returns table headers and matching rows (up to 50 rows per table). "
+            "Use column_filter to filter rows where a specific column matches a value."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_name": {
+                    "type": "string",
+                    "description": "Filename (or partial name) of the document to query.",
+                },
+                "column_filter": {
+                    "type": "object",
+                    "description": (
+                        "Optional row filter: {\"ColumnName\": \"value\"}. "
+                        "Returns only rows where that column matches exactly. "
+                        "Example: {\"Region\": \"APAC\"}"
+                    ),
+                    "additionalProperties": {"type": "string"},
+                },
+                "page": {
+                    "type": "integer",
+                    "description": "Optional: restrict to tables on this page number only.",
+                },
+            },
+            "required": ["document_name"],
+        },
+    },
+}
+
 EXECUTE_CODE_TOOL = {
     "type": "function",
     "function": {
@@ -460,7 +499,7 @@ def get_tools() -> list[dict]:
     """Return the active tool list based on current config."""
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
-             REMEMBER_TOOL, RECALL_TOOL]
+             REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL]
     if settings.web_search_enabled:
         tools.append(WEB_SEARCH_TOOL)
     if settings.sandbox_enabled:

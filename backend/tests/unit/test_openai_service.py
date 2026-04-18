@@ -99,3 +99,22 @@ class TestGetEmbeddingClient:
                 get_embedding_client()
                 call_kwargs = MockOpenAI.call_args[1]
                 assert "base_url" not in call_kwargs
+
+
+class TestQueryTablesTool:
+    def test_query_tables_in_general_tools(self):
+        """MODAL-03/D-07: QUERY_TABLES_TOOL is included in get_tools() (General Mode)."""
+        from app.services.openai_service import get_tools
+        with patch("app.services.openai_service.settings") as mock_settings:
+            mock_settings.web_search_enabled = False
+            mock_settings.sandbox_enabled = False
+            tools = get_tools()
+        names = [t["function"]["name"] for t in tools]
+        assert "query_tables" in names
+
+    def test_query_tables_not_in_explorer_tools(self):
+        """MODAL-03/D-07: QUERY_TABLES_TOOL is NOT in get_explorer_tools() (Explorer Mode)."""
+        from app.services.openai_service import get_explorer_tools
+        tools = get_explorer_tools()
+        names = [t["function"]["name"] for t in tools]
+        assert "query_tables" not in names
