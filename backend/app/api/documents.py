@@ -265,6 +265,7 @@ async def upload_document(
         supabase,
         raw,
         mime_type,
+        file.filename,
     )
     background_tasks.add_task(
         write_audit_entry,
@@ -313,6 +314,30 @@ async def list_documents(
             seen.add(doc["id"])
             merged.append(doc)
     merged.sort(key=lambda d: d["created_at"], reverse=True)
+
+    # D-09: aggregate table_count / image_count from document_tables and document_images
+    # Pitfall 4: supabase-py has no native GROUP BY — fetch document_id rows, count in Python
+    if merged:
+        from collections import Counter  # noqa: PLC0415
+        doc_ids = [d["id"] for d in merged]
+        table_rows_res = (
+            supabase.table("document_tables")
+            .select("document_id")
+            .in_("document_id", doc_ids)
+            .execute()
+        )
+        image_rows_res = (
+            supabase.table("document_images")
+            .select("document_id")
+            .in_("document_id", doc_ids)
+            .execute()
+        )
+        tc = Counter(r["document_id"] for r in (table_rows_res.data or []))
+        ic = Counter(r["document_id"] for r in (image_rows_res.data or []))
+        for doc in merged:
+            doc["table_count"] = tc.get(doc["id"], 0)
+            doc["image_count"] = ic.get(doc["id"], 0)
+
     return merged
 
 
@@ -472,11 +497,23 @@ def ingest_document(
     supabase: Client,
     raw: bytes = b"",
     mime_type: str = "",
+    filename: str = "",
 ) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
     try:
         supabase.table("documents").update({"status": "processing"}).eq("id", document_id).execute()
+
+        # Extract metadata FIRST so we can use it to enrich chunk embeddings.
+        # This is best-effort — failures are logged but never block ingestion.
+        metadata = extract_metadata(text)
+        metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+        # Normalize case-sensitive filter fields for consistent retrieval
+        if metadata_dict:
+            if metadata_dict.get("document_type"):
+                metadata_dict["document_type"] = metadata_dict["document_type"].lower()
+            if metadata_dict.get("language"):
+                metadata_dict["language"] = metadata_dict["language"].lower()
 
         chunks = chunk_text(text)
         if not chunks:
@@ -486,30 +523,37 @@ def ingest_document(
             }).eq("id", document_id).execute()
             return
 
+        # Build a context header prepended to each chunk before embedding.
+        # The header makes filename, title, date, and document type visible in the
+        # vector space so queries like "amount paid on 17 Jan" can match a receipt
+        # whose date appears only in the filename — not in its text content.
+        # We embed the enriched text but store the raw chunk for clean display.
+        header_parts = [f"Document: {filename}"] if filename else []
+        if metadata_dict:
+            if metadata_dict.get("title"):
+                header_parts.append(f"Title: {metadata_dict['title']}")
+            if metadata_dict.get("date"):
+                header_parts.append(f"Date: {metadata_dict['date']}")
+            if metadata_dict.get("document_type"):
+                header_parts.append(f"Type: {metadata_dict['document_type']}")
+        context_header = f"[{' | '.join(header_parts)}]\n" if header_parts else ""
+
+        texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks
+
         app_settings = load_app_settings()
-        embeddings = embed_chunks(chunks, model=app_settings.embedding_model or None)
+        embeddings = embed_chunks(texts_to_embed, model=app_settings.embedding_model or None)
 
         chunk_rows = [
             {
                 "document_id": document_id,
                 "user_id": user_id,
-                "content": chunk,
+                "content": chunk,        # raw text — clean for display and citations
                 "chunk_index": i,
-                "embedding": embedding,
+                "embedding": embedding,  # computed from context_header + chunk
             }
             for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
         ]
         supabase.table("document_chunks").insert(chunk_rows).execute()
-
-        # Extract metadata — best-effort, never blocks completion
-        metadata = extract_metadata(text)
-        metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
-        # Normalize case-sensitive filter fields for consistent retrieval
-        if metadata_dict:
-            if metadata_dict.get("document_type"):
-                metadata_dict["document_type"] = metadata_dict["document_type"].lower()
-            if metadata_dict.get("language"):
-                metadata_dict["language"] = metadata_dict["language"].lower()
 
         # --- Multi-modal extraction (Phase 35) ---
         if raw and mime_type:

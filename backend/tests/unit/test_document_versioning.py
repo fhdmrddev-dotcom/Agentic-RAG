@@ -366,8 +366,12 @@ class TestDocumentVersioningUI:
 
         latest_doc = self._base_doc()
 
-        # list_documents makes 1 own_docs query (no global folders patched away)
-        builder.execute.return_value = _make_result([latest_doc])
+        # list_documents: own docs, then document_tables and document_images aggregation queries
+        builder.execute.side_effect = [
+            _make_result([latest_doc]),   # own docs
+            _make_result([]),             # document_tables rows
+            _make_result([]),             # document_images rows
+        ]
 
         app.dependency_overrides[get_current_user] = lambda: MOCK_USER
         app.dependency_overrides[get_supabase] = lambda: supabase

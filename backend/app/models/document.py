@@ -36,3 +36,5 @@ class DocumentResponse(BaseModel):
     metadata: DocumentMetadata | None = None
     created_at: datetime
     updated_at: datetime
+    table_count: int = 0
+    image_count: int = 0
