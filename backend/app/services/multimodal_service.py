@@ -1,5 +1,5 @@
 """
-Multi-modal extraction service for Phase 35.
+Multi-modal extraction service for Phase 35-36.
 
 Extracts tables (MODAL-01) and images with vision descriptions (MODAL-02)
 from PDF and DOCX files during ingestion. All extractions are wrapped in
@@ -26,6 +26,10 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 
 # Maximum vision API calls per document (Pitfall 6: large PDFs)
 _MAX_VISION_CALLS = 20
+
+# Maximum base64 payload size per image — prevents uncapped vision API calls
+# 512 KB is sufficient for any low-detail vision call
+_MAX_B64_BYTES = 512 * 1024
 
 
 # ---------------------------------------------------------------------------
@@ -202,18 +206,22 @@ def extract_docx_images(raw: bytes, min_px: int = 50) -> list[dict]:
     return results
 
 
-def describe_image(b64_png: str, app_settings: "UserEffectiveSettings") -> str:
+def describe_image(b64_png: str, app_settings: "UserEffectiveSettings", client=None) -> str:
     """Call vision LLM to produce a 1-2 sentence description of the image.
 
     Uses the active model. Returns empty string on any failure (model may
     not support vision — Pitfall 3).
+
+    ``client`` is optional — callers can pass a pre-created OpenAI client for
+    connection reuse. If None, a new client is created (fallback for direct use).
     """
     from openai import OpenAI
 
-    client = OpenAI(
-        api_key=app_settings.llm_api_key,
-        base_url=app_settings.llm_base_url or None,
-    )
+    if client is None:
+        client = OpenAI(
+            api_key=app_settings.llm_api_key,
+            base_url=app_settings.llm_base_url or None,
+        )
     resp = client.chat.completions.create(
         model=app_settings.llm_model,
         messages=[{
@@ -264,16 +272,31 @@ def extract_and_store_images(
         if not image_dicts:
             return
 
+        from openai import OpenAI  # noqa: PLC0415
+        openai_client = OpenAI(
+            api_key=app_settings.llm_api_key,
+            base_url=app_settings.llm_base_url or None,
+        )
+
         rows: list[dict] = []
         for img in image_dicts[:_MAX_VISION_CALLS]:
             # Secondary size guard — extraction helpers filter too, but mocks bypass them in tests
             if img.get("width", 0) < 50 or img.get("height", 0) < 50:
                 continue
+            b64 = img["b64_png"]
+            if len(b64) > _MAX_B64_BYTES:
+                log.debug(
+                    "Skipping oversized image in %s (%d bytes b64)", document_id, len(b64)
+                )
+                continue
             try:
-                description = describe_image(img["b64_png"], app_settings)
+                description = describe_image(b64, app_settings, client=openai_client)
             except Exception as exc:
                 log.debug("Vision description failed for image in %s: %s", document_id, exc)
                 description = ""
+            if not description:
+                log.debug("Skipping image with no description in %s", document_id)
+                continue
             rows.append({
                 "document_id": document_id,
                 "user_id": user_id,
@@ -402,17 +425,22 @@ def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> str:
         headers: list[str] = tbl.get("headers") or []
         rows: list[list] = tbl.get("rows") or []
 
-        # Apply column_filter: keep rows where named column exactly matches value
+        # Apply column_filter: keep rows where ALL named columns match (AND semantics)
         if column_filter:
             matched: list[list] = []
             for row in rows:
+                match = True
                 for col_name, col_val in column_filter.items():
                     try:
                         col_idx = headers.index(col_name)
-                        if len(row) > col_idx and str(row[col_idx]) == str(col_val):
-                            matched.append(row)
+                        if not (len(row) > col_idx and str(row[col_idx]) == str(col_val)):
+                            match = False
+                            break
                     except ValueError:
-                        pass  # column not in this table — skip
+                        match = False
+                        break
+                if match:
+                    matched.append(row)
             rows = matched
 
         # Skip tables with no rows after filter (avoids empty table entries in output)
