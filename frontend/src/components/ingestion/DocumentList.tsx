@@ -350,11 +350,21 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium max-w-xs truncate">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 flex-wrap">
                       {doc.filename}
                       {(doc.version_number ?? 1) > 1 && (
                         <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
                           v{doc.version_number}
+                        </span>
+                      )}
+                      {(doc.table_count ?? 0) > 0 && (
+                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                          {doc.table_count} tables
+                        </span>
+                      )}
+                      {(doc.image_count ?? 0) > 0 && (
+                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.5 text-xs">
+                          {doc.image_count} imgs
                         </span>
                       )}
                     </span>

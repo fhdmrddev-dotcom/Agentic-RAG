@@ -118,6 +118,8 @@ export interface Document {
   metadata: DocumentMetadata | null
   created_at: string
   updated_at: string
+  table_count?: number
+  image_count?: number
 }
 
 export interface Skill {
