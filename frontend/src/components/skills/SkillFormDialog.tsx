@@ -13,6 +13,144 @@ import { Textarea } from "@/components/ui/textarea"
 import { listSkillFiles, uploadSkillFile, deleteSkillFile } from "@/lib/api"
 import type { Skill, SkillCreate, SkillUpdate, SkillFile } from "@/types"
 
+// ---------------------------------------------------------------------------
+// SkillForm — shared inner form component used by both SkillFormDialog and SkillDetailPanel
+// ---------------------------------------------------------------------------
+
+interface SkillFormProps {
+  name: string
+  setName: (v: string) => void
+  description: string
+  setDescription: (v: string) => void
+  instructions: string
+  setInstructions: (v: string) => void
+  isEdit: boolean
+  isOwner: boolean
+  skill?: Skill | null
+  files: SkillFile[]
+  uploading: boolean
+  fileError: string | null
+  onAttach: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onDeleteFile: (fileId: string) => void
+  fileInputRef: React.RefObject<HTMLInputElement>
+}
+
+function SkillForm({
+  name,
+  setName,
+  description,
+  setDescription,
+  instructions,
+  setInstructions,
+  isEdit,
+  isOwner,
+  skill,
+  files,
+  uploading,
+  fileError,
+  onAttach,
+  onDeleteFile,
+  fileInputRef,
+}: SkillFormProps) {
+  function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  return (
+    <div className="flex flex-col gap-4 overflow-y-auto flex-1 min-h-0">
+      {/* Name */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-foreground">Name</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. SQL Writer" />
+      </div>
+
+      {/* Description */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-foreground">Description</label>
+        <Textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="One sentence describing what this skill does"
+          rows={2}
+        />
+      </div>
+
+      {/* Instructions */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-foreground">Instructions</label>
+        <Textarea
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
+          rows={6}
+          className="font-mono text-sm"
+        />
+      </div>
+
+      {/* Attached Files — edit mode only */}
+      {isEdit && skill && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-foreground">Attached Files</label>
+            {isOwner && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
+                {uploading ? "Uploading..." : "Attach File"}
+              </Button>
+            )}
+          </div>
+          <input ref={fileInputRef} type="file" className="hidden" onChange={onAttach} />
+          {files.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No files attached.</p>
+          ) : (
+            <ul className="flex flex-col gap-1 overflow-y-auto max-h-48">
+              {files.map((f) => (
+                <li key={f.id} className="flex items-center justify-between text-xs bg-muted rounded px-2 py-1">
+                  <span className="flex items-center gap-1 text-foreground truncate">
+                    <FileText className="h-3 w-3 shrink-0" />
+                    {f.filename}
+                    <span className="text-muted-foreground ml-1">({formatBytes(f.file_size)})</span>
+                  </span>
+                  {isOwner && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5 hover:text-destructive shrink-0"
+                      onClick={() => onDeleteFile(f.id)}
+                      aria-label="Delete file"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {fileError && <p className="text-xs text-destructive">{fileError}</p>}
+        </div>
+      )}
+
+      {/* ENV VAR INPUTS — insert here when Skill schema gains env_vars field.
+          Per D-10/D-11: each Input gets className="bg-card/50 ghost-border rounded-lg",
+          wrapped in <div className="flex items-center gap-2">, with a Required or ReadOnly
+          <span> badge (bg-rose-500/10 text-rose-400 OR bg-muted text-muted-foreground)
+          as a sibling after the Input. */}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SkillFormDialog — modal variant (unchanged external behavior)
+// ---------------------------------------------------------------------------
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -52,12 +190,6 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
       }
     }
   }, [open, skill])
-
-  function formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -109,82 +241,28 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
           <DialogTitle>{isEdit ? "Edit Skill" : "New Skill"}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4 py-2 overflow-y-auto flex-1 min-h-0 pr-1">
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Name</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. SQL Writer"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Description</label>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="One sentence describing what this skill does"
-              rows={2}
-            />
-          </div>
-
-          {/* Instructions */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-foreground">Instructions</label>
-            <Textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              placeholder="Step-by-step instructions the agent follows when this skill is loaded..."
-              rows={6}
-              className="font-mono text-sm"
-            />
-          </div>
-
-          {/* Attached Files — edit mode only */}
-          {isEdit && skill && (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Attached Files</label>
-                {isOwner && (
-                  <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                    {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Paperclip className="h-3 w-3" />}
-                    {uploading ? "Uploading..." : "Attach File"}
-                  </Button>
-                )}
-              </div>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} />
-              {files.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No files attached.</p>
-              ) : (
-                <ul className="flex flex-col gap-1 overflow-y-auto max-h-48">
-                  {files.map((f) => (
-                    <li key={f.id} className="flex items-center justify-between text-xs bg-muted rounded px-2 py-1">
-                      <span className="flex items-center gap-1 text-foreground truncate">
-                        <FileText className="h-3 w-3 shrink-0" />
-                        {f.filename}
-                        <span className="text-muted-foreground ml-1">({formatBytes(f.file_size)})</span>
-                      </span>
-                      {isOwner && (
-                        <Button variant="ghost" size="icon" className="h-5 w-5 hover:text-destructive shrink-0" onClick={() => handleDeleteFile(f.id)} aria-label="Delete file">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {fileError && <p className="text-xs text-destructive">{fileError}</p>}
-            </div>
-          )}
+        <div className="py-2 flex-1 min-h-0 overflow-y-auto pr-1">
+          <SkillForm
+            name={name}
+            setName={setName}
+            description={description}
+            setDescription={setDescription}
+            instructions={instructions}
+            setInstructions={setInstructions}
+            isEdit={isEdit}
+            isOwner={isOwner}
+            skill={skill}
+            files={files}
+            uploading={uploading}
+            fileError={fileError}
+            onAttach={handleFileUpload}
+            onDeleteFile={handleDeleteFile}
+            fileInputRef={fileInputRef}
+          />
         </div>
 
         <DialogFooter className="flex-col items-stretch gap-2 shrink-0">
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
               Discard Changes
@@ -196,5 +274,137 @@ export function SkillFormDialog({ open, onOpenChange, skill, onSave, currentUser
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// SkillDetailPanel — inline panel variant for 3-pane SkillsPage layout
+// ---------------------------------------------------------------------------
+
+interface SkillDetailPanelProps {
+  skill: Skill | null
+  onSave: (body: SkillCreate | SkillUpdate) => Promise<void>
+  onDiscard: () => void
+  currentUserId?: string
+}
+
+export function SkillDetailPanel({ skill, onSave, onDiscard, currentUserId }: SkillDetailPanelProps) {
+  const isEdit = !!skill
+  const isOwner = !!(skill && currentUserId && skill.user_id === currentUserId)
+
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [instructions, setInstructions] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [files, setFiles] = useState<SkillFile[]>([])
+  const [uploading, setUploading] = useState(false)
+  const [fileError, setFileError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Reset when selected skill changes
+  useEffect(() => {
+    setName(skill?.name ?? "")
+    setDescription(skill?.description ?? "")
+    setInstructions(skill?.instructions ?? "")
+    setError(null)
+    setSaving(false)
+    setFiles([])
+    setFileError(null)
+    if (skill) {
+      listSkillFiles(skill.id)
+        .then(setFiles)
+        .catch(() => setFileError("Failed to load files."))
+    }
+  }, [skill])
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !skill) return
+    setUploading(true)
+    setFileError(null)
+    try {
+      const newFile = await uploadSkillFile(skill.id, file)
+      setFiles((prev) => [...prev, newFile])
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : "Upload failed.")
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!skill) return
+    try {
+      await deleteSkillFile(skill.id, fileId)
+      setFiles((prev) => prev.filter((f) => f.id !== fileId))
+    } catch {
+      setFileError("Failed to delete file.")
+    }
+  }
+
+  const handleSave = async () => {
+    if (!name.trim() || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const body = isEdit
+        ? ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillUpdate)
+        : ({ name: name.trim(), description: description.trim(), instructions: instructions.trim() } as SkillCreate)
+      await onSave(body)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save skill.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Panel header */}
+      <div className="px-6 pt-6 pb-4 border-b border-border/10 shrink-0">
+        <p className="text-base font-headline font-bold text-foreground">
+          {skill?.name ?? "New Skill"}
+        </p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {isEdit ? "Edit Skill" : "New Skill"}
+        </p>
+      </div>
+
+      {/* Form body */}
+      <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+        <SkillForm
+          name={name}
+          setName={setName}
+          description={description}
+          setDescription={setDescription}
+          instructions={instructions}
+          setInstructions={setInstructions}
+          isEdit={isEdit}
+          isOwner={isOwner}
+          skill={skill}
+          files={files}
+          uploading={uploading}
+          fileError={fileError}
+          onAttach={handleFileUpload}
+          onDeleteFile={handleDeleteFile}
+          fileInputRef={fileInputRef}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 pt-4 pb-6 border-t border-border/10 shrink-0">
+        {error && <p className="text-sm text-destructive mb-2">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onDiscard}>
+            Discard Changes
+          </Button>
+          <Button onClick={handleSave} disabled={!name.trim() || saving}>
+            {isEdit ? "Update Skill" : "Save Skill"}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
