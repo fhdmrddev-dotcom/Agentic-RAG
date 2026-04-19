@@ -238,7 +238,11 @@ Plans:
   3. Active skill toggles glow with indigo-to-cyan gradient
   4. Skill API key/env inputs use bg-card/50 pill styling with Required/ReadOnly badges
   5. SettingsPage section dividers replaced with tonal background shifts
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 042-01-PLAN.md — AppDock component creation, Sidebar nav extraction, ChatLayout integration
+- [ ] 042-02-PLAN.md — SkillsPage 3-pane rebuild, SkillDetailPanel inline form
+- [ ] 042-03-PLAN.md — Toggle glow upgrade, SettingsPage tonal card treatment
 **UI hint**: yes
 
 ### Phase 43: UI Redesign — Mobile & Responsive
@@ -303,5 +307,5 @@ Plans:
 | 39. User Feedback Loop — Backend | v2.3 | 1/2 | In Progress | 2026-04-18 |
 | 40. User Feedback Loop — Frontend | v2.3 | 0/2 | Planned | |
 | 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 2/2 | Complete | 2026-04-19 |
-| 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/1 | Planned | |
+| 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/3 | Planned | |
 | 43. UI Redesign — Mobile & Responsive | v2.3 | 0/1 | Planned | |
