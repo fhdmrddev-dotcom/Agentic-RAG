@@ -9,6 +9,7 @@ interface Props {
   skill: Skill
   currentUserId: string
   onEdit: (skill: Skill) => void
+  onSelect: (skill: Skill) => void
   onDelete: (id: string) => Promise<void>
   onToggleEnabled: (id: string) => Promise<void>
   onToggleGlobal: (id: string) => Promise<void>
@@ -20,6 +21,7 @@ export function SkillCard({
   skill,
   currentUserId,
   onEdit,
+  onSelect,
   onDelete,
   onToggleEnabled,
   onToggleGlobal,
@@ -77,9 +79,10 @@ export function SkillCard({
   return (
     <div
       className={cn(
-        "rounded-xl bg-card ghost-border p-4 transition-all animate-fadeSlideUp",
+        "rounded-xl bg-card ghost-border p-4 transition-all animate-fadeSlideUp cursor-pointer",
         !localEnabled && "opacity-50",
       )}
+      onClick={() => onSelect(skill)}
     >
       {/* Header row */}
       <div className="flex items-start gap-2">
@@ -191,7 +194,7 @@ export function SkillCard({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => onEdit(skill)}
+                      onClick={(e) => { e.stopPropagation(); onSelect(skill); onEdit(skill) }}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
