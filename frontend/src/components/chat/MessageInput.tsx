@@ -104,11 +104,11 @@ export function MessageInput({
     : null
 
   return (
-    <div className="bg-background/80 backdrop-blur-sm px-6 py-4">
+    <div className="px-4 pb-3 bg-transparent">
       <div className="max-w-4xl mx-auto">
         <div
           className={cn(
-            "rounded-xl ghost-border bg-card/80 backdrop-blur-sm shadow-sm transition-all duration-200",
+            "rounded-2xl ghost-border bg-card/80 backdrop-blur-sm shadow-lg shadow-primary/5 transition-all duration-200",
             "focus-within:ring-2 focus-within:ring-primary/30 focus-within:shadow-lg focus-within:shadow-primary/5",
           )}
         >
