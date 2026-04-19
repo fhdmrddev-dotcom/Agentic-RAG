@@ -93,7 +93,7 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
         {open ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
       </button>
       {open && (
-        <div className="mt-1 rounded-md bg-muted/30 px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-foreground/60 space-y-0.5 overflow-x-auto">
+        <div className="mt-1 rounded-md bg-card/50 backdrop-blur-md px-2.5 py-1.5 font-mono text-[10px] leading-relaxed text-foreground/60 space-y-0.5 overflow-x-auto">
           {entries.map(([key, val]) => (
             <div key={key} className="flex gap-2 min-w-0">
               <span className="text-primary/60 flex-shrink-0">{key}:</span>
@@ -431,7 +431,7 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
         <span className="font-medium">{summary}</span>
       </button>
       {open && content && (
-        <div className="mt-1.5 ml-4.5 rounded-lg bg-muted/15 p-2.5 ghost-border">
+        <div className="mt-1.5 ml-4.5 rounded-lg bg-card/50 backdrop-blur-md p-2.5 ghost-border">
           {content}
         </div>
       )}
@@ -517,7 +517,7 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
       "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
       isActivelyWorking
         ? "bg-primary/5 border border-primary/20 shadow-[0_0_20px_-4px_hsl(239_84%_67%/0.15)]"
-        : "bg-muted/30 ghost-border"
+        : "bg-card/80 backdrop-blur-sm ghost-border"
     )}>
       {/* Header */}
       <button
