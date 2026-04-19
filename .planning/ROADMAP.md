@@ -152,7 +152,11 @@ Plans:
   2. A query_tables tool allows the agent to query structured tables by document and optional column filter
   3. The document library shows a "Tables: N, Images: N" badge on documents where extraction produced results
   4. query_tables is listed in the General Mode system prompt tool catalog
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 043-01-PLAN.md — NavPanel collapsible component + ChatLayout migration
+- [ ] 043-02-PLAN.md — shadcn Tabs install + SettingsPage 5-tab layout + WR-03/WR-04 fixes
+- [ ] 043-03-PLAN.md — Mobile drawer + active thread gradient upgrade + human verification checkpoint
 **UI hint**: yes
 
 ### Phase 37: Knowledge Health Dashboard — Backend
@@ -308,4 +312,4 @@ Plans:
 | 40. User Feedback Loop — Frontend | v2.3 | 0/2 | Planned | |
 | 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 2/2 | Complete | 2026-04-19 |
 | 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/3 | Planned | |
-| 43. UI Redesign — Mobile & Responsive | v2.3 | 0/1 | Planned | |
+| 43. UI Redesign — Mobile & Responsive | v2.3 | 0/3 | Planned | |
