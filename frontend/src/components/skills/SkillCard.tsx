@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Zap, Eye, EyeOff, Pencil, Globe, Trash2, MessageSquare, Download, Loader2 } from "lucide-react"
+import { Zap, Pencil, Globe, Trash2, MessageSquare, Download, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
@@ -147,18 +147,27 @@ export function SkillCard({
             {!(skill.user_id !== currentUserId && skill.is_global) && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
+                  <button
+                    className="flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-full"
                     onClick={handleToggleEnabled}
+                    aria-pressed={localEnabled}
+                    aria-label={localEnabled ? "Disable skill" : "Enable skill"}
                   >
-                    {localEnabled ? (
-                      <Eye className="h-3.5 w-3.5" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
+                    <div
+                      className={cn(
+                        "relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-200",
+                        !localEnabled && "bg-muted",
+                      )}
+                      style={localEnabled ? {
+                        backgroundImage: "linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%))"
+                      } : undefined}
+                    >
+                      <span className={cn(
+                        "inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform",
+                        localEnabled ? "translate-x-4" : "translate-x-1",
+                      )} />
+                    </div>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   {localEnabled ? "Disable skill" : "Enable skill"}
