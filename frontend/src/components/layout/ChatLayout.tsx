@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from "react"
-import { Sidebar } from "./Sidebar"
-import { AppDock } from "./AppDock"
+import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
@@ -55,8 +54,10 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
 
   return (
     <div className="flex h-screen bg-background">
-      <AppDock activeView={activeView} onNavigate={onNavigate} onSignOut={onSignOut} />
-      <Sidebar
+      <NavPanel
+        activeView={activeView}
+        onNavigate={onNavigate}
+        onSignOut={onSignOut}
         threads={threads}
         selectedThread={selectedThread}
         onSelectThread={selectThread}
@@ -64,7 +65,6 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         loadThreads={loadThreads}
         onDeleteThread={deleteThread}
         onRenameThread={renameThread}
-        folders={folders}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
