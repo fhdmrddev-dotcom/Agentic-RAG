@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { Plus, LogOut, MessageSquare, FileText, Settings, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon, Moon, Sun, Zap, Activity } from "lucide-react"
+import { Plus, MessageSquare, Sparkles, Pencil, Trash2, MoreHorizontal, Folder as FolderIcon, Moon, Sun } from "lucide-react"
 import type { Folder, Thread } from "@/types"
-import type { ActiveView } from "@/App"
 
 interface Props {
   threads: Thread[]
   selectedThread: Thread | null
   onSelectThread: (thread: Thread) => void
   onNewThread: () => void
-  onSignOut: () => void
   loadThreads: () => Promise<void>
-  activeView: ActiveView
-  onNavigate: (view: ActiveView) => void
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
   folders: Folder[]
@@ -26,10 +22,7 @@ export function Sidebar({
   selectedThread,
   onSelectThread,
   onNewThread,
-  onSignOut,
   loadThreads,
-  activeView,
-  onNavigate,
   onDeleteThread,
   onRenameThread,
   folders: _folders,
@@ -86,7 +79,7 @@ export function Sidebar({
           </p>
           <div className="px-1 mb-2">
             <Button
-              onClick={() => { onNavigate("chat"); onNewThread() }}
+              onClick={() => onNewThread()}
               className="w-full justify-center gap-2 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
               size="sm"
             >
@@ -101,7 +94,7 @@ export function Sidebar({
               <p className="text-[10px] text-muted-foreground/50 text-center py-4 italic">No recent chats</p>
             )}
             {threads.map((thread) => {
-              const isSelected = activeView === "chat" && selectedThread?.id === thread.id
+              const isSelected = selectedThread?.id === thread.id
               const isEditing = editingId === thread.id
               const isMenuOpen = menuOpenId === thread.id
               const isHovered = hoveredId === thread.id
@@ -134,7 +127,7 @@ export function Sidebar({
                           ? "bg-primary/10 text-primary"
                           : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
                       )}
-                      onClick={() => { onNavigate("chat"); onSelectThread(thread) }}
+                      onClick={() => onSelectThread(thread)}
                     >
                       {/* Active indicator */}
                       {isSelected && (
@@ -197,96 +190,17 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Fixed Area — Knowledge Base + Footer */}
-      <div className="border-t border-border/10">
-        <div className="px-2 py-3 space-y-4">
-          {/* Knowledge Base Section */}
-          <div>
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-              Knowledge Base
-            </p>
-            <div className="space-y-0.5">
-              <Button
-                onClick={() => onNavigate("documents")}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start gap-2 transition-all py-2",
-                  activeView === "documents"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
-                )}
-              >
-                <FileText className="h-4 w-4" />
-                Documents
-              </Button>
-              <Button
-                onClick={() => onNavigate("library-health")}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start gap-2 transition-all py-2",
-                  activeView === "library-health"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
-                )}
-              >
-                <Activity className="h-4 w-4" />
-                Library Health
-              </Button>
-              <Button
-                onClick={() => onNavigate("skills")}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start gap-2 transition-all py-2",
-                  activeView === "skills"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
-                )}
-              >
-                <Zap className="h-4 w-4" />
-                Skills
-              </Button>
-              <Button
-                onClick={() => onNavigate("settings")}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start gap-2 transition-all py-2",
-                  activeView === "settings"
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
-                )}
-              >
-                <Settings className="h-4 w-4" />
-                Settings
-              </Button>
-            </div>
-          </div>
-
-          {/* User/System row */}
-          <div className="space-y-0.5">
-            <Button
-              onClick={onToggleTheme}
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all py-2"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              {theme === "dark" ? "Light Mode" : "Dark Mode"}
-            </Button>
-            <Button
-              onClick={onSignOut}
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive transition-all py-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
-          </div>
-        </div>
+      {/* Footer — theme toggle only */}
+      <div className="border-t border-border/10 px-2 py-2">
+        <Button
+          onClick={onToggleTheme}
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all py-2"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </Button>
       </div>
     </div>
   )
