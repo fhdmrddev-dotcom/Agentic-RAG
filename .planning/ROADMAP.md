@@ -240,9 +240,9 @@ Plans:
   5. SettingsPage section dividers replaced with tonal background shifts
 **Plans**: 3 plans
 Plans:
-- [ ] 042-01-PLAN.md — AppDock component creation, Sidebar nav extraction, ChatLayout integration
-- [ ] 042-02-PLAN.md — SkillsPage 3-pane rebuild, SkillDetailPanel inline form
-- [ ] 042-03-PLAN.md — Toggle glow upgrade, SettingsPage tonal card treatment
+- [x] 042-01-PLAN.md — AppDock component creation, Sidebar nav extraction, ChatLayout integration
+- [x] 042-02-PLAN.md — SkillsPage 3-pane rebuild, SkillDetailPanel inline form
+- [x] 042-03-PLAN.md — Toggle glow upgrade, SettingsPage tonal card treatment
 **UI hint**: yes
 
 ### Phase 43: UI Redesign — Mobile & Responsive
