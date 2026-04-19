@@ -180,14 +180,14 @@ export function NavPanel({
                   className={cn(
                     "relative rounded-lg cursor-pointer transition-all duration-150 py-1.5",
                     isSelected
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:bg-accent/40 hover:text-sidebar-foreground",
                   )}
                   onClick={() => onSelectThread(thread)}
                 >
                   {/* Active indicator */}
                   {isSelected && (
-                    <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary" />
+                    <div className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-gradient-to-b from-indigo-500 to-cyan-500" />
                   )}
                   {/* Title row */}
                   <div className="px-3 flex items-center gap-2 overflow-hidden whitespace-nowrap">
@@ -250,7 +250,7 @@ export function NavPanel({
   return (
     <div
       className={cn(
-        "flex flex-col h-full bg-sidebar border-r border-border/20 shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out",
+        "hidden md:flex flex-col h-full bg-sidebar border-r border-border/20 shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out",
         isCollapsed ? "w-14" : "w-64",
       )}
     >

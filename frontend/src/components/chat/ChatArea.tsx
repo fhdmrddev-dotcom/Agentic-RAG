@@ -4,7 +4,7 @@ import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
 import { getProviders } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
-import { Folder as FolderIcon, Sparkles } from "lucide-react"
+import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
 
 interface Provider {
   id: string
@@ -20,9 +20,10 @@ interface Props {
   folders: Folder[]
   prefillMessage?: string | null
   onClearPrefill?: () => void
+  onOpenDrawer?: () => void
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
   const { messages, isStreaming, loadMessages, sendMessage, stopStreaming } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
@@ -102,6 +103,17 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   if (!thread) {
     return (
       <div className="flex flex-col h-full bg-background">
+        {/* Mobile nav trigger for welcome state */}
+        <div className="md:hidden px-4 py-2 flex items-center border-b border-border/30">
+          <button
+            type="button"
+            className="flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            aria-label="Open navigation"
+            onClick={onOpenDrawer}
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-5 max-w-md px-6 animate-fadeSlideUp">
             <div className="flex justify-center">
@@ -144,6 +156,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="px-6 py-3 bg-background/80 backdrop-blur-md flex items-center gap-2.5 border-b border-border/30">
+        {/* Mobile menu trigger */}
+        <button
+          type="button"
+          className="md:hidden flex items-center justify-center w-11 h-11 rounded-xl text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+          aria-label="Open navigation"
+          onClick={onOpenDrawer}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
         <h2 className="font-headline font-semibold text-sm truncate text-foreground">{thread.title}</h2>
         {thread.folder_id && (
           <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium shrink-0">
