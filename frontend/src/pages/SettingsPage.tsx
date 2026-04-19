@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { getSettings, updateSettings, getAuditLogs, exportAuditLogs } from "@/lib/api"
 import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "@/lib/api"
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
@@ -281,6 +282,7 @@ function AuditLogSection() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const pageSize = 50
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -306,10 +308,11 @@ function AuditLogSection() {
 
   const handleExport = async () => {
     setExporting(true)
+    setExportError(null)
     try {
       await exportAuditLogs(since, actionType)
     } catch {
-      // Silently fail — export is best-effort
+      setExportError("Export failed. Please try again.")
     } finally {
       setExporting(false)
     }
@@ -322,10 +325,15 @@ function AuditLogSection() {
           <CardTitle className="text-base font-headline font-bold">Audit Log</CardTitle>
           <CardDescription>Your account activity — all significant actions recorded for security and compliance.</CardDescription>
         </div>
-        <Button size="sm" className="gap-2 gradient-primary shrink-0" onClick={handleExport} disabled={exporting || loading}>
-          {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-          Export CSV
-        </Button>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Button size="sm" className="gap-2 gradient-primary" onClick={handleExport} disabled={exporting || loading}>
+            {exporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Export CSV
+          </Button>
+          {exportError && (
+            <p className="text-xs text-destructive mt-1">{exportError}</p>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {/* Filters row */}
@@ -415,9 +423,25 @@ function AuditLogSection() {
 export function SettingsPage() {
   const [s, setS] = useState<FullAppSettings | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Per-tab save states
+  const [savingAI, setSavingAI] = useState(false)
+  const [savedAI, setSavedAI] = useState(false)
+  const [savingSearch, setSavingSearch] = useState(false)
+  const [savedSearch, setSavedSearch] = useState(false)
+  const [savingIntegrations, setSavingIntegrations] = useState(false)
+  const [savedIntegrations, setSavedIntegrations] = useState(false)
+
+  // Tab persistence
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    return localStorage.getItem("settings_active_tab") ?? "0"
+  })
+
+  function handleTabChange(value: string) {
+    setActiveTab(value)
+    localStorage.setItem("settings_active_tab", value)
+  }
 
   // Provider states
   const [providerStates, setProviderStates] = useState<ProviderState[]>([])
@@ -493,8 +517,8 @@ export function SettingsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleSave = async () => {
-    setSaving(true)
+  const handleSaveAIModel = async () => {
+    setSavingAI(true)
     setError(null)
     try {
       const body: SettingsUpdate = {
@@ -506,6 +530,23 @@ export function SettingsPage() {
           models: ps.models.split(",").map((m) => m.trim()).filter(Boolean),
           base_url: ps.base_url,
         })),
+      }
+      const updated = await updateSettings(body)
+      hydrate(updated)
+      setSavedAI(true)
+      setTimeout(() => setSavedAI(false), 2500)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save AI Model settings")
+    } finally {
+      setSavingAI(false)
+    }
+  }
+
+  const handleSaveSearch = async () => {
+    setSavingSearch(true)
+    setError(null)
+    try {
+      const body: SettingsUpdate = {
         embedding_model: embeddingModel,
         embedding_api_key: embeddingApiKey || KEY_PLACEHOLDER,
         embedding_base_url: embeddingBaseUrl,
@@ -522,18 +563,35 @@ export function SettingsPage() {
         vector_search_weight: vectorWeight,
         keyword_search_weight: keywordWeight,
         rrf_k: rrfK,
+      }
+      const updated = await updateSettings(body)
+      hydrate(updated)
+      setSavedSearch(true)
+      setTimeout(() => setSavedSearch(false), 2500)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to save Search settings")
+    } finally {
+      setSavingSearch(false)
+    }
+  }
+
+  const handleSaveIntegrations = async () => {
+    setSavingIntegrations(true)
+    setError(null)
+    try {
+      const body: SettingsUpdate = {
         tavily_api_key: tavilyApiKey || KEY_PLACEHOLDER,
         web_search_max_results: webSearchMaxResults,
         sandbox_enabled: sandboxEnabled,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      setSavedIntegrations(true)
+      setTimeout(() => setSavedIntegrations(false), 2500)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save settings")
+      setError(e instanceof Error ? e.message : "Failed to save Integrations settings")
     } finally {
-      setSaving(false)
+      setSavingIntegrations(false)
     }
   }
 
@@ -563,7 +621,7 @@ export function SettingsPage() {
     <div className="flex flex-col h-full overflow-y-auto p-8">
       <div className="max-w-3xl w-full mx-auto space-y-8">
 
-        {/* Header */}
+        {/* Header — no global Save button */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-headline font-bold text-foreground">Settings</h1>
@@ -572,13 +630,9 @@ export function SettingsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving} className="gap-1.5">
+            <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5">
               <RotateCcw className="h-3.5 w-3.5" />
               Reset
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 gradient-primary">
-              {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-              {saved ? "Saved!" : saving ? "Saving…" : "Save"}
             </Button>
           </div>
         </div>
@@ -587,178 +641,238 @@ export function SettingsPage() {
           <p className="text-sm text-destructive bg-destructive/10 px-4 py-2.5 rounded-lg">{error}</p>
         )}
 
-        {/* ── Providers ── */}
-        <SectionCard
-          title="LLM Providers"
-          description="Configure API keys and models for each provider. The active provider is used by default for new chats."
-        >
-          <div className="space-y-3 py-2">
-            {s?.providers.map((provider) => {
-              const ps = providerStates.find((p) => p.id === provider.id)
-              if (!ps) return null
-              return (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  state={ps}
-                  isActive={activeProvider === provider.id}
-                  onChange={(updated) =>
-                    setProviderStates((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-                  }
-                  onSetActive={() => {
-                    setActiveProvider(provider.id)
-                    const firstModel = ps.models.split(",")[0]?.trim()
-                    if (firstModel) setLlmModel(firstModel)
-                  }}
-                />
-              )
-            })}
-          </div>
-        </SectionCard>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="0">AI Model</TabsTrigger>
+            <TabsTrigger value="1">Search &amp; Retrieval</TabsTrigger>
+            <TabsTrigger value="2">Integrations</TabsTrigger>
+            <TabsTrigger value="3">Memory</TabsTrigger>
+            <TabsTrigger value="4">Audit Log</TabsTrigger>
+          </TabsList>
 
-        {/* ── Active model ── */}
-        <SectionCard title="Active Model" description="Default model used when starting a new chat.">
-          <FieldRow label="Model">
-            <TextInput value={llmModel} onChange={setLlmModel} placeholder="e.g. gpt-4o" />
-          </FieldRow>
-          {activeModels && (
-            <div className="py-2">
-              <p className="text-xs text-muted-foreground mb-1">Available from active provider:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {activeModels.split(",").map((m) => m.trim()).filter(Boolean).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setLlmModel(m)}
-                    className={cn(
-                      "text-[11px] px-2.5 py-1 rounded-full ghost-border transition-all",
-                      llmModel === m
-                        ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                        : "bg-muted/30 text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {m}
-                  </button>
-                ))}
+          {/* Tab 0: AI Model */}
+          <TabsContent value="0">
+            <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
+              {/* LLM Providers SectionCard */}
+              <SectionCard
+                title="LLM Providers"
+                description="Configure API keys and models for each provider. The active provider is used by default for new chats."
+              >
+                <div className="space-y-3 py-2">
+                  {s?.providers.map((provider) => {
+                    const ps = providerStates.find((p) => p.id === provider.id)
+                    if (!ps) return null
+                    return (
+                      <ProviderCard
+                        key={provider.id}
+                        provider={provider}
+                        state={ps}
+                        isActive={activeProvider === provider.id}
+                        onChange={(updated) =>
+                          setProviderStates((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+                        }
+                        onSetActive={() => {
+                          setActiveProvider(provider.id)
+                          const firstModel = ps.models.split(",")[0]?.trim()
+                          if (firstModel) setLlmModel(firstModel)
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+              </SectionCard>
+
+              {/* Active Model SectionCard */}
+              <SectionCard title="Active Model" description="Default model used when starting a new chat.">
+                <FieldRow label="Model">
+                  <TextInput value={llmModel} onChange={setLlmModel} placeholder="e.g. gpt-4o" />
+                </FieldRow>
+                {activeModels && (
+                  <div className="py-2">
+                    <p className="text-xs text-muted-foreground mb-1">Available from active provider:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeModels.split(",").map((m) => m.trim()).filter(Boolean).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setLlmModel(m)}
+                          className={cn(
+                            "text-[11px] px-2.5 py-1 rounded-full ghost-border transition-all",
+                            llmModel === m
+                              ? "bg-primary/10 text-primary border-primary/30 font-medium"
+                              : "bg-muted/30 text-muted-foreground hover:text-foreground",
+                          )}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </SectionCard>
+
+              {/* Save AI Model button */}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveAIModel}
+                  disabled={savingAI}
+                  className="gap-1.5 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
+                >
+                  {savingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : savedAI ? <Check className="h-4 w-4" /> : <Save className="h-3.5 w-3.5" />}
+                  {savedAI ? "Saved!" : savingAI ? "Saving\u2026" : "Save AI Model"}
+                </Button>
               </div>
             </div>
-          )}
-        </SectionCard>
+          </TabsContent>
 
-        {/* ── Embedding ── */}
-        <SectionCard title="Embedding" description="Model used to embed documents and queries for semantic search.">
-          <div className="bg-card/40 rounded-md px-3 py-2">
-            <FieldRow label="Model">
-              <TextInput value={embeddingModel} onChange={setEmbeddingModel} placeholder="text-embedding-3-small" />
-            </FieldRow>
-            <FieldRow label="Dimensions">
-              <NumberInput value={embeddingDimensions} onChange={setEmbeddingDimensions} min={64} max={4096} />
-            </FieldRow>
-            <FieldRow label="Base URL (optional)">
-              <TextInput value={embeddingBaseUrl} onChange={setEmbeddingBaseUrl} placeholder="Leave blank to use active provider" />
-            </FieldRow>
-            <FieldRow label="API Key (optional)">
-              <ApiKeyInput value={embeddingApiKey} onChange={setEmbeddingApiKey} placeholder="Leave blank to use active provider key" />
-            </FieldRow>
-          </div>
-        </SectionCard>
+          {/* Tab 1: Search & Retrieval */}
+          <TabsContent value="1">
+            <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
+              {/* Embedding SectionCard */}
+              <SectionCard title="Embedding" description="Model used to embed documents and queries for semantic search.">
+                <div className="bg-card/40 rounded-md px-3 py-2">
+                  <FieldRow label="Model">
+                    <TextInput value={embeddingModel} onChange={setEmbeddingModel} placeholder="text-embedding-3-small" />
+                  </FieldRow>
+                  <FieldRow label="Dimensions">
+                    <NumberInput value={embeddingDimensions} onChange={setEmbeddingDimensions} min={64} max={4096} />
+                  </FieldRow>
+                  <FieldRow label="Base URL (optional)">
+                    <TextInput value={embeddingBaseUrl} onChange={setEmbeddingBaseUrl} placeholder="Leave blank to use active provider" />
+                  </FieldRow>
+                  <FieldRow label="API Key (optional)">
+                    <ApiKeyInput value={embeddingApiKey} onChange={setEmbeddingApiKey} placeholder="Leave blank to use active provider key" />
+                  </FieldRow>
+                </div>
+              </SectionCard>
 
-        {/* ── Reranking ── */}
-        <SectionCard title="Reranking" description="Re-score retrieved chunks with a cross-encoder for higher precision.">
-          <FieldRow label="Enabled">
-            <Toggle checked={rerankEnabled} onChange={setRerankEnabled} label={rerankEnabled ? "On" : "Off"} />
-          </FieldRow>
-          {rerankEnabled && (
-            <>
-              <FieldRow label="Provider">
-                <select
-                  value={rerankProvider}
-                  onChange={(e) => setRerankProvider(e.target.value)}
-                  className="h-8 w-full text-sm rounded-md bg-muted/30 ghost-border px-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  <option value="api">API (Cohere)</option>
-                  <option value="local">Local (sentence-transformers)</option>
-                </select>
-              </FieldRow>
-              <FieldRow label="Model">
-                <TextInput value={rerankModel} onChange={setRerankModel} placeholder="rerank-v3.5" />
-              </FieldRow>
-              <FieldRow label="Top-N results">
-                <NumberInput value={rerankTopN} onChange={setRerankTopN} min={1} max={50} />
-              </FieldRow>
-              {rerankProvider === "api" && (
-                <FieldRow label="API Key">
-                  <ApiKeyInput value={rerankApiKey} onChange={setRerankApiKey} />
+              {/* Reranking SectionCard */}
+              <SectionCard title="Reranking" description="Re-score retrieved chunks with a cross-encoder for higher precision.">
+                <FieldRow label="Enabled">
+                  <Toggle checked={rerankEnabled} onChange={setRerankEnabled} label={rerankEnabled ? "On" : "Off"} />
                 </FieldRow>
-              )}
-            </>
-          )}
-        </SectionCard>
+                {rerankEnabled && (
+                  <>
+                    <FieldRow label="Provider">
+                      <select
+                        value={rerankProvider}
+                        onChange={(e) => setRerankProvider(e.target.value)}
+                        className="h-8 w-full text-sm rounded-md bg-muted/30 ghost-border px-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="api">API (Cohere)</option>
+                        <option value="local">Local (sentence-transformers)</option>
+                      </select>
+                    </FieldRow>
+                    <FieldRow label="Model">
+                      <TextInput value={rerankModel} onChange={setRerankModel} placeholder="rerank-v3.5" />
+                    </FieldRow>
+                    <FieldRow label="Top-N results">
+                      <NumberInput value={rerankTopN} onChange={setRerankTopN} min={1} max={50} />
+                    </FieldRow>
+                    {rerankProvider === "api" && (
+                      <FieldRow label="API Key">
+                        <ApiKeyInput value={rerankApiKey} onChange={setRerankApiKey} />
+                      </FieldRow>
+                    )}
+                  </>
+                )}
+              </SectionCard>
 
-        {/* ── Retrieval ── */}
-        <SectionCard title="Retrieval" description="Controls how document chunks are retrieved and ranked.">
-          <FieldRow label="Top-K chunks">
-            <NumberInput value={retrievalTopK} onChange={setRetrievalTopK} min={1} max={50} />
-          </FieldRow>
-          <FieldRow label="Match threshold">
-            <NumberInput value={retrievalThreshold} onChange={setRetrievalThreshold} min={0} max={1} step={0.05} />
-          </FieldRow>
-          <FieldRow label="Hybrid search">
-            <Toggle checked={hybridEnabled} onChange={setHybridEnabled} label={hybridEnabled ? "On" : "Off"} />
-          </FieldRow>
-          {hybridEnabled && (
-            <>
-              <FieldRow label="Candidate count">
-                <NumberInput value={hybridCandidates} onChange={setHybridCandidates} min={5} max={200} />
-              </FieldRow>
-              <FieldRow label="Vector weight">
-                <NumberInput value={vectorWeight} onChange={setVectorWeight} min={0} max={10} step={0.1} />
-              </FieldRow>
-              <FieldRow label="Keyword weight">
-                <NumberInput value={keywordWeight} onChange={setKeywordWeight} min={0} max={10} step={0.1} />
-              </FieldRow>
-              <FieldRow label="RRF-K constant">
-                <NumberInput value={rrfK} onChange={setRrfK} min={1} max={200} />
-              </FieldRow>
-            </>
-          )}
-        </SectionCard>
+              {/* Retrieval SectionCard */}
+              <SectionCard title="Retrieval" description="Controls how document chunks are retrieved and ranked.">
+                <FieldRow label="Top-K chunks">
+                  <NumberInput value={retrievalTopK} onChange={setRetrievalTopK} min={1} max={50} />
+                </FieldRow>
+                <FieldRow label="Match threshold">
+                  <NumberInput value={retrievalThreshold} onChange={setRetrievalThreshold} min={0} max={1} step={0.05} />
+                </FieldRow>
+                <FieldRow label="Hybrid search">
+                  <Toggle checked={hybridEnabled} onChange={setHybridEnabled} label={hybridEnabled ? "On" : "Off"} />
+                </FieldRow>
+                {hybridEnabled && (
+                  <>
+                    <FieldRow label="Candidate count">
+                      <NumberInput value={hybridCandidates} onChange={setHybridCandidates} min={5} max={200} />
+                    </FieldRow>
+                    <FieldRow label="Vector weight">
+                      <NumberInput value={vectorWeight} onChange={setVectorWeight} min={0} max={10} step={0.1} />
+                    </FieldRow>
+                    <FieldRow label="Keyword weight">
+                      <NumberInput value={keywordWeight} onChange={setKeywordWeight} min={0} max={10} step={0.1} />
+                    </FieldRow>
+                    <FieldRow label="RRF-K constant">
+                      <NumberInput value={rrfK} onChange={setRrfK} min={1} max={200} />
+                    </FieldRow>
+                  </>
+                )}
+              </SectionCard>
 
-        {/* ── Web search ── */}
-        <SectionCard title="Web Search" description="Enable web search via Tavily. Leave key blank to disable.">
-          <div className="bg-card/40 rounded-md px-3 py-2">
-            <FieldRow label="Tavily API Key">
-              <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-… (leave blank to disable)" />
-            </FieldRow>
-            <FieldRow label="Max results">
-              <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
-            </FieldRow>
-          </div>
-        </SectionCard>
+              {/* Save Search Settings button */}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveSearch}
+                  disabled={savingSearch}
+                  className="gap-1.5 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
+                >
+                  {savingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : savedSearch ? <Check className="h-4 w-4" /> : <Save className="h-3.5 w-3.5" />}
+                  {savedSearch ? "Saved!" : savingSearch ? "Saving\u2026" : "Save Search Settings"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
 
-        {/* ── Sandbox ── */}
-        <SectionCard title="Code Execution" description="Run Python code in a sandboxed Docker container.">
-          <FieldRow label="Sandbox enabled">
-            <Toggle checked={sandboxEnabled} onChange={setSandboxEnabled} label={sandboxEnabled ? "On" : "Off"} />
-          </FieldRow>
-        </SectionCard>
+          {/* Tab 2: Integrations */}
+          <TabsContent value="2">
+            <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
+              {/* Web Search SectionCard */}
+              <SectionCard title="Web Search" description="Enable web search via Tavily. Leave key blank to disable.">
+                <div className="bg-card/40 rounded-md px-3 py-2">
+                  <FieldRow label="Tavily API Key">
+                    <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-\u2026 (leave blank to disable)" />
+                  </FieldRow>
+                  <FieldRow label="Max results">
+                    <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
+                  </FieldRow>
+                </div>
+              </SectionCard>
 
-        {/* -- Memory -- */}
-        <MemorySection />
+              {/* Code Execution Sandbox SectionCard */}
+              <SectionCard title="Code Execution" description="Run Python code in a sandboxed Docker container.">
+                <FieldRow label="Sandbox enabled">
+                  <Toggle checked={sandboxEnabled} onChange={setSandboxEnabled} label={sandboxEnabled ? "On" : "Off"} />
+                </FieldRow>
+              </SectionCard>
 
-        {/* ── Audit Log ── */}
-        <AuditLogSection />
+              {/* Save Integrations button */}
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveIntegrations}
+                  disabled={savingIntegrations}
+                  className="gap-1.5 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
+                >
+                  {savingIntegrations ? <Loader2 className="h-4 w-4 animate-spin" /> : savedIntegrations ? <Check className="h-4 w-4" /> : <Save className="h-3.5 w-3.5" />}
+                  {savedIntegrations ? "Saved!" : savingIntegrations ? "Saving\u2026" : "Save Integrations"}
+                </Button>
+              </div>
+            </div>
+          </TabsContent>
 
-        {/* Save (bottom) */}
-        <div className="flex justify-end gap-2 pb-4">
-          <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving} className="gap-1.5">
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5 gradient-primary">
-            {saved ? <Check className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
-            {saved ? "Saved!" : saving ? "Saving…" : "Save all changes"}
-          </Button>
-        </div>
+          {/* Tab 3: Memory — read-only, no Save button */}
+          <TabsContent value="3">
+            <div className="bg-card/50 ghost-border rounded-xl p-6">
+              <MemorySection />
+            </div>
+          </TabsContent>
+
+          {/* Tab 4: Audit Log — read-only + export, no Save button */}
+          <TabsContent value="4">
+            <div className="bg-card/50 ghost-border rounded-xl p-6">
+              <AuditLogSection />
+            </div>
+          </TabsContent>
+        </Tabs>
 
       </div>
     </div>
