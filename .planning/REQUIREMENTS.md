@@ -80,9 +80,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### UI Redesign — Deep Midnight (UI)
 
-- [ ] **UI-01**: ToolCallPanel uses glassmorphic styling: bg-card/80 backdrop-blur-sm wrapper, bg-card/50 backdrop-blur-md nested parameter blocks
-- [ ] **UI-02**: CitationCard uses ambient gradient borders; file-type icons color-coded (PDF red, DOCX blue, Markdown purple)
-- [ ] **UI-03**: MessageInput renders as a floating pill (rounded-2xl shadow-lg backdrop-blur-sm) that does not block expanded citations
+- [x] **UI-01**: ToolCallPanel uses glassmorphic styling: bg-card/80 backdrop-blur-sm wrapper, bg-card/50 backdrop-blur-md nested parameter blocks
+- [x] **UI-02**: CitationCard uses ambient gradient borders; file-type icons color-coded (PDF red, DOCX blue, Markdown purple)
+- [x] **UI-03**: MessageInput renders as a floating pill (rounded-2xl shadow-lg backdrop-blur-sm) that does not block expanded citations
 - [ ] **UI-04**: Nav icons extracted from Sidebar into a standalone AppDock component
 - [ ] **UI-05**: SkillsPage uses 3-pane layout with tonal background depth instead of border-r dividers
 - [ ] **UI-06**: Active skill toggles glow with indigo-to-cyan gradient; env inputs use pill styling with Required/ReadOnly badges
@@ -158,9 +158,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 | FB-03 | Phase 39 | Complete |
 | FB-04 | Phase 40 | Complete |
 | FB-05 | Phase 40 | Complete |
-| UI-01 | Phase 41 | Planned |
-| UI-02 | Phase 41 | Planned |
-| UI-03 | Phase 41 | Planned |
+| UI-01 | Phase 41 | Complete |
+| UI-02 | Phase 41 | Complete |
+| UI-03 | Phase 41 | Complete |
 | UI-04 | Phase 42 | Planned |
 | UI-05 | Phase 42 | Planned |
 | UI-06 | Phase 42 | Planned |

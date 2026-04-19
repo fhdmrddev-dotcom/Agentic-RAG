@@ -91,7 +91,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 38: Knowledge Health Dashboard — Frontend** — Library Health view in sidebar with action hooks (delete, re-ingest, move) + KPI stat bar, retrieval chart, pagination, enhanced chips (completed 2026-04-18)
 - [x] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard (completed 2026-04-18)
 - [x] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health (completed 2026-04-19)
-- [ ] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput
+- [x] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput (completed 2026-04-19)
 - [ ] **Phase 42: UI Redesign — Layout Shell & Skills** — Extract AppDock from Sidebar; 3-pane SkillsPage with tonal depth; premium glow toggles; SettingsPage tonal polish
 - [ ] **Phase 43: UI Redesign — Mobile & Responsive** — Frosted overlay drawer for thread list on mobile; responsive breakpoints in ChatLayout; active-thread gradient accent
 ## Phase Details (v2.3)
@@ -302,6 +302,6 @@ Plans:
 | 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
 | 39. User Feedback Loop — Backend | v2.3 | 1/2 | In Progress | 2026-04-18 |
 | 40. User Feedback Loop — Frontend | v2.3 | 0/2 | Planned | |
-| 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 0/1 | Planned | |
+| 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 2/2 | Complete | 2026-04-19 |
 | 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/1 | Planned | |
 | 43. UI Redesign — Mobile & Responsive | v2.3 | 0/1 | Planned | |
