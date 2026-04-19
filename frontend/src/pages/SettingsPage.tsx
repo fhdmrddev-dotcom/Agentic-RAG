@@ -115,13 +115,13 @@ function SectionCard({ title, description, children }: {
   title: string; description: string; children: React.ReactNode
 }) {
   return (
-    <Card className="ghost-border bg-card/50 shadow-sm">
+    <Card className="ghost-border bg-card/60 shadow-sm">
       <CardHeader>
         <CardTitle className="text-base font-headline font-bold">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="divide-y divide-border/30">{children}</div>
+        <div className="space-y-1">{children}</div>
       </CardContent>
     </Card>
   )
@@ -316,7 +316,7 @@ function AuditLogSection() {
   }
 
   return (
-    <Card className="ghost-border bg-card/50 shadow-sm">
+    <Card className="ghost-border bg-card/60 shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
           <CardTitle className="text-base font-headline font-bold">Audit Log</CardTitle>
@@ -646,18 +646,20 @@ export function SettingsPage() {
 
         {/* ── Embedding ── */}
         <SectionCard title="Embedding" description="Model used to embed documents and queries for semantic search.">
-          <FieldRow label="Model">
-            <TextInput value={embeddingModel} onChange={setEmbeddingModel} placeholder="text-embedding-3-small" />
-          </FieldRow>
-          <FieldRow label="Dimensions">
-            <NumberInput value={embeddingDimensions} onChange={setEmbeddingDimensions} min={64} max={4096} />
-          </FieldRow>
-          <FieldRow label="Base URL (optional)">
-            <TextInput value={embeddingBaseUrl} onChange={setEmbeddingBaseUrl} placeholder="Leave blank to use active provider" />
-          </FieldRow>
-          <FieldRow label="API Key (optional)">
-            <ApiKeyInput value={embeddingApiKey} onChange={setEmbeddingApiKey} placeholder="Leave blank to use active provider key" />
-          </FieldRow>
+          <div className="bg-card/40 rounded-md px-3 py-2">
+            <FieldRow label="Model">
+              <TextInput value={embeddingModel} onChange={setEmbeddingModel} placeholder="text-embedding-3-small" />
+            </FieldRow>
+            <FieldRow label="Dimensions">
+              <NumberInput value={embeddingDimensions} onChange={setEmbeddingDimensions} min={64} max={4096} />
+            </FieldRow>
+            <FieldRow label="Base URL (optional)">
+              <TextInput value={embeddingBaseUrl} onChange={setEmbeddingBaseUrl} placeholder="Leave blank to use active provider" />
+            </FieldRow>
+            <FieldRow label="API Key (optional)">
+              <ApiKeyInput value={embeddingApiKey} onChange={setEmbeddingApiKey} placeholder="Leave blank to use active provider key" />
+            </FieldRow>
+          </div>
         </SectionCard>
 
         {/* ── Reranking ── */}
@@ -723,12 +725,14 @@ export function SettingsPage() {
 
         {/* ── Web search ── */}
         <SectionCard title="Web Search" description="Enable web search via Tavily. Leave key blank to disable.">
-          <FieldRow label="Tavily API Key">
-            <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-… (leave blank to disable)" />
-          </FieldRow>
-          <FieldRow label="Max results">
-            <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
-          </FieldRow>
+          <div className="bg-card/40 rounded-md px-3 py-2">
+            <FieldRow label="Tavily API Key">
+              <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-… (leave blank to disable)" />
+            </FieldRow>
+            <FieldRow label="Max results">
+              <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
+            </FieldRow>
+          </div>
         </SectionCard>
 
         {/* ── Sandbox ── */}
