@@ -232,4 +232,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 — Phase 34 complete: cross-thread memory settings UI shipped (MEM-02 — MemorySection component with view, inline-edit, delete wired into Settings page above AuditLogSection)*
+*Last updated: 2026-04-19 — Phase 41 complete: Deep Midnight UI redesign applied to ToolCallPanel (glassmorphic bg-card/80), CitationCard (gradient left-accent strip, color-coded file icons), CitationList (Radix Collapsible 200ms animation), and MessageInput (floating pill rounded-2xl). UI-01, UI-02, UI-03 validated.*
