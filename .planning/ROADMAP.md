@@ -127,7 +127,9 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   1. User must confirm through a dialog before a thread is deleted — the delete only executes on explicit confirmation
   2. After deleting a thread and creating a new one, the chat area shows a blank state with no ghost content from the deleted thread
   3. User can choose a folder when creating a new chat, and the thread is scoped to that folder from the start
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 45-01-PLAN.md — Delete confirmation dialog and ghost content fix (CHAT-01, CHAT-02)
+  - [ ] 45-02-PLAN.md — Folder selector on new chat creation (CHAT-03)
 **UI hint**: yes
 
 ### Phase 46: Smart Skill Dispatch
@@ -193,7 +195,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 44. SSE & Stop Reliability | v2.4 | 0/? | Not started | - |
-| 45. Chat UX Fixes | v2.4 | 0/? | Not started | - |
+| 45. Chat UX Fixes | v2.4 | 0/2 | Planning complete | - |
 | 46. Smart Skill Dispatch | v2.4 | 0/? | Not started | - |
 | 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
