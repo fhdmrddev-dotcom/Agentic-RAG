@@ -82,26 +82,29 @@ describe("FolderNode", () => {
     expect(svgs.length).toBeGreaterThan(0)
   })
 
-  it("shows Globe icon when is_global=true", () => {
+  it("shows global badge when is_global=true", () => {
     const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode({ is_global: true })}
         {...defaultProps}
       />
     )
-    const globeIcon = container.querySelector("[data-testid='globe-icon']")
-    expect(globeIcon).toBeInTheDocument()
+    // Redesign uses a "G" badge instead of a Globe icon
+    const globalBadge = container.querySelector(".rounded-full")
+    expect(globalBadge).toBeInTheDocument()
+    expect(globalBadge?.textContent).toBe("G")
   })
 
-  it("does not show Globe icon when is_global=false", () => {
+  it("does not show global badge when is_global=false", () => {
     const { container } = renderWithTooltip(
       <FolderNodeComponent
         node={makeNode({ is_global: false })}
         {...defaultProps}
       />
     )
-    const globeIcon = container.querySelector("[data-testid='globe-icon']")
-    expect(globeIcon).not.toBeInTheDocument()
+    const globalBadges = container.querySelectorAll(".rounded-full")
+    const hasGBadge = Array.from(globalBadges).some((el) => el.textContent === "G")
+    expect(hasGBadge).toBe(false)
   })
 
   it("inline rename: renders input when editingId matches node id", () => {
@@ -167,7 +170,8 @@ describe("FolderNode", () => {
         selectedFolderId="node-1"
       />
     )
-    const row = container.querySelector(".border-primary")
+    // Redesign uses bg-primary/10 for selected highlight
+    const row = container.querySelector(".bg-primary\\/10")
     expect(row).toBeInTheDocument()
   })
 })

@@ -75,8 +75,8 @@ describe("FolderTree", () => {
     renderWithTooltip(
       <FolderTree {...defaultProps} selectedFolderId={null} />
     )
-    // The Root row should have the primary border highlight
-    const rootRow = screen.getByText("Root").closest(".border-primary")
+    // The Root row should have the primary background highlight after redesign
+    const rootRow = screen.getByText("Root").closest(".bg-primary\\/10")
     expect(rootRow).toBeInTheDocument()
   })
 
@@ -98,11 +98,12 @@ describe("FolderTree", () => {
     expect(onSelectFolder).toHaveBeenCalledWith(null)
   })
 
-  it("global folder shows Globe icon", () => {
+  it("global folder shows global badge", () => {
     const { container } = renderWithTooltip(<FolderTree {...defaultProps} />)
-    // Beta is global — should have a Globe icon (data-testid='globe-icon')
-    const globeIcons = container.querySelectorAll("[data-testid='globe-icon']")
-    expect(globeIcons.length).toBeGreaterThan(0)
+    // Beta is global — should have a "G" badge after redesign
+    const globalBadges = container.querySelectorAll(".rounded-full")
+    const hasGBadge = Array.from(globalBadges).some((el) => el.textContent === "G")
+    expect(hasGBadge).toBe(true)
   })
 
   it("private folder does NOT show Globe icon for all-private tree", () => {

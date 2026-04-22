@@ -3,6 +3,7 @@
  */
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { MessageItem } from "@/components/chat/MessageItem"
 import type { Message } from "@/types"
 
@@ -21,14 +22,18 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
   }
 }
 
+function renderWithTooltip(ui: React.ReactElement) {
+  return render(<TooltipProvider>{ui}</TooltipProvider>)
+}
+
 describe("MessageItem – user messages", () => {
   it("renders the message content", () => {
-    render(<MessageItem message={makeMessage({ content: "Hello world" })} />)
+    renderWithTooltip(<MessageItem message={makeMessage({ content: "Hello world" })} />)
     expect(screen.getByText("Hello world")).toBeInTheDocument()
   })
 
   it("aligns user message to the right (justify-end)", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "user" })} />,
     )
     const wrapper = container.querySelector("div")
@@ -36,62 +41,63 @@ describe("MessageItem – user messages", () => {
   })
 
   it("does not show the bot icon for user messages", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "user" })} />,
     )
-    // Bot icon has a parent with bg-primary; user icon has bg-muted
+    // Bot icon has a parent with gradient-primary; user icon has bg-muted
     // We check the icon wrapper count: user messages only have 1 avatar div (right)
     const avatarDivs = container.querySelectorAll(".rounded-full")
     expect(avatarDivs).toHaveLength(1)
   })
 
   it("applies primary background for user messages", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "user", content: "Hi" })} />,
     )
-    // Find the bubble div
-    const bubble = container.querySelector(".bg-primary.text-primary-foreground")
+    // Find the bubble div — redesign uses gradient-primary
+    const bubble = container.querySelector(".gradient-primary")
     expect(bubble).toBeInTheDocument()
   })
 })
 
 describe("MessageItem – assistant messages", () => {
   it("renders the message content", () => {
-    render(
+    renderWithTooltip(
       <MessageItem message={makeMessage({ role: "assistant", content: "I can help!" })} />,
     )
     expect(screen.getByText("I can help!")).toBeInTheDocument()
   })
 
-  it("aligns assistant message to the left (justify-start)", () => {
-    const { container } = render(
+  it("aligns assistant message to the left (flex row with gap-3)", () => {
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "assistant" })} />,
     )
     const wrapper = container.querySelector("div")
-    expect(wrapper?.className).toContain("justify-start")
+    expect(wrapper?.className).toContain("gap-3")
   })
 
   it("shows the bot icon for assistant messages", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "assistant" })} />,
     )
-    // Bot icon parent has bg-primary class
-    const botIconWrapper = container.querySelector(".bg-primary")
+    // Bot icon parent has gradient-primary class after redesign
+    const botIconWrapper = container.querySelector(".gradient-primary")
     expect(botIconWrapper).toBeInTheDocument()
   })
 
-  it("applies muted background for assistant messages", () => {
-    const { container } = render(
+  it("applies text foreground for assistant messages", () => {
+    const { container } = renderWithTooltip(
       <MessageItem message={makeMessage({ role: "assistant", content: "Sure" })} />,
     )
-    const bubble = container.querySelector(".bg-muted")
-    expect(bubble).toBeInTheDocument()
+    // Assistant content uses text-foreground after redesign (no bg-muted bubble)
+    const content = container.querySelector(".text-foreground")
+    expect(content).toBeInTheDocument()
   })
 })
 
 describe("MessageItem – streaming state", () => {
   it("shows thinking indicator when streaming with empty content", () => {
-    render(
+    renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "" })}
         isStreaming={true}
@@ -101,7 +107,7 @@ describe("MessageItem – streaming state", () => {
   })
 
   it("shows cursor when streaming with non-empty content", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Partial" })}
         isStreaming={true}
@@ -113,7 +119,7 @@ describe("MessageItem – streaming state", () => {
   })
 
   it("does not show streaming indicators when not streaming", () => {
-    const { container } = render(
+    const { container } = renderWithTooltip(
       <MessageItem
         message={makeMessage({ role: "assistant", content: "Done" })}
         isStreaming={false}
