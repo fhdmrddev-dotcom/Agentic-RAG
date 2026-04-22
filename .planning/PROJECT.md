@@ -8,9 +8,21 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: Planning next milestone
+## Current Milestone: v2.4 Stability, Polish & UX Fixes
 
-**Goal:** TBD
+**Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
+
+**Target features:**
+- SSE & Stop Reliability — graceful disconnects, partial response persistence
+- Smart Skill Dispatch — relevance-based skill selection, not catalog blasting
+- Document Deletion Choices — version-aware delete with cleanup
+- Chat Delete Confirmation & State Cleanup — confirmation dialog, ghost chat fix
+- Folder Selector on New Chat — scope threads from creation
+- Root Folder Visibility — ensure root documents are clearly visible
+- Web Search Toggle — settings on/off switch like sandbox/reranking
+- Upload Error Clarity — specific failure reasons in UI
+- Navigation Polish — icon label alignment, collapsed logo visibility
+- Library Health at Scale — pagination, meaningful metrics, actionable empty states
 
 ## Current State
 
@@ -110,7 +122,28 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ### Active
 
-(Planning next milestone — no active requirements yet)
+- [ ] STREAM-01: Stop cancels SSE generator immediately (no "saving response" linger)
+- [ ] STREAM-02: Navigate/refresh during streaming disconnects gracefully (no socket errors)
+- [ ] STREAM-03: Partial responses persisted on stop, visible on reload
+- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills
+- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog
+- [ ] DOC-01: Delete document offers "this version only" or "all versions"
+- [ ] DOC-02: Single-version delete cleans chunks/storage and promotes next version
+- [ ] DOC-03: All-versions delete removes chunks, storage, and history
+- [ ] DOC-04: Root-folder documents clearly visible in document list
+- [ ] DOC-05: Upload errors show specific reasons (duplicate, type, empty, size)
+- [ ] DOC-06: Root folder upload works correctly with clear UX
+- [ ] CHAT-01: Thread delete shows confirmation dialog before executing
+- [ ] CHAT-02: No ghost content from deleted thread appears in new chat
+- [ ] CHAT-03: New chat creation presents folder selector
+- [ ] SETT-01: Web search toggle in Settings (on/off) like sandbox/reranking
+- [ ] SETT-02: Web search excluded from tool set when toggled off
+- [ ] NAV-01: Icon labels directly next to icons when sidebar is expanded
+- [ ] NAV-02: Logo icon visible when sidebar is collapsed
+- [ ] HLTH-01: Knowledge Health uses server-side pagination (not fixed top-10)
+- [ ] HLTH-02: Low confidence panel explains query-document relevance, not document quality
+- [ ] HLTH-03: Feedback empty states use actionable corporate-appropriate messaging
+- [ ] HLTH-04: Knowledge Health API supports pagination parameters
 
 ### Out of Scope
 
@@ -129,6 +162,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 | Folder-level permissions | Global folders visible to all, per-user folders private |
 | Switching to Docling | Existing pypdf + python-docx pipeline is working |
 | Nyquist VALIDATION.md compliance | Phase-level validation files in draft state; full compliance deferred |
+| Comprehensive skills system overhaul | Planned for next milestone; this milestone only fixes dispatch relevance |
 
 ## Context
 
@@ -159,6 +193,15 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - UAT verification gaps for phases 038–042 (require live browser testing)
 - Verification checks for phases 038, 039, 040, 041, 042 marked human_needed
 - Metadata ingest normalization covers only document_type/language
+- SSE "saving response" linger when user stops streaming mid-response
+- socket.send() exception when navigating/refreshing during active SSE stream
+- Skill catalog injected in full for every request (token waste, over-triggering)
+- No confirmation dialog on thread delete
+- Ghost chat content appears briefly after delete+new chat
+- Icon labels misaligned (far right of icons) in NavPanel
+- Logo disappears entirely when sidebar collapsed (opacity-0 on whole group)
+- Knowledge Health fixed top-10 lists don’t scale for large libraries
+- Low confidence metric is misleading (reflects query relevance, not document quality)
 
 ## Key Decisions
 
@@ -218,4 +261,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 after v2.3 milestone*
+*Last updated: 2026-04-22 after v2.4 milestone started*

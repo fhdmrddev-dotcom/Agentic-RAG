@@ -7,6 +7,7 @@
 - ✅ **v2.1 Stability & RAG Correctness** — Phases 18–25 (shipped 2026-04-11)
 - ✅ **v2.2 Trust & Compliance** — Phases 26–32 (shipped 2026-04-16)
 - ✅ **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (shipped 2026-04-19)
+- 🚧 **v2.4 Stability, Polish & UX Fixes** — Phases 44–50 (in progress)
 
 ## Phases
 
@@ -93,50 +94,108 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 </details>
 
+### 🚧 v2.4 Stability, Polish & UX Fixes (In Progress)
+
+**Milestone Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
+
+- [ ] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved
+- [ ] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats
+- [ ] **Phase 46: Smart Skill Dispatch** — Only relevant skills appear in the agent's context
+- [ ] **Phase 47: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
+- [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
+- [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
+- [ ] **Phase 50: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
+
+## Phase Details
+
+### Phase 44: SSE & Stop Reliability
+**Goal**: Streaming responses stop immediately when the user clicks stop, disconnects are handled gracefully, and partial responses are never lost
+**Depends on**: Nothing (first phase — core reliability)
+**Requirements**: STREAM-01, STREAM-02, STREAM-03
+**Success Criteria** (what must be TRUE):
+  1. User can stop a streaming response and see the response terminate immediately — no "saving response" text lingers in the UI
+  2. User can navigate away or refresh the page during an active stream and no server-side socket errors appear in logs
+  3. Partial assistant responses are persisted when stop is triggered, so the user can reload the page and see the partial answer
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 45: Chat UX Fixes
+**Goal**: Chat interactions are safe and predictable — no accidental deletes, no ghost content, and new chats start with the right folder context
+**Depends on**: Phase 44 (streaming reliability resolved first)
+**Requirements**: CHAT-01, CHAT-02, CHAT-03
+**Success Criteria** (what must be TRUE):
+  1. User must confirm through a dialog before a thread is deleted — the delete only executes on explicit confirmation
+  2. After deleting a thread and creating a new one, the chat area shows a blank state with no ghost content from the deleted thread
+  3. User can choose a folder when creating a new chat, and the thread is scoped to that folder from the start
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 46: Smart Skill Dispatch
+**Goal**: The agent's system prompt includes only skills relevant to the user's current message, eliminating over-triggering and token waste
+**Depends on**: Phase 44 (streaming reliability resolved first)
+**Requirements**: SKILL-01, SKILL-02
+**Success Criteria** (what must be TRUE):
+  1. Only skills whose descriptions match the user's current message appear in the agent's system prompt — not all enabled skills
+  2. Skills that don't match the user's intent are never triggered during conversation, even if they exist in the user's enabled catalog
+**Plans**: TBD
+
+### Phase 47: Document Version Deletion
+**Goal**: Users can delete document versions intelligently — choosing between a single version or all versions — with complete cleanup of chunks, storage, and history
+**Depends on**: Nothing specific (document versioning already exists from v2.2)
+**Requirements**: DOC-01, DOC-02, DOC-03
+**Success Criteria** (what must be TRUE):
+  1. User is offered a choice between "delete this version only" and "delete all versions" when deleting a document
+  2. Deleting a single version removes its chunks and storage file, and promotes the next-latest version as the current version
+  3. Deleting all versions removes every version's chunks, storage files, and history records for that document
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 48: Document List & Upload Polish
+**Goal**: Document management feels complete — root-folder documents are clearly visible and uploads fail with helpful, specific messages
+**Depends on**: Phase 47 (deletion changes may affect document list queries)
+**Requirements**: DOC-04, DOC-05, DOC-06
+**Success Criteria** (what must be TRUE):
+  1. Documents stored in the root folder (no folder assignment) are clearly visible in the document list and recognizable as root-level items
+  2. When a file upload fails, the user sees the specific reason (duplicate file, unsupported type, empty file, or size limit exceeded)
+  3. User can upload to the root folder successfully, and the UX makes it clear where the file is being placed
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 49: Settings & Navigation Polish
+**Goal**: The app feels polished — web search is explicitly controllable and the sidebar layout is visually tight
+**Depends on**: Nothing specific
+**Requirements**: SETT-01, SETT-02, NAV-01, NAV-02
+**Success Criteria** (what must be TRUE):
+  1. User can toggle web search on or off in Settings, independent of whether a Tavily API key is configured
+  2. When web search is toggled off, the web_search tool is never included in the agent's available tool set
+  3. Icon labels appear directly adjacent to their icons in the expanded sidebar with no large gaps between icon and text
+  4. When the sidebar is collapsed, the logo icon remains visible (icon-only, no text)
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 50: Library Health at Scale
+**Goal**: Knowledge Health works for real-sized libraries — paginated, accurately labeled, and provides actionable guidance instead of empty dead-ends
+**Depends on**: Nothing specific (enhances existing v2.3 feature)
+**Requirements**: HLTH-01, HLTH-02, HLTH-03, HLTH-04
+**Success Criteria** (what must be TRUE):
+  1. Knowledge Health dashboard loads data in pages the user can navigate through, rather than a fixed top-10 list
+  2. Low confidence panel explains that scores reflect query-document relevance (not document quality), with context about score distribution
+  3. Feedback empty states show actionable, professional messaging guiding the user on what to do next
+  4. Knowledge Health API accepts offset/limit pagination parameters and returns total counts alongside paginated results
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 1. Folder Schema & Core APIs | v1.0 | 2/2 | Complete | 2026-03-21 |
-| 2. Document-Folder Integration | v1.0 | 2/2 | Complete | 2026-03-21 |
-| 3. Ingestion UI | v1.0 | 3/3 | Complete | 2026-03-21 |
-| 4. Navigation Tools | v1.0 | 2/2 | Complete | 2026-03-22 |
-| 5. Search Tools | v1.0 | 2/2 | Complete | 2026-03-21 |
-| 6. Read Tool | v1.0 | 2/2 | Complete | 2026-03-22 |
-| 7. Explorer Sub-Agent | v1.0 | 2/2 | Complete | 2026-03-22 |
-| 8. Folder System Enhancements | v1.0 | 3/3 | Complete | 2026-03-28 |
-| 9. Persistent Tool Memory | v2.0 | 1/1 | Complete | 2026-03-29 |
-| 10. Agent Skills Core | v2.0 | 3/3 | Complete | 2026-03-31 |
-| 11. Skills LLM Integration | v2.0 | 3/3 | Complete | 2026-04-01 |
-| 12. Skills UI | v2.0 | 3/3 | Complete | 2026-04-02 |
-| 13. Skills Open Standard | v2.0 | 2/2 | Complete | 2026-04-02 |
-| 14. Code Execution Sandbox | v2.0 | 5/5 | Complete | 2026-04-03 |
-| 15. Code Output UI | v2.0 | 2/2 | Complete | 2026-04-03 |
-| 16. Skill File Management UI | v2.0 | 2/2 | Complete | 2026-04-04 |
-| 17. Tech Debt Cleanup | v2.0 | 1/1 | Complete | 2026-04-04 |
-| 18. Context Window Hardening | v2.1 | 1/1 | Complete | 2026-04-09 |
-| 19. Sub-Agent Guards & API Error Visibility | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 20. Blank Response Guards | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 21. Keyword Search Folder Scope | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 22. RAG Correctness Fixes | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 23. System Prompt Quality | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 24. Infrastructure Hardening | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 25. Sub-Agent Intelligence & Model-Aware Context | v2.1 | 1/1 | Complete | 2026-04-10 |
-| 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete | 2026-04-12 |
-| 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete | 2026-04-12 |
-| 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete | 2026-04-12 |
-| 29. Document Versioning — UI | v2.2 | 2/2 | Complete | 2026-04-13 |
-| 30. Audit Log — Backend | v2.2 | 2/2 | Complete | 2026-04-14 |
-| 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete | 2026-04-14 |
-| 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
-| 33. Cross-Thread Memory — Backend | v2.3 | 2/2 | Complete | 2026-04-17 |
-| 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete | 2026-04-17 |
-| 35. Multi-Modal Ingestion | v2.3 | 4/4 | Complete | 2026-04-18 |
-| 36. Multi-Modal Query & Library UI | v2.3 | 3/3 | Complete | 2026-04-18 |
-| 37. Knowledge Health Dashboard — Backend | v2.3 | 2/2 | Complete | 2026-04-18 |
-| 38. Knowledge Health Dashboard — Frontend | v2.3 | 2/2 | Complete | 2026-04-18 |
-| 39. User Feedback Loop — Backend | v2.3 | 2/2 | Complete | 2026-04-18 |
-| 40. User Feedback Loop — Frontend | v2.3 | 2/2 | Complete | 2026-04-19 |
-| 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 2/2 | Complete | 2026-04-19 |
-| 42. UI Redesign — Layout Shell & Skills | v2.3 | 3/3 | Complete | 2026-04-19 |
-| 43. UI Redesign — Mobile & Responsive | v2.3 | 3/3 | Complete | 2026-04-19 |
+| 44. SSE & Stop Reliability | v2.4 | 0/? | Not started | - |
+| 45. Chat UX Fixes | v2.4 | 0/? | Not started | - |
+| 46. Smart Skill Dispatch | v2.4 | 0/? | Not started | - |
+| 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
+| 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
+| 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
+| 50. Library Health at Scale | v2.4 | 0/? | Not started | - |
