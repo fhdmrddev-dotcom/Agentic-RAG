@@ -6,7 +6,7 @@
 - ✅ **v2.0 Agent Skills & Code Execution** — Phases 9–17 (shipped 2026-04-04)
 - ✅ **v2.1 Stability & RAG Correctness** — Phases 18–25 (shipped 2026-04-11)
 - ✅ **v2.2 Trust & Compliance** — Phases 26–32 (shipped 2026-04-16)
-- 🚧 **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (in progress)
+- ✅ **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (shipped 2026-04-19)
 
 ## Phases
 
@@ -79,7 +79,7 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 
 ---
 
-### v2.3 Memory, Multimodal & Experience (In Progress)
+### v2.3 Memory, Multimodal & Experience (SHIPPED 2026-04-19)
 
 **Milestone Goal:** Deepen the agent intelligence with persistent memory and richer document understanding, then elevate the product feel with the Deep Midnight UI redesign across chat, citations, skills, and mobile.
 
@@ -92,8 +92,8 @@ Full details: `.planning/milestones/v2.2-ROADMAP.md`
 - [x] **Phase 39: User Feedback Loop — Backend** — message_feedback table, thumbs endpoints, aggregate stats for dashboard (completed 2026-04-18)
 - [x] **Phase 40: User Feedback Loop — Frontend** — Thumbs up/down on messages, reason selector, feedback stats in Library Health (completed 2026-04-19)
 - [x] **Phase 41: UI Redesign — Tool Call Visualizer & Citations** — Glassmorphic upgrades to ToolCallPanel, CitationCard/CitationList; floating pill MessageInput (completed 2026-04-19)
-- [ ] **Phase 42: UI Redesign — Layout Shell & Skills** — Extract AppDock from Sidebar; 3-pane SkillsPage with tonal depth; premium glow toggles; SettingsPage tonal polish
-- [ ] **Phase 43: UI Redesign — Mobile & Responsive** — Frosted overlay drawer for thread list on mobile; responsive breakpoints in ChatLayout; active-thread gradient accent
+- [x] **Phase 42: UI Redesign — Layout Shell & Skills** — AppDock component; SkillsPage 3-pane rebuild; toggle glow + SettingsPage tonal polish (completed 2026-04-19)
+- [x] **Phase 43: UI Redesign — Mobile & Responsive** — NavPanel collapsible; mobile drawer; active thread gradient (completed 2026-04-19)
 ## Phase Details (v2.3)
 
 ### Phase 33: Cross-Thread Memory — Backend
@@ -154,9 +154,9 @@ Plans:
   4. query_tables is listed in the General Mode system prompt tool catalog
 **Plans**: 3 plans
 Plans:
-- [ ] 043-01-PLAN.md — NavPanel collapsible component + ChatLayout migration
-- [ ] 043-02-PLAN.md — shadcn Tabs install + SettingsPage 5-tab layout + WR-03/WR-04 fixes
-- [ ] 043-03-PLAN.md — Mobile drawer + active thread gradient upgrade + human verification checkpoint
+- [x] 036-01-PLAN.md — multimodal_service.py: query_tables tool (document_tables lookup), embed image descriptions in search_documents
+- [x] 036-02-PLAN.md — Tables badge + Images badge on documents in DocumentList
+- [x] 036-03-PLAN.md — Tables panel in DocumentDetailView + Images gallery (lightbox)
 **UI hint**: yes
 
 ### Phase 37: Knowledge Health Dashboard — Backend
@@ -229,8 +229,9 @@ Plans:
   3. CitationList expand/collapse animation is 200ms ease
   4. MessageInput renders as floating pill (rounded-2xl shadow-lg backdrop-blur-sm) at bottom of chat area
   5. All changes are additive CSS/Tailwind with no logic changes to SSE parsing or state management
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+- [x] 038-01-PLAN.md — Backend: POST /documents/{id}/reingest endpoint + test stubs
+- [x] 038-02-PLAN.md — Frontend: api.ts functions, fileIcons utility, health components, routing wiring
 
 ### Phase 42: UI Redesign — Layout Shell & Skills
 **Goal**: Nav icons extracted into AppDock; SkillsPage adopts 3-pane tonal layout; premium toggle styling across Skills and Settings
@@ -259,8 +260,10 @@ Plans:
   3. ChatLayout has responsive Tailwind breakpoints: sidebar hidden on mobile, full-width main on mobile
   4. MessageInput always visible as floating pill at bottom on all viewport sizes
   5. No layout regressions on desktop (>= 1024px)
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 3 plans
+- [x] 043-01-PLAN.md — NavPanel collapsible component + ChatLayout migration from old sidebar nav
+- [x] 043-02-PLAN.md — shadcn Tabs install + SettingsPage 5-tab layout + WR-03/WR-04 fixes
+- [x] 043-03-PLAN.md — Mobile drawer + active thread gradient upgrade + human verification checkpoint
 
 
 
@@ -298,7 +301,7 @@ Plans:
 | 26. Citations & Confidence — Backend | v2.2 | 2/2 | Complete    | 2026-04-12 |
 | 27. Citations & Confidence — Frontend | v2.2 | 1/1 | Complete    | 2026-04-12 |
 | 28. Document Versioning — Schema & Ingestion | v2.2 | 2/2 | Complete    | 2026-04-12 |
-| 29. Document Versioning — UI | v2.2 | 1/2 | Complete    | 2026-04-13 |
+| 29. Document Versioning — UI | v2.2 | 2/2 | Complete    | 2026-04-13 |
 | 30. Audit Log — Backend | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 31. Audit Log — Settings UI | v2.2 | 2/2 | Complete    | 2026-04-14 |
 | 32. Suggested Follow-Up Questions | v2.2 | 2/2 | Complete | 2026-04-16 |
@@ -306,10 +309,10 @@ Plans:
 | 34. Cross-Thread Memory — Settings UI | v2.3 | 1/1 | Complete    | 2026-04-17 |
 | 35. Multi-Modal Ingestion | v2.3 | 4/4 | Complete | 2026-04-18 |
 | 36. Multi-Modal Query & Library UI | v2.3 | 3/3 | Complete | 2026-04-18 |
-| 37. Knowledge Health Dashboard — Backend | v2.3 | 0/2 | Planned | |
-| 38. Knowledge Health Dashboard — Frontend | v2.3 | 0/2 | Planned | |
-| 39. User Feedback Loop — Backend | v2.3 | 1/2 | In Progress | 2026-04-18 |
-| 40. User Feedback Loop — Frontend | v2.3 | 0/2 | Planned | |
+| 37. Knowledge Health Dashboard — Backend | v2.3 | 2/2 | Complete | 2026-04-18 |
+| 38. Knowledge Health Dashboard — Frontend | v2.3 | 2/2 | Complete | 2026-04-18 |
+| 39. User Feedback Loop — Backend | v2.3 | 2/2 | Complete | 2026-04-18 |
+| 40. User Feedback Loop — Frontend | v2.3 | 2/2 | Complete | 2026-04-19 |
 | 41. UI Redesign — Tool Call Visualizer & Citations | v2.3 | 2/2 | Complete | 2026-04-19 |
-| 42. UI Redesign — Layout Shell & Skills | v2.3 | 0/3 | Planned | |
-| 43. UI Redesign — Mobile & Responsive | v2.3 | 0/3 | Planned | |
+| 42. UI Redesign — Layout Shell & Skills | v2.3 | 3/3 | Complete | 2026-04-19 |
+| 43. UI Redesign — Mobile & Responsive | v2.3 | 3/3 | Complete | 2026-04-19 |
