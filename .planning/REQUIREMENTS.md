@@ -83,11 +83,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **UI-01**: ToolCallPanel uses glassmorphic styling: bg-card/80 backdrop-blur-sm wrapper, bg-card/50 backdrop-blur-md nested parameter blocks
 - [x] **UI-02**: CitationCard uses ambient gradient borders; file-type icons color-coded (PDF red, DOCX blue, Markdown purple)
 - [x] **UI-03**: MessageInput renders as a floating pill (rounded-2xl shadow-lg backdrop-blur-sm) that does not block expanded citations
-- [ ] **UI-04**: Nav icons extracted from Sidebar into a standalone AppDock component
-- [ ] **UI-05**: SkillsPage uses 3-pane layout with tonal background depth instead of border-r dividers
-- [ ] **UI-06**: Active skill toggles glow with indigo-to-cyan gradient; env inputs use pill styling with Required/ReadOnly badges
-- [ ] **UI-07**: On mobile (< 768px) thread list opens as a frosted backdrop-blur-md overlay drawer
-- [ ] **UI-08**: Active thread in drawer indicated by brighter background and left gradient accent line
+- [x] **UI-04**: Nav icons extracted from Sidebar into a standalone AppDock component
+- [x] **UI-05**: SkillsPage uses 3-pane layout with tonal background depth instead of border-r dividers
+- [x] **UI-06**: Active skill toggles glow with indigo-to-cyan gradient; env inputs use pill styling with Required/ReadOnly badges
+- [x] **UI-07**: On mobile (< 768px) thread list opens as a frosted backdrop-blur-md overlay drawer
+- [x] **UI-08**: Active thread in drawer indicated by brighter background and left gradient accent line
 
 ## Future Requirements (v2.4+)
 
