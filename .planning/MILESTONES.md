@@ -1,5 +1,22 @@
 # Milestones
 
+## v2.3 Memory, Multimodal & Experience (Shipped: 2026-04-19)
+
+**Phases completed:** 11 phases, 27 plans
+
+**Key accomplishments:**
+
+1. Cross-Thread Memory — remember/recall tools with automatic injection into General Mode system prompts, plus Settings UI for memory management
+2. Multi-Modal Document Intelligence — PDF/DOCX table extraction, vision-LLM image descriptions, query_tables tool, and document badges
+3. Knowledge Health Dashboard — four-signal library health API (most-retrieved, never-retrieved, low-confidence, stale) with action hooks and KPI stat bar
+4. User Feedback Loop — thumbs up/down with reason selector, immutable ratings, feedback stats in Library Health
+5. Deep Midnight UI Redesign — glassmorphic ToolCallPanel, gradient CitationCards, floating pill MessageInput, AppDock, 3-pane SkillsPage, gradient toggles
+6. Mobile & Responsive — collapsible NavPanel, frosted drawer, 5-tab Settings refactor, responsive breakpoints
+
+**Known deferred items at close:** 4 UAT gaps, 5 verification gaps (require live browser testing), 12 quick task status markers (already committed code)
+
+---
+
 ## v2.2 Trust & Compliance (Shipped: 2026-04-16)
 
 **Phases completed:** 7 phases, 13 plans, 22 tasks
