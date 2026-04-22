@@ -17,10 +17,10 @@ LOW_DISCLAIMER = (
 )
 
 CONFIDENCE_THRESHOLDS = {
-    "high": 0.7,
-    "medium_upper": 0.69,
-    "medium_lower": 0.5,
-    "low": 0.49,
+    "high": 0.55,
+    "medium_upper": 0.54,
+    "medium_lower": 0.40,
+    "low": 0.39,
 }
 
 
@@ -58,8 +58,8 @@ class TestComputeConfidence:
         assert _compute_confidence(0.7) == "high"
 
     def test_medium_confidence(self):
-        """avg_similarity in [0.5, 0.7) maps to 'medium'."""
-        assert _compute_confidence(0.6) == "medium"
+        """avg_similarity in [0.40, 0.55) maps to 'medium'."""
+        assert _compute_confidence(0.45) == "medium"
 
     def test_medium_confidence_boundary(self):
         """Boundary value 0.5 maps to 'medium' (inclusive)."""
@@ -157,7 +157,7 @@ class TestConfidenceDisclaimer:
         """For level 'medium', disclaimer is None."""
         from app.api.threads import CONFIDENCE_DISCLAIMER
 
-        level = _compute_confidence(0.6)
+        level = _compute_confidence(0.45)
         assert level == "medium"
         disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
         assert disclaimer is None

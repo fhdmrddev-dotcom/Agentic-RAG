@@ -5,9 +5,10 @@ from unittest.mock import MagicMock
 from tests.conftest import mock_user_data
 
 
-def _make_result(data):
+def _make_result(data, count=None):
     r = MagicMock()
     r.data = data
+    r.count = count if count is not None else len(data)
     return r
 
 
@@ -77,8 +78,9 @@ def test_submit_feedback_duplicate_returns_409(client, auth_headers, mock_builde
 def test_stats_empty_returns_zero_rate(client, auth_headers, mock_builder):
     """GET /feedback/stats returns zeroed stats when no ratings exist."""
     mock_builder.execute.side_effect = [
-        _make_result([]),  # all ratings
-        _make_result([]),  # negative ratings in window
+        _make_result([], count=0),  # total ratings
+        _make_result([], count=0),  # positive ratings
+        _make_result([]),           # negative ratings in window
     ]
     res = client.get("/feedback/stats", headers=auth_headers)
     assert res.status_code == 200
@@ -92,8 +94,9 @@ def test_stats_positive_rate_calculation(client, auth_headers, mock_builder):
     """GET /feedback/stats computes all-time positive rate correctly (D-03)."""
     all_ratings = [_rating("positive"), _rating("positive"), _rating("positive"), _rating("negative")]
     mock_builder.execute.side_effect = [
-        _make_result(all_ratings),  # all ratings (3 positive, 1 negative)
-        _make_result([]),           # negative ratings in 30-day window (empty)
+        _make_result(all_ratings, count=4),      # total ratings (3 positive, 1 negative)
+        _make_result(all_ratings[:3], count=3),  # positive ratings
+        _make_result([]),                        # negative ratings in 30-day window (empty)
     ]
     res = client.get("/feedback/stats", headers=auth_headers)
     assert res.status_code == 200
@@ -107,10 +110,11 @@ def test_stats_downvoted_documents_attribution(client, auth_headers, mock_builde
     """GET /feedback/stats attributes downvotes to all source_refs documents (D-08)."""
     msg_id = "00000000-0000-0000-0000-000000000099"
     mock_builder.execute.side_effect = [
-        _make_result([_rating("negative")]),          # all ratings (1 negative)
-        _make_result([_neg_msg(msg_id)]),              # negative in window
-        _make_result([_message_with_refs(msg_id)]),   # messages with source_refs
-        _make_result([_doc_row("doc-1")]),             # documents lookup
+        _make_result([_rating("negative")], count=1),  # total ratings (1 negative)
+        _make_result([], count=0),                       # positive ratings (0)
+        _make_result([_neg_msg(msg_id)]),                # negative in window
+        _make_result([_message_with_refs(msg_id)]),     # messages with source_refs
+        _make_result([_doc_row("doc-1")]),               # documents lookup
     ]
     res = client.get("/feedback/stats", headers=auth_headers)
     assert res.status_code == 200
@@ -125,10 +129,11 @@ def test_stats_skips_messages_with_empty_source_refs(client, auth_headers, mock_
     """GET /feedback/stats excludes messages with empty source_refs from attribution (D-09)."""
     msg_id = "00000000-0000-0000-0000-000000000099"
     mock_builder.execute.side_effect = [
-        _make_result([_rating("negative")]),      # all ratings
-        _make_result([_neg_msg(msg_id)]),          # negative in window
-        _make_result([_message_no_refs(msg_id)]), # message with empty source_refs
-        # No 4th call — doc_counts is empty, documents lookup skipped
+        _make_result([_rating("negative")], count=1),  # total ratings
+        _make_result([], count=0),                       # positive ratings
+        _make_result([_neg_msg(msg_id)]),                # negative in window
+        _make_result([_message_no_refs(msg_id)]),       # message with empty source_refs
+        # No 5th call — doc_counts is empty, documents lookup skipped
     ]
     res = client.get("/feedback/stats", headers=auth_headers)
     assert res.status_code == 200
@@ -140,7 +145,8 @@ def test_stats_rls_user_id_filter_applied(client, auth_headers, mock_execute_res
     """All stats queries filter by user_id derived from JWT (RLS enforcement)."""
     mock_execute_result.data = []
     mock_builder.execute.side_effect = [
-        _make_result([]),  # all ratings
+        _make_result([]),  # total ratings
+        _make_result([]),  # positive ratings
         _make_result([]),  # negative ratings
     ]
     res = client.get("/feedback/stats", headers=auth_headers)

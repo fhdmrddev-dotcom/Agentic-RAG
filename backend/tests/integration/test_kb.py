@@ -84,6 +84,7 @@ class TestLs:
         mock_builder.execute.side_effect = [
             _make_result(_standard_folders()),
             _make_result([_doc_row(DOC_IN_REPORTS, "report.pdf", FOLDER_ROOT_A)]),
+            _make_result(_standard_folders()),  # get_globally_visible_folder_ids
         ]
         response = client.get("/kb/ls?path=/reports", headers=auth_headers)
         assert response.status_code == 200
@@ -107,6 +108,7 @@ class TestLs:
         mock_builder.execute.side_effect = [
             _make_result(_standard_folders()),  # notes has no children in _standard_folders
             _make_result([]),  # no documents in notes
+            _make_result(_standard_folders()),  # get_globally_visible_folder_ids
         ]
         response = client.get("/kb/ls?path=/notes", headers=auth_headers)
         assert response.status_code == 200
@@ -146,14 +148,14 @@ FOLDER_GRANDCHILD = str(uuid4())  # "january" under q1 (used in depth truncation
 class TestTree:
     def test_tree_root(self, client, auth_headers, mock_builder):
         """GET /kb/tree?path=/ returns 200 with tree containing root folders and nested children."""
-        # Sequential execute calls:
-        # 1. _fetch_visible_folders — folders query
-        # 2. in_("folder_id", all_ids) — documents in subtree
-        # 3. is_("folder_id", "null") — root documents (root path only)
+        # Sequential execute calls with new implementation:
+        # 1. _fetch_visible_folders — fetch_all_folders
+        # 2. get_globally_visible_folder_ids — fetch_all_folders
+        # 3. own_docs in subtree
         mock_builder.execute.side_effect = [
             _make_result(_standard_folders()),
+            _make_result(_standard_folders()),
             _make_result([_doc_row(DOC_IN_REPORTS, "report.pdf", FOLDER_ROOT_A)]),
-            _make_result([_doc_row(DOC_ROOT, "readme.pdf")]),
         ]
         response = client.get("/kb/tree?path=/", headers=auth_headers)
         assert response.status_code == 200
@@ -176,8 +178,10 @@ class TestTree:
         ]
         # Sequential execute calls:
         # 1. _fetch_visible_folders
-        # 2. in_("folder_id", all_ids) — no docs needed
+        # 2. get_globally_visible_folder_ids
+        # 3. own_docs in subtree
         mock_builder.execute.side_effect = [
+            _make_result(folders_with_grandchild),
             _make_result(folders_with_grandchild),
             _make_result([]),
         ]
@@ -304,7 +308,9 @@ class TestGlob:
             _make_result([
                 {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
                 {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
-            ]),  # documents query
+            ]),  # own_docs
+            _make_result(_standard_folders()),  # get_globally_visible_folder_ids
+            _make_result([]),  # global_docs
         ]
         response = client.get("/kb/glob?pattern=*.pdf", headers=auth_headers)
         assert response.status_code == 200
@@ -323,6 +329,8 @@ class TestGlob:
                 {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
                 {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
             ]),
+            _make_result(_standard_folders()),
+            _make_result([]),
         ]
         response = client.get("/kb/glob?pattern=reports/**/*.pdf", headers=auth_headers)
         assert response.status_code == 200
@@ -339,6 +347,8 @@ class TestGlob:
             _make_result([
                 {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
             ]),
+            _make_result(_standard_folders()),
+            _make_result([]),
         ]
         response = client.get("/kb/glob?pattern=*.xlsx", headers=auth_headers)
         assert response.status_code == 200
@@ -347,12 +357,14 @@ class TestGlob:
         assert data["matches"] == []
 
     def test_glob_rls(self, client, auth_headers, mock_builder):
-        """glob results are scoped to the user via .eq("user_id") on documents query."""
+        """glob results are scoped to the user via .eq(\"user_id\") on documents query."""
         mock_builder.execute.side_effect = [
             _make_result([]),  # no folders visible
             _make_result([
                 {"id": DOC_ROOT, "filename": "my-doc.pdf", "folder_id": None},
             ]),  # only user's docs returned
+            _make_result([]),  # get_globally_visible_folder_ids
+            _make_result([]),
         ]
         response = client.get("/kb/glob?pattern=*.pdf", headers=auth_headers)
         assert response.status_code == 200
@@ -368,6 +380,8 @@ class TestGlob:
                 {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
                 {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
             ]),
+            _make_result(_standard_folders()),
+            _make_result([]),
         ]
         response = client.get("/kb/glob?pattern=report*", headers=auth_headers)
         assert response.status_code == 200

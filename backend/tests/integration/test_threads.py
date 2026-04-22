@@ -195,7 +195,10 @@ class TestSendMessage:
         mock_builder.execute.side_effect = [
             _make_result(_thread_row()),             # thread ownership check
             _make_result([_message_row()]),          # insert user message
+            _make_result({"folder_id": None}),       # thread folder scope (single)
             _make_result([{"role": "user", "content": "Hello"}]),  # load history
+            _make_result([]),                        # skills catalog (default mode)
+            _make_result([]),                        # user_memory
             _make_result([_message_row("assistant", "Hi!")]),      # persist assistant msg
             _make_result([]),                        # touch thread updated_at
         ]
@@ -219,7 +222,8 @@ class TestSendMessage:
         data_lines = [l for l in lines if l.startswith("data: ")]
         assert len(data_lines) >= 1
 
-        done_lines = [l for l in data_lines if "[DONE]" in l]
+        # Endpoint emits {"type": "done"} and {"type": "stream_end"} instead of [DONE]
+        done_lines = [l for l in data_lines if '"type": "done"' in l or '"type": "stream_end"' in l]
         assert len(done_lines) >= 1
 
     def test_sse_stream_delta_events_are_valid_json(self, client, auth_headers, mock_builder):
@@ -227,7 +231,10 @@ class TestSendMessage:
         mock_builder.execute.side_effect = [
             _make_result(_thread_row()),
             _make_result([_message_row()]),
-            _make_result([{"role": "user", "content": "Hello"}]),
+            _make_result({"folder_id": None}),       # thread folder scope (single)
+            _make_result([{"role": "user", "content": "Hello"}]),  # load history
+            _make_result([]),                        # skills catalog (default mode)
+            _make_result([]),                        # user_memory
             _make_result([_message_row("assistant", "Hello back")]),
             _make_result([]),
         ]

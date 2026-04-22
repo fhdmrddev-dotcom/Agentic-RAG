@@ -13,9 +13,10 @@ def _approx_cutoff(days: int) -> datetime:
 
 # ── Internal helper ───────────────────────────────────────────────────────────
 
-def _make_result(data):
+def _make_result(data, count=None):
     r = MagicMock()
     r.data = data
+    r.count = count if count is not None else len(data)
     return r
 
 
@@ -95,6 +96,7 @@ def test_most_retrieved_counts_document_ids(client, auth_headers, mock_execute_r
         _make_result([]),           # never_retrieved audit_log
         _make_result([]),           # low_confidence messages
         _make_result([]),           # stale documents
+        _make_result([]),           # total_res count
     ]
     res = client.get("/knowledge-health/summary", headers=auth_headers)
     assert res.status_code == 200
@@ -126,6 +128,7 @@ def test_never_retrieved_excludes_retrieved_docs(client, auth_headers, mock_exec
         _make_result(audit_rows),   # never_retrieved: audit_log all-time
         _make_result([]),           # low_confidence messages
         _make_result([]),           # stale documents
+        _make_result([]),           # total_res count
     ]
     res = client.get("/knowledge-health/summary", headers=auth_headers)
     assert res.status_code == 200
@@ -163,6 +166,7 @@ def test_low_confidence_filters_below_threshold(client, auth_headers, mock_execu
         _make_result(messages),     # low_confidence messages
         _make_result(doc_rows),     # low_confidence documents join
         _make_result([]),           # stale documents
+        _make_result([]),           # total_res count
     ]
     res = client.get("/knowledge-health/summary", headers=auth_headers)
     assert res.status_code == 200
