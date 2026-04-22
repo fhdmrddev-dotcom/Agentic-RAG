@@ -196,9 +196,8 @@ def test_image_description_failure_continues():
             app_settings=mock_settings,
         )
 
-    # Row should still be inserted with empty description
-    insert_call_args = mock_builder.insert.call_args[0][0]
-    assert insert_call_args[0]["description"] == ""
+    # When all image descriptions fail, no rows are inserted (images skipped)
+    mock_builder.insert.assert_not_called()
 
 
 def test_extract_pdf_images_reads_stream_bytes(tmp_path):
