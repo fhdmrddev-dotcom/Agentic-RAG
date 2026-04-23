@@ -79,6 +79,10 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Context & Sub-agent
+    context_window_max_tokens: int
+    sub_agent_max_output_tokens: int
+
 
 # ── Override file I/O ─────────────────────────────────────────────────────────
 
@@ -253,6 +257,8 @@ def load_app_settings() -> UserEffectiveSettings:
         web_search_max_results=_int(override, "web_search_max_results", env_settings.web_search_max_results),
 
         sandbox_enabled=_bool(override, "sandbox_enabled", env_settings.sandbox_enabled),
+        context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
+        sub_agent_max_output_tokens=_int(override, "sub_agent_max_output_tokens", env_settings.sub_agent_max_output_tokens),
     )
 
 

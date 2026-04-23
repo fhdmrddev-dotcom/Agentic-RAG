@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -54,6 +54,9 @@ class FullSettingsResponse(BaseModel):
     web_search_max_results: int
     # Sandbox
     sandbox_enabled: bool
+    # Context & Sub-agent
+    context_window_max_tokens: int
+    sub_agent_max_output_tokens: int
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -93,6 +96,9 @@ class SettingsUpdate(BaseModel):
     web_search_max_results: int | None = None
     # Sandbox
     sandbox_enabled: bool | None = None
+    # Context & Sub-agent
+    context_window_max_tokens: int | None = None
+    sub_agent_max_output_tokens: int | None = Field(default=None, ge=4096, le=65536)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,6 +140,8 @@ def _build_response(s=None) -> FullSettingsResponse:
         web_search_enabled=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
+        context_window_max_tokens=s.context_window_max_tokens,
+        sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
     )
 
 
@@ -207,6 +215,10 @@ async def update_settings(
 
     if body.sandbox_enabled is not None:
         updates["sandbox_enabled"] = body.sandbox_enabled
+    if body.context_window_max_tokens is not None:
+        updates["context_window_max_tokens"] = body.context_window_max_tokens
+    if body.sub_agent_max_output_tokens is not None:
+        updates["sub_agent_max_output_tokens"] = body.sub_agent_max_output_tokens
 
     save_override(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
