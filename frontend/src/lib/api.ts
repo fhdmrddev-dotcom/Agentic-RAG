@@ -409,6 +409,8 @@ export interface FullAppSettings {
   web_search_enabled: boolean
   web_search_max_results: number
   sandbox_enabled: boolean
+  context_window_max_tokens: number
+  sub_agent_max_output_tokens: number
 }
 
 export type AppSettings = FullAppSettings
@@ -443,6 +445,8 @@ export interface SettingsUpdate {
   tavily_api_key?: string
   web_search_max_results?: number
   sandbox_enabled?: boolean
+  context_window_max_tokens?: number
+  sub_agent_max_output_tokens?: number
 }
 
 export async function getSettings(): Promise<FullAppSettings> {
