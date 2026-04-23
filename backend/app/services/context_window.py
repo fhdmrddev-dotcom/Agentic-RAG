@@ -278,13 +278,16 @@ def _remove_oldest_atomic(trimmable: list[dict]) -> int:
     # Just remove it to avoid orphan errors.
     if first_role == "tool":
         to_remove = 1
-        # Also remove any immediately following sibling tool messages with same parent
+        # Also remove any immediately following sibling tool messages with same parent.
+        # Guard: only match on non-None IDs — if tool_call_id is None we cannot
+        # reliably distinguish siblings from unrelated tool messages, so stop at one.
         tool_call_id = first.get("tool_call_id")
-        for msg in trimmable[1:]:
-            if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-                to_remove += 1
-            else:
-                break
+        if tool_call_id is not None:
+            for msg in trimmable[1:]:
+                if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
+                    to_remove += 1
+                else:
+                    break
         del trimmable[:to_remove]
         return to_remove
 
