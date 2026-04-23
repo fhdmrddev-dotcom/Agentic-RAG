@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: in_progress
-stopped_at: Phase 44 SSE & Stop Reliability — complete, ready for Phase 45
-last_updated: "2026-04-23T02:00:00.000Z"
+stopped_at: Phase 45 Plan 01 complete — ready for Plan 02
+last_updated: "2026-04-23T10:09:29.000Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 1
+  total_plans: 2
   completed_plans: 1
-  percent: 13
+  percent: 19
 ---
 
 # Project State
@@ -25,26 +25,23 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 
 ## Current Position
 
-Phase: 44 of 51 (SSE & Stop Reliability)
-Plan: 1/1 complete
-Status: Phase 44 complete and verified, ready for Phase 45
-Last activity: 2026-04-23 — Phase 44 executed, committed, and bug-fixed
+Phase: 45 of 51 (Chat UX Fixes)
+Plan: 1/2 complete
+Status: Phase 45 Plan 01 complete — ready for Plan 02
+Last activity: 2026-04-23 — Plan 45-01 executed
 
-Progress: [██░░░░░░░░] 13%
+Progress: [██░░░░░░░░] 19%
 
-## Phase 44 Plan Summary
+## Phase 45 Plan Summary
 
-1. **Plan 44-01: SSE & Stop Reliability** — SSEStreamingResponse for socket error suppression, "Response stopped" UX, interrupted tool calls, thread navigation during streaming. ✅ COMPLETE
+1. **Plan 45-01: Chat Delete Confirmation & Ghost Content Fix** — AlertDialog component, confirmation flow in NavPanel, clearMessages to prevent ghost content. ✅ COMPLETE
 
-## Phase 44 Verified Results
+## Phase 45 Verified Results
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| STREAM-01 | ✅ | "Response stopped" indicator with amber icon |
-| STREAM-02 | ✅ | No socket errors on disconnect (OSError + RuntimeError caught) |
-| STREAM-03 | ✅ | Partial responses reconcile with DB after stream ends |
-| STREAM-04 | ✅ | Thread navigation works during active streaming |
-| Thread switch | ✅ | Aborts stream quietly, no "stopped" label, new thread loads immediately |
+| CHAT-01 | ✅ | AlertDialog requires explicit Delete click before thread deletion |
+| CHAT-02 | ✅ | clearMessages runs synchronously on thread change, no ghost content |
 
 ## Performance Metrics
 
@@ -70,6 +67,8 @@ Recent decisions affecting current work:
 - Side phase numbering uses `side-NNN` prefix (separate from sequential phases)
 - SSEStreamingResponse uses stop_event mechanism for immediate client-disconnect detection
 - `abortStream()` vs `stopStreaming()`: navigation aborts quietly (no "stopped" label), explicit Stop sets stopped flag
+- AlertDialog confirmation before thread delete — client-side UX safeguard only; RLS provides actual security
+- clearMessages on thread switch prevents ghost content flash — synchronous reset before async loadMessages
 
 ### Pending Todos
 
@@ -98,5 +97,5 @@ Items acknowledged and carried forward from v2.3 milestone close:
 ## Session Continuity
 
 Last session: 2026-04-23
-Stopped at: Phase 44 complete — ready for Phase 45 (Chat UX Fixes)
-Resume file: .planning/phases/44-sse-stop-reliability/44-01-SUMMARY.md
+Stopped at: Phase 45 Plan 01 complete — ready for Plan 02
+Resume file: .planning/phases/45-chat-ux-fixes/45-01-SUMMARY.md

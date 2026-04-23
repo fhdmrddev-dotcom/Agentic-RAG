@@ -29,8 +29,8 @@ Requirements for Stability, Polish & UX Fixes milestone. Each maps to roadmap ph
 
 ### CHAT — Chat UX
 
-- [ ] **CHAT-01**: Deleting a thread shows a confirmation dialog before the delete executes
-- [ ] **CHAT-02**: After deleting a thread and creating a new one, no ghost content from the deleted thread appears
+- [x] **CHAT-01**: Deleting a thread shows a confirmation dialog before the delete executes
+- [x] **CHAT-02**: After deleting a thread and creating a new one, no ghost content from the deleted thread appears
 - [ ] **CHAT-03**: Creating a new chat presents a folder selector to scope the thread from the start
 
 ### SETT — Web Search Toggle
@@ -49,6 +49,14 @@ Requirements for Stability, Polish & UX Fixes milestone. Each maps to roadmap ph
 - [ ] **HLTH-02**: Low confidence panel explains that scores reflect query-document relevance, not document quality; includes context about score distribution
 - [ ] **HLTH-03**: Feedback empty states use actionable, corporate-appropriate messaging (not passive phrases like "No downvoted documents")
 - [ ] **HLTH-04**: Knowledge Health API accepts pagination parameters (offset/limit) and returns total counts
+
+### CTX — Context Window Management
+
+- [ ] **CTX-01**: Sub-agent detects generation tasks (PPTX, reports, drafting) via keyword routing and escalates to the capable model tier (Sonnet / GPT-4o / Gemini Flash) with a 32k output ceiling instead of the cheap model with 8k
+- [ ] **CTX-02**: Simple analysis tasks (summarise, extract, list, compare) continue to use the cheap sub-agent model — escalation only fires for creation/generation verbs
+- [ ] **CTX-03**: Settings page exposes a context history depth slider (maps to `context_window_max_tokens`), a sub-agent output token slider (maps to `sub_agent_max_output_tokens`), and a sub-agent model override dropdown
+- [ ] **CTX-04**: Each model entry in the model selector shows an inline info card with: context window size, max output tokens, cost tier, and best-use-case label — populated from a static per-model lookup, no API call
+- [ ] **CTX-05**: Token estimation for OpenAI models uses `tiktoken` (cl100k_base) for accurate counts; other providers fall back to the existing char heuristic with a documented margin note
 
 ## v3.0 Requirements
 
@@ -107,12 +115,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HLTH-02 | Phase 50 | Pending |
 | HLTH-03 | Phase 50 | Pending |
 | HLTH-04 | Phase 50 | Pending |
+| CTX-01 | Phase 51 | Pending |
+| CTX-02 | Phase 51 | Pending |
+| CTX-03 | Phase 51 | Pending |
+| CTX-04 | Phase 51 | Pending |
+| CTX-05 | Phase 51 | Pending |
 
 **Coverage:**
-- v2.4 requirements: 22 total
-- Mapped to phases: 22
+- v2.4 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-22*
-*Last updated: 2026-04-22 after v2.4 roadmap created*
+*Last updated: 2026-04-23 — Phase 51 Context Window Management added*

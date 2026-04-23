@@ -7,7 +7,7 @@
 - ✅ **v2.1 Stability & RAG Correctness** — Phases 18–25 (shipped 2026-04-11)
 - ✅ **v2.2 Trust & Compliance** — Phases 26–32 (shipped 2026-04-16)
 - ✅ **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (shipped 2026-04-19)
-- 🚧 **v2.4 Stability, Polish & UX Fixes** — Phases 44–50 (in progress)
+- 🚧 **v2.4 Stability, Polish & UX Fixes** — Phases 44–51 (in progress)
 
 ## Phases
 
@@ -105,6 +105,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
 - [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
 - [ ] **Phase 50: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
+- [ ] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation
 
 ## Phase Details
 
@@ -128,7 +129,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. After deleting a thread and creating a new one, the chat area shows a blank state with no ghost content from the deleted thread
   3. User can choose a folder when creating a new chat, and the thread is scoped to that folder from the start
 **Plans**: 2 plans
-  - [ ] 45-01-PLAN.md — Delete confirmation dialog and ghost content fix (CHAT-01, CHAT-02)
+  - [x] 45-01-PLAN.md — Delete confirmation dialog and ghost content fix (CHAT-01, CHAT-02) ✅
   - [ ] 45-02-PLAN.md — Folder selector on new chat creation (CHAT-03)
 **UI hint**: yes
 
@@ -190,14 +191,28 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50
+Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 → 51
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 44. SSE & Stop Reliability | v2.4 | 0/? | Not started | - |
-| 45. Chat UX Fixes | v2.4 | 0/2 | Planning complete | - |
+| 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
+| 45. Chat UX Fixes | v2.4 | 1/2 | In progress | - |
 | 46. Smart Skill Dispatch | v2.4 | 0/? | Not started | - |
 | 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
 | 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
 | 50. Library Health at Scale | v2.4 | 0/? | Not started | - |
+| 51. Context Window Management | v2.4 | 0/? | Not started | - |
+### Phase 51: Context Window Management
+
+**Goal**: Context limits are handled intelligently across all providers — sub-agents route complex generation tasks (PPTX, reports) to capable models, output token ceilings are configurable per task type, and admins can tune context behaviour from the Settings UI with inline per-model documentation
+**Depends on**: Phase 49 (Settings & Navigation Polish — builds on that UI foundation)
+**Requirements**: CTX-01, CTX-02, CTX-03, CTX-04, CTX-05
+**Success Criteria** (what must be TRUE):
+  1. A "summarise document and create PPTX" task completes without hitting context or output token limits — the sub-agent uses a capable model (Sonnet/GPT-4o/Gemini Flash) and a 32k output ceiling for generation tasks
+  2. Simple analysis tasks (summarise, extract, list) continue to use the cheap sub-agent model; only generation/creation tasks are escalated
+  3. Settings page exposes sliders for context history depth and sub-agent output token ceiling, and a dropdown for sub-agent model override
+  4. Each model in the model selector shows an inline info card (context window, output limit, cost tier, best-for label)
+  5. Token counting uses provider-accurate methods (tiktoken for OpenAI, char heuristic as fallback) rather than a single universal heuristic
+**Plans**: TBD
+**UI hint**: yes
