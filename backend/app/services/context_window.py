@@ -205,12 +205,15 @@ def trim_messages_to_fit(
             break
         trimmed_any = True
 
-    # Final build — add marker if any trimming occurred
-    if trimmed_any or (
-        trimmable == [] and estimate_messages_tokens(
-            _build_candidate(system_msg, [], protected, False)
-        ) > max_tokens
-    ):
+    # Final build — add marker if any trimming occurred.
+    # Only re-estimate when trimmable is fully exhausted and we haven't already
+    # confirmed a removal, to avoid a redundant token count call on the happy path.
+    protected_only_tokens = (
+        estimate_messages_tokens(_build_candidate(system_msg, [], protected, False))
+        if not trimmed_any and trimmable == []
+        else 0
+    )
+    if trimmed_any or (trimmable == [] and protected_only_tokens > max_tokens):
         trimmed_any = True
 
     return _build_candidate(system_msg, trimmable, protected, trimmed_any)
