@@ -566,3 +566,114 @@ All components below were visually updated. **No hooks, props, state, API calls,
 - **Requirements:** 37/37 complete
 - **Git tag:** `v2.0`
 - **Archives:** `.planning/milestones/v2.0-ROADMAP.md`, `.planning/milestones/v2.0-phases/`
+
+---
+
+## Milestone: Stability & RAG Correctness (v2.1) ✅ COMPLETE — 2026-04-11
+
+Phases 18–25. Context window hardening, sub-agent guards, blank response guards, keyword search folder scope, RAG correctness fixes, system prompt quality, infrastructure hardening, model-aware context. Full details: `.planning/milestones/v2.1-ROADMAP.md`
+
+---
+
+## Milestone: Trust & Compliance (v2.2) ✅ COMPLETE — 2026-04-16
+
+Phases 26–32. Citations & confidence (backend + frontend), document versioning (schema + UI), audit log (backend + UI), suggested follow-up questions. Full details: `.planning/milestones/v2.2-ROADMAP.md`
+
+### Phase 32.5: Retrieval Quality & Chunking Fixes ✅ COMPLETE (2026-04-18)
+
+Triggered by investigation of consistently low similarity scores (~0.43) on structured documents. Root-cause analysis identified six distinct problems; four fixed in this phase.
+
+- [x] **`embedding_service.py` — `chunk_text()` rewrite**: Replaced 1-char sliding sentence-boundary splitter with recursive hierarchical separator approach (`\n## ` → `\n### ` → `\n\n` → `\n` → `. ` → `! ` → `? ` → ` ` → char). Headings stay attached to their content; decimal numbers and numbered list markers no longer trigger false sentence splits. Combined-fragment logic prevents isolated heading chunks.
+- [x] **`documents.py` — context-enriched embeddings**: `extract_metadata()` moved before chunking. Each chunk is embedded as `[Document: {filename} | Title: {title} | Date: {date} | Type: {type}]\n{chunk}` but raw chunk text is stored in `document_chunks.content` (clean for display and citations).
+- [x] **`retrieval_service.py` — retrieval-time deduplication**: `_deduplicate_chunks()` added using word-set Jaccard similarity ≥ 0.85. Vector-only path fetches `top_k * 2` then deduplicates to `top_k`. Applied before reranking in hybrid path. `fetch_full_document()` updated to prefer `full_markdown` over chunk concatenation for `analyze_document` calls.
+- [x] **`threads.py` — confidence threshold recalibration**: `high` ≥ 0.55 (was 0.70), `medium` ≥ 0.40 (was 0.50). Calibrated for real `text-embedding-3-small` score distributions on structured documents.
+- [x] **`supabase/migrations/027_expand_document_status.sql`**: Dropped and recreated `documents_status_check` constraint to include `extracting_tables` and `extracting_images` status values added by Phase 35 multi-modal code.
+
+#### Verification results (Fahed Mrad Chapters 1-4_FM_29032026.docx, 6.86 MB DOCX)
+
+| Metric | Before | After |
+|--------|--------|-------|
+| `min_chunk_chars` | 20 (isolated heading) | 67 |
+| `avg_chunk_chars` | 784 | 815 |
+| `chunk_count` | 354 | 347 |
+| Confidence on RAG query | low/medium | high |
+| Isolated headings | yes (chunk 7 = "1.3 Research Problem") | no (heading attached to body) |
+
+#### Notes
+
+- DB data was cleared before re-ingestion — no migration needed for existing chunks
+- `pypdf` base text extraction quality (Problem 3 from investigation) deferred to Phase 35 where `pdfplumber` is introduced
+- Run `027_expand_document_status.sql` in Supabase SQL editor on any environment that had Phase 35 multi-modal code without this migration
+
+---
+
+## Milestone: Memory, Multimodal & Experience (v2.3) 🚧 IN PROGRESS
+
+### Phase 33: Cross-Thread Memory — Backend ✅ COMPLETE (2026-04-17)
+
+- [x] `user_memory` table with RLS, remember/recall tools, automatic memory injection into General Mode system prompt (top-10 most-recent)
+
+### Phase 34: Cross-Thread Memory — Settings UI ✅ COMPLETE (2026-04-17)
+
+- [x] MemorySection component in Settings with inline edit, delete confirmation, and empty state guidance
+
+### Phase 35: Multi-Modal Ingestion ✅ COMPLETE (2026-04-18)
+
+- [x] Tables extracted from PDFs (pdfplumber) and DOCX (python-docx), stored in `document_tables`
+- [x] Images extracted and described by vision LLM, stored in `document_images`
+- [x] `027_expand_document_status.sql` for Phase 36 multi-modal status values
+
+### Phase 36: Multi-Modal Query & Library UI ✅ COMPLETE (2026-04-18)
+
+- [x] `query_tables` tool for structured table queries against `document_tables`
+- [x] Image descriptions embedded and included in vector search
+- [x] Tables/Images badges on documents in DocumentList
+
+### Phase 37: Knowledge Health Dashboard — Backend ✅ COMPLETE (2026-04-18)
+
+- [x] GET /knowledge-health/summary: most-retrieved, never-retrieved, low-confidence, stale documents
+- [x] 7 unit tests (GREEN) for all four metrics
+
+### Phase 38: Knowledge Health Dashboard — Frontend ✅ COMPLETE (2026-04-18)
+
+- [x] Library Health nav item with 4 metric panels (Most Retrieved, Never Retrieved, Low Confidence, Stale)
+- [x] Action buttons (Delete, Re-ingest, Move to Folder) per document row
+- [x] GET /documents/{id}/reingest backend endpoint
+
+### Phase 39: User Feedback Loop — Backend ✅ COMPLETE (2026-04-18)
+
+- [x] `message_feedback` table with RLS (one rating per message per user), thumbs endpoints, aggregate stats
+- [x] Audit log integration for message_feedback action type
+
+### Phase 40: User Feedback Loop — Frontend ✅ COMPLETE (2026-04-19)
+
+- [x] Thumbs up/down on hover over assistant messages with reason selector
+- [x] FeedbackStatsPanel in Library Health (Promise.allSettled so fetch failure doesn't block render)
+
+### Phase 41: UI Redesign — Tool Call Visualizer & Citations ✅ COMPLETE (2026-04-19)
+
+- [x] ToolCallPanel glassmorphic wrapper (bg-card/80 backdrop-blur-sm), CitationCard gradient border, CitationList expand animation
+- [x] MessageInput floating pill with rounded-2xl shadow-lg backdrop-blur-sm
+
+### Phase 42: UI Redesign — Layout Shell & Skills ✅ COMPLETE (2026-04-19)
+
+- [x] AppDock.tsx — vertical icon rail (w-14) with gradient-primary active pill, extracted from Sidebar
+- [x] SkillsPage 3-pane rebuild (nav sidebar, skill list, detail/form) with tonal depth separation
+- [x] SkillCard gradient track toggle (indigo-to-cyan), SettingsPage bg-card/60 outer, bg-card/40 nested sections
+
+### Phase 43: UI Redesign — Mobile & Responsive 🚧 IN PROGRESS
+
+- [x] 43-01: NavPanel collapsible component + ChatLayout migration (w-14/w-64 toggle)
+- [x] 43-02: shadcn Tabs install + SettingsPage 5-tab layout + WR-03/WR-04 fixes
+- [ ] 43-03: Mobile drawer + active thread gradient upgrade + human verification (NOT STARTED)
+
+### Phase 44: SSE Stop Reliability ✅ COMPLETE (2026-04-23)
+
+- [x] **STREAM-02:** `backend/app/responses.py` — `SSEStreamingResponse` + `_SilentSSEIterator` suppress `OSError`, `RuntimeError`, `AssertionError` on client disconnect (covers Windows `ConnectionAbortedError`); wraps `send()` and `__anext__()`; calls `aclose()` on disconnect to trigger generator cleanup
+- [x] **STREAM-01:** `MessageItem.tsx` — "Response stopped" indicator (amber square icon) replaces "Saving response…" when user clicks Stop
+- [x] **STREAM-03:** `ToolCall.status` gains `"interrupted"` variant; `useMessages.ts` marks running tools as `interrupted` on abort; `Message.stopped` flag set on optimistic message; `_persist_assistant_message()` filters out `status != "done"` tool calls; `ToolCallPanel.tsx` renders interrupted tools with amber styling and "Stopped — used X tools" header
+- [x] **STREAM-04:** `useMessages.ts` — `streamingThreadIdRef` allows `loadMessages` to update for a different thread during active streaming; `abortStream()` provides quiet abort without "stopped" label; `ChatArea.tsx` calls `abortStream()` on thread switch; DB reload skipped on navigation abort so new thread loads immediately
+
+#### Known Issues (Deferred)
+
+- **KI-001:** In-flight LLM calls and tool executions continue after SSE disconnect because Python async generators can only receive `GeneratorExit` at `yield` points — the current LLM call or tool execution runs to completion before the generator can be stopped. Iteration stops immediately after, preventing new rounds. See `.planning/KNOWN-ISSUES.md` for root cause and solution sketches.
