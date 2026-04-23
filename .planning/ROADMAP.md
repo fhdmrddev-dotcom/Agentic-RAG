@@ -101,6 +101,8 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
 - [x] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans) — completed 2026-04-23
 - [ ] **Phase 46: Smart Skill Dispatch** — Only relevant skills appear in the agent's context
+  - [ ] 46-01-PLAN.md — Skill embedding infrastructure (RPC migration, config, CRUD hooks, backfill)
+  - [ ] 46-02-PLAN.md — Skill dispatch in chat stream (matching, tool filtering, graceful fallback)
 - [ ] **Phase 47: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
 - [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
 - [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
@@ -140,7 +142,9 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Success Criteria** (what must be TRUE):
   1. Only skills whose descriptions match the user's current message appear in the agent's system prompt — not all enabled skills
   2. Skills that don't match the user's intent are never triggered during conversation, even if they exist in the user's enabled catalog
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 46-01-PLAN.md — Skill embedding infrastructure (RPC migration, config, CRUD hooks, backfill)
+  - [ ] 46-02-PLAN.md — Skill dispatch in chat stream (matching, tool filtering, graceful fallback)
 
 ### Phase 47: Document Version Deletion
 **Goal**: Users can delete document versions intelligently — choosing between a single version or all versions — with complete cleanup of chunks, storage, and history
@@ -197,7 +201,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
 |-------|-----------|----------------|--------|-----------|
 | 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
-| 46. Smart Skill Dispatch | v2.4 | 0/? | Not started | - |
+| 46. Smart Skill Dispatch | v2.4 | 0/2 | Not started | - |
 | 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
 | 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
