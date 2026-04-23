@@ -197,7 +197,7 @@ export function MessageInput({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="min-w-[200px] mb-1">
-                    <TooltipProvider>
+                    <TooltipProvider delayDuration={0}>
                       {models.map((m) => {
                         const info = MODEL_INFO[m]
                         return (
