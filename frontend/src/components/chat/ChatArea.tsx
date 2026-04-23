@@ -61,11 +61,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-  useEffect(() => {
+useEffect(() => {
     if (thread) {
+      stopStreaming()
       loadMessages(thread.id).catch(console.error)
     }
-  }, [thread?.id, loadMessages])
+  }, [thread?.id, loadMessages, stopStreaming])
 
   const handleSend = async (content: string) => {
     let activeThread = thread

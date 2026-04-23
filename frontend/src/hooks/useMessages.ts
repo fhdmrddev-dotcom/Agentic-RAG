@@ -17,10 +17,11 @@ function makeTempId() {
 export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-const isSendingRef = useRef(false)
+  const isSendingRef = useRef(false)
   const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
+  const streamingThreadIdRef = useRef<string | null>(null)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -31,7 +32,12 @@ const isSendingRef = useRef(false)
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
     setMessages((prev) => {
-      // Don't wipe optimistic messages or live-only fields (confidence) if a send is in flight
+      // If a different thread is being requested, always allow the update
+      // so thread switching works even during active streaming.
+      if (streamingThreadIdRef.current && streamingThreadIdRef.current !== threadId) {
+        return data
+      }
+      // Same thread: don't wipe optimistic messages if a send is in flight
       // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
       if (sendGenerationRef.current !== generation) return prev
@@ -40,9 +46,10 @@ const isSendingRef = useRef(false)
   }, [])
 
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
-    if (isSendingRef.current) return
+if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
+    streamingThreadIdRef.current = threadId
 
     // Optimistic user message
     const userMsg: Message = {
@@ -235,6 +242,7 @@ const isSendingRef = useRef(false)
 } finally {
       abortControllerRef.current = null
       isSendingRef.current = false
+      streamingThreadIdRef.current = null
       setIsStreaming(false)
 
       // Mark running tool calls as "interrupted" if the user stopped the stream
