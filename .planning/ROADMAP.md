@@ -113,6 +113,8 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   - [ ] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
   - [ ] 051-04-PLAN.md — Settings stack for sub_agent_max_output_tokens (CTX-03)
   - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
+  - [ ] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
+  - [ ] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
 
 ## Phase Details
 
@@ -211,7 +213,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
 | 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
 | 50. Library Health at Scale | v2.4 | 0/? | Not started | - |
-| 51. Context Window Management | v2.4 | 0/5 | Not started | - |
+| 51. Context Window Management | v2.4 | 0/7 | Gap closure in progress | - |
 
 ### Phase 51: Context Window Management
 
@@ -224,10 +226,12 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
   3. Settings page exposes sliders for context history depth and sub-agent output token ceiling, and a dropdown for sub-agent model override
   4. Each model in the model selector shows an inline info card (context window, output limit, cost tier, best-for label)
   5. Token counting uses provider-accurate methods (tiktoken for OpenAI, char heuristic as fallback) rather than a single universal heuristic
-**Plans**: 5 plans
+**Plans**: 7 plans (5 original + 2 gap closure)
   - [ ] 051-01-PLAN.md — Test stubs: failing test scaffolds for CTX-01 through CTX-05
   - [ ] 051-02-PLAN.md — Sub-agent keyword routing + config field (CTX-01, CTX-02)
   - [ ] 051-03-PLAN.md — tiktoken upgrade in context_window.py (CTX-05)
   - [ ] 051-04-PLAN.md — Settings stack: sub_agent_max_output_tokens 6-layer threading + SliderInput (CTX-03)
   - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
+  - [ ] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
+  - [ ] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
 **UI hint**: yes
