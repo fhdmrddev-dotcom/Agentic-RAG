@@ -190,6 +190,11 @@ class Settings(BaseSettings):
     # Sub-agents have their own independent context window — this cap is NOT protecting
     # the main agent's budget. 600k chars ≈ 150k tokens, which fits any 200k+ model
     # (Haiku 4.5: 200k, GPT-5.4-nano: 400k, Gemini Flash: 1M) with headroom for output.
+    sub_agent_max_output_tokens: int = 8192
+    # Default output ceiling for sub-agent analysis tasks (D-08).
+    # Generation tasks (pptx, report, pdf, etc.) override this with max(32768, this value).
+    # Range: 4096–65536. Set SUB_AGENT_MAX_OUTPUT_TOKENS=<n> in .env to override globally.
+    # Overridable per-user via Settings UI slider.
 
     # Observability
     langsmith_api_key: str = ""
