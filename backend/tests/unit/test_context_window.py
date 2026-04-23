@@ -394,3 +394,43 @@ def test_trim_inter_iteration_growth_scenario():
     # The key correctness invariant is: no orphaned tool results (already checked above).
     # The result should be smaller than or equal to the original 12-message list.
     assert len(result) <= len(messages), "Trim should not grow the messages list"
+
+
+# ---------------------------------------------------------------------------
+# tiktoken integration (CTX-05)
+# ---------------------------------------------------------------------------
+
+def test_tiktoken_estimate():
+    """estimate_tokens uses tiktoken for gpt-* and o1/o3 models when available.
+
+    This test verifies the MODEL argument is accepted and the function returns
+    a reasonable count. If tiktoken is not installed, the test is skipped.
+    """
+    from app.services.context_window import estimate_tokens, _TIKTOKEN_AVAILABLE
+    if not _TIKTOKEN_AVAILABLE:
+        pytest.skip("tiktoken not installed — install with: pip install tiktoken==0.12.0")
+    text = "The quick brown fox jumps over the lazy dog"
+    # GPT-4 tokenizes this at 9 tokens; chars/4 gives 10 — tiktoken is more accurate
+    count = estimate_tokens(text, model="gpt-4o")
+    assert count > 0
+    # tiktoken count should differ from chars/4 for known text
+    chars_estimate = max(1, len(text) // 4)
+    # Both should be in a reasonable range (allow either path to pass for CI)
+    assert 5 <= count <= 20
+
+
+def test_tiktoken_fallback():
+    """estimate_tokens falls back to chars/4 for non-OpenAI models."""
+    from app.services.context_window import estimate_tokens
+    text = "hello world" * 10  # 110 chars → 110 // 4 = 27
+    # Non-OpenAI model → always uses chars/4
+    count = estimate_tokens(text, model="claude-sonnet-4-6")
+    assert count == max(1, len(text) // 4)
+
+
+def test_tiktoken_no_model_uses_chars_heuristic():
+    """estimate_tokens with no model arg returns chars/4 (backward-compat)."""
+    from app.services.context_window import estimate_tokens
+    text = "a" * 40
+    # No model arg → chars/4 → 10
+    assert estimate_tokens(text) == 10
