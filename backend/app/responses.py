@@ -33,7 +33,6 @@ class _SilentSSEIterator:
                 pass
 
     async def __anext__(self):
-        # If the client already disconnected (signaled via stop_event), stop immediately
         if self._stop_event.is_set():
             raise StopAsyncIteration
         try:
@@ -41,11 +40,11 @@ class _SilentSSEIterator:
         except StopAsyncIteration:
             raise
         except GeneratorExit:
-            logger.info("SSE client disconnected")
+            logger.info("SSE client disconnected (GeneratorExit)")
             await self.aclose()
             raise StopAsyncIteration
-        except (ConnectionResetError, BrokenPipeError):
-            logger.info("SSE client disconnected during send")
+        except OSError:
+            logger.info("SSE client disconnected (OSError)")
             await self.aclose()
             raise StopAsyncIteration
         except AssertionError as e:
@@ -55,17 +54,28 @@ class _SilentSSEIterator:
                 await self.aclose()
                 raise StopAsyncIteration
             raise
+        except RuntimeError as e:
+            err = str(e).lower()
+            if any(kw in err for kw in ("disconnect", "closed", "send")):
+                logger.debug("SSE transport error in iterator: %s", e)
+                await self.aclose()
+                raise StopAsyncIteration
+            raise
 
 
 class SSEStreamingResponse(StreamingResponse):
     """StreamingResponse that suppresses ASGI transport errors on client disconnect.
 
     Two-part strategy:
-    1. _safe_send wraps the ASGI send callable — catches transport errors and sets
-       stop_event so the iterator stops producing new chunks immediately.
+    1. _safe_send wraps the ASGI send callable — catches OSError and transport
+       errors, sets stop_event so the iterator stops producing new chunks.
     2. __call__ catches any remaining transport errors and aclose()'s the iterator
        in finally, so the underlying async generator is cancelled rather than
        orphaned (which would waste LLM API calls running to completion).
+
+    We override __call__ to replace Starlette's task-group-based disconnect
+    handling with direct error suppression, because Starlette's approach
+    (anyio CancelScope) can leave the generator running after a disconnect.
     """
 
     async def __call__(self, scope, receive, send):
@@ -78,10 +88,10 @@ class SSEStreamingResponse(StreamingResponse):
                 return
             try:
                 await send(event)
-            except (ConnectionResetError, BrokenPipeError):
+            except OSError:
                 closed = True
                 stop_event.set()
-                logger.info("SSE client disconnected during write")
+                logger.info("SSE client disconnected (OSError)")
             except AssertionError as e:
                 err = str(e).lower()
                 if any(kw in err for kw in ("send", "close", "write")):
@@ -90,21 +100,35 @@ class SSEStreamingResponse(StreamingResponse):
                     logger.debug("SSE transport closed: %s", e)
                 else:
                     raise
+            except RuntimeError as e:
+                err = str(e).lower()
+                if any(kw in err for kw in ("disconnect", "closed", "send")):
+                    closed = True
+                    stop_event.set()
+                    logger.debug("SSE runtime disconnect: %s", e)
+                else:
+                    raise
 
-        # Wire the stop_event into the iterator so __anext__ checks it
         if isinstance(self.body_iterator, _SilentSSEIterator):
             self.body_iterator._stop_event = stop_event
 
         try:
             await super().__call__(scope, receive, _safe_send)
-        except (ConnectionResetError, BrokenPipeError):
+        except OSError:
             stop_event.set()
-            logger.info("SSE client disconnected")
+            logger.info("SSE client disconnected (OSError in call)")
         except AssertionError as e:
             err = str(e).lower()
             if any(kw in err for kw in ("send", "close", "write")):
                 stop_event.set()
                 logger.debug("SSE transport closed: %s", e)
+            else:
+                raise
+        except RuntimeError as e:
+            err = str(e).lower()
+            if any(kw in err for kw in ("disconnect", "closed", "send")):
+                stop_event.set()
+                logger.debug("SSE runtime disconnect: %s", e)
             else:
                 raise
         finally:

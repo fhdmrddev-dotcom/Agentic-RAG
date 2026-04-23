@@ -8,6 +8,7 @@ interface UseMessages {
   loadMessages: (threadId: string) => Promise<void>
   sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
   stopStreaming: () => void
+  abortStream: () => void
 }
 
 function makeTempId() {
@@ -25,6 +26,10 @@ export function useMessages(): UseMessages {
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
+    abortControllerRef.current?.abort()
+  }, [])
+
+  const abortStream = useCallback(() => {
     abortControllerRef.current?.abort()
   }, [])
 
@@ -245,8 +250,10 @@ if (isSendingRef.current) return
       streamingThreadIdRef.current = null
       setIsStreaming(false)
 
+      const wasStoppedByUser = stoppedByUserRef.current
+
       // Mark running tool calls as "interrupted" if the user stopped the stream
-      if (stoppedByUserRef.current) {
+      if (wasStoppedByUser) {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.role !== "assistant") return m
@@ -269,14 +276,22 @@ if (isSendingRef.current) return
         if (lastMsg?.id === assistantId) {
           const updated = prev.map((m) =>
             m.id === assistantId
-              ? { ...m, ...(stoppedByUserRef.current ? { stopped: true } : {}) }
+              ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
               : m
           )
-          // Always reload from DB after stream ends to reconcile temp message with persisted version
-          setTimeout(() => {
-            stoppedByUserRef.current = false
-            loadMessages(threadId).catch(console.error)
-          }, 800)
+          // Only reload from DB if the user is still on the same thread.
+          // Skip the reload on navigation abort — the new thread's loadMessages
+          // has already started.
+          if (!wasStoppedByUser) {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+            }, 0)
+          } else {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+              loadMessages(threadId).catch(console.error)
+            }, 800)
+          }
           return updated
         }
 
@@ -296,5 +311,5 @@ if (isSendingRef.current) return
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming }
+  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream }
 }

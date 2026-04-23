@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming } = useMessages()
+  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -63,10 +63,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
 useEffect(() => {
     if (thread) {
-      stopStreaming()
+      abortStream()
       loadMessages(thread.id).catch(console.error)
     }
-  }, [thread?.id, loadMessages, stopStreaming])
+  }, [thread?.id, loadMessages, abortStream])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
