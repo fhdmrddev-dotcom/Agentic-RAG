@@ -98,7 +98,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 **Milestone Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
 
-- [ ] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved
+- [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
 - [ ] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats
 - [ ] **Phase 46: Smart Skill Dispatch** — Only relevant skills appear in the agent's context
 - [ ] **Phase 47: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
