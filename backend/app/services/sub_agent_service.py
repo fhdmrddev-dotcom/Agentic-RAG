@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # Gemini 3.x excluded — still in preview as of April 2026.
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
-    "openai":     "gpt-5.4-nano",
+    "openai":     "gpt-4.1-nano",
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
