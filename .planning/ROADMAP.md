@@ -108,6 +108,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
 - [ ] **Phase 50: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
 - [ ] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation
+  - [ ] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
+  - [ ] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
+  - [ ] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
+  - [ ] 051-04-PLAN.md — Settings stack for sub_agent_max_output_tokens (CTX-03)
+  - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
 
 ## Phase Details
 
@@ -174,7 +179,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Requirements**: SETT-01, SETT-02, NAV-01, NAV-02
 **Success Criteria** (what must be TRUE):
   1. User can toggle web search on or off in Settings, independent of whether a Tavily API key is configured
-  2. When web search is toggled off, the web_search tool is never included in the agent's available tool set
+  2. When web search is toggled off, the web_search tool is excluded from the agent's available tool set regardless of API key
   3. Icon labels appear directly adjacent to their icons in the expanded sidebar with no large gaps between icon and text
   4. When the sidebar is collapsed, the logo icon remains visible (icon-only, no text)
 **Plans**: TBD
@@ -206,7 +211,8 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
 | 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
 | 50. Library Health at Scale | v2.4 | 0/? | Not started | - |
-| 51. Context Window Management | v2.4 | 0/? | Not started | - |
+| 51. Context Window Management | v2.4 | 0/5 | Not started | - |
+
 ### Phase 51: Context Window Management
 
 **Goal**: Context limits are handled intelligently across all providers — sub-agents route complex generation tasks (PPTX, reports) to capable models, output token ceilings are configurable per task type, and admins can tune context behaviour from the Settings UI with inline per-model documentation
@@ -218,5 +224,10 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
   3. Settings page exposes sliders for context history depth and sub-agent output token ceiling, and a dropdown for sub-agent model override
   4. Each model in the model selector shows an inline info card (context window, output limit, cost tier, best-for label)
   5. Token counting uses provider-accurate methods (tiktoken for OpenAI, char heuristic as fallback) rather than a single universal heuristic
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 051-01-PLAN.md — Test stubs: failing test scaffolds for CTX-01 through CTX-05
+  - [ ] 051-02-PLAN.md — Sub-agent keyword routing + config field (CTX-01, CTX-02)
+  - [ ] 051-03-PLAN.md — tiktoken upgrade in context_window.py (CTX-05)
+  - [ ] 051-04-PLAN.md — Settings stack: sub_agent_max_output_tokens 6-layer threading + SliderInput (CTX-03)
+  - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
 **UI hint**: yes
