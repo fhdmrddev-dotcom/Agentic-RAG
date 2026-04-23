@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: in_progress
-stopped_at: Phase 45 Plan 01 complete — ready for Plan 02
-last_updated: "2026-04-23T10:09:29.000Z"
+stopped_at: Phase 45 complete — both plans done
+last_updated: "2026-04-23T10:17:03.000Z"
 last_activity: 2026-04-23
 progress:
   total_phases: 8
   completed_phases: 1
   total_plans: 2
-  completed_plans: 1
-  percent: 19
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State
@@ -26,15 +26,16 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 ## Current Position
 
 Phase: 45 of 51 (Chat UX Fixes)
-Plan: 1/2 complete
-Status: Phase 45 Plan 01 complete — ready for Plan 02
-Last activity: 2026-04-23 — Plan 45-01 executed
+Plan: 2/2 complete
+Status: Phase 45 complete — both plans done
+Last activity: 2026-04-23 — Plan 45-02 executed
 
-Progress: [██░░░░░░░░] 19%
+Progress: [███░░░░░░░] 25%
 
 ## Phase 45 Plan Summary
 
 1. **Plan 45-01: Chat Delete Confirmation & Ghost Content Fix** — AlertDialog component, confirmation flow in NavPanel, clearMessages to prevent ghost content. ✅ COMPLETE
+2. **Plan 45-02: Folder Selector on New Chat** — NavPanel folder picker dropdown next to New Chat, mobile drawer folder selector, ChatLayout passes folders prop. ✅ COMPLETE
 
 ## Phase 45 Verified Results
 
@@ -42,6 +43,7 @@ Progress: [██░░░░░░░░] 19%
 |------------|--------|-------|
 | CHAT-01 | ✅ | AlertDialog requires explicit Delete click before thread deletion |
 | CHAT-02 | ✅ | clearMessages runs synchronously on thread change, no ghost content |
+| CHAT-03 | ✅ | NavPanel + mobile drawer folder selectors scope thread creation to folder |
 
 ## Performance Metrics
 
@@ -69,6 +71,7 @@ Recent decisions affecting current work:
 - `abortStream()` vs `stopStreaming()`: navigation aborts quietly (no "stopped" label), explicit Stop sets stopped flag
 - AlertDialog confirmation before thread delete — client-side UX safeguard only; RLS provides actual security
 - clearMessages on thread switch prevents ghost content flash — synchronous reset before async loadMessages
+- NavPanel folder picker toggles visibility; collapsed sidebar hides picker via existing opacity-0 pattern
 
 ### Pending Todos
 
@@ -97,5 +100,5 @@ Items acknowledged and carried forward from v2.3 milestone close:
 ## Session Continuity
 
 Last session: 2026-04-23
-Stopped at: Phase 45 Plan 01 complete — ready for Plan 02
-Resume file: .planning/phases/45-chat-ux-fixes/45-01-SUMMARY.md
+Stopped at: Phase 45 complete — both plans done
+Resume file: .planning/phases/45-chat-ux-fixes/45-02-SUMMARY.md

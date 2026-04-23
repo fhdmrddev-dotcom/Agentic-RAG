@@ -99,7 +99,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Milestone Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
 
 - [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
-- [ ] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats
+- [ ] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans)
 - [ ] **Phase 46: Smart Skill Dispatch** — Only relevant skills appear in the agent's context
 - [ ] **Phase 47: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
 - [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
@@ -130,7 +130,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   3. User can choose a folder when creating a new chat, and the thread is scoped to that folder from the start
 **Plans**: 2 plans
   - [x] 45-01-PLAN.md — Delete confirmation dialog and ghost content fix (CHAT-01, CHAT-02) ✅
-  - [ ] 45-02-PLAN.md — Folder selector on new chat creation (CHAT-03)
+  - [x] 45-02-PLAN.md — Folder selector on new chat creation (CHAT-03) ✅
 **UI hint**: yes
 
 ### Phase 46: Smart Skill Dispatch
@@ -196,7 +196,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
-| 45. Chat UX Fixes | v2.4 | 1/2 | In progress | - |
+| 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
 | 46. Smart Skill Dispatch | v2.4 | 0/? | Not started | - |
 | 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
 | 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |

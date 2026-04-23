@@ -31,7 +31,7 @@ Requirements for Stability, Polish & UX Fixes milestone. Each maps to roadmap ph
 
 - [x] **CHAT-01**: Deleting a thread shows a confirmation dialog before the delete executes
 - [x] **CHAT-02**: After deleting a thread and creating a new one, no ghost content from the deleted thread appears
-- [ ] **CHAT-03**: Creating a new chat presents a folder selector to scope the thread from the start
+- [x] **CHAT-03**: Creating a new chat presents a folder selector to scope the thread from the start
 
 ### SETT — Web Search Toggle
 
@@ -104,9 +104,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOC-04 | Phase 48 | Pending |
 | DOC-05 | Phase 48 | Pending |
 | DOC-06 | Phase 48 | Pending |
-| CHAT-01 | Phase 45 | Pending |
-| CHAT-02 | Phase 45 | Pending |
-| CHAT-03 | Phase 45 | Pending |
+| CHAT-01 | Phase 45 | ✅ Complete |
+| CHAT-02 | Phase 45 | ✅ Complete |
+| CHAT-03 | Phase 45 | ✅ Complete |
 | SETT-01 | Phase 49 | Pending |
 | SETT-02 | Phase 49 | Pending |
 | NAV-01 | Phase 49 | Pending |
@@ -128,4 +128,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-04-22*
-*Last updated: 2026-04-23 — Phase 51 Context Window Management added*
+*Last updated: 2026-04-23 — CHAT-01, CHAT-02, CHAT-03 verified complete (Phase 45)*
