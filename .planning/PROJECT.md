@@ -26,10 +26,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ## Current State
 
-**Shipped:** v2.3 Memory, Multimodal & Experience — 2026-04-19 (Phases 33–43: cross-thread memory, multi-modal table/image extraction, knowledge health dashboard, user feedback, Deep Midnight UI redesign with mobile responsiveness)
+**Shipped:** v2.4 Phase 44–45 (SSE & Stop Reliability, Chat UX Fixes) — 2026-04-23
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~57,000 LOC (Python + TypeScript)
-**Phases shipped:** 43 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 7 v2.2 + 11 v2.3), 53 requirements validated
+**Phases shipped:** 45 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 7 v2.2 + 11 v2.3 + 2 v2.4), 56 requirements validated
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
 **Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
 **Known tech debt:** UAT/verification gaps for phases 038–042 (require live browser testing); metadata normalization covers only document_type/language
@@ -119,12 +119,13 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ F-09 Knowledge Health Dashboard — most-retrieved, never-retrieved, low-confidence, stale metrics with action hooks — v2.3 Phases 37–38
 - ✓ F-10 User Feedback Loop — thumbs up/down with reason selector, feedback stats in Library Health — v2.3 Phases 39–40
 - ✓ UI Deep Midnight Redesign — glassmorphic ToolCallPanel, gradient CitationCards, floating pill MessageInput, AppDock, 3-pane SkillsPage, mobile-responsive NavPanel — v2.3 Phases 41–43
+- ✓ STREAM-01/02/03: Stop cancels SSE, graceful disconnects, partial response persistence — v2.4 Phase 44
+- ✓ CHAT-01: Thread delete confirmation dialog (AlertDialog) — v2.4 Phase 45
+- ✓ CHAT-02: No ghost content after thread delete (clearMessages on switch) — v2.4 Phase 45
+- ✓ CHAT-03: Folder selector on new chat creation — v2.4 Phase 45
 
 ### Active
 
-- [ ] STREAM-01: Stop cancels SSE generator immediately (no "saving response" linger)
-- [ ] STREAM-02: Navigate/refresh during streaming disconnects gracefully (no socket errors)
-- [ ] STREAM-03: Partial responses persisted on stop, visible on reload
 - [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills
 - [ ] SKILL-02: Non-relevant skills never triggered even if in catalog
 - [ ] DOC-01: Delete document offers "this version only" or "all versions"
@@ -133,9 +134,6 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - [ ] DOC-04: Root-folder documents clearly visible in document list
 - [ ] DOC-05: Upload errors show specific reasons (duplicate, type, empty, size)
 - [ ] DOC-06: Root folder upload works correctly with clear UX
-- [ ] CHAT-01: Thread delete shows confirmation dialog before executing
-- [ ] CHAT-02: No ghost content from deleted thread appears in new chat
-- [ ] CHAT-03: New chat creation presents folder selector
 - [ ] SETT-01: Web search toggle in Settings (on/off) like sandbox/reranking
 - [ ] SETT-02: Web search excluded from tool set when toggled off
 - [ ] NAV-01: Icon labels directly next to icons when sidebar is expanded
@@ -193,11 +191,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - UAT verification gaps for phases 038–042 (require live browser testing)
 - Verification checks for phases 038, 039, 040, 041, 042 marked human_needed
 - Metadata ingest normalization covers only document_type/language
-- SSE "saving response" linger when user stops streaming mid-response
-- socket.send() exception when navigating/refreshing during active SSE stream
 - Skill catalog injected in full for every request (token waste, over-triggering)
-- No confirmation dialog on thread delete
-- Ghost chat content appears briefly after delete+new chat
 - Icon labels misaligned (far right of icons) in NavPanel
 - Logo disappears entirely when sidebar collapsed (opacity-0 on whole group)
 - Knowledge Health fixed top-10 lists don’t scale for large libraries
@@ -261,4 +255,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 after v2.4 milestone started*
+*Last updated: 2026-04-23 after Phase 45 completion*
