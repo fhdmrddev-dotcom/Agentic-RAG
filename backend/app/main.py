@@ -6,6 +6,32 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 
+
+def _patch_postgrest_maybe_single():
+    """Fix postgrest-py bug: maybe_single() raises APIError on 204 (no rows) instead of returning None."""
+    try:
+        from postgrest._sync.request_builder import SyncSingleRequestBuilder
+        from postgrest.exceptions import APIError
+        _orig = SyncSingleRequestBuilder.execute
+
+        def _safe(self):
+            try:
+                return _orig(self)
+            except APIError as e:
+                if getattr(e, "code", None) == "204":
+                    class _Empty:
+                        data = None
+                        count = None
+                    return _Empty()
+                raise
+
+        SyncSingleRequestBuilder.execute = _safe
+    except Exception:
+        pass
+
+
+_patch_postgrest_maybe_single()
+
 # Configure LangSmith tracing via environment variables
 os.environ["LANGSMITH_TRACING"] = settings.langsmith_tracing
 os.environ["LANGSMITH_PROJECT"] = settings.langsmith_project

@@ -17,11 +17,13 @@ function makeTempId() {
 export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-  const isSendingRef = useRef(false)
+const isSendingRef = useRef(false)
   const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
+  const stoppedByUserRef = useRef(false)
 
   const stopStreaming = useCallback(() => {
+    stoppedByUserRef.current = true
     abortControllerRef.current?.abort()
   }, [])
 
@@ -230,23 +232,57 @@ export function useMessages(): UseMessages {
       if (!(err instanceof Error && err.name === "AbortError")) {
         console.error(err)
       }
-    } finally {
+} finally {
       abortControllerRef.current = null
       isSendingRef.current = false
       setIsStreaming(false)
 
-      // Safety net: if the stream ended but the assistant message has no text content
-      // (SSE connection dropped before final delta events arrived), reload from DB after
-      // a short delay so the persisted response becomes visible without requiring a refresh.
+      // Mark running tool calls as "interrupted" if the user stopped the stream
+      if (stoppedByUserRef.current) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.role !== "assistant") return m
+            const hasRunning = m.tool_calls?.some((tc) => tc.status === "running")
+            if (!hasRunning) return m
+            return {
+              ...m,
+              tool_calls: m.tool_calls!.map((tc) =>
+                tc.status === "running"
+                  ? { ...tc, status: "interrupted" as const }
+                  : tc
+              ),
+            }
+          })
+        )
+      }
+
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
-        const sseDrop = lastMsg?.id === assistantId && !lastMsg.content
-        const racedEmpty = prev.length === 0  // race condition wiped messages
+        if (lastMsg?.id === assistantId) {
+          const updated = prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, ...(stoppedByUserRef.current ? { stopped: true } : {}) }
+              : m
+          )
+          // Always reload from DB after stream ends to reconcile temp message with persisted version
+          setTimeout(() => {
+            stoppedByUserRef.current = false
+            loadMessages(threadId).catch(console.error)
+          }, 800)
+          return updated
+        }
+
+        // Safety net: if the stream ended but assistant message has no text content
+        // (SSE connection dropped before final delta events arrived), reload from DB
+        const sseDrop = lastMsg?.role === "assistant" && !lastMsg?.content
+        const racedEmpty = prev.length === 0
         if (sseDrop || racedEmpty) {
           setTimeout(() => {
+            stoppedByUserRef.current = false
             loadMessages(threadId).catch(console.error)
           }, 1500)
         }
+        stoppedByUserRef.current = false
         return prev
       })
     }

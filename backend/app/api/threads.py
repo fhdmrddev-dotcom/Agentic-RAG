@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from app.responses import sse_response
 from openai import APIError
 from supabase import Client
 
@@ -557,7 +557,9 @@ async def send_message(
                 "content": _strip_nul(full_content),
             }
             if persisted_tool_calls:
-                row["tool_calls"] = _strip_nul(persisted_tool_calls)
+                completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
+                if completed_tools:
+                    row["tool_calls"] = _strip_nul(completed_tools)
             if unique_citations:
                 row["source_refs"] = unique_citations   # Full citation objects (D-13)
             elif unique_sources:
@@ -1416,4 +1418,4 @@ async def send_message(
             # prevents a double-insert when the normal path already persisted.
             _persist_assistant_message()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return sse_response(event_stream())
