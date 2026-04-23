@@ -9,6 +9,7 @@ interface UseMessages {
   sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
   stopStreaming: () => void
   abortStream: () => void
+  clearMessages: () => void
 }
 
 function makeTempId() {
@@ -31,6 +32,14 @@ export function useMessages(): UseMessages {
 
   const abortStream = useCallback(() => {
     abortControllerRef.current?.abort()
+  }, [])
+
+  const clearMessages = useCallback(() => {
+    setMessages([])
+    setIsStreaming(false)
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    isSendingRef.current = false
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
@@ -311,5 +320,5 @@ if (isSendingRef.current) return
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream }
+  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
 }

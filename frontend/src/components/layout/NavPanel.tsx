@@ -3,9 +3,20 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   MessageSquare, FileText, Activity, Zap, Settings,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
   Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
+  AlertCircle,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { Thread } from "@/types"
@@ -64,6 +75,7 @@ export function NavPanel({
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -178,7 +190,7 @@ export function NavPanel({
                     Rename
                   </button>
                   <button
-                    onClick={async () => { setMenuOpenId(null); await onDeleteThread(thread.id) }}
+                    onClick={() => { setMenuOpenId(null); setDeleteConfirmId(thread.id) }}
                     className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
                     aria-label="Delete Thread"
                   >
@@ -296,6 +308,34 @@ export function NavPanel({
             )}
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+                <AlertDialogTitle>Delete thread?</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                This will permanently delete this thread and all its messages. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (deleteConfirmId) {
+                    await onDeleteThread(deleteConfirmId)
+                    setDeleteConfirmId(null)
+                  }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Footer Area */}
         <div className="p-3 mt-auto space-y-1">

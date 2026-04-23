@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream } = useMessages()
+  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -62,11 +62,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   }
 
 useEffect(() => {
-    if (thread) {
-      abortStream()
-      loadMessages(thread.id).catch(console.error)
+    if (!thread) {
+      clearMessages()
+      return
     }
-  }, [thread?.id, loadMessages, abortStream])
+    // Clear stale messages from previous thread before loading new ones
+    clearMessages()
+    abortStream()
+    loadMessages(thread.id).catch(console.error)
+  }, [thread?.id, loadMessages, abortStream, clearMessages])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
