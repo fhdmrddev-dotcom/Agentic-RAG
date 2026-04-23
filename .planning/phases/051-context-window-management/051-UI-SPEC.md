@@ -114,7 +114,7 @@ Below: optional hint line (text-xs text-muted-foreground/70)
 
 | Property | Spec |
 |----------|------|
-| Container | `space-y-1.5` |
+| Container | `space-y-2` |
 | Track | `h-2 accent-primary cursor-pointer` |
 | Value readout | `text-xs font-mono text-muted-foreground w-20 text-right shrink-0` |
 | Hint text | `text-xs text-muted-foreground/70` |
