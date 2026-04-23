@@ -641,7 +641,11 @@ export function SettingsPage() {
   }
 
   const handleReset = () => {
-    if (s) hydrate(s)
+    if (s) {
+      if (activeTab === "0" || window.confirm("Reset all unsaved changes across all tabs?")) {
+        hydrate(s)
+      }
+    }
   }
 
   if (loading) {
