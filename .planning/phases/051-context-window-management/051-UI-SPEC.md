@@ -50,8 +50,8 @@ Declared values (must be multiples of 4):
 
 Exceptions:
 
-- `FieldRow` vertical padding: `py-2.5` (10px) — matches existing SettingsPage pattern; do not change
-- Slider track height: 6px (`h-1.5`) — intentionally sub-scale for visual lightness
+- `FieldRow` vertical padding: `py-3` (12px) — grid-aligned value closest to existing SettingsPage pattern
+- Slider track height: 8px (`h-2`) — grid-aligned; visually acceptable weight for a slider track
 - Info icon size: 12px (`h-3 w-3`) — matches existing `Cpu` icon size in MessageInput dropdown
 
 ---
@@ -70,7 +70,7 @@ All sizes from existing codebase patterns in SettingsPage.tsx and index.css.
 Notes:
 - Slider value readout uses `text-xs font-mono text-muted-foreground` — matches existing `NumberInput` field style
 - Section descriptions use `CardDescription` (shadcn default: `text-sm text-muted-foreground`)
-- Model info tooltip content: `text-xs` body, `font-medium` for field labels within the card
+- Model info tooltip content: `text-xs` body, `font-bold` for field labels within the card
 
 ---
 
@@ -115,7 +115,7 @@ Below: optional hint line (text-xs text-muted-foreground/70)
 | Property | Spec |
 |----------|------|
 | Container | `space-y-1.5` |
-| Track | `h-1.5 accent-primary cursor-pointer` |
+| Track | `h-2 accent-primary cursor-pointer` |
 | Value readout | `text-xs font-mono text-muted-foreground w-20 text-right shrink-0` |
 | Hint text | `text-xs text-muted-foreground/70` |
 | Auto state display | When value = 0 on context depth slider, readout shows "Auto" instead of "0" |
@@ -147,7 +147,7 @@ Below: optional hint line (text-xs text-muted-foreground/70)
 
 | Property | Spec |
 |----------|------|
-| Icon | `Info` from lucide-react, `h-3 w-3` |
+| Icon | `Info` from lucide-react, `h-3 w-3`, `aria-label="Model information"` |
 | Icon color | `text-muted-foreground/50` rest, `text-muted-foreground` hover |
 | Icon margin | `ml-1 shrink-0` |
 | Tooltip trigger | Hover only (no click) — use shadcn `Tooltip` |
@@ -155,7 +155,7 @@ Below: optional hint line (text-xs text-muted-foreground/70)
 | Tooltip max width | `max-w-[200px]` |
 | Tooltip text size | `text-xs` |
 | Tooltip spacing | `space-y-1` between field rows |
-| Tooltip field labels | `font-medium` (600 weight) |
+| Tooltip field labels | `font-bold` (700 weight) |
 | TooltipProvider placement | Hoisted above `DropdownMenuContent` map (not per-item) |
 | Degradation | No icon rendered if model ID not in `MODEL_INFO` |
 
