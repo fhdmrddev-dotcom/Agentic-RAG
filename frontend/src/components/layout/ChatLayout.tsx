@@ -59,6 +59,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   )
 
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [mobileFolderId, setMobileFolderId] = useState<string | null>(null)
 
   const handleTryInChat = useCallback((skillName: string) => {
     onSetPrefillMessage(`Use the ${skillName} skill`)
@@ -78,6 +79,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         loadThreads={loadThreads}
         onDeleteThread={deleteThread}
         onRenameThread={renameThread}
+        folders={folders}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
@@ -101,13 +103,25 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
             </p>
             <div className="px-1 mb-2">
               <Button
-                onClick={() => { newThread() }}
+                onClick={() => { newThread(mobileFolderId); setMobileFolderId(null) }}
                 className="w-full justify-center gap-2 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
                 size="sm"
               >
                 <Plus className="h-4 w-4" />
                 New Chat
               </Button>
+              {folders.length > 0 && (
+                <select
+                  value={mobileFolderId ?? ""}
+                  onChange={(e) => setMobileFolderId(e.target.value || null)}
+                  className="w-full text-xs rounded-lg px-2 py-1.5 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all mt-2"
+                >
+                  <option value="">All documents</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="space-y-0.5 mt-2">
               {threads.length === 0 && (

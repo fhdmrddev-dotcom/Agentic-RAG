@@ -19,7 +19,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
-import type { Thread } from "@/types"
+import type { Folder, Thread } from "@/types"
 
 interface Props {
   // From AppDock
@@ -29,10 +29,11 @@ interface Props {
   threads: Thread[]
   selectedThread: Thread | null
   onSelectThread: (thread: Thread) => void
-  onNewThread: () => void
+  onNewThread: (folderId?: string | null) => void
   loadThreads: () => Promise<void>
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
+  folders: Folder[]
   theme: "light" | "dark"
   onToggleTheme: () => void
 }
@@ -56,6 +57,7 @@ export function NavPanel({
   loadThreads,
   onDeleteThread,
   onRenameThread,
+  folders,
   theme,
   onToggleTheme,
 }: Props) {
@@ -76,6 +78,8 @@ export function NavPanel({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [showFolderPicker, setShowFolderPicker] = useState(false)
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -295,14 +299,50 @@ export function NavPanel({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
                     Chats
                   </span>
-                  <button
-                    onClick={() => onNewThread()}
-                    className="flex p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors items-center justify-center"
-                    title="New Chat"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        onNewThread(selectedFolderId)
+                        setShowFolderPicker(false)
+                      }}
+                      className="flex p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors items-center justify-center"
+                      title="New Chat"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    {folders.length > 0 && (
+                      <button
+                        onClick={() => setShowFolderPicker((prev) => !prev)}
+                        className={cn(
+                          "flex p-1 rounded-md transition-colors items-center justify-center",
+                          showFolderPicker
+                            ? "bg-accent text-primary"
+                            : "hover:bg-accent/40 text-muted-foreground hover:text-sidebar-foreground"
+                        )}
+                        title="Choose folder"
+                      >
+                        <FolderIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {showFolderPicker && folders.length > 0 && (
+                  <div className="mb-2 px-1">
+                    <select
+                      value={selectedFolderId ?? ""}
+                      onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                      className="w-full text-xs rounded-lg px-2 py-1.5 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                    >
+                      <option value="">All documents</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Scope this chat to a folder
+                    </p>
+                  </div>
+                )}
                 {renderThreadList()}
               </div>
             )}
