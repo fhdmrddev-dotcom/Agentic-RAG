@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: in_progress
-stopped_at: Phase 051 complete — PR #3 open, ready to merge
-last_updated: "2026-04-24T05:30:00.000Z"
+stopped_at: Phase 051 complete, PR #3 merged — Phase 46 (Smart Skill Dispatch) deferred to Skills Studio milestone
+last_updated: "2026-04-24T18:00:00.000Z"
 last_activity: 2026-04-24
 progress:
-  total_phases: 8
+  total_phases: 7
   completed_phases: 3
   total_plans: 11
   completed_plans: 11
-  percent: 37
+  percent: 43
 ---
 
 # Project State
@@ -32,7 +32,7 @@ Last activity: 2026-04-24 — Plans 06 and 07 executed (gap closure), UAT approv
 
 Progress: [████░░░░░░] 37%
 
-Next: Phase 46 (Smart Skill Dispatch)
+Next: Phase 46 (Document Version Deletion) — Smart Skill Dispatch deferred to Skills Studio milestone
 
 ## Phase 051 Plan Summary
 

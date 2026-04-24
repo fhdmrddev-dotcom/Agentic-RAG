@@ -96,17 +96,16 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 ### 🚧 v2.4 Stability, Polish & UX Fixes (In Progress)
 
-**Milestone Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
+**Milestone Goal:** Fix critical bugs (SSE disconnects, ghost chats) and polish UX gaps to bring the app to production quality.
+
+> **Note:** Phase 46 (Smart Skill Dispatch) was removed from this milestone. It modifies the `skills` table schema (pgvector embedding column), CRUD hooks, and system prompt injection — the same infrastructure the Skill Studio milestone will heavily extend. Deferring avoids fragmented schema migrations and ensures smart dispatch ships as a coherent foundation alongside the eval/iteration features it enables. See: `PRD_Skill_Studio.md` for the full Skills milestone scope.
 
 - [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
 - [x] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans) — completed 2026-04-23
-- [ ] **Phase 46: Smart Skill Dispatch** — Only relevant skills appear in the agent's context
-  - [ ] 46-01-PLAN.md — Skill embedding infrastructure (RPC migration, config, CRUD hooks, backfill)
-  - [ ] 46-02-PLAN.md — Skill dispatch in chat stream (matching, tool filtering, graceful fallback)
-- [ ] **Phase 47: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
-- [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
-- [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
-- [ ] **Phase 50: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
+- [ ] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
+- [ ] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
+- [ ] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
+- [ ] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
   - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
   - [x] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
@@ -142,18 +141,15 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   - [x] 45-02-PLAN.md — Folder selector on new chat creation (CHAT-03) ✅
 **UI hint**: yes
 
-### Phase 46: Smart Skill Dispatch
-**Goal**: The agent's system prompt includes only skills relevant to the user's current message, eliminating over-triggering and token waste
-**Depends on**: Phase 44 (streaming reliability resolved first)
-**Requirements**: SKILL-01, SKILL-02
-**Success Criteria** (what must be TRUE):
-  1. Only skills whose descriptions match the user's current message appear in the agent's system prompt — not all enabled skills
-  2. Skills that don't match the user's intent are never triggered during conversation, even if they exist in the user's enabled catalog
-**Plans**: 2 plans
-  - [ ] 46-01-PLAN.md — Skill embedding infrastructure (RPC migration, config, CRUD hooks, backfill)
-  - [ ] 46-02-PLAN.md — Skill dispatch in chat stream (matching, tool filtering, graceful fallback)
+### ~~Phase 46: Smart Skill Dispatch~~ — DEFERRED to Skills Studio milestone
 
-### Phase 47: Document Version Deletion
+**Deferred reason:** This phase adds a `vector(1536)` embedding column to the `skills` table, embedding compute hooks in `skills.py` CRUD, and replaces the full-catalog system prompt injection with cosine-similarity matching. The Skill Studio milestone (`PRD_Skill_Studio.md`) will further evolve the skills table (eval cases, eval runs, potential version column) and the same CRUD/dispatch code. Doing them in separate milestones creates fragmented migrations and forces integration work twice. Smart dispatch ships as Phase 1 of the Skills Studio milestone instead, where it serves as the foundation for relevance-aware eval execution.
+
+**Planning artifacts preserved:** `.planning/phases/46-smart-skill-dispatch/` (CONTEXT.md, DISCUSSION-LOG.md, 46-01-PLAN.md, 46-02-PLAN.md)
+
+---
+
+### Phase 46: Document Version Deletion
 **Goal**: Users can delete document versions intelligently — choosing between a single version or all versions — with complete cleanup of chunks, storage, and history
 **Depends on**: Nothing specific (document versioning already exists from v2.2)
 **Requirements**: DOC-01, DOC-02, DOC-03
@@ -164,9 +160,9 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 48: Document List & Upload Polish
+### Phase 47: Document List & Upload Polish
 **Goal**: Document management feels complete — root-folder documents are clearly visible and uploads fail with helpful, specific messages
-**Depends on**: Phase 47 (deletion changes may affect document list queries)
+**Depends on**: Phase 46 (deletion changes may affect document list queries)
 **Requirements**: DOC-04, DOC-05, DOC-06
 **Success Criteria** (what must be TRUE):
   1. Documents stored in the root folder (no folder assignment) are clearly visible in the document list and recognizable as root-level items
@@ -175,7 +171,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 49: Settings & Navigation Polish
+### Phase 48: Settings & Navigation Polish
 **Goal**: The app feels polished — web search is explicitly controllable and the sidebar layout is visually tight
 **Depends on**: Nothing specific
 **Requirements**: SETT-01, SETT-02, NAV-01, NAV-02
@@ -187,7 +183,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 50: Library Health at Scale
+### Phase 49: Library Health at Scale
 **Goal**: Knowledge Health works for real-sized libraries — paginated, accurately labeled, and provides actionable guidance instead of empty dead-ends
 **Depends on**: Nothing specific (enhances existing v2.3 feature)
 **Requirements**: HLTH-01, HLTH-02, HLTH-03, HLTH-04
@@ -202,23 +198,23 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 → 51
+Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
-| 46. Smart Skill Dispatch | v2.4 | 0/2 | Not started | - |
-| 47. Document Version Deletion | v2.4 | 0/? | Not started | - |
-| 48. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
-| 49. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
-| 50. Library Health at Scale | v2.4 | 0/? | Not started | - |
-| 51. Context Window Management | v2.4 | 0/7 | Gap closure in progress | - |
+| 46. Document Version Deletion | v2.4 | 0/? | Not started | - |
+| 47. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
+| 48. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
+| 49. Library Health at Scale | v2.4 | 0/? | Not started | - |
+| 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
+| ~~Smart Skill Dispatch~~ | Deferred → Skills Studio | — | Deferred | — |
 
 ### Phase 51: Context Window Management
 
 **Goal**: Context limits are handled intelligently across all providers — sub-agents route complex generation tasks (PPTX, reports) to capable models, output token ceilings are configurable per task type, and admins can tune context behaviour from the Settings UI with inline per-model documentation
-**Depends on**: Phase 49 (Settings & Navigation Polish — builds on that UI foundation)
+**Depends on**: Phase 48 (Settings & Navigation Polish — builds on that UI foundation)
 **Requirements**: CTX-01, CTX-02, CTX-03, CTX-04, CTX-05
 **Success Criteria** (what must be TRUE):
   1. A "summarise document and create PPTX" task completes without hitting context or output token limits — the sub-agent uses a capable model (Sonnet/GPT-4o/Gemini Flash) and a 32k output ceiling for generation tasks
