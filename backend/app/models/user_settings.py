@@ -82,6 +82,7 @@ class UserEffectiveSettings(BaseModel):
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
+    sub_agent_model: str
 
 
 # ── Override file I/O ─────────────────────────────────────────────────────────
@@ -259,6 +260,7 @@ def load_app_settings() -> UserEffectiveSettings:
         sandbox_enabled=_bool(override, "sandbox_enabled", env_settings.sandbox_enabled),
         context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
         sub_agent_max_output_tokens=_int(override, "sub_agent_max_output_tokens", env_settings.sub_agent_max_output_tokens),
+        sub_agent_model=_str(override, "sub_agent_model", env_settings.sub_agent_model),
     )
 
 
