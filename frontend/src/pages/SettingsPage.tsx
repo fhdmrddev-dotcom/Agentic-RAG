@@ -519,6 +519,7 @@ export function SettingsPage() {
   // Context & Sub-agent
   const [contextWindowMaxTokens, setContextWindowMaxTokens] = useState(0)
   const [subAgentMaxOutputTokens, setSubAgentMaxOutputTokens] = useState(8192)
+  const [subAgentModel, setSubAgentModel] = useState("")
 
   const hydrate = (data: FullAppSettings) => {
     setS(data)
@@ -551,6 +552,7 @@ export function SettingsPage() {
     setSandboxEnabled(data.sandbox_enabled)
     setContextWindowMaxTokens(data.context_window_max_tokens ?? 0)
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
+    setSubAgentModel(data.sub_agent_model ?? "")
   }
 
   useEffect(() => {
@@ -575,6 +577,7 @@ export function SettingsPage() {
         })),
         context_window_max_tokens: contextWindowMaxTokens,
         sub_agent_max_output_tokens: subAgentMaxOutputTokens,
+        sub_agent_model: subAgentModel,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
@@ -783,6 +786,22 @@ export function SettingsPage() {
                     step={1024}
                     hint="Generation tasks use at least 32,768 tokens regardless of this value"
                   />
+                </FieldRow>
+                <FieldRow label="Sub-agent model">
+                  <select
+                    value={subAgentModel}
+                    onChange={(e) => setSubAgentModel(e.target.value)}
+                    className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Auto (cheapest)</option>
+                    {activeModels
+                      .split(",")
+                      .map((m) => m.trim())
+                      .filter(Boolean)
+                      .map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                  </select>
                 </FieldRow>
               </SectionCard>
 
