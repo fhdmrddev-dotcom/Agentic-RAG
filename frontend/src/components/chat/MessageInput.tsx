@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, Info, Layers, Square } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, Layers, Square } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +58,6 @@ export function MessageInput({
   onClearPrefill,
 }: Props) {
   const [value, setValue] = useState("")
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -199,33 +198,24 @@ export function MessageInput({
                           key={m}
                           onSelect={() => onModelChange!(m)}
                           className={cn(
-                            "text-xs cursor-pointer gap-2",
+                            "text-xs cursor-pointer items-start gap-2 py-2",
                             m === selectedModel && "font-medium bg-accent",
                           )}
                         >
-                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                          {m}
-                          {m === selectedModel && (
-                            <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
-                          )}
-                          {info && (
-                            <div className="relative inline-flex ml-1">
-                              <Info
-                                className="h-3 w-3 shrink-0 text-muted-foreground/50 hover:text-muted-foreground cursor-default"
-                                aria-label="Model information"
-                                onMouseEnter={() => setHoveredModel(m)}
-                                onMouseLeave={() => setHoveredModel(null)}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              {hoveredModel === m && (
-                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-[9999] bg-popover border border-border rounded-md px-3 py-2 text-xs shadow-md space-y-1 min-w-[190px] pointer-events-none">
-                                  <div><span className="font-semibold">Context:</span> {info.contextWindow.toLocaleString()} tokens</div>
-                                  <div><span className="font-semibold">Max output:</span> {info.maxOutputTokens.toLocaleString()} tokens</div>
-                                  <div><span className="font-semibold">Best for:</span> {info.bestFor}</div>
-                                </div>
+                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                          <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>{m}</span>
+                              {m === selectedModel && (
+                                <span className="text-[10px] text-primary font-semibold">active</span>
                               )}
                             </div>
-                          )}
+                            {info && (
+                              <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
+                                {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
+                              </span>
+                            )}
+                          </div>
                         </DropdownMenuItem>
                       )
                     })}
