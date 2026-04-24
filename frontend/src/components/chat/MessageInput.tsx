@@ -8,12 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { MODEL_INFO } from "@/lib/model-info"
 import { cn } from "@/lib/utils"
 
@@ -64,6 +58,7 @@ export function MessageInput({
   onClearPrefill,
 }: Props) {
   const [value, setValue] = useState("")
+  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -181,7 +176,6 @@ export function MessageInput({
               ) : null}
 
               {/* Model selector */}
-              <TooltipProvider delayDuration={0}>
               {showModelSelector ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -215,22 +209,22 @@ export function MessageInput({
                             <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
                           )}
                           {info && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Info
-                                  className="h-3 w-3 shrink-0 text-muted-foreground/50 hover:text-muted-foreground ml-1"
-                                  aria-label="Model information"
-                                  onPointerMove={(e) => e.stopPropagation()}
-                                  onPointerLeave={(e) => e.stopPropagation()}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </TooltipTrigger>
-                              <TooltipContent side="right" className="max-w-[200px] text-xs space-y-1">
-                                <div><span className="font-bold">Context:</span> {info.contextWindow.toLocaleString()} tokens</div>
-                                <div><span className="font-bold">Max output:</span> {info.maxOutputTokens.toLocaleString()} tokens</div>
-                                <div><span className="font-bold">Best for:</span> {info.bestFor}</div>
-                              </TooltipContent>
-                            </Tooltip>
+                            <div className="relative inline-flex ml-1">
+                              <Info
+                                className="h-3 w-3 shrink-0 text-muted-foreground/50 hover:text-muted-foreground cursor-default"
+                                aria-label="Model information"
+                                onMouseEnter={() => setHoveredModel(m)}
+                                onMouseLeave={() => setHoveredModel(null)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              {hoveredModel === m && (
+                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-[9999] bg-popover border border-border rounded-md px-3 py-2 text-xs shadow-md space-y-1 min-w-[190px] pointer-events-none">
+                                  <div><span className="font-semibold">Context:</span> {info.contextWindow.toLocaleString()} tokens</div>
+                                  <div><span className="font-semibold">Max output:</span> {info.maxOutputTokens.toLocaleString()} tokens</div>
+                                  <div><span className="font-semibold">Best for:</span> {info.bestFor}</div>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </DropdownMenuItem>
                       )
@@ -245,7 +239,6 @@ export function MessageInput({
                   </span>
                 )
               )}
-              </TooltipProvider>
 
               {/* Agent mode selector */}
               {onAgentModeChange && (
