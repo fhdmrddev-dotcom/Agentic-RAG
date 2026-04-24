@@ -174,7 +174,12 @@ async def update_settings(
         if p.models:
             updates[f"{p.id}_models"] = ",".join(p.models)
         if p.id == "ollama" and p.base_url:
-            updates["ollama_base_url"] = p.base_url
+            # Strip /v1 suffix — _build_providers appends it at load time.
+            # Without this, each save round-trips http://host/v1 → stored as-is → /v1/v1 next load.
+            raw = p.base_url.rstrip("/")
+            if raw.endswith("/v1"):
+                raw = raw[:-3]
+            updates["ollama_base_url"] = raw
 
     if body.embedding_model is not None:
         updates["embedding_model"] = body.embedding_model
@@ -246,4 +251,4 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         for p in s.providers
         if p.api_key  # only providers that have a key set
     ]
-    return {"active": s.active_provider, "providers": configured}
+    return {"active": s.active_provider, "active_model": s.llm_model, "providers": configured}

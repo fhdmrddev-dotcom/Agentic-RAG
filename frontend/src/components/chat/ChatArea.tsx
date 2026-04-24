@@ -39,13 +39,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   useEffect(() => {
     getProviders()
-      .then(({ active, providers: list }) => {
+      .then(({ active, active_model, providers: list }) => {
         setProviders(list)
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)
           setModels(activeProvider.models)
-          setSelectedModel(activeProvider.models[0] ?? "")
+          const preferred = active_model && activeProvider.models.includes(active_model)
+            ? active_model
+            : (activeProvider.models[0] ?? "")
+          setSelectedModel(preferred)
         }
       })
       .catch(console.error)
