@@ -211,9 +211,14 @@ export function MessageInput({
                               )}
                             </div>
                             {info && (
-                              <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
-                                {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
-                              </span>
+                              <>
+                                <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
+                                  {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground/50 font-normal">
+                                  <span className="font-medium">Cost tier:</span> {info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}
+                                </span>
+                              </>
                             )}
                           </div>
                         </DropdownMenuItem>
