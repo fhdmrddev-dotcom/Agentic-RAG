@@ -29,6 +29,8 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gpt-4.1":                              400_000,  # actual 1M — practical cap
     "gpt-4.1-mini":                         400_000,  # actual 1M — practical cap
     "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap
+    "gpt-5":                                200_000,  # actual 200k
+    "gpt-5.4-mini":                         200_000,  # actual 200k
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-6":                      150_000,  # actual 200k
     "claude-sonnet-4-6":                    150_000,  # actual 200k
@@ -37,6 +39,7 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gemini-2.5-pro":                       600_000,  # actual 1M — practical cap
     "gemini-2.5-flash":                     600_000,  # actual 1M — practical cap
     "gemini-2.5-flash-lite":                600_000,  # actual 1M — practical cap
+    "gemini-3-flash-preview":               600_000,  # actual 1M — practical cap
     # ── OpenRouter ──────────────────────────────────────────────────────────
     "meta-llama/llama-3.3-70b-instruct":    100_000,  # actual 128k
     "deepseek/deepseek-r1":                 100_000,  # actual 128k via OpenRouter

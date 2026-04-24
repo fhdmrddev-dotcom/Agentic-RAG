@@ -12,7 +12,6 @@ if TYPE_CHECKING:
 
 # Sub-agent model defaults: cheapest stable model per provider.
 # These handle completion tasks well without needing the full orchestrator model.
-# Gemini 3.x excluded — still in preview as of April 2026.
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
     "openai":     "gpt-4.1-nano",

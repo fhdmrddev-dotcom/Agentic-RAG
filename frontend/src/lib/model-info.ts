@@ -1,12 +1,10 @@
 /**
- * Static model metadata lookup — used by MessageInput for model info tooltips.
+ * Static model metadata lookup — used by MessageInput for model info subtitles.
  * Keys mirror MODEL_CONTEXT_DEFAULTS in backend/app/config.py and
  * _MODEL_OUTPUT_DEFAULTS in backend/app/services/openai_service.py.
  *
- * For unknown model IDs: no entry in MODEL_INFO → no info icon shown (D-12).
- * OpenRouter models are omitted — too many to maintain and IDs are unstable.
- *
- * Update this file when new first-party models are added to config.py.
+ * For unknown model IDs: no entry in MODEL_INFO → no info subtitle shown (D-12).
+ * Update this file when new models are added to config.py.
  */
 
 export interface ModelInfo {
@@ -22,22 +20,24 @@ export interface ModelInfo {
 
 export const MODEL_INFO: Record<string, ModelInfo> = {
   // ── OpenAI ──────────────────────────────────────────────────────────────────
-  "gpt-4o":          { contextWindow: 100_000,  maxOutputTokens: 16384,  costTier: 'high', bestFor: "General purpose, vision" },
-  "gpt-4o-mini":     { contextWindow: 100_000,  maxOutputTokens: 16384,  costTier: 'low',  bestFor: "Fast, cost-efficient" },
-  "gpt-4.1":         { contextWindow: 400_000,  maxOutputTokens: 32768,  costTier: 'high', bestFor: "Long context, coding" },
-  "gpt-4.1-mini":    { contextWindow: 400_000,  maxOutputTokens: 32768,  costTier: 'mid',  bestFor: "Fast long context" },
-  "gpt-4.1-nano":    { contextWindow: 400_000,  maxOutputTokens: 16384,  costTier: 'low',  bestFor: "Ultra-fast, low cost" },
+  "gpt-4o":          { contextWindow: 100_000, maxOutputTokens: 16384, costTier: 'high', bestFor: "General purpose, vision" },
+  "gpt-4.1":         { contextWindow: 400_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Long context, coding" },
+  "gpt-4.1-mini":    { contextWindow: 400_000, maxOutputTokens: 32768, costTier: 'mid',  bestFor: "Fast long context" },
+  "gpt-5":           { contextWindow: 200_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Flagship, complex tasks" },
+  "gpt-5.4-mini":    { contextWindow: 200_000, maxOutputTokens: 32768, costTier: 'mid',  bestFor: "Fast GPT-5" },
 
   // ── Anthropic ────────────────────────────────────────────────────────────────
-  "claude-sonnet-4-6":         { contextWindow: 150_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Reasoning, long docs" },
   "claude-opus-4-6":           { contextWindow: 150_000, maxOutputTokens: 16384, costTier: 'high', bestFor: "Complex tasks, analysis" },
+  "claude-sonnet-4-6":         { contextWindow: 150_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Reasoning, long docs" },
   "claude-haiku-4-5-20251001": { contextWindow: 150_000, maxOutputTokens: 8192,  costTier: 'low',  bestFor: "Fast analysis, summaries" },
 
   // ── Google ───────────────────────────────────────────────────────────────────
-  "gemini-2.5-pro":            { contextWindow: 600_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Very long context, research" },
-  "gemini-2.5-flash":          { contextWindow: 600_000, maxOutputTokens: 32768, costTier: 'mid',  bestFor: "Fast, multimodal" },
-  "gemini-2.5-flash-lite":     { contextWindow: 600_000, maxOutputTokens: 16384, costTier: 'low',  bestFor: "Ultra-fast, high volume" },
+  "gemini-2.5-pro":          { contextWindow: 600_000, maxOutputTokens: 32768, costTier: 'high', bestFor: "Very long context, research" },
+  "gemini-2.5-flash":        { contextWindow: 600_000, maxOutputTokens: 32768, costTier: 'mid',  bestFor: "Fast, multimodal" },
+  "gemini-3-flash-preview":  { contextWindow: 600_000, maxOutputTokens: 32768, costTier: 'mid',  bestFor: "Next-gen flash, multimodal" },
 
-  // OpenRouter models intentionally omitted — graceful degradation per D-12
-  // (no icon shown for unknown model IDs)
+  // ── OpenRouter ───────────────────────────────────────────────────────────────
+  "deepseek/deepseek-r1":                 { contextWindow: 100_000, maxOutputTokens: 16384, costTier: 'mid', bestFor: "Advanced reasoning" },
+  "meta-llama/llama-3.3-70b-instruct":    { contextWindow: 100_000, maxOutputTokens: 16384, costTier: 'mid', bestFor: "Open source, balanced" },
+  "google/gemma-4-31b-it:free":           { contextWindow: 200_000, maxOutputTokens: 32768, costTier: 'low', bestFor: "Free tier, dev use" },
 }
