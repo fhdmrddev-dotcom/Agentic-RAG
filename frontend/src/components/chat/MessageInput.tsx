@@ -181,6 +181,7 @@ export function MessageInput({
               ) : null}
 
               {/* Model selector */}
+              <TooltipProvider delayDuration={0}>
               {showModelSelector ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -197,43 +198,43 @@ export function MessageInput({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="min-w-[200px] mb-1">
-                    <TooltipProvider delayDuration={0}>
-                      {models.map((m) => {
-                        const info = MODEL_INFO[m]
-                        return (
-                          <DropdownMenuItem
-                            key={m}
-                            onSelect={() => onModelChange!(m)}
-                            className={cn(
-                              "text-xs cursor-pointer gap-2",
-                              m === selectedModel && "font-medium bg-accent",
-                            )}
-                          >
-                            <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                            {m}
-                            {m === selectedModel && (
-                              <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
-                            )}
-                            {info && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info
-                                    className="h-3 w-3 shrink-0 text-muted-foreground/50 hover:text-muted-foreground ml-1"
-                                    aria-label="Model information"
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent side="right" className="max-w-[200px] text-xs space-y-1">
-                                  <div><span className="font-bold">Context:</span> {info.contextWindow.toLocaleString()} tokens</div>
-                                  <div><span className="font-bold">Max output:</span> {info.maxOutputTokens.toLocaleString()} tokens</div>
-                                  <div><span className="font-bold">Best for:</span> {info.bestFor}</div>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </DropdownMenuItem>
-                        )
-                      })}
-                    </TooltipProvider>
+                    {models.map((m) => {
+                      const info = MODEL_INFO[m]
+                      return (
+                        <DropdownMenuItem
+                          key={m}
+                          onSelect={() => onModelChange!(m)}
+                          className={cn(
+                            "text-xs cursor-pointer gap-2",
+                            m === selectedModel && "font-medium bg-accent",
+                          )}
+                        >
+                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          {m}
+                          {m === selectedModel && (
+                            <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
+                          )}
+                          {info && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info
+                                  className="h-3 w-3 shrink-0 text-muted-foreground/50 hover:text-muted-foreground ml-1"
+                                  aria-label="Model information"
+                                  onPointerMove={(e) => e.stopPropagation()}
+                                  onPointerLeave={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-[200px] text-xs space-y-1">
+                                <div><span className="font-bold">Context:</span> {info.contextWindow.toLocaleString()} tokens</div>
+                                <div><span className="font-bold">Max output:</span> {info.maxOutputTokens.toLocaleString()} tokens</div>
+                                <div><span className="font-bold">Best for:</span> {info.bestFor}</div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
@@ -244,6 +245,7 @@ export function MessageInput({
                   </span>
                 )
               )}
+              </TooltipProvider>
 
               {/* Agent mode selector */}
               {onAgentModeChange && (
