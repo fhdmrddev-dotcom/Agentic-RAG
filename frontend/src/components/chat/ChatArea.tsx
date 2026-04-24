@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
@@ -31,6 +31,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
+  const justCreatedThreadRef = useRef<string | null>(null)
 
   useEffect(() => {
     setAgentMode("default")
@@ -69,6 +70,13 @@ useEffect(() => {
       clearMessages()
       return
     }
+    // Skip clear+load when handleSend just created this thread — sendMessage is
+    // already streaming into it and clearMessages() would wipe the optimistic
+    // messages and abort the SSE connection, causing a blank chat.
+    if (justCreatedThreadRef.current === thread.id) {
+      justCreatedThreadRef.current = null
+      return
+    }
     // Clear stale messages from previous thread before loading new ones
     clearMessages()
     abortStream()
@@ -79,6 +87,7 @@ useEffect(() => {
     let activeThread = thread
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
+      justCreatedThreadRef.current = activeThread.id
     }
     await sendMessage(
       activeThread.id,
