@@ -1,209 +1,248 @@
 ---
 phase: 051-context-window-management
-reviewed: 2026-04-23T00:00:00Z
+reviewed: 2026-04-24T00:00:00Z
 depth: standard
-files_reviewed: 10
+files_reviewed: 12
 files_reviewed_list:
-  - backend/app/services/sub_agent_service.py
-  - backend/app/config.py
-  - backend/app/services/context_window.py
-  - backend/requirements.txt
-  - backend/app/models/user_settings.py
   - backend/app/api/settings.py
-  - frontend/src/lib/api.ts
-  - frontend/src/pages/SettingsPage.tsx
-  - frontend/src/lib/model-info.ts
+  - backend/app/models/user_settings.py
+  - backend/app/services/context_window.py
+  - backend/app/services/sub_agent_service.py
+  - backend/tests/unit/test_context_window.py
+  - backend/tests/unit/test_settings.py
+  - backend/tests/unit/test_sub_agent_routing.py
   - frontend/src/components/chat/MessageInput.tsx
+  - frontend/src/lib/api.ts
+  - frontend/src/lib/model-info.test.ts
+  - frontend/src/lib/model-info.ts
+  - frontend/src/pages/SettingsPage.tsx
 findings:
   critical: 0
-  warning: 4
-  info: 4
-  total: 8
+  warning: 2
+  info: 3
+  total: 5
 status: issues_found
 ---
 
-# Phase 051: Code Review Report
+# Phase 051: Code Review Report (Gap Closure — Plans 06 & 07)
 
-**Reviewed:** 2026-04-23
+**Reviewed:** 2026-04-24T00:00:00Z
 **Depth:** standard
-**Files Reviewed:** 10
+**Files Reviewed:** 12
 **Status:** issues_found
 
 ## Summary
 
-Phase 051 adds tiktoken-backed token estimation, a sliding-window trim algorithm, sub-agent keyword routing for generation vs analysis tasks, a settings UI slider for sub-agent output tokens, and model info tooltips in the chat model selector. The implementation is generally well-structured and consistent with project conventions.
+This review covers the Plan 06 and Plan 07 gap-closure additions to Phase 051:
 
-Four warnings and four info items were found. No critical security vulnerabilities. The most actionable warnings are: a logic bug in `_build_candidate` that inserts a trim-marker even when no trimming has yet occurred; a `_remove_oldest_atomic` edge case that silently drops tool messages whose siblings share a `tool_call_id` but belong to a different parent call; the `gpt-5.4-nano` model ID in sub-agent defaults hitting `_uses_max_completion_tokens` but not present in `_MODEL_OUTPUT_DEFAULTS`; and the Settings page `handleReset` resetting unsaved cross-tab state.
+- **Plan 06** — `sub_agent_model` field wired through the full backend settings stack:
+  `config.py` default, `UserEffectiveSettings` model, `SettingsUpdate`/`FullSettingsResponse`
+  in the API layer, `save_override`/`load_app_settings` persistence path, and the Settings
+  UI (state initialisation, hydration, save handler, and dropdown).
+- **Plan 07** — `costTier` field added to the `ModelInfo` TypeScript interface, populated for
+  all 11 first-party model entries, and rendered as a second subtitle line in the
+  `MessageInput` model dropdown.
 
----
+The field additions are complete and internally consistent across backend and frontend. No
+critical issues found. Two warnings and three info items follow.
+
+The two warnings are correctness issues: one is a runtime bug that causes the
+`sub_agent_model` UI setting to be silently ignored (the service reads the raw env value
+rather than the override-aware resolved value), and one is a UX correctness issue where the
+dropdown for sub-agent model selection cannot represent a saved value that came from outside
+the active provider's model list.
 
 ## Warnings
 
-### WR-01: `_build_candidate` inserts trim marker when `trimmable` is non-empty but nothing has been removed yet
+### WR-01: `sub_agent_service.py` reads env-only `settings.sub_agent_model`, ignoring the UI-persisted override
 
-**File:** `backend/app/services/context_window.py:229`
+**File:** `backend/app/services/sub_agent_service.py:70-71`
 
-**Issue:** `_build_candidate` is called inside the trim loop on every iteration — including the first iteration before any removal — with `add_marker=False`. However the logic at lines 229–232 reads:
+**Issue:** The model-selection block reads `settings.sub_agent_model`, where `settings` is
+the raw `app.config.Settings` Pydantic object sourced from `.env` environment variables only.
+The `sub_agent_model` field added in Plan 06 is stored in `settings_override.json` (via
+`save_override`) and is exposed through `UserEffectiveSettings.sub_agent_model` (resolved by
+`load_app_settings()`). Because `run_sub_agent` already receives
+`user_settings: UserEffectiveSettings | None`, the UI-persisted override is available on
+`user_settings.sub_agent_model` — but the routing code never reads it.
 
-```python
-if add_marker and trimmable is not None:
-    result.append({"role": "user", "content": _TRIM_MARKER})
-```
+A user who sets "Sub-agent model" in the Settings UI will see no runtime effect. The raw env
+value (`""` unless `SUB_AGENT_MODEL=` is set in `.env`) wins unconditionally, making the
+entire Plan 06 UI slider non-functional at runtime.
 
-The `trimmable is not None` guard is always True (an empty list is not None). This is harmless as currently called because `add_marker` starts as `False` and is only set to `True` after a removal. However the real issue is in the post-loop block (lines 209–214):
+The same bug exists in `backend/app/services/suggestion_service.py` lines 45-46 (outside
+this review's scope but noted for completeness).
 
-```python
-if trimmed_any or (
-    trimmable == [] and estimate_messages_tokens(
-        _build_candidate(system_msg, [], protected, False)
-    ) > max_tokens
-):
-    trimmed_any = True
-```
-
-When the entire trimmable list is exhausted but the protected tail alone still exceeds `max_tokens`, `trimmed_any` is set to `True` and the final `_build_candidate(system_msg, trimmable, protected, trimmed_any)` on line 216 inserts the trim marker — but `trimmable` is now `[]`, so the marker is inserted between the system message and the protected tail with zero historical messages between them. This accurately signals context loss and is arguably correct behaviour, but if the protected tail itself contains the very first user message (e.g. a single-turn conversation), the LLM will see the trim marker before any real content, which is confusing. More importantly, `estimate_messages_tokens` is called a second time in this branch on an already-checked candidate, wasting a full re-estimation of the protected messages.
-
-**Fix:** Guard the second estimation call with a length check and document the degenerate case:
+**Fix:**
 
 ```python
-# Only mark as trimmed if we actually removed something from trimmable,
-# OR if even the irreducible protected tail exceeds the budget (rare).
-protected_only_tokens = (
-    estimate_messages_tokens(_build_candidate(system_msg, [], protected, False))
-    if not trimmed_any and trimmable == []
-    else 0
+# sub_agent_service.py — replace the model-resolution block starting at line 70
+
+# Priority: user_settings override (UI/JSON) > env override (.env) > provider default
+override_model = (
+    (user_settings.sub_agent_model if user_settings else "")
+    or settings.sub_agent_model
 )
-if trimmed_any or (trimmable == [] and protected_only_tokens > max_tokens):
-    trimmed_any = True
+
+if override_model:
+    effective_model = override_model
+elif is_generation:
+    # D-02: escalate to orchestrator model for generation tasks
+    effective_model = (
+        (user_settings.llm_model if user_settings else None)
+        or model
+        or settings.llm_model
+    )
+else:
+    provider = user_settings.active_provider if user_settings else ""
+    provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+    effective_model = (
+        provider_default
+        or (user_settings.llm_model if user_settings else None)
+        or model
+        or settings.llm_model
+    )
 ```
 
 ---
 
-### WR-02: `_remove_oldest_atomic` drops sibling tool messages that share a `tool_call_id` but belong to a different parent
+### WR-02: Sub-agent model dropdown in `SettingsPage.tsx` cannot represent a saved value outside the active provider's model list
 
-**File:** `backend/app/services/context_window.py:279-285`
+**File:** `frontend/src/pages/SettingsPage.tsx:791-804`
 
-**Issue:** In the orphaned-tool-message branch (lines 276-285), the code removes the leading tool message and then continues removing subsequent messages that share the same `tool_call_id`:
+**Issue:** The `<select>` for "Sub-agent model" is populated solely from `activeModels` — the
+model list belonging to the currently active LLM provider. If a user has a saved
+`sub_agent_model` value that is not in `activeModels` (e.g. set via a previous provider's
+model, set via env var, or carried over from a provider switch), `hydrate()` at line 555
+correctly sets `subAgentModel` from the API response, but no matching `<option>` exists in
+the dropdown. The browser silently resets the `<select>` control to the first option
+("Auto (cheapest)"), meaning:
 
-```python
-tool_call_id = first.get("tool_call_id")
-for msg in trimmable[1:]:
-    if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-        to_remove += 1
-    else:
-        break
-```
+1. The UI falsely shows "Auto" even though a specific model is saved.
+2. If the user clicks "Save AI Model" without changing anything, `subAgentModel` will be
+   sent as `""`, overwriting the previously saved value with an empty string.
 
-If a model ever reuses a `tool_call_id` across two separate assistant turns (which violates the spec but has been observed with some proxy providers via OpenRouter), this will silently swallow the tool results for the *second* call, producing an API error or garbled output on the next turn. Additionally, if `tool_call_id` is `None` (missing from the message), the condition `msg.get("tool_call_id") == tool_call_id` evaluates to `None == None` → `True`, meaning all consecutive tool messages with missing IDs are bulk-removed even if they belong to different parent calls.
+This is a data-loss risk on save: a user visiting the settings page where the active provider
+differs from the one used when the sub-agent model was originally configured will silently
+clear the sub-agent model on the next save.
 
-**Fix:** Guard against the `None` ID case:
-
-```python
-tool_call_id = first.get("tool_call_id")
-if tool_call_id is not None:
-    for msg in trimmable[1:]:
-        if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-            to_remove += 1
-        else:
-            break
-```
-
----
-
-### WR-03: `gpt-5.4-nano` sub-agent default triggers `max_completion_tokens` but has no entry in `_MODEL_OUTPUT_DEFAULTS`
-
-**File:** `backend/app/services/sub_agent_service.py:19`
-
-**Issue:** `_SUB_AGENT_MODEL_DEFAULTS["openai"]` is set to `"gpt-5.4-nano"`. In `run_sub_agent`, `_uses_max_completion_tokens("gpt-5.4-nano")` returns `True` (matches `gpt-5` prefix), so `max_completion_tokens` is used — correct. However `_resolve_max_tokens(output_ceiling, user_settings)` (called at line 95) resolves `output_ceiling` as the `explicit` argument (non-None), so it returns it directly without any model lookup. This path is fine.
-
-The subtle bug is on the analysis path: `output_ceiling = settings.sub_agent_max_output_tokens` (default 8192). This value is used as-is. For analysis tasks using `gpt-5.4-nano`, 8192 tokens is within spec. However for generation tasks `output_ceiling = max(32768, settings.sub_agent_max_output_tokens)` = 32768. If the actual `gpt-5.4-nano` model has a lower output ceiling (it is not in `_MODEL_OUTPUT_DEFAULTS` or `model-info.ts`), the API will return a 400. The model ID `gpt-5.4-nano` appears to be a placeholder/speculative ID; the currently known GPT-5 nano variant is `gpt-4.1-nano`. If `gpt-5.4-nano` does not exist in the API, every OpenAI sub-agent call will fail with a 404/model-not-found error.
-
-**Fix:** Replace the speculative model ID with the known current model, and add it to `MODEL_INFO` and `_MODEL_OUTPUT_DEFAULTS`:
-
-```python
-# sub_agent_service.py line 18
-"openai": "gpt-4.1-nano",
-```
-
----
-
-### WR-04: `handleReset` in SettingsPage resets context/sub-agent state to last-fetched values, but those values are shared across tabs
-
-**File:** `frontend/src/pages/SettingsPage.tsx:643-645`
-
-**Issue:** The Reset button at the top of the page calls `hydrate(s)` which restores **all** state fields (including context/sub-agent sliders on Tab 0, all search fields on Tab 1, and integration settings on Tab 2) regardless of which tab is active. A user who has made changes on both Tab 0 and Tab 1, switches to Tab 1, and then clicks Reset will silently discard their unsaved Tab 0 changes too. There is no confirmation prompt.
-
-This is a UX bug rather than a data loss risk (since nothing is persisted until Save is clicked), but it is counter-intuitive enough that users will likely click Reset to undo Tab 1 edits and be surprised when their Tab 0 sliders reset too.
-
-**Fix:** Scope the reset to the active tab. The simplest approach is to add a per-tab reset handler that only restores the fields belonging to that tab, or move the Reset button inside each tab panel next to its own Save button. At minimum, show a confirmation when the user is not on the first tab:
+**Fix (minimal):** Replace the `<select>` with a free-text `<input>` (which matches how
+`llmModel` is handled via `TextInput`):
 
 ```tsx
-const handleReset = () => {
-  if (s) {
-    if (activeTab !== "0" || window.confirm("Reset all unsaved changes across all tabs?")) {
-      hydrate(s)
-    }
-  }
-}
+<FieldRow label="Sub-agent model">
+  <TextInput
+    value={subAgentModel}
+    onChange={setSubAgentModel}
+    placeholder="Leave blank for auto (cheapest per provider)"
+  />
+</FieldRow>
 ```
 
----
+**Fix (if dropdown is preferred):** Pre-inject the saved value as an option when it is not
+already in `activeModels`:
+
+```tsx
+<select
+  value={subAgentModel}
+  onChange={(e) => setSubAgentModel(e.target.value)}
+  className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+>
+  <option value="">Auto (cheapest)</option>
+  {subAgentModel &&
+    !activeModels.split(",").map((m) => m.trim()).includes(subAgentModel) && (
+      <option value={subAgentModel}>{subAgentModel} (current)</option>
+  )}
+  {activeModels
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean)
+    .map((m) => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+</select>
+```
 
 ## Info
 
-### IN-01: `estimate_tokens` uses `cl100k_base` for all `gpt-*` and `o1`/`o3` models regardless of generation
+### IN-01: `test_settings.py` has no coverage for the new `sub_agent_model` field
 
-**File:** `backend/app/services/context_window.py:106`
+**File:** `backend/tests/unit/test_settings.py`
 
-**Issue:** GPT-4.1, GPT-5, and newer OpenAI models use the `o200k_base` encoding, not `cl100k_base`. Using the wrong tokenizer produces estimates that are off by ~5-10% on English text and up to ~15% on code/JSON. For the purposes of context trimming this means the budget check is slightly optimistic (will trim slightly less than needed). This is unlikely to cause hard failures since the practical context budgets in `MODEL_CONTEXT_DEFAULTS` already leave headroom, but it is worth correcting when tiktoken support is extended.
+**Issue:** The three existing tests cover `sub_agent_max_output_tokens` range validation,
+`FullSettingsResponse` field presence, and the `config.py` default. None verify that
+`sub_agent_model` appears on `FullSettingsResponse` or `SettingsUpdate`, or that the
+`load_app_settings` round-trip through `save_override` preserves the value.
+
+**Fix:** Add at minimum:
 
 ```python
-# Suggested improvement:
-_O200K_MODELS = frozenset({"gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o"})
-enc = _tiktoken.get_encoding("o200k_base") if model in _O200K_MODELS else _get_cl100k()
+def test_sub_agent_model_field_in_response():
+    from app.api.settings import FullSettingsResponse
+    assert "sub_agent_model" in FullSettingsResponse.model_fields
+
+def test_sub_agent_model_accepted_by_settings_update():
+    from app.api.settings import SettingsUpdate
+    s = SettingsUpdate(sub_agent_model="gpt-4.1-nano")
+    assert s.sub_agent_model == "gpt-4.1-nano"
+
+def test_sub_agent_model_empty_string_accepted():
+    from app.api.settings import SettingsUpdate
+    s = SettingsUpdate(sub_agent_model="")
+    assert s.sub_agent_model == ""
 ```
 
 ---
 
-### IN-02: `_parse_model_limits` silently ignores malformed entries without logging
+### IN-02: `test_sub_agent_routing.py` does not test the `sub_agent_model` UI-override path
 
-**File:** `backend/app/services/context_window.py:51-62`
+**File:** `backend/tests/unit/test_sub_agent_routing.py`
 
-**Issue:** If a user typos the `MODEL_CONTEXT_LIMITS` env var (e.g. `gpt-4o=abc`), the bad entry is silently dropped and the model falls through to the provider default. There is no warning logged, so the misconfiguration is invisible.
+**Issue:** All routing tests use `patch.object(settings, "sub_agent_model", ...)` to patch
+the env-layer config. After WR-01 is fixed, the correct override path will be
+`user_settings.sub_agent_model`. The existing tests will not cover the new code path and
+will continue to pass even if the fix is applied incorrectly (because they patch the wrong
+layer).
 
-**Fix:** Add a warning log on the `ValueError` path:
+**Fix:** Add a test that patches via `user_settings` rather than `settings`:
 
 ```python
-except ValueError:
-    logger.warning("MODEL_CONTEXT_LIMITS: invalid token count for model '%s', ignoring", model)
+def test_user_settings_sub_agent_model_wins_over_env():
+    """user_settings.sub_agent_model (UI override) takes priority over env setting."""
+    from app.services import sub_agent_service
+    from app.config import settings
+
+    user_settings = _make_user_settings(provider="openai", llm_model="gpt-4o")
+    user_settings.sub_agent_model = "gpt-4.1-nano"   # set on the namespace
+
+    with patch.object(settings, "sub_agent_model", ""):
+        # Replicate the corrected routing logic
+        override_model = user_settings.sub_agent_model or settings.sub_agent_model
+        assert override_model == "gpt-4.1-nano"
 ```
 
 ---
 
-### IN-03: `gpt-5.4-nano` is absent from `MODEL_INFO` in `model-info.ts`
+### IN-03: `_build_candidate` `trimmable is not None` guard is unreachable dead code
 
-**File:** `frontend/src/lib/model-info.ts`
+**File:** `backend/app/services/context_window.py:232`
 
-**Issue:** The sub-agent default `gpt-5.4-nano` (and the new `gpt-5*` family generally) has no entry in `MODEL_INFO`. Per D-12 this is by design for unknown models — no info icon is shown. However given WR-03 above, this also flags that the model ID is likely wrong. If the correct ID `gpt-4.1-nano` is used instead, it is already present in `MODEL_INFO` at line 27.
+**Issue:** The marker-insertion guard reads `if add_marker and trimmable is not None`. The
+`trimmable is not None` check is always `True`: `trimmable` is typed and called as
+`list[dict]` at every call site; no caller ever passes `None`. The dead guard slightly
+misleads readers into thinking `None` is a valid sentinel.
 
-No action needed beyond resolving WR-03.
-
----
-
-### IN-04: `context_window_max_tokens` has no server-side validation range in `SettingsUpdate`
-
-**File:** `backend/app/api/settings.py:100-101`
-
-**Issue:** `sub_agent_max_output_tokens` has `ge=4096, le=65536` bounds validation via `Field`. The sibling field `context_window_max_tokens` (line 100) has no equivalent bounds — a client could POST `context_window_max_tokens=-1` or `context_window_max_tokens=99999999`, and `save_override` would persist it. The `resolve_context_budget` function only uses the value when it is `> 0` (config.py:81), so negative values are harmlessly ignored. But an absurdly large positive value would be used verbatim and could cause the context trim logic to never trigger, potentially sending excessively long prompts.
-
-**Fix:** Add range validation consistent with the UI slider bounds:
+**Fix:**
 
 ```python
-context_window_max_tokens: int | None = Field(default=None, ge=0, le=2_000_000)
+# line 232: change
+if add_marker and trimmable is not None:
+# to
+if add_marker:
 ```
 
 ---
 
-_Reviewed: 2026-04-23_
+_Reviewed: 2026-04-24T00:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
