@@ -57,6 +57,7 @@ class FullSettingsResponse(BaseModel):
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
+    sub_agent_model: str
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -99,6 +100,7 @@ class SettingsUpdate(BaseModel):
     # Context & Sub-agent
     context_window_max_tokens: int | None = None
     sub_agent_max_output_tokens: int | None = Field(default=None, ge=4096, le=65536)
+    sub_agent_model: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -142,6 +144,7 @@ def _build_response(s=None) -> FullSettingsResponse:
         sandbox_enabled=s.sandbox_enabled,
         context_window_max_tokens=s.context_window_max_tokens,
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
+        sub_agent_model=s.sub_agent_model,
     )
 
 
@@ -219,6 +222,8 @@ async def update_settings(
         updates["context_window_max_tokens"] = body.context_window_max_tokens
     if body.sub_agent_max_output_tokens is not None:
         updates["sub_agent_max_output_tokens"] = body.sub_agent_max_output_tokens
+    if body.sub_agent_model is not None:
+        updates["sub_agent_model"] = body.sub_agent_model
 
     save_override(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}

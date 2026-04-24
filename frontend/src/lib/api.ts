@@ -411,6 +411,7 @@ export interface FullAppSettings {
   sandbox_enabled: boolean
   context_window_max_tokens: number
   sub_agent_max_output_tokens: number
+  sub_agent_model: string
 }
 
 export type AppSettings = FullAppSettings
@@ -447,6 +448,7 @@ export interface SettingsUpdate {
   sandbox_enabled?: boolean
   context_window_max_tokens?: number
   sub_agent_max_output_tokens?: number
+  sub_agent_model?: string
 }
 
 export async function getSettings(): Promise<FullAppSettings> {
