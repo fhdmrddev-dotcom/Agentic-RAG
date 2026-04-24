@@ -794,6 +794,10 @@ export function SettingsPage() {
                     className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Auto (cheapest)</option>
+                    {subAgentModel &&
+                      !activeModels.split(",").map((m) => m.trim()).includes(subAgentModel) && (
+                        <option value={subAgentModel}>{subAgentModel} (current)</option>
+                    )}
                     {activeModels
                       .split(",")
                       .map((m) => m.trim())
