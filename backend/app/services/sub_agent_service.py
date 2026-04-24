@@ -67,8 +67,14 @@ def run_sub_agent(
     # Keyword routing: generation tasks escalate to the orchestrator model (D-01/D-02/D-03)
     is_generation = _is_generation_task(task)
 
-    if settings.sub_agent_model:
-        effective_model = settings.sub_agent_model
+    # Priority: user_settings override (UI/JSON) > env override (.env) > provider default
+    override_model = (
+        (user_settings.sub_agent_model if user_settings else "")
+        or settings.sub_agent_model
+    )
+
+    if override_model:
+        effective_model = override_model
     elif is_generation:
         # D-02: escalate to orchestrator model for generation tasks
         effective_model = (
