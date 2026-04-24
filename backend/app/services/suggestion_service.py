@@ -41,9 +41,13 @@ def generate_suggestions(
 
     client = get_llm_client(user_settings)
 
-    # Model resolution: same order as sub_agent_service.run_sub_agent
-    if settings.sub_agent_model:
-        effective_model = settings.sub_agent_model
+    # Model resolution: user_settings override (UI/JSON) > env override > provider default
+    override_model = (
+        (user_settings.sub_agent_model if user_settings else "")
+        or settings.sub_agent_model
+    )
+    if override_model:
+        effective_model = override_model
     else:
         provider = user_settings.active_provider if user_settings else ""
         provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")

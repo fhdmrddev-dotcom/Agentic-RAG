@@ -1,7 +1,7 @@
 """Context window management — token estimation and sliding-window trimming.
 
-Uses a character-based token estimation heuristic (1 token ~ 4 chars for English).
-No external API calls or tiktoken dependency required — runs in <1ms.
+Uses tiktoken cl100k_base for OpenAI models (gpt-*, o1, o3) when tiktoken is installed;
+falls back to a character-based heuristic (1 token ~ 4 chars) for all other providers.
 """
 from __future__ import annotations
 
@@ -11,6 +11,35 @@ import logging
 from app.config import settings, PROVIDER_CONTEXT_DEFAULTS, MODEL_CONTEXT_DEFAULTS
 
 logger = logging.getLogger(__name__)
+
+try:
+    import tiktoken as _tiktoken
+    _TIKTOKEN_AVAILABLE = True
+    _CL100K: "tiktoken.Encoding | None" = None
+except ImportError:
+    _tiktoken = None  # type: ignore[assignment]
+    _TIKTOKEN_AVAILABLE = False
+    _CL100K = None
+    logger.warning(
+        "tiktoken not installed — token estimation uses chars/4 heuristic. "
+        "Install with: pip install tiktoken"
+    )
+
+
+def _get_cl100k() -> "tiktoken.Encoding | None":
+    """Return cached cl100k_base encoder, or None if tiktoken unavailable.
+
+    Called once at module load to warm the encoder cache and avoid
+    first-request latency (tiktoken downloads vocab on first call).
+    """
+    global _CL100K
+    if _CL100K is None and _TIKTOKEN_AVAILABLE:
+        _CL100K = _tiktoken.get_encoding("cl100k_base")  # type: ignore[union-attr]
+    return _CL100K
+
+
+# Warm encoder at startup to avoid first-request latency (Pitfall 3 from RESEARCH.md)
+_get_cl100k()
 
 
 def _parse_model_limits(raw: str) -> dict[str, int]:
@@ -62,13 +91,22 @@ def resolve_context_budget(active_provider: str, model: str = "") -> int:
     return PROVIDER_CONTEXT_DEFAULTS.get(active_provider, 100_000)
 
 
-def estimate_tokens(text: str | None) -> int:
-    """Estimate token count for a string using chars/4 heuristic.
+def estimate_tokens(text: str | None, model: str = "") -> int:
+    """Estimate token count. Uses tiktoken cl100k_base for OpenAI models when available.
 
-    Returns 0 for None or empty strings.
+    Falls back to chars/4 heuristic for all other providers or when tiktoken
+    is not installed. The `model` parameter is optional — omitting it gives chars/4.
+
+    Args:
+        text: String to estimate. Returns 0 for None/empty.
+        model: Model ID (e.g. "gpt-4o"). Empty string or non-OpenAI → chars/4.
     """
     if not text:
         return 0
+    if model and (model.startswith("gpt-") or model.startswith(("o1", "o3"))):
+        enc = _get_cl100k()
+        if enc is not None:
+            return max(1, len(enc.encode(text)))
     return max(1, len(text) // 4)
 
 
@@ -167,12 +205,15 @@ def trim_messages_to_fit(
             break
         trimmed_any = True
 
-    # Final build — add marker if any trimming occurred
-    if trimmed_any or (
-        trimmable == [] and estimate_messages_tokens(
-            _build_candidate(system_msg, [], protected, False)
-        ) > max_tokens
-    ):
+    # Final build — add marker if any trimming occurred.
+    # Only re-estimate when trimmable is fully exhausted and we haven't already
+    # confirmed a removal, to avoid a redundant token count call on the happy path.
+    protected_only_tokens = (
+        estimate_messages_tokens(_build_candidate(system_msg, [], protected, False))
+        if not trimmed_any and trimmable == []
+        else 0
+    )
+    if trimmed_any or (trimmable == [] and protected_only_tokens > max_tokens):
         trimmed_any = True
 
     return _build_candidate(system_msg, trimmable, protected, trimmed_any)
@@ -237,13 +278,16 @@ def _remove_oldest_atomic(trimmable: list[dict]) -> int:
     # Just remove it to avoid orphan errors.
     if first_role == "tool":
         to_remove = 1
-        # Also remove any immediately following sibling tool messages with same parent
+        # Also remove any immediately following sibling tool messages with same parent.
+        # Guard: only match on non-None IDs — if tool_call_id is None we cannot
+        # reliably distinguish siblings from unrelated tool messages, so stop at one.
         tool_call_id = first.get("tool_call_id")
-        for msg in trimmable[1:]:
-            if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
-                to_remove += 1
-            else:
-                break
+        if tool_call_id is not None:
+            for msg in trimmable[1:]:
+                if msg.get("role") == "tool" and msg.get("tool_call_id") == tool_call_id:
+                    to_remove += 1
+                else:
+                    break
         del trimmable[:to_remove]
         return to_remove
 

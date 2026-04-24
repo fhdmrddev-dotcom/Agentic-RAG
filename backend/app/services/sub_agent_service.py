@@ -12,14 +12,30 @@ if TYPE_CHECKING:
 
 # Sub-agent model defaults: cheapest stable model per provider.
 # These handle completion tasks well without needing the full orchestrator model.
-# Gemini 3.x excluded — still in preview as of April 2026.
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
-    "openai":     "gpt-5.4-nano",
+    "openai":     "gpt-4.1-nano",
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
 }
+
+_GENERATION_KEYWORDS = frozenset({
+    "pptx", "powerpoint", "presentation",
+    "report", "document", "pdf",
+    "spreadsheet", "excel", "csv export",
+})
+
+
+def _is_generation_task(task: str) -> bool:
+    """Return True if the task contains any output-format generation keyword.
+
+    Note: 'document' is intentionally broad — may trigger on analysis phrases
+    like 'analyze the document'. This is accepted (D-01): escalation to the
+    capable model is safe even if slightly over-eager.
+    """
+    t = task.lower()
+    return any(kw in t for kw in _GENERATION_KEYWORDS)
 
 
 @traceable(name="sub-agent", run_type="llm")
@@ -47,13 +63,24 @@ def run_sub_agent(
     ]
 
     client = get_llm_client(user_settings)
-    # Resolution order:
-    # 1. SUB_AGENT_MODEL env var (power-user override for all providers)
-    # 2. Provider default (cheap/fast model suited for heavy doc processing)
-    # 3. User's selected model (fallback for unknown providers)
-    # 4. Server default
-    if settings.sub_agent_model:
-        effective_model = settings.sub_agent_model
+    # Keyword routing: generation tasks escalate to the orchestrator model (D-01/D-02/D-03)
+    is_generation = _is_generation_task(task)
+
+    # Priority: user_settings override (UI/JSON) > env override (.env) > provider default
+    override_model = (
+        (user_settings.sub_agent_model if user_settings else "")
+        or settings.sub_agent_model
+    )
+
+    if override_model:
+        effective_model = override_model
+    elif is_generation:
+        # D-02: escalate to orchestrator model for generation tasks
+        effective_model = (
+            (user_settings.llm_model if user_settings else None)
+            or model
+            or settings.llm_model
+        )
     else:
         provider = user_settings.active_provider if user_settings else ""
         provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
@@ -64,7 +91,13 @@ def run_sub_agent(
             or settings.llm_model
         )
 
-    resolved_tokens = _resolve_max_tokens(8192, user_settings)  # Haiku 4.5 ceiling
+    # D-03/D-08: generation tasks get at least 32768 tokens; analysis tasks use slider value
+    if is_generation:
+        output_ceiling = max(32768, settings.sub_agent_max_output_tokens)
+    else:
+        output_ceiling = settings.sub_agent_max_output_tokens
+
+    resolved_tokens = _resolve_max_tokens(output_ceiling, user_settings)
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     stream = client.chat.completions.create(
         model=effective_model,

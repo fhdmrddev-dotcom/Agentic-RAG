@@ -1,4 +1,4 @@
-import { Bot, Loader2, User, Zap } from "lucide-react"
+import { Bot, Loader2, Square, User, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
@@ -104,9 +104,11 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
           <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
             {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
             <span className="italic">
-              {isStreaming
+{isStreaming
                 ? (allToolsDone ? "Generating response" : "Working")
-                : "Saving response…"}
+                : message.stopped
+                  ? "Response stopped"
+                  : "Saving response…"}
             </span>
             {isStreaming && (
               <span className="flex gap-1 items-center">
@@ -116,7 +118,14 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
               </span>
             )}
           </span>
-        ) : null}
+) : null}
+        {/* Stopped indicator — shown after content when user stopped mid-stream */}
+        {message.stopped && !isStreaming && (
+          <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+            <Square className="w-3 h-3" />
+            <span className="italic">Response stopped</span>
+          </div>
+        )}
         {/* Active tool indicator — shown below content when a tool is running alongside text */}
         {isStreaming && hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">

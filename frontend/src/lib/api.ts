@@ -409,6 +409,9 @@ export interface FullAppSettings {
   web_search_enabled: boolean
   web_search_max_results: number
   sandbox_enabled: boolean
+  context_window_max_tokens: number
+  sub_agent_max_output_tokens: number
+  sub_agent_model: string
 }
 
 export type AppSettings = FullAppSettings
@@ -443,6 +446,9 @@ export interface SettingsUpdate {
   tavily_api_key?: string
   web_search_max_results?: number
   sandbox_enabled?: boolean
+  context_window_max_tokens?: number
+  sub_agent_max_output_tokens?: number
+  sub_agent_model?: string
 }
 
 export async function getSettings(): Promise<FullAppSettings> {
@@ -463,7 +469,7 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
   return res.json() as Promise<FullAppSettings>
 }
 
-export async function getProviders(): Promise<{ active: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
+export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get providers")

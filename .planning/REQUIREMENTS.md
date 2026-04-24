@@ -1,104 +1,72 @@
-# Requirements: Agentic RAG — v2.3 Memory, Multimodal & Experience
+# Requirements: Agentic RAG
 
-**Defined:** 2026-04-11
-**v2.3 extended:** 2026-04-16
-**Core Value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
+**Defined:** 2026-04-22
+**Core Value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
 
-## v2.2 Requirements
+## v2.4 Requirements
 
-Requirements for this milestone. Each maps to roadmap phases.
+Requirements for Stability, Polish & UX Fixes milestone. Each maps to roadmap phases.
 
-### Citation & Source Highlighting (F-01)
+### STREAM — SSE & Stop Reliability
 
-- [x] **CITE-01**: User can see exact retrieved passage text for each search result as a collapsible card beneath the assistant response
-- [x] **CITE-02**: Each citation card displays document name, section/location (if identifiable), and passage text (≤400 chars, expandable to full)
-- [x] **CITE-03**: Citation card text is visually distinct from the AI-generated response (quoted block style with different background)
-- [x] **CITE-04**: Citation cards appear only for passages retrieved in that response turn — never for documents not retrieved
-- [x] **CITE-05**: For `analyze_document` results, user sees document name attribution only (no chunk anchor available for full-doc analysis)
+- [ ] **STREAM-01**: User can stop a streaming response and the backend SSE generator cancels immediately (no linger, no "saving response…" text stuck in UI)
+- [ ] **STREAM-02**: Navigating away or refreshing during an active stream disconnects gracefully without server errors (no "socket.send() raised exception" logs)
+- [ ] **STREAM-03**: Partial assistant responses are persisted when stop is triggered, so the user sees their partial answer after page reload
 
-### Answer Confidence Score (F-05)
+### SKILL — Smart Skill Dispatch
 
-- [x] **CONF-01**: User can see a High/Medium/Low confidence badge on every document-grounded assistant message
-- [x] **CONF-02**: Confidence badge is colour-coded: green (High ≥ 0.7 avg similarity), amber (Medium 0.5–0.7), red (Low < 0.5 or zero results)
-- [x] **CONF-03**: Low-confidence responses include a standard disclaimer: "This answer is based on limited or weakly-matched evidence. Please verify with the source documents."
-- [x] **CONF-04**: Confidence badge does not appear on web_search, execute_code, or skill-only responses
+- [ ] **SKILL-01**: Skill catalog injection uses relevance-based filtering — only skills whose descriptions match the user's message are included in the system prompt (not all enabled skills)
+- [ ] **SKILL-02**: Skills that don't match the user's intent are never triggered, even if they exist in the catalog
 
-### Document Versioning & Change Detection (F-02)
+### DOC — Document Management
 
-- [x] **VER-01**: User uploading a file with the same filename as an existing document creates a new version rather than being rejected as a duplicate
-- [x] **VER-02**: Old document chunks are immediately excluded from all retrieval and search after a new version finishes ingesting
-- [x] **VER-03**: User can see a version badge (e.g. "v3") on documents that have been updated in the document library
-- [x] **VER-04**: User can expand a document row to view its full version history (version number, upload date, file size)
-- [x] **VER-05**: User can restore an older version as the active version (re-ingest from stored file or re-upload)
-- [x] **VER-06**: Answers citing a versioned document include the version number in the citation (e.g. "Report.pdf (v2) — Section 3")
+- [ ] **DOC-01**: User can choose between "delete this version only" and "delete all versions" when deleting a document
+- [ ] **DOC-02**: Deleting a single version cleans up its chunks and storage file, and promotes the next-latest version as is_latest
+- [ ] **DOC-03**: Deleting all versions removes all chunks, storage files, and version history for that filename
+- [ ] **DOC-04**: Root-folder documents (folder_id=null) are clearly visible in the document list and folder tree
+- [ ] **DOC-05**: Upload errors display specific reasons to the user (duplicate file, unsupported type, empty file, size limit exceeded)
+- [ ] **DOC-06**: Uploading to root folder works correctly with clear UX or is explicitly gated with an informative message
 
-### Audit Log (F-06)
+### CHAT — Chat UX
 
-- [x] **AUDIT-01**: All significant user actions are automatically logged: document upload, document delete, search query, code execution, skill load, thread create, thread delete, settings change
-- [x] **AUDIT-02**: Search query audit entries include the query text and the IDs of documents retrieved in the result
-- [x] **AUDIT-03**: Audit entries cannot be deleted or modified through any user-accessible API endpoint
-- [x] **AUDIT-04**: User can view their own audit log in Settings, filterable by date range and action type, paginated
-- [x] **AUDIT-05**: User can export their audit log as a CSV file
-- [x] **AUDIT-06**: Audit entries are written asynchronously (fire-and-forget) and never delay a chat response or document operation
+- [x] **CHAT-01**: Deleting a thread shows a confirmation dialog before the delete executes
+- [x] **CHAT-02**: After deleting a thread and creating a new one, no ghost content from the deleted thread appears
+- [x] **CHAT-03**: Creating a new chat presents a folder selector to scope the thread from the start
 
-### Suggested Follow-Up Questions (F-08)
+### SETT — Web Search Toggle
 
-- [x] **SUG-01**: User sees 2–3 suggested follow-up questions as clickable pill buttons below each assistant response
-- [x] **SUG-02**: Clicking a suggestion populates the chat input with that question and immediately submits it
-- [x] **SUG-03**: Suggestions appear within 2 seconds of the main response completing, generated by the cheapest available model for the active provider
-- [x] **SUG-04**: If suggestion generation fails for any reason, the main response is unaffected and no pills appear (non-blocking)
+- [ ] **SETT-01**: Web search has an explicit on/off toggle in Settings (like code execution and reranking), separate from API key presence
+- [ ] **SETT-02**: When web search is toggled off, the web_search tool is excluded from the agent's tool set regardless of API key
 
-## v2.3 Requirements
+### NAV — Navigation Polish
 
-### Cross-Thread Memory (F-03)
+- [ ] **NAV-01**: Icon labels appear directly adjacent to their icons in the expanded sidebar (no large gap between icon and text)
+- [ ] **NAV-02**: When the sidebar is collapsed, the logo icon remains visible (icon-only, no text)
 
-- [x] **MEM-01**: User's stated preferences (e.g. "respond in bullet points") persist across conversation threads via a `remember` tool
-- [x] **MEM-02**: User can view, edit, and delete memory entries from Settings
-- [x] **MEM-03**: Memory summary is injected at the start of each turn (capped to limit context window cost)
+### HLTH — Library Health at Scale
 
-### Multi-Modal Table & Image Extraction (F-07)
+- [ ] **HLTH-01**: Knowledge Health dashboard uses server-side pagination instead of fixed top-10 lists
+- [ ] **HLTH-02**: Low confidence panel explains that scores reflect query-document relevance, not document quality; includes context about score distribution
+- [ ] **HLTH-03**: Feedback empty states use actionable, corporate-appropriate messaging (not passive phrases like "No downvoted documents")
+- [ ] **HLTH-04**: Knowledge Health API accepts pagination parameters (offset/limit) and returns total counts
 
-- [x] **MODAL-01**: Tables extracted from PDF/DOCX during ingestion and stored as structured JSON
-- [x] **MODAL-02**: Embedded images described via vision LLM and indexed for vector search
-- [x] **MODAL-03**: Table data queryable via extended query_documents or new query_tables tool
+### CTX — Context Window Management
 
-### Knowledge Health Dashboard (F-09)
+- [ ] **CTX-01**: Sub-agent detects generation tasks (PPTX, reports, drafting) via keyword routing and escalates to the capable model tier (Sonnet / GPT-4o / Gemini Flash) with a 32k output ceiling instead of the cheap model with 8k
+- [ ] **CTX-02**: Simple analysis tasks (summarise, extract, list, compare) continue to use the cheap sub-agent model — escalation only fires for creation/generation verbs
+- [ ] **CTX-03**: Settings page exposes a context history depth slider (maps to `context_window_max_tokens`), a sub-agent output token slider (maps to `sub_agent_max_output_tokens`), and a sub-agent model override dropdown
+- [ ] **CTX-04**: Each model entry in the model selector shows an inline info card with: context window size, max output tokens, cost tier, and best-use-case label — populated from a static per-model lookup, no API call
+- [ ] **CTX-05**: Token estimation for OpenAI models uses `tiktoken` (cl100k_base) for accurate counts; other providers fall back to the existing char heuristic with a documented margin note
 
-- [x] **HLTH-01**: User can see top-10 most-retrieved documents (last 30 days) in a Library Health view
-- [x] **HLTH-02**: User can see never-retrieved documents (uploaded but zero retrieval events)
-- [x] **HLTH-03**: User can see low-confidence documents (frequently retrieved with low similarity scores)
-- [x] **HLTH-04**: User can see stale documents (not updated in > 90 days, configurable)
-- [x] **HLTH-05**: User can act directly from Library Health: delete, re-ingest, or move a document to a folder
+## v3.0 Requirements
 
-### User Feedback Loop (F-10)
+Deferred to future milestone. Tracked but not in current roadmap.
 
-- [x] **FB-01**: Each assistant message has thumbs-up / thumbs-down buttons (shown on hover)
-- [x] **FB-02**: On thumbs-down: optional reason selector appears (Wrong answer / Not from my documents / Incomplete / Other)
-- [x] **FB-03**: Feedback stored immutably; one rating per message per user; no modification allowed
-- [x] **FB-04**: Overall positive-rate stat and most-downvoted documents shown in Library Health dashboard
-- [x] **FB-05**: Submitting feedback does not interrupt the conversation or require confirmation
+### Skills System Overhaul
 
-### UI Redesign — Deep Midnight (UI)
-
-- [x] **UI-01**: ToolCallPanel uses glassmorphic styling: bg-card/80 backdrop-blur-sm wrapper, bg-card/50 backdrop-blur-md nested parameter blocks
-- [x] **UI-02**: CitationCard uses ambient gradient borders; file-type icons color-coded (PDF red, DOCX blue, Markdown purple)
-- [x] **UI-03**: MessageInput renders as a floating pill (rounded-2xl shadow-lg backdrop-blur-sm) that does not block expanded citations
-- [ ] **UI-04**: Nav icons extracted from Sidebar into a standalone AppDock component
-- [ ] **UI-05**: SkillsPage uses 3-pane layout with tonal background depth instead of border-r dividers
-- [ ] **UI-06**: Active skill toggles glow with indigo-to-cyan gradient; env inputs use pill styling with Required/ReadOnly badges
-- [ ] **UI-07**: On mobile (< 768px) thread list opens as a frosted backdrop-blur-md overlay drawer
-- [ ] **UI-08**: Active thread in drawer indicated by brighter background and left gradient accent line
-
-## Future Requirements (v2.4+)
-
-### Group-Level Access Control (F-04)
-
-- **GROUP-01**: User can create groups and invite members by email
-- **GROUP-02**: Documents and folders can be scoped to a specific group (private / group / global)
-- **GROUP-03**: All KB tools and retrieval respect group-scoped RLS
-- **GROUP-04**: Removing a user from a group immediately revokes access to group-scoped documents
-
-> Note: Deferred pending clarity on multi-tenancy architecture (isolated vs co-tenant, auth/billing model).
+- **SKILL-03**: Full skills marketplace and discovery system
+- **SKILL-04**: Skill versioning and dependency management
+- **SKILL-05**: Skill sharing and collaboration features
 
 ## Out of Scope
 
@@ -107,72 +75,57 @@ Requirements for this milestone. Each maps to roadmap phases.
 | In-document PDF highlighting (F-01 v2) | Requires PDF renderer integration; citation cards sufficient for v2.2 |
 | Citation export / cross-thread citation linking | Complexity vs. value; defer |
 | Diff view between document versions | Nice-to-have; version history + restore covers core need |
-| Per-claim confidence scoring | Too granular for v2.2; response-level confidence sufficient |
-| Organisation-level audit view / SIEM integration | Single-user audit sufficient; no multi-tenant in v2.2 |
+| Per-claim confidence scoring | Too granular; response-level confidence sufficient |
+| Organisation-level audit view / SIEM integration | Single-user audit sufficient; no multi-tenant yet |
 | Suggestions in Explorer mode | Explorer is KB-focused tool mode; follow-ups add noise |
-| Knowledge Health Dashboard (F-09) | Promoted to v2.3 active scope |
-| User Feedback Loop (F-10) | Promoted to v2.3 active scope |
+| Multi-tenancy / Org-level transform | Requires clarity on isolated vs co-tenant architecture and auth/billing model |
+| Automatic local folder scanning/import | Phase II feature, adds complexity |
+| Team-based folder sharing with access controls | Keep it simple: global or private only |
+| Real-time collaboration on folders | Not needed for current use case |
+| Folder-level permissions | Global folders visible to all, per-user folders private |
+| Switching to Docling | Existing pypdf + python-docx pipeline is working |
+| Nyquist VALIDATION.md compliance | Phase-level validation files in draft state; full compliance deferred |
+| Comprehensive skills system overhaul | Planned for next milestone; this milestone only fixes dispatch relevance |
 
 ## Traceability
 
+Which phases cover which requirements. Updated during roadmap creation.
+
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CITE-01 | Phase 26 | Complete |
-| CITE-02 | Phase 26 | Complete |
-| CITE-03 | Phase 27 | Complete |
-| CITE-04 | Phase 26 | Complete |
-| CITE-05 | Phase 26 | Complete |
-| CONF-01 | Phase 26 | Complete |
-| CONF-02 | Phase 26 | Complete |
-| CONF-03 | Phase 26 | Complete |
-| CONF-04 | Phase 26 | Complete |
-| VER-01 | Phase 28 | Complete |
-| VER-02 | Phase 28 | Complete |
-| VER-03 | Phase 29 | Complete |
-| VER-04 | Phase 29 | Complete |
-| VER-05 | Phase 29 | Complete |
-| VER-06 | Phase 28 | Complete |
-| AUDIT-01 | Phase 30 | Complete |
-| AUDIT-02 | Phase 30 | Complete |
-| AUDIT-03 | Phase 30 | Complete |
-| AUDIT-04 | Phase 31 | Complete |
-| AUDIT-05 | Phase 31 | Complete |
-| AUDIT-06 | Phase 30 | Complete |
-| SUG-01 | Phase 32 | Complete |
-| SUG-02 | Phase 32 | Complete |
-| SUG-03 | Phase 32 | Complete |
-| SUG-04 | Phase 32 | Complete |
-| MEM-01 | Phase 33 | Complete |
-| MEM-02 | Phase 34 | Complete |
-| MEM-03 | Phase 33 | Complete |
-| MODAL-01 | Phase 35 | Complete |
-| MODAL-02 | Phase 35 | Complete |
-| MODAL-03 | Phase 36 | Complete |
-| HLTH-01 | Phase 37 | Complete |
-| HLTH-02 | Phase 37 | Complete |
-| HLTH-03 | Phase 37 | Complete |
-| HLTH-04 | Phase 37 | Complete |
-| HLTH-05 | Phase 38 | Complete |
-| FB-01 | Phase 39 | Complete |
-| FB-02 | Phase 39 | Complete |
-| FB-03 | Phase 39 | Complete |
-| FB-04 | Phase 40 | Complete |
-| FB-05 | Phase 40 | Complete |
-| UI-01 | Phase 41 | Complete |
-| UI-02 | Phase 41 | Complete |
-| UI-03 | Phase 41 | Complete |
-| UI-04 | Phase 42 | Planned |
-| UI-05 | Phase 42 | Planned |
-| UI-06 | Phase 42 | Planned |
-| UI-07 | Phase 43 | Planned |
-| UI-08 | Phase 43 | Planned |
+| STREAM-01 | Phase 44 | Pending |
+| STREAM-02 | Phase 44 | Pending |
+| STREAM-03 | Phase 44 | Pending |
+| SKILL-01 | Phase 46 | Pending |
+| SKILL-02 | Phase 46 | Pending |
+| DOC-01 | Phase 47 | Pending |
+| DOC-02 | Phase 47 | Pending |
+| DOC-03 | Phase 47 | Pending |
+| DOC-04 | Phase 48 | Pending |
+| DOC-05 | Phase 48 | Pending |
+| DOC-06 | Phase 48 | Pending |
+| CHAT-01 | Phase 45 | ✅ Complete |
+| CHAT-02 | Phase 45 | ✅ Complete |
+| CHAT-03 | Phase 45 | ✅ Complete |
+| SETT-01 | Phase 49 | Pending |
+| SETT-02 | Phase 49 | Pending |
+| NAV-01 | Phase 49 | Pending |
+| NAV-02 | Phase 49 | Pending |
+| HLTH-01 | Phase 50 | Pending |
+| HLTH-02 | Phase 50 | Pending |
+| HLTH-03 | Phase 50 | Pending |
+| HLTH-04 | Phase 50 | Pending |
+| CTX-01 | Phase 51 | Pending |
+| CTX-02 | Phase 51 | Pending |
+| CTX-03 | Phase 51 | Pending |
+| CTX-04 | Phase 51 | Pending |
+| CTX-05 | Phase 51 | Pending |
 
 **Coverage:**
-- v2.2 requirements: 25 total (all complete)
-- v2.3 requirements: 28 new (MEM x3, MODAL x3, HLTH x5, FB x5, UI x8)
-- Total mapped: 53
+- v2.4 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-04-11*
-*Last updated: 2026-04-16 — v2.3 milestone added: F-03 (Memory), F-07 (Multimodal), F-09 (Knowledge Health), F-10 (Feedback), UI redesign (Phases 33–43)*
+*Requirements defined: 2026-04-22*
+*Last updated: 2026-04-23 — CHAT-01, CHAT-02, CHAT-03 verified complete (Phase 45)*

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
@@ -24,13 +24,14 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming } = useMessages()
+  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
+  const justCreatedThreadRef = useRef<string | null>(null)
 
   useEffect(() => {
     setAgentMode("default")
@@ -39,13 +40,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   useEffect(() => {
     getProviders()
-      .then(({ active, providers: list }) => {
+      .then(({ active, active_model, providers: list }) => {
         setProviders(list)
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)
           setModels(activeProvider.models)
-          setSelectedModel(activeProvider.models[0] ?? "")
+          const preferred = active_model && activeProvider.models.includes(active_model)
+            ? active_model
+            : (activeProvider.models[0] ?? "")
+          setSelectedModel(preferred)
         }
       })
       .catch(console.error)
@@ -61,16 +65,29 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-  useEffect(() => {
-    if (thread) {
-      loadMessages(thread.id).catch(console.error)
+useEffect(() => {
+    if (!thread) {
+      clearMessages()
+      return
     }
-  }, [thread?.id, loadMessages])
+    // Skip clear+load when handleSend just created this thread — sendMessage is
+    // already streaming into it and clearMessages() would wipe the optimistic
+    // messages and abort the SSE connection, causing a blank chat.
+    if (justCreatedThreadRef.current === thread.id) {
+      justCreatedThreadRef.current = null
+      return
+    }
+    // Clear stale messages from previous thread before loading new ones
+    clearMessages()
+    abortStream()
+    loadMessages(thread.id).catch(console.error)
+  }, [thread?.id, loadMessages, abortStream, clearMessages])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
+      justCreatedThreadRef.current = activeThread.id
     }
     await sendMessage(
       activeThread.id,

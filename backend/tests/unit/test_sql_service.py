@@ -70,7 +70,7 @@ class TestQueryDocumentsRpcCall:
         query_documents("SELECT * FROM documents", USER_ID, sb)
         sb.rpc.assert_called_once_with(
             "query_user_documents",
-            {"sql_query": "SELECT * FROM documents"},
+            {"sql_query": "SELECT * FROM documents WHERE documents.user_id = '00000000-0000-0000-0000-000000000001'"},
         )
 
     def test_raises_runtime_error_on_rpc_exception(self):

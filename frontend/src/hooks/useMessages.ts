@@ -8,6 +8,8 @@ interface UseMessages {
   loadMessages: (threadId: string) => Promise<void>
   sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
   stopStreaming: () => void
+  abortStream: () => void
+  clearMessages: () => void
 }
 
 function makeTempId() {
@@ -20,16 +22,36 @@ export function useMessages(): UseMessages {
   const isSendingRef = useRef(false)
   const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
+  const stoppedByUserRef = useRef(false)
+  const streamingThreadIdRef = useRef<string | null>(null)
 
   const stopStreaming = useCallback(() => {
+    stoppedByUserRef.current = true
     abortControllerRef.current?.abort()
+  }, [])
+
+  const abortStream = useCallback(() => {
+    abortControllerRef.current?.abort()
+  }, [])
+
+  const clearMessages = useCallback(() => {
+    setMessages([])
+    setIsStreaming(false)
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
+    isSendingRef.current = false
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
     setMessages((prev) => {
-      // Don't wipe optimistic messages or live-only fields (confidence) if a send is in flight
+      // If a different thread is being requested, always allow the update
+      // so thread switching works even during active streaming.
+      if (streamingThreadIdRef.current && streamingThreadIdRef.current !== threadId) {
+        return data
+      }
+      // Same thread: don't wipe optimistic messages if a send is in flight
       // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
       if (sendGenerationRef.current !== generation) return prev
@@ -38,9 +60,10 @@ export function useMessages(): UseMessages {
   }, [])
 
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
-    if (isSendingRef.current) return
+if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
+    streamingThreadIdRef.current = threadId
 
     // Optimistic user message
     const userMsg: Message = {
@@ -230,27 +253,72 @@ export function useMessages(): UseMessages {
       if (!(err instanceof Error && err.name === "AbortError")) {
         console.error(err)
       }
-    } finally {
+} finally {
       abortControllerRef.current = null
       isSendingRef.current = false
+      streamingThreadIdRef.current = null
       setIsStreaming(false)
 
-      // Safety net: if the stream ended but the assistant message has no text content
-      // (SSE connection dropped before final delta events arrived), reload from DB after
-      // a short delay so the persisted response becomes visible without requiring a refresh.
+      const wasStoppedByUser = stoppedByUserRef.current
+
+      // Mark running tool calls as "interrupted" if the user stopped the stream
+      if (wasStoppedByUser) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.role !== "assistant") return m
+            const hasRunning = m.tool_calls?.some((tc) => tc.status === "running")
+            if (!hasRunning) return m
+            return {
+              ...m,
+              tool_calls: m.tool_calls!.map((tc) =>
+                tc.status === "running"
+                  ? { ...tc, status: "interrupted" as const }
+                  : tc
+              ),
+            }
+          })
+        )
+      }
+
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
-        const sseDrop = lastMsg?.id === assistantId && !lastMsg.content
-        const racedEmpty = prev.length === 0  // race condition wiped messages
+        if (lastMsg?.id === assistantId) {
+          const updated = prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
+              : m
+          )
+          // Only reload from DB if the user is still on the same thread.
+          // Skip the reload on navigation abort — the new thread's loadMessages
+          // has already started.
+          if (!wasStoppedByUser) {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+            }, 0)
+          } else {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+              loadMessages(threadId).catch(console.error)
+            }, 800)
+          }
+          return updated
+        }
+
+        // Safety net: if the stream ended but assistant message has no text content
+        // (SSE connection dropped before final delta events arrived), reload from DB
+        const sseDrop = lastMsg?.role === "assistant" && !lastMsg?.content
+        const racedEmpty = prev.length === 0
         if (sseDrop || racedEmpty) {
           setTimeout(() => {
+            stoppedByUserRef.current = false
             loadMessages(threadId).catch(console.error)
           }, 1500)
         }
+        stoppedByUserRef.current = false
         return prev
       })
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming }
+  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
 }

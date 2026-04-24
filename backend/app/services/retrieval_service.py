@@ -122,6 +122,33 @@ def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
     return enriched
 
 
+def _deduplicate_chunks(rows: list[dict], text_overlap_threshold: float = 0.85) -> list[dict]:
+    """Remove near-duplicate chunks from a ranked result list.
+
+    Two chunks are considered duplicates when their word-set Jaccard similarity
+    exceeds *text_overlap_threshold* (default 0.85). The higher-scoring chunk is
+    kept. This is a safety net against the old chunking algorithm producing
+    near-identical overlapping chunks and, after the fix, against any edge cases
+    in very repetitive documents.
+    """
+    kept: list[dict] = []
+    for candidate in rows:
+        words_c = set(candidate["content"].lower().split())
+        is_dup = False
+        for existing in kept:
+            words_e = set(existing["content"].lower().split())
+            union = words_c | words_e
+            if not union:
+                continue
+            jaccard = len(words_c & words_e) / len(union)
+            if jaccard >= text_overlap_threshold:
+                is_dup = True
+                break
+        if not is_dup:
+            kept.append(candidate)
+    return kept
+
+
 def _avg_cosine(rows: list[dict]) -> float:
     """Average cosine similarity from vector search rows. Returns 0.0 if no rows."""
     sims = [row["similarity"] for row in rows if row.get("similarity") and row["similarity"] > 0]
@@ -162,10 +189,16 @@ def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | 
 
 
 def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
-    """Fetch complete document content by concatenating all ordered chunks."""
+    """Fetch complete document content for the analyze_document sub-agent.
+
+    Prefers `full_markdown` (the raw extracted text stored at ingest time) over
+    concatenating chunks. Chunks now have context-enriched embeddings but store
+    raw content, so either path produces clean text — but `full_markdown` avoids
+    any repeated context headers if the chunk storage format ever changes.
+    """
     doc_result = (
         supabase.table("documents")
-        .select("id, filename, metadata, version_number")
+        .select("id, filename, metadata, version_number, full_markdown")
         .eq("id", document_id)
         .eq("user_id", user_id)
         .single()
@@ -175,15 +208,20 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
         return None
 
     doc = doc_result.data
-    chunks_result = (
-        supabase.table("document_chunks")
-        .select("content")
-        .eq("document_id", document_id)
-        .order("chunk_index")
-        .execute()
-    )
-    chunks = chunks_result.data or []
-    full_text = "\n\n".join(c["content"] for c in chunks)
+
+    # Use full_markdown when available (set during ingestion from the raw extracted text)
+    full_text = doc.get("full_markdown") or ""
+    if not full_text:
+        # Fallback: reassemble from chunks (documents ingested before full_markdown was stored)
+        chunks_result = (
+            supabase.table("document_chunks")
+            .select("content")
+            .eq("document_id", document_id)
+            .order("chunk_index")
+            .execute()
+        )
+        full_text = "\n\n".join(c["content"] for c in (chunks_result.data or []))
+
     return {
         "document_id": doc["id"],
         "filename": doc["filename"],
@@ -216,17 +254,18 @@ def search_documents(
     rerank_top_n = user_settings.rerank_top_n if user_settings else settings.rerank_top_n
 
     if not hybrid_enabled:
-        # Vector-only path
+        # Vector-only path — fetch 2x top_k so dedup has candidates to spare
         rows = _vector_search(
             query, user_id, supabase, metadata_filter,
-            top_n=top_k, match_threshold=match_threshold,
+            top_n=top_k * 2, match_threshold=match_threshold,
             user_settings=user_settings,
             folder_ids=folder_ids,
         )
         avg_sim = _avg_cosine(rows)
+        rows = _deduplicate_chunks(rows)[:top_k]
         return _enrich_with_filenames(rows, supabase), avg_sim
 
-    # Hybrid path: vector + keyword → RRF fusion → optional reranking
+    # Hybrid path: vector + keyword → RRF fusion → dedup → optional reranking
     vector_rows = _vector_search(
         query, user_id, supabase, metadata_filter,
         top_n=candidate_count, match_threshold=match_threshold,
@@ -246,6 +285,9 @@ def search_documents(
         vector_weight=vector_weight,
         keyword_weight=keyword_weight,
     )
+
+    # Deduplicate before reranking so duplicate slots don't waste the reranker budget
+    fused = _deduplicate_chunks(fused)
 
     # Take top-K before reranking
     candidates = fused[: max(top_k, rerank_top_n)]

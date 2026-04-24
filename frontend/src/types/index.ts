@@ -26,9 +26,9 @@ export interface OutputFile {
 }
 
 export interface ToolCall {
-  name: string
+name: string
   args: Record<string, string>
-  status: "running" | "done"
+  status: "running" | "done" | "interrupted"
   result?: string
   sub_agent?: SubAgentState
   startedAt?: number   // Date.now() when tool_start received
@@ -77,8 +77,10 @@ export interface Message {
   citations?: Citation[]       // Set by citations SSE event; loaded from source_refs on DB load
   confidence?: ConfidenceResult // Set by confidence SSE event; persisted in confidence_* columns
   suggestions?: string[]   // Set by suggestions SSE event; ephemeral — not persisted, not loaded
-  /** True while the agent has finished one tool-call round and is deciding its next action. */
+/** True while the agent has finished one tool-call round and is deciding its next action. */
   isPlanning?: boolean
+  /** True if the user clicked Stop — shows "Response stopped" indicator instead of "Saving response…" */
+  stopped?: boolean
 }
 
 export interface DocumentMetadata {

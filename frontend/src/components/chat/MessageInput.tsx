@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MODEL_INFO } from "@/lib/model-info"
 import { cn } from "@/lib/utils"
 
 interface Provider {
@@ -190,22 +191,39 @@ export function MessageInput({
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="min-w-[200px] mb-1">
-                    {models.map((m) => (
-                      <DropdownMenuItem
-                        key={m}
-                        onSelect={() => onModelChange!(m)}
-                        className={cn(
-                          "text-xs cursor-pointer gap-2",
-                          m === selectedModel && "font-medium bg-accent",
-                        )}
-                      >
-                        <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        {m}
-                        {m === selectedModel && (
-                          <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
+                    {models.map((m) => {
+                      const info = MODEL_INFO[m]
+                      return (
+                        <DropdownMenuItem
+                          key={m}
+                          onSelect={() => onModelChange!(m)}
+                          className={cn(
+                            "text-xs cursor-pointer items-start gap-2 py-2",
+                            m === selectedModel && "font-medium bg-accent",
+                          )}
+                        >
+                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                          <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span>{m}</span>
+                              {m === selectedModel && (
+                                <span className="text-[10px] text-primary font-semibold">active</span>
+                              )}
+                            </div>
+                            {info && (
+                              <>
+                                <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
+                                  {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground/50 font-normal">
+                                  <span className="font-medium">Cost tier:</span> {info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (

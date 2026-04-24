@@ -211,6 +211,59 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.3 — Memory, Multimodal & Experience
+
+**Shipped:** 2026-04-19
+**Phases:** 11 (Phases 33–43) | **Plans:** 27 | **Tasks:** ~50
+**Timeline:** 2026-04-16 → 2026-04-19 (3 days)
+**Commits:** 139
+**LOC:** ~57,000 total (Python + TypeScript)
+
+### What Was Built
+
+- Cross-thread memory: `user_memory` table with RLS, remember/recall tools, auto-injection into General Mode, Settings UI (MemorySection)
+- Multi-modal ingestion: PDF/DOCX table extraction (pdfplumber), image description via vision LLM, `document_tables` + `document_images` tables
+- Multi-modal query: `query_tables` tool, image descriptions in vector search, Tables/Images badge chips on documents
+- Knowledge Health Dashboard: 4-metric API (most-retrieved, never-retrieved, low-confidence, stale) from audit_log, reingest endpoint, full frontend page with 2x2 grid
+- User Feedback Loop: `message_feedback` table with immutable ratings, thumbs up/down with reason selector, `FeedbackStatsPanel` in Library Health
+- Deep Midnight UI: glassmorphic ToolCallPanel, gradient CitationCard, animated CitationList (Radix Collapsible), floating pill MessageInput
+- Layout refactor: AppDock vertical icon rail, 3-pane SkillsPage with tonal backgrounds, gradient toggle glow, tonal SettingsPage cards
+- Mobile & Responsive: NavPanel collapsible navigation, frosted drawer overlay, 5-tab Settings refactor, responsive breakpoints
+
+### What Worked
+
+- **Backend/frontend phase pairing** — Phases 33+34, 37+38, 39+40 split backend and frontend cleanly; each plan was focused and executable in 2–8 minutes
+- **Consistent fire-and-forget pattern** — `asyncio.create_task` used for memory writes (Phase 33), audit writes (Phase 30), and feedback writes (Phase 39) — same pattern across three different features
+- **Additive CSS-only UI redesign** — All Deep Midnight changes are Tailwind classes with zero logic changes to SSE parsing or state management; zero regression risk
+- **Quick execution pace** — 11 phases in 3 days is the fastest milestone yet; narrow phase scoping and TDD scaffolds kept each plan under 10 minutes
+
+### What Was Inefficient
+
+- **UAT verification gaps** — 4 phases have incomplete UAT and 5 have `human_needed` verification status; live browser testing wasn't performed for phases 038–042
+- **Quick task status markers** — 12 quick task entries show "missing" status despite being committed; procedural cleanup not done
+- **Phase 041 plan reference error** — Phase 41 ROADMAP references 038-01 and 038-02 plan IDs instead of 041-01/041-02
+
+### Patterns Established
+
+- **Memory injection pattern** — Top-N memory entries injected as a concise block at system prompt start; Explorer mode excluded by design
+- **Health metrics from audit_log** — Already-present audit data repurposed for knowledge health metrics; zero new data collection needed
+- **Additive Tailwind redesign** — Visual refreshes done purely through className changes, not component rewrites; safe pattern for UI evolution
+
+### Key Lessons
+
+- UAT that requires live browser testing should be scheduled as a dedicated activity, not deferred
+- When ROADMAP phase plans reference wrong plan IDs, milestone audit catches it but it causes confusion during execution
+- Multi-modal ingestion resilience (non-fatal extraction) was the right call — ingestion continues even if image description or table extraction fails
+- 3-pane layouts (SkillsPage, health dashboard) benefit from tonal background shifts instead of hard border-r dividers
+
+### Cost Observations
+
+- Model: claude-sonnet-4-6 throughout
+- Sessions: multiple across 3 days (fastest milestone pace)
+- Notable: Phases 35 (multi-modal) had the most complex backend work; Phase 43 (mobile) required the most UI iteration
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -218,3 +271,5 @@ Living retrospective — updated at each milestone boundary.
 | v1.0 KB Explorer | 8 | 18 | 2.25 | 13 days |
 | v2.0 Agent Skills | 9 | 22 | 2.44 | 6 days |
 | v2.1 Stability | 8 | 8 | 1.0 | 3 days |
+| v2.2 Trust & Compliance | 7 | 13 | 1.86 | 4 days |
+| v2.3 Memory, Multimodal & Experience | 11 | 27 | 2.45 | 3 days |

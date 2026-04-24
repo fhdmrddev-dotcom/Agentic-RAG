@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from app.responses import sse_response
 from openai import APIError
 from supabase import Client
 
@@ -28,7 +28,7 @@ from app.services.context_window import trim_messages_to_fit, estimate_messages_
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
-from app.services.sub_agent_service import run_sub_agent
+from app.services.sub_agent_service import run_sub_agent, _SUB_AGENT_MODEL_DEFAULTS
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
@@ -260,7 +260,20 @@ def generate_thread_title(first_user_message: str, user_settings=None) -> str:
     """Call LLM to produce a short thread title from the first user message."""
     try:
         client = get_llm_client(user_settings)
-        model = user_settings.llm_model if user_settings else settings.llm_model
+        # Use cheapest model per provider — same resolution as sub_agent_service/suggestion_service.
+        # Avoids burning the main (expensive) model on a 20-token title call.
+        override = (
+            (user_settings.sub_agent_model if user_settings else "")
+            or settings.sub_agent_model
+        )
+        if override:
+            model = override
+        else:
+            provider = user_settings.active_provider if user_settings else ""
+            model = (
+                _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+                or (user_settings.llm_model if user_settings else settings.llm_model)
+            )
         token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
         response = client.chat.completions.create(
             model=model,
@@ -557,7 +570,9 @@ async def send_message(
                 "content": _strip_nul(full_content),
             }
             if persisted_tool_calls:
-                row["tool_calls"] = _strip_nul(persisted_tool_calls)
+                completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
+                if completed_tools:
+                    row["tool_calls"] = _strip_nul(completed_tools)
             if unique_citations:
                 row["source_refs"] = unique_citations   # Full citation objects (D-13)
             elif unique_sources:
@@ -1416,4 +1431,4 @@ async def send_message(
             # prevents a double-insert when the normal path already persisted.
             _persist_assistant_message()
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return sse_response(event_stream())

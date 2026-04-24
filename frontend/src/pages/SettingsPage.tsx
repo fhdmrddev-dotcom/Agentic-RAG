@@ -61,6 +61,43 @@ function NumberInput({ value, onChange, min, max, step }: {
   )
 }
 
+function SliderInput({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  hint,
+}: {
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  step: number
+  hint?: string
+}) {
+  const displayValue = value === 0 ? "Auto" : value.toLocaleString()
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <input
+          type="range"
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          min={min}
+          max={max}
+          step={step}
+          className="flex-1 h-2 accent-primary cursor-pointer"
+        />
+        <span className="text-xs font-mono text-muted-foreground w-20 text-right shrink-0">
+          {displayValue}
+        </span>
+      </div>
+      {hint && <p className="text-xs text-muted-foreground/70">{hint}</p>}
+    </div>
+  )
+}
+
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
@@ -479,6 +516,11 @@ export function SettingsPage() {
   // Sandbox
   const [sandboxEnabled, setSandboxEnabled] = useState(false)
 
+  // Context & Sub-agent
+  const [contextWindowMaxTokens, setContextWindowMaxTokens] = useState(0)
+  const [subAgentMaxOutputTokens, setSubAgentMaxOutputTokens] = useState(8192)
+  const [subAgentModel, setSubAgentModel] = useState("")
+
   const hydrate = (data: FullAppSettings) => {
     setS(data)
     setActiveProvider(data.active_provider)
@@ -508,6 +550,9 @@ export function SettingsPage() {
     setTavilyApiKey(data.web_search_enabled ? KEY_PLACEHOLDER : "")
     setWebSearchMaxResults(data.web_search_max_results)
     setSandboxEnabled(data.sandbox_enabled)
+    setContextWindowMaxTokens(data.context_window_max_tokens ?? 0)
+    setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
+    setSubAgentModel(data.sub_agent_model ?? "")
   }
 
   useEffect(() => {
@@ -530,6 +575,9 @@ export function SettingsPage() {
           models: ps.models.split(",").map((m) => m.trim()).filter(Boolean),
           base_url: ps.base_url,
         })),
+        context_window_max_tokens: contextWindowMaxTokens,
+        sub_agent_max_output_tokens: subAgentMaxOutputTokens,
+        sub_agent_model: subAgentModel,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
@@ -596,7 +644,11 @@ export function SettingsPage() {
   }
 
   const handleReset = () => {
-    if (s) hydrate(s)
+    if (s) {
+      if (activeTab === "0" || window.confirm("Reset all unsaved changes across all tabs?")) {
+        hydrate(s)
+      }
+    }
   }
 
   if (loading) {
@@ -708,6 +760,53 @@ export function SettingsPage() {
                     </div>
                   </div>
                 )}
+              </SectionCard>
+
+              {/* Context & Sub-Agent SectionCard (D-05: below Active Model, reuses Save button per D-10) */}
+              <SectionCard
+                title="Context & Sub-Agent"
+                description="Tune how much history the agent sees and how the sub-agent is configured."
+              >
+                <FieldRow label="Context depth">
+                  <SliderInput
+                    value={contextWindowMaxTokens}
+                    onChange={setContextWindowMaxTokens}
+                    min={0}
+                    max={200000}
+                    step={1000}
+                    hint={contextWindowMaxTokens === 0 ? "Using model default" : "Overrides model default"}
+                  />
+                </FieldRow>
+                <FieldRow label="Sub-agent output tokens">
+                  <SliderInput
+                    value={subAgentMaxOutputTokens}
+                    onChange={setSubAgentMaxOutputTokens}
+                    min={4096}
+                    max={65536}
+                    step={1024}
+                    hint="Generation tasks use at least 32,768 tokens regardless of this value"
+                  />
+                </FieldRow>
+                <FieldRow label="Sub-agent model">
+                  <select
+                    value={subAgentModel}
+                    onChange={(e) => setSubAgentModel(e.target.value)}
+                    className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="">Auto (cheapest)</option>
+                    {subAgentModel &&
+                      !activeModels.split(",").map((m) => m.trim()).includes(subAgentModel) && (
+                        <option value={subAgentModel}>{subAgentModel} (current)</option>
+                    )}
+                    {activeModels
+                      .split(",")
+                      .map((m) => m.trim())
+                      .filter(Boolean)
+                      .map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                  </select>
+                </FieldRow>
               </SectionCard>
 
               {/* Save AI Model button */}

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, BackgroundTasks, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -54,6 +54,10 @@ class FullSettingsResponse(BaseModel):
     web_search_max_results: int
     # Sandbox
     sandbox_enabled: bool
+    # Context & Sub-agent
+    context_window_max_tokens: int
+    sub_agent_max_output_tokens: int
+    sub_agent_model: str
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -93,6 +97,10 @@ class SettingsUpdate(BaseModel):
     web_search_max_results: int | None = None
     # Sandbox
     sandbox_enabled: bool | None = None
+    # Context & Sub-agent
+    context_window_max_tokens: int | None = None
+    sub_agent_max_output_tokens: int | None = Field(default=None, ge=4096, le=65536)
+    sub_agent_model: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,6 +142,9 @@ def _build_response(s=None) -> FullSettingsResponse:
         web_search_enabled=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
+        context_window_max_tokens=s.context_window_max_tokens,
+        sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
+        sub_agent_model=s.sub_agent_model,
     )
 
 
@@ -163,7 +174,12 @@ async def update_settings(
         if p.models:
             updates[f"{p.id}_models"] = ",".join(p.models)
         if p.id == "ollama" and p.base_url:
-            updates["ollama_base_url"] = p.base_url
+            # Strip /v1 suffix — _build_providers appends it at load time.
+            # Without this, each save round-trips http://host/v1 → stored as-is → /v1/v1 next load.
+            raw = p.base_url.rstrip("/")
+            if raw.endswith("/v1"):
+                raw = raw[:-3]
+            updates["ollama_base_url"] = raw
 
     if body.embedding_model is not None:
         updates["embedding_model"] = body.embedding_model
@@ -207,6 +223,12 @@ async def update_settings(
 
     if body.sandbox_enabled is not None:
         updates["sandbox_enabled"] = body.sandbox_enabled
+    if body.context_window_max_tokens is not None:
+        updates["context_window_max_tokens"] = body.context_window_max_tokens
+    if body.sub_agent_max_output_tokens is not None:
+        updates["sub_agent_max_output_tokens"] = body.sub_agent_max_output_tokens
+    if body.sub_agent_model is not None:
+        updates["sub_agent_model"] = body.sub_agent_model
 
     save_override(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
@@ -229,4 +251,4 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         for p in s.providers
         if p.api_key  # only providers that have a key set
     ]
-    return {"active": s.active_provider, "providers": configured}
+    return {"active": s.active_provider, "active_model": s.llm_model, "providers": configured}

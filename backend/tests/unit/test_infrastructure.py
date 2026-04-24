@@ -59,41 +59,49 @@ def test_short_text_returns_single_chunk():
 def test_cache_returns_same_object_within_ttl():
     """Two calls within TTL window return same cached result without re-reading disk."""
     import app.models.user_settings as us
+    from unittest.mock import MagicMock
     # Reset cache state
     us._override_cache_time = 0.0
     us._override_cache = {}
 
-    with patch.object(us._OVERRIDE_FILE, 'read_text', return_value='{"key": "value"}') as mock_read:
+    mock_path = MagicMock()
+    mock_path.read_text.return_value = '{"key": "value"}'
+    with patch.object(us, '_OVERRIDE_FILE', mock_path):
         result1 = us._load_override()
         result2 = us._load_override()
 
     # Should only read from disk once
-    assert mock_read.call_count == 1
+    assert mock_path.read_text.call_count == 1
     assert result1 == result2 == {"key": "value"}
 
 
 def test_cache_invalidated_after_ttl():
     """Call after TTL window triggers a fresh disk read."""
     import app.models.user_settings as us
+    from unittest.mock import MagicMock
     us._override_cache_time = 0.0
     us._override_cache = {}
 
-    with patch.object(us._OVERRIDE_FILE, 'read_text', return_value='{}') as mock_read:
+    mock_path = MagicMock()
+    mock_path.read_text.return_value = '{}'
+    with patch.object(us, '_OVERRIDE_FILE', mock_path):
         us._load_override()
         # Simulate TTL expiry
         us._override_cache_time = time.time() - us._OVERRIDE_CACHE_TTL - 1
         us._load_override()
 
-    assert mock_read.call_count == 2
+    assert mock_path.read_text.call_count == 2
 
 
 def test_save_override_invalidates_cache():
     """save_override resets cache so next _load_override re-reads from disk."""
     import app.models.user_settings as us
+    from unittest.mock import MagicMock
     us._override_cache_time = time.time()  # mark as fresh
 
-    with patch.object(us._OVERRIDE_FILE, 'read_text', return_value='{}'):
-        with patch.object(us._OVERRIDE_FILE, 'write_text'):
-            us.save_override({"x": "y"})
+    mock_path = MagicMock()
+    mock_path.read_text.return_value = '{}'
+    with patch.object(us, '_OVERRIDE_FILE', mock_path):
+        us.save_override({"x": "y"})
 
     assert us._override_cache_time == 0.0

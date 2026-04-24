@@ -158,7 +158,7 @@ describe("useDocuments", () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    mockUploadDocument.mockResolvedValue(uploadedDoc)
+    mockUploadDocument.mockResolvedValue({ doc: uploadedDoc, isDuplicate: false })
 
     const { result } = renderHook(() => useDocuments())
 

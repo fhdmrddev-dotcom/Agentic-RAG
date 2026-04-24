@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  Folder, BookOpen, Zap, Clock, Code2, Terminal,
+  Folder, BookOpen, Zap, Clock, Code2, Terminal, Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -35,6 +35,7 @@ function toolIcon(name: string) {
 
 function toolIconColor(name: string, status: string) {
   if (status === "running") return "text-primary"
+  if (status === "interrupted") return "text-amber-400"
   if (name === "web_search") return "text-amber-400"
   if (name === "query_documents") return "text-emerald-400"
   if (name === "search_documents") return "text-primary"
@@ -108,12 +109,12 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
 
 // ---- Result rendering helpers ----
 
-function countTreeNodes(nodes: any[]): number {
-  if (!Array.isArray(nodes)) return 0
+function countTreeNodes(nodes: any[], depth = 0): number {
+  if (!Array.isArray(nodes) || depth > 10) return 0
   let count = 0
   for (const node of nodes) {
     count++
-    if (Array.isArray(node.children)) count += countTreeNodes(node.children)
+    if (Array.isArray(node.children)) count += countTreeNodes(node.children, depth + 1)
     if (Array.isArray(node.documents)) count += node.documents.length
   }
   return count
@@ -483,21 +484,20 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
 // ---- Main panel ----
 
 export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
-  const allDone = toolCalls.every((tc) => tc.status === "done") &&
+  if (!toolCalls || toolCalls.length === 0) return null
+
+  const hasInterrupted = toolCalls.some((tc) => tc.status === "interrupted")
+  const allDone = toolCalls.every((tc) => tc.status === "done" || tc.status === "interrupted") &&
     (!subAgent || subAgent.status === "done")
 
-  // Always start expanded — never auto-collapse, even when all tools finish or the
-  // message is reloaded from DB. The user can manually collapse if they want.
-  const [expanded, setExpanded] = useState(true)
+const [expanded, setExpanded] = useState(true)
 
   const isExpanded = expanded
   const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
-
-  // Find the currently active tool for the header label
   const activeTool = toolCalls.find((tc) => tc.status === "running")
 
   const headerLabel = (() => {
-    if (allDone && !isPlanning) return `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
+    if (allDone && !isPlanning) return hasInterrupted ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}` : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
     if (isPlanning) return "Planning next action…"
     if (activeTool) {
       const summary = toolSummary(activeTool)
@@ -507,8 +507,6 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
     }
     return "Working…"
   })()
-
-  if (!toolCalls || toolCalls.length === 0) return null
 
   const isActivelyWorking = !allDone || isPlanning
 
@@ -524,8 +522,12 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
         onClick={() => setExpanded((v) => !v)}
       >
-        {!isActivelyWorking ? (
-          <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
+{!isActivelyWorking ? (
+          hasInterrupted ? (
+            <Square className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
+          )
         ) : (
           <div className="flex-shrink-0 animate-pulseGlow rounded-full">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
@@ -584,20 +586,22 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
                       </span>
                       {/* Duration badge */}
                       <TimeBadge tc={tc} />
-                      <span className="flex-shrink-0">
+<span className="flex-shrink-0">
                         {tc.status === "running" ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        ) : tc.status === "interrupted" ? (
+                          <Square className="w-3.5 h-3.5 text-amber-500" />
                         ) : (
                           <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
                         )}
                       </span>
                     </div>
 
-                    {/* Expandable parameters */}
-                    {tc.status === "done" && <ToolArgsBlock tc={tc} />}
+{/* Expandable parameters */}
+                    {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
 
                     {/* Result block (all tools) */}
-                    {tc.status === "done" && tc.result && !agentState && (
+                    {(tc.status === "done" || tc.status === "interrupted") && tc.result && !agentState && (
                       <ToolResultBlock tc={tc} />
                     )}
 

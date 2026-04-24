@@ -3,26 +3,37 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   MessageSquare, FileText, Activity, Zap, Settings,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
-  Moon, Sun, ChevronLeft, ChevronRight, Folder as FolderIcon,
+  Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
+  AlertCircle,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
-import type { Thread } from "@/types"
+import type { Folder, Thread } from "@/types"
 
 interface Props {
   // From AppDock
   activeView: ActiveView
   onNavigate: (view: ActiveView) => void
   onSignOut: () => void
-  // From Sidebar
   threads: Thread[]
   selectedThread: Thread | null
   onSelectThread: (thread: Thread) => void
-  onNewThread: () => void
+  onNewThread: (folderId?: string | null) => void
   loadThreads: () => Promise<void>
   onDeleteThread: (id: string) => Promise<void>
   onRenameThread: (id: string, title: string) => Promise<void>
+  folders: Folder[]
   theme: "light" | "dark"
   onToggleTheme: () => void
 }
@@ -46,6 +57,7 @@ export function NavPanel({
   loadThreads,
   onDeleteThread,
   onRenameThread,
+  folders,
   theme,
   onToggleTheme,
 }: Props) {
@@ -65,6 +77,9 @@ export function NavPanel({
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [showFolderPicker, setShowFolderPicker] = useState(false)
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -90,59 +105,7 @@ export function NavPanel({
     setEditingId(null)
   }
 
-  // Icon rail — shared between collapsed and expanded left sub-column
-  function renderIconRail(showTooltips: boolean) {
-    return (
-      <>
-        <div className="flex flex-col items-center gap-1 flex-1 pt-1">
-          {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
-            const isActive = activeView === view
-            return (
-              <Tooltip key={view}>
-                <TooltipTrigger asChild>
-                  <button
-                    className={cn(
-                      "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-                      !isActive && "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40",
-                    )}
-                    aria-label={label}
-                    aria-current={isActive ? "page" : undefined}
-                    onClick={() => onNavigate(view)}
-                  >
-                    {isActive ? (
-                      <div className="flex items-center justify-center w-10 h-10 rounded-xl gradient-primary shadow-sm shadow-primary/20">
-                        <Icon className="w-4 h-4 text-white" />
-                      </div>
-                    ) : (
-                      <Icon className="w-4 h-4" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                {showTooltips && <TooltipContent side="right">{label}</TooltipContent>}
-              </Tooltip>
-            )
-          })}
-        </div>
-
-        <div className="flex flex-col items-center pb-3">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                aria-label="Sign out"
-                onClick={onSignOut}
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </TooltipTrigger>
-            {showTooltips && <TooltipContent side="right">Sign out</TooltipContent>}
-          </Tooltip>
-        </div>
-      </>
-    )
-  }
-
-  // Thread list — shared in expanded right sub-column
+  // Thread list — displayed ONLY when activeView === "chat"
   function renderThreadList() {
     return (
       <div className="space-y-0.5 mt-2">
@@ -231,7 +194,7 @@ export function NavPanel({
                     Rename
                   </button>
                   <button
-                    onClick={async () => { setMenuOpenId(null); await onDeleteThread(thread.id) }}
+                    onClick={() => { setMenuOpenId(null); setDeleteConfirmId(thread.id) }}
                     className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-destructive/10 text-destructive transition-colors"
                     aria-label="Delete Thread"
                   >
@@ -250,101 +213,224 @@ export function NavPanel({
   return (
     <div
       className={cn(
-        "hidden md:flex flex-col h-full bg-sidebar border-r border-border/20 shrink-0 overflow-hidden transition-[width] duration-200 ease-in-out",
-        isCollapsed ? "w-14" : "w-64",
+        "hidden md:flex flex-col h-full bg-sidebar border-r border-border/20 shrink-0 transition-[width] duration-300 ease-in-out relative overflow-hidden",
+        isCollapsed ? "w-16" : "w-64"
       )}
     >
-      {isCollapsed ? (
-        /* Collapsed: icon rail only */
-        <div className="flex flex-col h-full w-14 items-center">
-          {/* Logo icon */}
-          <div className="flex items-center justify-center py-4">
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl gradient-primary shadow-sm shadow-primary/20">
-              <Sparkles className="w-4.5 h-4.5 text-white" />
+      {/* 
+        Unified Inner Wrapper: Always 64 (256px) wide. 
+        When the parent shrinks to w-16 (64px), it simply masks over the content gracefully. 
+        No layout recalculation or DOM swapping occurs, eliminating layout jumps entirely.
+      */}
+      <div className="flex flex-col h-full w-64 min-w-[16rem]">
+        
+        {/* Toggle Button - Absolute positions cleanly animate over the full width */}
+        <button
+          onClick={handleToggle}
+          className={cn(
+            "absolute top-4 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-all duration-300 z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+            isCollapsed ? "left-[16px]" : "left-[212px]"
+          )}
+          aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
+        >
+          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+        </button>
+
+        {/* Header Row: Logo */}
+        <div className="flex items-center h-16 px-4 mb-2 shrink-0">
+          <div className={cn(
+            "flex items-center gap-2 transition-opacity duration-200", 
+            isCollapsed ? "opacity-0" : "opacity-100 delay-100"
+          )}>
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
+              <Sparkles className="w-4 h-4 text-white" />
             </div>
+            <span className="font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground">
+              Agentic RAG
+            </span>
           </div>
-
-          {/* Toggle button */}
-          <button
-            onClick={handleToggle}
-            className="flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-            aria-label="Expand navigation"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          {/* Nav icons + sign out */}
-          {renderIconRail(true)}
         </div>
-      ) : (
-        /* Expanded: icon sub-column + thread list sub-column */
-        <div className="flex h-full">
-          {/* Left: w-14 icon rail */}
-          <div className="flex flex-col w-14 items-center border-r border-border/10 shrink-0 pt-3">
-            {renderIconRail(false)}
-          </div>
 
-          {/* Right: flex-1 thread list */}
-          <div className="flex flex-col flex-1 overflow-hidden">
-            {/* Logo block */}
-            <div className="flex items-center gap-2.5 px-4 py-4">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl gradient-primary shadow-sm shadow-primary/20">
-                <Sparkles className="w-4.5 h-4.5 text-white" />
-              </div>
-              <div className="flex flex-col leading-none">
-                <span className="font-headline font-semibold text-sm tracking-tight text-sidebar-foreground">Agentic RAG</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Powered by AI</span>
-              </div>
-            </div>
-
-            {/* Toggle button */}
-            <div className="px-2 pb-1">
+        {/* Primary Nav Items */}
+        {/* padding px-3 (12px), button px-2.5 (10px). Icon is centered at 32px perfectly fitting the 64px collapsed parent. */}
+        <div className="px-3 pb-2 space-y-1">
+          {NAV_ITEMS.map(({ view, icon: Icon, label }) => {
+            const isActive = activeView === view
+            const buttonContent = (
               <button
-                onClick={handleToggle}
-                className="flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-                aria-label="Collapse navigation"
+                onClick={() => onNavigate(view)}
+                className={cn(
+                  "flex items-center gap-3 w-full h-10 px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 relative",
+                    isActive 
+                    ? "bg-primary/15 text-primary font-medium" 
+                    : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
+                )}
               >
-                <ChevronLeft className="w-4 h-4" />
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className={cn(
+                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  isCollapsed ? "opacity-0" : "opacity-100"
+                )}>
+                  {label}
+                </span>
               </button>
-            </div>
+            )
 
-            {/* Chat section */}
-            <div className="flex-1 px-2 overflow-y-auto overflow-x-hidden pt-1">
-              <div>
-                <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                  Chat
-                </p>
-                <div className="px-1 mb-2">
-                  <Button
-                    onClick={() => onNewThread()}
-                    className="w-full justify-center gap-2 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
-                    size="sm"
-                  >
-                    <Plus className="h-4 w-4" />
-                    New Chat
-                  </Button>
+            return isCollapsed ? (
+              <Tooltip key={view} delayDuration={0}>
+                <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
+                <TooltipContent side="right" className="ml-2">{label}</TooltipContent>
+              </Tooltip>
+            ) : (
+              <div key={view}>{buttonContent}</div>
+            )
+          })}
+        </div>
+
+        {/* Dynamic Content Area (Threads) */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2 scrollbar-thin">
+          <div className={cn(
+            "transition-opacity duration-200 w-[232px]", 
+            isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 delay-100"
+          )}>
+            {activeView === "chat" && (
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between pb-2 px-1 border-b border-border/10 mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                    Chats
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        onNewThread(selectedFolderId)
+                        setShowFolderPicker(false)
+                      }}
+                      className="flex p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-md transition-colors items-center justify-center"
+                      title="New Chat"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    {folders.length > 0 && (
+                      <button
+                        onClick={() => setShowFolderPicker((prev) => !prev)}
+                        className={cn(
+                          "flex p-1 rounded-md transition-colors items-center justify-center",
+                          showFolderPicker
+                            ? "bg-accent text-primary"
+                            : "hover:bg-accent/40 text-muted-foreground hover:text-sidebar-foreground"
+                        )}
+                        title="Choose folder"
+                      >
+                        <FolderIcon className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-
-                {/* Thread list */}
+                {showFolderPicker && folders.length > 0 && (
+                  <div className="mb-2 px-1">
+                    <select
+                      value={selectedFolderId ?? ""}
+                      onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                      className="w-full text-xs rounded-lg px-2 py-1.5 bg-card text-foreground ghost-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                    >
+                      <option value="">All documents</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Scope this chat to a folder
+                    </p>
+                  </div>
+                )}
                 {renderThreadList()}
               </div>
-            </div>
-
-            {/* Footer — theme toggle */}
-            <div className="border-t border-border/10 px-2 py-2">
-              <Button
-                onClick={onToggleTheme}
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start gap-2 text-muted-foreground hover:text-sidebar-foreground transition-all py-2"
-              >
-                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {theme === "dark" ? "Light Mode" : "Dark Mode"}
-              </Button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null) }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+                <AlertDialogTitle>Delete thread?</AlertDialogTitle>
+              </div>
+              <AlertDialogDescription>
+                This will permanently delete this thread and all its messages. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (deleteConfirmId) {
+                    await onDeleteThread(deleteConfirmId)
+                    setDeleteConfirmId(null)
+                  }
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Footer Area */}
+        <div className="p-3 mt-auto space-y-1">
+          {(() => {
+            const themeButtonContent = (
+              <button
+                onClick={onToggleTheme}
+                className="flex items-center gap-3 w-full h-10 px-2.5 text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors rounded-lg focus-visible:outline-none"
+              >
+                {theme === "dark" ? <Sun className="w-5 h-5 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
+                <span className={cn(
+                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  isCollapsed ? "opacity-0" : "opacity-100"
+                )}>
+                  {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                </span>
+              </button>
+            )
+
+            const signOutButtonContent = (
+              <button
+                onClick={onSignOut}
+                className="flex items-center gap-3 w-full h-10 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg focus-visible:outline-none"
+              >
+                <LogOut className="w-5 h-5 shrink-0" />
+                <span className={cn(
+                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  isCollapsed ? "opacity-0" : "opacity-100"
+                )}>
+                  Sign out
+                </span>
+              </button>
+            )
+
+            return (
+              <>
+                {isCollapsed ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>{themeButtonContent}</TooltipTrigger>
+                    <TooltipContent side="right" className="ml-2">Toggle Theme</TooltipContent>
+                  </Tooltip>
+                ) : themeButtonContent}
+                
+                {isCollapsed ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>{signOutButtonContent}</TooltipTrigger>
+                    <TooltipContent side="right" className="ml-2">Sign out</TooltipContent>
+                  </Tooltip>
+                ) : signOutButtonContent}
+              </>
+            )
+          })()}
+        </div>
+      </div>
     </div>
   )
 }
+

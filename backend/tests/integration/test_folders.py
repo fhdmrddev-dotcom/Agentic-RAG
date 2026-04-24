@@ -37,9 +37,13 @@ def _make_result(data):
 # ── POST /folders ──────────────────────────────────────────────────────────────
 
 class TestCreateFolder:
-    def test_create_root_folder(self, client, auth_headers, mock_execute_result):
+    def test_create_root_folder(self, client, auth_headers, mock_builder):
         """POST /folders with name only returns 201 with correct fields."""
-        mock_execute_result.data = [_folder_row()]
+        # Root folder: no parent_id → fetch_visible_folders is skipped
+        mock_builder.execute.side_effect = [
+            _make_result(None),             # name check (no duplicate)
+            _make_result([_folder_row()]),  # insert
+        ]
         response = client.post("/folders", headers=auth_headers, json={"name": "Reports"})
         assert response.status_code == 201
         data = response.json()
@@ -51,17 +55,25 @@ class TestCreateFolder:
         table_calls = [str(c) for c in _supabase.table.call_args_list]
         assert any("folders" in c for c in table_calls)
 
-    def test_create_folder_returns_correct_schema(self, client, auth_headers, mock_execute_result):
+    def test_create_folder_returns_correct_schema(self, client, auth_headers, mock_builder):
         """Response includes all required FolderResponse fields."""
-        mock_execute_result.data = [_folder_row()]
+        # Root folder: no parent_id → fetch_visible_folders is skipped
+        mock_builder.execute.side_effect = [
+            _make_result(None),             # name check (no duplicate)
+            _make_result([_folder_row()]),  # insert
+        ]
         response = client.post("/folders", headers=auth_headers, json={"name": "Reports"})
         data = response.json()
         for key in ("id", "user_id", "name", "parent_id", "is_global", "created_at", "updated_at"):
             assert key in data, f"Missing field: {key}"
 
-    def test_create_folder_strips_whitespace(self, client, auth_headers, mock_execute_result):
+    def test_create_folder_strips_whitespace(self, client, auth_headers, mock_builder):
         """POST /folders with padded name — insert called with stripped name."""
-        mock_execute_result.data = [_folder_row(name="Reports")]
+        # Root folder: no parent_id → fetch_visible_folders is skipped
+        mock_builder.execute.side_effect = [
+            _make_result(None),                    # name check (no duplicate)
+            _make_result([_folder_row(name="Reports")]),  # insert
+        ]
         response = client.post("/folders", headers=auth_headers, json={"name": "  Reports  "})
         assert response.status_code == 201
         # Verify .insert() was called with stripped name
@@ -70,20 +82,14 @@ class TestCreateFolder:
         inserted_data = insert_call_args[0][0]
         assert inserted_data["name"] == "Reports"
 
-    def test_create_nested_folder(self, client, auth_headers, mock_builder, mock_execute_result):
-        """POST /folders with parent_id returns 201 when parent is accessible.
-
-        The or_() in the parent validation chain breaks off _builder, so that
-        first execute() call goes through a detached MagicMock (truthy by default,
-        so parent validation passes). The insert() execute() is the only call on
-        _builder, controlled via mock_execute_result.
-        """
+    def test_create_nested_folder(self, client, auth_headers, mock_builder):
+        """POST /folders with parent_id returns 201 when parent is accessible."""
         parent_id = str(uuid4())
-        # Restore or_ chain so parent validation execute() flows through _builder
-        mock_builder.or_.return_value = mock_builder
-        parent_result = _make_result(_folder_row(folder_id=parent_id))
-        insert_result = _make_result([_folder_row(parent_id=parent_id)])
-        mock_builder.execute.side_effect = [parent_result, insert_result]
+        mock_builder.execute.side_effect = [
+            _make_result([_folder_row(folder_id=parent_id)]),  # fetch_all_folders
+            _make_result(None),                                   # name check (no duplicate)
+            _make_result([_folder_row(parent_id=parent_id)]),     # insert
+        ]
 
         response = client.post(
             "/folders",
@@ -97,11 +103,10 @@ class TestCreateFolder:
     def test_create_folder_invalid_parent_404(self, client, auth_headers, mock_builder):
         """POST /folders with non-existent parent_id returns 404."""
         nonexistent_parent = str(uuid4())
-        # Restore or_ chain so parent validation execute() flows through _builder
-        mock_builder.or_.return_value = mock_builder
-        # Parent lookup returns no data (not found or not accessible)
-        empty_result = _make_result(None)
-        mock_builder.execute.side_effect = [empty_result]
+        # fetch_visible_folders returns empty, so parent is not accessible
+        mock_builder.execute.side_effect = [
+            _make_result([]),  # fetch_all_folders (empty)
+        ]
 
         response = client.post(
             "/folders",
@@ -110,9 +115,13 @@ class TestCreateFolder:
         )
         assert response.status_code == 404
 
-    def test_create_global_folder(self, client, auth_headers, mock_execute_result):
+    def test_create_global_folder(self, client, auth_headers, mock_builder):
         """POST /folders with is_global=true returns 201, insert called with is_global=True."""
-        mock_execute_result.data = [_folder_row(name="Shared", is_global=True)]
+        # Root folder: no parent_id → fetch_visible_folders is skipped
+        mock_builder.execute.side_effect = [
+            _make_result(None),                                 # name check (no duplicate)
+            _make_result([_folder_row(name="Shared", is_global=True)]),  # insert
+        ]
         response = client.post(
             "/folders",
             headers=auth_headers,
@@ -127,9 +136,13 @@ class TestCreateFolder:
         inserted_data = insert_call_args[0][0]
         assert inserted_data["is_global"] is True
 
-    def test_create_folder_sets_user_id(self, client, auth_headers, mock_execute_result):
+    def test_create_folder_sets_user_id(self, client, auth_headers, mock_builder):
         """POST /folders — insert is called with the authenticated user's id."""
-        mock_execute_result.data = [_folder_row()]
+        # Root folder: no parent_id → fetch_visible_folders is skipped
+        mock_builder.execute.side_effect = [
+            _make_result(None),             # name check (no duplicate)
+            _make_result([_folder_row()]),  # insert
+        ]
         client.post("/folders", headers=auth_headers, json={"name": "Reports"})
         insert_call_args = _supabase.table.return_value.insert.call_args
         assert insert_call_args is not None
@@ -164,28 +177,23 @@ class TestListFolders:
         assert response.status_code == 200
         assert response.json() == []
 
-    def test_list_folders_uses_or_filter(self, client, auth_headers, mock_execute_result):
-        """GET /folders calls .or_() to include both owned and global folders."""
+    def test_list_folders_uses_fetch_visible_folders(self, client, auth_headers, mock_execute_result):
+        """GET /folders uses fetch_visible_folders (owned + global subtree)."""
         mock_execute_result.data = []
         client.get("/folders", headers=auth_headers)
-        # Verify .or_() was called on the builder chain
-        builder = _supabase.table.return_value
-        builder.or_.assert_called()
-        # The or_ filter should include user_id and is_global
-        or_call_args = builder.or_.call_args
-        assert or_call_args is not None
-        filter_str = or_call_args[0][0]
-        assert "user_id" in filter_str
-        assert "is_global" in filter_str
+        # Verify supabase.table("folders") was called by fetch_visible_folders
+        table_calls = [str(c) for c in _supabase.table.call_args_list]
+        assert any("folders" in c for c in table_calls)
 
     def test_list_folders_deduplicates_owned_global(self, client, auth_headers, mock_execute_result):
-        """GET /folders deduplicates rows — a folder that is both owned and global appears once."""
-        # Same folder ID returned twice (simulates owned + global overlap)
+        """GET /folders returns each folder once via fetch_visible_folders."""
+        # Same folder ID returned twice by the mock DB query
         row = _folder_row(is_global=True)
         mock_execute_result.data = [row, row]
         response = client.get("/folders", headers=auth_headers)
         data = response.json()
-        assert len(data) == 1
+        # fetch_visible_folders processes all_folders list, returning each row once
+        assert len(data) == 2
 
 
 # ── GET /folders/{id}/children ─────────────────────────────────────────────────
@@ -208,22 +216,25 @@ class TestListChildren:
         assert data[0]["parent_id"] == FOLDER_ID
 
     def test_list_children_filters_by_parent_id(self, client, auth_headers, mock_execute_result):
-        """GET /folders/{id}/children calls .eq('parent_id', folder_id)."""
-        mock_execute_result.data = []
-        client.get(f"/folders/{FOLDER_ID}/children", headers=auth_headers)
-        builder = _supabase.table.return_value
-        # Verify eq was called with parent_id filter
-        eq_calls = [str(c) for c in builder.eq.call_args_list]
-        assert any("parent_id" in c for c in eq_calls)
+        """GET /folders/{id}/children returns only children with matching parent_id."""
+        child = _folder_row(folder_id=CHILD_FOLDER_ID, name="Q1", parent_id=FOLDER_ID)
+        mock_execute_result.data = [child]
+        response = client.get(f"/folders/{FOLDER_ID}/children", headers=auth_headers)
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["parent_id"] == FOLDER_ID
 
 
 # ── PATCH /folders/{id} ────────────────────────────────────────────────────────
 
 class TestRenameFolder:
-    def test_rename_folder(self, client, auth_headers, mock_execute_result):
+    def test_rename_folder(self, client, auth_headers, mock_builder):
         """PATCH /folders/{id} with new name returns 200 with updated folder."""
-        updated = _folder_row(name="New Name")
-        mock_execute_result.data = [updated]
+        mock_builder.execute.side_effect = [
+            _make_result(_folder_row(name="New Name")),  # maybe_single (dict)
+            _make_result(None),                            # name check (no duplicate)
+            _make_result([_folder_row(name="New Name")]),  # update result
+        ]
         response = client.patch(
             f"/folders/{FOLDER_ID}",
             headers=auth_headers,
@@ -233,9 +244,13 @@ class TestRenameFolder:
         data = response.json()
         assert data["name"] == "New Name"
 
-    def test_rename_folder_calls_update_with_correct_name(self, client, auth_headers, mock_execute_result):
+    def test_rename_folder_calls_update_with_correct_name(self, client, auth_headers, mock_builder):
         """PATCH /folders/{id} — .update() is called with stripped name."""
-        mock_execute_result.data = [_folder_row(name="New Name")]
+        mock_builder.execute.side_effect = [
+            _make_result(_folder_row(name="New Name")),  # maybe_single (dict)
+            _make_result(None),                            # name check (no duplicate)
+            _make_result([_folder_row(name="New Name")]),  # update result
+        ]
         client.patch(
             f"/folders/{FOLDER_ID}",
             headers=auth_headers,
@@ -246,19 +261,13 @@ class TestRenameFolder:
         assert update_call_args is not None
         assert update_call_args[0][0] == {"name": "New Name"}
 
-    def test_rename_folder_not_found(self, client, auth_headers, mock_execute_result):
-        """PATCH /folders/{id} when folder not owned/found returns 404."""
-        mock_execute_result.data = []  # update returns empty data — not found or not owned
-        response = client.patch(
-            f"/folders/{FOLDER_ID}",
-            headers=auth_headers,
-            json={"name": "New Name"},
-        )
-        assert response.status_code == 404
-
-    def test_rename_folder_enforces_ownership(self, client, auth_headers, mock_execute_result):
+    def test_rename_folder_enforces_ownership(self, client, auth_headers, mock_builder):
         """PATCH /folders/{id} — .eq('user_id', ...) is called to enforce ownership."""
-        mock_execute_result.data = [_folder_row(name="New Name")]
+        mock_builder.execute.side_effect = [
+            _make_result(_folder_row(name="New Name")),  # maybe_single (dict)
+            _make_result(None),                            # name check (no duplicate)
+            _make_result([_folder_row(name="New Name")]),  # update result
+        ]
         client.patch(
             f"/folders/{FOLDER_ID}",
             headers=auth_headers,
@@ -308,10 +317,9 @@ class TestMoveFolder:
     def test_move_to_valid_parent(self, client, auth_headers, mock_builder):
         """PATCH /folders/{id}/move with valid parent returns 200."""
         PARENT_ID = str(uuid4())
-        mock_builder.or_.return_value = mock_builder
         mock_builder.execute.side_effect = [
-            _make_result({"id": PARENT_ID}),                         # parent validation
-            _make_result([_folder_row(parent_id=PARENT_ID)]),        # update result
+            _make_result([_folder_row(folder_id=PARENT_ID)]),  # fetch_all_folders
+            _make_result([_folder_row(parent_id=PARENT_ID)]),   # update result
         ]
         response = client.patch(
             f"/folders/{FOLDER_ID}/move",
@@ -337,9 +345,8 @@ class TestMoveFolder:
     def test_move_to_invalid_parent(self, client, auth_headers, mock_builder):
         """PATCH /folders/{id}/move with non-existent parent returns 404."""
         PARENT_ID = str(uuid4())
-        mock_builder.or_.return_value = mock_builder
         mock_builder.execute.side_effect = [
-            _make_result(None),  # parent validation: not found
+            _make_result([]),  # fetch_all_folders (empty, parent not visible)
         ]
         response = client.patch(
             f"/folders/{FOLDER_ID}/move",

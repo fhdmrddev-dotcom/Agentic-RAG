@@ -585,6 +585,8 @@ _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     "gpt-4.1":                               32768,  # supports 32k
     "gpt-4.1-mini":                          32768,  # supports 32k
     "gpt-4.1-nano":                          16384,  # nano — keep conservative
+    "gpt-5":                                 32768,  # conservative ceiling
+    "gpt-5.4-mini":                          32768,  # conservative ceiling
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-haiku-4-5-20251001":              8192,  # hard ceiling 8k
     "claude-sonnet-4-6":                     32768,  # supports 64k; 32k practical
@@ -593,6 +595,7 @@ _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     "gemini-2.5-pro":                        32768,  # supports 65k; 32k practical
     "gemini-2.5-flash":                      32768,  # supports 65k; 32k practical
     "gemini-2.5-flash-lite":                 16384,  # lite — keep conservative
+    "gemini-3-flash-preview":                32768,  # preview — conservative ceiling
     # ── OpenRouter ──────────────────────────────────────────────────────────
     "meta-llama/llama-3.3-70b-instruct":     16384,  # standard
     "deepseek/deepseek-r1":                  16384,  # standard via OpenRouter

@@ -83,12 +83,12 @@ class TestExplorerSystemPrompt:
         assert "Knowledge Base Explorer" in EXPLORER_SYSTEM_PROMPT
 
     def test_explorer_system_prompt_contains_synthesis_instruction(self):
-        """EXPLORER_SYSTEM_PROMPT instructs coherent synthesized answer (AGENT-03)."""
-        assert "coherent synthesized answer" in EXPLORER_SYSTEM_PROMPT
+        """EXPLORER_SYSTEM_PROMPT instructs coherent prose answer (AGENT-03)."""
+        assert "coherent prose answer" in EXPLORER_SYSTEM_PROMPT
 
     def test_explorer_system_prompt_contains_empty_result_instruction(self):
-        """EXPLORER_SYSTEM_PROMPT handles empty-result case (AGENT-03)."""
-        assert "no relevant documents" in EXPLORER_SYSTEM_PROMPT
+        """EXPLORER_SYSTEM_PROMPT handles empty-result case via fallback to analyze_document (AGENT-03)."""
+        assert "analyze_document" in EXPLORER_SYSTEM_PROMPT
 
     def test_explorer_system_prompt_contains_filename_instruction(self):
         """EXPLORER_SYSTEM_PROMPT instructs using filename for analyze_document (Pitfall 1)."""
@@ -168,11 +168,12 @@ def _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="explorer"
     1. thread select (single) — thread lookup
     2. messages insert (user msg) — returns nothing meaningful
     3. threads select folder_id (single) — thread folder scope query (inside event_stream)
-    4. skills catalog select — only for general/default mode (agent_mode != 'explorer')
-    5. messages select (history) — returns message list
-    6. messages insert (assistant msg) — returns nothing meaningful
-    7. threads update (touch updated_at) — returns nothing meaningful
-    8. threads update (set title) — fires when history had exactly 1 user msg
+    4. messages select (history) — returns message list
+    5. skills catalog select — only for general/default mode (agent_mode != 'explorer')
+    6. user_memory select — memory/recall query (inside event_stream); skipped for explorer
+    7. messages insert (assistant msg) — returns nothing meaningful
+    8. threads update (touch updated_at) — returns nothing meaningful
+    9. threads update (set title) — fires when history had exactly 1 user msg
        (generate_thread_title is also patched to avoid real LLM call)
     """
     thread_result = MagicMock()
@@ -198,23 +199,34 @@ def _setup_thread_mocks(mock_builder, mock_execute_result, agent_mode="explorer"
     touch_result = MagicMock()
     touch_result.data = [{}]
 
-    side_effects = [
-        thread_result,
-        insert_result,
-        thread_folder_result,
-        history_result,
-    ]
-
-    # Skills catalog query fires for general/default mode only (after history in event_stream)
-    if agent_mode != "explorer":
+    if agent_mode == "explorer":
+        # Explorer mode: no skills catalog, no user_memory
+        side_effects = [
+            thread_result,
+            insert_result,
+            thread_folder_result,
+            history_result,
+            assistant_insert_result,
+            touch_result,
+        ]
+    else:
+        # Default mode: history, then skills catalog, then user_memory
         skills_result = MagicMock()
         skills_result.data = []  # No enabled skills — catalog not appended
-        side_effects.append(skills_result)
 
-    side_effects.extend([
-        assistant_insert_result,
-        touch_result,
-    ])
+        memory_result = MagicMock()
+        memory_result.data = []  # Empty memory so no memory note appended
+
+        side_effects = [
+            thread_result,
+            insert_result,
+            thread_folder_result,
+            history_result,
+            skills_result,
+            memory_result,
+            assistant_insert_result,
+            touch_result,
+        ]
 
     mock_builder.execute.side_effect = side_effects
 
