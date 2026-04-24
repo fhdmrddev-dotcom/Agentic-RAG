@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: in_progress
-stopped_at: Phase 45 complete — both plans done
-last_updated: "2026-04-23T10:17:03.000Z"
-last_activity: 2026-04-23
+stopped_at: Phase 051 complete — all 7 plans done, UAT approved
+last_updated: "2026-04-24T05:30:00.000Z"
+last_activity: 2026-04-24
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 25
+  completed_phases: 3
+  total_plans: 11
+  completed_plans: 11
+  percent: 37
 ---
 
 # Project State
@@ -25,25 +25,34 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 
 ## Current Position
 
-Phase: 45 of 51 (Chat UX Fixes)
-Plan: 2/2 complete
-Status: Phase 45 complete — both plans done
-Last activity: 2026-04-23 — Plan 45-02 executed
+Phase: 051 of 51 (Context Window Management) — COMPLETE
+Plan: 7/7 complete
+Status: Phase 051 complete — all plans done, UAT approved 2026-04-24
+Last activity: 2026-04-24 — Plans 06 and 07 executed (gap closure), UAT approved
 
-Progress: [███░░░░░░░] 25%
+Progress: [████░░░░░░] 37%
 
-## Phase 45 Plan Summary
+Next: Phase 46 (Smart Skill Dispatch)
 
-1. **Plan 45-01: Chat Delete Confirmation & Ghost Content Fix** — AlertDialog component, confirmation flow in NavPanel, clearMessages to prevent ghost content. ✅ COMPLETE
-2. **Plan 45-02: Folder Selector on New Chat** — NavPanel folder picker dropdown next to New Chat, mobile drawer folder selector, ChatLayout passes folders prop. ✅ COMPLETE
+## Phase 051 Plan Summary
 
-## Phase 45 Verified Results
+1. **Plan 051-01: Test stubs** — Failing tests for all CTX requirements. ✅ COMPLETE
+2. **Plan 051-02: Sub-agent keyword routing** — CTX-01/CTX-02 task escalation. ✅ COMPLETE
+3. **Plan 051-03: tiktoken upgrade** — OpenAI token estimation (CTX-05). ✅ COMPLETE
+4. **Plan 051-04: Settings stack** — sub_agent_max_output_tokens 6-layer threading (CTX-03). ✅ COMPLETE
+5. **Plan 051-05: Model info cards** — Inline model subtitles in chat selector (CTX-04). ✅ COMPLETE
+6. **Plan 051-06: Gap closure — sub_agent_model settings** — Full 6-layer override stack (CTX-03). ✅ COMPLETE
+7. **Plan 051-07: Gap closure — cost tier** — costTier field in ModelInfo + tooltip render (CTX-04). ✅ COMPLETE
+
+## Phase 051 Verified Results
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| CHAT-01 | ✅ | AlertDialog requires explicit Delete click before thread deletion |
-| CHAT-02 | ✅ | clearMessages runs synchronously on thread change, no ghost content |
-| CHAT-03 | ✅ | NavPanel + mobile drawer folder selectors scope thread creation to folder |
+| CTX-01 | ✅ | PPTX/report/generation tasks escalate to orchestrator model with 32k ceiling |
+| CTX-02 | ✅ | Analysis tasks use cheapest sub-agent model per provider |
+| CTX-03 | ✅ | Settings: context depth slider, sub-agent output slider, sub-agent model dropdown |
+| CTX-04 | ✅ | Model selector shows inline subtitles: context, output, cost tier, best-for |
+| CTX-05 | ✅ | tiktoken for OpenAI models, chars/4 fallback for all others |
 
 ## Performance Metrics
 

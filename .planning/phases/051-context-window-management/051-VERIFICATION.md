@@ -1,159 +1,159 @@
 ---
 phase: 051-context-window-management
-verified: 2026-04-23T00:00:00Z
-status: gaps_found
-score: 3/5 must-haves verified
+verified: 2026-04-24T00:00:00Z
+status: passed
+score: 5/5 must-haves verified
 overrides_applied: 0
-gaps:
-  - truth: "Settings page exposes sliders for context history depth and sub-agent output token ceiling, AND a dropdown for sub-agent model override"
-    status: partial
-    reason: "Two sliders (context depth, sub-agent output tokens) are implemented and wired. The sub-agent model override dropdown is entirely absent from SettingsPage.tsx. Both REQUIREMENTS.md CTX-03 and ROADMAP SC #3 explicitly require it. Plan 04 noted it was out of scope for that plan ('not required by CTX-03') but the roadmap contract requires it."
-    artifacts:
-      - path: "frontend/src/pages/SettingsPage.tsx"
-        issue: "Context & Sub-Agent SectionCard has 2 SliderInput rows only — no sub-agent model override dropdown control"
-      - path: "backend/app/api/settings.py"
-        issue: "sub_agent_model field is not present in SettingsUpdate or FullSettingsResponse — the config field exists in config.py but is not surfaced through the settings API"
-      - path: "frontend/src/lib/api.ts"
-        issue: "sub_agent_model is absent from FullAppSettings and SettingsUpdate interfaces"
-    missing:
-      - "Dropdown (or select) control in Context & Sub-Agent SectionCard for sub_agent_model override"
-      - "sub_agent_model field in FullSettingsResponse and SettingsUpdate in backend/app/api/settings.py"
-      - "sub_agent_model field in FullAppSettings and SettingsUpdate in frontend/src/lib/api.ts"
-      - "sub_agent_model in UserEffectiveSettings and load_app_settings() in backend/app/models/user_settings.py"
-
-  - truth: "Each model in the model selector shows an inline info card with context window, output limit, cost tier, and best-for label"
-    status: partial
-    reason: "MODEL_INFO entries show context window, max output tokens, and best-for label. The 'cost tier' field is absent from ModelInfo interface and all 11 model entries. REQUIREMENTS.md CTX-04 and ROADMAP SC #4 both list cost tier as a required data point in the info card. The tooltip in MessageInput renders only 3 data points."
-    artifacts:
-      - path: "frontend/src/lib/model-info.ts"
-        issue: "ModelInfo interface has contextWindow, maxOutputTokens, bestFor — no costTier field. All 11 entries lack cost tier data."
-      - path: "frontend/src/components/chat/MessageInput.tsx"
-        issue: "TooltipContent renders Context, Max output, Best for — no cost tier line"
-    missing:
-      - "costTier field in ModelInfo interface (e.g. 'low' | 'mid' | 'high' or a string label)"
-      - "costTier value for each of the 11 model entries in MODEL_INFO"
-      - "Cost tier row in the TooltipContent in MessageInput.tsx"
+re_verification:
+  previous_status: gaps_found
+  previous_score: 3/5
+  gaps_closed:
+    - "Settings page sub-agent model override dropdown (CTX-03) — implemented via plan 06"
+    - "Model info cost tier display (CTX-04) — implemented via plan 07"
+  gaps_remaining: []
+  regressions: []
+human_verification:
+  - test: "Open chat → open model selector dropdown → confirm each known model shows two subtitle lines (context/output/bestFor + cost tier) as inline text beneath the model name"
+    expected: "All 11 known models show inline subtitle rows; unknown/OpenRouter models show no subtitle; cost tier displays Low ($) / Mid ($$) / High ($$$)"
+    why_human: "Inline subtitle rendering requires visual inspection — vitest tests confirm TypeScript structure but do not exercise DOM render inside DropdownMenuContent"
+  - test: "Open Settings → AI Model tab → scroll to 'Context & Sub-Agent' section → verify two sliders and a sub-agent model dropdown render and save correctly"
+    expected: "Sliders move and display correct values; context depth slider shows 'Using model default' hint at 0; sub-agent model dropdown lists active-provider models plus 'Auto (cheapest)'; Save AI Model button persists all three values across page reload"
+    why_human: "Slider visual styling, hint text updates, and save-then-reload round-trip require browser verification"
+  - test: "Send a chat message requesting 'Create a PPTX presentation of the uploaded document' while a document is loaded — observe backend logs or LangSmith trace"
+    expected: "effective_model = user's orchestrator model (not haiku/nano), output_ceiling = 32768"
+    why_human: "Requires live sub-agent execution with a real LLM call; unit tests verify routing logic only"
 ---
 
 # Phase 051: Context Window Management Verification Report
 
 **Phase Goal:** Context limits are handled intelligently across all providers — sub-agents route complex generation tasks (PPTX, reports) to capable models, output token ceilings are configurable per task type, and admins can tune context behaviour from the Settings UI with inline per-model documentation
-**Verified:** 2026-04-23
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+
+**Verified:** 2026-04-24
+**Status:** human_needed
+**Re-verification:** Yes — after gap closure (Plans 06 and 07 closed the two gaps from the previous 3/5 report)
 
 ## Goal Achievement
 
-### Observable Truths
+### Observable Truths (from ROADMAP Success Criteria)
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Sub-agent escalates generation tasks (pptx/report/pdf/spreadsheet/excel/csv export) to orchestrator model with 32768 output ceiling | VERIFIED | `_GENERATION_KEYWORDS` frozenset (9 keywords) at line 24 of `sub_agent_service.py`; `_is_generation_task()` at line 31; `max(32768, settings.sub_agent_max_output_tokens)` at line 91 |
-| 2 | Analysis tasks (summarise/extract/list/compare) continue to use cheap sub-agent model via `_SUB_AGENT_MODEL_DEFAULTS` | VERIFIED | else-branch at lines 79-87 of `sub_agent_service.py` preserves `_SUB_AGENT_MODEL_DEFAULTS` lookup; analysis ceiling uses `settings.sub_agent_max_output_tokens` |
-| 3 | Settings page exposes context depth slider, sub-agent output token slider, AND sub-agent model override dropdown | PARTIAL FAIL | Two sliders are present and wired (see SettingsPage.tsx lines 758-783). Dropdown for `sub_agent_model` override is absent from all layers (SettingsPage.tsx, api.ts, settings.py, user_settings.py) |
-| 4 | Each model in the selector shows an info card with context window, output limit, cost tier, and best-for label | PARTIAL FAIL | MODEL_INFO has 11 entries with contextWindow/maxOutputTokens/bestFor. `costTier` field is not present in ModelInfo interface or any entry; tooltip renders only 3 data points |
-| 5 | Token estimation for OpenAI models uses tiktoken (cl100k_base); other providers use char heuristic | VERIFIED | `_TIKTOKEN_AVAILABLE`, `_get_cl100k()`, and `model.startswith("gpt-")` branch present in `context_window.py` lines 15-110; `tiktoken>=0.12.0` in requirements.txt |
+| 1 | PPTX/generation tasks use capable model with 32k output ceiling | VERIFIED | `_GENERATION_KEYWORDS` frozenset + `_is_generation_task()` in `sub_agent_service.py`; `output_ceiling = max(32768, settings.sub_agent_max_output_tokens)` on generation branch (line 97); zero hardcoded `8192` in that file |
+| 2 | Analysis tasks continue to use cheap sub-agent model | VERIFIED | `else` branch uses `_SUB_AGENT_MODEL_DEFAULTS` (haiku/nano/flash); ceiling = `settings.sub_agent_max_output_tokens` |
+| 3 | Settings page exposes sliders for context depth + sub-agent output AND a dropdown for sub-agent model override | VERIFIED | `SliderInput` component (line 64); state at lines 520-522; hydrate at 553-555; save at 578-580; "Context & Sub-Agent" SectionCard at line 765 with 2 SliderInputs + `<select>` dropdown with "Auto (cheapest)" option |
+| 4 | Each model in model selector shows inline info card (context, output, cost tier, best-for) | VERIFIED | `MODEL_INFO` in `model-info.ts` with 11 entries all having `contextWindow`, `maxOutputTokens`, `costTier`, `bestFor`; `MessageInput.tsx` renders two subtitle spans for known models (inline subtitle approach, not tooltip — intentional deviation documented in plan 07 SUMMARY) |
+| 5 | Token counting uses tiktoken for OpenAI, chars/4 fallback for all others | VERIFIED | `_TIKTOKEN_AVAILABLE` flag + `_get_cl100k()` cached encoder in `context_window.py`; `estimate_tokens(text, model)` routes gpt-*/o1/o3 through tiktoken cl100k_base; all others use chars/4; `tiktoken>=0.12.0` in `requirements.txt` |
 
-**Score:** 3/5 truths verified
+**Score:** 5/5 truths verified
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `backend/app/services/sub_agent_service.py` | `_GENERATION_KEYWORDS` frozenset + `_is_generation_task()` + routing logic | VERIFIED | Frozenset at line 24, function at line 31, routing replaces hardcoded 8192 at lines 89-95 |
-| `backend/app/config.py` | `sub_agent_max_output_tokens: int = 8192` | VERIFIED | Line 193: `sub_agent_max_output_tokens: int = 8192` |
-| `backend/app/services/context_window.py` | `_TIKTOKEN_AVAILABLE`, `_get_cl100k()`, updated `estimate_tokens(text, model="")` | VERIFIED | Lines 15-42 for tiktoken block; line 94 for updated signature |
+| `backend/app/services/sub_agent_service.py` | `_GENERATION_KEYWORDS`, `_is_generation_task`, routing logic, no hardcoded 8192 | VERIFIED | Frozenset at line 24 (9 keywords); `_is_generation_task()` at line 31; routing in `run_sub_agent()`; grep for `8192` returns no matches |
+| `backend/app/config.py` | `sub_agent_max_output_tokens: int = 8192` | VERIFIED | Line 193 |
+| `backend/app/services/context_window.py` | `_TIKTOKEN_AVAILABLE`, `_get_cl100k`, updated `estimate_tokens(text, model="")` | VERIFIED | Optional import block lines 15-42; cached encoder; startup warming call; backward-compatible signature |
 | `backend/requirements.txt` | `tiktoken>=0.12.0` | VERIFIED | Line 5 |
-| `backend/app/models/user_settings.py` | `sub_agent_max_output_tokens: int` in UserEffectiveSettings + `load_app_settings()` wiring | VERIFIED | Line 84 (field); line 261 (`_int(override, "sub_agent_max_output_tokens", ...)`) |
-| `backend/app/api/settings.py` | `sub_agent_max_output_tokens` in FullSettingsResponse, SettingsUpdate (ge=4096, le=65536), `_build_response()`, handler | VERIFIED | Lines 59, 101, 144, 221 |
-| `frontend/src/lib/api.ts` | `sub_agent_max_output_tokens` in FullAppSettings and SettingsUpdate | VERIFIED | Lines 413, 449 |
-| `frontend/src/pages/SettingsPage.tsx` | SliderInput component + state + hydrate + save + Context & Sub-Agent SectionCard | VERIFIED | SliderInput at line 64; state at lines 520-521; hydrate at lines 552-553; save at lines 576-577; SectionCard at lines 758-783 |
-| `frontend/src/lib/model-info.ts` | ModelInfo interface + MODEL_INFO with 11 entries including cost tier | STUB | Interface exists with 3 fields (contextWindow, maxOutputTokens, bestFor) — costTier field absent; 11 entries present but no cost tier data |
-| `frontend/src/components/chat/MessageInput.tsx` | Info icon + Tooltip with context/output/costTier/bestFor for known models | PARTIAL | TooltipProvider + Tooltip + Info icon all present; tooltip renders 3 of 4 required data points — cost tier row missing |
-| `backend/app/api/settings.py` | `sub_agent_model` in FullSettingsResponse and SettingsUpdate | MISSING | sub_agent_model is a config field in config.py but is not surfaced in any settings API layer |
-| `frontend/src/pages/SettingsPage.tsx` | Sub-agent model override dropdown in Context & Sub-Agent SectionCard | MISSING | SectionCard contains only 2 SliderInput rows; no dropdown for sub_agent_model |
+| `backend/app/models/user_settings.py` | `sub_agent_max_output_tokens: int`, `sub_agent_model: str` in `UserEffectiveSettings`; both wired in `load_app_settings()` | VERIFIED | Lines 83-85 (fields); lines 261-263 (`_int()` and `_str()` wiring) |
+| `backend/app/api/settings.py` | All three new fields in `FullSettingsResponse`, `SettingsUpdate` (with ge/le), `_build_response`, `update_settings` | VERIFIED | `FullSettingsResponse` lines 57-60; `SettingsUpdate` lines 100-103 with `Field(ge=4096, le=65536)` on `sub_agent_max_output_tokens`; `_build_response` lines 144-147; `update_settings` handler lines 221-226 |
+| `frontend/src/lib/api.ts` | `context_window_max_tokens`, `sub_agent_max_output_tokens`, `sub_agent_model` in `FullAppSettings`; optional variants in `SettingsUpdate` | VERIFIED | `FullAppSettings` lines 411-414; `SettingsUpdate` lines 448-451 |
+| `frontend/src/pages/SettingsPage.tsx` | `SliderInput` component; state/hydrate/save for all 3 controls; "Context & Sub-Agent" SectionCard with dropdown | VERIFIED | `SliderInput` at line 64; all 3 state vars at 520-522; hydrate at 553-555; save at 578-580; SectionCard at 765 including `<select>` with "Auto (cheapest)" leading option |
+| `frontend/src/lib/model-info.ts` | `ModelInfo` interface with `costTier: 'low' | 'mid' | 'high'`; 11 model entries all populated | VERIFIED | Interface lines 12-21; 11 entries (5 OpenAI + 3 Anthropic + 3 Google) each with correct `costTier` value |
+| `frontend/src/components/chat/MessageInput.tsx` | `MODEL_INFO` import; info rendered as inline subtitles; cost tier display | VERIFIED | Import at line 11; inline subtitles at lines 213-222 inside `{info && ...}` block; cost tier ternary at line 219 |
+| `backend/tests/unit/test_sub_agent_routing.py` | 18 routing tests for CTX-01/CTX-02 | VERIFIED | File exists; lazy-import pattern; 18 test functions |
+| `backend/tests/unit/test_context_window.py` | 3 tiktoken tests appended | VERIFIED | `test_tiktoken_estimate`, `test_tiktoken_fallback`, `test_tiktoken_no_model_uses_chars_heuristic` present |
+| `backend/tests/unit/test_settings.py` | 3 sub-agent settings tests | VERIFIED | `test_sub_agent_output_tokens_field_range`, `test_sub_agent_settings_roundtrip`, `test_sub_agent_default_in_config` present |
+| `frontend/src/lib/model-info.test.ts` | 8 vitest tests including `costTier` assertions | VERIFIED | 8 `it()` blocks; dedicated `costTier values` test for all 11 models |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `run_sub_agent()` | `_is_generation_task()` | `is_generation = _is_generation_task(task)` | WIRED | Line 68 of sub_agent_service.py |
-| `_is_generation_task()` | `_GENERATION_KEYWORDS` | `any(kw in t for kw in _GENERATION_KEYWORDS)` | WIRED | Line 39 of sub_agent_service.py |
-| `run_sub_agent()` | `settings.sub_agent_max_output_tokens` | `output_ceiling = settings.sub_agent_max_output_tokens` (analysis) / `max(32768, ...)` (generation) | WIRED | Lines 91-93 |
-| `estimate_tokens()` | `_get_cl100k()` | `enc = _get_cl100k(); return len(enc.encode(text))` | WIRED | Lines 107-109 of context_window.py |
-| `SettingsPage.tsx hydrate()` | `FullAppSettings.sub_agent_max_output_tokens` | `setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)` | WIRED | Line 553 |
-| `SettingsPage.tsx handleSaveAIModel()` | `PUT /api/settings` | body includes `sub_agent_max_output_tokens: subAgentMaxOutputTokens` | WIRED | Line 577 |
-| `_build_response()` | `UserEffectiveSettings.sub_agent_max_output_tokens` | `sub_agent_max_output_tokens=s.sub_agent_max_output_tokens` | WIRED | Line 144 of settings.py |
-| `MessageInput.tsx models.map()` | `MODEL_INFO[m]` | `const info = MODEL_INFO[m]` | WIRED | Line 202 of MessageInput.tsx |
-| `TooltipProvider` | `models.map()` | TooltipProvider hoisted above map | WIRED | Lines 200, 236 of MessageInput.tsx |
-| `SettingsPage.tsx` | `sub_agent_model` dropdown | sub_agent_model setting in Context & Sub-Agent SectionCard | NOT_WIRED | No dropdown exists; config field not surfaced through any layer |
+| `run_sub_agent()` | `_is_generation_task()` | `is_generation = _is_generation_task(task)` | WIRED | Line 68 in sub_agent_service.py |
+| `_is_generation_task()` | `_GENERATION_KEYWORDS` | `any(kw in t for kw in _GENERATION_KEYWORDS)` | WIRED | Line 39 |
+| `run_sub_agent()` | `settings.sub_agent_max_output_tokens` | `output_ceiling = settings.sub_agent_max_output_tokens` (analysis, line 99); `max(32768, ...)` (generation, line 97) | WIRED | Both branches read the config field |
+| `run_sub_agent()` | `user_settings.sub_agent_model` | `override_model = (user_settings.sub_agent_model if user_settings else "")` | WIRED | Lines 71-74; UI-set override takes priority over env setting |
+| `SettingsPage hydrate()` | `FullAppSettings.*` | `setContextWindowMaxTokens(data.context_window_max_tokens ?? 0)`, `setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)`, `setSubAgentModel(data.sub_agent_model ?? "")` | WIRED | Lines 553-555 |
+| `SettingsPage handleSaveAIModel()` | `PUT /api/settings` | Body includes all three fields | WIRED | Lines 578-580 |
+| `_build_response()` | `UserEffectiveSettings.*` | `context_window_max_tokens=s.context_window_max_tokens`, `sub_agent_max_output_tokens=s.sub_agent_max_output_tokens`, `sub_agent_model=s.sub_agent_model` | WIRED | Lines 145-147 in settings.py |
+| `load_app_settings()` | config + override | `_int(override, "sub_agent_max_output_tokens", ...)`, `_str(override, "sub_agent_model", ...)` | WIRED | Lines 261-263 in user_settings.py |
+| `MessageInput.tsx models.map()` | `MODEL_INFO[m]` | `const info = MODEL_INFO[m]` | WIRED | Line 195 |
+| `estimate_tokens(text, model)` | `_get_cl100k()` | `enc = _get_cl100k(); return max(1, len(enc.encode(text)))` for gpt-*/o1/o3 | WIRED | Lines 107-109 in context_window.py |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|---------------|--------|--------------------|--------|
-| `SettingsPage.tsx` | `subAgentMaxOutputTokens` | `GET /api/settings` → `data.sub_agent_max_output_tokens` → `_build_response()` → `UserEffectiveSettings` → `settings_override.json` / `.env` | Yes — defaults to 8192 from config, persisted in override file | FLOWING |
-| `SettingsPage.tsx` | `contextWindowMaxTokens` | `GET /api/settings` → `data.context_window_max_tokens` → `_build_response()` → `UserEffectiveSettings` | Yes | FLOWING |
-| `MessageInput.tsx` | `info` (ModelInfo) | `MODEL_INFO[m]` — static lookup by model ID string | Static data — no DB query needed for a static lookup | FLOWING |
-| `sub_agent_service.py` | `output_ceiling` | `settings.sub_agent_max_output_tokens` from config / override | Yes — reads from pydantic settings | FLOWING |
+|----------|---------------|--------|-------------------|--------|
+| `SettingsPage.tsx` context depth slider | `contextWindowMaxTokens` | `GET /api/settings` → `FullAppSettings.context_window_max_tokens` → `_build_response()` → `_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens)` | Yes — reads live override or env default | FLOWING |
+| `SettingsPage.tsx` sub-agent output slider | `subAgentMaxOutputTokens` | Same path via `sub_agent_max_output_tokens` | Yes | FLOWING |
+| `SettingsPage.tsx` sub-agent model dropdown | `subAgentModel` | Same path via `sub_agent_model` | Yes | FLOWING |
+| `MessageInput.tsx` inline subtitles | `info = MODEL_INFO[m]` | Static lookup — no API call | Yes — static data, intentionally | FLOWING |
+| `run_sub_agent()` routing | `is_generation` / `output_ceiling` | `_is_generation_task(task)` + `settings.sub_agent_max_output_tokens` | Yes — reads config | FLOWING |
+| `estimate_tokens(text, model)` | tiktoken encode result | `_get_cl100k()` — module-level cached `cl100k_base` encoder | Yes — real tokenizer | FLOWING |
 
 ### Behavioral Spot-Checks
 
-Step 7b: SKIPPED — requires running server/venv. Static code analysis used throughout.
-
-| Behavior | Method | Result | Status |
-|----------|--------|--------|--------|
-| `_is_generation_task("Create a pptx")` returns True | grep for `_GENERATION_KEYWORDS` containing "pptx" + `any(kw in t ...)` logic | "pptx" in frozenset; case-insensitive match confirmed | PASS |
-| `_is_generation_task("Summarize this text")` returns False | None of "summarize", "text" are in `_GENERATION_KEYWORDS` | Confirmed by reading frozenset | PASS |
-| `estimate_tokens(text, model="gpt-4o")` uses tiktoken path | `model.startswith("gpt-")` check at line 106 | Correctly branches to `_get_cl100k()` | PASS |
-| `SettingsUpdate(sub_agent_max_output_tokens=4095)` raises ValidationError | `Field(ge=4096, le=65536)` at line 101 of settings.py | Pydantic validation confirmed | PASS |
-| Sub-agent model dropdown visible in Settings UI | grep SettingsPage.tsx for sub_agent_model or dropdown in Context SectionCard | Zero matches — dropdown absent | FAIL |
-| costTier in ModelInfo tooltip | grep model-info.ts and MessageInput.tsx for costTier | Zero matches in both files | FAIL |
+| Behavior | Evidence | Status |
+|----------|----------|--------|
+| No hardcoded `8192` in sub_agent_service.py | File read confirms zero matches for `8192` | PASS |
+| `_GENERATION_KEYWORDS` has exactly 9 keywords | Frozenset at line 24: pptx, powerpoint, presentation, report, document, pdf, spreadsheet, excel, csv export | PASS |
+| `tiktoken>=0.12.0` in requirements.txt | Line 5 of requirements.txt | PASS |
+| `sub_agent_model: str` in `FullSettingsResponse` | File read confirms line 60 in settings.py | PASS |
+| `Field(ge=4096, le=65536)` on `SettingsUpdate.sub_agent_max_output_tokens` | Line 102 in settings.py | PASS |
+| 11 MODEL_INFO entries all with `costTier` | File read confirms 11 entries with low/mid/high values | PASS |
+| Cost tier rendered in model selector | Line 219 in MessageInput.tsx: ternary `'Low ($)' : 'Mid ($$)' : 'High ($$$)'` | PASS |
+| "Context & Sub-Agent" SectionCard with 3 controls | Lines 765-810 in SettingsPage.tsx: 2 SliderInputs + `<select>` with "Auto (cheapest)" | PASS |
+| Sub-agent model wired into `run_sub_agent()` | Lines 71-74: `override_model` reads `user_settings.sub_agent_model` before `settings.sub_agent_model` | PASS |
 
 ### Requirements Coverage
 
-| Requirement | Source Plan | Description | Status | Evidence |
-|-------------|-------------|-------------|--------|----------|
-| CTX-01 | 051-02 | Sub-agent detects generation tasks via keyword routing and escalates to capable model with 32k ceiling | SATISFIED | `_GENERATION_KEYWORDS` frozenset + `_is_generation_task()` + `max(32768, settings.sub_agent_max_output_tokens)` in sub_agent_service.py |
-| CTX-02 | 051-02 | Simple analysis tasks use cheap sub-agent model — escalation only for creation/generation verbs | SATISFIED | else-branch in `run_sub_agent()` preserves `_SUB_AGENT_MODEL_DEFAULTS`; analysis ceiling = `settings.sub_agent_max_output_tokens` |
-| CTX-03 | 051-04 | Settings page exposes context depth slider, sub-agent output token slider, AND sub-agent model override dropdown | BLOCKED | Two sliders implemented and wired through all 6 layers. Sub-agent model override dropdown entirely absent from SettingsPage.tsx, api.ts, settings.py, and user_settings.py |
-| CTX-04 | 051-05 | Model selector shows inline info card with context window, output limit, cost tier, and best-for label | BLOCKED | INFO card shows 3/4 required data points (context window, max output, best-for). Cost tier field absent from ModelInfo interface and all 11 model entries; tooltip does not render it |
-| CTX-05 | 051-03 | Token estimation for OpenAI models uses tiktoken (cl100k_base); others use char heuristic | SATISFIED | `_TIKTOKEN_AVAILABLE`, `_get_cl100k()` cache, `model.startswith("gpt-"/"o1"/"o3")` branch; tiktoken>=0.12.0 in requirements.txt |
+| Requirement | Source Plan(s) | Description | Status | Evidence |
+|-------------|---------------|-------------|--------|---------|
+| CTX-01 | 051-02 | Sub-agent escalates PPTX/report/generation tasks to capable model with 32k ceiling | SATISFIED | `_is_generation_task()` + routing branch in `run_sub_agent()` |
+| CTX-02 | 051-02 | Analysis tasks stay on cheap model | SATISFIED | `else` branch uses `_SUB_AGENT_MODEL_DEFAULTS` |
+| CTX-03 | 051-04, 051-06 | Settings: context depth slider, sub-agent output slider, sub-agent model dropdown | SATISFIED | All 3 controls in SettingsPage.tsx, wired through 6-layer stack including `Field(ge=4096, le=65536)` validation |
+| CTX-04 | 051-05, 051-07 | Model selector inline info card: context, output, cost tier, best-for | SATISFIED | `model-info.ts` with 4-field ModelInfo; `MessageInput.tsx` renders inline subtitles with all 4 data points |
+| CTX-05 | 051-03 | tiktoken for OpenAI models, chars/4 fallback | SATISFIED | `estimate_tokens(text, model)` with tiktoken routing; silent ImportError fallback; `tiktoken>=0.12.0` in requirements.txt |
+
+All 5 CTX requirements are covered. No orphaned requirements found for Phase 051 in REQUIREMENTS.md.
 
 ### Anti-Patterns Found
 
 | File | Pattern | Severity | Impact |
 |------|---------|----------|--------|
-| `frontend/src/pages/SettingsPage.tsx` | Context & Sub-Agent SectionCard omits `sub_agent_model` dropdown — plan 04 explicitly deferred it but roadmap SC requires it | BLOCKER | CTX-03 not fully satisfied; admin cannot override sub-agent model from UI |
-| `frontend/src/lib/model-info.ts` | `ModelInfo` interface missing `costTier` field; all 11 entries lack cost tier data | BLOCKER | CTX-04 not fully satisfied; info card is incomplete per requirement |
+| `MessageInput.tsx` | No `Info` icon import, no `TooltipProvider`, no `e.stopPropagation()` — plan 05 spec required tooltip-on-hover pattern | INFO | Intentional adaptation. Plan 07 SUMMARY documents: "Adapted cost tier display to current inline subtitle format (from 051-05) instead of planned TooltipContent." The inline subtitle approach achieves the goal (CTX-04 info visible to user) without Radix tooltip portalling issues. Not a blocker. |
+
+No TODO/FIXME/placeholder patterns found in production code. No stub implementations. No empty return values in components that render dynamic data.
 
 ### Human Verification Required
 
-#### 1. Sub-Agent Model Override Dropdown Absence
+#### 1. Model info inline card visual rendering
 
-**Test:** Navigate to Settings > AI Model tab. Scroll to "Context & Sub-Agent" section.
-**Expected:** A dropdown/select control for overriding the sub-agent model should be present.
-**Why human:** Confirms the UI gap is visible to the end user, not just absent from code.
+**Test:** Open the chat page, click the model selector dropdown, inspect model items for known models (gpt-4o, claude-sonnet-4-6, gemini-2.5-pro) and for an unknown model (any OpenRouter model)
+**Expected:** Known models show two dimmed lines beneath the model name: first line "Xk ctx · Y out · {bestFor}", second line "Cost tier: Low ($) / Mid ($$) / High ($$$)". Unknown models show only the model name, no subtitles. The "active" badge still appears for the selected model.
+**Why human:** Inline subtitle rendering requires visual inspection — vitest tests confirm the TypeScript type structure but not the actual CSS/DOM render inside DropdownMenuContent
 
-#### 2. Model Info Tooltip — Cost Tier Row Absent
+#### 2. Context & Sub-Agent settings controls — visual and save round-trip
 
-**Test:** Open the chat model selector dropdown. Hover over the info icon on any known model (e.g. gpt-4o).
-**Expected:** Tooltip should show Context, Max output, Cost tier, and Best for.
-**Why human:** Confirms the tooltip is missing the cost tier line visually, not just in code.
+**Test:** Open Settings → AI Model tab → scroll to "Context & Sub-Agent" section. Adjust the context depth slider to a non-zero value, change sub-agent output to 16384, select a specific model from the sub-agent model dropdown. Click "Save AI Model". Reload the page.
+**Expected:** After reload, all three controls reflect the saved values. The context depth slider no longer shows "Using model default" hint. The sub-agent model dropdown shows the previously saved model as selected.
+**Why human:** Slider visual styling, hint text conditional updates, and save-then-reload persistence require browser verification
 
-### Gaps Summary
+#### 3. Sub-agent generation task escalation — end-to-end behavioral
 
-Two gaps block full goal achievement for Phase 051:
-
-**Gap 1 — Sub-agent model override dropdown (CTX-03)**
-The roadmap success criterion #3 and REQUIREMENTS.md CTX-03 both explicitly require a "dropdown for sub-agent model override" in the Settings UI. Plan 04 noted this was out of scope ("not required by CTX-03"), but plans cannot reduce scope below what the roadmap contract states. The `sub_agent_model` config field exists in `backend/app/config.py` but is not surfaced through any layer of the settings stack (UserEffectiveSettings, FullSettingsResponse, SettingsUpdate, api.ts, SettingsPage.tsx). The dropdown, state variable, hydrate binding, and save body entry are all absent.
-
-**Gap 2 — Cost tier field in model info cards (CTX-04)**
-REQUIREMENTS.md CTX-04 and ROADMAP SC #4 both list "cost tier" as a required data point in the inline model info card. The `ModelInfo` interface in `model-info.ts` has three fields (`contextWindow`, `maxOutputTokens`, `bestFor`) but no `costTier`. All 11 model entries lack cost tier data. The tooltip in `MessageInput.tsx` renders three lines (Context, Max output, Best for) but no cost tier line.
-
-Both gaps require targeted additions. They share no root cause and can be addressed independently.
+**Test:** Upload a document, then send "Create a PPTX presentation summarizing this document." Observe LangSmith trace or backend stdout logs.
+**Expected:** Backend log shows `effective_model` = user's orchestrator model (e.g., claude-sonnet-4-6, not claude-haiku-4-5-20251001), `output_ceiling` = 32768. Response does not truncate mid-sentence.
+**Why human:** Requires live LLM call via the actual sub-agent service; unit tests verify routing logic but not end-to-end execution with a real provider
 
 ---
 
-_Verified: 2026-04-23_
+## Gaps Summary
+
+No gaps. All 5 roadmap success criteria are verified by code inspection. The two gaps from the previous verification (CTX-03 sub-agent model dropdown + CTX-04 cost tier) were closed by Plans 06 and 07 respectively.
+
+The three human verification items are standard visual/behavioral checks that cannot be verified by static code analysis. They are expected for any phase that modifies UI components and integration-level behavior.
+
+---
+
+_Verified: 2026-04-24_
 _Verifier: Claude (gsd-verifier)_

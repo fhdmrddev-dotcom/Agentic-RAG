@@ -107,14 +107,14 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [ ] **Phase 48: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
 - [ ] **Phase 49: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
 - [ ] **Phase 50: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
-- [ ] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation
-  - [ ] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
-  - [ ] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
-  - [ ] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
-  - [ ] 051-04-PLAN.md — Settings stack for sub_agent_max_output_tokens (CTX-03)
-  - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
-  - [ ] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
-  - [ ] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
+- [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
+  - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
+  - [x] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
+  - [x] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
+  - [x] 051-04-PLAN.md — Settings stack for sub_agent_max_output_tokens (CTX-03)
+  - [x] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
+  - [x] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
+  - [x] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
 
 ## Phase Details
 
@@ -228,10 +228,10 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 50 �
   5. Token counting uses provider-accurate methods (tiktoken for OpenAI, char heuristic as fallback) rather than a single universal heuristic
 **Plans**: 7 plans (5 original + 2 gap closure)
   - [ ] 051-01-PLAN.md — Test stubs: failing test scaffolds for CTX-01 through CTX-05
-  - [ ] 051-02-PLAN.md — Sub-agent keyword routing + config field (CTX-01, CTX-02)
-  - [ ] 051-03-PLAN.md — tiktoken upgrade in context_window.py (CTX-05)
-  - [ ] 051-04-PLAN.md — Settings stack: sub_agent_max_output_tokens 6-layer threading + SliderInput (CTX-03)
-  - [ ] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
-  - [ ] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
-  - [ ] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
+  - [x] 051-02-PLAN.md — Sub-agent keyword routing + config field (CTX-01, CTX-02)
+  - [x] 051-03-PLAN.md — tiktoken upgrade in context_window.py (CTX-05)
+  - [x] 051-04-PLAN.md — Settings stack: sub_agent_max_output_tokens 6-layer threading + SliderInput (CTX-03)
+  - [x] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
+  - [x] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
+  - [x] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
 **UI hint**: yes
