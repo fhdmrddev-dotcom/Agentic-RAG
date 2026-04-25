@@ -184,6 +184,8 @@ async def get_feedback_stats(
         return {
             "positive_rate": round(positive_rate, 4),
             "total_ratings": total_ratings,
+            "positive_count": positive_count,
+            "negative_count": total_ratings - positive_count,
             "downvoted_documents": downvoted_documents,
         }
 

@@ -95,6 +95,7 @@ class SettingsUpdate(BaseModel):
     # Web search
     tavily_api_key: str | None = None      # "***" = keep; "" = clear; real = save
     web_search_max_results: int | None = None
+    web_search_enabled: bool | None = None
     # Sandbox
     sandbox_enabled: bool | None = None
     # Context & Sub-agent
@@ -139,7 +140,7 @@ def _build_response(s=None) -> FullSettingsResponse:
         vector_search_weight=s.vector_search_weight,
         keyword_search_weight=s.keyword_search_weight,
         rrf_k=s.rrf_k,
-        web_search_enabled=bool(s.tavily_api_key),
+        web_search_enabled=s.web_search_enabled,
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
         context_window_max_tokens=s.context_window_max_tokens,
@@ -220,6 +221,8 @@ async def update_settings(
         updates["tavily_api_key"] = body.tavily_api_key
     if body.web_search_max_results is not None:
         updates["web_search_max_results"] = body.web_search_max_results
+    if body.web_search_enabled is not None:
+        updates["web_search_enabled"] = body.web_search_enabled
 
     if body.sandbox_enabled is not None:
         updates["sandbox_enabled"] = body.sandbox_enabled
