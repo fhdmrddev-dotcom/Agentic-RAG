@@ -273,14 +273,12 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
       <div>
         <p className="text-sm text-muted-foreground text-center py-8">
           {folderId == null
-            ? "No documents uploaded yet."
+            ? "No root documents yet."
             : "No documents in this folder"}
         </p>
-        {folderId != null && (
-          <p className="text-xs text-muted-foreground text-center">
-            Upload files above to add them here.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground text-center">
+          Upload files above to add them here.
+        </p>
       </div>
     )
   }

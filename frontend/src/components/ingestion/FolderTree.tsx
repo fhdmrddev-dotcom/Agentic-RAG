@@ -10,6 +10,7 @@ interface FolderTreeProps {
   folders: Folder[]
   selectedFolderId: string | null
   currentUserId: string
+  rootDocumentCount?: number
   onSelectFolder: (id: string | null) => void
   onCreateFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
   onRenameFolder: (id: string, name: string) => Promise<void>
@@ -21,6 +22,7 @@ export function FolderTree({
   folders,
   selectedFolderId,
   currentUserId,
+  rootDocumentCount,
   onSelectFolder,
   onCreateFolder,
   onRenameFolder,
@@ -142,6 +144,9 @@ export function FolderTree({
         <div className="h-4 w-4 shrink-0" />
         <RootIcon className={isRootSelected ? "h-4 w-4 shrink-0 text-primary" : "h-4 w-4 shrink-0 text-amber-500/70"} />
         <span className="text-sm truncate flex-1">Root</span>
+        <span className="text-xs text-muted-foreground ml-auto">
+          {rootDocumentCount ?? 0}
+        </span>
       </div>
 
       {/* Create input at root level */}

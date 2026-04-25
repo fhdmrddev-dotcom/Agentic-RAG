@@ -39,6 +39,10 @@ export function IngestionPage() {
     return folders.filter((f) => f.parent_id === selectedFolderId).length
   }, [selectedFolderId, folders])
 
+  const rootDocumentCount = useMemo(() => {
+    return documents.filter((d) => d.folder_id == null).length
+  }, [documents])
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full overflow-y-auto p-8">
@@ -56,6 +60,7 @@ export function IngestionPage() {
               folders={folders}
               selectedFolderId={selectedFolderId}
               currentUserId={user?.id ?? ""}
+              rootDocumentCount={rootDocumentCount}
               onSelectFolder={setSelectedFolderId}
               onCreateFolder={createFolder}
               onRenameFolder={renameFolder}
@@ -66,6 +71,12 @@ export function IngestionPage() {
 
           {/* Right panel: Breadcrumb + Upload + Document List */}
           <div className="flex-1 flex flex-col overflow-y-auto space-y-6">
+            {selectedFolderId === null && (
+              <div>
+                <h2 className="text-lg font-semibold">Root</h2>
+                <p className="text-sm text-muted-foreground">Documents not assigned to a folder</p>
+              </div>
+            )}
             {selectedFolderId !== null && (
               <>
                 <FolderBreadcrumb
