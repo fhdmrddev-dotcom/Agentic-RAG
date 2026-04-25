@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client
 
@@ -7,6 +7,7 @@ from app.models.user_settings import (
     KEY_PLACEHOLDER,
     load_app_settings,
     save_override,
+    resolve_sub_agent_model,
 )
 from app.services.audit_service import write_audit_entry
 
@@ -59,6 +60,7 @@ class FullSettingsResponse(BaseModel):
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
     sub_agent_model: str
+    resolved_sub_agent_model: str
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -148,6 +150,7 @@ def _build_response(s=None) -> FullSettingsResponse:
         context_window_max_tokens=s.context_window_max_tokens,
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,
+        resolved_sub_agent_model=resolve_sub_agent_model(s),
     )
 
 
@@ -234,6 +237,23 @@ async def update_settings(
         updates["sub_agent_max_output_tokens"] = body.sub_agent_max_output_tokens
     if body.sub_agent_model is not None:
         updates["sub_agent_model"] = body.sub_agent_model
+
+    # MDL-01: Validate sub_agent_model against active provider's model list
+    if body.sub_agent_model:
+        current_settings = load_app_settings()
+        pending_provider = (
+            getattr(body, "active_provider", None)
+            or current_settings.active_provider
+        )
+        provider_obj = next(
+            (p for p in current_settings.providers if p.id == pending_provider),
+            None,
+        )
+        if provider_obj and provider_obj.models and body.sub_agent_model not in provider_obj.models:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Model '{body.sub_agent_model}' is not available for provider '{pending_provider}'.",
+            )
 
     save_override(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
