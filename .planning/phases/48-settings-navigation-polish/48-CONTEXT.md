@@ -8,24 +8,32 @@
 <domain>
 ## Phase Boundary
 
-Two independent areas of polish:
+Four independent fixes in this phase:
 
-1. **Web search toggle (SETT-01/02):** Add an explicit on/off toggle for web search in the Settings → Integrations tab. Currently web search is implicitly enabled by having a Tavily key. After this phase it has an independent boolean that can turn off the tool even when a key exists.
+1. **Web search toggle (SETT-01/02):** Add an explicit on/off toggle for web search in Settings → Integrations tab. Currently web search is implicitly enabled by having a Tavily key. After this phase it has an independent boolean that can turn off the tool even when a key exists.
 
 2. **Nav logo visibility (NAV-01/02):** The Sparkles brand icon disappears entirely when the sidebar is collapsed because `opacity-0` is applied to the whole logo group. Fix: show the icon-only when collapsed, hide only the text.
 
+3. **Stale tab animation bug:** The Stale tab shows a visual "sprinkling and shaking" animation when selected. Root cause is `TabsTrigger transition-all` in `tabs.tsx` animating all CSS properties on tab selection — should be `transition-colors` only.
+
+4. **Feedback panel blank space:** The User Feedback section only shows a small gauge leaving a large empty area. Add a stats breakdown (Total Ratings, Positive, Negative) alongside the gauge. Backend already computes `positive_count` but doesn't return it — add it to the response.
+
 What's in scope:
 - `web_search_enabled` bool in `UserEffectiveSettings` + `SettingsUpdate` + override file
-- Toggle UI in Integrations tab (gating the key and max-results fields)
+- Toggle UI in Integrations tab (gating key and max-results fields)
 - Inline warning when toggle=on but no key configured
 - GET response uses the stored bool (not derived from key presence)
 - NavPanel logo header: icon always visible, text fades on collapse
+- `TabsTrigger` — change `transition-all` → `transition-colors` to fix stale tab animation
+- `feedback.py` stats response — add `positive_count` + `negative_count`
+- `FeedbackStatsPanel` layout — 2-col header: gauge left, 3 stat cards right
 
 What's NOT in scope:
 - Any other Settings tab changes
 - Nav item icon visibility (already correct — only the span has opacity-0)
 - Sidebar width, layout, or collapse/expand behavior
-- Any backend changes to the Tavily API call itself
+- Any other tab animation changes (only Stale tab reported as broken)
+- Backend Tavily API call changes
 
 </domain>
 
@@ -74,10 +82,25 @@ What's NOT in scope:
 
 - **D-09:** No positional changes needed. The Sparkles icon at `px-4` (16px) left aligns naturally within the 64px collapsed strip — visually centered in the icon column. This covers both NAV-01 and NAV-02 (they're the same root cause).
 
+### Stale Tab Animation Bug
+
+- **D-10:** `TabsTrigger` in `frontend/src/components/ui/tabs.tsx:30` uses `transition-all`. This animates ALL CSS properties when a tab is activated (including box-shadow, color, background, transform, etc.), causing a visible "sprinkling and shaking" effect on the Stale tab. Fix: replace `transition-all` with `transition-colors` in the `TabsTrigger` className. This is a global change to the shared Tabs component — verify no other tabs regress.
+
+### Feedback Panel Enhancement
+
+- **D-11:** Add `positive_count: int` and `negative_count: int` to the `/feedback/stats` backend response. `positive_count` is already computed at `backend/app/api/feedback.py:116` as a local variable — just include it in the return dict at line 184. `negative_count = total_ratings - positive_count`. Add both fields to the `FeedbackStats` TypeScript interface in `frontend/src/lib/api.ts`.
+
+- **D-12:** Restructure the positive-rate section of `FeedbackStatsPanel` from a `flex` row (gauge + text) into a 2-column layout:
+  - Left: existing `HealthScoreGauge size="sm"` + "positive rating" subtitle (unchanged)
+  - Right: 3 mini stat cards stacked or in a grid — **Total Ratings** (`stats.total_ratings`), **Positive** (`stats.positive_count`, green), **Negative** (`stats.negative_count`, red)
+  
+  Layout: `grid grid-cols-[auto_1fr] gap-4 px-4 pt-4 pb-2` with gauge on the left and a `grid grid-cols-3 gap-2` stat-cards section on the right. Each mini card: label (muted text-xs) + large number (tabular-nums font-bold) + colored accent. This fills the blank space without any new API calls or route changes.
+
 ### Claude's Discretion
 
 - Whether the Tavily key warning (D-07) appears below the Toggle FieldRow or below the key input field — Claude picks whatever reads most naturally in the UI.
 - Exact amber shade: `text-amber-500` or `text-yellow-500` — match whatever is used in the codebase for non-critical inline warnings.
+- Exact layout of the 3 stat cards in D-12 (stacked vs 3-col grid) — Claude picks whatever fits the card width cleanly.
 
 </decisions>
 
@@ -102,6 +125,18 @@ What's NOT in scope:
 - `frontend/src/components/layout/NavPanel.tsx` §239–252 — logo header block; D-08 applies here
 - `frontend/src/components/layout/NavPanel.tsx` §262–288 — nav item buttons; icons are already opacity-safe (only the span has opacity-0); no changes needed here
 
+### Shared UI — Tabs
+- `frontend/src/components/ui/tabs.tsx` §30 — `TabsTrigger` className; change `transition-all` → `transition-colors` for D-10
+
+### Backend — Feedback stats
+- `backend/app/api/feedback.py` §116 — `positive_count` local variable already computed here; add to return dict at §184 (D-11)
+- `backend/app/api/feedback.py` §184–188 — return dict; add `positive_count` and `negative_count = total_ratings - positive_count`
+
+### Frontend — Feedback panel
+- `frontend/src/lib/api.ts` §687–691 — `FeedbackStats` interface; add `positive_count: number` and `negative_count: number` (D-11)
+- `frontend/src/components/health/FeedbackStatsPanel.tsx` §47–56 — positive-rate flex row; restructure to 2-col layout with stat cards (D-12)
+- `frontend/src/pages/KnowledgeHealthPage.tsx` §515–543 — FeedbackStatsPanel mount point; no changes needed here
+
 </canonical_refs>
 
 <code_context>
@@ -121,6 +156,8 @@ What's NOT in scope:
 ### Integration Points
 - `FullAppSettings.web_search_enabled` (settings.py:53) is already surfaced in the GET response — frontend only needs to read it and wire the state
 - `UserEffectiveSettings` flows through `load_user_settings()` → `get_tools()` in `openai_service.py` — adding the field at the model level automatically gates the tool correctly
+- `TabsTrigger` is used by ALL `<Tabs>` in the app (Settings, Library Health, Low Confidence sub-tabs, etc.) — `transition-all` → `transition-colors` change is global; verify Settings tabs and Low Confidence sub-tabs don't regress
+- `positive_count` in `feedback.py:116` is a local variable today; surfacing it requires adding it to the return dict only (no query changes)
 
 </code_context>
 
