@@ -1,85 +1,87 @@
-import { useMemo } from "react"
-
 interface Props {
   score: number
   size?: "lg" | "sm"
 }
 
 export function HealthScoreGauge({ score, size = "lg" }: Props) {
-  const clamped = Math.max(0, Math.min(100, score))
+  const v = Math.max(0, Math.min(100, score))
 
-  const { colorClass, strokeColor, label } = useMemo(() => {
-    if (clamped >= 80) return { colorClass: "text-emerald-400", strokeColor: "#34d399", label: "Healthy" }
-    if (clamped >= 60) return { colorClass: "text-amber-400", strokeColor: "#fbbf24", label: "Needs Attention" }
-    return { colorClass: "text-red-400", strokeColor: "#f87171", label: "At Risk" }
-  }, [clamped])
+  const strokeColor = v >= 80 ? "#34d399" : v >= 60 ? "#fbbf24" : "#f87171"
+  const colorClass  = v >= 80 ? "text-emerald-400" : v >= 60 ? "text-amber-400" : "text-red-400"
+  const label       = v >= 80 ? "Healthy" : v >= 60 ? "Needs Attention" : "At Risk"
 
-  const cx = 100
-  const cy = 100
-  const r = 80
-  // All arcs share one path — zone segments use dashoffset so boundaries are pixel-perfect
-  const arcPath = `M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`
-  const totalLength = Math.PI * r
-  const z1 = totalLength * 0.60  // 0–60  (red zone)
-  const z2 = totalLength * 0.20  // 60–80 (amber zone)
-  const z3 = totalLength * 0.20  // 80–100 (green zone)
+  // Semicircle: center (100, 100), r=76, from left (24,100) to right (176,100)
+  const cx = 100, cy = 100, r = 76
+  const arc = `M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`
+  const L   = Math.PI * r                              // arc circumference ≈ 238.8
 
-  // Score fill
-  const fillLength = (clamped / 100) * totalLength
+  // Fill — minimum 5 px so a sliver of colour is always visible when score > 0
+  const fill = v > 0 ? Math.max((v / 100) * L, 5) : 0
 
-  // Needle
-  const needleLen = r - 4
-  const angleRad = Math.PI * (1 - clamped / 100)
-  const tipX = (cx + needleLen * Math.cos(angleRad)).toFixed(2)
-  const tipY = (cy - needleLen * Math.sin(angleRad)).toFixed(2)
+  // Needle tip (stops 10 px short of arc so it doesn't pierce the track)
+  const angle = Math.PI * (1 - v / 100)
+  const nx = (cx + (r - 10) * Math.cos(angle)).toFixed(1)
+  const ny = (cy - (r - 10) * Math.sin(angle)).toFixed(1)
 
-  // Zone boundary divider ticks
-  const dividers = [60, 80].map((s) => {
-    const a = Math.PI * (1 - s / 100)
-    return {
-      key: s,
-      x1: (cx + (r - 8) * Math.cos(a)).toFixed(2),
-      y1: (cy - (r - 8) * Math.sin(a)).toFixed(2),
-      x2: (cx + (r + 2) * Math.cos(a)).toFixed(2),
-      y2: (cy - (r + 2) * Math.sin(a)).toFixed(2),
-    }
-  })
-
-  const sw = 13
   const isLg = size === "lg"
+  const sw   = isLg ? 14 : 11                          // track stroke width
+
+  // Zone boundary tick helper (sits on the outer edge of the track)
+  const tick = (s: number) => {
+    const a  = Math.PI * (1 - s / 100)
+    const ri = r - sw / 2 - 1
+    const ro = r + sw / 2 + 1
+    return {
+      x1: (cx + ri * Math.cos(a)).toFixed(1), y1: (cy - ri * Math.sin(a)).toFixed(1),
+      x2: (cx + ro * Math.cos(a)).toFixed(1), y2: (cy - ro * Math.sin(a)).toFixed(1),
+    }
+  }
 
   return (
-    <div className={`${isLg ? "w-full h-56" : "w-32"} flex flex-col items-center justify-center`}>
-      <svg viewBox="0 0 200 120" className="w-full">
-        {/* Zone backgrounds — same arcPath + dashoffset, no separate endpoints, no seam artifacts */}
-        <path d={arcPath} fill="none" stroke="#f87171" strokeOpacity="0.22" strokeWidth={sw}
-          strokeLinecap="butt" strokeDasharray={`${z1} ${totalLength}`} />
-        <path d={arcPath} fill="none" stroke="#fbbf24" strokeOpacity="0.22" strokeWidth={sw}
-          strokeLinecap="butt" strokeDasharray={`${z2} ${totalLength}`} strokeDashoffset={-z1} />
-        <path d={arcPath} fill="none" stroke="#34d399" strokeOpacity="0.22" strokeWidth={sw}
-          strokeLinecap="butt" strokeDasharray={`${z3} ${totalLength}`} strokeDashoffset={-(z1 + z2)} />
-        {/* Score fill — same path, animated */}
-        <path d={arcPath} fill="none" stroke={strokeColor} strokeWidth={sw} strokeLinecap="butt"
-          strokeDasharray={`${fillLength} ${totalLength}`}
-          style={{ transition: "stroke-dasharray 0.7s ease-out" }} />
-        {/* Zone dividers at 60 and 80 */}
-        {dividers.map(({ key, x1, y1, x2, y2 }) => (
-          <line key={key} x1={x1} y1={y1} x2={x2} y2={y2}
-            stroke="hsl(var(--background))" strokeWidth="2.5" />
-        ))}
-        {/* Needle pivot — zone color */}
-        <circle cx={cx} cy={cy} r="5" fill={strokeColor}
-          style={{ transition: "fill 0.7s ease-out" }} />
-        {/* Needle */}
-        <line x1={cx} y1={cy} x2={tipX} y2={tipY}
-          stroke="hsl(var(--foreground))" strokeWidth="2.5" strokeLinecap="round"
-          style={{ transition: "all 0.7s ease-out" }} />
+    <div className={`flex flex-col items-center ${isLg ? "w-full" : ""}`}>
+      {/* viewBox height 108 leaves just enough room below the arc for the pivot */}
+      <svg
+        viewBox="0 0 200 108"
+        className={isLg ? "w-full max-w-[280px]" : "w-[110px]"}
+        overflow="visible"
+      >
+        {/* ── Track (muted background) ── */}
+        <path d={arc} fill="none"
+          stroke="hsl(var(--muted))" strokeWidth={sw} strokeLinecap="round" />
+
+        {/* ── Score fill ── */}
+        <path d={arc} fill="none"
+          stroke={strokeColor} strokeWidth={sw} strokeLinecap="round"
+          strokeDasharray={`${fill} ${L}`}
+          style={{ transition: "stroke-dasharray 0.6s ease-out, stroke 0.4s ease-out" }} />
+
+        {/* ── Zone boundary ticks at 60 and 80 ── */}
+        {[60, 80].map((s) => {
+          const t = tick(s)
+          return (
+            <line key={s} x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
+              stroke="hsl(var(--background))" strokeWidth="2" strokeLinecap="round" />
+          )
+        })}
+
+        {/* ── Needle ── */}
+        <line x1={cx} y1={cy} x2={nx} y2={ny}
+          stroke="hsl(var(--foreground))" strokeWidth={isLg ? 2 : 1.5} strokeLinecap="round"
+          style={{ transition: "all 0.6s ease-out" }} />
+
+        {/* ── Pivot — always zone-coloured so status is clear even at score 0 ── */}
+        <circle cx={cx} cy={cy} r={isLg ? 5 : 4} fill={strokeColor}
+          style={{ transition: "fill 0.4s ease-out" }} />
       </svg>
-      <div className="flex flex-col items-center -mt-2">
-        <span className={`font-bold font-headline tabular-nums leading-none ${colorClass} ${isLg ? "text-4xl" : "text-2xl"}`}>
-          {clamped}
+
+      {/* Score + label below */}
+      <div className={`flex flex-col items-center ${isLg ? "-mt-3" : "-mt-2"}`}>
+        <span className={`font-bold font-headline tabular-nums leading-none ${colorClass} ${isLg ? "text-4xl" : "text-xl"}`}>
+          {v}
         </span>
-        <span className={`font-medium ${isLg ? "text-sm" : "text-xs"} text-muted-foreground mt-1`}>{label}</span>
+        <span className={`font-medium text-muted-foreground mt-0.5 ${isLg ? "text-sm" : "text-[10px]"}`}>
+          {label}
+        </span>
       </div>
     </div>
   )
