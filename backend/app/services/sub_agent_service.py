@@ -4,21 +4,11 @@ from typing import TYPE_CHECKING, Generator
 
 from langsmith import traceable
 
-from app.config import settings
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.openai_service import get_llm_client, _resolve_max_tokens, _uses_max_completion_tokens
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
-
-# Sub-agent model defaults: cheapest stable model per provider.
-# These handle completion tasks well without needing the full orchestrator model.
-_SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
-    "anthropic":  "claude-haiku-4-5-20251001",
-    "openai":     "gpt-4.1-nano",
-    "google":     "gemini-2.5-flash",
-    "openrouter": "",   # Unknown routing — fall back to user's selected model
-    "ollama":     "",   # Local, user manages their own models
-}
 
 _GENERATION_KEYWORDS = frozenset({
     "pptx", "powerpoint", "presentation",

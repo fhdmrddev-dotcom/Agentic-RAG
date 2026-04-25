@@ -52,6 +52,18 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
 }
 
 
+# Sub-agent model defaults: cheapest stable model per provider.
+# Intentionally lives here (not in sub_agent_service) to avoid circular imports
+# when user_settings.py needs to resolve the model without importing sub_agent_service.
+_SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
+    "anthropic":  "claude-haiku-4-5-20251001",
+    "openai":     "gpt-4.1-nano",
+    "google":     "gemini-2.5-flash",
+    "openrouter": "",   # Unknown routing — fall back to user's selected model
+    "ollama":     "",   # Local, user manages their own models
+}
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

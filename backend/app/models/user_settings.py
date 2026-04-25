@@ -281,3 +281,19 @@ def override_provider(effective: UserEffectiveSettings, provider_id: str) -> Use
 
 def load_user_settings(user_id: str, supabase=None) -> UserEffectiveSettings:
     return load_app_settings()
+
+
+def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:
+    """Return the model that would actually be used for sub-agent calls right now.
+
+    Resolution order (matches run_sub_agent logic):
+      1. sub_agent_model override (from settings_override.json or env)
+      2. _SUB_AGENT_MODEL_DEFAULTS[active_provider]
+      3. s.llm_model (main chat model as last resort)
+    """
+    from app.config import _SUB_AGENT_MODEL_DEFAULTS
+    override = s.sub_agent_model or env_settings.sub_agent_model
+    if override:
+        return override
+    provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(s.active_provider, "")
+    return provider_default or s.llm_model
