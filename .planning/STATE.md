@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
-status: verifying
-stopped_at: Phase 52 all plans complete — verifying
-last_updated: "2026-04-25T21:00:00.000Z"
-last_activity: 2026-04-25 -- Phase 52 execution complete (3/3 plans), running verification
+status: planning
+stopped_at: Phase 53 planning complete — ready for execution
+last_updated: "2026-04-26T12:00:00.000Z"
+last_activity: 2026-04-26 -- Phase 53 planning created (4/4 plans)
 progress:
-  total_phases: 10
-  completed_phases: 7
-  total_plans: 25
+  total_phases: 11
+  completed_phases: 9
+  total_plans: 29
   completed_plans: 23
-  percent: 92
+  percent: 85
 ---
 
 # Project State
@@ -21,43 +21,51 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-22)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 52
+**Current focus:** Phase 53 — Cross-Provider Tool Calling Reliability
 
 ## Current Position
 
-Phase: --phase (52) — EXECUTING
-Plan: 1 of --name
-Status: Executing Phase --phase
-Last activity: 2026-04-25 -- Phase --phase execution started
+Phase: 53 — PLANNING COMPLETE
+Plan: 0 of 4
+Status: Ready for execution
+Last activity: 2026-04-26 -- Phase 53 planning artifacts created
 
-Progress: [█████░░░░░] 57%
+Progress: [████████░░] 80%
 
-Next: Phase 48 (Settings & Navigation Polish)
+Next: Phase 53-01 — Capability Registry + Dual-Mode Backend
 
-## Phase 47 Plan Summary
+## Phase 53 Plan Summary
 
-1. **Plan 47-01: Frontend root visibility** — Root document count badge in FolderTree, Root header block in IngestionPage, updated empty state copy in DocumentList. ✅ COMPLETE
-2. **Plan 47-02: Backend 50 MB upload limit** — Early size validation in documents.py upload endpoint with specific error message propagating through existing frontend error chain. ✅ COMPLETE
+1. **Plan 53-01: Capability Registry + Dual-Mode Backend** — MODEL_CAPABILITIES registry in config.py, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (`:exacto`, `parallel_tool_calls=False`, Response Healing). Backend only.
+2. **Plan 53-02: OpenRouter Strategy Setting** — `openrouter_tool_strategy` enum field (quality/native/xml) with backend settings stack and frontend dropdown in AI Model Settings tab.
+3. **Plan 53-03: JSON Tool Call Parser** — Dedicated `tool_parser.py` module with `ToolCall` dataclass, markdown/inline JSON extraction, tool name validation. Integrates into threads.py event_stream().
+4. **Plan 53-04: Validation & Zero-Regression Tests** — `test_tool_parser.py` (12+ tests), `test_calling_mode.py` (14+ tests), `test_openai_service.py` (6+ tests). Confirms zero regression in existing suite.
 
-## Phase 47 Verified Results
+## Recent Completed Phases
 
-| Requirement | Status | Notes |
-|------------|--------|-------|
-| DOC-04 | ✅ | Root documents clearly visible with count badge and contextual header |
-| DOC-05 | ✅ | Uploads >50 MB return specific "File too large. Maximum size is 50 MB." error |
-| DOC-06 | ✅ | Root upload UX improved with clear header and empty state guidance |
+### Phase 52: Multi-Provider Model Routing (Complete 2026-04-25)
+- Full provider-aware routing for main, sub-agent, title, and follow-up models
+- Cross-provider 404 fallback with SSE sentinel and user notification
+- Save-time validation for sub_agent_model against provider's available models
+- Resolved model labels in Settings UI
+
+### Phase 51: Context Window Management (Complete 2026-04-24)
+- Sub-agent keyword routing (generation tasks escalated to capable models)
+- tiktoken integration for OpenAI token estimation
+- Configurable sub_agent_max_output_tokens with Settings UI slider
+- Model info cards in chat model selector
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 59 (across v1.0–v2.4)
-- Previous milestones: v1.0 (8 phases), v2.0 (9), v2.1 (8), v2.2 (7), v2.3 (11)
+- Total plans completed: 66 (across v1.0–v2.4)
+- Previous milestones: v1.0 (8 phases), v2.0 (9), v2.1 (8), v2.2 (7), v2.3 (11), v2.4-in-progress (9)
 - Average duration: ~1 day/phase
 
 **Recent Trend:**
 
-- Last phase shipped: Phase 46 (6 commits)
+- Last phase shipped: Phase 52 (3 plans)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -67,12 +75,17 @@ Next: Phase 48 (Settings & Navigation Polish)
 ### Roadmap Evolution
 
 - Phase 52 added: Multi-Provider Model Routing — full provider-aware routing for all agent roles, cross-provider sub-agent fix, model fallback on unavailable models
+- Phase 53 added: Cross-Provider Tool Calling Reliability — capability registry with native/structured dual-mode tool calling, user-controllable OpenRouter strategy, deterministic JSON parser for non-native models
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- **D-53-01**: Two calling modes — Native (API tools param) for proven models, Structured (JSON-in-prompt) for everything else. No retries, no fallbacks, one-shot deterministic.
+- **D-53-02**: Unknown models default to structured mode (`native_tools: false`). Safe by default; user flips flag after testing.
+- **D-53-03**: OpenRouter strategy global setting with three modes: `quality` (default, uses `:exacto` + Response Healing), `native` (assumes tool support), `xml` (forces structured).
+- **D-53-04**: OpenAI path is identical to before. Capability check is O(1) dict lookup. Zero additional latency.
 - No cancel endpoint for SSE stop — GeneratorExit mechanism is fast enough for v2.4
 - Side phase numbering uses `side-NNN` prefix (separate from sequential phases)
 - SSEStreamingResponse uses stop_event mechanism for immediate client-disconnect detection
@@ -85,7 +98,16 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None for v2.4.
+| Phase | Task | Priority |
+|-------|------|----------|
+| 53-01 | Create MODEL_CAPABILITIES registry | High |
+| 53-01 | Implement create_adaptive_streaming_chat() | High |
+| 53-01 | Add structured mode system prompt injection | High |
+| 53-02 | Add openrouter_tool_strategy backend field | High |
+| 53-02 | Add frontend dropdown UI | High |
+| 53-03 | Create tool_parser.py module | High |
+| 53-03 | Integrate parser into threads.py | High |
+| 53-04 | Write 32+ unit tests | High |
 
 ### Blockers/Concerns
 
@@ -110,6 +132,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-25
-Stopped at: Phase 47 complete
-Next: Phase 48 — Settings & Navigation Polish
+Last session: 2026-04-26
+Stopped at: Phase 53 planning complete
+Next: Phase 53-01 — Capability Registry + Dual-Mode Backend

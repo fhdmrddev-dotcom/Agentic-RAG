@@ -118,6 +118,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   - [x] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
   - [x] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
   - [x] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
+- [ ] **Phase 53: Cross-Provider Tool Calling Reliability** — Capability registry routes models to native or structured tool calling; OpenRouter quality strategy setting; JSON parser for non-native models; zero regression for OpenAI (4/4 plans)
+  - [ ] 053-01-PLAN.md — Backend: MODEL_CAPABILITIES registry, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (Wave 1)
+  - [ ] 053-02-PLAN.md — Backend + Frontend: openrouter_tool_strategy setting with UI dropdown (Wave 2)
+  - [ ] 053-03-PLAN.md — Backend: tool_parser.py module with JSON extraction, threads.py integration (Wave 3)
+  - [ ] 053-04-PLAN.md — Tests: test_tool_parser.py, test_calling_mode.py, test_openai_service.py (Wave 4)
 
 ## Phase Details
 
@@ -208,7 +213,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
+Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51 → 52 → 53
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -216,9 +221,11 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
 | 46. Document Version Deletion | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 47. Document List & Upload Polish | v2.4 | 2/2 | Complete | 2026-04-25 |
-| 48. Settings & Navigation Polish | v2.4 | 0/3 | Not started | - |
-| 49. Library Health at Scale | v2.4 | 2/2 | Complete    | 2026-04-25 |
+| 48. Settings & Navigation Polish | v2.4 | 3/3 | Complete | 2026-04-25 |
+| 49. Library Health at Scale | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
+| 52. Multi-Provider Model Routing | v2.4 | 3/3 | Complete | 2026-04-25 |
+| 53. Cross-Provider Tool Calling Reliability | v2.4 | 0/4 | Not started | - |
 | ~~Smart Skill Dispatch~~ | Deferred → Skills Studio | — | Deferred | — |
 
 ### Phase 51: Context Window Management
@@ -255,3 +262,24 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
   5. Settings clearly exposes which model each agent role uses (main, sub-agent, title, follow-up) so the user always knows what is running
 **Plans**: 3/3 complete — completed 2026-04-25
 **UI hint**: yes
+
+### Phase 53: Cross-Provider Tool Calling Reliability
+
+**Goal**: Tool calling works reliably across all providers — OpenAI models use native API tools (zero regression), while non-OpenAI models (GLM 5.1, DeepSeek, Kimi via OpenRouter) use deterministic structured JSON-in-prompt mode. User controls OpenRouter behavior via a Settings dropdown.
+
+**Depends on**: Phase 52 (Multi-Provider Model Routing — provider-aware infrastructure in place)
+**Requirements**: TOOL-01, TOOL-02, TOOL-03, TOOL-04
+**Success Criteria** (what must be TRUE):
+  1. OpenAI models (gpt-4o, gpt-4.1, etc.) emit tool calls via native API parameters with identical behavior and latency to pre-phase code
+  2. GLM 5.1, DeepSeek, Kimi, and other OpenRouter models output structured JSON tool calls instead of planning text ("Now let me search...")
+  3. Structured JSON parser extracts tool calls from markdown blocks or inline JSON with 100% reliability for valid output
+  4. Unknown or untested models default to structured mode — safe by default, no surprises
+  5. User can toggle OpenRouter strategy between Quality (`:exacto` routing + Response Healing), Native (assume tool support), and XML (force structured) in Settings
+  6. Parse failures are graceful — conversation continues with text response, no errors or infinite loops
+  7. 32+ unit tests cover parser, calling mode resolution, and OpenRouter quality enhancements with zero regression in existing tests
+**Plans**: 4 plans
+  - [ ] 053-01-PLAN.md — Backend: MODEL_CAPABILITIES registry, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (Wave 1)
+  - [ ] 053-02-PLAN.md — Backend + Frontend: openrouter_tool_strategy setting with UI dropdown (Wave 2)
+  - [ ] 053-03-PLAN.md — Backend: tool_parser.py module with JSON extraction, threads.py integration (Wave 3)
+  - [ ] 053-04-PLAN.md — Tests: 32+ unit tests for parser, calling mode, and OpenRouter enhancements (Wave 4)
+**UI hint**: yes (Settings dropdown only; no chat UI changes)
