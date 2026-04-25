@@ -637,6 +637,37 @@ export interface HealthSummary {
   stale: StaleDoc[]
 }
 
+export interface HealthOverview {
+  health_score: number
+  total_documents: number
+  retrieved_this_month: number
+  never_retrieved_count: number
+  stale_count: number
+  low_confidence_queries_count: number
+  coverage_percent: number
+  avg_confidence: number
+}
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  offset: number
+  limit: number
+}
+
+export interface RetrievalTrendPoint {
+  date: string
+  retrieval_count: number
+  unique_documents: number
+}
+
+export interface LowConfidenceQuery {
+  query_text: string
+  avg_similarity: number
+  occurrence_count: number
+  document_count: number
+}
+
 // -- Feedback types -----------------------------------------------------------
 
 export interface FeedbackRequest {
@@ -660,11 +691,63 @@ export interface FeedbackStats {
 
 // ── Knowledge Health API functions ────────────────────────────────────────────
 
+/**
+ * @deprecated Use paginated endpoints (getHealthOverview, getMostRetrieved, etc.) instead.
+ */
 export async function getKnowledgeHealthSummary(staleDays = 90): Promise<HealthSummary> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/knowledge-health/summary?stale_days=${staleDays}`, { headers })
   if (!res.ok) throw new Error("Failed to load health summary")
   return res.json() as Promise<HealthSummary>
+}
+
+export async function getHealthOverview(staleDays = 90): Promise<HealthOverview> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/overview?stale_days=${staleDays}`, { headers })
+  if (!res.ok) throw new Error("Failed to load health overview")
+  return res.json() as Promise<HealthOverview>
+}
+
+export async function getMostRetrieved(offset = 0, limit = 20): Promise<PaginatedResponse<MostRetrievedDoc>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/most-retrieved?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load most retrieved documents")
+  return res.json() as Promise<PaginatedResponse<MostRetrievedDoc>>
+}
+
+export async function getNeverRetrieved(offset = 0, limit = 20): Promise<PaginatedResponse<NeverRetrievedDoc>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/never-retrieved?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load never retrieved documents")
+  return res.json() as Promise<PaginatedResponse<NeverRetrievedDoc>>
+}
+
+export async function getStaleDocs(offset = 0, limit = 20, staleDays = 90): Promise<PaginatedResponse<StaleDoc>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/stale?offset=${offset}&limit=${limit}&stale_days=${staleDays}`, { headers })
+  if (!res.ok) throw new Error("Failed to load stale documents")
+  return res.json() as Promise<PaginatedResponse<StaleDoc>>
+}
+
+export async function getLowConfidenceDocs(offset = 0, limit = 20): Promise<PaginatedResponse<LowConfidenceDoc>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/low-confidence/documents?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load low confidence documents")
+  return res.json() as Promise<PaginatedResponse<LowConfidenceDoc>>
+}
+
+export async function getLowConfidenceQueries(offset = 0, limit = 20): Promise<PaginatedResponse<LowConfidenceQuery>> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/low-confidence/queries?offset=${offset}&limit=${limit}`, { headers })
+  if (!res.ok) throw new Error("Failed to load low confidence queries")
+  return res.json() as Promise<PaginatedResponse<LowConfidenceQuery>>
+}
+
+export async function getRetrievalTrend(days = 30): Promise<RetrievalTrendPoint[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/knowledge-health/retrieval-trend?days=${days}`, { headers })
+  if (!res.ok) throw new Error("Failed to load retrieval trend")
+  return res.json() as Promise<RetrievalTrendPoint[]>
 }
 
 export async function moveDocument(id: string, folderId: string | null): Promise<Document> {
