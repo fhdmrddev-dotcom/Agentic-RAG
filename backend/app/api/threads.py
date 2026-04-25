@@ -526,6 +526,23 @@ async def send_message(
                 )
                 active_system_prompt = active_system_prompt + memory_note
 
+            # Inform the agent about tools disabled via user settings so it
+            # doesn't attempt to call them or ask clarifying questions about them.
+            disabled_tools: list[str] = []
+            if not user_settings.web_search_enabled:
+                disabled_tools.append("web_search (disabled in Settings › Integrations › Web Search)")
+            if not user_settings.sandbox_enabled:
+                disabled_tools.append("execute_code (disabled in Settings › Integrations › Code Execution)")
+            if disabled_tools:
+                disabled_note = (
+                    "\n\n## Disabled Tools\n"
+                    "The following tools are currently disabled by the user and are NOT available. "
+                    "Do not attempt to call them. If a task requires one of these tools, "
+                    "clearly tell the user it is disabled and how to enable it:\n"
+                    + "\n".join(f"- {t}" for t in disabled_tools)
+                )
+                active_system_prompt = active_system_prompt + disabled_note
+
         messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
         messages.extend(_reconstruct_history(history_resp.data))
 

@@ -548,7 +548,7 @@ export function SettingsPage() {
     setVectorWeight(data.vector_search_weight)
     setKeywordWeight(data.keyword_search_weight)
     setRrfK(data.rrf_k)
-    setTavilyApiKey(data.web_search_enabled ? KEY_PLACEHOLDER : "")
+    setTavilyApiKey(data.web_search_has_api_key ? KEY_PLACEHOLDER : "")
     setWebSearchMaxResults(data.web_search_max_results)
     setWebSearchEnabled(data.web_search_enabled)
     setSandboxEnabled(data.sandbox_enabled)

@@ -51,6 +51,7 @@ class FullSettingsResponse(BaseModel):
     rrf_k: int
     # Web search
     web_search_enabled: bool
+    web_search_has_api_key: bool
     web_search_max_results: int
     # Sandbox
     sandbox_enabled: bool
@@ -141,6 +142,7 @@ def _build_response(s=None) -> FullSettingsResponse:
         keyword_search_weight=s.keyword_search_weight,
         rrf_k=s.rrf_k,
         web_search_enabled=s.web_search_enabled,
+        web_search_has_api_key=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
         context_window_max_tokens=s.context_window_max_tokens,

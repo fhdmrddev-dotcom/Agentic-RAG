@@ -407,6 +407,7 @@ export interface FullAppSettings {
   keyword_search_weight: number
   rrf_k: number
   web_search_enabled: boolean
+  web_search_has_api_key: boolean
   web_search_max_results: number
   sandbox_enabled: boolean
   context_window_max_tokens: number
