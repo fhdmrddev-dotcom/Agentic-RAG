@@ -23,6 +23,7 @@ interface Props<T extends BaseDoc> {
   emptyHeading: string
   emptyBody: string
   emptyIcon: LucideIcon
+  emptyVariant?: "positive" | "neutral"
   renderChip: (doc: T) => React.ReactNode
   onRemove: (id: string) => void
   maxVisible?: number
@@ -36,6 +37,7 @@ export function HealthPanel<T extends BaseDoc>({
   emptyHeading,
   emptyBody,
   emptyIcon,
+  emptyVariant = "positive",
   renderChip,
   onRemove,
   maxVisible = DEFAULT_MAX_VISIBLE,
@@ -60,7 +62,7 @@ export function HealthPanel<T extends BaseDoc>({
       </CardHeader>
       <CardContent className="p-0">
         {documents.length === 0 ? (
-          <HealthEmptyState icon={emptyIcon} heading={emptyHeading} body={emptyBody} />
+          <HealthEmptyState icon={emptyIcon} heading={emptyHeading} body={emptyBody} variant={emptyVariant} />
         ) : (
           <>
             <div className="divide-y divide-border/30">
