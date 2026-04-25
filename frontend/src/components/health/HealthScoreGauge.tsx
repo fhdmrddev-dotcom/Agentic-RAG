@@ -25,64 +25,70 @@ export function HealthScoreGauge({ score, size = "lg" }: Props) {
   const tipX = cx + needleLen * Math.cos(angleRad)
   const tipY = cy - needleLen * Math.sin(angleRad)
 
-  const ticks = [0, 25, 50, 75, 100]
+  // Points on the arc for zone boundaries
+  const ptAt = (s: number) => {
+    const a = Math.PI * (1 - s / 100)
+    return { x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) }
+  }
+  const p0   = ptAt(0)
+  const p60  = ptAt(60)
+  const p80  = ptAt(80)
+  const p100 = ptAt(100)
 
-  const dimensions = size === "lg"
-    ? { width: "w-full", height: "h-56", textSize: "text-4xl", labelSize: "text-sm" }
-    : { width: "w-32", height: "h-28", textSize: "text-2xl", labelSize: "text-xs" }
+  const sw = 13
+  const isLg = size === "lg"
 
   return (
-    <div className={`${dimensions.width} ${dimensions.height} flex flex-col items-center justify-center`}>
-      <svg viewBox="0 0 200 120" className="w-full h-full">
-        {/* Background arc */}
+    <div className={`${isLg ? "w-full h-56" : "w-32"} flex flex-col items-center justify-center`}>
+      <svg viewBox="0 0 200 120" className="w-full">
+        {/* Zone backgrounds — always visible so color context is clear at any score */}
         <path
-          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`}
-          fill="none"
-          stroke="hsl(var(--muted))"
-          strokeWidth="12"
-          strokeLinecap="round"
+          d={`M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 0 0 ${p60.x.toFixed(2)} ${p60.y.toFixed(2)}`}
+          fill="none" stroke="#f87171" strokeOpacity="0.22" strokeWidth={sw} strokeLinecap="butt"
         />
-        {/* Foreground arc */}
         <path
-          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`}
+          d={`M ${p60.x.toFixed(2)} ${p60.y.toFixed(2)} A ${r} ${r} 0 0 0 ${p80.x.toFixed(2)} ${p80.y.toFixed(2)}`}
+          fill="none" stroke="#fbbf24" strokeOpacity="0.22" strokeWidth={sw} strokeLinecap="butt"
+        />
+        <path
+          d={`M ${p80.x.toFixed(2)} ${p80.y.toFixed(2)} A ${r} ${r} 0 0 0 ${p100.x.toFixed(2)} ${p100.y.toFixed(2)}`}
+          fill="none" stroke="#34d399" strokeOpacity="0.22" strokeWidth={sw} strokeLinecap="butt"
+        />
+        {/* Score fill arc — overlays the zone background up to the current score */}
+        <path
+          d={`M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)} A ${r} ${r} 0 0 0 ${p100.x.toFixed(2)} ${p100.y.toFixed(2)}`}
           fill="none"
           stroke={strokeColor}
-          strokeWidth="12"
+          strokeWidth={sw}
           strokeLinecap="round"
           strokeDasharray={dashArray}
           style={{ transition: "stroke-dasharray 0.7s ease-out" }}
         />
-        {/* Ticks */}
-        {ticks.map((t) => {
-          const tickAngle = Math.PI * (1 - t / 100)
-          const innerR = r - 18
-          const outerR = r - 6
-          const x1 = cx + innerR * Math.cos(tickAngle)
-          const y1 = cy - innerR * Math.sin(tickAngle)
-          const x2 = cx + outerR * Math.cos(tickAngle)
-          const y2 = cy - outerR * Math.sin(tickAngle)
+        {/* Zone dividers at 60 and 80 */}
+        {[60, 80].map((s) => {
+          const a = Math.PI * (1 - s / 100)
           return (
             <line
-              key={t}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="hsl(var(--muted-foreground))"
-              strokeWidth="2"
-              strokeLinecap="round"
-              opacity={0.5}
+              key={s}
+              x1={(cx + (r - sw * 0.55) * Math.cos(a)).toFixed(2)}
+              y1={(cy - (r - sw * 0.55) * Math.sin(a)).toFixed(2)}
+              x2={(cx + (r + sw * 0.55) * Math.cos(a)).toFixed(2)}
+              y2={(cy - (r + sw * 0.55) * Math.sin(a)).toFixed(2)}
+              stroke="hsl(var(--background))"
+              strokeWidth="2.5"
             />
           )
         })}
-        {/* Needle pivot circle */}
-        <circle cx={cx} cy={cy} r="5" fill="hsl(var(--card))" stroke="hsl(var(--foreground))" strokeWidth="2" />
+        {/* Needle pivot — colored by zone */}
+        <circle
+          cx={cx} cy={cy} r="5"
+          fill={strokeColor}
+          style={{ transition: "fill 0.7s ease-out" }}
+        />
         {/* Needle */}
         <line
-          x1={cx}
-          y1={cy}
-          x2={tipX}
-          y2={tipY}
+          x1={cx} y1={cy}
+          x2={tipX.toFixed(2)} y2={tipY.toFixed(2)}
           stroke="hsl(var(--foreground))"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -91,10 +97,10 @@ export function HealthScoreGauge({ score, size = "lg" }: Props) {
       </svg>
       {/* Score text */}
       <div className="flex flex-col items-center -mt-2">
-        <span className={`font-bold font-headline tabular-nums leading-none ${colorClass} ${dimensions.textSize}`}>
+        <span className={`font-bold font-headline tabular-nums leading-none ${colorClass} ${isLg ? "text-4xl" : "text-2xl"}`}>
           {clamped}
         </span>
-        <span className={`font-medium ${dimensions.labelSize} text-muted-foreground mt-1`}>{label}</span>
+        <span className={`font-medium ${isLg ? "text-sm" : "text-xs"} text-muted-foreground mt-1`}>{label}</span>
       </div>
     </div>
   )

@@ -639,6 +639,7 @@ export interface HealthSummary {
 
 export interface HealthOverview {
   health_score: number
+  high_confidence_rate: number
   total_documents: number
   retrieved_this_month: number
   never_retrieved_count: number

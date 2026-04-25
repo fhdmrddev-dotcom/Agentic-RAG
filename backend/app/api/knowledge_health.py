@@ -11,6 +11,7 @@ router = APIRouter(prefix="/knowledge-health", tags=["knowledge-health"])
 
 TOP_N = 10
 LOW_CONF_THRESHOLD = 0.40   # D-02: avg similarity below this = low-confidence
+HIGH_CONF_THRESHOLD = 0.50  # similarity at or above this = "matched well"
 WINDOW_DAYS = 30             # D-07: most-retrieved and low-confidence window
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
@@ -492,6 +493,9 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
         if row.get("source_refs") and row.get("confidence_avg_similarity") is not None
     ]
     avg_confidence = round(sum(conf_values) / max(len(conf_values), 1), 2)
+    high_confidence_rate = round(
+        sum(1 for v in conf_values if v >= HIGH_CONF_THRESHOLD) / max(len(conf_values), 1), 2
+    )
 
     # Feedback positive rate
     feedback_res = (
@@ -523,6 +527,7 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
         "low_confidence_queries_count": low_confidence_queries_count,
         "coverage_percent": coverage_percent,
         "avg_confidence": avg_confidence,
+        "high_confidence_rate": high_confidence_rate,
     }
 
 
