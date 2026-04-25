@@ -75,6 +75,7 @@ class UserEffectiveSettings(BaseModel):
     # Web search
     tavily_api_key: str
     web_search_max_results: int
+    web_search_enabled: bool
 
     # Sandbox
     sandbox_enabled: bool
@@ -256,6 +257,7 @@ def load_app_settings() -> UserEffectiveSettings:
 
         tavily_api_key=_str(override, "tavily_api_key", env_settings.tavily_api_key),
         web_search_max_results=_int(override, "web_search_max_results", env_settings.web_search_max_results),
+        web_search_enabled=_bool(override, "web_search_enabled", bool(env_settings.tavily_api_key)),
 
         sandbox_enabled=_bool(override, "sandbox_enabled", env_settings.sandbox_enabled),
         context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
