@@ -152,6 +152,12 @@ async def upload_document(
         )
 
     raw = await file.read()
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+    if len(raw) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="File too large. Maximum size is 50 MB.",
+        )
     if len(raw) == 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
