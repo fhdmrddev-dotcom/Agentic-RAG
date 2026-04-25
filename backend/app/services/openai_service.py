@@ -495,14 +495,17 @@ EXPLORER_SYSTEM_PROMPT = (
 )
 
 
-def get_tools() -> list[dict]:
-    """Return the active tool list based on current config."""
+def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict]:
+    """Return the active tool list based on per-user effective settings."""
+    effective = user_settings if user_settings is not None else None
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL]
-    if settings.web_search_enabled:
+    web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
+    sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
+    if web_enabled:
         tools.append(WEB_SEARCH_TOOL)
-    if settings.sandbox_enabled:
+    if sandbox_enabled:
         tools.append(EXECUTE_CODE_TOOL)
     return tools
 
@@ -699,7 +702,7 @@ def create_streaming_chat(
         token_param: resolved_tokens,
     }
     if tool_choice == "auto":
-        kwargs["tools"] = tools_override if tools_override is not None else get_tools()
+        kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)
         kwargs["tool_choice"] = "auto"
     return client.chat.completions.create(**kwargs)
 
