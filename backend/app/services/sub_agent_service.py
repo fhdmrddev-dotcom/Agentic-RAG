@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import openai
 from typing import TYPE_CHECKING, Generator
 
 from langsmith import traceable
@@ -89,13 +91,36 @@ def run_sub_agent(
 
     resolved_tokens = _resolve_max_tokens(output_ceiling, user_settings)
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
-    stream = client.chat.completions.create(
-        model=effective_model,
-        messages=messages,
-        stream=True,
-        **{token_param: resolved_tokens},
-    )
-
-    for chunk in stream:
-        if chunk.choices and chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+    _original_model = effective_model
+    try:
+        stream = client.chat.completions.create(
+            model=effective_model,
+            messages=messages,
+            stream=True,
+            **{token_param: resolved_tokens},
+        )
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except openai.NotFoundError:
+        provider = user_settings.active_provider if user_settings else ""
+        fallback = (
+            _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+            or (user_settings.llm_model if user_settings else None)
+            or model
+            or settings.llm_model
+        )
+        if not fallback or fallback == _original_model:
+            raise
+        # Yield sentinel so the caller (event_stream) can re-emit as SSE event
+        yield json.dumps({"__type": "fallback_model", "original_model": _original_model, "fallback_model": fallback})
+        token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
+        stream2 = client.chat.completions.create(
+            model=fallback,
+            messages=messages,
+            stream=True,
+            **{token_param2: resolved_tokens},
+        )
+        for chunk in stream2:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content

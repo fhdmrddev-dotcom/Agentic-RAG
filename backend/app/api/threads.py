@@ -9,6 +9,7 @@ from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.responses import sse_response
+import openai
 from openai import APIError
 from supabase import Client
 
@@ -256,8 +257,14 @@ async def delete_thread(
     )
 
 
-def generate_thread_title(first_user_message: str, user_settings=None) -> str:
-    """Call LLM to produce a short thread title from the first user message."""
+def generate_thread_title(
+    first_user_message: str,
+    user_settings=None,
+) -> tuple[str, dict | None]:
+    """Call LLM to produce a short thread title from the first user message.
+
+    Returns (title, fallback_info). fallback_info is None unless a 404 retry occurred.
+    """
     try:
         client = get_llm_client(user_settings)
         # Use cheapest model per provider — same resolution as sub_agent_service/suggestion_service.
@@ -275,21 +282,46 @@ def generate_thread_title(first_user_message: str, user_settings=None) -> str:
                 or (user_settings.llm_model if user_settings else settings.llm_model)
             )
         token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
+        title_messages = [
+            {
+                "role": "system",
+                "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
+            },
+            {"role": "user", "content": first_user_message[:500]},
+        ]
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
-                },
-                {"role": "user", "content": first_user_message[:500]},
-            ],
+            messages=title_messages,
             stream=False,
             **{token_param: 20},
         )
-        return response.choices[0].message.content.strip() or "New Chat"
+        return response.choices[0].message.content.strip() or "New Chat", None
+    except openai.NotFoundError:
+        provider = user_settings.active_provider if user_settings else ""
+        fallback = (
+            _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+            or (user_settings.llm_model if user_settings else settings.llm_model)
+        )
+        if not fallback or fallback == model:
+            return first_user_message[:40].strip() or "New Chat", None
+        fallback_info = {"original_model": model, "fallback_model": fallback}
+        token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
+        title_messages = [
+            {
+                "role": "system",
+                "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
+            },
+            {"role": "user", "content": first_user_message[:500]},
+        ]
+        response = client.chat.completions.create(
+            model=fallback,
+            messages=title_messages,
+            stream=False,
+            **{token_param2: 20},
+        )
+        return response.choices[0].message.content.strip() or "New Chat", fallback_info
     except Exception:
-        return first_user_message[:40].strip() or "New Chat"
+        return first_user_message[:40].strip() or "New Chat", None
 
 
 @router.get("/{thread_id}/messages", response_model=list[MessageResponse])
@@ -864,6 +896,14 @@ async def send_message(
                                     sub_agent_content = ""
                                     try:
                                         for text_chunk in run_sub_agent(doc["content"], doc["filename"], args["task"], model=body.model, user_settings=user_settings):
+                                            # Detect fallback sentinel emitted by sub_agent_service
+                                            if text_chunk.startswith('{"__type": "fallback_model"'):
+                                                try:
+                                                    sentinel = json.loads(text_chunk)
+                                                    yield f"data: {json.dumps({'type': 'fallback_model', 'original_model': sentinel['original_model'], 'fallback_model': sentinel['fallback_model']})}\n\n"
+                                                except (json.JSONDecodeError, KeyError):
+                                                    pass
+                                                continue
                                             sub_agent_content += text_chunk
                                             yield f"data: {json.dumps({'type': 'sub_agent_delta', 'content': text_chunk})}\n\n"
                                     except Exception as sa_err:
@@ -1416,7 +1456,9 @@ async def send_message(
           # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
           if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
               first_user_msg = history_resp.data[0]["content"]
-              title = generate_thread_title(first_user_msg, user_settings=user_settings)
+              title, title_fallback = generate_thread_title(first_user_msg, user_settings=user_settings)
+              if title_fallback:
+                  yield f"data: {json.dumps({'type': 'fallback_model', **title_fallback})}\n\n"
               try:
                   supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
                   yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
@@ -1429,11 +1471,13 @@ async def send_message(
           # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
           try:
               from app.services.suggestion_service import generate_suggestions
-              questions = generate_suggestions(
+              questions, sugg_fallback = generate_suggestions(
                   user_message=body.content,       # the user's message
                   assistant_response=full_content,  # accumulated full response text
                   user_settings=user_settings,
               )
+              if sugg_fallback:
+                  yield f"data: {json.dumps({'type': 'fallback_model', **sugg_fallback})}\n\n"
               if questions:
                   yield f"data: {json.dumps({'type': 'suggestions', 'questions': questions[:3]})}\n\n"
           except Exception:
