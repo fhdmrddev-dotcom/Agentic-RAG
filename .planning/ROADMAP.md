@@ -104,7 +104,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans) — completed 2026-04-23
 - [x] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup (2/2 plans) — completed 2026-04-25
 - [x] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works (2/2 plans) — completed 2026-04-25
-- [ ] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
+- [x] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment (3/3 plans) — completed 2026-04-25
 - [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states (completed 2026-04-25)
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
   - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
@@ -184,9 +184,9 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   4. When the sidebar is collapsed, the logo icon remains visible (icon-only, no text)
 **Plans**: 3 plans
 Plans:
-- [ ] 048-01-PLAN.md — Backend: web_search_enabled settings stack + feedback stats counts (SETT-01, SETT-02)
-- [ ] 048-02-PLAN.md — Frontend: NavPanel logo icon visibility + TabsTrigger animation fix (NAV-01, NAV-02)
-- [ ] 048-03-PLAN.md — Frontend: web search toggle UI + feedback panel stat cards (SETT-01, SETT-02)
+- [x] 048-01-PLAN.md — Backend: web_search_enabled settings stack + feedback stats counts (SETT-01, SETT-02)
+- [x] 048-02-PLAN.md — Frontend: NavPanel logo icon visibility + TabsTrigger animation fix (NAV-01, NAV-02)
+- [x] 048-03-PLAN.md — Frontend: web search toggle UI + feedback panel stat cards (SETT-01, SETT-02)
 **UI hint**: yes
 
 ### Phase 49: Library Health at Scale
