@@ -25,27 +25,27 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 
 ## Current Position
 
-Phase: 46 of 7 (Document Version Deletion) — COMPLETE
+Phase: 47 of 7 (Document List & Upload Polish) — COMPLETE
 Plan: 2/2 complete
-Status: Phase 46 complete — UAT approved 2026-04-25
-Last activity: 2026-04-25 — Backend scope param + frontend version-aware dialog shipped
+Status: Phase 47 complete — 2026-04-25
+Last activity: 2026-04-25 — Root visibility polish + 50 MB upload limit
 
 Progress: [█████░░░░░] 57%
 
-Next: Phase 47 (Document List & Upload Polish) — needs planning
+Next: Phase 48 (Settings & Navigation Polish)
 
-## Phase 46 Plan Summary
+## Phase 47 Plan Summary
 
-1. **Plan 46-01: Backend scope param** — Extended DELETE /documents/{id} with scope=version|all, is_latest promotion, bulk sibling delete, audit log. ✅ COMPLETE
-2. **Plan 46-02: Frontend delete dialog** — Version-aware dialog (Cancel | Delete vN | Delete All Versions), api.ts + useDocuments.ts scope threading. ✅ COMPLETE
+1. **Plan 47-01: Frontend root visibility** — Root document count badge in FolderTree, Root header block in IngestionPage, updated empty state copy in DocumentList. ✅ COMPLETE
+2. **Plan 47-02: Backend 50 MB upload limit** — Early size validation in documents.py upload endpoint with specific error message propagating through existing frontend error chain. ✅ COMPLETE
 
-## Phase 46 Verified Results
+## Phase 47 Verified Results
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| DOC-01 | ✅ | User offered version vs all-versions choice in delete dialog |
-| DOC-02 | ✅ | scope=version deletes row+storage, promotes next-highest sibling as is_latest |
-| DOC-03 | ✅ | scope=all bulk-deletes all sibling rows/storage; CASCADE handles chunks/tables/images |
+| DOC-04 | ✅ | Root documents clearly visible with count badge and contextual header |
+| DOC-05 | ✅ | Uploads >50 MB return specific "File too large. Maximum size is 50 MB." error |
+| DOC-06 | ✅ | Root upload UX improved with clear header and empty state guidance |
 
 ## Performance Metrics
 

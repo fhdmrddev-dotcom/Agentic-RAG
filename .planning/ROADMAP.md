@@ -103,7 +103,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
 - [x] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans) — completed 2026-04-23
 - [x] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup (2/2 plans) — completed 2026-04-25
-- [ ] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
+- [x] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works (2/2 plans) — completed 2026-04-25
 - [ ] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
 - [ ] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
@@ -168,7 +168,9 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   1. Documents stored in the root folder (no folder assignment) are clearly visible in the document list and recognizable as root-level items
   2. When a file upload fails, the user sees the specific reason (duplicate file, unsupported type, empty file, or size limit exceeded)
   3. User can upload to the root folder successfully, and the UX makes it clear where the file is being placed
-**Plans**: TBD
+**Plans**: 2 plans
+  - [x] 47-01-PLAN.md — Frontend root visibility: badge, header, empty state (DOC-04, DOC-06) ✅
+  - [x] 47-02-PLAN.md — Backend 50 MB file size limit with specific error (DOC-05) ✅
 **UI hint**: yes
 
 ### Phase 48: Settings & Navigation Polish
