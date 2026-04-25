@@ -92,10 +92,12 @@ export function useDocuments(): UseDocuments {
   const deleteDoc = useCallback(async (id: string, scope?: "version" | "all") => {
     await deleteDocument(id, scope)
     if (scope === "all") {
-      // Optimistically remove all documents with the same filename (all versions gone)
+      // Optimistically remove all documents with the same filename in the same folder
       const target = documents.find((d) => d.id === id)
       if (target) {
-        setDocuments((prev) => prev.filter((d) => d.filename !== target.filename))
+        setDocuments((prev) =>
+          prev.filter((d) => !(d.filename === target.filename && d.folder_id === target.folder_id))
+        )
       }
     } else {
       setDocuments((prev) => prev.filter((d) => d.id !== id))

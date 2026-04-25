@@ -518,9 +518,10 @@ async def delete_document(
                     pass
 
         # Delete all sibling rows; ON DELETE CASCADE handles chunks/tables/images (D-09)
+        # user_id guard redundant (sibling_ids from user-scoped SELECT) but added for defence-in-depth
         sibling_ids = [s["id"] for s in siblings]
         if sibling_ids:
-            supabase.table("documents").delete().in_("id", sibling_ids).execute()
+            supabase.table("documents").delete().eq("user_id", current_user["id"]).in_("id", sibling_ids).execute()
 
     else:
         # scope == "version" (default) — D-06: delete only the targeted row + storage file
