@@ -207,7 +207,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 | 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
 | 46. Document Version Deletion | v2.4 | 2/2 | Complete | 2026-04-25 |
-| 47. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
+| 47. Document List & Upload Polish | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 48. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
 | 49. Library Health at Scale | v2.4 | 0/? | Not started | - |
 | 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
