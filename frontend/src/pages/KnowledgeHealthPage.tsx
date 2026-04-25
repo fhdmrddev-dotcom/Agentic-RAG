@@ -422,18 +422,18 @@ export function KnowledgeHealthPage() {
                 </Card>
                 <Card className="ghost-border bg-card/50 flex flex-col justify-center p-4">
                   <CardHeader className="p-0 pb-2">
-                    <CardTitle className="text-xs font-medium text-muted-foreground">Match Quality</CardTitle>
+                    <CardTitle className="text-xs font-medium text-muted-foreground">Retrieval Score</CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     {(() => {
-                      const pct = Math.round((overview?.high_confidence_rate ?? 0) * 100)
-                      const color = pct >= 70 ? "text-emerald-400" : pct >= 50 ? "text-amber-400" : "text-red-400"
+                      const pct = Math.round((overview?.avg_confidence ?? 0) * 100)
+                      const color = pct >= 60 ? "text-emerald-400" : pct >= 40 ? "text-amber-400" : "text-red-400"
                       return (
                         <>
                           <p className={`text-3xl font-bold font-headline tabular-nums leading-none ${color}`}>
                             {pct}%
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">queries matched well (≥50% similarity)</p>
+                          <p className="text-xs text-muted-foreground mt-1">avg doc relevance to queries</p>
                         </>
                       )
                     })()}
