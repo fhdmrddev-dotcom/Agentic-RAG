@@ -475,10 +475,12 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
     # Coverage percent
     coverage_percent = round((retrieved_this_month / max(total_documents, 1)) * 100, 1)
 
-    # Average confidence
+    # Average confidence — only for assistant messages that performed RAG retrieval
+    # (have source_refs). Non-RAG messages (chitchat, tool calls without retrieval)
+    # have confidence_avg_similarity = 0 and must not drag down the average.
     conf_res = (
         supabase.table("messages")
-        .select("confidence_avg_similarity")
+        .select("confidence_avg_similarity, source_refs")
         .eq("user_id", user_id)
         .eq("role", "assistant")
         .gte("created_at", _window_cutoff(WINDOW_DAYS))
@@ -487,7 +489,7 @@ def _fetch_overview_metrics(supabase: Client, user_id: str, stale_days: int) -> 
     conf_values = [
         row.get("confidence_avg_similarity") or 0.0
         for row in conf_res.data
-        if row.get("confidence_avg_similarity") is not None
+        if row.get("source_refs") and row.get("confidence_avg_similarity") is not None
     ]
     avg_confidence = round(sum(conf_values) / max(len(conf_values), 1), 2)
 

@@ -8,10 +8,10 @@ interface Props {
 export function HealthScoreGauge({ score, size = "lg" }: Props) {
   const clamped = Math.max(0, Math.min(100, score))
 
-  const { colorClass, label } = useMemo(() => {
-    if (clamped >= 80) return { colorClass: "text-emerald-400", label: "Healthy" }
-    if (clamped >= 60) return { colorClass: "text-amber-400", label: "Needs Attention" }
-    return { colorClass: "text-red-400", label: "At Risk" }
+  const { colorClass, strokeColor, label } = useMemo(() => {
+    if (clamped >= 80) return { colorClass: "text-emerald-400", strokeColor: "#34d399", label: "Healthy" }
+    if (clamped >= 60) return { colorClass: "text-amber-400", strokeColor: "#fbbf24", label: "Needs Attention" }
+    return { colorClass: "text-red-400", strokeColor: "#f87171", label: "At Risk" }
   }, [clamped])
 
   const cx = 100
@@ -46,7 +46,7 @@ export function HealthScoreGauge({ score, size = "lg" }: Props) {
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 0 ${cx + r} ${cy}`}
           fill="none"
-          className={colorClass.replace("text-", "stroke-")}
+          stroke={strokeColor}
           strokeWidth="12"
           strokeLinecap="round"
           strokeDasharray={dashArray}
