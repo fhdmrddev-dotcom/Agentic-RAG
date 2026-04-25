@@ -238,14 +238,14 @@ export function NavPanel({
 
         {/* Header Row: Logo */}
         <div className="flex items-center h-16 px-4 mb-2 shrink-0">
-          <div className={cn(
-            "flex items-center gap-2 transition-opacity duration-200", 
-            isCollapsed ? "opacity-0" : "opacity-100 delay-100"
-          )}>
+          <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className="font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground">
+            <span className={cn(
+              "font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground transition-opacity duration-200",
+              isCollapsed ? "opacity-0" : "opacity-100 delay-100"
+            )}>
               Agentic RAG
             </span>
           </div>
