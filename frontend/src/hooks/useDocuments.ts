@@ -8,7 +8,7 @@ interface UseDocuments {
   uploading: boolean
   uploadingCount: number
   upload: (file: File, folderId?: string | null) => Promise<{ isDuplicate: boolean }>
-  deleteDoc: (id: string) => Promise<void>
+  deleteDoc: (id: string, scope?: "version" | "all") => Promise<void>
   loadDocuments: () => Promise<void>
 }
 
@@ -89,11 +89,18 @@ export function useDocuments(): UseDocuments {
     }
   }, [])
 
-  const deleteDoc = useCallback(async (id: string) => {
-    await deleteDocument(id)
-    // Realtime DELETE event will update state; optimistically remove too
-    setDocuments((prev) => prev.filter((d) => d.id !== id))
-  }, [])
+  const deleteDoc = useCallback(async (id: string, scope?: "version" | "all") => {
+    await deleteDocument(id, scope)
+    if (scope === "all") {
+      // Optimistically remove all documents with the same filename (all versions gone)
+      const target = documents.find((d) => d.id === id)
+      if (target) {
+        setDocuments((prev) => prev.filter((d) => d.filename !== target.filename))
+      }
+    } else {
+      setDocuments((prev) => prev.filter((d) => d.id !== id))
+    }
+  }, [documents])
 
   return { documents, uploading: uploadingCount > 0, uploadingCount, upload, deleteDoc, loadDocuments }
 }

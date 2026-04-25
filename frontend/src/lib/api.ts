@@ -238,12 +238,12 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
   return { doc, isDuplicate: res.status === 200 }
 }
 
-export async function deleteDocument(id: string): Promise<void> {
+export async function deleteDocument(id: string, scope?: "version" | "all"): Promise<void> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/documents/${id}`, {
-    method: "DELETE",
-    headers,
-  })
+  const url = scope
+    ? `${API_BASE}/documents/${id}?scope=${scope}`
+    : `${API_BASE}/documents/${id}`
+  const res = await fetch(url, { method: "DELETE", headers })
   if (!res.ok) throw new Error("Failed to delete document")
 }
 
