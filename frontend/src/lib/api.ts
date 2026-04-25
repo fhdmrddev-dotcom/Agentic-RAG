@@ -118,6 +118,7 @@ export async function streamMessage(
   onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
   onSuggestions?: (questions: string[]) => void,
   onPlanning?: (iteration: number) => void,
+  onFallbackModel?: (originalModel: string, fallbackModel: string) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   const headers = await getAuthHeaders()
@@ -203,6 +204,8 @@ export async function streamMessage(
           return  // True end of stream after optional suggestions event (Phase 32)
         } else if (parsed.type === "planning" && onPlanning) {
           onPlanning(parsed.iteration as number)
+        } else if (parsed.type === "fallback_model" && onFallbackModel) {
+          onFallbackModel(parsed.original_model as string, parsed.fallback_model as string)
         }
       } catch {
         // ignore malformed lines
@@ -413,6 +416,7 @@ export interface FullAppSettings {
   context_window_max_tokens: number
   sub_agent_max_output_tokens: number
   sub_agent_model: string
+  resolved_sub_agent_model: string
 }
 
 export type AppSettings = FullAppSettings
@@ -466,7 +470,17 @@ export async function updateSettings(body: SettingsUpdate): Promise<FullAppSetti
     headers,
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error("Failed to save settings")
+  if (!res.ok) {
+    try {
+      const err = await res.json() as { detail?: string | Array<{ msg: string }> }
+      if (typeof err.detail === "string") throw new Error(err.detail)
+      if (Array.isArray(err.detail)) throw new Error(err.detail.map((e) => e.msg).join("; "))
+    } catch (parseErr) {
+      // If the thrown error from inner block propagates, let it through
+      if (parseErr instanceof Error && parseErr.message !== "Failed to parse error response") throw parseErr
+    }
+    throw new Error("Failed to save settings")
+  }
   return res.json() as Promise<FullAppSettings>
 }
 

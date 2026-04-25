@@ -5,6 +5,7 @@ import { getMessages, streamMessage } from "../lib/api"
 interface UseMessages {
   messages: Message[]
   isStreaming: boolean
+  fallbackNotice: string | null
   loadMessages: (threadId: string) => Promise<void>
   sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
   stopStreaming: () => void
@@ -19,6 +20,7 @@ function makeTempId() {
 export function useMessages(): UseMessages {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const isSendingRef = useRef(false)
   const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -246,6 +248,11 @@ if (isSendingRef.current) return
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
         )
       },
+      // onFallbackModel — sub-agent retried with provider default after 404
+      (original: string, fallback: string) => {
+        setFallbackNotice(`Model ${original} unavailable — using ${fallback}.`)
+        setTimeout(() => setFallbackNotice(null), 4000)
+      },
       controller.signal,
     )
     } catch (err) {
@@ -320,5 +327,5 @@ if (isSendingRef.current) return
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
 }

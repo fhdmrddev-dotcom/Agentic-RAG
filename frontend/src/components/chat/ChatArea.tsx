@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages } = useMessages()
+  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -190,6 +190,11 @@ useEffect(() => {
           </span>
         )}
       </div>
+      {fallbackNotice && (
+        <div className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1">
+          {fallbackNotice}
+        </div>
+      )}
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
