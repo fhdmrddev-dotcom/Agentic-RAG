@@ -5,7 +5,7 @@ import zipfile
 from uuid import uuid4
 
 from docx import Document as DocxDocument
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pypdf import PdfReader
 from supabase import Client
 
@@ -478,6 +478,7 @@ async def reingest_document(
 async def delete_document(
     document_id: str,
     background_tasks: BackgroundTasks,
+    scope: str = Query(default="version", pattern="^(version|all)$"),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -486,25 +487,12 @@ async def delete_document(
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
-        .single()
+        .maybe_single()
         .execute()
     )
     if not doc_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
-
-    try:
-        supabase.storage.from_("documents").remove([doc_resp.data["file_path"]])
-    except Exception:
-        pass
-
-    supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
-    background_tasks.add_task(
-        write_audit_entry,
-        user_id=current_user["id"],
-        action_type="document.delete",
-        metadata={"document_id": document_id, "filename": doc_resp.data.get("filename", "")},
-        supabase=supabase,
-    )
+    target = doc_resp.data
 
 
 @router.patch("/{document_id}/move", response_model=DocumentResponse)
