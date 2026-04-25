@@ -182,7 +182,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. When web search is toggled off, the web_search tool is excluded from the agent's available tool set regardless of API key
   3. Icon labels appear directly adjacent to their icons in the expanded sidebar with no large gaps between icon and text
   4. When the sidebar is collapsed, the logo icon remains visible (icon-only, no text)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 048-01-PLAN.md — Backend: web_search_enabled settings stack + feedback stats counts (SETT-01, SETT-02)
+- [ ] 048-02-PLAN.md — Frontend: NavPanel logo icon visibility + TabsTrigger animation fix (NAV-01, NAV-02)
+- [ ] 048-03-PLAN.md — Frontend: web search toggle UI + feedback panel stat cards (SETT-01, SETT-02)
 **UI hint**: yes
 
 ### Phase 49: Library Health at Scale
@@ -208,7 +212,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
 | 46. Document Version Deletion | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 47. Document List & Upload Polish | v2.4 | 2/2 | Complete | 2026-04-25 |
-| 48. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
+| 48. Settings & Navigation Polish | v2.4 | 0/3 | Not started | - |
 | 49. Library Health at Scale | v2.4 | 2/2 | Complete    | 2026-04-25 |
 | 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
 | ~~Smart Skill Dispatch~~ | Deferred → Skills Studio | — | Deferred | — |
