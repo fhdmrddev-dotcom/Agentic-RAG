@@ -16,7 +16,7 @@ import type { Document, DocumentMetadata } from "@/types"
 
 interface Props {
   documents: Document[]
-  onDelete: (id: string) => void
+  onDelete: (id: string, scope?: "version" | "all") => void
   onRefresh: () => void
   folderId?: string | null
   currentUserId: string
@@ -228,6 +228,9 @@ function VersionHistoryPanel({
 export function DocumentList({ documents, onDelete, onRefresh, folderId, currentUserId }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<Document | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
 
   // Filter by selected folder:
   // - folderId === undefined: no folder context — show all (backward compat)
@@ -246,6 +249,24 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+
+  const handleDelete = async (scope?: "version" | "all") => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setActiveScope(scope ?? null)
+    setDeleteError(null)
+    try {
+      await onDelete(deleteTarget.id, scope)
+      setDeleteTarget(null)
+      setDeleteError(null)
+    } catch {
+      setDeleteError("Delete failed. Please try again.")
+      // Do NOT close dialog — let user retry or cancel
+    } finally {
+      setDeleting(false)
+      setActiveScope(null)
+    }
+  }
 
   if (filtered.length === 0) {
     return (
@@ -367,31 +388,100 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
       </div>
 
       {/* Delete confirmation dialog */}
-      <Dialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null)
+            setDeleteError(null)
+            setActiveScope(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete document?</DialogTitle>
             <DialogDescription>
-              This will permanently delete{" "}
-              <span className="font-medium text-foreground">{deleteTarget?.filename}</span>{" "}
-              and all its chunks. This action cannot be undone.
+              {deleteTarget && hasVersions(deleteTarget) ? (
+                <>
+                  This document has {deleteTarget.version_number} versions.{" "}
+                  <span className="font-medium text-foreground">Delete v{deleteTarget.version_number}</span>{" "}
+                  to promote v{(deleteTarget.version_number ?? 1) - 1} as current, or delete all versions permanently.
+                </>
+              ) : (
+                <>
+                  Permanently delete{" "}
+                  <span className="font-medium text-foreground">{deleteTarget?.filename}</span>?{" "}
+                  This action cannot be undone.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
+
+          {deleteError && (
+            <p className="text-sm text-destructive px-1">{deleteError}</p>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null)
+                setDeleteError(null)
+                setActiveScope(null)
+              }}
+              disabled={deleting}
+            >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (deleteTarget) {
-                  onDelete(deleteTarget.id)
-                  setDeleteTarget(null)
-                }
-              }}
-            >
-              Delete
-            </Button>
+
+            {deleteTarget && hasVersions(deleteTarget) ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => handleDelete("version")}
+                  disabled={deleting}
+                >
+                  {deleting && activeScope === "version" ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    `Delete v${deleteTarget.version_number}`
+                  )}
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDelete("all")}
+                  disabled={deleting}
+                >
+                  {deleting && activeScope === "all" ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete All Versions"
+                  )}
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete()}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <span className="h-3 w-3 animate-spin rounded-full border border-current border-t-transparent mr-2" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
