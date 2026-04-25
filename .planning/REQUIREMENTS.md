@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STREAM-03 | Phase 44 | Pending |
 | SKILL-01 | Phase 46 | Pending |
 | SKILL-02 | Phase 46 | Pending |
-| DOC-01 | Phase 47 | Pending |
-| DOC-02 | Phase 47 | Pending |
-| DOC-03 | Phase 47 | Pending |
+| DOC-01 | Phase 46 | Implemented |
+| DOC-02 | Phase 46 | Implemented |
+| DOC-03 | Phase 46 | Implemented |
 | DOC-04 | Phase 48 | Pending |
 | DOC-05 | Phase 48 | Pending |
 | DOC-06 | Phase 48 | Pending |
