@@ -107,7 +107,10 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment (3/3 plans) — completed 2026-04-25
 - [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states (completed 2026-04-25)
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
-- [ ] **Phase 52: Multi-Provider Model Routing** — Full user control over main, sub-agent, title, and follow-up models; provider-aware routing; cross-provider sub-agent fix; fallback on unavailable models
+- [x] **Phase 52: Multi-Provider Model Routing** — Full user control over main, sub-agent, title, and follow-up models; provider-aware routing; cross-provider sub-agent fix; fallback on unavailable models (3/3 plans) — completed 2026-04-25
+  - [x] 052-01-PLAN.md — Backend: config defaults, 404 fallback + SSE sentinel, resolved_sub_agent_model in settings (Wave 1)
+  - [x] 052-02-PLAN.md — Frontend: 422 error parsing, fallback banner, resolved model labels (Wave 2)
+  - [x] 052-03-PLAN.md — MDL-02/03 verification tests + provider-aware routing confirmed (Wave 2)
   - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
   - [x] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
   - [x] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
@@ -250,5 +253,5 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
   3. Switching the chat model mid-conversation preserves full message history — no context loss
   4. If the selected model is unavailable or returns a non-retryable error, the app falls back to a default model for that provider and informs the user
   5. Settings clearly exposes which model each agent role uses (main, sub-agent, title, follow-up) so the user always knows what is running
-**Plans**: TBD
+**Plans**: 3/3 complete — completed 2026-04-25
 **UI hint**: yes
