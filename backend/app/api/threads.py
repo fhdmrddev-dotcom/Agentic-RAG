@@ -19,7 +19,7 @@ from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
-from app.config import settings
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens
 
 # Lazy sandbox import — only if enabled
@@ -29,7 +29,7 @@ from app.services.context_window import trim_messages_to_fit, estimate_messages_
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sql_service import query_documents
-from app.services.sub_agent_service import run_sub_agent, _SUB_AGENT_MODEL_DEFAULTS
+from app.services.sub_agent_service import run_sub_agent
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
