@@ -415,7 +415,7 @@ export function KnowledgeHealthPage() {
                   </CardHeader>
                   <CardContent className="p-0">
                     <p className="text-3xl font-bold font-headline tabular-nums leading-none text-primary">
-                      {Math.round((overview?.coverage_percent ?? 0) * 100)}%
+                      {Math.round(overview?.coverage_percent ?? 0)}%
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">unique docs retrieved / total</p>
                   </CardContent>
@@ -466,7 +466,7 @@ export function KnowledgeHealthPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <p className="text-3xl font-bold font-headline tabular-nums leading-none text-primary">
-                    {Math.round((overview?.coverage_percent ?? 0) * 100)}%
+                    {Math.round(overview?.coverage_percent ?? 0)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">of documents have been retrieved at least once</p>
                   <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
