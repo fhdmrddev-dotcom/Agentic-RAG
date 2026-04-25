@@ -687,6 +687,8 @@ export interface DownvotedDocument {
 export interface FeedbackStats {
   positive_rate: number
   total_ratings: number
+  positive_count: number
+  negative_count: number
   downvoted_documents: DownvotedDocument[]
 }
 

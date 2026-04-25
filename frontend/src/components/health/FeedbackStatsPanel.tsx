@@ -44,14 +44,27 @@ export function FeedbackStatsPanel({ stats, onRemoveDownvoted }: Props) {
           />
         ) : (
           <>
-            {/* Positive rate gauge */}
-            <div className="flex items-center gap-4 px-4 pt-4 pb-2">
-              <HealthScoreGauge score={positivePercent} size="sm" />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-muted-foreground">positive rating</span>
-                <span className="text-xs text-muted-foreground">
-                  all-time · {stats.total_ratings} total ratings
-                </span>
+            {/* Positive rate — 2-col: gauge left, stat cards right */}
+            <div className="grid grid-cols-[auto_1fr] gap-4 px-4 pt-4 pb-2">
+              {/* Left: gauge + subtitle */}
+              <div className="flex flex-col items-center justify-center">
+                <HealthScoreGauge score={positivePercent} size="sm" />
+                <span className="text-xs text-muted-foreground mt-1">positive rating</span>
+              </div>
+              {/* Right: 3 stat cards */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="text-lg font-bold tabular-nums">{stats.total_ratings}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Positive</span>
+                  <span className="text-lg font-bold tabular-nums text-emerald-400">{stats.positive_count}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Negative</span>
+                  <span className="text-lg font-bold tabular-nums text-red-400">{stats.negative_count}</span>
+                </div>
               </div>
             </div>
 

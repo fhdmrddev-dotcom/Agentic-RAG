@@ -512,6 +512,7 @@ export function SettingsPage() {
   // Web search
   const [tavilyApiKey, setTavilyApiKey] = useState("")
   const [webSearchMaxResults, setWebSearchMaxResults] = useState(5)
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true)
 
   // Sandbox
   const [sandboxEnabled, setSandboxEnabled] = useState(false)
@@ -549,6 +550,7 @@ export function SettingsPage() {
     setRrfK(data.rrf_k)
     setTavilyApiKey(data.web_search_enabled ? KEY_PLACEHOLDER : "")
     setWebSearchMaxResults(data.web_search_max_results)
+    setWebSearchEnabled(data.web_search_enabled)
     setSandboxEnabled(data.sandbox_enabled)
     setContextWindowMaxTokens(data.context_window_max_tokens ?? 0)
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
@@ -630,6 +632,7 @@ export function SettingsPage() {
       const body: SettingsUpdate = {
         tavily_api_key: tavilyApiKey || KEY_PLACEHOLDER,
         web_search_max_results: webSearchMaxResults,
+        web_search_enabled: webSearchEnabled,
         sandbox_enabled: sandboxEnabled,
       }
       const updated = await updateSettings(body)
@@ -925,15 +928,25 @@ export function SettingsPage() {
           <TabsContent value="2">
             <div className="bg-card/50 ghost-border rounded-xl p-6 space-y-6">
               {/* Web Search SectionCard */}
-              <SectionCard title="Web Search" description="Enable web search via Tavily. Leave key blank to disable.">
-                <div className="bg-card/40 rounded-md px-3 py-2">
-                  <FieldRow label="Tavily API Key">
-                    <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-\u2026 (leave blank to disable)" />
-                  </FieldRow>
-                  <FieldRow label="Max results">
-                    <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
-                  </FieldRow>
-                </div>
+              <SectionCard title="Web Search" description="Enable web search via Tavily to include live results in responses.">
+                <FieldRow label="Enabled">
+                  <Toggle checked={webSearchEnabled} onChange={setWebSearchEnabled} label={webSearchEnabled ? "On" : "Off"} />
+                </FieldRow>
+                {webSearchEnabled && tavilyApiKey === "" && (
+                  <p className="text-xs text-amber-400 px-3 pb-1">
+                    No Tavily API key configured \u2014 web search will not run.
+                  </p>
+                )}
+                {webSearchEnabled && (
+                  <div className="bg-card/40 rounded-md px-3 py-2">
+                    <FieldRow label="Tavily API Key">
+                      <ApiKeyInput value={tavilyApiKey} onChange={setTavilyApiKey} placeholder="tvly-\u2026" />
+                    </FieldRow>
+                    <FieldRow label="Max results">
+                      <NumberInput value={webSearchMaxResults} onChange={setWebSearchMaxResults} min={1} max={20} />
+                    </FieldRow>
+                  </div>
+                )}
               </SectionCard>
 
               {/* Code Execution Sandbox SectionCard */}
