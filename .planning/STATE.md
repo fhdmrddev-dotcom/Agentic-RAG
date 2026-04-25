@@ -64,6 +64,9 @@ Next: Phase 48 (Settings & Navigation Polish)
 
 ## Accumulated Context
 
+### Roadmap Evolution
+- Phase 52 added: Multi-Provider Model Routing — full provider-aware routing for all agent roles, cross-provider sub-agent fix, model fallback on unavailable models
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.

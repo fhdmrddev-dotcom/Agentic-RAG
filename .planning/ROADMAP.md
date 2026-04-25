@@ -107,6 +107,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment (3/3 plans) — completed 2026-04-25
 - [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states (completed 2026-04-25)
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
+- [ ] **Phase 52: Multi-Provider Model Routing** — Full user control over main, sub-agent, title, and follow-up models; provider-aware routing; cross-provider sub-agent fix; fallback on unavailable models
   - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
   - [x] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
   - [x] 051-03-PLAN.md — tiktoken upgrade for OpenAI token estimation (CTX-05)
@@ -236,4 +237,18 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
   - [x] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
   - [x] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
   - [x] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
+**UI hint**: yes
+
+### Phase 52: Multi-Provider Model Routing
+
+**Goal**: Every model used by the app — main chat, sub-agent, title drafter, follow-up suggester — is transparently controllable by the user, routes correctly across provider boundaries, and degrades gracefully when a model is unavailable
+**Depends on**: Phase 51 (Context Window Management — sub-agent model settings already in place)
+**Requirements**: MDL-01, MDL-02, MDL-03, MDL-04, MDL-05
+**Success Criteria** (what must be TRUE):
+  1. Sub-agent always uses a model from the same provider as the main chat model unless explicitly overridden — the cross-provider 404 error is eliminated
+  2. Title-drafter and follow-up-suggester agents use a cheap model from the active provider (not hardcoded to a specific provider)
+  3. Switching the chat model mid-conversation preserves full message history — no context loss
+  4. If the selected model is unavailable or returns a non-retryable error, the app falls back to a default model for that provider and informs the user
+  5. Settings clearly exposes which model each agent role uses (main, sub-agent, title, follow-up) so the user always knows what is running
+**Plans**: TBD
 **UI hint**: yes
