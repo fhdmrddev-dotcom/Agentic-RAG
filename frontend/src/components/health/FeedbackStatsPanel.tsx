@@ -35,15 +35,30 @@ export function FeedbackStatsPanel({ stats, onRemoveDownvoted }: Props) {
           />
         ) : (
           <>
-            {/* Positive rate stat */}
-            <div className="flex items-baseline gap-2 mb-4 px-4 pt-2">
-              <span className="text-3xl font-bold font-headline tabular-nums leading-none text-primary">
-                {positivePercent}%
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">positive rating</span>
-              <span className="text-xs font-medium text-muted-foreground">
-                all-time &middot; {stats.total_ratings} total ratings
-              </span>
+            {/* Positive rate — 2-col: score left, stat cards right */}
+            <div className="grid grid-cols-[auto_1fr] gap-4 px-4 pt-4 pb-2">
+              {/* Left: positive rate score + subtitle */}
+              <div className="flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold font-headline tabular-nums leading-none text-primary">
+                  {positivePercent}%
+                </span>
+                <span className="text-xs text-muted-foreground mt-1">positive rating</span>
+              </div>
+              {/* Right: 3 stat cards */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Total</span>
+                  <span className="text-lg font-bold tabular-nums">{stats.total_ratings}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Positive</span>
+                  <span className="text-lg font-bold tabular-nums text-emerald-400">{stats.positive_count}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center rounded-md bg-card/60 border border-border/30 py-2 px-1">
+                  <span className="text-xs text-muted-foreground">Negative</span>
+                  <span className="text-lg font-bold tabular-nums text-red-400">{stats.negative_count}</span>
+                </div>
+              </div>
             </div>
 
             {/* Most downvoted section heading */}
