@@ -102,7 +102,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 - [x] **Phase 44: SSE & Stop Reliability** — Streaming stops instantly, disconnects cleanly, partial responses are preserved (1/1 plans) — completed 2026-04-23
 - [x] **Phase 45: Chat UX Fixes** — Confirmation dialogs, no ghost content, folder-scoped new chats (2/2 plans) — completed 2026-04-23
-- [ ] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup
+- [x] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup (2/2 plans) — completed 2026-04-25
 - [ ] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works
 - [ ] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
 - [ ] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
@@ -204,7 +204,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 |-------|-----------|----------------|--------|-----------|
 | 44. SSE & Stop Reliability | v2.4 | 1/1 | Complete | 2026-04-23 |
 | 45. Chat UX Fixes | v2.4 | 2/2 | Complete | 2026-04-23 |
-| 46. Document Version Deletion | v2.4 | 0/? | Not started | - |
+| 46. Document Version Deletion | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 47. Document List & Upload Polish | v2.4 | 0/? | Not started | - |
 | 48. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
 | 49. Library Health at Scale | v2.4 | 0/? | Not started | - |

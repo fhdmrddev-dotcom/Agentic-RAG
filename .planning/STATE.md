@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: in_progress
-stopped_at: Phase 46 context gathered — ready for planning
-last_updated: "2026-04-24T19:00:00.000Z"
-last_activity: 2026-04-24
+stopped_at: Phase 46 complete — UAT approved 2026-04-25
+last_updated: "2026-04-25T00:00:00.000Z"
+last_activity: 2026-04-25
 progress:
   total_phases: 7
-  completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
-  percent: 43
+  completed_phases: 4
+  total_plans: 13
+  completed_plans: 13
+  percent: 57
 ---
 
 # Project State
@@ -25,44 +25,37 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 
 ## Current Position
 
-Phase: 051 of 51 (Context Window Management) — COMPLETE
-Plan: 7/7 complete
-Status: Phase 051 complete — all plans done, UAT approved 2026-04-24
-Last activity: 2026-04-24 — Plans 06 and 07 executed (gap closure), UAT approved
+Phase: 46 of 7 (Document Version Deletion) — COMPLETE
+Plan: 2/2 complete
+Status: Phase 46 complete — UAT approved 2026-04-25
+Last activity: 2026-04-25 — Backend scope param + frontend version-aware dialog shipped
 
-Progress: [████░░░░░░] 37%
+Progress: [█████░░░░░] 57%
 
-Next: Phase 46 (Document Version Deletion) — context ready, run /gsd-plan-phase 46
+Next: Phase 47 (Document List & Upload Polish) — needs planning
 
-## Phase 051 Plan Summary
+## Phase 46 Plan Summary
 
-1. **Plan 051-01: Test stubs** — Failing tests for all CTX requirements. ✅ COMPLETE
-2. **Plan 051-02: Sub-agent keyword routing** — CTX-01/CTX-02 task escalation. ✅ COMPLETE
-3. **Plan 051-03: tiktoken upgrade** — OpenAI token estimation (CTX-05). ✅ COMPLETE
-4. **Plan 051-04: Settings stack** — sub_agent_max_output_tokens 6-layer threading (CTX-03). ✅ COMPLETE
-5. **Plan 051-05: Model info cards** — Inline model subtitles in chat selector (CTX-04). ✅ COMPLETE
-6. **Plan 051-06: Gap closure — sub_agent_model settings** — Full 6-layer override stack (CTX-03). ✅ COMPLETE
-7. **Plan 051-07: Gap closure — cost tier** — costTier field in ModelInfo + tooltip render (CTX-04). ✅ COMPLETE
+1. **Plan 46-01: Backend scope param** — Extended DELETE /documents/{id} with scope=version|all, is_latest promotion, bulk sibling delete, audit log. ✅ COMPLETE
+2. **Plan 46-02: Frontend delete dialog** — Version-aware dialog (Cancel | Delete vN | Delete All Versions), api.ts + useDocuments.ts scope threading. ✅ COMPLETE
 
-## Phase 051 Verified Results
+## Phase 46 Verified Results
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| CTX-01 | ✅ | PPTX/report/generation tasks escalate to orchestrator model with 32k ceiling |
-| CTX-02 | ✅ | Analysis tasks use cheapest sub-agent model per provider |
-| CTX-03 | ✅ | Settings: context depth slider, sub-agent output slider, sub-agent model dropdown |
-| CTX-04 | ✅ | Model selector shows inline subtitles: context, output, cost tier, best-for |
-| CTX-05 | ✅ | tiktoken for OpenAI models, chars/4 fallback for all others |
+| DOC-01 | ✅ | User offered version vs all-versions choice in delete dialog |
+| DOC-02 | ✅ | scope=version deletes row+storage, promotes next-highest sibling as is_latest |
+| DOC-03 | ✅ | scope=all bulk-deletes all sibling rows/storage; CASCADE handles chunks/tables/images |
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 55 (across v1.0–v2.4)
+- Total plans completed: 57 (across v1.0–v2.4)
 - Previous milestones: v1.0 (8 phases), v2.0 (9), v2.1 (8), v2.2 (7), v2.3 (11)
 - Average duration: ~1 day/phase
 
 **Recent Trend:**
-- Last phase shipped: Phase 44 (3 commits + 2 fixes)
+- Last phase shipped: Phase 46 (6 commits)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -81,6 +74,8 @@ Recent decisions affecting current work:
 - AlertDialog confirmation before thread delete — client-side UX safeguard only; RLS provides actual security
 - clearMessages on thread switch prevents ghost content flash — synchronous reset before async loadMessages
 - NavPanel folder picker toggles visibility; collapsed sidebar hides picker via existing opacity-0 pattern
+- scope=version|all delete: FastAPI Query(pattern=) for enum validation; user_id guard on both SELECT and DELETE paths
+- Version-aware delete dialog: 3-button footer for multi-version, 1-button for single-version; error-in-dialog pattern
 
 ### Pending Todos
 
@@ -91,6 +86,7 @@ None for v2.4.
 - UAT verification gaps from v2.3 (phases 038–042) still require live browser testing
 - Metadata normalization only covers document_type/language
 - 15 backend test failures remain from side-phase 002 (test-suite-remediation)
+- Phase 46 human UAT (3 items): CASCADE cleanup, dialog rendering, non-contiguous version promotion
 
 ### Known Issues
 
@@ -108,6 +104,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-24
-Stopped at: Phase 46 context gathered
-Resume file: .planning/phases/46-document-version-deletion/46-CONTEXT.md
+Last session: 2026-04-25
+Stopped at: Phase 46 complete, UAT approved
+Next: Phase 47 — Document List & Upload Polish
