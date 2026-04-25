@@ -224,31 +224,43 @@ export function NavPanel({
       */}
       <div className="flex flex-col h-full w-64 min-w-[16rem]">
         
-        {/* Toggle Button - Absolute positions cleanly animate over the full width */}
-        <button
-          onClick={handleToggle}
-          className={cn(
-            "absolute top-4 flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-all duration-300 z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-            isCollapsed ? "left-[16px]" : "left-[212px]"
-          )}
-          aria-label={isCollapsed ? "Expand navigation" : "Collapse navigation"}
-        >
-          {isCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
-        </button>
+        {/* Collapsed Header — absolutely positioned on the 64px outer container: toggle on top, logo below */}
+        <div className={cn(
+          "absolute top-0 left-0 w-16 flex flex-col items-center pt-1 gap-1 z-20 transition-opacity duration-200",
+          isCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}>
+          <button
+            onClick={handleToggle}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            aria-label="Expand navigation"
+          >
+            <PanelLeftOpen className="w-5 h-5" />
+          </button>
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+        </div>
 
-        {/* Header Row: Logo */}
-        <div className="flex items-center h-16 px-4 mb-2 shrink-0">
+        {/* Expanded Header — normal flow; hidden when collapsed but stays in DOM to preserve nav item spacing */}
+        <div className={cn(
+          "flex items-center justify-between h-16 px-4 mb-2 shrink-0 transition-opacity duration-200",
+          isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100"
+        )}>
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary shadow-sm shadow-primary/20 shrink-0">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
-            <span className={cn(
-              "font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground transition-opacity duration-200",
-              isCollapsed ? "opacity-0" : "opacity-100 delay-100"
-            )}>
+            <span className="font-headline font-semibold text-[15px] tracking-tight text-sidebar-foreground">
               Agentic RAG
             </span>
           </div>
+          <button
+            onClick={handleToggle}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            aria-label="Collapse navigation"
+          >
+            <PanelLeftClose className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Primary Nav Items */}
@@ -260,15 +272,16 @@ export function NavPanel({
               <button
                 onClick={() => onNavigate(view)}
                 className={cn(
-                  "flex items-center gap-3 w-full h-10 px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 relative",
-                    isActive 
-                    ? "bg-primary/15 text-primary font-medium" 
+                  "flex items-center gap-3 h-10 px-2.5 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 relative",
+                  isCollapsed ? "w-10" : "w-full",
+                  isActive
+                    ? "bg-primary/15 text-primary font-medium"
                     : "text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
                 )}
               >
                 <Icon className="w-5 h-5 shrink-0" />
                 <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  "text-sm whitespace-nowrap transition-opacity duration-200",
                   isCollapsed ? "opacity-0" : "opacity-100"
                 )}>
                   {label}
@@ -383,11 +396,14 @@ export function NavPanel({
             const themeButtonContent = (
               <button
                 onClick={onToggleTheme}
-                className="flex items-center gap-3 w-full h-10 px-2.5 text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors rounded-lg focus-visible:outline-none"
+                className={cn(
+                  "flex items-center gap-3 h-10 px-2.5 text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40 transition-colors rounded-lg focus-visible:outline-none",
+                  isCollapsed ? "w-10" : "w-full"
+                )}
               >
                 {theme === "dark" ? <Sun className="w-5 h-5 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
                 <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  "text-sm whitespace-nowrap transition-opacity duration-200",
                   isCollapsed ? "opacity-0" : "opacity-100"
                 )}>
                   {theme === "dark" ? "Light Mode" : "Dark Mode"}
@@ -398,11 +414,14 @@ export function NavPanel({
             const signOutButtonContent = (
               <button
                 onClick={onSignOut}
-                className="flex items-center gap-3 w-full h-10 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg focus-visible:outline-none"
+                className={cn(
+                  "flex items-center gap-3 h-10 px-2.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg focus-visible:outline-none",
+                  isCollapsed ? "w-10" : "w-full"
+                )}
               >
                 <LogOut className="w-5 h-5 shrink-0" />
                 <span className={cn(
-                  "text-sm whitespace-nowrap transition-opacity duration-200", 
+                  "text-sm whitespace-nowrap transition-opacity duration-200",
                   isCollapsed ? "opacity-0" : "opacity-100"
                 )}>
                   Sign out
