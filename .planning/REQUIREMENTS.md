@@ -45,10 +45,10 @@ Requirements for Stability, Polish & UX Fixes milestone. Each maps to roadmap ph
 
 ### HLTH — Library Health at Scale
 
-- [ ] **HLTH-01**: Knowledge Health dashboard uses server-side pagination instead of fixed top-10 lists
-- [ ] **HLTH-02**: Low confidence panel explains that scores reflect query-document relevance, not document quality; includes context about score distribution
-- [ ] **HLTH-03**: Feedback empty states use actionable, corporate-appropriate messaging (not passive phrases like "No downvoted documents")
-- [ ] **HLTH-04**: Knowledge Health API accepts pagination parameters (offset/limit) and returns total counts
+- [x] **HLTH-01**: Knowledge Health dashboard uses server-side pagination instead of fixed top-10 lists
+- [x] **HLTH-02**: Low confidence panel explains that scores reflect query-document relevance, not document quality; includes context about score distribution
+- [x] **HLTH-03**: Feedback empty states use actionable, corporate-appropriate messaging (not passive phrases like "No downvoted documents")
+- [x] **HLTH-04**: Knowledge Health API accepts pagination parameters (offset/limit) and returns total counts
 
 ### CTX — Context Window Management
 
@@ -111,10 +111,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETT-02 | Phase 49 | Pending |
 | NAV-01 | Phase 49 | Pending |
 | NAV-02 | Phase 49 | Pending |
-| HLTH-01 | Phase 50 | Pending |
-| HLTH-02 | Phase 50 | Pending |
-| HLTH-03 | Phase 50 | Pending |
-| HLTH-04 | Phase 50 | Pending |
+| HLTH-01 | Phase 50 | Complete |
+| HLTH-02 | Phase 50 | Complete |
+| HLTH-03 | Phase 50 | Complete |
+| HLTH-04 | Phase 50 | Complete |
 | CTX-01 | Phase 51 | Pending |
 | CTX-02 | Phase 51 | Pending |
 | CTX-03 | Phase 51 | Pending |

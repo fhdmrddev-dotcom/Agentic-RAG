@@ -105,7 +105,7 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup (2/2 plans) — completed 2026-04-25
 - [x] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works (2/2 plans) — completed 2026-04-25
 - [ ] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment
-- [ ] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
+- [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states (completed 2026-04-25)
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
   - [x] 051-01-PLAN.md — Test stubs (Wave 0: failing tests for all CTX requirements)
   - [x] 051-02-PLAN.md — Sub-agent keyword routing (CTX-01, CTX-02)
@@ -209,7 +209,7 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51
 | 46. Document Version Deletion | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 47. Document List & Upload Polish | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 48. Settings & Navigation Polish | v2.4 | 0/? | Not started | - |
-| 49. Library Health at Scale | v2.4 | 0/? | Not started | - |
+| 49. Library Health at Scale | v2.4 | 2/2 | Complete    | 2026-04-25 |
 | 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
 | ~~Smart Skill Dispatch~~ | Deferred → Skills Studio | — | Deferred | — |
 
