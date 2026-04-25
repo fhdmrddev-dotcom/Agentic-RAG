@@ -5,7 +5,7 @@ import zipfile
 from uuid import uuid4
 
 from docx import Document as DocxDocument
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pypdf import PdfReader
 from supabase import Client
 
@@ -478,6 +478,7 @@ async def reingest_document(
 async def delete_document(
     document_id: str,
     background_tasks: BackgroundTasks,
+    scope: str = Query(default="version", pattern="^(version|all)$"),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -486,23 +487,82 @@ async def delete_document(
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
-        .single()
+        .maybe_single()
         .execute()
     )
     if not doc_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    target = doc_resp.data
+    folder_id = target.get("folder_id")
 
-    try:
-        supabase.storage.from_("documents").remove([doc_resp.data["file_path"]])
-    except Exception:
-        pass
+    if scope == "all":
+        # D-07: find all sibling rows by (user_id, filename, folder_id)
+        siblings_q = (
+            supabase.table("documents")
+            .select("id, file_path")
+            .eq("user_id", current_user["id"])
+            .eq("filename", target["filename"])
+        )
+        if folder_id is None:
+            siblings_q = siblings_q.is_("folder_id", "null")
+        else:
+            siblings_q = siblings_q.eq("folder_id", folder_id)
+        siblings = siblings_q.execute().data or []
 
-    supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+        # D-10: delete all storage files; failures silently swallowed
+        for sibling in siblings:
+            if sibling.get("file_path"):
+                try:
+                    supabase.storage.from_("documents").remove([sibling["file_path"]])
+                except Exception:
+                    pass
+
+        # Delete all sibling rows; ON DELETE CASCADE handles chunks/tables/images (D-09)
+        sibling_ids = [s["id"] for s in siblings]
+        if sibling_ids:
+            supabase.table("documents").delete().in_("id", sibling_ids).execute()
+
+    else:
+        # scope == "version" (default) — D-06: delete only the targeted row + storage file
+        # D-10: storage failure silently swallowed
+        try:
+            supabase.storage.from_("documents").remove([target["file_path"]])
+        except Exception:
+            pass
+
+        supabase.table("documents").delete().eq("id", document_id).eq("user_id", current_user["id"]).execute()
+
+        # D-06: if deleted row was is_latest, promote next-highest sibling
+        if target.get("is_latest"):
+            siblings_q = (
+                supabase.table("documents")
+                .select("id, version_number")
+                .eq("user_id", current_user["id"])
+                .eq("filename", target["filename"])
+                .neq("id", document_id)
+            )
+            if folder_id is None:
+                siblings_q = siblings_q.is_("folder_id", "null")
+            else:
+                siblings_q = siblings_q.eq("folder_id", folder_id)
+            siblings = siblings_q.execute().data or []
+
+            if siblings:
+                # Sort descending by version_number; promote the highest
+                siblings.sort(key=lambda s: s.get("version_number") or 0, reverse=True)
+                next_latest_id = siblings[0]["id"]
+                supabase.table("documents").update({"is_latest": True}).eq("id", next_latest_id).execute()
+
+    # D-11: audit log for both paths — include scope in metadata
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
         action_type="document.delete",
-        metadata={"document_id": document_id, "filename": doc_resp.data.get("filename", "")},
+        metadata={
+            "document_id": document_id,
+            "filename": target.get("filename", ""),
+            "scope": scope,
+        },
         supabase=supabase,
     )
 
