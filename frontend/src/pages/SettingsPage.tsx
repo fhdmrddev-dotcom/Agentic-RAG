@@ -521,6 +521,8 @@ export function SettingsPage() {
   const [contextWindowMaxTokens, setContextWindowMaxTokens] = useState(0)
   const [subAgentMaxOutputTokens, setSubAgentMaxOutputTokens] = useState(8192)
   const [subAgentModel, setSubAgentModel] = useState("")
+  const [subAgentModelError, setSubAgentModelError] = useState<string | null>(null)
+  const [resolvedSubAgentModel, setResolvedSubAgentModel] = useState("")
 
   const hydrate = (data: FullAppSettings) => {
     setS(data)
@@ -555,6 +557,7 @@ export function SettingsPage() {
     setContextWindowMaxTokens(data.context_window_max_tokens ?? 0)
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
     setSubAgentModel(data.sub_agent_model ?? "")
+    setResolvedSubAgentModel(data.resolved_sub_agent_model ?? "")
   }
 
   useEffect(() => {
@@ -567,6 +570,7 @@ export function SettingsPage() {
   const handleSaveAIModel = async () => {
     setSavingAI(true)
     setError(null)
+    setSubAgentModelError(null)
     try {
       const body: SettingsUpdate = {
         active_provider: activeProvider,
@@ -586,7 +590,12 @@ export function SettingsPage() {
       setSavedAI(true)
       setTimeout(() => setSavedAI(false), 2500)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save AI Model settings")
+      const msg = e instanceof Error ? e.message : "Failed to save AI Model settings"
+      if (msg.includes("is not available for provider")) {
+        setSubAgentModelError(msg)
+      } else {
+        setError(msg)
+      }
     } finally {
       setSavingAI(false)
     }
@@ -793,7 +802,7 @@ export function SettingsPage() {
                 <FieldRow label="Sub-agent model">
                   <select
                     value={subAgentModel}
-                    onChange={(e) => setSubAgentModel(e.target.value)}
+                    onChange={(e) => { setSubAgentModel(e.target.value); setSubAgentModelError(null) }}
                     className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Auto (cheapest)</option>
@@ -809,6 +818,24 @@ export function SettingsPage() {
                         <option key={m} value={m}>{m}</option>
                       ))}
                   </select>
+                  {subAgentModelError && (
+                    <p className="text-xs text-destructive mt-1">{subAgentModelError}</p>
+                  )}
+                </FieldRow>
+                {/* D-09: Read-only resolved model labels for title & follow-up */}
+                <FieldRow label="Title drafting">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {subAgentModel
+                      ? subAgentModel
+                      : `${resolvedSubAgentModel || "auto"} (auto)`}
+                  </span>
+                </FieldRow>
+                <FieldRow label="Follow-up suggestions">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {subAgentModel
+                      ? subAgentModel
+                      : `${resolvedSubAgentModel || "auto"} (auto)`}
+                  </span>
                 </FieldRow>
               </SectionCard>
 
@@ -817,7 +844,7 @@ export function SettingsPage() {
                 <Button
                   size="sm"
                   onClick={handleSaveAIModel}
-                  disabled={savingAI}
+                  disabled={savingAI || subAgentModelError !== null}
                   className="gap-1.5 gradient-primary text-white shadow-md shadow-primary/20 hover:opacity-90 transition-all border-none font-semibold"
                 >
                   {savingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : savedAI ? <Check className="h-4 w-4" /> : <Save className="h-3.5 w-3.5" />}
