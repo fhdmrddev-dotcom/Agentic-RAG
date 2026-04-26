@@ -120,9 +120,10 @@ SYSTEM_PROMPT = (
     "document content and flag the discrepancy explicitly to the user.\n"
     "- **Tool call brevity:** When calling tools, do NOT narrate your plan or reasoning. Just call the tool. "
     "Verbalizing your intent wastes output tokens and can cause the tool call to be cut off mid-stream.\n"
-    "- **After analyze_document (generation task — PPT, report, PDF, etc.):** Call execute_code IMMEDIATELY "
-    "with complete Python code. Do NOT write any text first. Do NOT call more search/query tools. "
-    "A sentence like 'Let me now build the presentation...' is a failure — call the tool, do not announce it.\n"
+    "- **After analyze_document (generation task — PPT, report, PDF, etc.):** IMMEDIATELY call execute_code "
+    "with complete Python code. ZERO text before the tool call — not a single word. "
+    "Writing 'Now I have everything I need...' or 'Let me build...' wastes the entire token budget and breaks the task. "
+    "YOUR NEXT TOKEN MUST BE THE OPENING OF A TOOL CALL, NOT A WORD.\n"
     "- **After analyze_document (Q&A task):** Respond with your findings. Do not call more tools.\n\n"
 
     "## Confidence & hedging\n"
@@ -909,6 +910,31 @@ async def send_message(
                     break
 
                 if finish_reason == "length":
+                    # Detect "prose-before-code" anti-pattern: model wrote text instead of calling
+                    # execute_code, consumed the full token budget, and never made the tool call.
+                    # Recovery: inject a corrective user message and continue the loop so the model
+                    # can call execute_code on the next iteration.
+                    _generation_keywords = ("powerpoint", "pptx", "ppt", "presentation", "pdf",
+                                            "word", "excel", "report", "chart", "generate", "create",
+                                            "build", "python", "execute_code")
+                    _content_lower = full_content.lower()
+                    _looks_like_prose_not_code = (
+                        iteration > 0
+                        and not tool_calls_buffer
+                        and any(kw in _content_lower for kw in _generation_keywords)
+                        and len(full_content) > 500
+                    )
+                    if _looks_like_prose_not_code:
+                        # Strip the truncated prose — inject a recovery prompt instead
+                        full_content = ""
+                        _recovery = (
+                            "You wrote a text response but hit the output token limit before calling execute_code. "
+                            "Do NOT write any more text. Call execute_code NOW with complete Python code to produce the file."
+                        )
+                        messages.append({"role": "assistant", "content": "[Response truncated — token limit reached before execute_code was called]"})
+                        messages.append({"role": "user", "content": _recovery})
+                        logger.warning("prose_before_code_recovery: iteration %d hit length limit without tool call — injecting recovery prompt", iteration)
+                        continue  # retry this iteration
                     truncation_note = "\n\n*[Response truncated — output token limit reached. Start a new chat or reduce document length.]*"
                     full_content += truncation_note
                     yield f"data: {json.dumps({'type': 'delta', 'content': truncation_note})}\n\n"
