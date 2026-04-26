@@ -1,3 +1,5 @@
+from typing import TypedDict
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,6 +32,7 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gpt-4.1-mini":                         400_000,  # actual 1M — practical cap
     "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap
     "gpt-5":                                200_000,  # actual 200k
+    "gpt-5.4":                              200_000,  # actual 200k
     "gpt-5.4-mini":                         200_000,  # actual 200k
     # ── Anthropic ───────────────────────────────────────────────────────────
     "claude-opus-4-6":                      150_000,  # actual 200k
@@ -52,12 +55,60 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
 }
 
 
+class ModelCapability(TypedDict):
+    native_tools: bool
+    provider: str  # documentation only; actual provider from user settings
+
+
+# Capability registry: which models support native API tool calling.
+# Unknown models default to native_tools=False (structured mode).
+# User-extensible: add new models here after testing.
+MODEL_CAPABILITIES: dict[str, ModelCapability] = {
+    # OpenAI — proven native tool support
+    "gpt-4o": {"native_tools": True, "provider": "openai"},
+    "gpt-4o-mini": {"native_tools": True, "provider": "openai"},
+    "gpt-4.1": {"native_tools": True, "provider": "openai"},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai"},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai"},
+    "gpt-5": {"native_tools": True, "provider": "openai"},
+    "gpt-5.4": {"native_tools": True, "provider": "openai"},
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai"},
+    "o1": {"native_tools": True, "provider": "openai"},
+    "o3": {"native_tools": True, "provider": "openai"},
+    "o4": {"native_tools": True, "provider": "openai"},
+    # Anthropic direct — native tool_use
+    "claude-opus-4-6": {"native_tools": True, "provider": "anthropic"},
+    "claude-sonnet-4-6": {"native_tools": True, "provider": "anthropic"},
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic"},
+    # Google direct — native function calling
+    "gemini-2.5-pro": {"native_tools": True, "provider": "google"},
+    "gemini-2.5-flash": {"native_tools": True, "provider": "google"},
+    "gemini-2.5-flash-lite": {"native_tools": True, "provider": "google"},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google"},
+    # OpenRouter — mixed; start safe with structured mode
+    "deepseek/deepseek-chat": {"native_tools": False, "provider": "openrouter"},
+    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter"},
+    "deepseek/deepseek-r1": {"native_tools": False, "provider": "openrouter"},
+    "z-ai/glm-5.1": {"native_tools": False, "provider": "openrouter"},
+    "moonshotai/kimi-k2.5": {"native_tools": False, "provider": "openrouter"},
+    "moonshotai/kimi-k2.6": {"native_tools": False, "provider": "openrouter"},
+    "minimax/minimax-01": {"native_tools": False, "provider": "openrouter"},
+    "minimax/minimax-m2.7": {"native_tools": False, "provider": "openrouter"},
+    "minimax/minimax-m2.5:free": {"native_tools": False, "provider": "openrouter"},
+}
+
+
+def get_model_capability(model_id: str) -> ModelCapability:
+    """Return capability for a model. Unknown models default to structured mode (safe)."""
+    return MODEL_CAPABILITIES.get(model_id, {"native_tools": False, "provider": "unknown"})
+
+
 # Sub-agent model defaults: cheapest stable model per provider.
 # Intentionally lives here (not in sub_agent_service) to avoid circular imports
 # when user_settings.py needs to resolve the model without importing sub_agent_service.
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
-    "openai":     "gpt-4.1-nano",
+    "openai":     "gpt-4o-mini",
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
