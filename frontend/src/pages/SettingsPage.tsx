@@ -483,6 +483,7 @@ export function SettingsPage() {
   // Provider states
   const [providerStates, setProviderStates] = useState<ProviderState[]>([])
   const [activeProvider, setActiveProvider] = useState("")
+  const isNativeProvider = ["openai", "anthropic", "google"].includes(activeProvider)
 
   // LLM
   const [llmModel, setLlmModel] = useState("")
@@ -779,26 +780,42 @@ export function SettingsPage() {
                 title="Context & Sub-Agent"
                 description="Tune how much history the agent sees and how the sub-agent is configured."
               >
-                <FieldRow label="Context depth">
-                  <SliderInput
-                    value={contextWindowMaxTokens}
-                    onChange={setContextWindowMaxTokens}
-                    min={0}
-                    max={200000}
-                    step={1000}
-                    hint={contextWindowMaxTokens === 0 ? "Using model default" : "Overrides model default"}
-                  />
-                </FieldRow>
-                <FieldRow label="Sub-agent output tokens">
-                  <SliderInput
-                    value={subAgentMaxOutputTokens}
-                    onChange={setSubAgentMaxOutputTokens}
-                    min={4096}
-                    max={65536}
-                    step={1024}
-                    hint="Generation tasks use at least 32,768 tokens regardless of this value"
-                  />
-                </FieldRow>
+                {isNativeProvider ? (
+                  <FieldRow label="Context depth">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Model default (managed automatically)
+                    </span>
+                  </FieldRow>
+                ) : (
+                  <FieldRow label="Context depth">
+                    <SliderInput
+                      value={contextWindowMaxTokens}
+                      onChange={setContextWindowMaxTokens}
+                      min={0}
+                      max={200000}
+                      step={1000}
+                      hint={contextWindowMaxTokens === 0 ? "Using model default" : "Overrides model default"}
+                    />
+                  </FieldRow>
+                )}
+                {isNativeProvider ? (
+                  <FieldRow label="Sub-agent output tokens">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Model default (managed automatically)
+                    </span>
+                  </FieldRow>
+                ) : (
+                  <FieldRow label="Sub-agent output tokens">
+                    <SliderInput
+                      value={subAgentMaxOutputTokens}
+                      onChange={setSubAgentMaxOutputTokens}
+                      min={4096}
+                      max={65536}
+                      step={1024}
+                      hint="Generation tasks use at least 32,768 tokens regardless of this value"
+                    />
+                  </FieldRow>
+                )}
                 <FieldRow label="Sub-agent model">
                   <select
                     value={subAgentModel}
