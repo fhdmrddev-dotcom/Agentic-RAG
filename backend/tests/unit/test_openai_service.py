@@ -118,3 +118,75 @@ class TestQueryTablesTool:
         tools = get_explorer_tools()
         names = [t["function"]["name"] for t in tools]
         assert "query_tables" not in names
+
+
+# ---------------------------------------------------------------------------
+# OpenRouter quality enhancements — TOOL-01
+# ---------------------------------------------------------------------------
+
+def _make_user_settings(
+    provider: str = "openrouter",
+    llm_model: str = "openrouter/gpt-4o",
+    strategy: str = "quality",
+    llm_max_output_tokens: int = 0,
+):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        active_provider=provider,
+        llm_model=llm_model,
+        llm_max_output_tokens=llm_max_output_tokens,
+        openrouter_tool_strategy=strategy,
+        web_search_enabled=False,
+        sandbox_enabled=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# GEN-02/GEN-05: _resolve_max_tokens provider bypass
+# These tests are RED until Wave 1 (054-02-PLAN.md) adds NATIVE_PROVIDERS bypass.
+# ---------------------------------------------------------------------------
+
+class TestResolveMaxTokensProviderBypass:
+    """_resolve_max_tokens must bypass user override for openai/anthropic/google."""
+
+    def _call(self, provider, llm_model, user_override):
+        with patch("app.services.openai_service.settings") as mock_settings:
+            mock_settings.llm_max_output_tokens = 8192  # env default — should not interfere
+            mock_settings.llm_provider = provider
+            mock_settings.llm_model = llm_model
+            mock_settings.model_output_limits = ""
+            from app.services.openai_service import _resolve_max_tokens
+            us = _make_user_settings(
+                provider=provider,
+                llm_model=llm_model,
+                llm_max_output_tokens=user_override,
+            )
+            return _resolve_max_tokens(None, us)
+
+    def test_anthropic_provider_ignores_user_override(self):
+        """Stale override=4096 must NOT cap Anthropic calls."""
+        result = self._call("anthropic", "claude-sonnet-4-6", 4096)
+        assert result != 4096, (
+            f"Expected bypass (result != 4096) but got {result}. "
+            "NATIVE_PROVIDERS bypass not yet implemented — will be fixed in 054-02-PLAN.md"
+        )
+
+    def test_openai_provider_ignores_user_override(self):
+        """Stale override=4096 must NOT cap OpenAI calls."""
+        result = self._call("openai", "gpt-4o", 4096)
+        assert result != 4096, f"Expected bypass but got {result}"
+
+    def test_google_provider_ignores_user_override(self):
+        """Stale override=4096 must NOT cap Google calls."""
+        result = self._call("google", "gemini-2.5-flash", 4096)
+        assert result != 4096, f"Expected bypass but got {result}"
+
+    def test_openrouter_provider_respects_user_override(self):
+        """OpenRouter MUST respect user override — no bypass."""
+        result = self._call("openrouter", "openrouter/gpt-4o", 4096)
+        assert result == 4096, f"Expected 4096 (user override) but got {result}"
+
+    def test_ollama_provider_respects_user_override(self):
+        """Ollama MUST respect user override — no bypass."""
+        result = self._call("ollama", "llama3", 2048)
+        assert result == 2048, f"Expected 2048 (user override) but got {result}"
