@@ -11,6 +11,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.responses import sse_response
 import openai
 from openai import APIError
+try:
+    from anthropic import APIError as AnthropicAPIError
+except ImportError:
+    AnthropicAPIError = Exception  # fallback if SDK not installed
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -20,7 +24,8 @@ from app.services.audit_service import write_audit_entry
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
-from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens
+from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, get_tools, _resolve_max_tokens
+from app.services.anthropic_service import stream_anthropic
 
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
@@ -680,45 +685,84 @@ async def send_message(
 
                 while True:
                     try:
-                        stream = create_streaming_chat(
-                            messages,
-                            model=body.model,
-                            user_settings=user_settings,
-                            tool_choice=tool_choice,
-                            tools_override=active_tools,
-                        )
+                        active_provider_name = getattr(user_settings, "active_provider", "") or ""
 
-                        tool_calls_buffer: dict = {}
-                        finish_reason: str | None = None
+                        if active_provider_name == "anthropic":
+                            # --- Anthropic native SDK path (GEN-02) ---
+                            _ant_max_tokens = _resolve_max_tokens(None, user_settings)
+                            _ant_api_key = getattr(user_settings, "anthropic_api_key", "") or settings.llm_api_key or ""
+                            _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                            _ant_gen = stream_anthropic(
+                                messages=messages,
+                                tools=_ant_tools,
+                                system_prompt=active_system_prompt,
+                                model=body.model or user_settings.llm_model,
+                                api_key=_ant_api_key,
+                                max_tokens=_ant_max_tokens,
+                                force_no_tools=force_no_tools,
+                            )
+                            tool_calls_buffer = {}
+                            finish_reason = None
+                            for _ant_event in _ant_gen:
+                                _etype = _ant_event.get("type")
+                                if _etype == "delta":
+                                    _text = _ant_event.get("content", "")
+                                    if _text:
+                                        full_content += _text
+                                        yield f"data: {json.dumps({'type': 'delta', 'content': _text})}\n\n"
+                                elif _etype == "tool_start":
+                                    # Map to tool_calls_buffer format (same as OpenAI path)
+                                    _idx = len(tool_calls_buffer)
+                                    tool_calls_buffer[_idx] = {
+                                        "id": _ant_event["id"],
+                                        "name": _ant_event["name"],
+                                        "arguments": json.dumps(_ant_event.get("args", {})),
+                                    }
+                                elif _etype == "finish":
+                                    finish_reason = _ant_event.get("finish_reason", "stop")
+                            break  # stream completed
 
-                        for chunk in stream:
-                            if not chunk.choices:
-                                continue
-                            choice = chunk.choices[0]
-                            delta = choice.delta
+                        else:
+                            # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
+                            stream = create_streaming_chat(
+                                messages,
+                                model=body.model,
+                                user_settings=user_settings,
+                                tool_choice=tool_choice,
+                                tools_override=active_tools,
+                            )
 
-                            if choice.finish_reason:
-                                finish_reason = choice.finish_reason
+                            tool_calls_buffer: dict = {}
+                            finish_reason: str | None = None
 
-                            if delta.content:
-                                full_content += delta.content
-                                yield f"data: {json.dumps({'type': 'delta', 'content': delta.content})}\n\n"
+                            for chunk in stream:
+                                if not chunk.choices:
+                                    continue
+                                choice = chunk.choices[0]
+                                delta = choice.delta
 
-                            if delta.tool_calls:
-                                for tc in delta.tool_calls:
-                                    idx = tc.index
-                                    if idx not in tool_calls_buffer:
-                                        tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                    if tc.id:
-                                        tool_calls_buffer[idx]["id"] = tc.id
-                                    if tc.function and tc.function.name:
-                                        tool_calls_buffer[idx]["name"] = tc.function.name
-                                    if tc.function and tc.function.arguments:
-                                        tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+                                if choice.finish_reason:
+                                    finish_reason = choice.finish_reason
 
-                        break  # stream completed successfully
+                                if delta.content:
+                                    full_content += delta.content
+                                    yield f"data: {json.dumps({'type': 'delta', 'content': delta.content})}\n\n"
 
-                    except APIError as provider_err:
+                                if delta.tool_calls:
+                                    for tc in delta.tool_calls:
+                                        idx = tc.index
+                                        if idx not in tool_calls_buffer:
+                                            tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
+                                        if tc.id:
+                                            tool_calls_buffer[idx]["id"] = tc.id
+                                        if tc.function and tc.function.name:
+                                            tool_calls_buffer[idx]["name"] = tc.function.name
+                                        if tc.function and tc.function.arguments:
+                                            tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+                            break  # stream completed successfully
+
+                    except (APIError, AnthropicAPIError) as provider_err:
                         if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
                             _provider_retries += 1
                             delay = _retry_delays[_provider_retries - 1]
@@ -727,7 +771,7 @@ async def send_message(
                                 "attempt %d/%d — retrying in %.1fs. status=%s",
                                 iteration, thread_id,
                                 _provider_retries, _MAX_PROVIDER_RETRIES + 1,
-                                delay, provider_err.status_code,
+                                delay, getattr(provider_err, "status_code", "unknown"),
                             )
                             await asyncio.sleep(delay)
                             continue
