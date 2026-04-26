@@ -384,3 +384,47 @@ class TestSendMessageAgentModeBranching:
         system_msgs = [m for m in captured_messages if m.get("role") == "system"]
         assert len(system_msgs) == 1
         assert system_msgs[0]["content"] == SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# GEN-04: max_iterations values
+# These tests are RED until Wave 1 (054-02-PLAN.md) changes threads.py.
+# ---------------------------------------------------------------------------
+
+class TestMaxIterationsConfig:
+    """GEN-04: Assert max_iterations values in threads.py meet the target spec."""
+
+    def _read_threads_source(self) -> str:
+        import os
+        # Navigate from this test file to threads.py
+        here = os.path.dirname(__file__)
+        threads_path = os.path.join(here, "..", "..", "app", "api", "threads.py")
+        with open(threads_path) as f:
+            return f.read()
+
+    def test_general_mode_max_iterations_is_15(self):
+        """General agent mode must allow 15 iterations (was 8) — GEN-04."""
+        source = self._read_threads_source()
+        assert "max_iterations = 15" in source, (
+            "Expected 'max_iterations = 15' in threads.py for general mode. "
+            "Current value is 8 — will be fixed in 054-02-PLAN.md (Wave 1)."
+        )
+
+    def test_explorer_mode_max_iterations_is_8(self):
+        """Explorer mode must allow 8 iterations (was 6) — GEN-04."""
+        source = self._read_threads_source()
+        assert "max_iterations = 8" in source, (
+            "Expected 'max_iterations = 8' in threads.py for explorer mode. "
+            "Current value is 6 — will be fixed in 054-02-PLAN.md (Wave 1)."
+        )
+
+    def test_old_general_max_iterations_8_is_gone(self):
+        """After the fix, 'max_iterations = 8' should refer to explorer, not general.
+        There should be exactly ONE occurrence of 'max_iterations = 8' (explorer)
+        and ONE occurrence of 'max_iterations = 15' (general).
+        This test passes only after both changes are applied."""
+        source = self._read_threads_source()
+        count_8 = source.count("max_iterations = 8")
+        count_15 = source.count("max_iterations = 15")
+        assert count_8 == 1, f"Expected exactly 1 occurrence of 'max_iterations = 8' but found {count_8}"
+        assert count_15 == 1, f"Expected exactly 1 occurrence of 'max_iterations = 15' but found {count_15}"
