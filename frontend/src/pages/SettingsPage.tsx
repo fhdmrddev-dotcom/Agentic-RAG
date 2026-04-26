@@ -524,6 +524,8 @@ export function SettingsPage() {
   const [subAgentModel, setSubAgentModel] = useState("")
   const [subAgentModelError, setSubAgentModelError] = useState<string | null>(null)
   const [resolvedSubAgentModel, setResolvedSubAgentModel] = useState("")
+  const [llmMaxOutputTokens, setLlmMaxOutputTokens] = useState(0)
+  const [openrouterToolStrategy, setOpenrouterToolStrategy] = useState<"quality" | "native" | "xml">("quality")
 
   const hydrate = (data: FullAppSettings) => {
     setS(data)
@@ -559,6 +561,8 @@ export function SettingsPage() {
     setSubAgentMaxOutputTokens(data.sub_agent_max_output_tokens ?? 8192)
     setSubAgentModel(data.sub_agent_model ?? "")
     setResolvedSubAgentModel(data.resolved_sub_agent_model ?? "")
+    setLlmMaxOutputTokens(data.llm_max_output_tokens ?? 0)
+    setOpenrouterToolStrategy(data.openrouter_tool_strategy ?? "quality")
   }
 
   useEffect(() => {
@@ -585,6 +589,8 @@ export function SettingsPage() {
         context_window_max_tokens: contextWindowMaxTokens,
         sub_agent_max_output_tokens: subAgentMaxOutputTokens,
         sub_agent_model: subAgentModel,
+        llm_max_output_tokens: llmMaxOutputTokens,
+        openrouter_tool_strategy: openrouterToolStrategy,
       }
       const updated = await updateSettings(body)
       hydrate(updated)
@@ -781,20 +787,38 @@ export function SettingsPage() {
                 description="Tune how much history the agent sees and how the sub-agent is configured."
               >
                 {isNativeProvider ? (
-                  <FieldRow label="Context depth">
+                  <FieldRow label="Context depth (input)">
                     <span className="text-xs text-muted-foreground font-mono">
                       Model default (managed automatically)
                     </span>
                   </FieldRow>
                 ) : (
-                  <FieldRow label="Context depth">
+                  <FieldRow label="Context depth (input)">
                     <SliderInput
                       value={contextWindowMaxTokens}
                       onChange={setContextWindowMaxTokens}
                       min={0}
                       max={200000}
                       step={1000}
-                      hint={contextWindowMaxTokens === 0 ? "Using model default" : "Overrides model default"}
+                      hint={contextWindowMaxTokens === 0 ? "Using model default" : `${contextWindowMaxTokens.toLocaleString()} tokens`}
+                    />
+                  </FieldRow>
+                )}
+                {isNativeProvider ? (
+                  <FieldRow label="Main model output tokens">
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Model default (managed automatically)
+                    </span>
+                  </FieldRow>
+                ) : (
+                  <FieldRow label="Main model output tokens">
+                    <SliderInput
+                      value={llmMaxOutputTokens}
+                      onChange={setLlmMaxOutputTokens}
+                      min={0}
+                      max={65536}
+                      step={1024}
+                      hint={llmMaxOutputTokens === 0 ? "Auto (per-model default)" : `${llmMaxOutputTokens.toLocaleString()} tokens`}
                     />
                   </FieldRow>
                 )}
@@ -838,6 +862,22 @@ export function SettingsPage() {
                   {subAgentModelError && (
                     <p className="text-xs text-destructive mt-1">{subAgentModelError}</p>
                   )}
+                </FieldRow>
+                <FieldRow label="OpenRouter Tool Strategy" tooltip="How OpenRouter models handle tool calling. Quality = best reliability with routing. Native = assume native tool support. XML = force structured prompting for maximum compatibility.">
+                  <select
+                    value={openrouterToolStrategy}
+                    onChange={(e) => setOpenrouterToolStrategy(e.target.value as "quality" | "native" | "xml")}
+                    className="w-full h-8 text-xs font-mono bg-muted/30 border border-input rounded px-2 text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="quality">Quality (Recommended)</option>
+                    <option value="native">Native</option>
+                    <option value="xml">XML / Structured</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {openrouterToolStrategy === "quality" && "Uses :exacto routing and response healing for best tool reliability."}
+                    {openrouterToolStrategy === "native" && "Assumes the selected model supports native tool calling."}
+                    {openrouterToolStrategy === "xml" && "Forces structured JSON prompting. Safest for untested models."}
+                  </p>
                 </FieldRow>
                 {/* D-09: Read-only resolved model labels for title & follow-up */}
                 <FieldRow label="Title drafting">

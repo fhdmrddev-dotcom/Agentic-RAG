@@ -24,8 +24,9 @@ from app.services.audit_service import write_audit_entry
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
-from app.services.openai_service import create_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, get_tools, _resolve_max_tokens
+from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
+from app.services.tool_parser import parse_structured_tool_calls, ToolCall
 
 # Lazy sandbox import — only if enabled
 if settings.sandbox_enabled:
@@ -63,10 +64,12 @@ def _is_transient_provider_error(e: APIError) -> bool:
 SYSTEM_PROMPT = (
     "You are a helpful AI assistant with access to the user's document library.\n\n"
 
-    "## CRITICAL: Stop when you have the answer\n"
-    "After EVERY tool call, check: do I now have enough to answer? If yes — STOP and respond.\n"
-    "Do NOT call more tools to 'verify' or 'confirm' an answer you already have.\n"
-    "Most questions need 1 tool call. Complex questions need 2-3. Never more than necessary.\n\n"
+    "## CRITICAL: Two operating modes\n"
+    "**Q&A / retrieval** (user asks a question, wants information): After each tool call, check: do I have enough to answer? "
+    "If yes — respond directly. Do NOT call more tools to verify what you already have.\n"
+    "**Generation** (user asks for a file — PPT, report, PDF, chart, etc.): retrieve/analyze the required content, "
+    "then call execute_code to produce the file. "
+    "Writing text that describes what you plan to build is NOT acceptable — call execute_code immediately.\n\n"
 
     "## Tool selection guide\n"
     "Pick the ONE tool that best fits the task:\n"
@@ -78,15 +81,18 @@ SYSTEM_PROMPT = (
     "These are SQL-style questions about document attributes, not about what documents say.\n"
     "- **analyze_document** → full-document tasks: summarize, compare, or extract all key points from an entire document. "
     "If the target document is ambiguous (user says 'the report' without specifying which), call search_documents or "
-    "query_documents first to identify it, then call analyze_document.\n"
+    "query_documents first to identify it, then call analyze_document. "
+    "**Once analyze_document returns, never call read_document on that same document — the full content has already been processed.**\n"
     "- **ls / tree** → browse folder structure and navigate the knowledge base\n"
     "- **grep** → find documents containing a specific phrase or regex pattern\n"
     "- **glob** → find documents by filename pattern (*.pdf, report-*, etc.)\n"
     "- **read_document** → read a specific section when search chunks are cut off or incomplete; use start_line/end_line; "
     "do NOT call more than once per document per question\n"
     "- **web_search** → current events, software versions, or topics not covered in uploaded documents\n"
-    "- **execute_code** → calculations, data analysis, chart generation, file creation "
-    "(always pass `libraries` for non-stdlib packages; pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename})\n"
+    "- **execute_code** → **USE THIS for any file generation request** (PowerPoint, PDF, Word, Excel, charts, reports). "
+    "Also for calculations and data analysis. Always pass `libraries` for non-stdlib packages. "
+    "Pass `skill_files` to inject skill attachment files into the sandbox at /sandbox/{filename}. "
+    "Write output files to /sandbox/output/ and list them in `output_files`.\n"
     "- **load_skill** → activate a skill; call silently and then follow the skill's instructions exactly\n"
     "- **save_skill / read_skill_file** → skill management\n"
     "- **query_tables** → structured table data from documents: 'show me the revenue table from Q3 Report', "
@@ -109,8 +115,15 @@ SYSTEM_PROMPT = (
     "— do not fabricate.\n"
     "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
     "on that document rather than answering from nothing — unless analyze_document was already called this turn.\n"
+    "- **Never loop on read_document:** If two consecutive read_document calls on the same document return no results, stop — do not call it a third time. Answer from what you have or use analyze_document once.\n"
     "- **Web vs documents conflict:** If web_search results conflict with content in your documents, prioritize the "
-    "document content and flag the discrepancy explicitly to the user.\n\n"
+    "document content and flag the discrepancy explicitly to the user.\n"
+    "- **Tool call brevity:** When calling tools, do NOT narrate your plan or reasoning. Just call the tool. "
+    "Verbalizing your intent wastes output tokens and can cause the tool call to be cut off mid-stream.\n"
+    "- **After analyze_document (generation task — PPT, report, PDF, etc.):** Call execute_code IMMEDIATELY "
+    "with complete Python code. Do NOT write any text first. Do NOT call more search/query tools. "
+    "A sentence like 'Let me now build the presentation...' is a failure — call the tool, do not announce it.\n"
+    "- **After analyze_document (Q&A task):** Respond with your findings. Do not call more tools.\n\n"
 
     "## Confidence & hedging\n"
     "search_documents results include a `similarity` score (0–1). If ALL returned chunks have "
@@ -131,6 +144,50 @@ SYSTEM_PROMPT = (
     "do NOT write markdown links or URLs for them. Mention the filename naturally: "
     "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'.\n"
 )
+
+
+TOOL_USAGE_INSTRUCTIONS = """
+
+## Tool Usage Format
+
+When you need to use a tool, output a JSON block in this exact format:
+
+```json
+{{"tool": "TOOL_NAME", "arguments": {{"arg1": "value1", "arg2": "value2"}}}}
+```
+
+Available tools:
+{tool_list}
+
+Rules:
+1. Output ONLY the JSON block — do not describe your plan or say "Now I'll search..."
+2. Use the exact tool name from the list above
+3. Include ALL required arguments
+4. If you don't need a tool, respond normally with text
+"""
+
+
+def _format_tool_list(tools: list[dict]) -> str:
+    """Format tool schemas as a human-readable list for structured mode prompts."""
+    lines = []
+    for tool in tools:
+        fn = tool.get("function", {})
+        name = fn.get("name", "unknown")
+        desc = fn.get("description", "")
+        params = fn.get("parameters", {})
+        props = params.get("properties", {})
+        required = params.get("required", [])
+        
+        lines.append(f"- **{name}**: {desc}")
+        if props:
+            arg_lines = []
+            for arg_name, arg_info in props.items():
+                req_flag = " (required)" if arg_name in required else ""
+                arg_desc = arg_info.get("description", "")
+                arg_type = arg_info.get("type", "any")
+                arg_lines.append(f"  - `{arg_name}` ({arg_type}){req_flag}: {arg_desc}")
+            lines.extend(arg_lines)
+    return "\n".join(lines)
 
 
 CONFIDENCE_DISCLAIMER = (
@@ -536,9 +593,9 @@ async def send_message(
                 )
                 catalog_note = (
                     f"\n\n## Available Skills\n"
-                    f"The following skills are enabled. When the user's request matches a skill description, "
-                    f"call `load_skill(skill_name)` silently (no announcement) then follow the skill's "
-                    f"instructions exactly:\n{catalog_lines}"
+                    f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
+                    f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
+                    f"description similarity — wait for an explicit request:\n{catalog_lines}"
                 )
                 active_system_prompt = active_system_prompt + catalog_note
 
@@ -657,6 +714,15 @@ async def send_message(
 
         try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
           try:
+            # Pre-inject tool instructions only for OpenRouter XML strategy — the one
+            # deterministic structured-mode path. All other providers use native tool
+            # calling; unknown models get post-creation injection (next iteration).
+            _needs_pre_injection = (
+                getattr(user_settings, "active_provider", "") == "openrouter"
+                and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+            )
+            _structured_tools_injected = False
+
             for iteration in range(max_iterations):
                 # Between tool-call rounds: signal to the frontend that the agent
                 # is deciding its next action (all prior tools are done).
@@ -683,14 +749,28 @@ async def send_message(
                 _MAX_PROVIDER_RETRIES = 2
                 _retry_delays = [0.5, 1.5]
 
+                # OpenRouter XML: inject tool-format instructions BEFORE stream creation
+                # so the model sees them on the very first call.
+                if _needs_pre_injection and not _structured_tools_injected and tool_choice == "auto":
+                    _tl_text = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
+                    for _si, _sm in enumerate(messages):
+                        if _sm.get("role") == "system":
+                            messages[_si] = {
+                                "role": "system",
+                                "content": _sm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_text),
+                            }
+                            _structured_tools_injected = True
+                            break
+
                 while True:
                     try:
                         active_provider_name = getattr(user_settings, "active_provider", "") or ""
 
                         if active_provider_name == "anthropic":
                             # --- Anthropic native SDK path (GEN-02) ---
+                            from app.services.openai_service import _resolve_max_tokens
                             _ant_max_tokens = _resolve_max_tokens(None, user_settings)
-                            _ant_api_key = getattr(user_settings, "anthropic_api_key", "") or settings.llm_api_key or ""
+                            _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
                             _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
                             _ant_gen = stream_anthropic(
                                 messages=messages,
@@ -724,13 +804,26 @@ async def send_message(
 
                         else:
                             # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
-                            stream = create_streaming_chat(
-                                messages,
+                            stream, calling_mode = create_adaptive_streaming_chat(
+                                messages=messages,
                                 model=body.model,
                                 user_settings=user_settings,
                                 tool_choice=tool_choice,
                                 tools_override=active_tools,
                             )
+
+                            # Fallback: inject for other structured-mode models (unknown models).
+                            # Happens after the first call; subsequent iterations will have instructions.
+                            if calling_mode == CallingMode.STRUCTURED and tool_choice == "auto" and not _structured_tools_injected:
+                                _tl_fb = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
+                                for _fi, _fm in enumerate(messages):
+                                    if _fm.get("role") == "system":
+                                        messages[_fi] = {
+                                            "role": "system",
+                                            "content": _fm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_fb),
+                                        }
+                                        _structured_tools_injected = True
+                                        break
 
                             tool_calls_buffer: dict = {}
                             finish_reason: str | None = None
@@ -742,7 +835,7 @@ async def send_message(
                                 delta = choice.delta
 
                                 if choice.finish_reason:
-                                    finish_reason = choice.finish_reason
+                                    finish_reason = normalize_finish_reason(choice.finish_reason)
 
                                 if delta.content:
                                     full_content += delta.content
@@ -759,6 +852,31 @@ async def send_message(
                                             tool_calls_buffer[idx]["name"] = tc.function.name
                                         if tc.function and tc.function.arguments:
                                             tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+                            # Parse tool calls based on calling mode
+                            if calling_mode == CallingMode.STRUCTURED:
+                                structured_calls = parse_structured_tool_calls(full_content)
+                                if structured_calls:
+                                    # Convert to tool_calls_buffer format for uniform execution
+                                    for idx, call in enumerate(structured_calls):
+                                        tool_calls_buffer[idx] = {
+                                            "id": call.id,
+                                            "name": call.function.name,
+                                            "arguments": call.function.arguments,
+                                        }
+                                    # Clear content since it was a tool call, not a user-facing response
+                                    full_content = ""
+                                    finish_reason = "tool_calls"
+                                elif full_content.strip():
+                                    # Log parse failure for observability
+                                    logger.warning(
+                                        "structured_tool_parse_failed",
+                                        extra={
+                                            "model": body.model,
+                                            "provider": user_settings.active_provider if user_settings else "unknown",
+                                            "content_preview": full_content[:200],
+                                        }
+                                    )
 
                             break  # stream completed successfully
 
@@ -796,8 +914,10 @@ async def send_message(
                     yield f"data: {json.dumps({'type': 'delta', 'content': truncation_note})}\n\n"
                     break
 
-                # No tool calls → natural stop (stop / end_turn / None), we're done
-                if finish_reason != "tool_calls" or not tool_calls_buffer:
+                # Execute tools if any were buffered, regardless of finish_reason.
+                # Anthropic's compat layer sends "end_turn" (not "tool_calls") even when
+                # tool calls are present — checking finish_reason alone would silently drop them.
+                if not tool_calls_buffer:
                     if finish_reason not in ("tool_calls", "stop", "end_turn", None):
                         logger.warning(
                             "Unexpected finish_reason %r on iteration %d — treating as stop",
@@ -807,7 +927,7 @@ async def send_message(
                     # iteration, retry once — handles transient hiccups and reasoning
                     # models (e.g. Kimi K2.5) that exhaust output budget on thinking
                     # tokens and return empty content after a tool call.
-                    if not full_content and not tool_calls_buffer and _empty_retries < 1:
+                    if not full_content and _empty_retries < 1:
                         _empty_retries += 1
                         logger.warning(
                             "LLM returned empty response on iteration %d (thread %s) — retrying once",
@@ -1451,8 +1571,8 @@ async def send_message(
                   yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
               yield f"data: {json.dumps({'type': 'error', 'message': err_str})}\n\n"
           except Exception as e:
-              logger.error("Unexpected error in event stream (thread %s): %s", thread_id, e, exc_info=True)
-              user_msg = "*An unexpected error occurred. Please try again.*"
+              logger.error("Unexpected error in event stream (thread %s): %s [%s]", thread_id, e, type(e).__name__, exc_info=True)
+              user_msg = f"*An unexpected error occurred ({type(e).__name__}). Please try again.*"
               if not full_content:
                   full_content += user_msg
                   yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
