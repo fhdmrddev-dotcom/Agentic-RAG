@@ -882,41 +882,26 @@ async def send_message(
                             break  # stream completed successfully
 
                     except (APIError, AnthropicAPIError) as provider_err:
-                        # Detect "request too large" 429 — distinct from rate-limit 429.
-                        # Fires when a single request exceeds the account's TPM bucket
-                        # (e.g. OpenAI Tier-1: 30k TPM). Auto-trim messages and retry once.
+                        # Detect "request too large" 429 — distinct from a rate-limit 429.
+                        # This fires when the account's TPM ceiling (e.g. OpenAI Tier-1: 30k)
+                        # is smaller than the single request size. This is an account plan
+                        # limitation, not a model or app issue — do NOT trim content.
                         _err_str = str(provider_err).lower()
                         _is_request_too_large = (
                             getattr(provider_err, "status_code", None) == 429
                             and ("request too large" in _err_str or "tokens per min" in _err_str)
-                            and _provider_retries == 0  # only attempt trim-retry once
                         )
                         if _is_request_too_large:
-                            # Trim large tool results in history to reduce request size.
-                            # The model already processed each result when it ran; stored
-                            # versions in messages[] only need to be summary-length.
-                            _TRIM_LIMIT = 12000  # ~3k tokens per stored tool result
-                            _trimmed_count = 0
-                            for _m in messages:
-                                if _m.get("role") == "tool" and len(_m.get("content", "")) > _TRIM_LIMIT:
-                                    _m["content"] = _m["content"][:_TRIM_LIMIT] + "\n[Result condensed to fit account token limits]"
-                                    _trimmed_count += 1
-                            if _trimmed_count:
-                                logger.warning(
-                                    "request_too_large on iteration %d — trimmed %d tool result(s) in history and retrying",
-                                    iteration, _trimmed_count,
-                                )
-                                _provider_retries += 1
-                                continue  # retry with trimmed messages
-                            else:
-                                # Nothing to trim — show actionable error
-                                _tpm_msg = (
-                                    "*Your OpenAI account's token limit is too low for this document "
-                                    f"(requested {getattr(provider_err, 'status_code', '')} tokens). "
-                                    "Try: switch to Anthropic (claude-sonnet-4-6), use OpenRouter, or upgrade your OpenAI plan at platform.openai.com/account/rate-limits.*"
-                                )
-                                yield f"data: {json.dumps({'type': 'delta', 'content': _tpm_msg})}\n\n"
-                                break
+                            _tpm_msg = (
+                                "*This document is too large for your current OpenAI account plan. "
+                                "gpt-4.1 supports up to 1M tokens, but your account's TPM limit "
+                                "rejected this request. To fix: upgrade to OpenAI Tier 2 at "
+                                "platform.openai.com/account/rate-limits, switch to Anthropic "
+                                "(claude-sonnet-4-6), or use OpenRouter which has higher limits.*"
+                            )
+                            full_content += _tpm_msg
+                            yield f"data: {json.dumps({'type': 'delta', 'content': _tpm_msg})}\n\n"
+                            break
 
                         if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
                             _provider_retries += 1
