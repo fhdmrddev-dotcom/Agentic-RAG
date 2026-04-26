@@ -496,11 +496,11 @@ async def send_message(
         if body.agent_mode == "explorer":
             active_system_prompt = EXPLORER_SYSTEM_PROMPT
             active_tools = get_explorer_tools()
-            max_iterations = 6
+            max_iterations = 8   # GEN-04: was 6
         else:
             active_system_prompt = SYSTEM_PROMPT
             active_tools = None  # None = use default get_tools() in create_streaming_chat
-            max_iterations = 8
+            max_iterations = 15  # GEN-04: was 8
 
         # Augment system prompt with folder scope context so LLM generates scoped queries
         if scoped_folder_path:
@@ -646,13 +646,9 @@ async def send_message(
                 return [_strip_nul(item) for item in obj]
             return obj
 
-        # Option B context budget: cap tool result size in the messages array.
-        # The LLM consumed the full result in the iteration it ran — subsequent
-        # iterations only need a condensed version. This keeps the context window
-        # from growing unbounded across many tool calls.
-        # analyze_document results are longer by nature; everything else caps lower.
-        _CTX_LIMIT_DEFAULT = 3000    # chars in messages[] for most tools
-        _CTX_LIMIT_SUBAGENT = 10000  # chars for analyze_document (rich synthesis)
+        # GEN-03: Tool results stored in full — no character caps.
+        # Context budget managed by trim_messages_to_fit() which drops OLDER messages
+        # when total context exceeds the model's budget.
 
         try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
           try:
@@ -744,14 +740,14 @@ async def send_message(
 
                 if finish_reason == "length" and tool_calls_buffer:
                     # length limit hit while streaming tool arguments — discard partial call
-                    err_msg = "*Response cut off mid-tool-call (output length limit). Please try a shorter request.*"
+                    err_msg = "*The conversation grew too large for this model's context window. Start a new chat and try the generation request again.*"
                     full_content += err_msg
                     yield f"data: {json.dumps({'type': 'delta', 'content': err_msg})}\n\n"
                     yield f"data: {json.dumps({'type': 'error', 'message': 'finish_reason=length during tool streaming'})}\n\n"
                     break
 
                 if finish_reason == "length":
-                    truncation_note = "\n\n*[Response truncated — output token limit reached. Try a shorter request or increase LLM_MAX_OUTPUT_TOKENS.]*"
+                    truncation_note = "\n\n*[Response truncated — output token limit reached. Start a new chat or reduce document length.]*"
                     full_content += truncation_note
                     yield f"data: {json.dumps({'type': 'delta', 'content': truncation_note})}\n\n"
                     break
@@ -1325,20 +1321,13 @@ async def send_message(
 
                     yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name, 'result': tool_result[:2000]})}\n\n"
 
-                    # --- Option B: cap tool result size added to the LLM messages array ---
-                    # Use the URL-stripped version for execute_code; raw result otherwise.
-                    ctx_content = llm_tool_content if llm_tool_content is not None else tool_result
-                    ctx_limit = (
-                        _CTX_LIMIT_SUBAGENT if tool_name == "analyze_document"
-                        else _CTX_LIMIT_DEFAULT  # cap read_document — use start_line/end_line for large docs
-                    )
-                    if len(ctx_content) > ctx_limit:
-                        ctx_content = ctx_content[:ctx_limit] + f"\n[... truncated for context — {len(ctx_content) - ctx_limit} chars omitted]"
-
+                    # GEN-03: Store full tool result — no character cap.
+                    # trim_messages_to_fit() drops OLDER messages when context budget is exceeded.
+                    full_content = llm_tool_content if llm_tool_content is not None else tool_result
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc["id"],
-                        "content": ctx_content,
+                        "content": full_content,
                     })
 
                     # Persist tool call — for execute_code rebuild from tool_result
@@ -1372,7 +1361,13 @@ async def send_message(
 
             # Fallback: if the loop ended with no content produced, emit a safe message
             if not full_content:
-                fallback = "*I wasn't able to generate a response. Please try rephrasing your question.*"
+                # GEN-07: two distinct messages — context overflow vs empty model response
+                # Context overflow is caught earlier (finish_reason == "length").
+                # This branch = model returned empty content after all iterations/retries.
+                fallback = (
+                    f"*The model returned an empty response after {max_iterations} iterations. "
+                    "Try breaking the request into smaller steps or switching to a different model.*"
+                )
                 full_content += fallback
                 yield f"data: {json.dumps({'type': 'delta', 'content': fallback})}\n\n"
 
