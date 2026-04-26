@@ -105,6 +105,9 @@ class TestCreateStreamingChatToolsOverride:
         with patch("app.services.openai_service.get_llm_client") as mock_get_client, \
              patch("app.services.openai_service.settings") as mock_settings:
             mock_settings.llm_model = "gpt-4o"
+            mock_settings.llm_provider = ""
+            mock_settings.llm_max_output_tokens = 0
+            mock_settings.model_output_limits = ""
             mock_settings.web_search_enabled = False
             mock_client = MagicMock()
             mock_get_client.return_value = mock_client
@@ -128,6 +131,9 @@ class TestCreateStreamingChatToolsOverride:
              patch("app.services.openai_service.settings") as mock_settings, \
              patch("app.services.openai_service.get_tools") as mock_get_tools:
             mock_settings.llm_model = "gpt-4o"
+            mock_settings.llm_provider = ""
+            mock_settings.llm_max_output_tokens = 0
+            mock_settings.model_output_limits = ""
             mock_settings.web_search_enabled = False
             default_tools = [{"type": "function", "function": {"name": "search_documents", "parameters": {}}}]
             mock_get_tools.return_value = default_tools
@@ -244,9 +250,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             captured_messages.extend(messages)
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -268,9 +275,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             captured_kwargs.update(kwargs)
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -299,9 +307,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             call_count[0] += 1
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -323,9 +332,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             captured_messages.extend(messages)
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -347,9 +357,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             captured_kwargs.update(kwargs)
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -371,9 +382,10 @@ class TestSendMessageAgentModeBranching:
 
         def mock_create_streaming_chat(messages, **kwargs):
             captured_messages.extend(messages)
-            return iter([_make_simple_stream_chunk()])
+            from app.services.openai_service import CallingMode
+            return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "default"},

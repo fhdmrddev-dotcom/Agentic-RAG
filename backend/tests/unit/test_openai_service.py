@@ -141,6 +141,126 @@ def _make_user_settings(
     )
 
 
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_parallel_tool_calls_false(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings()
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert call_kwargs.get("parallel_tool_calls") is False
+
+
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_exacto_appended_for_quality(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings(llm_model="openrouter/anthropic/claude-sonnet-4.5")
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert ":exacto" in call_kwargs.get("model", "")
+
+
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_exacto_not_doubled(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    """If model already has :exacto, don't double-append."""
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings(llm_model="openrouter/gpt-4o:exacto")
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    model = call_kwargs.get("model", "")
+    assert model.count(":exacto") == 1
+
+
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_response_healing_plugin(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings()
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    extra_body = call_kwargs.get("extra_body", {})
+    plugins = extra_body.get("plugins", [])
+    assert any(p.get("id") == "response-healing" for p in plugins)
+
+
+@patch("app.services.openai_service.get_llm_client")
+@patch("app.services.openai_service._resolve_max_tokens")
+@patch("app.services.openai_service._uses_max_completion_tokens")
+def test_native_strategy_no_exacto(mock_uses_max, mock_resolve_tokens, mock_get_client):
+    mock_client = MagicMock()
+    mock_get_client.return_value = mock_client
+    mock_resolve_tokens.return_value = 1000
+    mock_uses_max.return_value = False
+
+    user_settings = _make_user_settings(strategy="native")
+    messages = [{"role": "user", "content": "hello"}]
+
+    from app.services.openai_service import create_adaptive_streaming_chat
+    create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice="auto",
+        user_settings=user_settings,
+    )
+
+    call_kwargs = mock_client.chat.completions.create.call_args.kwargs
+    assert ":exacto" not in call_kwargs.get("model", "")
+    assert "extra_body" not in call_kwargs
+
+
 # ---------------------------------------------------------------------------
 # GEN-02/GEN-05: _resolve_max_tokens provider bypass
 # These tests are RED until Wave 1 (054-02-PLAN.md) adds NATIVE_PROVIDERS bypass.
