@@ -27,22 +27,27 @@ PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
 MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     # ── OpenAI ──────────────────────────────────────────────────────────────
     "gpt-4o":                               100_000,  # actual 128k
-    "gpt-4o-mini":                          100_000,  # actual 128k
+    "gpt-4o-mini":                          100_000,  # actual 128k — deprecated, kept for compat
     "gpt-4.1":                              400_000,  # actual 1M — practical cap
     "gpt-4.1-mini":                         400_000,  # actual 1M — practical cap
-    "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap
-    "gpt-5":                                200_000,  # actual 200k
-    "gpt-5.4":                              200_000,  # actual 200k
-    "gpt-5.4-mini":                         200_000,  # actual 200k
+    "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap — deprecated
+    "gpt-5":                                200_000,  # actual 200k — superseded by 5.4+
+    "gpt-5.4":                              400_000,  # actual 1M — 400K practical cap
+    "gpt-5.4-mini":                         200_000,  # actual 400K — 200K practical cap
+    "gpt-5.4-nano":                         200_000,  # actual 400K — 200K practical cap
+    "gpt-5.5":                              400_000,  # actual 1M — 400K practical cap
     # ── Anthropic ───────────────────────────────────────────────────────────
-    "claude-opus-4-6":                      150_000,  # actual 200k
-    "claude-sonnet-4-6":                    150_000,  # actual 200k
-    "claude-haiku-4-5-20251001":            150_000,  # actual 200k
+    "claude-opus-4-7":                      200_000,  # actual 1M — 200K practical cap
+    "claude-opus-4-6":                      200_000,  # actual 1M — superseded by 4.7
+    "claude-sonnet-4-6":                    200_000,  # actual 1M — 200K practical cap
+    "claude-sonnet-4-5":                    200_000,  # actual 1M — 200K practical cap
+    "claude-haiku-4-5-20251001":            200_000,  # actual 1M — 200K practical cap
     # ── Google ──────────────────────────────────────────────────────────────
     "gemini-2.5-pro":                       600_000,  # actual 1M — practical cap
     "gemini-2.5-flash":                     600_000,  # actual 1M — practical cap
     "gemini-2.5-flash-lite":                600_000,  # actual 1M — practical cap
     "gemini-3-flash-preview":               600_000,  # actual 1M — practical cap
+    "gemini-3.1-pro-preview":               600_000,  # actual 1M — 600K practical cap
     # ── OpenRouter ──────────────────────────────────────────────────────────
     "meta-llama/llama-3.3-70b-instruct":    100_000,  # actual 128k
     "deepseek/deepseek-r1":                 100_000,  # actual 128k via OpenRouter
@@ -73,18 +78,23 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "gpt-5": {"native_tools": True, "provider": "openai"},
     "gpt-5.4": {"native_tools": True, "provider": "openai"},
     "gpt-5.4-mini": {"native_tools": True, "provider": "openai"},
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai"},
+    "gpt-5.5": {"native_tools": True, "provider": "openai"},
     "o1": {"native_tools": True, "provider": "openai"},
     "o3": {"native_tools": True, "provider": "openai"},
     "o4": {"native_tools": True, "provider": "openai"},
     # Anthropic direct — native tool_use
+    "claude-opus-4-7": {"native_tools": True, "provider": "anthropic"},
     "claude-opus-4-6": {"native_tools": True, "provider": "anthropic"},
     "claude-sonnet-4-6": {"native_tools": True, "provider": "anthropic"},
+    "claude-sonnet-4-5": {"native_tools": True, "provider": "anthropic"},
     "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic"},
     # Google direct — native function calling
     "gemini-2.5-pro": {"native_tools": True, "provider": "google"},
     "gemini-2.5-flash": {"native_tools": True, "provider": "google"},
     "gemini-2.5-flash-lite": {"native_tools": True, "provider": "google"},
     "gemini-3-flash-preview": {"native_tools": True, "provider": "google"},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google"},
     # OpenRouter — mixed; start safe with structured mode
     "deepseek/deepseek-chat": {"native_tools": False, "provider": "openrouter"},
     "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter"},
@@ -108,7 +118,7 @@ def get_model_capability(model_id: str) -> ModelCapability:
 # when user_settings.py needs to resolve the model without importing sub_agent_service.
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
-    "openai":     "gpt-4o-mini",
+    "openai":     "gpt-5.4-mini",
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
@@ -255,7 +265,7 @@ class Settings(BaseSettings):
     sub_agent_max_chars: int = 600_000
     # Sub-agents have their own independent context window — this cap is NOT protecting
     # the main agent's budget. 600k chars ≈ 150k tokens, which fits any 200k+ model
-    # (Haiku 4.5: 200k, GPT-5.4-nano: 400k, Gemini Flash: 1M) with headroom for output.
+    # (Haiku 4.5: 200k, GPT-5.4-mini: 200k, Gemini Flash: 1M) with headroom for output.
     sub_agent_max_output_tokens: int = 8192
     # Default output ceiling for sub-agent analysis tasks (D-08).
     # Generation tasks (pptx, report, pdf, etc.) override this with max(32768, this value).

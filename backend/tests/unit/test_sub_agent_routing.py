@@ -35,8 +35,8 @@ def test_anthropic_sub_agent_uses_haiku():
 
 
 def test_openai_sub_agent_uses_mini():
-    """OpenAI sub-agent uses gpt-4o-mini (high TPM, capable for analysis)."""
-    assert _SUB_AGENT_MODEL_DEFAULTS["openai"] == "gpt-4o-mini"
+    """OpenAI sub-agent uses gpt-5.4-mini (high TPM, capable for analysis)."""
+    assert _SUB_AGENT_MODEL_DEFAULTS["openai"] == "gpt-5.4-mini"
 
 
 def test_google_sub_agent_uses_flash():
@@ -81,7 +81,7 @@ def test_analysis_task_does_not_use_main_model():
                 _SUB_AGENT_MODEL_DEFAULTS.get(user_settings.active_provider, "")
                 or user_settings.llm_model
             )
-        assert effective_model == "gpt-4o-mini"
+        assert effective_model == "gpt-5.4-mini"
         assert effective_model != "gpt-4.1"
 
 
@@ -92,7 +92,7 @@ def test_generation_task_also_uses_provider_default():
     with patch.object(settings, "sub_agent_model", ""):
         override = user_settings.sub_agent_model or settings.sub_agent_model
         effective_model = override or _SUB_AGENT_MODEL_DEFAULTS.get(user_settings.active_provider, "") or user_settings.llm_model
-        assert effective_model == "gpt-4o-mini"
+        assert effective_model == "gpt-5.4-mini"
 
 
 # ---------------------------------------------------------------------------

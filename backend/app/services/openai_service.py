@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from openai import OpenAI
 
-from app.config import settings
+from app.config import settings, get_model_capability
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -53,11 +54,14 @@ QUERY_DOCUMENTS_TOOL = {
             "structured questions about their uploaded files and folder organisation. Use for "
             "questions like 'how many documents do I have?', 'list all PDFs', 'which files were "
             "uploaded in 2024?', 'what folders do I have?', 'which folder is X in?'. "
-            "Table: documents. Columns: id (uuid), filename (text), file_type (text), "
-            "status (text, e.g. 'completed'), created_at (timestamptz), folder_id (uuid, nullable, "
-            "references folders.id), "
+            "Table: documents. Columns: id (uuid), filename (text), mime_type (text, "
+            "e.g. 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', "
+            "'text/plain'), status (text, e.g. 'completed'), created_at (timestamptz), "
+            "folder_id (uuid, nullable, references folders.id), "
             "metadata (jsonb with keys: title, author, date, document_type, topics, "
             "language, summary). "
+            "IMPORTANT: the file-type column is named mime_type, NOT file_type. "
+            "To filter PDFs use: WHERE d.mime_type = 'application/pdf'. "
             "Table: folders. Columns: id (uuid), name (text), parent_id (uuid, nullable), "
             "user_id (uuid), is_global (boolean). "
             "JOIN example: SELECT d.filename, f.name AS folder FROM documents d "
@@ -588,17 +592,23 @@ NATIVE_PROVIDERS = frozenset({"openai", "anthropic", "google"})
 _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     # ── OpenAI ──────────────────────────────────────────────────────────────
     "gpt-4o":                                16384,  # supports 16k
-    "gpt-4o-mini":                           16384,  # supports 16k
-    "gpt-4.1":                               32768,  # supports 32k
-    "gpt-4.1-mini":                          32768,  # supports 32k
-    "gpt-4.1-nano":                          16384,  # nano — keep conservative
-    "gpt-5":                                 32768,  # conservative ceiling
-    "gpt-5.4-mini":                          32768,  # conservative ceiling
+    "gpt-4o-mini":                           16384,  # supports 16k — deprecated
+    "gpt-4.1":                               32768,  # supports 32k — deprecated
+    "gpt-4.1-mini":                          32768,  # supports 32k — deprecated
+    "gpt-4.1-nano":                          16384,  # nano — deprecated
+    "gpt-5":                                 32768,  # superseded by 5.4+
+    "gpt-5.4":                               65536,  # supports 128k; 64K practical ceiling
+    "gpt-5.4-mini":                          32768,  # supports 128k; 32K conservative
+    "gpt-5.4-nano":                          16384,  # budget — keep conservative
+    "gpt-5.5":                               65536,  # supports 128k; 64K practical ceiling
     # ── Anthropic ───────────────────────────────────────────────────────────
+    "claude-opus-4-7":                       16384,  # flagship — 16K (35% tokenizer overhead)
     "claude-haiku-4-5-20251001":              8192,  # hard ceiling 8k
+    "claude-sonnet-4-5":                     32768,  # supports 64k; 32k practical
     "claude-sonnet-4-6":                     32768,  # supports 64k; 32k practical
     "claude-opus-4-6":                       16384,  # supports 32k; 16k conservative
     # ── Google ──────────────────────────────────────────────────────────────
+    "gemini-3.1-pro-preview":                32768,  # preview — conservative ceiling
     "gemini-2.5-pro":                        32768,  # supports 65k; 32k practical
     "gemini-2.5-flash":                      32768,  # supports 65k; 32k practical
     "gemini-2.5-flash-lite":                 16384,  # lite — keep conservative
@@ -663,7 +673,7 @@ def _resolve_max_tokens(
     env_val = settings.llm_max_output_tokens
     env_default = 8192  # matches the default in config.py
     if env_val != env_default:
-        # User deliberately set LLM_MAX_OUTPUT_TOKENS — respect it for all providers
+        # User deliberately set LLM_MAX_OUTPUT_TOKENS in .env — respect it for all providers
         return env_val
 
     model = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
@@ -693,6 +703,70 @@ def _uses_max_completion_tokens(model: str) -> bool:
     return False
 
 
+# ── Provider normalization ────────────────────────────────────────────────────
+#
+# Each provider's OpenAI-compat layer translates its native values differently.
+# Centralising the mapping here means threads.py never needs per-provider logic.
+
+_FINISH_REASON_MAP: dict[str, str] = {
+    # Anthropic compat layer
+    "end_turn":       "stop",        # normal stop AND tool-call stop both arrive as end_turn
+    "tool_use":       "tool_calls",  # Anthropic native tool_use (may appear in some compat versions)
+    # Google compat layer
+    "STOP":           "stop",
+    "MAX_TOKENS":     "length",
+    "SAFETY":         "stop",
+    "RECITATION":     "stop",
+    "OTHER":          "stop",
+    # OpenAI / OpenRouter (already canonical, listed for documentation)
+    "stop":           "stop",
+    "tool_calls":     "tool_calls",
+    "length":         "length",
+    "content_filter": "stop",
+}
+
+# Providers whose compat layers reject or silently mishandle parallel_tool_calls.
+# Always single-call for these; do not send the parameter at all.
+_NO_PARALLEL_TOOL_CALLS: frozenset[str] = frozenset({"google"})
+
+
+def normalize_finish_reason(raw: str | None) -> str | None:
+    """Map any provider's finish_reason to a canonical OpenAI value.
+
+    Unknown values pass through unchanged so new providers don't silently break.
+    """
+    if raw is None:
+        return None
+    return _FINISH_REASON_MAP.get(raw, raw)
+
+
+class CallingMode(str, Enum):
+    NATIVE = "native"       # Standard OpenAI tools parameter
+    STRUCTURED = "structured"  # Tool schemas injected into system prompt
+
+
+def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | None" = None) -> CallingMode:
+    """Determine whether to use native API tools or structured JSON prompting."""
+    cap = get_model_capability(model_id)
+    
+    # OpenRouter strategy override — applies when the active provider is openrouter
+    # OR when the model is explicitly in the registry as an openrouter model
+    is_openrouter = (
+        (user_settings is not None and user_settings.active_provider == "openrouter")
+        or cap["provider"] == "openrouter"
+    )
+    if is_openrouter and user_settings is not None:
+        strategy = getattr(user_settings, "openrouter_tool_strategy", "quality")
+        if strategy == "xml":
+            return CallingMode.STRUCTURED
+        # quality and native both attempt native, but quality adds :exacto
+        return CallingMode.NATIVE
+    
+    if cap["native_tools"]:
+        return CallingMode.NATIVE
+    return CallingMode.STRUCTURED
+
+
 def create_streaming_chat(
     messages: list[dict],
     tool_choice: str = "auto",
@@ -701,22 +775,70 @@ def create_streaming_chat(
     tools_override: list[dict] | None = None,
     max_tokens: int | None = None,
 ):
+    """Backward-compatible wrapper — always uses native mode."""
+    stream, _ = create_adaptive_streaming_chat(
+        messages=messages,
+        tool_choice=tool_choice,
+        model=model,
+        user_settings=user_settings,
+        tools_override=tools_override,
+        max_tokens=max_tokens,
+    )
+    return stream
+
+
+def create_adaptive_streaming_chat(
+    messages: list[dict],
+    tool_choice: str = "auto",
+    model: str | None = None,
+    user_settings: UserEffectiveSettings | None = None,
+    tools_override: list[dict] | None = None,
+    max_tokens: int | None = None,
+) -> tuple:
+    """Returns (stream, calling_mode). calling_mode indicates how to parse the response."""
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
     resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
-    # GPT-5 / o-series use max_completion_tokens; everything else uses max_tokens.
-    # Anthropic compat defaults to 1024 if unset — always be explicit.
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
+    
+    calling_mode = resolve_calling_mode(effective_model, user_settings)
+    
+    effective_tokens = resolved_tokens  # GEN-01: full budget always — no reduction
+    
     kwargs: dict = {
         "model": effective_model,
         "messages": messages,
         "stream": True,
-        token_param: resolved_tokens,
+        token_param: effective_tokens,
     }
+    
+    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+
     if tool_choice == "auto":
-        kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)
-        kwargs["tool_choice"] = "auto"
-    return client.chat.completions.create(**kwargs)
+        if calling_mode == CallingMode.NATIVE:
+            # Native mode: pass tools via API parameter
+            kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)
+            kwargs["tool_choice"] = "auto"
+            # parallel_tool_calls is not supported by all compat layers — skip for known-bad providers.
+            if provider.lower() not in _NO_PARALLEL_TOOL_CALLS:
+                kwargs["parallel_tool_calls"] = False
+
+            # OpenRouter quality strategy enhancements
+            if user_settings and getattr(user_settings, "openrouter_tool_strategy", "quality") == "quality":
+                if effective_model.startswith("openrouter/") or "/" in effective_model:
+                    # Append :exacto for quality routing if not already present
+                    if ":exacto" not in effective_model:
+                        kwargs["model"] = f"{effective_model}:exacto"
+                    # Enable Response Healing plugin
+                    kwargs.setdefault("extra_body", {})
+                    kwargs["extra_body"]["plugins"] = [{"id": "response-healing"}]
+        else:
+            # Structured mode: DO NOT pass tools param
+            # Tool schemas are injected into system prompt by caller (threads.py)
+            pass
+    
+    stream = client.chat.completions.create(**kwargs)
+    return stream, calling_mode
 
 
 def embed_texts(

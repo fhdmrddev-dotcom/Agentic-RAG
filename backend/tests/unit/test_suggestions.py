@@ -134,7 +134,7 @@ def test_generate_suggestions_uses_sub_agent_model_override():
 # ---------------------------------------------------------------------------
 
 def test_generate_suggestions_uses_provider_default():
-    """settings.sub_agent_model='', user provider=openai → model should be gpt-4o-mini."""
+    """settings.sub_agent_model='', user provider=openai → model should be gpt-5.4-mini."""
     mock_client = _make_mock_client("Q1?\nQ2?\nQ3?")
     user_settings = _make_user_settings(provider="openai", llm_model="gpt-4o")
 
@@ -152,7 +152,7 @@ def test_generate_suggestions_uses_provider_default():
 
     create_call = mock_client.chat.completions.create.call_args
     model_used = create_call.kwargs.get("model") or (create_call.args[0] if create_call.args else None)
-    assert model_used == "gpt-4o-mini", f"Expected gpt-4o-mini for openai provider, got {model_used!r}"
+    assert model_used == "gpt-5.4-mini", f"Expected gpt-5.4-mini for openai provider, got {model_used!r}"
 
 
 # ---------------------------------------------------------------------------
