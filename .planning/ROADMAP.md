@@ -136,11 +136,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   2. User can navigate away or refresh the page during an active stream and no server-side socket errors appear in logs
   3. Partial assistant responses are persisted when stop is triggered, so the user can reload the page and see the partial answer
 **Plans**: 5 plans
-  - [ ] 054-01-PLAN.md — TDD Wave 0: failing tests for GEN-01/GEN-02/GEN-04/GEN-05 (Wave 1)
-  - [ ] 054-02-PLAN.md — Remove 20%% token reduction + tool-result caps + anthropic SDK (Wave 2)
-  - [ ] 054-03-PLAN.md — anthropic_service.py native SDK adapter with message conversion + prompt caching (Wave 2)
-  - [ ] 054-04-PLAN.md — threads.py Anthropic dispatch + SettingsPage.tsx provider-conditional sliders (Wave 3)
-  - [ ] 054-05-PLAN.md — Full test suite verification + 054-VERIFICATION.md (Wave 4)
+  - [x] 054-01-PLAN.md ï¿½ TDD Wave 0: failing tests for GEN-01/GEN-02/GEN-04/GEN-05 (Wave 1)
+  - [x] 054-02-PLAN.md ï¿½ Remove 20%% token reduction + tool-result caps + anthropic SDK (Wave 2)
+  - [x] 054-03-PLAN.md ï¿½ anthropic_service.py native SDK adapter with message conversion + prompt caching (Wave 2)
+  - [x] 054-04-PLAN.md ï¿½ threads.py Anthropic dispatch + SettingsPage.tsx provider-conditional sliders (Wave 3)
+  - [x] 054-05-PLAN.md ï¿½ Full test suite verification + 054-VERIFICATION.md (Wave 4)
 **UI hint**: yes (Settings sliders hidden for native providers; read-only info rows shown)
 **UI hint**: yes
 
