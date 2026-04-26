@@ -4,8 +4,8 @@ milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: milestone_complete
 stopped_at: Phase 53 execution complete
-last_updated: "2026-04-26T10:30:51.440Z"
-last_activity: 2026-04-26 -- Phase 054 execution started
+last_updated: "2026-04-26T19:54:00.000Z"
+last_activity: 2026-04-26 -- Hotfix PROMPT-01 applied (execute_code over-triggering)
 progress:
   total_phases: 12
   completed_phases: 10
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-04-22)
 ## Current Position
 
 Phase: 054
-Plan: Not started
-Status: Milestone complete
+Plan: Hotfix PROMPT-01 applied
+Status: In progress
 Last activity: 2026-04-26
 
 Progress: [█████████░] 90%
 
-Next: Phase 54 — TBD
+Next: Continue Phase 054 model registry updates
 
 ## Phase 53 Plan Summary
 
@@ -78,6 +78,7 @@ Next: Phase 54 — TBD
 
 - Phase 52 added: Multi-Provider Model Routing — full provider-aware routing for all agent roles, cross-provider sub-agent fix, model fallback on unavailable models
 - Phase 53 added: Cross-Provider Tool Calling Reliability — capability registry with native/structured dual-mode tool calling, user-controllable OpenRouter strategy, deterministic JSON parser for non-native models
+- Phase 55 added: Streaming Reliability & Connection Resilience — async LLM streaming for true cancellation, Supabase Realtime subscription so navigation never loses a response, shield persist on disconnect
 
 ### Decisions
 
@@ -88,6 +89,7 @@ Recent decisions affecting current work:
 - **D-53-02**: Unknown models default to structured mode (`native_tools: false`). Safe by default; user flips flag after testing.
 - **D-53-03**: OpenRouter strategy global setting with three modes: `quality` (default, uses `:exacto` + Response Healing), `native` (assumes tool support), `xml` (forces structured).
 - **D-53-04**: OpenAI path is identical to before. Capability check is O(1) dict lookup. Zero additional latency.
+- **D-054-01 (PROMPT-01)**: System prompt Q&A vs Generation mode disambiguation. Old prompt used keyword matching ("report", "summary") → triggered execute_code on Q&A queries. Fix: Generation mode only activates on explicit file-creation verbs ("create", "generate", "build", "make"). Default is Q&A. Backup at `.planning/backups/SYSTEM_PROMPT_BACKUP_2026-04-26.md`. Revert: `git checkout 25a27b9 -- backend/app/api/threads.py`.
 - No cancel endpoint for SSE stop — GeneratorExit mechanism is fast enough for v2.4
 - Side phase numbering uses `side-NNN` prefix (separate from sequential phases)
 - SSEStreamingResponse uses stop_event mechanism for immediate client-disconnect detection
@@ -100,7 +102,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None — Phase 53 complete.
+| Phase | Task | Status |
+|-------|------|--------|
+| 054 | PROMPT-01: System prompt Q&A vs Generation fix | ✅ Complete |
+| 054 | Model registry updates (6 new models) | ⬜ Not started |
+| 054 | Sub-agent default update (gpt-4o-mini → gpt-5.4-mini) | ⬜ Not started |
 
 ### Completed Todos (Phase 53)
 
@@ -139,5 +145,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 ## Session Continuity
 
 Last session: 2026-04-26
-Stopped at: Phase 53 execution complete
-Next: Phase 54 — TBD
+Stopped at: Hotfix PROMPT-01 applied — system prompt execute_code over-triggering fixed
+Next: Phase 054 model registry updates + sub-agent defaults
+Revert point: `git checkout 25a27b9 -- backend/app/api/threads.py`

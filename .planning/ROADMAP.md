@@ -163,6 +163,16 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 **Planning artifacts preserved:** `.planning/phases/46-smart-skill-dispatch/` (CONTEXT.md, DISCUSSION-LOG.md, 46-01-PLAN.md, 46-02-PLAN.md)
 
+### Phase 55: Streaming Reliability & Connection Resilience
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 54
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 55 to break down)
+
 ---
 
 ### Phase 46: Document Version Deletion
@@ -293,14 +303,19 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51 �
 
 ### Phase 54: Reliable Agentic Generation
 
-**Goal**: Complex end-to-end tasks (PPT, report, PDF generation from documents) complete successfully for all providers — the agent retrieves content, calls execute_code exactly once with complete Python code, and delivers a working output file.
+**Goal**: Complex end-to-end tasks (PPT, report, PDF generation from documents) complete successfully for all providers — the agent retrieves content, calls execute_code exactly once with complete Python code, and delivers a working output file. Q&A queries must NOT trigger execute_code.
 
 **Depends on**: Phase 53 (Cross-Provider Tool Calling Reliability)
-**Requirements**: GEN-01, GEN-02, GEN-03, GEN-04, GEN-05
+**Requirements**: GEN-01, GEN-02, GEN-03, GEN-04, GEN-05, PROMPT-01
 **Success Criteria** (what must be TRUE):
   1. "Generate a PPT from my dissertation" completes end-to-end: file downloaded, no truncation errors
   2. execute_code is called with complete Python code — never truncated mid-JSON
   3. No intermediate searches after analyze_document for generation tasks
   4. Empty-response fallback ("I wasn't able to generate a response") eliminated for legitimate requests
   5. Works for Anthropic (claude-sonnet-4-6), OpenAI (gpt-4.1), and Google (gemini-2.5-flash)
-**Plans**: TBD
+  6. Q&A queries ("summarize the report", "what does this say?") respond with text only — no execute_code triggered
+**Plans**:
+  - [x] **PROMPT-01 (Hotfix):** System prompt Q&A vs Generation disambiguation — narrowed Generation trigger to explicit file-creation verbs only, added "DO NOT use execute_code for" blocklist, removed overly aggressive "ZERO text" language. Backup: `.planning/backups/SYSTEM_PROMPT_BACKUP_2026-04-26.md`. Revert: `git checkout 25a27b9 -- backend/app/api/threads.py`
+  - [ ] 054-REGISTRY: Model registry updates (6 new models, 5 corrections, sub-agent default fix)
+  - [ ] 054-SETTINGS: SettingsPage merge conflict resolution + native provider UI
+  - [ ] 054-VERIFICATION: Full test suite verification

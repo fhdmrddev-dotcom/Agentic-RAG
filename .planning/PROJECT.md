@@ -193,6 +193,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - Metadata ingest normalization covers only document_type/language
 - Skill catalog injected in full for every request (token waste, over-triggering)
 - Icon labels misaligned (far right of icons) in NavPanel
+- ~~PROMPT-01: execute_code triggered on Q&A queries (e.g. "summarize the report")~~ — **FIXED 2026-04-26**
 - Logo disappears entirely when sidebar collapsed (opacity-0 on whole group)
 - Knowledge Health fixed top-10 lists don’t scale for large libraries
 - Low confidence metric is misleading (reflects query relevance, not document quality)
@@ -226,6 +227,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 | Deep Midnight is additive CSS/Tailwind only | No logic changes to SSE parsing or state management | ✓ Good — zero regression risk |
 | NavPanel collapses from Sidebar + AppDock | Single component with localStorage-persisted state replaces dual-component layout | ✓ Good — cleaner responsive breakpoint story |
 | 5-tab SettingsPage | Per-tab scoped Save handlers fix KEY_PLACEHOLDER contamination | ✓ Good — WR-03/WR-04 resolved |
+| System prompt Q&A vs Generation disambiguation (PROMPT-01) | Old prompt keyword-matched "report"/"summary" → triggered execute_code on Q&A queries. Fix: Generation mode only activates on explicit file-creation verbs. Default is always Q&A. | ✓ Good — eliminates false-positive .docx generation |
 
 ## Constraints
 
