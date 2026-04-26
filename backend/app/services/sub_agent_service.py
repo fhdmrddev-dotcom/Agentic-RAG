@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generator
 from langsmith import traceable
 
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
-from app.services.openai_service import get_llm_client, _resolve_max_tokens, _uses_max_completion_tokens
+from app.services.openai_service import get_llm_client, _uses_max_completion_tokens, _MODEL_OUTPUT_DEFAULTS, _PROVIDER_DEFAULT_MAX_TOKENS, _FALLBACK_MAX_TOKENS
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -60,11 +60,15 @@ def run_sub_agent(
             or settings.llm_model
         )
 
-    # Sub-agents always get the full output budget — they analyze complete documents
-    # and need enough tokens to return thorough extractions to the main agent.
-    output_ceiling = max(32768, settings.sub_agent_max_output_tokens)
-
-    resolved_tokens = _resolve_max_tokens(output_ceiling, user_settings)
+    # Sub-agents get as many tokens as possible for thorough extractions,
+    # but capped by the sub-agent model's actual API limit.
+    provider = user_settings.active_provider if user_settings else ""
+    model_max = _MODEL_OUTPUT_DEFAULTS.get(
+        effective_model,
+        _PROVIDER_DEFAULT_MAX_TOKENS.get(provider, _FALLBACK_MAX_TOKENS),
+    )
+    desired = max(32768, settings.sub_agent_max_output_tokens)
+    resolved_tokens = min(desired, model_max)
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     _original_model = effective_model
     try:
