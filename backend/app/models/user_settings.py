@@ -192,13 +192,16 @@ def _build_providers(override: dict) -> list[LLMProvider]:
         api_key = _str(override, key_field, env_key)
         models = _models_list(override, models_field, env_models_raw)
 
-        # If user hasn't configured a model list for this native provider,
-        # auto-populate from the registry so new models appear without manual setup.
-        if not models and pid in ("openai", "anthropic", "google"):
-            models = sorted(
+        # For native providers, merge saved list with registry so new registry
+        # models appear automatically without requiring manual Settings updates.
+        if pid in ("openai", "anthropic", "google"):
+            registry = [
                 m for m, cap in MODEL_CAPABILITIES.items()
                 if cap.get("provider") == pid
-            )
+            ]
+            # Preserve user's ordering; append any registry models not already present
+            existing_set = set(models)
+            models = models + [m for m in registry if m not in existing_set]
 
         if pid == "ollama":
             base_url = f"{ollama_base}/v1"
