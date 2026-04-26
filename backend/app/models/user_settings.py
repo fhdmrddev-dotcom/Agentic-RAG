@@ -9,12 +9,19 @@ from __future__ import annotations
 
 import json
 import time as _time
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
 
-from app.config import settings as env_settings
+from app.config import settings as env_settings, MODEL_CAPABILITIES
+
+
+class OpenRouterToolStrategy(str, Enum):
+    QUALITY = "quality"
+    NATIVE = "native"
+    XML = "xml"
 
 # Path to the override file (sits next to .env in the backend dir)
 _OVERRIDE_FILE = Path(__file__).parent.parent.parent / "settings_override.json"
@@ -84,6 +91,10 @@ class UserEffectiveSettings(BaseModel):
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
     sub_agent_model: str
+    llm_max_output_tokens: int  # 0 = auto (use per-model defaults)
+
+    # OpenRouter tool calling strategy
+    openrouter_tool_strategy: OpenRouterToolStrategy = OpenRouterToolStrategy.QUALITY
 
 
 # ── Override file I/O ─────────────────────────────────────────────────────────
@@ -181,6 +192,14 @@ def _build_providers(override: dict) -> list[LLMProvider]:
         api_key = _str(override, key_field, env_key)
         models = _models_list(override, models_field, env_models_raw)
 
+        # If user hasn't configured a model list for this native provider,
+        # auto-populate from the registry so new models appear without manual setup.
+        if not models and pid in ("openai", "anthropic", "google"):
+            models = sorted(
+                m for m, cap in MODEL_CAPABILITIES.items()
+                if cap.get("provider") == pid
+            )
+
         if pid == "ollama":
             base_url = f"{ollama_base}/v1"
             api_key = api_key or "ollama"
@@ -263,6 +282,8 @@ def load_app_settings() -> UserEffectiveSettings:
         context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
         sub_agent_max_output_tokens=_int(override, "sub_agent_max_output_tokens", env_settings.sub_agent_max_output_tokens),
         sub_agent_model=_str(override, "sub_agent_model", env_settings.sub_agent_model),
+        llm_max_output_tokens=_int(override, "llm_max_output_tokens", env_settings.llm_max_output_tokens),
+        openrouter_tool_strategy=OpenRouterToolStrategy(_str(override, "openrouter_tool_strategy", OpenRouterToolStrategy.QUALITY.value)),
     )
 
 
