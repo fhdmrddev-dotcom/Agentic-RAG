@@ -105,7 +105,8 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 - [x] **Phase 46: Document Version Deletion** — Choose to delete one version or all, with proper cleanup (2/2 plans) — completed 2026-04-25
 - [x] **Phase 47: Document List & Upload Polish** — Root documents visible, upload errors clear, root upload works (2/2 plans) — completed 2026-04-25
 - [x] **Phase 48: Settings & Navigation Polish** — Web search toggle in settings, sidebar icon/logo alignment (3/3 plans) — completed 2026-04-25
-- [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states (completed 2026-04-25)
+- [x] **Phase 49: Library Health at Scale** — Paginated health dashboard, accurate labels, actionable empty states
+ (completed 2026-04-25)
 - [x] **Phase 51: Context Window Management** — Per-model context limits, task-complexity routing for sub-agents, configurable settings UI with inline model documentation (7/7 plans) — completed 2026-04-24
 - [x] **Phase 52: Multi-Provider Model Routing** — Full user control over main, sub-agent, title, and follow-up models; provider-aware routing; cross-provider sub-agent fix; fallback on unavailable models (3/3 plans) — completed 2026-04-25
   - [x] 052-01-PLAN.md — Backend: config defaults, 404 fallback + SSE sentinel, resolved_sub_agent_model in settings (Wave 1)
@@ -134,7 +135,13 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   1. User can stop a streaming response and see the response terminate immediately — no "saving response" text lingers in the UI
   2. User can navigate away or refresh the page during an active stream and no server-side socket errors appear in logs
   3. Partial assistant responses are persisted when stop is triggered, so the user can reload the page and see the partial answer
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 054-01-PLAN.md � TDD Wave 0: failing tests for GEN-01/GEN-02/GEN-04/GEN-05 (Wave 1)
+  - [ ] 054-02-PLAN.md � Remove 20%% token reduction + tool-result caps + anthropic SDK (Wave 2)
+  - [ ] 054-03-PLAN.md � anthropic_service.py native SDK adapter with message conversion + prompt caching (Wave 2)
+  - [ ] 054-04-PLAN.md � threads.py Anthropic dispatch + SettingsPage.tsx provider-conditional sliders (Wave 3)
+  - [ ] 054-05-PLAN.md � Full test suite verification + 054-VERIFICATION.md (Wave 4)
+**UI hint**: yes (Settings sliders hidden for native providers; read-only info rows shown)
 **UI hint**: yes
 
 ### Phase 45: Chat UX Fixes
@@ -283,3 +290,17 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51 �
   - [ ] 053-03-PLAN.md — Backend: tool_parser.py module with JSON extraction, threads.py integration (Wave 3)
   - [ ] 053-04-PLAN.md — Tests: 32+ unit tests for parser, calling mode, and OpenRouter enhancements (Wave 4)
 **UI hint**: yes (Settings dropdown only; no chat UI changes)
+
+### Phase 54: Reliable Agentic Generation
+
+**Goal**: Complex end-to-end tasks (PPT, report, PDF generation from documents) complete successfully for all providers — the agent retrieves content, calls execute_code exactly once with complete Python code, and delivers a working output file.
+
+**Depends on**: Phase 53 (Cross-Provider Tool Calling Reliability)
+**Requirements**: GEN-01, GEN-02, GEN-03, GEN-04, GEN-05
+**Success Criteria** (what must be TRUE):
+  1. "Generate a PPT from my dissertation" completes end-to-end: file downloaded, no truncation errors
+  2. execute_code is called with complete Python code — never truncated mid-JSON
+  3. No intermediate searches after analyze_document for generation tasks
+  4. Empty-response fallback ("I wasn't able to generate a response") eliminated for legitimate requests
+  5. Works for Anthropic (claude-sonnet-4-6), OpenAI (gpt-4.1), and Google (gemini-2.5-flash)
+**Plans**: TBD
