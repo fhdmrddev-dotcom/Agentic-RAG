@@ -56,11 +56,11 @@ def test_sub_agent_model_provider_default_anthropic():
 
 
 def test_sub_agent_model_provider_default_openai():
-    """When provider=openai, default to gpt-5.4-nano."""
+    """When provider=openai, default to gpt-4o-mini."""
     from app.services import sub_agent_service
 
     provider_default = sub_agent_service._SUB_AGENT_MODEL_DEFAULTS.get("openai", "")
-    assert provider_default == "gpt-5.4-nano"
+    assert provider_default == "gpt-4o-mini"
 
 
 def test_sub_agent_model_provider_default_google():

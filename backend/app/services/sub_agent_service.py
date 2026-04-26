@@ -12,23 +12,6 @@ from app.services.openai_service import get_llm_client, _resolve_max_tokens, _us
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
-_GENERATION_KEYWORDS = frozenset({
-    "pptx", "powerpoint", "presentation",
-    "report", "document", "pdf",
-    "spreadsheet", "excel", "csv export",
-})
-
-
-def _is_generation_task(task: str) -> bool:
-    """Return True if the task contains any output-format generation keyword.
-
-    Note: 'document' is intentionally broad — may trigger on analysis phrases
-    like 'analyze the document'. This is accepted (D-01): escalation to the
-    capable model is safe even if slightly over-eager.
-    """
-    t = task.lower()
-    return any(kw in t for kw in _GENERATION_KEYWORDS)
-
 
 @traceable(name="sub-agent", run_type="llm")
 def run_sub_agent(
@@ -55,10 +38,11 @@ def run_sub_agent(
     ]
 
     client = get_llm_client(user_settings)
-    # Keyword routing: generation tasks escalate to the orchestrator model (D-01/D-02/D-03)
-    is_generation = _is_generation_task(task)
 
     # Priority: user_settings override (UI/JSON) > env override (.env) > provider default
+    # Sub-agents always use their dedicated model — the main agent handles generation.
+    # Escalating to the orchestrator model caused sub-agents to use the expensive main
+    # model (e.g. gpt-4.1) even for pure document analysis tasks, burning TPM quota.
     override_model = (
         (user_settings.sub_agent_model if user_settings else "")
         or settings.sub_agent_model
@@ -66,13 +50,6 @@ def run_sub_agent(
 
     if override_model:
         effective_model = override_model
-    elif is_generation:
-        # D-02: escalate to orchestrator model for generation tasks
-        effective_model = (
-            (user_settings.llm_model if user_settings else None)
-            or model
-            or settings.llm_model
-        )
     else:
         provider = user_settings.active_provider if user_settings else ""
         provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
@@ -83,11 +60,9 @@ def run_sub_agent(
             or settings.llm_model
         )
 
-    # D-03/D-08: generation tasks get at least 32768 tokens; analysis tasks use slider value
-    if is_generation:
-        output_ceiling = max(32768, settings.sub_agent_max_output_tokens)
-    else:
-        output_ceiling = settings.sub_agent_max_output_tokens
+    # Sub-agents always get the full output budget — they analyze complete documents
+    # and need enough tokens to return thorough extractions to the main agent.
+    output_ceiling = max(32768, settings.sub_agent_max_output_tokens)
 
     resolved_tokens = _resolve_max_tokens(output_ceiling, user_settings)
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"

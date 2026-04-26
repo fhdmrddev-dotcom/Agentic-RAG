@@ -23,6 +23,7 @@ def _make_user_settings(provider: str = "openai", llm_model: str = "gpt-4o"):
     us = MagicMock()
     us.active_provider = provider
     us.llm_model = llm_model
+    us.sub_agent_model = ""  # no override so provider default is used
     return us
 
 
@@ -56,9 +57,10 @@ def test_generate_suggestions_returns_list():
             assistant_response="The report shows revenue grew by 20%.",
         )
 
-    assert isinstance(result, list)
-    assert len(result) == 3
-    assert all(isinstance(q, str) and q for q in result)
+    questions, fallback = result
+    assert isinstance(questions, list)
+    assert len(questions) == 3
+    assert all(isinstance(q, str) and q for q in questions)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +79,8 @@ def test_generate_suggestions_clamps_to_3():
             assistant_response="Here is a detailed response.",
         )
 
-    assert len(result) == 3
+    questions, _ = result
+    assert len(questions) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -96,8 +99,9 @@ def test_generate_suggestions_empty_lines_filtered():
             assistant_response="Hello",
         )
 
-    assert len(result) == 3
-    assert all(q.strip() for q in result)
+    questions, _ = result
+    assert len(questions) == 3
+    assert all(q.strip() for q in questions)
 
 
 # ---------------------------------------------------------------------------
@@ -114,16 +118,12 @@ def test_generate_suggestions_uses_sub_agent_model_override():
         mock_settings.llm_model = "fallback-model"
 
         from app.services import suggestion_service
-        # Re-import to pick up patched settings
-        result = suggestion_service.generate_suggestions(
+        suggestion_service.generate_suggestions(
             user_message="Tell me something",
             assistant_response="Here it is.",
             user_settings=_make_user_settings(provider="anthropic"),
         )
 
-    call_kwargs = mock_client.chat.completions.create.call_args
-    assert call_kwargs.kwargs.get("model") == "custom-model" or call_kwargs.args[0] if call_kwargs.args else call_kwargs.kwargs["model"] == "custom-model"
-    # Verify model was custom-model
     create_call = mock_client.chat.completions.create.call_args
     model_used = create_call.kwargs.get("model") or (create_call.args[0] if create_call.args else None)
     assert model_used == "custom-model", f"Expected custom-model, got {model_used!r}"
@@ -134,7 +134,7 @@ def test_generate_suggestions_uses_sub_agent_model_override():
 # ---------------------------------------------------------------------------
 
 def test_generate_suggestions_uses_provider_default():
-    """settings.sub_agent_model='', user provider=openai → model should be gpt-5.4-nano."""
+    """settings.sub_agent_model='', user provider=openai → model should be gpt-4o-mini."""
     mock_client = _make_mock_client("Q1?\nQ2?\nQ3?")
     user_settings = _make_user_settings(provider="openai", llm_model="gpt-4o")
 
@@ -152,7 +152,7 @@ def test_generate_suggestions_uses_provider_default():
 
     create_call = mock_client.chat.completions.create.call_args
     model_used = create_call.kwargs.get("model") or (create_call.args[0] if create_call.args else None)
-    assert model_used == "gpt-5.4-nano", f"Expected gpt-5.4-nano for openai provider, got {model_used!r}"
+    assert model_used == "gpt-4o-mini", f"Expected gpt-4o-mini for openai provider, got {model_used!r}"
 
 
 # ---------------------------------------------------------------------------
