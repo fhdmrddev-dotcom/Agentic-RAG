@@ -579,6 +579,10 @@ _PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
 }
 _FALLBACK_MAX_TOKENS = 8192  # used when provider is unknown / legacy mode
 
+# Native providers use model-registry values — user slider overrides are ignored.
+# Prevents stale OpenRouter overrides from silently capping Anthropic/OpenAI/Google.
+NATIVE_PROVIDERS = frozenset({"openai", "anthropic", "google"})
+
 # Per-model output token defaults. Tuned to each model's real ceiling vs practical need.
 # Override any entry via MODEL_OUTPUT_LIMITS in .env (format: model-id=tokens,...)
 _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
@@ -647,6 +651,15 @@ def _resolve_max_tokens(
     if explicit is not None:
         return explicit
 
+    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+
+    # For native providers: skip user override to prevent stale slider values
+    # from silently capping output. (GEN-05 defense-in-depth)
+    if provider.lower() not in NATIVE_PROVIDERS:
+        user_max_tokens = getattr(user_settings, "llm_max_output_tokens", 0) if user_settings else 0
+        if user_max_tokens > 0:
+            return user_max_tokens
+
     env_val = settings.llm_max_output_tokens
     env_default = 8192  # matches the default in config.py
     if env_val != env_default:
@@ -661,7 +674,6 @@ def _resolve_max_tokens(
         if model in _MODEL_OUTPUT_DEFAULTS:
             return _MODEL_OUTPUT_DEFAULTS[model]
 
-    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
     return _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
 
 
