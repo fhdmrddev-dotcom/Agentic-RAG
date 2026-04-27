@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react"
 import type { Message, ToolCall, OutputLine, OutputFile } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
+import { supabase } from "../lib/supabase"
 
 interface UseMessages {
   messages: Message[]
@@ -26,6 +27,8 @@ export function useMessages(): UseMessages {
   const abortControllerRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const isStreamingRef = useRef(false)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -93,8 +96,59 @@ if (isSendingRef.current) return
     }
     setMessages((prev) => [...prev, assistantMsg])
     setIsStreaming(true)
+    isStreamingRef.current = true
     const controller = new AbortController()
     abortControllerRef.current = controller
+
+    // D-03: Realtime subscription for SSE drop recovery.
+    // Subscribes filtered to this thread only. Torn down in finally.
+    // Only processes events when streaming is NOT active (isStreamingRef guard)
+    // to avoid racing with the live SSE delta updates.
+    const channelName = `messages-thread-${threadId}`
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
+          // SSE delta events handle live updates. Only process after SSE drops/ends.
+          if (isStreamingRef.current) return
+
+          if (payload.eventType === "INSERT") {
+            const newMsg = payload.new as Message
+            setMessages((prev) => {
+              // Replace the optimistic temp-id placeholder for assistant messages,
+              // or deduplicate by id for user messages.
+              if (newMsg.role === "assistant") {
+                const tempIdx = prev.findIndex(
+                  (m) => m.role === "assistant" && m.id.startsWith("temp-")
+                )
+                if (tempIdx !== -1) {
+                  const next = [...prev]
+                  next[tempIdx] = newMsg
+                  return next
+                }
+              }
+              // Deduplicate: skip if already present (normal path persisted it)
+              if (prev.some((m) => m.id === newMsg.id)) return prev
+              return [...prev, newMsg]
+            })
+          } else if (payload.eventType === "UPDATE") {
+            const updatedMsg = payload.new as Message
+            setMessages((prev) =>
+              prev.map((m) => m.id === updatedMsg.id ? updatedMsg : m)
+            )
+          }
+        }
+      )
+      .subscribe()
+    channelRef.current = channel
 
     try {
       await streamMessage(
@@ -107,6 +161,10 @@ if (isSendingRef.current) return
       },
       () => {
         setIsStreaming(false)
+        // Clear planning flag when stream ends — prevents stuck spinner
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
+        )
       },
       model,
       provider,
@@ -265,6 +323,18 @@ if (isSendingRef.current) return
       isSendingRef.current = false
       streamingThreadIdRef.current = null
       setIsStreaming(false)
+      isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
+
+      // D-03/D-06: Tear down Realtime subscription for this thread.
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+
+      // Always clear planning flag on stream end
+      setMessages((prev) =>
+        prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
+      )
 
       const wasStoppedByUser = stoppedByUserRef.current
 
@@ -311,16 +381,6 @@ if (isSendingRef.current) return
           return updated
         }
 
-        // Safety net: if the stream ended but assistant message has no text content
-        // (SSE connection dropped before final delta events arrived), reload from DB
-        const sseDrop = lastMsg?.role === "assistant" && !lastMsg?.content
-        const racedEmpty = prev.length === 0
-        if (sseDrop || racedEmpty) {
-          setTimeout(() => {
-            stoppedByUserRef.current = false
-            loadMessages(threadId).catch(console.error)
-          }, 1500)
-        }
         stoppedByUserRef.current = false
         return prev
       })
