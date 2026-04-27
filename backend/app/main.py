@@ -1,5 +1,12 @@
+import logging
 import os
 from contextlib import asynccontextmanager
+
+# Suppress asyncio transport-level "socket.send() raised exception." warnings.
+# These fire from CPython's selector_events.py when a client disconnects while
+# we're mid-write — our SSEStreamingResponse already handles the disconnect
+# gracefully at the ASGI layer, so these warnings are noise.
+logging.getLogger("asyncio").setLevel(logging.ERROR)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
