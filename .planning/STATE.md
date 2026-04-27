@@ -33,40 +33,39 @@ Progress: [█████████░] 88%
 
 Next: Add new user-defined phase, then plan and execute
 
-## Phase 53 Plan Summary
-
-1. **Plan 53-01: Capability Registry + Dual-Mode Backend** — MODEL_CAPABILITIES registry in config.py, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (`:exacto`, `parallel_tool_calls=False`, Response Healing). Backend only.
-2. **Plan 53-02: OpenRouter Strategy Setting** — `openrouter_tool_strategy` enum field (quality/native/xml) with backend settings stack and frontend dropdown in AI Model Settings tab.
-3. **Plan 53-03: JSON Tool Call Parser** — Dedicated `tool_parser.py` module with `ToolCall` dataclass, markdown/inline JSON extraction, tool name validation. Integrates into threads.py event_stream().
-4. **Plan 53-04: Validation & Zero-Regression Tests** — `test_tool_parser.py` (12+ tests), `test_calling_mode.py` (14+ tests), `test_openai_service.py` (6+ tests). Confirms zero regression in existing suite.
-
 ## Recent Completed Phases
 
-### Phase 52: Multi-Provider Model Routing (Complete 2026-04-25)
+### Phase 54: Reliable Agentic Generation (Complete 2026-04-26)
 
-- Full provider-aware routing for main, sub-agent, title, and follow-up models
-- Cross-provider 404 fallback with SSE sentinel and user notification
-- Save-time validation for sub_agent_model against provider's available models
-- Resolved model labels in Settings UI
+- PROMPT-01 hotfix: Generation mode only activates on explicit file-creation verbs
+- Anthropic SDK native adapter with prompt caching
+- threads.py Anthropic dispatch + provider-conditional Settings sliders
+- Full test suite verification
 
-### Phase 51: Context Window Management (Complete 2026-04-24)
+### Phase 53: Cross-Provider Tool Calling Reliability (Complete 2026-04-26)
 
-- Sub-agent keyword routing (generation tasks escalated to capable models)
-- tiktoken integration for OpenAI token estimation
-- Configurable sub_agent_max_output_tokens with Settings UI slider
-- Model info cards in chat model selector
+- MODEL_CAPABILITIES registry with native/structured dual-mode routing
+- openrouter_tool_strategy setting (quality/native/xml) with UI dropdown
+- tool_parser.py for deterministic JSON extraction from non-native models
+- 32+ unit tests, zero regression
+
+### Phase 55: Streaming Reliability (Deferred — 4/5 plans done)
+
+- Plans 01–04 complete: DB prereq, TDD scaffold, stop_event threading, asyncio.shield, Realtime subscription
+- Plan 05 (verification) blocked — Realtime INSERT race not resolved after 5 fix attempts
+- See `.planning/phases/055-streaming-reliability-connection-resilience/055-DEFERRAL.md`
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 71 (across v1.0–v2.4)
-- Previous milestones: v1.0 (8 phases), v2.0 (9), v2.1 (8), v2.2 (7), v2.3 (11), v2.4-in-progress (9)
+- Total plans completed: ~80 (across v1.0–v2.4)
+- Previous milestones: v1.0 (8 phases), v2.0 (9), v2.1 (8), v2.2 (7), v2.3 (11), v2.4 (11 phases, 1 deferred)
 - Average duration: ~1 day/phase
 
 **Recent Trend:**
 
-- Last phase shipped: Phase 52 (3 plans)
+- Last phase fully shipped: Phase 54 (2026-04-26)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -103,22 +102,7 @@ Recent decisions affecting current work:
 
 | Phase | Task | Status |
 |-------|------|--------|
-| 054 | PROMPT-01: System prompt Q&A vs Generation fix | ✅ Complete |
-| 054 | Model registry updates (6 new models) | ⬜ Not started |
-| 054 | Sub-agent default update (gpt-4o-mini → gpt-5.4-mini) | ⬜ Not started |
-
-### Completed Todos (Phase 53)
-
-| Phase | Task | Status |
-|-------|------|--------|
-| 53-01 | Create MODEL_CAPABILITIES registry | ✅ Complete |
-| 53-01 | Implement create_adaptive_streaming_chat() | ✅ Complete |
-| 53-01 | Add structured mode system prompt injection | ✅ Complete |
-| 53-02 | Add openrouter_tool_strategy backend field | ✅ Complete |
-| 53-02 | Add frontend dropdown UI | ✅ Complete |
-| 53-03 | Create tool_parser.py module | ✅ Complete |
-| 53-03 | Integrate parser into threads.py | ✅ Complete |
-| 53-04 | Write 32+ unit tests | ✅ Complete |
+| 055 | Realtime INSERT race — needs console.log investigation before next attempt | ⏸ Deferred |
 
 ### Blockers/Concerns
 
@@ -143,7 +127,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-26
-Stopped at: Hotfix PROMPT-01 applied — system prompt execute_code over-triggering fixed
-Next: Phase 054 model registry updates + sub-agent defaults
-Revert point: `git checkout 25a27b9 -- backend/app/api/threads.py`
+Last session: 2026-04-27
+Stopped at: Phase 055 deferred after 5 failed fix attempts — useMessages.ts reverted to 055-04 state
+Next: New phase to be added by user

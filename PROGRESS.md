@@ -607,7 +607,7 @@ Triggered by investigation of consistently low similarity scores (~0.43) on stru
 
 ---
 
-## Milestone: Memory, Multimodal & Experience (v2.3) 🚧 IN PROGRESS
+## Milestone: Memory, Multimodal & Experience (v2.3) ✅ COMPLETE — 2026-04-19
 
 ### Phase 33: Cross-Thread Memory — Backend ✅ COMPLETE (2026-04-17)
 
@@ -661,11 +661,11 @@ Triggered by investigation of consistently low similarity scores (~0.43) on stru
 - [x] SkillsPage 3-pane rebuild (nav sidebar, skill list, detail/form) with tonal depth separation
 - [x] SkillCard gradient track toggle (indigo-to-cyan), SettingsPage bg-card/60 outer, bg-card/40 nested sections
 
-### Phase 43: UI Redesign — Mobile & Responsive 🚧 IN PROGRESS
+### Phase 43: UI Redesign — Mobile & Responsive ✅ COMPLETE (2026-04-19)
 
 - [x] 43-01: NavPanel collapsible component + ChatLayout migration (w-14/w-64 toggle)
 - [x] 43-02: shadcn Tabs install + SettingsPage 5-tab layout + WR-03/WR-04 fixes
-- [ ] 43-03: Mobile drawer + active thread gradient upgrade + human verification (NOT STARTED)
+- [x] 43-03: Mobile drawer + active thread gradient upgrade
 
 ### Phase 44: SSE Stop Reliability ✅ COMPLETE (2026-04-23)
 
@@ -677,3 +677,83 @@ Triggered by investigation of consistently low similarity scores (~0.43) on stru
 #### Known Issues (Deferred)
 
 - **KI-001:** In-flight LLM calls and tool executions continue after SSE disconnect because Python async generators can only receive `GeneratorExit` at `yield` points — the current LLM call or tool execution runs to completion before the generator can be stopped. Iteration stops immediately after, preventing new rounds. See `.planning/KNOWN-ISSUES.md` for root cause and solution sketches.
+
+---
+
+## Milestone: Stability, Polish & UX Fixes (v2.4) 🚧 IN PROGRESS
+
+### Phase 44: SSE & Stop Reliability ✅ COMPLETE (2026-04-23)
+
+- [x] `SSEStreamingResponse` + `_SilentSSEIterator` suppress transport errors on disconnect
+- [x] "Response stopped" indicator in `MessageItem.tsx`
+- [x] `ToolCall.status` gains `"interrupted"` variant; running tools marked on abort
+- [x] `streamingThreadIdRef` allows thread switch during active streaming; `abortStream()` for quiet nav abort
+
+### Phase 45: Chat UX Fixes ✅ COMPLETE (2026-04-23)
+
+- [x] AlertDialog confirmation before thread deletion
+- [x] Ghost content fix — `clearMessages()` on thread switch prevents stale content flash
+- [x] Folder selector on new chat creation (scope fixed at creation)
+
+### Phase 46: Document Version Deletion ✅ COMPLETE (2026-04-25)
+
+- [x] Version-aware delete dialog (single version vs. all versions)
+- [x] Single version delete: removes chunks + storage, promotes next-latest as current
+- [x] All versions delete: removes every version, chunks, storage, and history
+
+### Phase 47: Document List & Upload Polish ✅ COMPLETE (2026-04-25)
+
+- [x] Root-folder documents visible with clear "Root" label
+- [x] Specific upload error messages (duplicate, unsupported type, empty, size limit)
+- [x] 50 MB file size limit enforced backend with user-facing error
+
+### Phase 48: Settings & Navigation Polish ✅ COMPLETE (2026-04-25)
+
+- [x] Web search toggle in Settings (independent of Tavily API key presence)
+- [x] NavPanel logo icon visible when sidebar collapsed
+- [x] TabsTrigger animation fix; icon/label alignment
+
+### Phase 49: Library Health at Scale ✅ COMPLETE (2026-04-25)
+
+- [x] Paginated health dashboard (offset/limit with total counts)
+- [x] Low-confidence panel explains score distribution context
+- [x] Actionable empty states for feedback panels
+
+### Phase 51: Context Window Management ✅ COMPLETE (2026-04-24)
+
+- [x] Sub-agent keyword routing — generation tasks escalated to capable models
+- [x] tiktoken integration for OpenAI token estimation
+- [x] `sub_agent_max_output_tokens` settings stack with UI slider
+- [x] Model info cards in chat model selector (context window, output limit, cost tier)
+
+### Phase 52: Multi-Provider Model Routing ✅ COMPLETE (2026-04-25)
+
+- [x] Full provider-aware routing for main, sub-agent, title, follow-up models
+- [x] Cross-provider 404 fallback with SSE sentinel and user notification
+- [x] Resolved model labels in Settings UI
+
+### Phase 53: Cross-Provider Tool Calling Reliability ✅ COMPLETE (2026-04-26)
+
+- [x] `MODEL_CAPABILITIES` registry — native vs. structured mode per model
+- [x] `create_adaptive_streaming_chat()` — dual-mode dispatch in `openai_service.py`
+- [x] `openrouter_tool_strategy` setting (quality/native/xml) with Settings UI dropdown
+- [x] `tool_parser.py` — deterministic JSON extraction from non-native model output
+- [x] 32+ unit tests (`test_tool_parser.py`, `test_calling_mode.py`, `test_openai_service.py`)
+
+### Phase 54: Reliable Agentic Generation ✅ COMPLETE (2026-04-26)
+
+- [x] PROMPT-01 hotfix — Generation mode gated on explicit file-creation verbs only
+- [x] Anthropic SDK native adapter (`anthropic_service.py`) with prompt caching
+- [x] `threads.py` Anthropic dispatch + provider-conditional Settings sliders
+- [x] Token reduction caps and tool-result caps removed
+- [x] Full test suite verification
+
+### Phase 55: Streaming Reliability & Connection Resilience ⏸ DEFERRED
+
+- [x] Messages table added to `supabase_realtime` publication
+- [x] 8 unit tests for STREAM-01 and STREAM-03 (all passing)
+- [x] `stop_event` threading in `event_stream()` — checked at iteration boundaries and between chunks
+- [x] `asyncio.shield()` on `_persist_assistant_message()` — DB write survives ASGI task cancellation
+- [x] Supabase Realtime subscription in `useMessages.ts` for SSE drop recovery
+- [ ] Plan 055-05: Verification — blocked by Realtime INSERT race condition (5 fix attempts, root cause unclear)
+- See `.planning/phases/055-streaming-reliability-connection-resilience/055-DEFERRAL.md`
