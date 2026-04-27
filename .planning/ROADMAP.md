@@ -119,11 +119,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
   - [x] 051-05-PLAN.md — Model info cards in chat model selector (CTX-04)
   - [x] 051-06-PLAN.md — Gap closure: sub_agent_model override settings stack (CTX-03)
   - [x] 051-07-PLAN.md — Gap closure: cost tier in model info cards (CTX-04)
-- [ ] **Phase 53: Cross-Provider Tool Calling Reliability** — Capability registry routes models to native or structured tool calling; OpenRouter quality strategy setting; JSON parser for non-native models; zero regression for OpenAI (4/4 plans)
-  - [ ] 053-01-PLAN.md — Backend: MODEL_CAPABILITIES registry, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (Wave 1)
-  - [ ] 053-02-PLAN.md — Backend + Frontend: openrouter_tool_strategy setting with UI dropdown (Wave 2)
-  - [ ] 053-03-PLAN.md — Backend: tool_parser.py module with JSON extraction, threads.py integration (Wave 3)
-  - [ ] 053-04-PLAN.md — Tests: test_tool_parser.py, test_calling_mode.py, test_openai_service.py (Wave 4)
+- [x] **Phase 53: Cross-Provider Tool Calling Reliability** — Capability registry routes models to native or structured tool calling; OpenRouter quality strategy setting; JSON parser for non-native models; zero regression for OpenAI (4/4 plans) — completed 2026-04-26
+  - [x] 053-01-PLAN.md — Backend: MODEL_CAPABILITIES registry, create_adaptive_streaming_chat() with native/structured routing, OpenRouter quality enhancements (Wave 1)
+  - [x] 053-02-PLAN.md — Backend + Frontend: openrouter_tool_strategy setting with UI dropdown (Wave 2)
+  - [x] 053-03-PLAN.md — Backend: tool_parser.py module with JSON extraction, threads.py integration (Wave 3)
+  - [x] 053-04-PLAN.md — Tests: test_tool_parser.py, test_calling_mode.py, test_openai_service.py (Wave 4)
 
 ## Phase Details
 
@@ -163,22 +163,18 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 **Planning artifacts preserved:** `.planning/phases/46-smart-skill-dispatch/` (CONTEXT.md, DISCUSSION-LOG.md, 46-01-PLAN.md, 46-02-PLAN.md)
 
-### Phase 55: Streaming Reliability & Connection Resilience
+### Phase 55: Streaming Reliability & Connection Resilience — DEFERRED
 
-**Goal**: Fix three streaming durability gaps -- stop_event threading so the backend generator checks for disconnect between chunks (KI-001), Supabase Realtime subscription for SSE drop recovery, and asyncio.shield on persist-on-disconnect so the DB write survives ASGI task cancellation
+**Goal**: Fix three streaming durability gaps -- stop_event threading, Supabase Realtime subscription for SSE drop recovery, asyncio.shield on persist-on-disconnect
 **Depends on:** Phase 54
 **Requirements**: STREAM-01, STREAM-02, STREAM-03
-**Success Criteria** (what must be TRUE):
-  1. Backend SSE generator checks stop_event at each iteration boundary and between every LLM streaming chunk -- stops within one chunk cycle after disconnect
-  2. Navigating away mid-stream does not lose the response -- Supabase Realtime delivers the persisted message to the UI on return
-  3. _persist_assistant_message() always completes even when ASGI cancels the generator task on disconnect
-**Plans:** 5 plans
-Plans:
-- [ ] 055-01-PLAN.md -- Wave 0: DB prerequisite checkpoint (messages in supabase_realtime publication)
-- [ ] 055-02-PLAN.md -- Wave 1: TDD test scaffold (test_streaming_reliability.py, 8 tests)
-- [ ] 055-03-PLAN.md -- Wave 2: Backend fix -- stop_event threading in responses.py + threads.py, asyncio.shield persist (STREAM-01, STREAM-03)
-- [ ] 055-04-PLAN.md -- Wave 2: Frontend fix -- Realtime subscription + sseDrop removal in useMessages.ts (STREAM-02)
-- [ ] 055-05-PLAN.md -- Wave 3: Verification -- full test suite + browser manual verification + VERIFICATION.md
+**Status:** Deferred — Plans 01–04 complete, Plan 05 (verification) blocked by Realtime race condition. See `.planning/phases/055-streaming-reliability-connection-resilience/055-DEFERRAL.md` for full root cause and recommended fix approach.
+**Plans:** 5 plans (4/5 complete)
+- [x] 055-01-PLAN.md -- DB prerequisite checkpoint
+- [x] 055-02-PLAN.md -- TDD test scaffold (8 tests)
+- [x] 055-03-PLAN.md -- Backend: stop_event threading + asyncio.shield persist (STREAM-01, STREAM-03)
+- [x] 055-04-PLAN.md -- Frontend: Realtime subscription + sseDrop removal (STREAM-02)
+- [ ] 055-05-PLAN.md -- Verification — deferred (Realtime INSERT race not resolved)
 
 ---
 
@@ -249,7 +245,9 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51 �
 | 49. Library Health at Scale | v2.4 | 2/2 | Complete | 2026-04-25 |
 | 51. Context Window Management | v2.4 | 7/7 | Complete | 2026-04-24 |
 | 52. Multi-Provider Model Routing | v2.4 | 3/3 | Complete | 2026-04-25 |
-| 53. Cross-Provider Tool Calling Reliability | v2.4 | 0/4 | Not started | - |
+| 53. Cross-Provider Tool Calling Reliability | v2.4 | 4/4 | Complete | 2026-04-26 |
+| 54. Reliable Agentic Generation | v2.4 | 5/5 | Complete | 2026-04-26 |
+| 55. Streaming Reliability & Connection Resilience | v2.4 | 4/5 | Deferred | — |
 | ~~Smart Skill Dispatch~~ | Deferred → Skills Studio | — | Deferred | — |
 
 ### Phase 51: Context Window Management
@@ -321,8 +319,10 @@ Phases execute in numeric order: 44 → 45 → 46 → 47 → 48 → 49 → 51 �
   4. Empty-response fallback ("I wasn't able to generate a response") eliminated for legitimate requests
   5. Works for Anthropic (claude-sonnet-4-6), OpenAI (gpt-4.1), and Google (gemini-2.5-flash)
   6. Q&A queries ("summarize the report", "what does this say?") respond with text only — no execute_code triggered
-**Plans**:
-  - [x] **PROMPT-01 (Hotfix):** System prompt Q&A vs Generation disambiguation — narrowed Generation trigger to explicit file-creation verbs only, added "DO NOT use execute_code for" blocklist, removed overly aggressive "ZERO text" language. Backup: `.planning/backups/SYSTEM_PROMPT_BACKUP_2026-04-26.md`. Revert: `git checkout 25a27b9 -- backend/app/api/threads.py`
-  - [ ] 054-REGISTRY: Model registry updates (6 new models, 5 corrections, sub-agent default fix)
-  - [ ] 054-SETTINGS: SettingsPage merge conflict resolution + native provider UI
-  - [ ] 054-VERIFICATION: Full test suite verification
+**Plans**: 5 plans — completed 2026-04-26
+  - [x] **PROMPT-01 (Hotfix):** System prompt Q&A vs Generation disambiguation
+  - [x] 054-01-PLAN.md — TDD Wave 0: failing tests for GEN requirements
+  - [x] 054-02-PLAN.md — Remove token reduction caps + Anthropic SDK
+  - [x] 054-03-PLAN.md — anthropic_service.py native SDK adapter + prompt caching
+  - [x] 054-04-PLAN.md — threads.py Anthropic dispatch + SettingsPage provider UI
+  - [x] 054-05-PLAN.md — Full test suite verification + VERIFICATION.md
