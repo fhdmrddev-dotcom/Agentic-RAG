@@ -165,13 +165,20 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 ### Phase 55: Streaming Reliability & Connection Resilience
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal**: Fix three streaming durability gaps -- stop_event threading so the backend generator checks for disconnect between chunks (KI-001), Supabase Realtime subscription for SSE drop recovery, and asyncio.shield on persist-on-disconnect so the DB write survives ASGI task cancellation
 **Depends on:** Phase 54
-**Plans:** 0 plans
-
+**Requirements**: STREAM-01, STREAM-02, STREAM-03
+**Success Criteria** (what must be TRUE):
+  1. Backend SSE generator checks stop_event at each iteration boundary and between every LLM streaming chunk -- stops within one chunk cycle after disconnect
+  2. Navigating away mid-stream does not lose the response -- Supabase Realtime delivers the persisted message to the UI on return
+  3. _persist_assistant_message() always completes even when ASGI cancels the generator task on disconnect
+**Plans:** 5 plans
 Plans:
-- [ ] TBD (run /gsd-plan-phase 55 to break down)
+- [ ] 055-01-PLAN.md -- Wave 0: DB prerequisite checkpoint (messages in supabase_realtime publication)
+- [ ] 055-02-PLAN.md -- Wave 1: TDD test scaffold (test_streaming_reliability.py, 8 tests)
+- [ ] 055-03-PLAN.md -- Wave 2: Backend fix -- stop_event threading in responses.py + threads.py, asyncio.shield persist (STREAM-01, STREAM-03)
+- [ ] 055-04-PLAN.md -- Wave 2: Frontend fix -- Realtime subscription + sseDrop removal in useMessages.ts (STREAM-02)
+- [ ] 055-05-PLAN.md -- Wave 3: Verification -- full test suite + browser manual verification + VERIFICATION.md
 
 ---
 
