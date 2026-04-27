@@ -29,7 +29,6 @@ export function useMessages(): UseMessages {
   const streamingThreadIdRef = useRef<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const isStreamingRef = useRef(false)
-  const activeThreadIdRef = useRef<string | null>(null)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -49,7 +48,6 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
-    activeThreadIdRef.current = threadId  // set before await so Realtime guard is current
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
     setMessages((prev) => {
@@ -71,7 +69,6 @@ if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
     streamingThreadIdRef.current = threadId
-    activeThreadIdRef.current = threadId
 
     // Optimistic user message
     const userMsg: Message = {
@@ -122,11 +119,6 @@ if (isSendingRef.current) return
           // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
           // SSE delta events handle live updates. Only process after SSE drops/ends.
           if (isStreamingRef.current) return
-          // Skip if user explicitly stopped — preserve the stopped partial until navigation.
-          if (stoppedByUserRef.current) return
-          // Skip if this event belongs to a different thread than the one currently displayed.
-          // This closes the race between isStreamingRef=false and removeChannel() completing.
-          if ((payload.new as Message).thread_id !== activeThreadIdRef.current) return
 
           if (payload.eventType === "INSERT") {
             const newMsg = payload.new as Message
@@ -373,13 +365,19 @@ if (isSendingRef.current) return
               ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
               : m
           )
-          // Reset the stop flag. The channel is already torn down above, so no
-          // further Realtime events can arrive — safe to clear immediately.
-          // Do NOT call loadMessages here:
-          //   - stopped: user sees partial until they navigate away (Realtime guard blocks INSERT)
-          //   - navigation: ChatArea's loadMessages(newThread) already called
-          //   - normal completion: Realtime INSERT fires and replaces temp placeholder
-          setTimeout(() => { stoppedByUserRef.current = false }, 0)
+          // Only reload from DB if the user is still on the same thread.
+          // Skip the reload on navigation abort — the new thread's loadMessages
+          // has already started.
+          if (!wasStoppedByUser) {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+            }, 0)
+          } else {
+            setTimeout(() => {
+              stoppedByUserRef.current = false
+              loadMessages(threadId).catch(console.error)
+            }, 800)
+          }
           return updated
         }
 
