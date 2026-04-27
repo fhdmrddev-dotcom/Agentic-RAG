@@ -509,7 +509,9 @@ async def send_message(
         "content": body.content,
     }).execute()
 
-    async def event_stream() -> AsyncGenerator[str, None]:
+    _stop_event = asyncio.Event()
+
+    async def event_stream(stop_event: asyncio.Event = _stop_event) -> AsyncGenerator[str, None]:
         import logging
         logger = logging.getLogger(__name__)
 
@@ -737,6 +739,8 @@ async def send_message(
             _structured_tools_injected = False
 
             for iteration in range(max_iterations):
+                if stop_event.is_set():
+                    return
                 # Between tool-call rounds: signal to the frontend that the agent
                 # is deciding its next action (all prior tools are done).
                 if iteration > 0:
@@ -797,6 +801,8 @@ async def send_message(
                             tool_calls_buffer = {}
                             finish_reason = None
                             for _ant_event in _ant_gen:
+                                if stop_event.is_set():
+                                    return
                                 _etype = _ant_event.get("type")
                                 if _etype == "delta":
                                     _text = _ant_event.get("content", "")
@@ -842,6 +848,8 @@ async def send_message(
                             finish_reason: str | None = None
 
                             for chunk in stream:
+                                if stop_event.is_set():
+                                    return
                                 if not chunk.choices:
                                     continue
                                 choice = chunk.choices[0]
@@ -1708,6 +1716,13 @@ async def send_message(
             # Safety net: runs on GeneratorExit (client disconnect) or any
             # unhandled BaseException. The guard inside _persist_assistant_message
             # prevents a double-insert when the normal path already persisted.
-            _persist_assistant_message()
+            # asyncio.shield() ensures the DB write completes even if the ASGI task
+            # is cancelled (CancelledError) before the finally block finishes.
+            async def _shielded_persist():
+                _persist_assistant_message()
+            try:
+                await asyncio.shield(_shielded_persist())
+            except asyncio.CancelledError:
+                pass
 
-    return sse_response(event_stream())
+    return sse_response(event_stream(_stop_event), stop_event=_stop_event)

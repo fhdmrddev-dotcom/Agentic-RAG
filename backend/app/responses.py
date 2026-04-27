@@ -80,7 +80,6 @@ class SSEStreamingResponse(StreamingResponse):
 
     async def __call__(self, scope, receive, send):
         closed = False
-        stop_event = asyncio.Event()
 
         async def _safe_send(event):
             nonlocal closed
@@ -109,8 +108,14 @@ class SSEStreamingResponse(StreamingResponse):
                 else:
                     raise
 
+        # Reuse the pre-created stop_event from the iterator if available.
+        # This ensures event_stream()'s stop_event parameter and the disconnect
+        # event set by _safe_send are the SAME asyncio.Event instance.
+        # If the iterator has no pre-created event, create one now.
         if isinstance(self.body_iterator, _SilentSSEIterator):
-            self.body_iterator._stop_event = stop_event
+            stop_event = self.body_iterator._stop_event  # reuse — do NOT overwrite
+        else:
+            stop_event = asyncio.Event()
 
         try:
             await super().__call__(scope, receive, _safe_send)
@@ -136,6 +141,13 @@ class SSEStreamingResponse(StreamingResponse):
                 await self.body_iterator.aclose()
 
 
-def sse_response(gen, media_type="text/event-stream"):
-    """Create a StreamingResponse that silently handles SSE client disconnects."""
-    return SSEStreamingResponse(_SilentSSEIterator(gen), media_type=media_type)
+def sse_response(gen, media_type="text/event-stream", stop_event=None):
+    """Create a StreamingResponse that silently handles SSE client disconnects.
+
+    If stop_event is provided (pre-created by the route handler), it is passed
+    to _SilentSSEIterator so that SSEStreamingResponse.__call__ can reuse the
+    same event object rather than creating a new one. This ensures that
+    event_stream()'s stop_event parameter and the disconnect-detection event
+    are the SAME asyncio.Event instance.
+    """
+    return SSEStreamingResponse(_SilentSSEIterator(gen, stop_event), media_type=media_type)
