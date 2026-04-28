@@ -98,7 +98,9 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
           {entries.map(([key, val]) => (
             <div key={key} className="flex gap-2 min-w-0">
               <span className="text-primary/60 flex-shrink-0">{key}:</span>
-              <span className="truncate text-foreground/70">{String(val)}</span>
+              <span className="truncate text-foreground/70">
+                {typeof val === "object" && val !== null ? JSON.stringify(val) : String(val)}
+              </span>
             </div>
           ))}
         </div>
