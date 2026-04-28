@@ -221,14 +221,24 @@ if (isSendingRef.current) return
           }),
         )
       },
-      // onSkillActivated
+      // onSkillActivated — Phase 56 D-08/D-09: append to ordered activatedSkills array
+      // for inline rendering in ToolCallPanel. Legacy activatedSkill field retained
+      // for backward compat with components that read the single-value form.
       (skillName) => {
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, activatedSkill: skillName }
-              : m,
-          ),
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            const newActivation = {
+              type: 'skill_activation' as const,
+              skillName,
+              occurredAt: Date.now(),
+            }
+            return {
+              ...m,
+              activatedSkill: skillName,
+              activatedSkills: [...(m.activatedSkills ?? []), newActivation],
+            }
+          }),
         )
       },
       // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
@@ -304,6 +314,14 @@ if (isSendingRef.current) return
       () => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
+        )
+      },
+      // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
+      (iteration: number) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, iterationCount: iteration } : m,
+          ),
         )
       },
       // onFallbackModel — sub-agent retried with provider default after 404
