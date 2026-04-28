@@ -59,6 +59,8 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
             toolCalls={message.tool_calls}
             subAgent={message.sub_agent}
             isPlanning={message.isPlanning}
+            iterationCount={message.iterationCount}
+            activatedSkills={message.activatedSkills}
           />
         )}
         {message.activatedSkill && (

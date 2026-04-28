@@ -485,6 +485,27 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
   )
 }
 
+// ---- Skill activation row (Phase 56 D-08/D-09) ----
+
+function SkillRow({ activation }: { activation: SkillActivation }) {
+  return (
+    <div className="pt-2.5 animate-toolSlideIn">
+      <div className="flex items-center gap-2.5">
+        <span className="flex-shrink-0 p-1 rounded-md bg-muted/50 text-violet-400">
+          <Zap className="w-3.5 h-3.5" />
+        </span>
+        <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
+          <span className="font-semibold text-foreground/80">Using skill</span>
+          <span className="ml-1.5 opacity-50">"{activation.skillName}"</span>
+        </span>
+        <span className="flex-shrink-0">
+          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ---- Main panel ----
 
 export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount, activatedSkills }: Props) {
@@ -537,6 +558,16 @@ const [expanded, setExpanded] = useState(true)
 
   const isActivelyWorking = !allDone || isPlanning
 
+  // Phase 56 D-09: interleave skill activations with tool calls by timestamp,
+  // so skill rows appear inline between the tools in the order they occurred.
+  type DisplayItem =
+    | { kind: 'tool'; tc: ToolCall; t: number }
+    | { kind: 'skill'; activation: SkillActivation; t: number }
+  const displayItems: DisplayItem[] = [
+    ...toolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.startedAt ?? 0 })),
+    ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
+  ].sort((a, b) => a.t - b.t)
+
   return (
     <div className={cn(
       "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
@@ -584,7 +615,17 @@ const [expanded, setExpanded] = useState(true)
       {/* Body */}
       {isExpanded && (
         <div className="px-4 pb-3.5 space-y-1 border-t border-border/20 min-w-0 overflow-hidden">
-          {toolCalls.map((tc, i) => {
+          {displayItems.map((item, i) => {
+            if (item.kind === 'skill') {
+              return (
+                <div key={`skill-${i}-${item.activation.occurredAt}`}>
+                  {i > 0 && <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />}
+                  <SkillRow activation={item.activation} />
+                </div>
+              )
+            }
+            const tc = item.tc
+            // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
             // Use persisted sub_agent or live streaming sub_agent
             const agentState: SubAgentState | undefined =
@@ -613,7 +654,7 @@ const [expanded, setExpanded] = useState(true)
                       </span>
                       {/* Duration badge */}
                       <TimeBadge tc={tc} />
-<span className="flex-shrink-0">
+                      <span className="flex-shrink-0">
                         {tc.status === "running" ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                         ) : tc.status === "interrupted" ? (
@@ -624,7 +665,7 @@ const [expanded, setExpanded] = useState(true)
                       </span>
                     </div>
 
-{/* Expandable parameters */}
+                    {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
 
                     {/* Result block (all tools) */}
