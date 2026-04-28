@@ -123,6 +123,8 @@ export interface Document {
   mime_type: string
   status: "pending" | "processing" | "completed" | "failed"
   error_message: string | null
+  /** Phase 56 D-10/D-11: granular sub-status while status='processing'. One of: 'extracting', 'chunking', 'embedding', 'metadata'. Backend sets via Realtime UPDATE; frontend renders via DocumentStatusBadge. */
+  ingestion_step?: string | null
   chunk_count: number | null
   content_hash: string | null
   version_number?: number
