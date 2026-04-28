@@ -7,15 +7,19 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { ToolCall, SubAgentState } from "@/types"
+import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
-import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { toolLabel, toolSummary as getToolSummary, taskPhaseLabel } from "@/lib/toolMeta"
 
 interface Props {
   toolCalls: ToolCall[]
   subAgent?: SubAgentState  // live sub-agent state during streaming
   isPlanning?: boolean      // agent finished tool round, deciding next action
+  /** Phase 56 D-03: 0-based iteration index from iteration_start SSE event. Display as `Step ${N + 1}`. */
+  iterationCount?: number
+  /** Phase 56 D-08/D-09: ordered list of skill activations to interleave with tool rows. */
+  activatedSkills?: SkillActivation[]
 }
 
 function toolIcon(name: string) {
@@ -483,9 +487,30 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
   )
 }
 
+// ---- Skill activation row (Phase 56 D-08/D-09) ----
+
+function SkillRow({ activation }: { activation: SkillActivation }) {
+  return (
+    <div className="pt-2.5 animate-toolSlideIn">
+      <div className="flex items-center gap-2.5">
+        <span className="flex-shrink-0 p-1 rounded-md bg-muted/50 text-violet-400">
+          <Zap className="w-3.5 h-3.5" />
+        </span>
+        <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
+          <span className="font-semibold text-foreground/80">Using skill</span>
+          <span className="ml-1.5 opacity-50">"{activation.skillName}"</span>
+        </span>
+        <span className="flex-shrink-0">
+          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
+export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount, activatedSkills }: Props) {
   if (!toolCalls || toolCalls.length === 0) return null
 
   const hasInterrupted = toolCalls.some((tc) => tc.status === "interrupted")
@@ -498,19 +523,52 @@ const [expanded, setExpanded] = useState(true)
   const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
   const activeTool = toolCalls.find((tc) => tc.status === "running")
 
+  const stepPrefix = (iterationCount != null && iterationCount >= 0)
+    ? `Step ${iterationCount + 1}`
+    : null
+
+  // Phase 56 D-07: model is streaming the final answer when:
+  //   - panel is still actively working (NOT allDone)
+  //   - we are NOT in the explicit `isPlanning` between-rounds gap
+  //   - no tool is currently running
+  //   - at least one tool has run already (toolCalls.length > 0)
+  // Pure derivation from existing state — no new SSE event, no new prop.
+  const isSynthesizing = !allDone && !isPlanning && !activeTool && toolCalls.length > 0
+
   const headerLabel = (() => {
-    if (allDone && !isPlanning) return hasInterrupted ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}` : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
-    if (isPlanning) return "Planning next action…"
-    if (activeTool) {
-      const summary = toolSummary(activeTool)
-      return summary
-        ? `${toolLabel(activeTool.name)} — ${summary}`
-        : `${toolLabel(activeTool.name)}…`
+    if (allDone && !isPlanning) {
+      return hasInterrupted
+        ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
+        : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
     }
-    return "Working…"
+    // Phase 56 D-03/D-05/D-07: Step N prefix + task phase label (D-07 mapping from active tool name).
+    if (activeTool) {
+      const phase = taskPhaseLabel(activeTool.name)
+      const summary = toolSummary(activeTool)
+      const body = summary ? `${phase} — ${summary}` : `${phase}…`
+      return stepPrefix ? `${stepPrefix} — ${body}` : body
+    }
+    if (isSynthesizing) {
+      return stepPrefix ? `${stepPrefix} — Synthesizing answer` : "Synthesizing answer"
+    }
+    if (isPlanning) {
+      return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
+    }
+    // Default fallback (D-07 default) — never empty, never "Working".
+    return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
   })()
 
   const isActivelyWorking = !allDone || isPlanning
+
+  // Phase 56 D-09: interleave skill activations with tool calls by timestamp,
+  // so skill rows appear inline between the tools in the order they occurred.
+  type DisplayItem =
+    | { kind: 'tool'; tc: ToolCall; t: number }
+    | { kind: 'skill'; activation: SkillActivation; t: number }
+  const displayItems: DisplayItem[] = [
+    ...toolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.startedAt ?? 0 })),
+    ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
+  ].sort((a, b) => a.t - b.t)
 
   return (
     <div className={cn(
@@ -559,7 +617,17 @@ const [expanded, setExpanded] = useState(true)
       {/* Body */}
       {isExpanded && (
         <div className="px-4 pb-3.5 space-y-1 border-t border-border/20 min-w-0 overflow-hidden">
-          {toolCalls.map((tc, i) => {
+          {displayItems.map((item, i) => {
+            if (item.kind === 'skill') {
+              return (
+                <div key={`skill-${i}-${item.activation.occurredAt}`}>
+                  {i > 0 && <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />}
+                  <SkillRow activation={item.activation} />
+                </div>
+              )
+            }
+            const tc = item.tc
+            // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
             // Use persisted sub_agent or live streaming sub_agent
             const agentState: SubAgentState | undefined =
@@ -588,7 +656,7 @@ const [expanded, setExpanded] = useState(true)
                       </span>
                       {/* Duration badge */}
                       <TimeBadge tc={tc} />
-<span className="flex-shrink-0">
+                      <span className="flex-shrink-0">
                         {tc.status === "running" ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                         ) : tc.status === "interrupted" ? (
@@ -599,7 +667,7 @@ const [expanded, setExpanded] = useState(true)
                       </span>
                     </div>
 
-{/* Expandable parameters */}
+                    {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
 
                     {/* Result block (all tools) */}

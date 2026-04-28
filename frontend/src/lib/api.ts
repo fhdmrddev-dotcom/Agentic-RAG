@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, ConfidenceResult } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -118,6 +118,7 @@ export async function streamMessage(
   onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
   onSuggestions?: (questions: string[]) => void,
   onPlanning?: (iteration: number) => void,
+  onIterationStart?: (iteration: number) => void,
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void,
   signal?: AbortSignal,
 ): Promise<void> {
@@ -204,6 +205,8 @@ export async function streamMessage(
           return  // True end of stream after optional suggestions event (Phase 32)
         } else if (parsed.type === "planning" && onPlanning) {
           onPlanning(parsed.iteration as number)
+        } else if (parsed.type === "iteration_start" && onIterationStart) {
+          onIterationStart(parsed.iteration as number)
         } else if (parsed.type === "fallback_model" && onFallbackModel) {
           onFallbackModel(parsed.original_model as string, parsed.fallback_model as string)
         }

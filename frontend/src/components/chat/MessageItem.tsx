@@ -1,5 +1,4 @@
 import { Bot, Loader2, Square, User, Zap } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
@@ -59,6 +58,8 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
             toolCalls={message.tool_calls}
             subAgent={message.sub_agent}
             isPlanning={message.isPlanning}
+            iterationCount={message.iterationCount}
+            activatedSkills={message.activatedSkills}
           />
         )}
         {message.activatedSkill && (

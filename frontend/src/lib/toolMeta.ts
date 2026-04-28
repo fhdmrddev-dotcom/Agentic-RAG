@@ -35,3 +35,18 @@ export function toolSummary(name: string, args: Record<string, unknown>): string
   if (args.filename) return args.filename as string
   return null
 }
+
+/**
+ * Phase 56 D-07: derive overall task phase from active tool name.
+ * Pure frontend logic — no new backend events. Used by ToolCallPanel header.
+ * Default returns "Thinking…" per D-07 (between tools / unknown).
+ */
+export function taskPhaseLabel(toolName: string): string {
+  if (toolName === "search_documents") return "Gathering context"
+  if (toolName === "query_documents") return "Gathering context"
+  if (toolName === "web_search") return "Gathering context"
+  if (toolName === "analyze_document") return "Analyzing"
+  if (toolName === "execute_code") return "Running code"
+  if (toolName === "load_skill") return "Loading skill"
+  return "Thinking…"
+}
