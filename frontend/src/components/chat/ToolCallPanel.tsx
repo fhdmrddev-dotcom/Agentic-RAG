@@ -7,15 +7,19 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { ToolCall, SubAgentState } from "@/types"
+import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
-import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { toolLabel, toolSummary as getToolSummary, taskPhaseLabel } from "@/lib/toolMeta"
 
 interface Props {
   toolCalls: ToolCall[]
   subAgent?: SubAgentState  // live sub-agent state during streaming
   isPlanning?: boolean      // agent finished tool round, deciding next action
+  /** Phase 56 D-03: 0-based iteration index from iteration_start SSE event. Display as `Step ${N + 1}`. */
+  iterationCount?: number
+  /** Phase 56 D-08/D-09: ordered list of skill activations to interleave with tool rows. */
+  activatedSkills?: SkillActivation[]
 }
 
 function toolIcon(name: string) {
@@ -483,7 +487,7 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
 
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent, isPlanning }: Props) {
+export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount, activatedSkills }: Props) {
   if (!toolCalls || toolCalls.length === 0) return null
 
   const hasInterrupted = toolCalls.some((tc) => tc.status === "interrupted")
@@ -496,16 +500,39 @@ const [expanded, setExpanded] = useState(true)
   const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
   const activeTool = toolCalls.find((tc) => tc.status === "running")
 
+  const stepPrefix = (iterationCount != null && iterationCount >= 0)
+    ? `Step ${iterationCount + 1}`
+    : null
+
+  // Phase 56 D-07: model is streaming the final answer when:
+  //   - panel is still actively working (NOT allDone)
+  //   - we are NOT in the explicit `isPlanning` between-rounds gap
+  //   - no tool is currently running
+  //   - at least one tool has run already (toolCalls.length > 0)
+  // Pure derivation from existing state — no new SSE event, no new prop.
+  const isSynthesizing = !allDone && !isPlanning && !activeTool && toolCalls.length > 0
+
   const headerLabel = (() => {
-    if (allDone && !isPlanning) return hasInterrupted ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}` : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
-    if (isPlanning) return "Planning next action…"
-    if (activeTool) {
-      const summary = toolSummary(activeTool)
-      return summary
-        ? `${toolLabel(activeTool.name)} — ${summary}`
-        : `${toolLabel(activeTool.name)}…`
+    if (allDone && !isPlanning) {
+      return hasInterrupted
+        ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
+        : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
     }
-    return "Working…"
+    // Phase 56 D-03/D-05/D-07: Step N prefix + task phase label (D-07 mapping from active tool name).
+    if (activeTool) {
+      const phase = taskPhaseLabel(activeTool.name)
+      const summary = toolSummary(activeTool)
+      const body = summary ? `${phase} — ${summary}` : `${phase}…`
+      return stepPrefix ? `${stepPrefix} — ${body}` : body
+    }
+    if (isSynthesizing) {
+      return stepPrefix ? `${stepPrefix} — Synthesizing answer` : "Synthesizing answer"
+    }
+    if (isPlanning) {
+      return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
+    }
+    // Default fallback (D-07 default) — never empty, never "Working".
+    return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
   })()
 
   const isActivelyWorking = !allDone || isPlanning
