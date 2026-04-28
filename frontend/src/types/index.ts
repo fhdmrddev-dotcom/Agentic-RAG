@@ -62,6 +62,12 @@ export interface ConfidenceResult {
   disclaimer: string | null
 }
 
+export interface SkillActivation {
+  type: 'skill_activation'
+  skillName: string
+  occurredAt: number  // Date.now() at SSE event arrival; preserves D-09 ordering
+}
+
 export interface Message {
   id: string
   thread_id: string
@@ -71,13 +77,17 @@ export interface Message {
   created_at: string
   updated_at: string
   tool_calls?: ToolCall[]
+  /** Phase 56 D-03/D-04: latest iteration index (0-based) seen on iteration_start SSE event. Frontend adds +1 for display. */
+  iterationCount?: number
   sub_agent?: SubAgentState
-  activatedSkill?: string  // Set by skill_activated SSE event
+  activatedSkill?: string  // Legacy single-skill field (kept for DB-loaded message compat)
+  /** Phase 56 D-08/D-09: ordered list of skills activated during the live stream, used for inline rendering in ToolCallPanel. */
+  activatedSkills?: SkillActivation[]
   sources?: SourceReference[]  // Set by sources SSE event; persisted in source_refs column
   citations?: Citation[]       // Set by citations SSE event; loaded from source_refs on DB load
   confidence?: ConfidenceResult // Set by confidence SSE event; persisted in confidence_* columns
   suggestions?: string[]   // Set by suggestions SSE event; ephemeral — not persisted, not loaded
-/** True while the agent has finished one tool-call round and is deciding its next action. */
+  /** True while the agent has finished one tool-call round and is deciding its next action. */
   isPlanning?: boolean
   /** True if the user clicked Stop — shows "Response stopped" indicator instead of "Saving response…" */
   stopped?: boolean
