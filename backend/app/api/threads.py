@@ -741,6 +741,10 @@ async def send_message(
             for iteration in range(max_iterations):
                 if stop_event.is_set():
                     return
+                # D-04 (Phase 56): emit iteration_start at the top of every iteration.
+                # Frontend uses this to increment the "Step N" counter (D-03).
+                # iteration is 0-indexed; frontend adds +1 for display (Pitfall 1).
+                yield f"data: {json.dumps({'type': 'iteration_start', 'iteration': iteration})}\n\n"
                 # Between tool-call rounds: signal to the frontend that the agent
                 # is deciding its next action (all prior tools are done).
                 if iteration > 0:
