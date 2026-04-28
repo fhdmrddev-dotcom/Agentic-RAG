@@ -633,6 +633,9 @@ def ingest_document(
     log = logging.getLogger(__name__)
     try:
         supabase.table("documents").update({"status": "processing"}).eq("id", document_id).execute()
+        # D-10/D-11 (Phase 56): granular ingestion_step for Realtime-driven UI badge.
+        # status='processing' gates UI visibility; ingestion_step provides the label.
+        supabase.table("documents").update({"ingestion_step": "extracting"}).eq("id", document_id).execute()
 
         # Extract metadata FIRST so we can use it to enrich chunk embeddings.
         # This is best-effort — failures are logged but never block ingestion.
@@ -645,6 +648,7 @@ def ingest_document(
             if metadata_dict.get("language"):
                 metadata_dict["language"] = metadata_dict["language"].lower()
 
+        supabase.table("documents").update({"ingestion_step": "chunking"}).eq("id", document_id).execute()
         chunks = chunk_text(text)
         if not chunks:
             supabase.table("documents").update({
@@ -671,6 +675,7 @@ def ingest_document(
         texts_to_embed = [context_header + chunk for chunk in chunks] if context_header else chunks
 
         app_settings = load_app_settings()
+        supabase.table("documents").update({"ingestion_step": "embedding"}).eq("id", document_id).execute()
         embeddings = embed_chunks(texts_to_embed, model=app_settings.embedding_model or None)
 
         chunk_rows = [
@@ -697,6 +702,7 @@ def ingest_document(
             supabase.table("documents").update({"status": "extracting_images"}).eq("id", document_id).execute()
             extract_and_store_images(raw, mime_type, document_id, user_id, supabase, app_settings)
 
+        supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
         supabase.table("documents").update({
             "status": "completed",
             "chunk_count": len(chunks),
