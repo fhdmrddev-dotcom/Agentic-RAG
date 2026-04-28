@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react"
-import type { Message, ToolCall, OutputLine, OutputFile } from "../types"
+import type { Message, ToolCall, OutputFile } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
 import { supabase } from "../lib/supabase"
 

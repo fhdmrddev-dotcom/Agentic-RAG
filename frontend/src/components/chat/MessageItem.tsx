@@ -1,5 +1,4 @@
 import { Bot, Loader2, Square, User, Zap } from "lucide-react"
-import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
