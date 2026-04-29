@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
@@ -76,6 +76,22 @@ function TimeBadge({ tc }: { tc: ToolCall }) {
     <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
       <Clock className="w-2.5 h-2.5" />
       {formatDuration(duration)}
+    </span>
+  )
+}
+
+// ---- Live elapsed timer (running tools) ----
+
+function ElapsedTimer({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(() => Date.now() - startedAt)
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(Date.now() - startedAt), 250)
+    return () => clearInterval(t)
+  }, [startedAt])
+  return (
+    <span className="flex items-center gap-0.5 text-[10px] text-primary/70 font-mono tabular-nums flex-shrink-0 animate-pulse">
+      <Clock className="w-2.5 h-2.5" />
+      {formatDuration(elapsed)}
     </span>
   )
 }
