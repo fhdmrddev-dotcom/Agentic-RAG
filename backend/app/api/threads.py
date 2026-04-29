@@ -1238,14 +1238,15 @@ async def send_message(
                             skill_name = args.get("skill_name", "")
                             filename = args.get("filename", "")
                             # Resolve skill to get owner's user_id for storage path
-                            skill_row = (
+                            _sr_resp = (
                                 supabase.table("skills")
                                 .select("id, user_id")
                                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                 .eq("name", skill_name)
                                 .maybe_single()
                                 .execute()
-                            ).data
+                            )
+                            skill_row = _sr_resp.data if _sr_resp is not None else None
                             if not skill_row:
                                 tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
                             else:
@@ -1328,14 +1329,15 @@ async def send_message(
                                     sf_filename = sf.get("filename", "")
                                     if not sf_skill_name or not sf_filename:
                                         continue
-                                    sf_skill = (
+                                    _sf_resp = (
                                         supabase.table("skills")
                                         .select("id, user_id")
                                         .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                         .eq("name", sf_skill_name)
                                         .maybe_single()
                                         .execute()
-                                    ).data
+                                    )
+                                    sf_skill = _sf_resp.data if _sf_resp is not None else None
                                     if not sf_skill:
                                         logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
                                         continue
