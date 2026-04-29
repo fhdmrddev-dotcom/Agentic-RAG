@@ -195,6 +195,19 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 ---
 
+### Phase 56.1: Agent Feedback Gaps
+
+**Goal:** Eliminate the 30–120 second silence window during tool argument generation; add live elapsed timer during execution; prevent pre-emptive execute_code via system prompt
+**Depends on:** Phase 56
+**Plans:** 3 plans
+
+Plans:
+- [ ] 056.1-01-PLAN.md — Wave 1: Backend tool_preparing emission (OpenAI/Anthropic/structured paths) + system prompt guard rules
+- [ ] 056.1-02-PLAN.md — Wave 2: Frontend types + api.ts + useMessages preparing/upgrade logic
+- [ ] 056.1-03-PLAN.md — Wave 2 (parallel): ToolCallPanel preparing state render + ElapsedTimer
+
+---
+
 ### Phase 57: SSE Realtime Reconnect Fix
 
 **Goal:** After a stream ends or the page is refreshed mid-stream, the assistant message is always visible — no empty threads, no silent data loss
