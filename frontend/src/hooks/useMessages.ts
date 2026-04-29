@@ -33,6 +33,7 @@ export function useMessages(): UseMessages {
   const threadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -73,8 +74,13 @@ export function useMessages(): UseMessages {
           // Guard: skip while SSE is active — SSE delta events handle live updates.
           // This subscription is recovery-only (for refresh/reconnect after F5).
           if (isStreamingRef.current) return
-          // Reload from DB on any INSERT — handles deduplication and ordering.
-          loadMessages(threadId).catch(console.error)
+          // Debounce: multiple INSERTs (user msg + assistant msg) can fire in rapid
+          // succession. Batch them into one reload so we don't flood the backend.
+          if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
+          reloadTimerRef.current = setTimeout(() => {
+            reloadTimerRef.current = null
+            loadMessages(threadId).catch(console.error)
+          }, 300)
         }
       )
       .subscribe()
@@ -424,17 +430,17 @@ if (isSendingRef.current) return
       setIsStreaming(false)
       isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
 
-      // Phase 56 D-14/D-16: Delay channel teardown by 2000ms so a late-arriving
-      // Realtime INSERT (the persisted assistant message from asyncio.shield in
-      // Phase 55) can still be processed. isStreamingRef is already false (set just
-      // above) so the guard no longer blocks the event.
-      // Per 055-DEFERRAL.md "Recommended Approach": instrument with console.log first.
+      // Tear down the per-stream Realtime channel.
+      // If the user navigated away (activeThreadIdRef no longer points to this thread),
+      // remove immediately — the 2s window would let Thread A's INSERT corrupt Thread B's
+      // message list. Only keep the 2s grace period when the user stayed on the same thread.
       const channelToRemove = channelRef.current
       channelRef.current = null
       if (channelToRemove) {
+        const navigatedAway = activeThreadIdRef.current !== threadId
         setTimeout(() => {
           supabase.removeChannel(channelToRemove)
-        }, 2000)
+        }, navigatedAway ? 0 : 2000)
       }
 
       // Always clear planning flag on stream end

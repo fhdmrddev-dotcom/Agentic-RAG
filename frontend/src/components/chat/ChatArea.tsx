@@ -82,13 +82,28 @@ useEffect(() => {
     clearMessages()
     abortStream()
     loadMessages(thread.id).catch(console.error)
-    // Fix F (STREAM-02): Subscribe to Realtime INSERTs for this thread.
-    // This catches the case where the backend persists the assistant message
-    // after a page refresh (asyncio.shield), when no SSE stream is active.
     subscribeToThread(thread.id)
+
+    // Fix F fallback: backend may still be persisting (asyncio.shield) when this
+    // effect runs after an F5 mid-stream. Reload once after 8s as a safety net in
+    // case the Realtime INSERT fires before the subscription is fully established.
+    const fallbackTimer = setTimeout(() => {
+      loadMessages(thread.id).catch(console.error)
+    }, 8000)
+
+    // Fix E: reload messages when the user switches back to this tab, in case the
+    // stream finished while the tab was in the background.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadMessages(thread.id).catch(console.error)
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
       unsubscribeFromThread()
+      clearTimeout(fallbackTimer)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [thread?.id, loadMessages, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread])
 
