@@ -40,6 +40,7 @@ export function useMessages(): UseMessages {
   }, [])
 
   const clearMessages = useCallback(() => {
+    console.log("[Phase56-Realtime] clearMessages called", { streamingThread: streamingThreadIdRef.current, channelExists: channelRef.current != null })
     setMessages([])
     setIsStreaming(false)
     abortControllerRef.current?.abort()
@@ -48,8 +49,10 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
+    console.log("[Phase56-Realtime] loadMessages start", { threadId, generation: sendGenerationRef.current, isSending: isSendingRef.current, streamingThread: streamingThreadIdRef.current })
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
+    console.log("[Phase56-Realtime] loadMessages fetched", { threadId, dataLen: data.length, currentGen: sendGenerationRef.current, originalGen: generation })
     setMessages((prev) => {
       // If a different thread is being requested, always allow the update
       // so thread switching works even during active streaming.
@@ -116,6 +119,14 @@ if (isSendingRef.current) return
           filter: `thread_id=eq.${threadId}`,
         },
         (payload) => {
+          console.log("[Phase56-Realtime] payload received", {
+            eventType: payload.eventType,
+            newId: (payload.new as { id?: string })?.id,
+            newRole: (payload.new as { role?: string })?.role,
+            newThreadId: (payload.new as { thread_id?: string })?.thread_id,
+            isStreaming: isStreamingRef.current,
+            streamingThread: streamingThreadIdRef.current,
+          })
           // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
           // SSE delta events handle live updates. Only process after SSE drops/ends.
           if (isStreamingRef.current) return
@@ -337,16 +348,32 @@ if (isSendingRef.current) return
         console.error(err)
       }
 } finally {
+      console.log("[Phase56-Realtime] finally entering", {
+        assistantId,
+        isStreaming: isStreamingRef.current,
+        isSending: isSendingRef.current,
+        stoppedByUser: stoppedByUserRef.current,
+        channelExists: channelRef.current != null,
+      })
       abortControllerRef.current = null
       isSendingRef.current = false
       streamingThreadIdRef.current = null
       setIsStreaming(false)
       isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
 
-      // D-03/D-06: Tear down Realtime subscription for this thread.
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
+      // Phase 56 D-14/D-16: Delay channel teardown by 2000ms so a late-arriving
+      // Realtime INSERT (the persisted assistant message from asyncio.shield in
+      // Phase 55) can still be processed. isStreamingRef is already false (set just
+      // above) so the guard no longer blocks the event.
+      // Per 055-DEFERRAL.md "Recommended Approach": instrument with console.log first.
+      const channelToRemove = channelRef.current
+      channelRef.current = null
+      if (channelToRemove) {
+        console.log("[Phase56-Realtime] scheduling delayed removeChannel (2000ms)")
+        setTimeout(() => {
+          console.log("[Phase56-Realtime] firing delayed removeChannel")
+          supabase.removeChannel(channelToRemove)
+        }, 2000)
       }
 
       // Always clear planning flag on stream end
