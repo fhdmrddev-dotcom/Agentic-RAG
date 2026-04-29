@@ -12,6 +12,8 @@ interface UseMessages {
   stopStreaming: () => void
   abortStream: () => void
   clearMessages: () => void
+  subscribeToThread: (threadId: string) => void
+  unsubscribeFromThread: () => void
 }
 
 function makeTempId() {
@@ -28,6 +30,7 @@ export function useMessages(): UseMessages {
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const threadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
 
@@ -46,6 +49,63 @@ export function useMessages(): UseMessages {
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     isSendingRef.current = false
+  }, [])
+
+  const subscribeToThread = useCallback((threadId: string) => {
+    // Tear down any existing always-on subscription first (no-op if null)
+    if (threadChannelRef.current) {
+      supabase.removeChannel(threadChannelRef.current)
+      threadChannelRef.current = null
+    }
+
+    const channelName = `thread-always-on-${threadId}`
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          // Guard: skip while SSE is active — SSE delta events handle live updates.
+          // This subscription is recovery-only (for refresh/reconnect scenarios).
+          if (isStreamingRef.current) return
+
+          const newMsg = payload.new as Message
+          setMessages((prev) => {
+            // Replace optimistic temp-id placeholder for assistant messages
+            if (newMsg.role === "assistant") {
+              const tempIdx = prev.findIndex(
+                (m) => m.role === "assistant" && m.id.startsWith("temp-")
+              )
+              if (tempIdx !== -1) {
+                const next = [...prev]
+                next[tempIdx] = newMsg
+                return next
+              }
+            }
+            // Deduplicate: skip if already present
+            if (prev.some((m) => m.id === newMsg.id)) return prev
+            // Fresh message (e.g. from a completed stream on a refreshed page)
+            // Reload from DB to get canonical order and full message data
+            loadMessages(threadId).catch(console.error)
+            return prev // loadMessages will trigger a proper setMessages
+          })
+        }
+      )
+      .subscribe()
+
+    threadChannelRef.current = channel
+  }, [loadMessages])
+
+  const unsubscribeFromThread = useCallback(() => {
+    if (threadChannelRef.current) {
+      supabase.removeChannel(threadChannelRef.current)
+      threadChannelRef.current = null
+    }
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
@@ -463,5 +523,5 @@ if (isSendingRef.current) return
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread }
 }
