@@ -137,6 +137,7 @@ export async function streamMessage(
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
+  let doneFired = false
 
   while (true) {
     let done: boolean, value: Uint8Array | undefined
@@ -200,7 +201,7 @@ export async function streamMessage(
             parsed.disclaimer as string | null,
           )
         } else if (parsed.type === "done") {
-          onDone()
+          if (!doneFired) { doneFired = true; onDone() }
           // Do NOT return — stream stays open for suggestions event (Phase 32)
         } else if (parsed.type === "suggestions" && onSuggestions) {
           onSuggestions((parsed.questions ?? []) as string[])
@@ -219,7 +220,7 @@ export async function streamMessage(
     }
   }
 
-  onDone()
+  if (!doneFired) onDone()
 }
 
 export async function listDocuments(): Promise<Document[]> {
