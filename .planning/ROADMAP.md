@@ -195,11 +195,11 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 ---
 
-### Phase 56.1: Agent Feedback Gaps
+### Phase 56.1: Agent Feedback Gaps ✓ Complete 2026-04-29
 
 **Goal:** Eliminate the 30–120 second silence window during tool argument generation; add live elapsed timer during execution; prevent pre-emptive execute_code via system prompt
 **Depends on:** Phase 56
-**Plans:** 3 plans
+**Plans:** 3/3 complete — completed 2026-04-29
 
 Plans:
 - [X] 056.1-01-PLAN.md — Wave 1: Backend tool_preparing emission (OpenAI/Anthropic/structured paths) + system prompt guard rules
