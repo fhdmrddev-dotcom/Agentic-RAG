@@ -425,7 +425,7 @@ if (isSendingRef.current) return
       if (wasStoppedByUser) {
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.role !== "assistant") return m
+            if (m.id !== assistantId) return m
             const hasActiveTools = m.tool_calls?.some(
               (tc) => tc.status === "running" || tc.status === "preparing"
             )
