@@ -898,6 +898,11 @@ async def send_message(
                                             "name": call.function.name,
                                             "arguments": call.function.arguments,
                                         }
+                                    # D-05 (Phase 56.1): emit tool_preparing for each structured call.
+                                    # Structured mode has no streaming name delivery; this fires immediately
+                                    # after parse returns, before the tool execution loop.
+                                    for idx, call in enumerate(structured_calls):
+                                        yield f"data: {json.dumps({'type': 'tool_preparing', 'name': call.function.name, 'index': idx})}\n\n"
                                     # Clear content since it was a tool call, not a user-facing response
                                     full_content = ""
                                     finish_reason = "tool_calls"
