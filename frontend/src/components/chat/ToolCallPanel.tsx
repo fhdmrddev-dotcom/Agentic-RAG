@@ -537,7 +537,7 @@ const [expanded, setExpanded] = useState(true)
 
   const isExpanded = expanded
   const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
-  const activeTool = toolCalls.find((tc) => tc.status === "running")
+  const activeTool = toolCalls.find((tc) => tc.status === "running" || tc.status === "preparing")
 
   const stepPrefix = (iterationCount != null && iterationCount >= 0)
     ? `Step ${iterationCount + 1}`
@@ -655,25 +655,42 @@ const [expanded, setExpanded] = useState(true)
                 {i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
-                {tc.name === "execute_code" ? (
+                {tc.name === "execute_code" && tc.status !== "preparing" ? (
                   <ExecuteCodeBlock tc={tc} />
                 ) : (
                   <>
                     {/* Tool row */}
                     <div className="flex items-center gap-2.5">
-                      <span className={cn("flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300", toolIconColor(tc.name, tc.status))}>
+                      <span className={cn(
+                        "flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300",
+                        toolIconColor(tc.name, tc.status),
+                        tc.status === "preparing" && "opacity-50"
+                      )}>
                         {toolIcon(tc.name)}
                       </span>
                       <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
-                        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-                        {summary && (
-                          <span className="ml-1.5 opacity-50">"{summary}"</span>
+                        {tc.status === "preparing" ? (
+                          <span className="font-semibold text-foreground/50 italic">
+                            Preparing {toolLabel(tc.name)}…
+                          </span>
+                        ) : (
+                          <>
+                            <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+                            {summary && (
+                              <span className="ml-1.5 opacity-50">"{summary}"</span>
+                            )}
+                          </>
                         )}
                       </span>
-                      {/* Duration badge */}
-                      <TimeBadge tc={tc} />
+                      {/* Duration badge — live timer while running, static badge when done */}
+                      {tc.status === "running" && tc.startedAt != null
+                        ? <ElapsedTimer startedAt={tc.startedAt} />
+                        : <TimeBadge tc={tc} />
+                      }
                       <span className="flex-shrink-0">
-                        {tc.status === "running" ? (
+                        {tc.status === "preparing" ? (
+                          <span className="w-3.5 h-3.5 rounded-full bg-primary/30 animate-pulse inline-block" />
+                        ) : tc.status === "running" ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
                         ) : tc.status === "interrupted" ? (
                           <Square className="w-3.5 h-3.5 text-amber-500" />
@@ -682,6 +699,11 @@ const [expanded, setExpanded] = useState(true)
                         )}
                       </span>
                     </div>
+
+                    {/* Preparing indicator bar — only visible during "preparing" state */}
+                    {tc.status === "preparing" && (
+                      <div className="mt-1.5 h-0.5 rounded-full bg-gradient-to-r from-primary/30 to-primary/10 animate-pulse" />
+                    )}
 
                     {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
