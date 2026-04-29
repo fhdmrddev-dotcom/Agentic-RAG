@@ -138,7 +138,7 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
         {isStreaming && message.isPlanning && !hasRunningTools && message.content && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground animate-fadeSlideUp">
             <Loader2 className="w-3 h-3 animate-spin text-primary flex-shrink-0" />
-            <span className="italic">Planning next action…</span>
+            <span className="italic">Thinking…</span>
           </div>
         )}
       </div>
