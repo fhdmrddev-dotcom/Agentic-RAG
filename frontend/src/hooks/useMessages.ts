@@ -99,7 +99,7 @@ export function useMessages(): UseMessages {
       .subscribe()
 
     threadChannelRef.current = channel
-  }, [loadMessages])
+  }, [])  // loadMessages has stable identity (useCallback with [] deps) — safe to omit
 
   const unsubscribeFromThread = useCallback(() => {
     if (threadChannelRef.current) {
