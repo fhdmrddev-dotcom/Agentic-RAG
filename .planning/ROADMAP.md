@@ -208,23 +208,30 @@ Plans:
 
 ---
 
-### Phase 57: SSE Realtime Reconnect Fix
+### Phase 57: SSE Realtime Reconnect Fix — DEFERRED 2026-04-30
 
 **Goal:** After a stream ends or the page is refreshed mid-stream, the assistant message is always visible — no empty threads, no silent data loss
 **Depends on:** Phase 56 (console.log tracing in place; root cause confirmed via browser trace)
 **Requirements**: STREAM-02
-**Plans:** 2 plans
+**Plans:** 2 plans (executed, manual tests unreliable — deferred)
 
-Root cause (confirmed 2026-04-29 via console trace):
-- **E (tab switch):** Realtime INSERT fires while `isStreamingRef.current = true` → blocked by guard → `finally` runs too late to catch it. The 2s delayed removeChannel only helps INSERTs that arrive *after* `isStreamingRef = false`.
-- **F (refresh mid-stream):** No Realtime channel on fresh page load. `loadMessages` runs before backend persists. Backend persists via asyncio.shield ~5s later but nobody is listening.
+**Deferral reason:** Supabase Realtime INSERT event delivery is unreliable for the specific timing windows in Symptoms E and F. Multiple fix attempts (Realtime subscription, debouncing, visibilitychange, 8s fallback) did not produce consistent test results. See `057-DEFERRAL.md` for full analysis and recommended approach for next milestone.
 
-Fix approach:
-- Plan 01: In `finally`, after `isStreamingRef = false`, call `loadMessages(threadId)` directly (guarded by thread identity + not stopped). Replaces the "catch INSERT via Realtime" with a direct DB reload. Handles E.
-- Plan 02: Set up a Realtime subscription whenever a thread is selected (in `useEffect([thread?.id])`), not only inside `sendMessage`. Tear down on thread change. Handles F.
+**What was shipped:**
+- `activeThreadIdRef` thread-identity guard (prevents cross-thread `loadMessages` on navigation)
+- `loadMessages` in `finally` block moved outside React state updater (correct placement)
+- Immediate `channelRef` teardown on navigation (prevents Thread A messages in Thread B)
+- `subscribeToThread`/`unsubscribeFromThread` always-on Realtime subscription wired in ChatArea
+- `visibilitychange` listener + 8s fallback reload in ChatArea
+- All Phase 56 diagnostic console.log statements removed
+
+**What was NOT fixed:** Symptoms E (tab switch) and F (F5 refresh) remain unreliable.
+
+**Next milestone re-plan:** Use polling for F; use `visibilitychange` alone for E (tested in isolation). Verify Supabase Realtime RLS/REPLICA IDENTITY before relying on any Realtime approach. See `057-DEFERRAL.md`.
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 57 to break down)
+- [x] 057-01-PLAN.md — Fix E: loadMessages in finally with thread identity guard
+- [~] 057-02-PLAN.md — Fix F: always-on Realtime subscription (partial — code shipped, tests unreliable)
 
 ---
 

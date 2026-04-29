@@ -3,7 +3,11 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: ready_for_next_phase
-stopped_at: Phase 056.1 complete — tool_preparing SSE + ElapsedTimer + system prompt guards
+deferred_phases:
+  - phase: 057
+    symptoms: E (tab switch), F (F5 refresh)
+    see: .planning/phases/057-sse-realtime-reconnect-fix/057-DEFERRAL.md
+stopped_at: Phase 057 deferred — SSE reconnect fixes partially shipped; Symptoms E/F remain unreliable (see 057-DEFERRAL.md)
 last_updated: "2026-04-29T00:00:00.000Z"
 last_activity: 2026-04-29
 progress:
