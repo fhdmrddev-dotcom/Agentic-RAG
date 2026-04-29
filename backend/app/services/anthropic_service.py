@@ -178,7 +178,9 @@ def stream_anthropic(
                         "name": block.name,
                         "arguments": "",
                     }
-                    # Do NOT yield tool_start here — wait for full arguments at content_block_stop
+                    # Yield tool_preparing immediately — name is known, args still streaming.
+                    # tool_start is still delayed until content_block_stop (needs complete args).
+                    yield {"type": "tool_preparing", "id": block.id, "name": block.name, "index": event.index}
 
             elif event_type == "content_block_delta":
                 delta = event.delta

@@ -819,12 +819,15 @@ async def send_message(
                                     if _text:
                                         full_content += _text
                                         yield f"data: {json.dumps({'type': 'delta', 'content': _text})}\n\n"
-                                elif _etype == "tool_start":
-                                    # D-01 (Phase 56.1): Anthropic delivers complete tool calls via tool_start,
-                                    # so emit tool_preparing immediately — fires before buffer assignment.
-                                    _idx = len(tool_calls_buffer)
+                                elif _etype == "tool_preparing":
+                                    # D-01 (Phase 56.1, corrected): fired at content_block_start when
+                                    # tool name is first known — before arguments finish streaming.
+                                    _idx = _ant_event.get("index", len(tool_calls_buffer))
                                     yield f"data: {json.dumps({'type': 'tool_preparing', 'name': _ant_event['name'], 'index': _idx})}\n\n"
-                                    # Map to tool_calls_buffer format (same as OpenAI path)
+                                elif _etype == "tool_start":
+                                    # Fired at content_block_stop — arguments now complete.
+                                    # tool_preparing was already emitted above; just populate buffer.
+                                    _idx = len(tool_calls_buffer)
                                     tool_calls_buffer[_idx] = {
                                         "id": _ant_event["id"],
                                         "name": _ant_event["name"],
