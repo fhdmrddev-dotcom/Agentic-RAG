@@ -1248,6 +1248,19 @@ async def send_message(
                             )
                             skill_row = _sr_resp.data if _sr_resp is not None else None
                             if not skill_row:
+                                # Retry with normalized name for agent display-name mismatches
+                                _sr_norm = skill_name.lower().replace(" ", "-")
+                                if _sr_norm != skill_name:
+                                    _sr_resp2 = (
+                                        supabase.table("skills")
+                                        .select("id, user_id")
+                                        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                        .eq("name", _sr_norm)
+                                        .maybe_single()
+                                        .execute()
+                                    )
+                                    skill_row = _sr_resp2.data if _sr_resp2 is not None else None
+                            if not skill_row:
                                 tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
                             else:
                                 row = skill_row[0] if isinstance(skill_row, list) else skill_row
@@ -1338,6 +1351,20 @@ async def send_message(
                                         .execute()
                                     )
                                     sf_skill = _sf_resp.data if _sf_resp is not None else None
+                                    if not sf_skill:
+                                        # Retry with normalized name: agent often uses display name
+                                        # ("Weekly Report Writer") instead of stored slug ("weekly-report-writer")
+                                        _sf_norm = sf_skill_name.lower().replace(" ", "-")
+                                        if _sf_norm != sf_skill_name:
+                                            _sf_resp2 = (
+                                                supabase.table("skills")
+                                                .select("id, user_id")
+                                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                                .eq("name", _sf_norm)
+                                                .maybe_single()
+                                                .execute()
+                                            )
+                                            sf_skill = _sf_resp2.data if _sf_resp2 is not None else None
                                     if not sf_skill:
                                         logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
                                         continue
