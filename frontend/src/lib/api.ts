@@ -102,6 +102,7 @@ export async function streamMessage(
   model?: string,
   provider?: string,
   onTitleUpdate?: (title: string) => void,
+  onToolPreparing?: (name: string, index: number) => void,
   onToolStart?: (name: string, args: Record<string, string>) => void,
   onToolEnd?: (name: string, result?: string) => void,
   onSubAgentStart?: (filename: string, task: string) => void,
@@ -161,6 +162,8 @@ export async function streamMessage(
           onDelta(parsed.content as string)
         } else if (parsed.type === "title" && onTitleUpdate) {
           onTitleUpdate(parsed.content as string)
+        } else if (parsed.type === "tool_preparing" && onToolPreparing) {
+          onToolPreparing(parsed.name as string, parsed.index as number)
         } else if (parsed.type === "tool_start" && onToolStart) {
           onToolStart(parsed.name as string, parsed.args as Record<string, string>)
         } else if (parsed.type === "tool_end" && onToolEnd) {
