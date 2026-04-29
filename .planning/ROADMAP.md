@@ -203,8 +203,8 @@ Full details: `.planning/milestones/v2.3-ROADMAP.md`
 
 Plans:
 - [X] 056.1-01-PLAN.md — Wave 1: Backend tool_preparing emission (OpenAI/Anthropic/structured paths) + system prompt guard rules
-- [ ] 056.1-02-PLAN.md — Wave 2: Frontend types + api.ts + useMessages preparing/upgrade logic
-- [ ] 056.1-03-PLAN.md — Wave 2 (parallel): ToolCallPanel preparing state render + ElapsedTimer
+- [X] 056.1-02-PLAN.md — Wave 2: Frontend types + api.ts + useMessages preparing/upgrade logic
+- [X] 056.1-03-PLAN.md — Wave 2 (parallel): ToolCallPanel preparing state render + ElapsedTimer
 
 ---
 

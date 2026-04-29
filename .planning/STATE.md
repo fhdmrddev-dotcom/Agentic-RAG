@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
 status: Ready for next phase
-stopped_at: Completed 056.1-01-PLAN.md — tool_preparing SSE event in all 3 LLM paths + system prompt execute_code guard rules
-last_updated: "2026-04-29T15:40:30.479Z"
+stopped_at: Completed 056.1-03-PLAN.md — ElapsedTimer + preparing-state render in ToolCallPanel
+last_updated: "2026-04-29T19:17:22.688Z"
 last_activity: 2026-04-27
 progress:
   total_phases: 17
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 44
-  completed_plans: 40
-  percent: 91
+  completed_plans: 42
+  percent: 95
 ---
 
 # Project State
@@ -29,7 +29,7 @@ Phase: 055 (deferred) — awaiting new phase from user
 Status: Ready for next phase
 Last activity: 2026-04-27
 
-Progress: [█████████░] 91%
+Progress: [██████████] 95%
 
 Next: Add new user-defined phase, then plan and execute
 
@@ -100,6 +100,8 @@ Recent decisions affecting current work:
 - Version-aware delete dialog: 3-button footer for multi-version, 1-button for single-version; error-in-dialog pattern
 - D-01 (Phase 56.1): _announced_tools set[int] guards OpenAI tool_preparing to emit exactly once per tool index
 - D-05 (Phase 56.1): Structured mode uses two separate loops (populate then emit) — all tools buffer-registered before any tool_preparing events fire
+- D-03 (Phase 56.1): ElapsedTimer uses setInterval(250ms) with useEffect cleanup — clearInterval on unmount prevents timer leak
+- D-05 (Phase 56.1): ExecuteCodeBlock guarded with tc.status !== preparing — prevents render with empty args
 
 ### Pending Todos
 
@@ -107,6 +109,7 @@ Recent decisions affecting current work:
 |-------|------|--------|
 | 055 | Realtime INSERT race — needs console.log investigation before next attempt | ⏸ Deferred |
 | Phase 056.1 P01 | 127s | 4 tasks | 1 files |
+| Phase 056.1 P03 | 10 | 3 tasks | 1 files |
 
 ### Blockers/Concerns
 
@@ -131,6 +134,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-29T15:40:30.470Z
-Stopped at: Completed 056.1-01-PLAN.md — tool_preparing SSE event in all 3 LLM paths + system prompt execute_code guard rules
+Last session: 2026-04-29T19:17:22.678Z
+Stopped at: Completed 056.1-03-PLAN.md — ElapsedTimer + preparing-state render in ToolCallPanel
 Next: New phase to be added by user
