@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages } = useMessages()
+  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -68,6 +68,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 useEffect(() => {
     if (!thread) {
       clearMessages()
+      unsubscribeFromThread()
       return
     }
     // Skip clear+load when handleSend just created this thread — sendMessage is
@@ -81,7 +82,15 @@ useEffect(() => {
     clearMessages()
     abortStream()
     loadMessages(thread.id).catch(console.error)
-  }, [thread?.id, loadMessages, abortStream, clearMessages])
+    // Fix F (STREAM-02): Subscribe to Realtime INSERTs for this thread.
+    // This catches the case where the backend persists the assistant message
+    // after a page refresh (asyncio.shield), when no SSE stream is active.
+    subscribeToThread(thread.id)
+
+    return () => {
+      unsubscribeFromThread()
+    }
+  }, [thread?.id, loadMessages, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
