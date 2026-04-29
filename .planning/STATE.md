@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.4
 milestone_name: Stability, Polish & UX Fixes
-status: ready_for_next_phase
-stopped_at: Phase 55 deferred — Realtime race condition not resolved
-last_updated: "2026-04-27T00:00:00.000Z"
-last_activity: 2026-04-27 -- Phase 053 complete, Phase 054 complete, Phase 055 deferred (4/5 plans done)
+status: Ready for next phase
+stopped_at: Completed 056.1-01-PLAN.md — tool_preparing SSE event in all 3 LLM paths + system prompt execute_code guard rules
+last_updated: "2026-04-29T15:40:30.479Z"
+last_activity: 2026-04-27
 progress:
-  total_phases: 12
+  total_phases: 17
   completed_phases: 11
-  total_plans: 41
-  completed_plans: 36
-  percent: 88
+  total_plans: 44
+  completed_plans: 40
+  percent: 91
 ---
 
 # Project State
@@ -29,7 +29,7 @@ Phase: 055 (deferred) — awaiting new phase from user
 Status: Ready for next phase
 Last activity: 2026-04-27
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 91%
 
 Next: Add new user-defined phase, then plan and execute
 
@@ -77,6 +77,7 @@ Next: Add new user-defined phase, then plan and execute
 - Phase 52 added: Multi-Provider Model Routing — full provider-aware routing for all agent roles, cross-provider sub-agent fix, model fallback on unavailable models
 - Phase 53 added: Cross-Provider Tool Calling Reliability — capability registry with native/structured dual-mode tool calling, user-controllable OpenRouter strategy, deterministic JSON parser for non-native models
 - Phase 55 added: Streaming Reliability & Connection Resilience — async LLM streaming for true cancellation, Supabase Realtime subscription so navigation never loses a response, shield persist on disconnect
+- Phase 56 added: Agent Real-Time Feedback — eliminate silence windows during tool argument streaming (tool_preparing SSE event), add elapsed time counter for running tools, fix missing initial planning event
 
 ### Decisions
 
@@ -97,12 +98,15 @@ Recent decisions affecting current work:
 - NavPanel folder picker toggles visibility; collapsed sidebar hides picker via existing opacity-0 pattern
 - scope=version|all delete: FastAPI Query(pattern=) for enum validation; user_id guard on both SELECT and DELETE paths
 - Version-aware delete dialog: 3-button footer for multi-version, 1-button for single-version; error-in-dialog pattern
+- D-01 (Phase 56.1): _announced_tools set[int] guards OpenAI tool_preparing to emit exactly once per tool index
+- D-05 (Phase 56.1): Structured mode uses two separate loops (populate then emit) — all tools buffer-registered before any tool_preparing events fire
 
 ### Pending Todos
 
 | Phase | Task | Status |
 |-------|------|--------|
 | 055 | Realtime INSERT race — needs console.log investigation before next attempt | ⏸ Deferred |
+| Phase 056.1 P01 | 127s | 4 tasks | 1 files |
 
 ### Blockers/Concerns
 
@@ -127,6 +131,6 @@ Items acknowledged and carried forward from v2.3 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-04-27
-Stopped at: Phase 055 deferred after 5 failed fix attempts — useMessages.ts reverted to 055-04 state
+Last session: 2026-04-29T15:40:30.470Z
+Stopped at: Completed 056.1-01-PLAN.md — tool_preparing SSE event in all 3 LLM paths + system prompt execute_code guard rules
 Next: New phase to be added by user
