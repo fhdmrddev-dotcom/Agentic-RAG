@@ -347,7 +347,7 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatBytes(doc.file_size)}</td>
                   <td className="px-4 py-3 text-muted-foreground">{doc.chunk_count ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <DocumentStatusBadge status={doc.status} />
+                    <DocumentStatusBadge status={doc.status} ingestionStep={doc.ingestion_step} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Button

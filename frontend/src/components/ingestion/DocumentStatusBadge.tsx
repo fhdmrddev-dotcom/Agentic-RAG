@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils"
 
 interface Props {
   status: "pending" | "processing" | "completed" | "failed"
+  /** Phase 56 D-13: granular sub-status; only consulted while status='processing'. */
+  ingestionStep?: string | null
 }
 
 const styles: Record<Props["status"], string> = {
@@ -11,7 +13,16 @@ const styles: Record<Props["status"], string> = {
   failed: "bg-red-100 text-red-800",
 }
 
-export function DocumentStatusBadge({ status }: Props) {
+function ingestionStepLabel(step: string | null | undefined): string {
+  if (step === "extracting") return "Extracting"
+  if (step === "chunking") return "Chunking"
+  if (step === "embedding") return "Embedding"
+  if (step === "metadata") return "Extracting metadata"
+  return "processing"
+}
+
+export function DocumentStatusBadge({ status, ingestionStep }: Props) {
+  const label = status === "processing" ? ingestionStepLabel(ingestionStep) : status
   return (
     <span
       className={cn(
@@ -22,7 +33,7 @@ export function DocumentStatusBadge({ status }: Props) {
       {status === "processing" && (
         <span className="h-2 w-2 animate-spin rounded-full border border-current border-t-transparent" />
       )}
-      {status}
+      {label}
     </span>
   )
 }
