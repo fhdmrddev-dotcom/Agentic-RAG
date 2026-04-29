@@ -810,6 +810,7 @@ async def send_message(
                             )
                             tool_calls_buffer = {}
                             finish_reason = None
+                            _announced_tools_ant: set[int] = set()
                             for _ant_event in _ant_gen:
                                 if stop_event.is_set():
                                     return
@@ -823,7 +824,9 @@ async def send_message(
                                     # D-01 (Phase 56.1, corrected): fired at content_block_start when
                                     # tool name is first known — before arguments finish streaming.
                                     _idx = _ant_event.get("index", len(tool_calls_buffer))
-                                    yield f"data: {json.dumps({'type': 'tool_preparing', 'name': _ant_event['name'], 'index': _idx})}\n\n"
+                                    if _idx not in _announced_tools_ant:
+                                        _announced_tools_ant.add(_idx)
+                                        yield f"data: {json.dumps({'type': 'tool_preparing', 'name': _ant_event['name'], 'index': _idx})}\n\n"
                                 elif _etype == "tool_start":
                                     # Fired at content_block_stop — arguments now complete.
                                     # tool_preparing was already emitted above; just populate buffer.
