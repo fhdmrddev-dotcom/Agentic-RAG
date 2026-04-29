@@ -186,10 +186,10 @@ if (isSendingRef.current) return
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
-            // Deduplicate: if a preparing entry for this tool name already exists, skip
-            const alreadyPreparing = (m.tool_calls ?? []).some(
-              (tc) => tc.name === name && tc.status === "preparing"
-            )
+            // Deduplicate on the synthetic id (preparing-{index}), not on name.
+            // Keying on name silently drops the second tool_preparing for same-named parallel calls.
+            const preparingId = `preparing-${index}`
+            const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
             if (alreadyPreparing) return m
             const preparingEntry: ToolCall = {
               id: `preparing-${index}`,
@@ -220,8 +220,9 @@ if (isSendingRef.current) return
                   : tc
               )
             } else {
-              // No preparing entry — append new running entry (fallback for race/reconnect)
-              updatedCalls = [...existingCalls, { name, args, status: "running" as const, startedAt: Date.now() }]
+              // No preparing entry — append new running entry (fallback for race/reconnect).
+              // Include a stable id so tool_end's name-match still works if it tries to match by id.
+              updatedCalls = [...existingCalls, { id: `running-${Date.now()}`, name, args, status: "running" as const, startedAt: Date.now() }]
             }
             return { ...m, isPlanning: false, tool_calls: updatedCalls }
           }),
