@@ -915,6 +915,10 @@ async def send_message(
                                     # after parse returns, before the tool execution loop.
                                     for idx, call in enumerate(structured_calls):
                                         yield f"data: {json.dumps({'type': 'tool_preparing', 'name': call.function.name, 'index': idx})}\n\n"
+                                    # Yield control so the SSE flush reaches the client before
+                                    # execution begins — otherwise preparing and running arrive in
+                                    # the same TCP packet and the preparing state is never rendered.
+                                    await asyncio.sleep(0)
                                     # Clear content since it was a tool call, not a user-facing response
                                     full_content = ""
                                     finish_reason = "tool_calls"
