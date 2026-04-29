@@ -69,31 +69,12 @@ export function useMessages(): UseMessages {
           table: "messages",
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
+        () => {
           // Guard: skip while SSE is active — SSE delta events handle live updates.
-          // This subscription is recovery-only (for refresh/reconnect scenarios).
+          // This subscription is recovery-only (for refresh/reconnect after F5).
           if (isStreamingRef.current) return
-
-          const newMsg = payload.new as Message
-          setMessages((prev) => {
-            // Replace optimistic temp-id placeholder for assistant messages
-            if (newMsg.role === "assistant") {
-              const tempIdx = prev.findIndex(
-                (m) => m.role === "assistant" && m.id.startsWith("temp-")
-              )
-              if (tempIdx !== -1) {
-                const next = [...prev]
-                next[tempIdx] = newMsg
-                return next
-              }
-            }
-            // Deduplicate: skip if already present
-            if (prev.some((m) => m.id === newMsg.id)) return prev
-            // Fresh message (e.g. from a completed stream on a refreshed page)
-            // Reload from DB to get canonical order and full message data
-            loadMessages(threadId).catch(console.error)
-            return prev // loadMessages will trigger a proper setMessages
-          })
+          // Reload from DB on any INSERT — handles deduplication and ordering.
+          loadMessages(threadId).catch(console.error)
         }
       )
       .subscribe()
@@ -484,42 +465,30 @@ if (isSendingRef.current) return
         )
       }
 
+      // Apply stopped flag to the placeholder message (pure state update, no side effects)
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
         if (lastMsg?.id === assistantId) {
-          const updated = prev.map((m) =>
+          return prev.map((m) =>
             m.id === assistantId
               ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
               : m
           )
-          // Only reload from DB if the user is still on the same thread.
-          // Skip the reload on navigation abort — the new thread's loadMessages
-          // has already started.
-          if (!wasStoppedByUser) {
-            setTimeout(() => {
-              stoppedByUserRef.current = false
-            }, 0)
-            // Fix E (D-STREAM-01/D-STREAM-02): Reload from DB after natural stream completion.
-            // The Realtime INSERT fires while isStreamingRef=true and is blocked by the guard.
-            // By the time isStreamingRef=false, the INSERT event is gone — so we pull from DB.
-            // Guards per D-STREAM-02:
-            //   activeThreadIdRef === threadId: user hasn't navigated to a different thread
-            //   !stoppedByUserRef: stop path already persisted via asyncio.shield
-            if (activeThreadIdRef.current === threadId && !stoppedByUserRef.current) {
-              loadMessages(threadId).catch(console.error)
-            }
-          } else {
-            setTimeout(() => {
-              stoppedByUserRef.current = false
-              loadMessages(threadId).catch(console.error)
-            }, 800)
-          }
-          return updated
         }
-
-        stoppedByUserRef.current = false
         return prev
       })
+
+      // Reset stopped ref outside any state updater so it runs exactly once
+      stoppedByUserRef.current = false
+
+      // Fix E (D-STREAM-01): Reload from DB after natural stream completion.
+      // The Realtime INSERT fires while isStreamingRef=true (blocked by guard).
+      // By the time finally runs, the event is gone — pull fresh from DB.
+      // Guard: user is still on the same thread (not navigated away).
+      // Stop path skipped: asyncio.shield already persists the partial message.
+      if (!wasStoppedByUser && activeThreadIdRef.current === threadId) {
+        loadMessages(threadId).catch(console.error)
+      }
     }
   }, [loadMessages])
 
