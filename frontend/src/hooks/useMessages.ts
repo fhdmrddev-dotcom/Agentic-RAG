@@ -40,7 +40,7 @@ export function useMessages(): UseMessages {
   }, [])
 
   const clearMessages = useCallback(() => {
-    console.log("[Phase56-Realtime] clearMessages called", { streamingThread: streamingThreadIdRef.current, channelExists: channelRef.current != null })
+    console.log("[Phase56-Realtime] clearMessages called", { streamingThread: streamingThreadIdRef.current, channelExists: channelRef.current != null, caller: new Error().stack?.split('\n').slice(1, 4).join(' | ') })
     setMessages([])
     setIsStreaming(false)
     abortControllerRef.current?.abort()
@@ -180,13 +180,50 @@ if (isSendingRef.current) return
       model,
       provider,
       onTitleUpdate,
-      // onToolStart — clear planning flag when a new tool fires
+      // onToolPreparing — D-01/D-02 (Phase 56.1): creates a "preparing" placeholder entry
+      // immediately when the tool name is known, before arguments finish streaming.
+      (name: string, index: number) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== assistantId) return m
+            // Deduplicate: if a preparing entry for this tool name already exists, skip
+            const alreadyPreparing = (m.tool_calls ?? []).some(
+              (tc) => tc.name === name && tc.status === "preparing"
+            )
+            if (alreadyPreparing) return m
+            const preparingEntry: ToolCall = {
+              id: `preparing-${index}`,
+              name,
+              args: {},
+              status: "preparing",
+              startedAt: undefined,
+            }
+            return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
+          }),
+        )
+      },
+      // onToolStart — clear planning flag; upgrade preparing entry to running, or append if none
       (name, args) => {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
-            const newTool: ToolCall = { name, args, status: "running", startedAt: Date.now() }
-            return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), newTool] }
+            const existingCalls = m.tool_calls ?? []
+            const preparingIdx = existingCalls.findIndex(
+              (tc) => tc.name === name && tc.status === "preparing"
+            )
+            let updatedCalls: ToolCall[]
+            if (preparingIdx !== -1) {
+              // Upgrade the preparing entry to running in place (preserves ordering)
+              updatedCalls = existingCalls.map((tc, i) =>
+                i === preparingIdx
+                  ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
+                  : tc
+              )
+            } else {
+              // No preparing entry — append new running entry (fallback for race/reconnect)
+              updatedCalls = [...existingCalls, { name, args, status: "running" as const, startedAt: Date.now() }]
+            }
+            return { ...m, isPlanning: false, tool_calls: updatedCalls }
           }),
         )
       },
@@ -383,17 +420,19 @@ if (isSendingRef.current) return
 
       const wasStoppedByUser = stoppedByUserRef.current
 
-      // Mark running tool calls as "interrupted" if the user stopped the stream
+      // Mark running or preparing tool calls as "interrupted" if the user stopped the stream
       if (wasStoppedByUser) {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.role !== "assistant") return m
-            const hasRunning = m.tool_calls?.some((tc) => tc.status === "running")
-            if (!hasRunning) return m
+            const hasActiveTools = m.tool_calls?.some(
+              (tc) => tc.status === "running" || tc.status === "preparing"
+            )
+            if (!hasActiveTools) return m
             return {
               ...m,
               tool_calls: m.tool_calls!.map((tc) =>
-                tc.status === "running"
+                tc.status === "running" || tc.status === "preparing"
                   ? { ...tc, status: "interrupted" as const }
                   : tc
               ),
