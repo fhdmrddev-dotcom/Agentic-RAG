@@ -850,6 +850,7 @@ async def send_message(
 
                             tool_calls_buffer: dict = {}
                             finish_reason: str | None = None
+                            _announced_tools: set[int] = set()
 
                             for chunk in stream:
                                 if stop_event.is_set():
@@ -875,6 +876,11 @@ async def send_message(
                                             tool_calls_buffer[idx]["id"] = tc.id
                                         if tc.function and tc.function.name:
                                             tool_calls_buffer[idx]["name"] = tc.function.name
+                                            # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
+                                            # before arguments finish streaming. Fires exactly once per tool index.
+                                            if idx not in _announced_tools:
+                                                _announced_tools.add(idx)
+                                                yield f"data: {json.dumps({'type': 'tool_preparing', 'name': tc.function.name, 'index': idx})}\n\n"
                                         if tc.function and tc.function.arguments:
                                             tool_calls_buffer[idx]["arguments"] += tc.function.arguments
 
