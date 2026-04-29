@@ -106,7 +106,7 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
             {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
             <span className="italic">
 {isStreaming
-                ? (allToolsDone ? "Generating response" : "Working")
+                ? (allToolsDone ? "Synthesizing answer" : "Working")
                 : message.stopped
                   ? "Response stopped"
                   : "Saving response…"}
