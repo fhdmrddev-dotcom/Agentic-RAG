@@ -26,9 +26,10 @@ export interface OutputFile {
 }
 
 export interface ToolCall {
-name: string
+  name: string
+  id?: string          // set to "preparing-{index}" by onToolPreparing; replaced by real id when tool_start arrives
   args: Record<string, string>
-  status: "running" | "done" | "interrupted"
+  status: "running" | "done" | "interrupted" | "preparing"
   result?: string
   sub_agent?: SubAgentState
   startedAt?: number   // Date.now() when tool_start received
