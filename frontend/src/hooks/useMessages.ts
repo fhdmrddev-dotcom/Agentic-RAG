@@ -29,6 +29,7 @@ export function useMessages(): UseMessages {
   const streamingThreadIdRef = useRef<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const isStreamingRef = useRef(false)
+  const activeThreadIdRef = useRef<string | null>(null)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -40,7 +41,6 @@ export function useMessages(): UseMessages {
   }, [])
 
   const clearMessages = useCallback(() => {
-    console.log("[Phase56-Realtime] clearMessages called", { streamingThread: streamingThreadIdRef.current, channelExists: channelRef.current != null, caller: new Error().stack?.split('\n').slice(1, 4).join(' | ') })
     setMessages([])
     setIsStreaming(false)
     abortControllerRef.current?.abort()
@@ -49,10 +49,9 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
-    console.log("[Phase56-Realtime] loadMessages start", { threadId, generation: sendGenerationRef.current, isSending: isSendingRef.current, streamingThread: streamingThreadIdRef.current })
+    activeThreadIdRef.current = threadId
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
-    console.log("[Phase56-Realtime] loadMessages fetched", { threadId, dataLen: data.length, currentGen: sendGenerationRef.current, originalGen: generation })
     setMessages((prev) => {
       // If a different thread is being requested, always allow the update
       // so thread switching works even during active streaming.
@@ -119,14 +118,6 @@ if (isSendingRef.current) return
           filter: `thread_id=eq.${threadId}`,
         },
         (payload) => {
-          console.log("[Phase56-Realtime] payload received", {
-            eventType: payload.eventType,
-            newId: (payload.new as { id?: string })?.id,
-            newRole: (payload.new as { role?: string })?.role,
-            newThreadId: (payload.new as { thread_id?: string })?.thread_id,
-            isStreaming: isStreamingRef.current,
-            streamingThread: streamingThreadIdRef.current,
-          })
           // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
           // SSE delta events handle live updates. Only process after SSE drops/ends.
           if (isStreamingRef.current) return
@@ -386,13 +377,6 @@ if (isSendingRef.current) return
         console.error(err)
       }
 } finally {
-      console.log("[Phase56-Realtime] finally entering", {
-        assistantId,
-        isStreaming: isStreamingRef.current,
-        isSending: isSendingRef.current,
-        stoppedByUser: stoppedByUserRef.current,
-        channelExists: channelRef.current != null,
-      })
       abortControllerRef.current = null
       isSendingRef.current = false
       streamingThreadIdRef.current = null
@@ -407,9 +391,7 @@ if (isSendingRef.current) return
       const channelToRemove = channelRef.current
       channelRef.current = null
       if (channelToRemove) {
-        console.log("[Phase56-Realtime] scheduling delayed removeChannel (2000ms)")
         setTimeout(() => {
-          console.log("[Phase56-Realtime] firing delayed removeChannel")
           supabase.removeChannel(channelToRemove)
         }, 2000)
       }
@@ -457,6 +439,15 @@ if (isSendingRef.current) return
             setTimeout(() => {
               stoppedByUserRef.current = false
             }, 0)
+            // Fix E (D-STREAM-01/D-STREAM-02): Reload from DB after natural stream completion.
+            // The Realtime INSERT fires while isStreamingRef=true and is blocked by the guard.
+            // By the time isStreamingRef=false, the INSERT event is gone — so we pull from DB.
+            // Guards per D-STREAM-02:
+            //   activeThreadIdRef === threadId: user hasn't navigated to a different thread
+            //   !stoppedByUserRef: stop path already persisted via asyncio.shield
+            if (activeThreadIdRef.current === threadId && !stoppedByUserRef.current) {
+              loadMessages(threadId).catch(console.error)
+            }
           } else {
             setTimeout(() => {
               stoppedByUserRef.current = false
