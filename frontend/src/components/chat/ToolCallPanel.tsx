@@ -582,7 +582,7 @@ const [expanded, setExpanded] = useState(true)
     | { kind: 'tool'; tc: ToolCall; t: number }
     | { kind: 'skill'; activation: SkillActivation; t: number }
   const displayItems: DisplayItem[] = [
-    ...toolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.startedAt ?? 0 })),
+    ...toolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.status === "preparing" ? Infinity : (tc.startedAt ?? Date.now()) })),
     ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
   ].sort((a, b) => a.t - b.t)
 
