@@ -1,5 +1,24 @@
 # Milestones
 
+## v2.4 Stability, Polish & UX Fixes (Shipped: 2026-04-30)
+
+**Phases completed:** 12 phases shipped + 2 deferred (55, 57), 42/44 plans complete
+**Timeline:** 2026-04-22 → 2026-04-30 (8 days, 278 commits)
+**Files changed:** 72 source files (+6,122 / -1,325 lines)
+
+**Key accomplishments:**
+
+1. Cross-provider tool calling reliability — MODEL_CAPABILITIES registry routes to native or structured mode; tool_parser.py deterministic JSON extraction for non-native models; 32+ tests
+2. Anthropic native SDK integration — anthropic_service.py with prompt caching; 20% token reduction removed; PROMPT-01 generation/Q&A disambiguation fix
+3. Context-aware sub-agent routing — keyword-based escalation to capable model tier for generation tasks; tiktoken estimation; per-model info cards with cost tier
+4. Multi-provider model routing — full user control over all agent model roles; 404 fallback with SSE event; resolved_sub_agent_model in Settings
+5. Agent real-time feedback — tool_preparing SSE eliminates 30–120s silence window; ElapsedTimer for running tools; iteration_start Step N counter; ingestion step badges
+6. UX polish shipped — thread delete confirmation, no ghost content, folder-scoped new chats, root document visibility, version-aware delete dialog, web search toggle, nav polish, paginated library health
+
+**Known deferred items at close:** 19 acknowledged (STREAM-02 partial, SKILL-01/02 to Skills Studio, 14 human UAT items, 12 quick tasks)
+
+---
+
 ## v2.3 Memory, Multimodal & Experience (Shipped: 2026-04-19)
 
 **Phases completed:** 11 phases, 27 plans

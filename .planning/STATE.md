@@ -1,13 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.4
-milestone_name: Stability, Polish & UX Fixes
-status: ready_for_next_phase
-deferred_phases:
-  - phase: 057
-    symptoms: E (tab switch), F (F5 refresh)
-    see: .planning/phases/057-sse-realtime-reconnect-fix/057-DEFERRAL.md
-stopped_at: Phase 057 deferred — SSE reconnect fixes partially shipped; Symptoms E/F remain unreliable (see 057-DEFERRAL.md)
+milestone: v2.5
+milestone_name: TBD — run /gsd-new-milestone
+status: milestone_complete
+stopped_at: v2.4 archived 2026-04-30 — run /gsd-new-milestone to start v2.5
 last_updated: "2026-04-29T00:00:00.000Z"
 last_activity: 2026-04-29
 progress:
@@ -136,8 +132,33 @@ Items acknowledged and carried forward from v2.3 milestone close:
 | Tech debt | Metadata normalization only covers document_type/language | Known | v2.1 |
 | Test suite | 15 backend mock compatibility failures | side-002 | v2.4 |
 
+Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items, all known:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat | Phase 45: 45-HUMAN-UAT.md — 5 pending scenarios (delete dialog, ghost content, folder picker desktop+mobile) | partial |
+| uat | Phase 46: 46-HUMAN-UAT.md — 3 pending scenarios (CASCADE cleanup, dialog rendering, non-contiguous version promotion) | partial |
+| uat | Phase 48: 48-HUMAN-UAT.md — 6 pending scenarios (web search toggle, logo visibility, nav polish visual checks) | partial |
+| verification | Phase 45: 45-VERIFICATION.md — human_needed (visual/interactive items) | human_needed |
+| verification | Phase 46: 46-VERIFICATION.md — human_needed (live DB and dialog items) | human_needed |
+| verification | Phase 48: 48-VERIFICATION.md — human_needed (visual items) | human_needed |
+| quick_task | 260322-26g-improve-tool-call-display-for-ls-tree-gr | missing |
+| quick_task | 260328-v6n-investigate-and-plan-fixes-for-duplicate | missing |
+| quick_task | 260328-wqj-fix-folder-scoped-chat-returning-results | missing |
+| quick_task | 260328-x6n-fix-bug-folder-not-created-when-pressing | missing |
+| quick_task | 260404-vel-fix-streaming-cursor-bug-and-add-meaning | missing |
+| quick_task | 260405-rgy-fix-folder-public-visibility-files-and-s | missing |
+| quick_task | 260405-s1e-hide-toggle-global-from-non-owners-and-b | missing |
+| quick_task | 260405-stg-add-chat-references-cascade-deletions-an | missing |
+| quick_task | 260407-vqw-review-and-fix-context-window-management | missing |
+| quick_task | 260411-wj5-fix-skill-file-upload-bug-files-not-save | missing |
+| quick_task | 260412-dqu-fix-four-issues-in-backend-app-api-skill | missing |
+| quick_task | 260412-jnc-import-skill-return-202-backgroundtask-f | missing |
+
+Known deferred at v2.4 close: 19 (see above)
+
 ## Session Continuity
 
-Last session: 2026-04-29T19:17:22.678Z
-Stopped at: Completed 056.1-03-PLAN.md — ElapsedTimer + preparing-state render in ToolCallPanel
-Next: New phase to be added by user
+Last session: 2026-04-30
+Stopped at: v2.4 milestone close — all items acknowledged, proceeding to archive
+Next: /gsd-new-milestone for v2.5

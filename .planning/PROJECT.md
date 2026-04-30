@@ -8,31 +8,16 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: v2.4 Stability, Polish & UX Fixes
-
-**Goal:** Fix critical bugs (SSE disconnects, skill over-triggering, ghost chats) and polish UX gaps to bring the app to production quality.
-
-**Target features:**
-- SSE & Stop Reliability — graceful disconnects, partial response persistence
-- Smart Skill Dispatch — relevance-based skill selection, not catalog blasting
-- Document Deletion Choices — version-aware delete with cleanup
-- Chat Delete Confirmation & State Cleanup — confirmation dialog, ghost chat fix
-- Folder Selector on New Chat — scope threads from creation
-- Root Folder Visibility — ensure root documents are clearly visible
-- Web Search Toggle — settings on/off switch like sandbox/reranking
-- Upload Error Clarity — specific failure reasons in UI
-- Navigation Polish — icon label alignment, collapsed logo visibility
-- Library Health at Scale — pagination, meaningful metrics, actionable empty states
-
 ## Current State
 
-**Shipped:** v2.4 Phase 56.1 (Agent Feedback Gaps — tool_preparing SSE, ElapsedTimer, system prompt guards) — 2026-04-29
+**Shipped:** v2.4 (Stability, Polish & UX Fixes) — 2026-04-30
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
-**Codebase:** ~57,000 LOC (Python + TypeScript)
-**Phases shipped:** 45 phases (8 v1.0 + 9 v2.0 + 8 v2.1 + 7 v2.2 + 11 v2.3 + 2 v2.4), 56 requirements validated
+**Codebase:** ~57,000 LOC (Python + TypeScript), 72 files changed in v2.4
+**Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
-**Docker:** `llm-sandbox` container used for code execution (`SANDBOX_ENABLED=true`)
-**Known tech debt:** UAT/verification gaps for phases 038–042 (require live browser testing); metadata normalization covers only document_type/language
+**Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
+**Next milestone:** v2.5 (planning)
+**Known tech debt:** KI-001 (in-flight LLM runs to yield point on GeneratorExit); STREAM-02 (Realtime reconnect — polling approach needed); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
 
 ## Requirements
 
@@ -119,29 +104,26 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ F-09 Knowledge Health Dashboard — most-retrieved, never-retrieved, low-confidence, stale metrics with action hooks — v2.3 Phases 37–38
 - ✓ F-10 User Feedback Loop — thumbs up/down with reason selector, feedback stats in Library Health — v2.3 Phases 39–40
 - ✓ UI Deep Midnight Redesign — glassmorphic ToolCallPanel, gradient CitationCards, floating pill MessageInput, AppDock, 3-pane SkillsPage, mobile-responsive NavPanel — v2.3 Phases 41–43
-- ✓ STREAM-01/02/03: Stop cancels SSE, graceful disconnects, partial response persistence — v2.4 Phase 44
+- ✓ STREAM-01: Stop cancels SSE immediately — v2.4 Phase 44 *(KI-001: in-flight LLM runs to yield point)*
+- ✓ STREAM-03: Partial responses persisted on stop (asyncio.shield) — v2.4 Phase 44+55
 - ✓ CHAT-01: Thread delete confirmation dialog (AlertDialog) — v2.4 Phase 45
 - ✓ CHAT-02: No ghost content after thread delete (clearMessages on switch) — v2.4 Phase 45
 - ✓ CHAT-03: Folder selector on new chat creation — v2.4 Phase 45
+- ✓ DOC-01/02/03: Version-aware document delete with cleanup and promotion — v2.4 Phase 46
+- ✓ DOC-04/05/06: Root document visibility, specific upload errors, root upload — v2.4 Phase 47
+- ✓ SETT-01/02: Web search toggle in Settings, tool excluded when off — v2.4 Phase 48
+- ✓ NAV-01/02: Icon label alignment, logo visible when sidebar collapsed — v2.4 Phase 48
+- ✓ HLTH-01/02/03/04: Paginated health dashboard, accurate labels, actionable empty states — v2.4 Phase 49
+- ✓ CTX-01/02/03/04/05: Context-aware sub-agent routing, per-model settings, tiktoken estimation — v2.4 Phase 51
+- ✓ MDL-01/02/03/04/05: Multi-provider model routing, fallback on 404, resolved model in Settings — v2.4 Phase 52
+- ✓ TOOL-01: Cross-provider tool calling reliability (MODEL_CAPABILITIES, tool_parser.py) — v2.4 Phase 53
+- ✓ GEN-01/02/04/05: Anthropic native SDK, no token reduction, generation mode disambiguation — v2.4 Phase 54
 
-### Active
+### Active (carry-forward to v2.5)
 
-- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills
-- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog
-- [ ] DOC-01: Delete document offers "this version only" or "all versions"
-- [ ] DOC-02: Single-version delete cleans chunks/storage and promotes next version
-- [ ] DOC-03: All-versions delete removes chunks, storage, and history
-- [ ] DOC-04: Root-folder documents clearly visible in document list
-- [ ] DOC-05: Upload errors show specific reasons (duplicate, type, empty, size)
-- [ ] DOC-06: Root folder upload works correctly with clear UX
-- [ ] SETT-01: Web search toggle in Settings (on/off) like sandbox/reranking
-- [ ] SETT-02: Web search excluded from tool set when toggled off
-- [ ] NAV-01: Icon labels directly next to icons when sidebar is expanded
-- [ ] NAV-02: Logo icon visible when sidebar is collapsed
-- [ ] HLTH-01: Knowledge Health uses server-side pagination (not fixed top-10)
-- [ ] HLTH-02: Low confidence panel explains query-document relevance, not document quality
-- [ ] HLTH-03: Feedback empty states use actionable corporate-appropriate messaging
-- [ ] HLTH-04: Knowledge Health API supports pagination parameters
+- [ ] STREAM-02: Refresh/navigate during stream — message appears automatically. *(Code shipped in Phase 57; browser tests unreliable. Next: polling for F5 case, visibilitychange for tab-switch. Verify Supabase Realtime REPLICA IDENTITY first.)*
+- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone)*
+- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone)*
 
 ### Out of Scope
 
@@ -188,15 +170,12 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - Explorer: KB-focused mode with 6 KB tools, dedicated system prompt, max_iterations=8
 
 **Known issues:**
-- UAT verification gaps for phases 038–042 (require live browser testing)
-- Verification checks for phases 038, 039, 040, 041, 042 marked human_needed
+- UAT verification gaps for phases 038–042 (require live browser testing) — carried from v2.3
+- Human UAT pending for Phases 45, 46, 48 (delete dialog, ghost content, web search toggle, nav visual)
 - Metadata ingest normalization covers only document_type/language
-- Skill catalog injected in full for every request (token waste, over-triggering)
-- Icon labels misaligned (far right of icons) in NavPanel
-- ~~PROMPT-01: execute_code triggered on Q&A queries (e.g. "summarize the report")~~ — **FIXED 2026-04-26**
-- Logo disappears entirely when sidebar collapsed (opacity-0 on whole group)
-- Knowledge Health fixed top-10 lists don’t scale for large libraries
-- Low confidence metric is misleading (reflects query relevance, not document quality)
+- Skill catalog injected in full for every request (SKILL-01/02 deferred to Skills Studio milestone)
+- KI-001: In-flight LLM calls continue after SSE disconnect — GeneratorExit only fires at yield points; current call completes before iteration stops. See KNOWN-ISSUES.md.
+- STREAM-02: Supabase Realtime INSERT timing unreliable for tab-switch and F5 scenarios — polling approach recommended for next milestone
 
 ## Key Decisions
 
@@ -228,6 +207,12 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 | NavPanel collapses from Sidebar + AppDock | Single component with localStorage-persisted state replaces dual-component layout | ✓ Good — cleaner responsive breakpoint story |
 | 5-tab SettingsPage | Per-tab scoped Save handlers fix KEY_PLACEHOLDER contamination | ✓ Good — WR-03/WR-04 resolved |
 | System prompt Q&A vs Generation disambiguation (PROMPT-01) | Old prompt keyword-matched "report"/"summary" → triggered execute_code on Q&A queries. Fix: Generation mode only activates on explicit file-creation verbs. Default is always Q&A. | ✓ Good — eliminates false-positive .docx generation |
+| Two tool calling modes (D-53-01/02) | Native (API tools param) for proven models in MODEL_CAPABILITIES, Structured (JSON-in-prompt) for everything else. No retries, one-shot deterministic. | ✓ Good — clean branching; tool_parser.py handles structured path reliably |
+| OpenRouter strategy setting (D-53-03) | quality/native/xml — user-controllable. quality default uses :extended model IDs for better compliance. | ✓ Good — no hardcoded assumptions about OpenRouter model behavior |
+| NATIVE_PROVIDERS bypass for token cap (v2.4) | Anthropic and Google bypass the _resolve_max_tokens cap; Settings hides irrelevant sliders for those providers. | ✓ Good — clean provider-conditional UI pattern |
+| _announced_tools set[int] guard (D-056.1-01) | Guards tool_preparing SSE to emit exactly once per tool index in OpenAI path. Anthropic path has separate _announced_tools_ant guard. | ✓ Good — prevents duplicate preparing events on parallel same-name tool calls |
+| loadMessages outside React state updater (v2.4 Phase 57) | Side effects (loadMessages, stoppedByUserRef reset) must be outside setMessages updater — Strict Mode double-invokes updaters and bail-out optimization can skip them entirely. | ✓ Good — structural correctness; documented for future hook maintainers |
+| Realtime reconnect deferred (STREAM-02) | Supabase Realtime INSERT delivery timing unreliable for tab-switch and F5 scenarios. Use polling for F5 + visibilitychange for tab-switch in next attempt. Verify REPLICA IDENTITY on messages table first. | ⚠ Revisit — see 057-DEFERRAL.md |
 
 ## Constraints
 
@@ -257,4 +242,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-29 after Phase 56.1 completion*
+*Last updated: 2026-04-30 after v2.4 milestone completion*
