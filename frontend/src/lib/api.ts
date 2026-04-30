@@ -45,9 +45,9 @@ export async function createThread(title = "New Chat", folderId?: string | null)
   return res.json() as Promise<Thread>
 }
 
-export async function getMessages(threadId: string): Promise<Message[]> {
+export async function getMessages(threadId: string, signal?: AbortSignal): Promise<Message[]> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers })
+  const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers, signal })
   if (!res.ok) throw new Error("Failed to get messages")
   const data = await res.json() as Array<Message & {
     source_refs?: Citation[]

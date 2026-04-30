@@ -35,6 +35,9 @@ export function useMessages(): UseMessages {
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Cancels any in-flight getMessages fetch when a newer loadMessages call starts.
+  // This unblocks navigation when the backend is slow (e.g. SSE occupying the worker).
+  const loadAbortRef = useRef<AbortController | null>(null)
 
   // ──────────────────────────────────────────────────────────────────────────
   // FIX 1: loadMessages — guard against cross-thread overwrites
@@ -50,26 +53,28 @@ export function useMessages(): UseMessages {
   // The generation check is kept as a secondary guard for same-thread races.
   // ──────────────────────────────────────────────────────────────────────────
   const loadMessages = useCallback(async (threadId: string) => {
-    // NOTE: Do NOT write activeThreadIdRef here — only setViewingThread() does that.
-    // Writing it here would cause two concurrent loadMessages calls to overwrite
-    // each other's ref, defeating the post-await guard below.
+    // Cancel any previous in-flight fetch — this unblocks navigation when the
+    // backend is slow (e.g. Thread A's SSE occupying the FastAPI worker queue).
+    loadAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadAbortRef.current = controller
+
     const generation = sendGenerationRef.current
     try {
-      const data = await getMessages(threadId)
+      const data = await getMessages(threadId, controller.signal)
 
-      // CRITICAL GUARD: Discard if user navigated away while this fetch was in-flight.
-      // Uses activeThreadIdRef which is ONLY written by setViewingThread (navigation),
-      // never by loadMessages itself — this is what makes the guard reliable.
+      // Guard: discard if user navigated to a different thread while in-flight.
+      // activeThreadIdRef is ONLY written by setViewingThread (navigation), never
+      // by loadMessages — so it reliably reflects the user's current thread.
       if (activeThreadIdRef.current !== threadId) return
 
       setMessages((prev) => {
-        // Don't wipe optimistic messages if a send is in flight on THIS thread
         if (isSendingRef.current && streamingThreadIdRef.current === threadId) return prev
-        // Stale fetch from a previous send — discard
         if (sendGenerationRef.current !== generation) return prev
         return data
       })
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return  // cancelled by newer load
       console.error("loadMessages failed:", err)
     }
   }, [])
@@ -512,13 +517,11 @@ export function useMessages(): UseMessages {
       })
 
       stoppedByUserRef.current = false
-
-      // Only reload if user is still on this thread.
-      // Even if this fires for the old thread, FIX 1's post-await guard
-      // in loadMessages will discard the result if activeThreadIdRef changed.
-      if (!wasStoppedByUser && activeThreadIdRef.current === threadId) {
-        loadMessages(threadId).catch(console.error)
-      }
+      // NOTE: We intentionally do NOT call loadMessages here after stream completion.
+      // Fetching the DB version caused raw tool-result JSON (stored in message content
+      // by the backend) to appear inline in the chat, replacing the clean streaming
+      // format. The streaming messages in state are correct as-is. The canonical DB
+      // version will be fetched naturally when the user navigates away and returns.
     }
   }, [loadMessages])
 
