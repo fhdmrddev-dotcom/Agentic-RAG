@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread } = useMessages()
+  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread, setViewingThread } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -129,6 +129,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // the effect to re-fire on every render if any future change adds a dep.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
+    // FIRST: update the viewing thread ref unconditionally so all async guards
+    // immediately reflect the user's current thread, even before any fetch starts.
+    // This must run before abortStream() so the finally-block guard in sendMessage
+    // sees the new thread and skips the stale loadMessages(oldThread) call.
+    setViewingThread(thread?.id ?? null)
+
     if (!thread) {
       clearMessages()
       unsubscribeFromThread()

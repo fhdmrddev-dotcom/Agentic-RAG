@@ -14,6 +14,7 @@ interface UseMessages {
   clearMessages: () => void
   subscribeToThread: (threadId: string) => void
   unsubscribeFromThread: () => void
+  setViewingThread: (threadId: string | null) => void
 }
 
 function makeTempId() {
@@ -49,16 +50,16 @@ export function useMessages(): UseMessages {
   // The generation check is kept as a secondary guard for same-thread races.
   // ──────────────────────────────────────────────────────────────────────────
   const loadMessages = useCallback(async (threadId: string) => {
-    // Set active thread BEFORE the await — tells other code paths which
-    // thread the user is currently viewing.
-    activeThreadIdRef.current = threadId
+    // NOTE: Do NOT write activeThreadIdRef here — only setViewingThread() does that.
+    // Writing it here would cause two concurrent loadMessages calls to overwrite
+    // each other's ref, defeating the post-await guard below.
     const generation = sendGenerationRef.current
     try {
       const data = await getMessages(threadId)
 
-      // CRITICAL GUARD: If the user navigated to a different thread while
-      // this fetch was in-flight, discard the result. Without this, stale
-      // data from Thread A overwrites Thread B's messages.
+      // CRITICAL GUARD: Discard if user navigated away while this fetch was in-flight.
+      // Uses activeThreadIdRef which is ONLY written by setViewingThread (navigation),
+      // never by loadMessages itself — this is what makes the guard reliable.
       if (activeThreadIdRef.current !== threadId) return
 
       setMessages((prev) => {
@@ -69,9 +70,15 @@ export function useMessages(): UseMessages {
         return data
       })
     } catch (err) {
-      // Network errors during load should not crash the app
       console.error("loadMessages failed:", err)
     }
+  }, [])
+
+  // setViewingThread is the ONLY place activeThreadIdRef is written.
+  // Called from ChatArea's effect before abortStream/clearMessages/loadMessages,
+  // so the ref always reflects the user's current thread when any async guard runs.
+  const setViewingThread = useCallback((threadId: string | null) => {
+    activeThreadIdRef.current = threadId
   }, [])
 
   const stopStreaming = useCallback(() => {
@@ -515,5 +522,5 @@ export function useMessages(): UseMessages {
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread, setViewingThread }
 }
