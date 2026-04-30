@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
-import { getMessages, getProviders } from "@/lib/api"
+import { getProviders } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
 
@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread, setViewingThread } = useMessages()
+  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -65,116 +65,47 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-  // Ref to mirror isStreaming for use in stable callbacks without stale closures
-  const isStreamingRef = useRef(false)
-  isStreamingRef.current = isStreaming
-
-  // Polling controller — cancelled on thread change or unmount
-  const pollAbortRef = useRef<AbortController | null>(null)
-
-  // FIX 5: Poll for a pending assistant response after F5 mid-stream.
-  // After initial loadMessages, if the last message is role=user, the backend
-  // may still be generating via asyncio.shield. Poll every 2s for up to 30s.
-  // This replaces the unreliable 8s unconditional timer from Phase 057.
-  const startPollForPendingResponse = useCallback((threadId: string) => {
-    pollAbortRef.current?.abort()
-    const abortCtrl = new AbortController()
-    pollAbortRef.current = abortCtrl
-
-    let attempts = 0
-    const maxAttempts = 15 // 30 seconds at 2s intervals
-
-    const poll = async () => {
-      if (abortCtrl.signal.aborted) return
-      try {
-        const msgs = await getMessages(threadId)
-        if (abortCtrl.signal.aborted) return
-        const lastMsg = msgs[msgs.length - 1]
-        if (lastMsg?.role === "assistant") {
-          // Response arrived — loadMessages will update state with guards intact
-          loadMessages(threadId).catch(console.error)
-          return
-        }
-        attempts++
-        if (attempts >= maxAttempts) return
-        setTimeout(poll, 2000)
-      } catch {
-        // Network error — stop polling silently
-      }
-    }
-
-    // Check after 1s to let the initial loadMessages setState settle
-    setTimeout(async () => {
-      if (abortCtrl.signal.aborted) return
-      try {
-        const msgs = await getMessages(threadId)
-        if (abortCtrl.signal.aborted) return
-        if (msgs[msgs.length - 1]?.role === "user") {
-          poll()
-        }
-      } catch { /* ignore */ }
-    }, 1000)
-  }, [loadMessages])
-
-  // FIX 4: Thread-switch effect — abort-first order, single dependency.
-  //
-  // Old order (clearMessages then abortStream) caused clearMessages to abort
-  // the SSE as a side effect, triggering sendMessage's finally block before
-  // the new thread's state was set up — racing loadMessages(threadA) against
-  // loadMessages(threadB). Now clearMessages() does NOT abort (FIX 2), so we
-  // call abortStream() explicitly first, then clear, then load.
-  //
-  // Dependency array is [thread?.id] only. All functions are stable
-  // (useCallback with [] deps using refs internally). Listing them would cause
-  // the effect to re-fire on every render if any future change adds a dep.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    // FIRST: update the viewing thread ref unconditionally so all async guards
-    // immediately reflect the user's current thread, even before any fetch starts.
-    // This must run before abortStream() so the finally-block guard in sendMessage
-    // sees the new thread and skips the stale loadMessages(oldThread) call.
-    setViewingThread(thread?.id ?? null)
-
+useEffect(() => {
     if (!thread) {
       clearMessages()
       unsubscribeFromThread()
       return
     }
-    // Skip when handleSend just created this thread — sendMessage is already
-    // streaming; clearMessages() here would wipe the optimistic messages.
+    // Skip clear+load when handleSend just created this thread — sendMessage is
+    // already streaming into it and clearMessages() would wipe the optimistic
+    // messages and abort the SSE connection, causing a blank chat.
     if (justCreatedThreadRef.current === thread.id) {
       justCreatedThreadRef.current = null
       return
     }
-
-    // IMPORTANT: abort FIRST so sendMessage's finally runs with the old thread
-    // context before we wipe state. clearMessages() no longer aborts (FIX 2).
-    abortStream()
+    // Clear stale messages from previous thread before loading new ones
     clearMessages()
+    abortStream()
+    loadMessages(thread.id).catch(console.error)
+    subscribeToThread(thread.id)
 
-    const threadId = thread.id
-    loadMessages(threadId)
-      .then(() => startPollForPendingResponse(threadId))
-      .catch(console.error)
+    // Fix F fallback: backend may still be persisting (asyncio.shield) when this
+    // effect runs after an F5 mid-stream. Reload once after 8s as a safety net in
+    // case the Realtime INSERT fires before the subscription is fully established.
+    const fallbackTimer = setTimeout(() => {
+      loadMessages(thread.id).catch(console.error)
+    }, 8000)
 
-    subscribeToThread(threadId)
-
-    // FIX 5 (Symptom E): reload when user switches back to this tab.
-    // Guard: skip during active streaming — SSE deltas are the source of truth;
-    // fetching from DB would overwrite in-progress content with stale state.
+    // Fix E: reload messages when the user switches back to this tab, in case the
+    // stream finished while the tab was in the background.
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !isStreamingRef.current) {
-        loadMessages(threadId).catch(console.error)
+      if (document.visibilityState === "visible") {
+        loadMessages(thread.id).catch(console.error)
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange)
 
     return () => {
       unsubscribeFromThread()
-      pollAbortRef.current?.abort()
+      clearTimeout(fallbackTimer)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [thread?.id])
+  }, [thread?.id, loadMessages, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread])
 
   const handleSend = async (content: string) => {
     let activeThread = thread

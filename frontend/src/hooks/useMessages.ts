@@ -14,7 +14,6 @@ interface UseMessages {
   clearMessages: () => void
   subscribeToThread: (threadId: string) => void
   unsubscribeFromThread: () => void
-  setViewingThread: (threadId: string | null) => void
 }
 
 function makeTempId() {
@@ -26,7 +25,7 @@ export function useMessages(): UseMessages {
   const [isStreaming, setIsStreaming] = useState(false)
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const isSendingRef = useRef(false)
-  const sendGenerationRef = useRef(0)
+  const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
@@ -35,56 +34,6 @@ export function useMessages(): UseMessages {
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // Cancels any in-flight getMessages fetch when a newer loadMessages call starts.
-  // This unblocks navigation when the backend is slow (e.g. SSE occupying the worker).
-  const loadAbortRef = useRef<AbortController | null>(null)
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // FIX 1: loadMessages — guard against cross-thread overwrites
-  //
-  // PROBLEM: When user navigates Thread A → Thread B while A is streaming:
-  //   1. ChatArea effect fires clearMessages() + loadMessages(B)
-  //   2. sendMessage's finally block fires loadMessages(A) (closure capture)
-  //   3. Both fetches race. If A's response arrives second, it overwrites B's
-  //      messages with A's data — user sees wrong thread or blank screen.
-  //
-  // FIX: Capture activeThreadIdRef AFTER the await (not before). If the active
-  // thread changed while the fetch was in-flight, discard the result entirely.
-  // The generation check is kept as a secondary guard for same-thread races.
-  // ──────────────────────────────────────────────────────────────────────────
-  const loadMessages = useCallback(async (threadId: string) => {
-    // Cancel any previous in-flight fetch — this unblocks navigation when the
-    // backend is slow (e.g. Thread A's SSE occupying the FastAPI worker queue).
-    loadAbortRef.current?.abort()
-    const controller = new AbortController()
-    loadAbortRef.current = controller
-
-    const generation = sendGenerationRef.current
-    try {
-      const data = await getMessages(threadId, controller.signal)
-
-      // Guard: discard if user navigated to a different thread while in-flight.
-      // activeThreadIdRef is ONLY written by setViewingThread (navigation), never
-      // by loadMessages — so it reliably reflects the user's current thread.
-      if (activeThreadIdRef.current !== threadId) return
-
-      setMessages((prev) => {
-        if (isSendingRef.current && streamingThreadIdRef.current === threadId) return prev
-        if (sendGenerationRef.current !== generation) return prev
-        return data
-      })
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return  // cancelled by newer load
-      console.error("loadMessages failed:", err)
-    }
-  }, [])
-
-  // setViewingThread is the ONLY place activeThreadIdRef is written.
-  // Called from ChatArea's effect before abortStream/clearMessages/loadMessages,
-  // so the ref always reflects the user's current thread when any async guard runs.
-  const setViewingThread = useCallback((threadId: string | null) => {
-    activeThreadIdRef.current = threadId
-  }, [])
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -95,27 +44,16 @@ export function useMessages(): UseMessages {
     abortControllerRef.current?.abort()
   }, [])
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // FIX 2: clearMessages — DON'T abort the stream here
-  //
-  // PROBLEM: clearMessages() was calling abortControllerRef.current?.abort()
-  // which kills the SSE connection. When ChatArea's thread-switch effect
-  // calls clearMessages() then abortStream() separately, the abort fires
-  // inside clearMessages AND triggers sendMessage's finally block, which
-  // then calls loadMessages(oldThreadId) — racing with the new thread.
-  //
-  // FIX: clearMessages only clears state. Aborting is the caller's job
-  // (ChatArea calls abortStream() explicitly). This separates concerns:
-  // clearMessages = wipe UI state, abortStream = kill network.
-  // ──────────────────────────────────────────────────────────────────────────
   const clearMessages = useCallback(() => {
     setMessages([])
     setIsStreaming(false)
-    isStreamingRef.current = false
+    abortControllerRef.current?.abort()
+    abortControllerRef.current = null
     isSendingRef.current = false
   }, [])
 
   const subscribeToThread = useCallback((threadId: string) => {
+    // Tear down any existing always-on subscription first (no-op if null)
     if (threadChannelRef.current) {
       supabase.removeChannel(threadChannelRef.current)
       threadChannelRef.current = null
@@ -133,13 +71,11 @@ export function useMessages(): UseMessages {
           filter: `thread_id=eq.${threadId}`,
         },
         () => {
+          // Guard: skip while SSE is active — SSE delta events handle live updates.
+          // This subscription is recovery-only (for refresh/reconnect after F5).
           if (isStreamingRef.current) return
-
-          // GUARD: Don't reload if user already navigated to a different thread.
-          // Without this, a late INSERT from Thread A would trigger loadMessages(A)
-          // even though the user is now viewing Thread B.
-          if (activeThreadIdRef.current !== threadId) return
-
+          // Debounce: multiple INSERTs (user msg + assistant msg) can fire in rapid
+          // succession. Batch them into one reload so we don't flood the backend.
           if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
           reloadTimerRef.current = setTimeout(() => {
             reloadTimerRef.current = null
@@ -150,21 +86,35 @@ export function useMessages(): UseMessages {
       .subscribe()
 
     threadChannelRef.current = channel
-  }, [])
+  }, [])  // loadMessages has stable identity (useCallback with [] deps) — safe to omit
 
   const unsubscribeFromThread = useCallback(() => {
-    if (reloadTimerRef.current) {
-      clearTimeout(reloadTimerRef.current)
-      reloadTimerRef.current = null
-    }
     if (threadChannelRef.current) {
       supabase.removeChannel(threadChannelRef.current)
       threadChannelRef.current = null
     }
   }, [])
 
+  const loadMessages = useCallback(async (threadId: string) => {
+    activeThreadIdRef.current = threadId
+    const generation = sendGenerationRef.current
+    const data = await getMessages(threadId)
+    setMessages((prev) => {
+      // If a different thread is being requested, always allow the update
+      // so thread switching works even during active streaming.
+      if (streamingThreadIdRef.current && streamingThreadIdRef.current !== threadId) {
+        return data
+      }
+      // Same thread: don't wipe optimistic messages if a send is in flight
+      // or if a newer send started while this fetch was in-flight.
+      if (isSendingRef.current) return prev
+      if (sendGenerationRef.current !== generation) return prev
+      return data
+    })
+  }, [])
+
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
-    if (isSendingRef.current) return
+if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
     streamingThreadIdRef.current = threadId
@@ -199,7 +149,10 @@ export function useMessages(): UseMessages {
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    // Per-stream Realtime channel for SSE drop recovery
+    // D-03: Realtime subscription for SSE drop recovery.
+    // Subscribes filtered to this thread only. Torn down in finally.
+    // Only processes events when streaming is NOT active (isStreamingRef guard)
+    // to avoid racing with the live SSE delta updates.
     const channelName = `messages-thread-${threadId}`
     const channel = supabase
       .channel(channelName)
@@ -212,13 +165,15 @@ export function useMessages(): UseMessages {
           filter: `thread_id=eq.${threadId}`,
         },
         (payload) => {
+          // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
+          // SSE delta events handle live updates. Only process after SSE drops/ends.
           if (isStreamingRef.current) return
-          // GUARD: Don't process if user navigated away from this thread
-          if (activeThreadIdRef.current !== threadId) return
 
           if (payload.eventType === "INSERT") {
             const newMsg = payload.new as Message
             setMessages((prev) => {
+              // Replace the optimistic temp-id placeholder for assistant messages,
+              // or deduplicate by id for user messages.
               if (newMsg.role === "assistant") {
                 const tempIdx = prev.findIndex(
                   (m) => m.role === "assistant" && m.id.startsWith("temp-")
@@ -229,6 +184,7 @@ export function useMessages(): UseMessages {
                   return next
                 }
               }
+              // Deduplicate: skip if already present (normal path persisted it)
               if (prev.some((m) => m.id === newMsg.id)) return prev
               return [...prev, newMsg]
             })
@@ -254,6 +210,7 @@ export function useMessages(): UseMessages {
       },
       () => {
         setIsStreaming(false)
+        // Clear planning flag when stream ends — prevents stuck spinner
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
         )
@@ -261,11 +218,14 @@ export function useMessages(): UseMessages {
       model,
       provider,
       onTitleUpdate,
-      // onToolPreparing
+      // onToolPreparing — D-01/D-02 (Phase 56.1): creates a "preparing" placeholder entry
+      // immediately when the tool name is known, before arguments finish streaming.
       (name: string, index: number) => {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
+            // Deduplicate on the synthetic id (preparing-{index}), not on name.
+            // Keying on name silently drops the second tool_preparing for same-named parallel calls.
             const preparingId = `preparing-${index}`
             const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
             if (alreadyPreparing) return m
@@ -280,7 +240,7 @@ export function useMessages(): UseMessages {
           }),
         )
       },
-      // onToolStart
+      // onToolStart — clear planning flag; upgrade preparing entry to running, or append if none
       (name, args) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -291,12 +251,15 @@ export function useMessages(): UseMessages {
             )
             let updatedCalls: ToolCall[]
             if (preparingIdx !== -1) {
+              // Upgrade the preparing entry to running in place (preserves ordering)
               updatedCalls = existingCalls.map((tc, i) =>
                 i === preparingIdx
                   ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
                   : tc
               )
             } else {
+              // No preparing entry — append new running entry (fallback for race/reconnect).
+              // Include a stable id so tool_end's name-match still works if it tries to match by id.
               updatedCalls = [...existingCalls, { id: `running-${Date.now()}`, name, args, status: "running" as const, startedAt: Date.now() }]
             }
             return { ...m, isPlanning: false, tool_calls: updatedCalls }
@@ -345,7 +308,9 @@ export function useMessages(): UseMessages {
           }),
         )
       },
-      // onSkillActivated
+      // onSkillActivated — Phase 56 D-08/D-09: append to ordered activatedSkills array
+      // for inline rendering in ToolCallPanel. Legacy activatedSkill field retained
+      // for backward compat with components that read the single-value form.
       (skillName) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -363,7 +328,7 @@ export function useMessages(): UseMessages {
           }),
         )
       },
-      // onCodeExecutionStart
+      // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
       undefined,
       // onCodeStdout
       (content: string) => {
@@ -393,7 +358,7 @@ export function useMessages(): UseMessages {
           })
         )
       },
-      // onCodeExecutionComplete
+      // onCodeExecutionComplete — sets data fields only; tool_end will set status="done"
       (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -426,19 +391,19 @@ export function useMessages(): UseMessages {
           prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
         )
       },
-      // onSuggestions
+      // onSuggestions — ephemeral, like confidence (not persisted)
       (questions) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, suggestions: questions } : m)
         )
       },
-      // onPlanning
+      // onPlanning — agent finished one tool-call round, deciding next action
       () => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
         )
       },
-      // onIterationStart
+      // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
       (iteration: number) => {
         setMessages((prev) =>
           prev.map((m) =>
@@ -446,7 +411,7 @@ export function useMessages(): UseMessages {
           ),
         )
       },
-      // onFallbackModel
+      // onFallbackModel — sub-agent retried with provider default after 404
       (original: string, fallback: string) => {
         setFallbackNotice(`Model ${original} unavailable — using ${fallback}.`)
         setTimeout(() => setFallbackNotice(null), 4000)
@@ -454,36 +419,38 @@ export function useMessages(): UseMessages {
       controller.signal,
     )
     } catch (err) {
+      // Swallow abort errors — user intentionally stopped
       if (!(err instanceof Error && err.name === "AbortError")) {
         console.error(err)
       }
-    } finally {
+} finally {
       abortControllerRef.current = null
       isSendingRef.current = false
       streamingThreadIdRef.current = null
       setIsStreaming(false)
-      isStreamingRef.current = false
+      isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
 
-      // ────────────────────────────────────────────────────────────────────
-      // FIX 3: Tear down per-stream channel IMMEDIATELY
-      //
-      // The 2s delay created a window where two Realtime channels (per-stream
-      // + always-on) coexisted, both calling loadMessages and racing each other.
-      // The always-on subscription (threadChannelRef) handles recovery.
-      // ────────────────────────────────────────────────────────────────────
+      // Tear down the per-stream Realtime channel.
+      // If the user navigated away (activeThreadIdRef no longer points to this thread),
+      // remove immediately — the 2s window would let Thread A's INSERT corrupt Thread B's
+      // message list. Only keep the 2s grace period when the user stayed on the same thread.
       const channelToRemove = channelRef.current
       channelRef.current = null
       if (channelToRemove) {
-        supabase.removeChannel(channelToRemove)
+        const navigatedAway = activeThreadIdRef.current !== threadId
+        setTimeout(() => {
+          supabase.removeChannel(channelToRemove)
+        }, navigatedAway ? 0 : 2000)
       }
 
-      // Clear planning flag
+      // Always clear planning flag on stream end
       setMessages((prev) =>
         prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
       )
 
       const wasStoppedByUser = stoppedByUserRef.current
 
+      // Mark running or preparing tool calls as "interrupted" if the user stopped the stream
       if (wasStoppedByUser) {
         setMessages((prev) =>
           prev.map((m) => {
@@ -504,6 +471,7 @@ export function useMessages(): UseMessages {
         )
       }
 
+      // Apply stopped flag to the placeholder message (pure state update, no side effects)
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
         if (lastMsg?.id === assistantId) {
@@ -516,14 +484,19 @@ export function useMessages(): UseMessages {
         return prev
       })
 
+      // Reset stopped ref outside any state updater so it runs exactly once
       stoppedByUserRef.current = false
-      // NOTE: We intentionally do NOT call loadMessages here after stream completion.
-      // Fetching the DB version caused raw tool-result JSON (stored in message content
-      // by the backend) to appear inline in the chat, replacing the clean streaming
-      // format. The streaming messages in state are correct as-is. The canonical DB
-      // version will be fetched naturally when the user navigates away and returns.
+
+      // Fix E (D-STREAM-01): Reload from DB after natural stream completion.
+      // The Realtime INSERT fires while isStreamingRef=true (blocked by guard).
+      // By the time finally runs, the event is gone — pull fresh from DB.
+      // Guard: user is still on the same thread (not navigated away).
+      // Stop path skipped: asyncio.shield already persists the partial message.
+      if (!wasStoppedByUser && activeThreadIdRef.current === threadId) {
+        loadMessages(threadId).catch(console.error)
+      }
     }
   }, [loadMessages])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread, setViewingThread }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread }
 }
