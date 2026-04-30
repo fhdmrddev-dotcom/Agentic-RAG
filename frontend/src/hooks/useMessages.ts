@@ -47,9 +47,12 @@ export function useMessages(): UseMessages {
   const clearMessages = useCallback(() => {
     setMessages([])
     setIsStreaming(false)
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = null
+    isStreamingRef.current = false
     isSendingRef.current = false
+    // FIX 2: Do NOT abort the stream here. Aborting inside clearMessages
+    // triggers sendMessage's finally block as a side effect of clearing
+    // state — racing with the new thread's loadMessages. The caller
+    // (ChatArea's useEffect) calls abortStream() explicitly and first.
   }, [])
 
   const subscribeToThread = useCallback((threadId: string) => {
@@ -99,12 +102,12 @@ export function useMessages(): UseMessages {
     activeThreadIdRef.current = threadId
     const generation = sendGenerationRef.current
     const data = await getMessages(threadId)
+    // FIX 1: Discard if the user navigated to a different thread while this
+    // fetch was in-flight. Without this, two concurrent loadMessages calls
+    // (one from finally for Thread A, one from the effect for Thread B) race
+    // and the faster one overwrites the screen with wrong-thread data.
+    if (activeThreadIdRef.current !== threadId) return
     setMessages((prev) => {
-      // If a different thread is being requested, always allow the update
-      // so thread switching works even during active streaming.
-      if (streamingThreadIdRef.current && streamingThreadIdRef.current !== threadId) {
-        return data
-      }
       // Same thread: don't wipe optimistic messages if a send is in flight
       // or if a newer send started while this fetch was in-flight.
       if (isSendingRef.current) return prev
@@ -430,17 +433,15 @@ if (isSendingRef.current) return
       setIsStreaming(false)
       isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
 
-      // Tear down the per-stream Realtime channel.
-      // If the user navigated away (activeThreadIdRef no longer points to this thread),
-      // remove immediately — the 2s window would let Thread A's INSERT corrupt Thread B's
-      // message list. Only keep the 2s grace period when the user stayed on the same thread.
+      // FIX 3: Always remove the per-stream channel immediately. The 2s grace
+      // period was an attempt to catch late Realtime INSERTs, but it created a
+      // window where two channels (per-stream + always-on threadChannelRef) both
+      // fired loadMessages, racing each other. The always-on subscription handles
+      // recovery — the per-stream channel is no longer needed after the stream ends.
       const channelToRemove = channelRef.current
       channelRef.current = null
       if (channelToRemove) {
-        const navigatedAway = activeThreadIdRef.current !== threadId
-        setTimeout(() => {
-          supabase.removeChannel(channelToRemove)
-        }, navigatedAway ? 0 : 2000)
+        supabase.removeChannel(channelToRemove)
       }
 
       // Always clear planning flag on stream end
