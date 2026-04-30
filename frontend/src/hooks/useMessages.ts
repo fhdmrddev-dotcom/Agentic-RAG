@@ -25,7 +25,7 @@ export function useMessages(): UseMessages {
   const [isStreaming, setIsStreaming] = useState(false)
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const isSendingRef = useRef(false)
-  const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
+  const sendGenerationRef = useRef(0)
   const abortControllerRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
@@ -34,6 +34,45 @@ export function useMessages(): UseMessages {
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FIX 1: loadMessages — guard against cross-thread overwrites
+  //
+  // PROBLEM: When user navigates Thread A → Thread B while A is streaming:
+  //   1. ChatArea effect fires clearMessages() + loadMessages(B)
+  //   2. sendMessage's finally block fires loadMessages(A) (closure capture)
+  //   3. Both fetches race. If A's response arrives second, it overwrites B's
+  //      messages with A's data — user sees wrong thread or blank screen.
+  //
+  // FIX: Capture activeThreadIdRef AFTER the await (not before). If the active
+  // thread changed while the fetch was in-flight, discard the result entirely.
+  // The generation check is kept as a secondary guard for same-thread races.
+  // ──────────────────────────────────────────────────────────────────────────
+  const loadMessages = useCallback(async (threadId: string) => {
+    // Set active thread BEFORE the await — tells other code paths which
+    // thread the user is currently viewing.
+    activeThreadIdRef.current = threadId
+    const generation = sendGenerationRef.current
+    try {
+      const data = await getMessages(threadId)
+
+      // CRITICAL GUARD: If the user navigated to a different thread while
+      // this fetch was in-flight, discard the result. Without this, stale
+      // data from Thread A overwrites Thread B's messages.
+      if (activeThreadIdRef.current !== threadId) return
+
+      setMessages((prev) => {
+        // Don't wipe optimistic messages if a send is in flight on THIS thread
+        if (isSendingRef.current && streamingThreadIdRef.current === threadId) return prev
+        // Stale fetch from a previous send — discard
+        if (sendGenerationRef.current !== generation) return prev
+        return data
+      })
+    } catch (err) {
+      // Network errors during load should not crash the app
+      console.error("loadMessages failed:", err)
+    }
+  }, [])
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -44,19 +83,27 @@ export function useMessages(): UseMessages {
     abortControllerRef.current?.abort()
   }, [])
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // FIX 2: clearMessages — DON'T abort the stream here
+  //
+  // PROBLEM: clearMessages() was calling abortControllerRef.current?.abort()
+  // which kills the SSE connection. When ChatArea's thread-switch effect
+  // calls clearMessages() then abortStream() separately, the abort fires
+  // inside clearMessages AND triggers sendMessage's finally block, which
+  // then calls loadMessages(oldThreadId) — racing with the new thread.
+  //
+  // FIX: clearMessages only clears state. Aborting is the caller's job
+  // (ChatArea calls abortStream() explicitly). This separates concerns:
+  // clearMessages = wipe UI state, abortStream = kill network.
+  // ──────────────────────────────────────────────────────────────────────────
   const clearMessages = useCallback(() => {
     setMessages([])
     setIsStreaming(false)
     isStreamingRef.current = false
     isSendingRef.current = false
-    // FIX 2: Do NOT abort the stream here. Aborting inside clearMessages
-    // triggers sendMessage's finally block as a side effect of clearing
-    // state — racing with the new thread's loadMessages. The caller
-    // (ChatArea's useEffect) calls abortStream() explicitly and first.
   }, [])
 
   const subscribeToThread = useCallback((threadId: string) => {
-    // Tear down any existing always-on subscription first (no-op if null)
     if (threadChannelRef.current) {
       supabase.removeChannel(threadChannelRef.current)
       threadChannelRef.current = null
@@ -74,11 +121,13 @@ export function useMessages(): UseMessages {
           filter: `thread_id=eq.${threadId}`,
         },
         () => {
-          // Guard: skip while SSE is active — SSE delta events handle live updates.
-          // This subscription is recovery-only (for refresh/reconnect after F5).
           if (isStreamingRef.current) return
-          // Debounce: multiple INSERTs (user msg + assistant msg) can fire in rapid
-          // succession. Batch them into one reload so we don't flood the backend.
+
+          // GUARD: Don't reload if user already navigated to a different thread.
+          // Without this, a late INSERT from Thread A would trigger loadMessages(A)
+          // even though the user is now viewing Thread B.
+          if (activeThreadIdRef.current !== threadId) return
+
           if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
           reloadTimerRef.current = setTimeout(() => {
             reloadTimerRef.current = null
@@ -89,35 +138,21 @@ export function useMessages(): UseMessages {
       .subscribe()
 
     threadChannelRef.current = channel
-  }, [])  // loadMessages has stable identity (useCallback with [] deps) — safe to omit
+  }, [])
 
   const unsubscribeFromThread = useCallback(() => {
+    if (reloadTimerRef.current) {
+      clearTimeout(reloadTimerRef.current)
+      reloadTimerRef.current = null
+    }
     if (threadChannelRef.current) {
       supabase.removeChannel(threadChannelRef.current)
       threadChannelRef.current = null
     }
   }, [])
 
-  const loadMessages = useCallback(async (threadId: string) => {
-    activeThreadIdRef.current = threadId
-    const generation = sendGenerationRef.current
-    const data = await getMessages(threadId)
-    // FIX 1: Discard if the user navigated to a different thread while this
-    // fetch was in-flight. Without this, two concurrent loadMessages calls
-    // (one from finally for Thread A, one from the effect for Thread B) race
-    // and the faster one overwrites the screen with wrong-thread data.
-    if (activeThreadIdRef.current !== threadId) return
-    setMessages((prev) => {
-      // Same thread: don't wipe optimistic messages if a send is in flight
-      // or if a newer send started while this fetch was in-flight.
-      if (isSendingRef.current) return prev
-      if (sendGenerationRef.current !== generation) return prev
-      return data
-    })
-  }, [])
-
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
-if (isSendingRef.current) return
+    if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
     streamingThreadIdRef.current = threadId
@@ -152,10 +187,7 @@ if (isSendingRef.current) return
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    // D-03: Realtime subscription for SSE drop recovery.
-    // Subscribes filtered to this thread only. Torn down in finally.
-    // Only processes events when streaming is NOT active (isStreamingRef guard)
-    // to avoid racing with the live SSE delta updates.
+    // Per-stream Realtime channel for SSE drop recovery
     const channelName = `messages-thread-${threadId}`
     const channel = supabase
       .channel(channelName)
@@ -168,15 +200,13 @@ if (isSendingRef.current) return
           filter: `thread_id=eq.${threadId}`,
         },
         (payload) => {
-          // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
-          // SSE delta events handle live updates. Only process after SSE drops/ends.
           if (isStreamingRef.current) return
+          // GUARD: Don't process if user navigated away from this thread
+          if (activeThreadIdRef.current !== threadId) return
 
           if (payload.eventType === "INSERT") {
             const newMsg = payload.new as Message
             setMessages((prev) => {
-              // Replace the optimistic temp-id placeholder for assistant messages,
-              // or deduplicate by id for user messages.
               if (newMsg.role === "assistant") {
                 const tempIdx = prev.findIndex(
                   (m) => m.role === "assistant" && m.id.startsWith("temp-")
@@ -187,7 +217,6 @@ if (isSendingRef.current) return
                   return next
                 }
               }
-              // Deduplicate: skip if already present (normal path persisted it)
               if (prev.some((m) => m.id === newMsg.id)) return prev
               return [...prev, newMsg]
             })
@@ -213,7 +242,6 @@ if (isSendingRef.current) return
       },
       () => {
         setIsStreaming(false)
-        // Clear planning flag when stream ends — prevents stuck spinner
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
         )
@@ -221,14 +249,11 @@ if (isSendingRef.current) return
       model,
       provider,
       onTitleUpdate,
-      // onToolPreparing — D-01/D-02 (Phase 56.1): creates a "preparing" placeholder entry
-      // immediately when the tool name is known, before arguments finish streaming.
+      // onToolPreparing
       (name: string, index: number) => {
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
-            // Deduplicate on the synthetic id (preparing-{index}), not on name.
-            // Keying on name silently drops the second tool_preparing for same-named parallel calls.
             const preparingId = `preparing-${index}`
             const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
             if (alreadyPreparing) return m
@@ -243,7 +268,7 @@ if (isSendingRef.current) return
           }),
         )
       },
-      // onToolStart — clear planning flag; upgrade preparing entry to running, or append if none
+      // onToolStart
       (name, args) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -254,15 +279,12 @@ if (isSendingRef.current) return
             )
             let updatedCalls: ToolCall[]
             if (preparingIdx !== -1) {
-              // Upgrade the preparing entry to running in place (preserves ordering)
               updatedCalls = existingCalls.map((tc, i) =>
                 i === preparingIdx
                   ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
                   : tc
               )
             } else {
-              // No preparing entry — append new running entry (fallback for race/reconnect).
-              // Include a stable id so tool_end's name-match still works if it tries to match by id.
               updatedCalls = [...existingCalls, { id: `running-${Date.now()}`, name, args, status: "running" as const, startedAt: Date.now() }]
             }
             return { ...m, isPlanning: false, tool_calls: updatedCalls }
@@ -311,9 +333,7 @@ if (isSendingRef.current) return
           }),
         )
       },
-      // onSkillActivated — Phase 56 D-08/D-09: append to ordered activatedSkills array
-      // for inline rendering in ToolCallPanel. Legacy activatedSkill field retained
-      // for backward compat with components that read the single-value form.
+      // onSkillActivated
       (skillName) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -331,7 +351,7 @@ if (isSendingRef.current) return
           }),
         )
       },
-      // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
+      // onCodeExecutionStart
       undefined,
       // onCodeStdout
       (content: string) => {
@@ -361,7 +381,7 @@ if (isSendingRef.current) return
           })
         )
       },
-      // onCodeExecutionComplete — sets data fields only; tool_end will set status="done"
+      // onCodeExecutionComplete
       (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => {
         setMessages((prev) =>
           prev.map((m) => {
@@ -394,19 +414,19 @@ if (isSendingRef.current) return
           prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
         )
       },
-      // onSuggestions — ephemeral, like confidence (not persisted)
+      // onSuggestions
       (questions) => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, suggestions: questions } : m)
         )
       },
-      // onPlanning — agent finished one tool-call round, deciding next action
+      // onPlanning
       () => {
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
         )
       },
-      // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
+      // onIterationStart
       (iteration: number) => {
         setMessages((prev) =>
           prev.map((m) =>
@@ -414,7 +434,7 @@ if (isSendingRef.current) return
           ),
         )
       },
-      // onFallbackModel — sub-agent retried with provider default after 404
+      // onFallbackModel
       (original: string, fallback: string) => {
         setFallbackNotice(`Model ${original} unavailable — using ${fallback}.`)
         setTimeout(() => setFallbackNotice(null), 4000)
@@ -422,36 +442,36 @@ if (isSendingRef.current) return
       controller.signal,
     )
     } catch (err) {
-      // Swallow abort errors — user intentionally stopped
       if (!(err instanceof Error && err.name === "AbortError")) {
         console.error(err)
       }
-} finally {
+    } finally {
       abortControllerRef.current = null
       isSendingRef.current = false
       streamingThreadIdRef.current = null
       setIsStreaming(false)
-      isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
+      isStreamingRef.current = false
 
-      // FIX 3: Always remove the per-stream channel immediately. The 2s grace
-      // period was an attempt to catch late Realtime INSERTs, but it created a
-      // window where two channels (per-stream + always-on threadChannelRef) both
-      // fired loadMessages, racing each other. The always-on subscription handles
-      // recovery — the per-stream channel is no longer needed after the stream ends.
+      // ────────────────────────────────────────────────────────────────────
+      // FIX 3: Tear down per-stream channel IMMEDIATELY
+      //
+      // The 2s delay created a window where two Realtime channels (per-stream
+      // + always-on) coexisted, both calling loadMessages and racing each other.
+      // The always-on subscription (threadChannelRef) handles recovery.
+      // ────────────────────────────────────────────────────────────────────
       const channelToRemove = channelRef.current
       channelRef.current = null
       if (channelToRemove) {
         supabase.removeChannel(channelToRemove)
       }
 
-      // Always clear planning flag on stream end
+      // Clear planning flag
       setMessages((prev) =>
         prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
       )
 
       const wasStoppedByUser = stoppedByUserRef.current
 
-      // Mark running or preparing tool calls as "interrupted" if the user stopped the stream
       if (wasStoppedByUser) {
         setMessages((prev) =>
           prev.map((m) => {
@@ -472,7 +492,6 @@ if (isSendingRef.current) return
         )
       }
 
-      // Apply stopped flag to the placeholder message (pure state update, no side effects)
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1]
         if (lastMsg?.id === assistantId) {
@@ -485,14 +504,11 @@ if (isSendingRef.current) return
         return prev
       })
 
-      // Reset stopped ref outside any state updater so it runs exactly once
       stoppedByUserRef.current = false
 
-      // Fix E (D-STREAM-01): Reload from DB after natural stream completion.
-      // The Realtime INSERT fires while isStreamingRef=true (blocked by guard).
-      // By the time finally runs, the event is gone — pull fresh from DB.
-      // Guard: user is still on the same thread (not navigated away).
-      // Stop path skipped: asyncio.shield already persists the partial message.
+      // Only reload if user is still on this thread.
+      // Even if this fires for the old thread, FIX 1's post-await guard
+      // in loadMessages will discard the result if activeThreadIdRef changed.
       if (!wasStoppedByUser && activeThreadIdRef.current === threadId) {
         loadMessages(threadId).catch(console.error)
       }
