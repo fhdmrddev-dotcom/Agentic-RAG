@@ -2,6 +2,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+import anyio
+
 # Suppress asyncio transport-level "socket.send() raised exception." warnings.
 # These fire from CPython's selector_events.py when a client disconnects while
 # we're mid-write — our SSEStreamingResponse already handles the disconnect
@@ -48,7 +50,12 @@ if settings.langsmith_api_key:
 
 @asynccontextmanager
 async def lifespan(app_instance):
-    # Startup: nothing to do — sandbox sessions created on demand
+    # Startup: bump AnyIO default thread limiter so SSE-path .execute()
+    # wraps don't queue at the 40-token default (research §A2, D-058-07).
+    # Env-overridable via ANYIO_THREAD_TOKENS.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = (
+        settings.anyio_thread_tokens
+    )
     yield
     # Shutdown: close all open sandbox sessions to free Docker containers
     if settings.sandbox_enabled:
