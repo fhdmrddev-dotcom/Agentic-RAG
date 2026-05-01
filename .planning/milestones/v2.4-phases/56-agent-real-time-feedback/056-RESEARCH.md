@@ -621,22 +621,25 @@ The current state of `useMessages.ts` already has the full Realtime subscription
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Is the 2s `removeChannel()` delay sufficient for all network conditions?**
    - What we know: Backend persists before yielding `done`; Realtime is typically <500ms latency on Supabase
    - What's unclear: Slow networks or overloaded Supabase instances could exceed 2s
    - Recommendation: 2s is sufficient for v2.4; document as a known edge case in KNOWN-ISSUES.md
+   - **RESOLVED:** Plan 03 Task 3 implements `setTimeout(..., 2000)` for the delayed `removeChannel`. Acceptable edge case documented in T-56-13 threat model entry.
 
 2. **Should the planning event be retained alongside iteration_start?**
    - What we know: `planning` fires at `iteration > 0`; `iteration_start` fires at all iterations; both carry iteration number
    - What's unclear: Whether `isPlanning: true` on the Message is still meaningful after D-05 replaces "Planning next action…" with "Thinking…"
    - Recommendation: Retain `planning` / `isPlanning` — it still controls the "Thinking…" indicator between tool rounds, which is separate from the step counter
+   - **RESOLVED:** Plan 01 Task 3 retains the `planning` event unchanged. Plan 02 Task 2 keeps `onPlanning` writing `isPlanning: true`, which drives the "Thinking…" header state in ToolCallPanel.
 
 3. **displayItems array vs activatedSkills array for D-08/D-09**
    - What we know: Both approaches work; `displayItems` is more flexible
    - What's unclear: Whether skill rows need to persist across page reload (they don't, per D-08 — ephemeral)
    - Recommendation: Use the simpler `activatedSkills: SkillActivation[]` array on Message type, ordered by arrival time, without the full displayItems refactor
+   - **RESOLVED:** Plan 02 uses `activatedSkills: SkillActivation[]` on Message type (Task 2) and a local `displayItems` merge computed inside ToolCallPanel for rendering order (Task 4). The local `displayItems` computation is scoped to the component's render function — it is not a "full refactor" of the Message type and aligns with the recommendation. The array on Message stays minimal; the display-time merge is an implementation detail.
 
 ---
 

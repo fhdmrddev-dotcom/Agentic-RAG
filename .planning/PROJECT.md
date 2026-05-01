@@ -8,16 +8,29 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
+## Current Milestone: v2.5 SSE Concurrency & Reconnect Stability
+
+**Goal:** Resolve the Phase 057 deferral by fixing the dominant backend concurrency blocker (sync supabase calls in async event_stream) and shipping a correct frontend reconnect architecture (race fixes + visibilitychange + Resume button).
+
+**Target features:**
+- Backend SSE handler doesn't block other requests during long agent loops (cross-tab GET < 1s during streaming)
+- Long-running agent loops decoupled from request lifetime (background task + asyncio.Queue + sse-starlette)
+- Frontend race conditions eliminated (setViewingThread separation, AbortController-based cancellation, finally-block reload removed)
+- Tab-switch (Symptom E) and F5-mid-stream (Symptom F) recover reliably without breaking Stop (G) or thread navigation (H)
+- Reproducible browser-based test harness so future SSE work can be validated in isolation
+
+**Key context:** Two prior implementation attempts failed (`057-DEFERRAL.md`). Authoritative research saved at `.planning/research/058-sse-concurrency-research.md`: `run_in_threadpool` is the immediate fix; `--workers N` masks the bug; Supabase Realtime is best-effort, not at-least-once.
+
 ## Current State
 
 **Shipped:** v2.4 (Stability, Polish & UX Fixes) — 2026-04-30
+**Active:** v2.5 (SSE Concurrency & Reconnect Stability) — started 2026-05-01
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
 **Codebase:** ~57,000 LOC (Python + TypeScript), 72 files changed in v2.4
 **Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
 **Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
-**Next milestone:** v2.5 (planning)
-**Known tech debt:** KI-001 (in-flight LLM runs to yield point on GeneratorExit); STREAM-02 (Realtime reconnect — polling approach needed); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
+**Known tech debt:** KI-001 (in-flight LLM runs to yield point on GeneratorExit); STREAM-02 (now scoped to v2.5 phases 058–062); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
 
 ## Requirements
 
@@ -119,9 +132,13 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ TOOL-01: Cross-provider tool calling reliability (MODEL_CAPABILITIES, tool_parser.py) — v2.4 Phase 53
 - ✓ GEN-01/02/04/05: Anthropic native SDK, no token reduction, generation mode disambiguation — v2.4 Phase 54
 
-### Active (carry-forward to v2.5)
+### Active (v2.5 in flight)
 
-- [ ] STREAM-02: Refresh/navigate during stream — message appears automatically. *(Code shipped in Phase 57; browser tests unreliable. Next: polling for F5 case, visibilitychange for tab-switch. Verify Supabase Realtime REPLICA IDENTITY first.)*
+- [ ] CONCUR-01: Backend SSE handler does not block concurrent requests during long agent loops *(v2.5 Phase 058)*
+- [ ] CONCUR-02: SSE architecture decouples handler lifetime from agent loop lifetime *(v2.5 Phase 059)*
+- [ ] STREAM-02a: Frontend race conditions eliminated (setViewingThread, AbortController, finally-block reload removed) *(v2.5 Phase 060)*
+- [ ] STREAM-02b: Tab-switch (E) and F5 mid-stream (F) recover without breaking Stop (G) or navigation (H) *(v2.5 Phase 061)*
+- [ ] TEST-01: Reproducible browser-based test harness for SSE/reconnect scenarios *(v2.5 Phase 062)*
 - [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone)*
 - [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone)*
 
@@ -242,4 +259,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-30 after v2.4 milestone completion*
+*Last updated: 2026-05-01 — v2.5 milestone started (SSE Concurrency & Reconnect Stability)*

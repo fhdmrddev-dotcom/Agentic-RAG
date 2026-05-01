@@ -125,6 +125,7 @@ Also includes reconnect resilience: when the user refreshes or switches tabs dur
 - **Extended thinking token display** — streaming Claude reasoning tokens into a collapsible "Reasoning" block. Anthropic-only, future phase.
 - **Cross-thread background notifications** — "your agent task in Thread X finished". Would require global messages subscription + notification UI. Future phase.
 - **Folder-level ingestion progress** — per-folder ingest queue status. Out of scope.
+- **Phase 56 Realtime diagnostic console.log cleanup** — Plan 03 Task 3 adds `[Phase56-Realtime]` console.log statements to useMessages.ts (loadMessages, clearMessages, finally, Realtime callback, delayed removeChannel) per 055-DEFERRAL.md mandate. These are diagnostic-only and must be removed in a follow-up phase once the D-14/D-16 reconnect race is verified fixed. Tracked here so the cleanup is not lost.
 
 </deferred>
 
