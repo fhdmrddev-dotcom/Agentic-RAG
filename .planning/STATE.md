@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: SSE Concurrency & Reconnect Stability
 status: planning
-stopped_at: v2.5 milestone started 2026-05-01 — defining requirements
+stopped_at: v2.5 roadmap defined 2026-05-01 — ready to plan Phase 058
 last_updated: "2026-05-01T00:00:00.000Z"
 last_activity: 2026-05-01
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,14 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.5 milestone — SSE Concurrency & Reconnect Stability (5 phases proposed)
+**Current focus:** v2.5 milestone — SSE Concurrency & Reconnect Stability (5 phases scoped: 058–062)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Roadmap defined, ready to plan Phase 058
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-01 — Milestone v2.5 started
+Status: Roadmap defined, ready to plan Phase 058
+Last activity: 2026-05-01 — ROADMAP.md authored with v2.5 milestone (5 phases, 100% requirement coverage)
+Next action: `/gsd-plan-phase 058` to draft the Backend SSE Concurrency Fix plan
 
 ## Recent Completed Phases
 
@@ -69,6 +70,7 @@ Last activity: 2026-05-01 — Milestone v2.5 started
 
 - v2.5 milestone scoped 2026-05-01 to fix Phase 057 deferral via 5 phases (058–062)
 - Research synthesized at .planning/research/058-sse-concurrency-research.md before milestone start
+- ROADMAP.md authored 2026-05-01: 5 phases, 5/5 v1 requirements mapped, dependencies form valid DAG (058→059→060→061; 062 parallel-able with 058)
 
 ### Decisions
 
@@ -82,6 +84,7 @@ Recent decisions affecting v2.5 work:
 - **D-v2.5-04**: SSE architecture refactor uses `asyncio.Queue` + background task + `sse-starlette` (not Celery, not BackgroundTasks). Decouples handler lifetime from agent loop lifetime.
 - **D-v2.5-05**: Frontend reconnect uses `visibilitychange` + `pageshow` + single reconcile fetch + Resume button (not auto-polling loop). Don't auto-retry LLM calls — costs money, may duplicate.
 - **D-v2.5-06**: Race-condition fix uses `AbortController` cancellation, not request-id refs alone. Confirmed canonical by React docs and Max Rozen post.
+- **D-v2.5-07**: Validation harness (Phase 062) lands before Phase 061 reconnect work — addresses the v2.5-dev failure mode where iterating on a complex hook without browser feedback loop hid real bugs.
 
 ### Pending Todos
 
@@ -121,5 +124,5 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: 2026-05-01
-Stopped at: v2.5 milestone bootstrap — PROJECT.md updated, STATE.md reset, v2.4 phases archived (17 dirs), defining requirements next
-Next: Define REQUIREMENTS.md, spawn gsd-roadmapper to create ROADMAP.md
+Stopped at: v2.5 roadmap defined — 5 phases scoped (058–062), 5/5 v1 requirements mapped, ROADMAP.md and STATE.md updated
+Next: `/gsd-plan-phase 058` to draft the Backend SSE Concurrency Fix plan
