@@ -227,6 +227,15 @@ class Settings(BaseSettings):
     sandbox_enabled: bool = False
     sandbox_ttl_minutes: int = 30
 
+    # Concurrency (Phase 058 — D-058-07)
+    # Total AnyIO thread-pool tokens. FastAPI defaults to 40, which is the
+    # ceiling for concurrent in-flight blocking .execute() calls when
+    # wrapped in run_in_threadpool. SSE chat with parallel tool calls +
+    # ingestion + audit writes can exceed 40 quickly; 200 gives headroom
+    # until async client migration (CONCUR-03). Override in .env:
+    # ANYIO_THREAD_TOKENS=<int>.
+    anyio_thread_tokens: int = 200
+
     @property
     def web_search_enabled(self) -> bool:
         return bool(self.tavily_api_key)
