@@ -21,6 +21,7 @@ from app.dependencies import get_current_user, get_supabase
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
+from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
@@ -496,24 +497,25 @@ async def send_message(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    thread_resp = (
+    thread_resp = await aexec(
         supabase.table("threads")
         .select("id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
-        .execute()
     )
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    # Insert user message
-    supabase.table("messages").insert({
-        "thread_id": thread_id,
-        "user_id": current_user["id"],
-        "role": "user",
-        "content": body.content,
-    }).execute()
+    # Insert user message (D-058-02: pre-stream INSERT in scope for 058)
+    await aexec(
+        supabase.table("messages").insert({
+            "thread_id": thread_id,
+            "user_id": current_user["id"],
+            "role": "user",
+            "content": body.content,
+        })
+    )
 
     _stop_event = asyncio.Event()
 
@@ -527,12 +529,11 @@ async def send_message(
             user_settings = override_provider(user_settings, body.provider)
 
         # Load thread's folder scope
-        thread_data = (
+        thread_data = await aexec(
             supabase.table("threads")
             .select("folder_id")
             .eq("id", thread_id)
             .single()
-            .execute()
         )
         thread_folder_id: str | None = thread_data.data.get("folder_id") if thread_data.data else None
 
@@ -540,7 +541,7 @@ async def send_message(
         folder_subtree_ids: list[str] | None = None
         scoped_folder_path: str | None = None
         if thread_folder_id:
-            all_folders = fetch_visible_folders(supabase, current_user["id"])
+            all_folders = await fetch_visible_folders(supabase, current_user["id"])
 
             def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
                 result = [root_id]
@@ -566,13 +567,12 @@ async def send_message(
             scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
 
         # Load full message history (includes just-inserted user message)
-        history_resp = (
+        history_resp = await aexec(
             supabase.table("messages")
             .select("role, content, tool_calls")
             .eq("thread_id", thread_id)
             .eq("user_id", current_user["id"])
             .order("created_at")
-            .execute()
         )
 
         # Select system prompt, tools, and iteration limit based on agent mode
@@ -599,14 +599,14 @@ async def send_message(
 
         # Inject enabled skills catalog (General Mode only) — SKIL-09
         if body.agent_mode != "explorer":
-            enabled_skills = (
+            _skills_resp = await aexec(
                 supabase.table("skills")
                 .select("name, description")
                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                 .eq("is_enabled", True)
                 .order("name")
-                .execute()
-            ).data or []
+            )
+            enabled_skills = _skills_resp.data or []
 
             if enabled_skills:
                 catalog_lines = "\n".join(
@@ -621,14 +621,14 @@ async def send_message(
                 active_system_prompt = active_system_prompt + catalog_note
 
             # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
-            memory_rows = (
+            _memory_resp = await aexec(
                 supabase.table("user_memory")
                 .select("key, value")
                 .eq("user_id", current_user["id"])
                 .order("updated_at", desc=True)
                 .limit(10)
-                .execute()
-            ).data or []
+            )
+            memory_rows = _memory_resp.data or []
 
             if memory_rows:
                 memory_lines = "\n".join(
@@ -684,7 +684,7 @@ async def send_message(
         _message_persisted = False  # guard against double-insert
         _empty_retries = 0  # tracks empty-response retries across all iterations
 
-        def _persist_assistant_message() -> None:
+        async def _persist_assistant_message() -> None:
             """Insert the assistant message row. Idempotent — only runs once."""
             nonlocal _message_persisted
             if _message_persisted:
@@ -715,7 +715,7 @@ async def send_message(
                 row["confidence_avg_similarity"] = c["avg_similarity"]
                 row["confidence_disclaimer"] = c["disclaimer"]
             try:
-                supabase.table("messages").insert(row).execute()
+                await aexec(supabase.table("messages").insert(row))
             except Exception as e:
                 logger.error("Failed to persist assistant message: %s", e)
 
@@ -1061,18 +1061,18 @@ async def send_message(
                         yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args})}\n\n"
                         if tool_name == "ls":
                             path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                            result = ls_path(path, current_user["id"], supabase)
+                            result = await ls_path(path, current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "tree":
                             path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                            result = tree_path(path, args.get("depth"), current_user["id"], supabase)
+                            result = await tree_path(path, args.get("depth"), current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "grep":
                             path = args.get("path") or scoped_folder_path
-                            result = grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
+                            result = await grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
                             tool_result = json.dumps(result)
                         elif tool_name == "glob":
-                            result = glob_path(args.get("pattern", ""), current_user["id"], supabase)
+                            result = await glob_path(args.get("pattern", ""), current_user["id"], supabase)
                             # Scope glob results to folder subtree if thread is folder-scoped
                             if folder_subtree_ids is not None and "matches" in result:
                                 result["matches"] = [
@@ -1082,7 +1082,7 @@ async def send_message(
                                 result["total"] = len(result["matches"])
                             tool_result = json.dumps(result)
                         elif tool_name == "read_document":
-                            result = read_path(
+                            result = await read_path(
                                 args["document_id"],
                                 current_user["id"],
                                 supabase,
@@ -1092,7 +1092,7 @@ async def send_message(
                             tool_result = json.dumps(result)
                         elif tool_name == "search_documents":
                             metadata_filter = args.get("metadata_filter") or None
-                            results, avg_sim = search_documents(
+                            results, avg_sim = await search_documents(
                                 args["query"], current_user["id"], supabase,
                                 metadata_filter=metadata_filter,
                                 user_settings=user_settings,
@@ -1130,15 +1130,15 @@ async def send_message(
                                 supabase=supabase,
                             ))
                         elif tool_name == "query_documents":
-                            tool_result = query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
+                            tool_result = await query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
                         elif tool_name == "web_search":
                             tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
                         elif tool_name == "analyze_document":
-                            doc_id = resolve_document_id(args["filename"], current_user["id"], supabase)
+                            doc_id = await resolve_document_id(args["filename"], current_user["id"], supabase)
                             if not doc_id:
                                 tool_result = f"Document '{args['filename']}' not found."
                             else:
-                                doc = fetch_full_document(doc_id, current_user["id"], supabase)
+                                doc = await fetch_full_document(doc_id, current_user["id"], supabase)
                                 if not doc:
                                     tool_result = f"Could not retrieve content for '{args['filename']}'."
                                 else:
@@ -1179,15 +1179,15 @@ async def send_message(
                             # Emit skill_activated SSE event immediately (SKIL-12)
                             yield f"data: {json.dumps({'type': 'skill_activated', 'skill_name': skill_name})}\n\n"
                             # Resolve skill — prefer user-owned over global when names conflict
-                            skill_row = (
+                            _skill_resp = await aexec(
                                 supabase.table("skills")
                                 .select("id, name, description, instructions, user_id")
                                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                 .eq("name", skill_name)
                                 .eq("is_enabled", True)
                                 .order("is_global")
-                                .execute()
-                            ).data
+                            )
+                            skill_row = _skill_resp.data
                             if not skill_row:
                                 tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                             else:
@@ -1199,13 +1199,13 @@ async def send_message(
                                     supabase=supabase,
                                 ))
                                 # Fetch attached filenames (FILE-04)
-                                files_data = (
+                                _files_resp = await aexec(
                                     supabase.table("skill_files")
                                     .select("filename")
                                     .eq("skill_id", row["id"])
                                     .order("filename")
-                                    .execute()
-                                ).data or []
+                                )
+                                files_data = _files_resp.data or []
                                 file_names = [f["filename"] for f in files_data]
                                 tool_result = json.dumps({
                                     "name": row["name"],
@@ -1220,54 +1220,55 @@ async def send_message(
                                 tool_result = json.dumps({"error": "Skill name is required."})
                             else:
                                 # Check if user already owns a skill with this name
-                                existing_resp = (
+                                existing_resp = await aexec(
                                     supabase.table("skills")
                                     .select("id")
                                     .eq("user_id", current_user["id"])
                                     .eq("name", name)
                                     .limit(1)
-                                    .execute()
                                 )
                                 existing = existing_resp.data[0] if existing_resp.data else None
                                 if existing:
                                     row = existing
-                                    supabase.table("skills").update({
-                                        "description": description,
-                                        "instructions": instructions,
-                                    }).eq("id", row["id"]).eq("user_id", current_user["id"]).execute()
+                                    await aexec(
+                                        supabase.table("skills").update({
+                                            "description": description,
+                                            "instructions": instructions,
+                                        }).eq("id", row["id"]).eq("user_id", current_user["id"])
+                                    )
                                     tool_result = json.dumps({"status": "updated", "name": name})
                                 else:
-                                    supabase.table("skills").insert({
-                                        "user_id": current_user["id"],
-                                        "name": name,
-                                        "description": description,
-                                        "instructions": instructions,
-                                    }).execute()
+                                    await aexec(
+                                        supabase.table("skills").insert({
+                                            "user_id": current_user["id"],
+                                            "name": name,
+                                            "description": description,
+                                            "instructions": instructions,
+                                        })
+                                    )
                                     tool_result = json.dumps({"status": "created", "name": name})
                         elif tool_name == "read_skill_file":
                             skill_name = args.get("skill_name", "")
                             filename = args.get("filename", "")
                             # Resolve skill to get owner's user_id for storage path
-                            _sr_resp = (
+                            _sr_resp = await aexec(
                                 supabase.table("skills")
                                 .select("id, user_id")
                                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                 .eq("name", skill_name)
                                 .maybe_single()
-                                .execute()
                             )
                             skill_row = _sr_resp.data if _sr_resp is not None else None
                             if not skill_row:
                                 # Retry with normalized name for agent display-name mismatches
                                 _sr_norm = skill_name.lower().replace(" ", "-")
                                 if _sr_norm != skill_name:
-                                    _sr_resp2 = (
+                                    _sr_resp2 = await aexec(
                                         supabase.table("skills")
                                         .select("id, user_id")
                                         .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                         .eq("name", _sr_norm)
                                         .maybe_single()
-                                        .execute()
                                     )
                                     skill_row = _sr_resp2.data if _sr_resp2 is not None else None
                             if not skill_row:
@@ -1352,13 +1353,12 @@ async def send_message(
                                     sf_filename = sf.get("filename", "")
                                     if not sf_skill_name or not sf_filename:
                                         continue
-                                    _sf_resp = (
+                                    _sf_resp = await aexec(
                                         supabase.table("skills")
                                         .select("id, user_id")
                                         .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                         .eq("name", sf_skill_name)
                                         .maybe_single()
-                                        .execute()
                                     )
                                     sf_skill = _sf_resp.data if _sf_resp is not None else None
                                     if not sf_skill:
@@ -1366,13 +1366,12 @@ async def send_message(
                                         # ("Weekly Report Writer") instead of stored slug ("weekly-report-writer")
                                         _sf_norm = sf_skill_name.lower().replace(" ", "-")
                                         if _sf_norm != sf_skill_name:
-                                            _sf_resp2 = (
+                                            _sf_resp2 = await aexec(
                                                 supabase.table("skills")
                                                 .select("id, user_id")
                                                 .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
                                                 .eq("name", _sf_norm)
                                                 .maybe_single()
-                                                .execute()
                                             )
                                             sf_skill = _sf_resp2.data if _sf_resp2 is not None else None
                                     if not sf_skill:
@@ -1466,13 +1465,15 @@ async def send_message(
                                         actual_exit_code = 1
 
                                 # Log execution to DB (SAND-09)
-                                exec_row = supabase.table("code_executions").insert({
-                                    "thread_id": thread_id,
-                                    "user_id": current_user["id"],
-                                    "code": code,
-                                    "exit_code": actual_exit_code,
-                                    "duration_ms": duration_ms,
-                                }).execute()
+                                exec_row = await aexec(
+                                    supabase.table("code_executions").insert({
+                                        "thread_id": thread_id,
+                                        "user_id": current_user["id"],
+                                        "code": code,
+                                        "exit_code": actual_exit_code,
+                                        "duration_ms": duration_ms,
+                                    })
+                                )
                                 execution_id = exec_row.data[0]["id"] if exec_row.data else None
 
                                 # Harvest output files from container (SAND-07, SAND-08)
@@ -1532,14 +1533,16 @@ async def send_message(
                                     _uid: str = current_user["id"],
                                 ) -> None:
                                     try:
-                                        supabase.table("user_memory").upsert(
-                                            {
-                                                "user_id": _uid,
-                                                "key": _key,
-                                                "value": _value,
-                                            },
-                                            on_conflict="user_id,key",
-                                        ).execute()
+                                        await aexec(
+                                            supabase.table("user_memory").upsert(
+                                                {
+                                                    "user_id": _uid,
+                                                    "key": _key,
+                                                    "value": _value,
+                                                },
+                                                on_conflict="user_id,key",
+                                            )
+                                        )
                                     except Exception as exc:
                                         logger.warning(
                                             "memory.remember write failed [user=%s key=%s]: %s",
@@ -1560,13 +1563,12 @@ async def send_message(
                             key = (args.get("key", "") or "").strip().lower()
 
                             if key:
-                                resp = (
+                                resp = await aexec(
                                     supabase.table("user_memory")
                                     .select("value")
                                     .eq("user_id", current_user["id"])
                                     .eq("key", key)
                                     .maybe_single()
-                                    .execute()
                                 )
                                 row = resp.data if resp else None
                                 # Pitfall 5: maybe_single() mock compatibility
@@ -1577,13 +1579,13 @@ async def send_message(
                                 else:
                                     tool_result = f"No memory entry found for key: {key}"
                             else:
-                                rows = (
+                                _rows_resp = await aexec(
                                     supabase.table("user_memory")
                                     .select("key, value")
                                     .eq("user_id", current_user["id"])
                                     .order("updated_at", desc=True)
-                                    .execute()
-                                ).data or []
+                                )
+                                rows = _rows_resp.data or []
                                 if rows:
                                     tool_result = "\n".join(
                                         f"- {r['key']}: {r['value']}" for r in rows
@@ -1600,7 +1602,7 @@ async def send_message(
                         elif tool_name == "query_tables":
                             # MODAL-03 Phase 36: query structured table data from documents
                             from app.services.multimodal_service import handle_query_tables  # noqa: PLC0415
-                            tool_result = handle_query_tables(args, current_user["id"], supabase)
+                            tool_result = await handle_query_tables(args, current_user["id"], supabase)
                         else:
                             tool_result = f"Unknown tool: {tool_name}"
                     except json.JSONDecodeError:
@@ -1734,11 +1736,11 @@ async def send_message(
               yield f"data: {json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer})}\n\n"
 
           # Persist assistant message (normal path — before [DONE])
-          _persist_assistant_message()
+          await _persist_assistant_message()
 
           # Touch thread so it rises in updated_at ordering
           try:
-              supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id).execute()
+              await aexec(supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id))
           except Exception:
               pass
 
@@ -1749,7 +1751,7 @@ async def send_message(
               if title_fallback:
                   yield f"data: {json.dumps({'type': 'fallback_model', **title_fallback})}\n\n"
               try:
-                  supabase.table("threads").update({"title": title}).eq("id", thread_id).execute()
+                  await aexec(supabase.table("threads").update({"title": title}).eq("id", thread_id))
                   yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
               except Exception:
                   pass
@@ -1782,7 +1784,7 @@ async def send_message(
             # asyncio.shield() ensures the DB write completes even if the ASGI task
             # is cancelled (CancelledError) before the finally block finishes.
             async def _shielded_persist():
-                _persist_assistant_message()
+                await _persist_assistant_message()
             try:
                 await asyncio.shield(_shielded_persist())
             except asyncio.CancelledError:

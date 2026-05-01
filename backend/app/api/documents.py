@@ -300,7 +300,7 @@ async def list_documents(
     own_docs = own_result.data or []
 
     # Documents in globally visible folders (not owned by current user)
-    global_folder_ids = get_globally_visible_folder_ids(supabase, current_user["id"])
+    global_folder_ids = await get_globally_visible_folder_ids(supabase, current_user["id"])
     global_docs = []
     if global_folder_ids:
         global_result = (
