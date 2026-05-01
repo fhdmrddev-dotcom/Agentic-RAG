@@ -6,6 +6,8 @@ Never await directly in a request handler.
 import logging
 from supabase import Client
 
+from app.utils.db import aexec
+
 logger = logging.getLogger(__name__)
 
 VALID_ACTION_TYPES = frozenset({
@@ -28,10 +30,10 @@ async def write_audit_entry(
     Exceptions are caught, logged to stderr, and swallowed (D-05).
     """
     try:
-        supabase.table("audit_log").insert({
+        await aexec(supabase.table("audit_log").insert({
             "user_id": user_id,
             "action_type": action_type,
             "metadata": metadata,
-        }).execute()
+        }))
     except Exception as exc:
         logger.error("audit write failed [action=%s user=%s]: %s", action_type, user_id, exc)

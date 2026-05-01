@@ -9,6 +9,7 @@ from supabase import Client
 from app.config import settings
 from app.services.openai_service import embed_texts
 from app.services.rerank_service import rerank
+from app.utils.db import aexec
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Private helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _vector_search(
+async def _vector_search(
     query: str,
     user_id: str,
     supabase: Client,
@@ -30,6 +31,8 @@ def _vector_search(
     user_settings: UserEffectiveSettings | None,
     folder_ids: list[str] | None = None,
 ) -> list[dict]:
+    # embed_texts is a sync OpenAI HTTP call. Per D-058-01, only Supabase
+    # `.execute()` is in scope for 058 — this OpenAI call is deferred.
     query_embedding = embed_texts([query], user_settings=user_settings)[0]
     params: dict = {
         "query_embedding": query_embedding,
@@ -42,11 +45,11 @@ def _vector_search(
     if folder_ids:
         params["p_folder_ids"] = folder_ids
 
-    result = supabase.rpc("match_document_chunks", params).execute()
+    result = await aexec(supabase.rpc("match_document_chunks", params))
     return result.data or []
 
 
-def _keyword_search(
+async def _keyword_search(
     query: str,
     user_id: str,
     supabase: Client,
@@ -64,7 +67,7 @@ def _keyword_search(
     if folder_ids:
         params["p_folder_ids"] = folder_ids
 
-    result = supabase.rpc("keyword_search_chunks", params).execute()
+    result = await aexec(supabase.rpc("keyword_search_chunks", params))
     return result.data or []
 
 
@@ -99,11 +102,15 @@ def _rrf_fuse(
     return result
 
 
-def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
+async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dict]:
     if not rows:
         return []
     doc_ids = list({row["document_id"] for row in rows})
-    docs_result = supabase.table("documents").select("id, filename, metadata, version_number").in_("id", doc_ids).execute()
+    docs_result = await aexec(
+        supabase.table("documents")
+        .select("id, filename, metadata, version_number")
+        .in_("id", doc_ids)
+    )
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
     enriched = []
     for row in rows:
@@ -159,36 +166,34 @@ def _avg_cosine(rows: list[dict]) -> float:
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
-def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
+async def resolve_document_id(filename: str, user_id: str, supabase: Client) -> str | None:
     """Case-insensitive filename lookup for a user's document (latest version only). Tries exact match then partial match."""
     # Exact case-insensitive match — only resolve to the latest version
-    result = (
+    result = await aexec(
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
         .eq("is_latest", True)
         .ilike("filename", filename)
         .limit(1)
-        .execute()
     )
     if result.data:
         return result.data[0]["id"]
     # Partial match (allows approximate filenames like "Elitefooty PRD")
-    result = (
+    result = await aexec(
         supabase.table("documents")
         .select("id")
         .eq("user_id", user_id)
         .eq("is_latest", True)
         .ilike("filename", f"%{filename}%")
         .limit(1)
-        .execute()
     )
     if result.data:
         return result.data[0]["id"]
     return None
 
 
-def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
+async def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dict | None:
     """Fetch complete document content for the analyze_document sub-agent.
 
     Prefers `full_markdown` (the raw extracted text stored at ingest time) over
@@ -196,13 +201,12 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
     raw content, so either path produces clean text — but `full_markdown` avoids
     any repeated context headers if the chunk storage format ever changes.
     """
-    doc_result = (
+    doc_result = await aexec(
         supabase.table("documents")
         .select("id, filename, metadata, version_number, full_markdown")
         .eq("id", document_id)
         .eq("user_id", user_id)
         .single()
-        .execute()
     )
     if not doc_result.data:
         return None
@@ -213,12 +217,11 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
     full_text = doc.get("full_markdown") or ""
     if not full_text:
         # Fallback: reassemble from chunks (documents ingested before full_markdown was stored)
-        chunks_result = (
+        chunks_result = await aexec(
             supabase.table("document_chunks")
             .select("content")
             .eq("document_id", document_id)
             .order("chunk_index")
-            .execute()
         )
         full_text = "\n\n".join(c["content"] for c in (chunks_result.data or []))
 
@@ -231,7 +234,7 @@ def fetch_full_document(document_id: str, user_id: str, supabase: Client) -> dic
 
 
 @traceable(name="search-documents", run_type="retriever")
-def search_documents(
+async def search_documents(
     query: str,
     user_id: str,
     supabase: Client,
@@ -255,7 +258,7 @@ def search_documents(
 
     if not hybrid_enabled:
         # Vector-only path — fetch 2x top_k so dedup has candidates to spare
-        rows = _vector_search(
+        rows = await _vector_search(
             query, user_id, supabase, metadata_filter,
             top_n=top_k * 2, match_threshold=match_threshold,
             user_settings=user_settings,
@@ -263,16 +266,16 @@ def search_documents(
         )
         avg_sim = _avg_cosine(rows)
         rows = _deduplicate_chunks(rows)[:top_k]
-        return _enrich_with_filenames(rows, supabase), avg_sim
+        return await _enrich_with_filenames(rows, supabase), avg_sim
 
     # Hybrid path: vector + keyword → RRF fusion → dedup → optional reranking
-    vector_rows = _vector_search(
+    vector_rows = await _vector_search(
         query, user_id, supabase, metadata_filter,
         top_n=candidate_count, match_threshold=match_threshold,
         user_settings=user_settings,
         folder_ids=folder_ids,
     )
-    keyword_rows = _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
+    keyword_rows = await _keyword_search(query, user_id, supabase, metadata_filter, top_n=candidate_count, folder_ids=folder_ids)
 
     if not vector_rows and not keyword_rows:
         return [], 0.0
@@ -294,8 +297,9 @@ def search_documents(
 
     rerank_enabled = user_settings.rerank_enabled if user_settings else settings.rerank_enabled
     if rerank_enabled:
+        # rerank is a sync OpenAI/Cohere HTTP call; out of 058 scope (D-058-01).
         candidates = rerank(query, candidates, top_n=top_k, user_settings=user_settings)
     else:
         candidates = candidates[:top_k]
 
-    return _enrich_with_filenames(candidates, supabase), avg_sim
+    return await _enrich_with_filenames(candidates, supabase), avg_sim

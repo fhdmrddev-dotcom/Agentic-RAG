@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from supabase import Client
 
+from app.utils.db import aexec
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
 import re
@@ -67,7 +68,7 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     return sql + f" WHERE {condition}"
 
 
-def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:
+async def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:
     """
     Execute a SELECT query against the user's documents table via the
     query_user_documents RPC. Injects user_id filter since the service role
@@ -82,7 +83,7 @@ def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: 
         raise ValueError("Query must be a single statement (no semicolons).")
 
     # Scope to current user (service role bypasses RLS)
-    global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+    global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
     scoped = _inject_user_id(clean, user_id, global_folder_ids)
 
     # Scope to folder subtree if provided
@@ -90,7 +91,7 @@ def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: 
         scoped = _inject_folder_scope(scoped, folder_ids)
 
     try:
-        result = supabase.rpc("query_user_documents", {"sql_query": scoped}).execute()
+        result = await aexec(supabase.rpc("query_user_documents", {"sql_query": scoped}))
     except Exception as e:
         raise RuntimeError(f"Database query failed: {e}") from e
 

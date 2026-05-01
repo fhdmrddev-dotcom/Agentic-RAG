@@ -10,9 +10,9 @@ from app.utils.folder_utils import fetch_visible_folders as _fetch_all_visible_f
 router = APIRouter(prefix="/kb", tags=["kb"])
 
 
-def _fetch_visible_folders(supabase: Client, user_id: str) -> list[dict]:
+async def _fetch_visible_folders(supabase: Client, user_id: str) -> list[dict]:
     """Fetch all folders visible to user (owned + in global subtree), deduplicated."""
-    return _fetch_all_visible_folders(supabase, user_id)
+    return await _fetch_all_visible_folders(supabase, user_id)
 
 
 def _build_tree_map(folders: list[dict]) -> tuple[dict[str, dict], list[dict]]:
@@ -47,9 +47,11 @@ def _resolve_path(path: str, roots: list[dict]) -> dict | None:
     return current_node
 
 
-def ls_path(path: str, user_id: str, supabase: Client) -> dict:
+async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
     """Core ls logic callable outside the HTTP layer (e.g. from the agent tool loop)."""
-    all_folders = _fetch_visible_folders(supabase, user_id)
+    from app.utils.db import aexec  # noqa: PLC0415
+
+    all_folders = await _fetch_visible_folders(supabase, user_id)
     nodes, roots = _build_tree_map(all_folders)
 
     if path.strip("/") == "":
@@ -57,12 +59,11 @@ def ls_path(path: str, user_id: str, supabase: Client) -> dict:
             {"id": r["id"], "name": r["name"], "is_global": r["is_global"]}
             for r in roots
         ]
-        doc_result = (
+        doc_result = await aexec(
             supabase.table("documents")
             .select("id, filename, status, created_at")
             .is_("folder_id", "null")
             .eq("user_id", user_id)
-            .execute()
         )
         return {"path": "/", "folders": folder_entries, "documents": doc_result.data}
 
@@ -75,22 +76,22 @@ def ls_path(path: str, user_id: str, supabase: Client) -> dict:
         for c in target["children"]
     ]
     # Docs in the target folder visible to this user
-    own_docs_in_folder = (
+    own_docs_resp = await aexec(
         supabase.table("documents")
         .select("id, filename, status, created_at")
         .eq("folder_id", target["id"])
         .eq("user_id", user_id)
-        .execute()
-    ).data or []
-    global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+    )
+    own_docs_in_folder = own_docs_resp.data or []
+    global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
     global_docs_in_folder = []
     if target["id"] in global_folder_ids:
-        global_docs_in_folder = (
+        _gd_resp = await aexec(
             supabase.table("documents")
             .select("id, filename, status, created_at")
             .eq("folder_id", target["id"])
-            .execute()
-        ).data or []
+        )
+        global_docs_in_folder = _gd_resp.data or []
     # Merge, dedup
     seen_ids: set[str] = set()
     doc_data: list[dict] = []
@@ -101,9 +102,11 @@ def ls_path(path: str, user_id: str, supabase: Client) -> dict:
     return {"path": path, "folders": folder_entries, "documents": doc_data}
 
 
-def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> dict:
+async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> dict:
     """Core tree logic callable outside the HTTP layer (e.g. from the agent tool loop)."""
-    all_folders = _fetch_visible_folders(supabase, user_id)
+    from app.utils.db import aexec  # noqa: PLC0415
+
+    all_folders = await _fetch_visible_folders(supabase, user_id)
     nodes, roots = _build_tree_map(all_folders)
 
     if path.strip("/") == "":
@@ -119,25 +122,25 @@ def tree_path(path: str, depth: int | None, user_id: str, supabase: Client) -> d
         all_ids.extend(_collect_folder_ids(tn))
 
     if all_ids:
-        global_folder_ids_set = set(get_globally_visible_folder_ids(supabase, user_id))
+        global_folder_ids_set = set(await get_globally_visible_folder_ids(supabase, user_id))
         # Fetch own docs in subtree
-        own_docs = (
+        _own_resp = await aexec(
             supabase.table("documents")
             .select("id, filename, folder_id, status, created_at")
             .in_("folder_id", all_ids)
             .eq("user_id", user_id)
-            .execute()
-        ).data or []
+        )
+        own_docs = _own_resp.data or []
         # Fetch docs in globally visible folders within subtree
         global_ids_in_subtree = [fid for fid in all_ids if fid in global_folder_ids_set]
         global_docs: list[dict] = []
         if global_ids_in_subtree:
-            global_docs = (
+            _glob_resp = await aexec(
                 supabase.table("documents")
                 .select("id, filename, folder_id, status, created_at")
                 .in_("folder_id", global_ids_in_subtree)
-                .execute()
-            ).data or []
+            )
+            global_docs = _glob_resp.data or []
         # Merge, dedup
         seen_ids: set[str] = set()
         all_docs: list[dict] = []
@@ -173,7 +176,7 @@ async def ls(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = ls_path(path, current_user["id"], supabase)
+    result = await ls_path(path, current_user["id"], supabase)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return LsResponse(**result)
@@ -221,7 +224,7 @@ async def tree(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = tree_path(path, depth, current_user["id"], supabase)
+    result = await tree_path(path, depth, current_user["id"], supabase)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return TreeResponse(**result)
@@ -235,12 +238,14 @@ def _inject_user_id_for_grep(sql: str, user_id: str) -> str:
     return sql + f" WHERE {condition}"
 
 
-def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) -> dict:
+async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) -> dict:
     """Search document full_markdown for regex pattern, optionally scoped to a folder subtree."""
+    from app.utils.db import aexec  # noqa: PLC0415
+
     # Determine folder scoping
     folder_ids: list[str] | None = None
     if path and path.strip("/") != "":
-        all_folders = _fetch_visible_folders(supabase, user_id)
+        all_folders = await _fetch_visible_folders(supabase, user_id)
         nodes, roots = _build_tree_map(all_folders)
         target = _resolve_path(path, roots)
         if target is None:
@@ -255,7 +260,7 @@ def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) ->
         sql += f" AND folder_id IN ({ids_list})"
 
     try:
-        result = supabase.rpc("query_user_documents", {"sql_query": _inject_user_id_for_grep(sql, user_id)}).execute()
+        result = await aexec(supabase.rpc("query_user_documents", {"sql_query": _inject_user_id_for_grep(sql, user_id)}))
     except Exception as e:
         return {"error": f"Grep failed: {e}"}
 
@@ -271,7 +276,7 @@ async def grep(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = grep_path(pattern, path, current_user["id"], supabase)
+    result = await grep_path(pattern, path, current_user["id"], supabase)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return GrepResponse(**result)
@@ -308,32 +313,34 @@ def _glob_pattern_to_regex(pattern: str) -> re.Pattern:
     return re.compile("^" + p + "$")
 
 
-def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
+async def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
     """Match document filenames against a glob pattern, path-aware.
 
     Patterns like '*.pdf' match any PDF. Patterns like 'reports/**/*.pdf'
     match PDFs under /reports at any depth. Supports *, ?, and ** (recursive).
     """
-    all_folders = _fetch_visible_folders(supabase, user_id)
+    from app.utils.db import aexec  # noqa: PLC0415
+
+    all_folders = await _fetch_visible_folders(supabase, user_id)
     nodes, roots = _build_tree_map(all_folders)
     folder_paths = _build_folder_path_map(nodes, roots)
 
     # Fetch all visible documents (own + in globally visible folders)
-    own_docs = (
+    _own_resp = await aexec(
         supabase.table("documents")
         .select("id, filename, folder_id")
         .eq("user_id", user_id)
-        .execute()
-    ).data or []
-    global_folder_ids_set = set(get_globally_visible_folder_ids(supabase, user_id))
+    )
+    own_docs = _own_resp.data or []
+    global_folder_ids_set = set(await get_globally_visible_folder_ids(supabase, user_id))
     global_docs: list[dict] = []
     if global_folder_ids_set:
-        global_docs = (
+        _glob_resp = await aexec(
             supabase.table("documents")
             .select("id, filename, folder_id")
             .in_("folder_id", list(global_folder_ids_set))
-            .execute()
-        ).data or []
+        )
+        global_docs = _glob_resp.data or []
     seen_ids: set[str] = set()
     docs: list[dict] = []
     for d in own_docs + global_docs:
@@ -371,11 +378,11 @@ async def glob_search(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = glob_path(pattern, current_user["id"], supabase)
+    result = await glob_path(pattern, current_user["id"], supabase)
     return GlobResponse(**result)
 
 
-def read_path(
+async def read_path(
     document_id: str,
     user_id: str,
     supabase: Client,
@@ -383,29 +390,29 @@ def read_path(
     end_line: int | None = None,
 ) -> dict:
     """Fetch full_markdown for a document, optionally sliced to a line range."""
+    from app.utils.db import aexec  # noqa: PLC0415
+
     try:
         # Try fetching as owner first
-        result = (
+        result = await aexec(
             supabase.table("documents")
             .select("id, filename, full_markdown")
             .eq("id", document_id)
             .eq("user_id", user_id)
             .maybe_single()
-            .execute()
         )
-        if not result.data:
+        if not result or not result.data:
             # Check if document is in a globally visible folder
-            global_folder_ids = get_globally_visible_folder_ids(supabase, user_id)
+            global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
             if global_folder_ids:
-                result = (
+                result = await aexec(
                     supabase.table("documents")
                     .select("id, filename, full_markdown")
                     .eq("id", document_id)
                     .in_("folder_id", global_folder_ids)
                     .maybe_single()
-                    .execute()
                 )
-        if not result.data:
+        if not result or not result.data:
             return {"error": f"Document '{document_id}' not found or access denied."}
     except Exception:
         return {"error": f"Document '{document_id}' not found or access denied."}
@@ -450,7 +457,7 @@ async def read(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    result = read_path(document_id, current_user["id"], supabase, start_line, end_line)
+    result = await read_path(document_id, current_user["id"], supabase, start_line, end_line)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return ReadResponse(**result)

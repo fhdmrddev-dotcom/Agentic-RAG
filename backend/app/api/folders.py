@@ -14,7 +14,7 @@ async def list_folders(
     supabase: Client = Depends(get_supabase),
 ):
     """List all folders visible to the current user (owned + global subtree)."""
-    folders = fetch_visible_folders(supabase, current_user["id"])
+    folders = await fetch_visible_folders(supabase, current_user["id"])
     folders.sort(key=lambda f: f["name"])
     return folders
 
@@ -26,7 +26,7 @@ async def list_children(
     supabase: Client = Depends(get_supabase),
 ):
     """List direct children of a folder that are visible to the current user."""
-    visible = fetch_visible_folders(supabase, current_user["id"])
+    visible = await fetch_visible_folders(supabase, current_user["id"])
     children = [f for f in visible if f["parent_id"] == folder_id]
     children.sort(key=lambda f: f["name"])
     return children
@@ -40,7 +40,7 @@ async def create_folder(
 ):
     """Create a new folder. Validates parent_id ownership if provided."""
     if body.parent_id:
-        visible = fetch_visible_folders(supabase, current_user["id"])
+        visible = await fetch_visible_folders(supabase, current_user["id"])
         visible_ids = {f["id"] for f in visible}
         if str(body.parent_id) not in visible_ids:
             raise HTTPException(status_code=404, detail="Parent folder not found")
@@ -213,7 +213,7 @@ async def move_folder(
     """Move a folder to a different parent. parent_id=null moves to root."""
     # 1. Validate new parent accessibility (if not moving to root)
     if body.parent_id:
-        visible = fetch_visible_folders(supabase, current_user["id"])
+        visible = await fetch_visible_folders(supabase, current_user["id"])
         visible_ids = {f["id"] for f in visible}
         if str(body.parent_id) not in visible_ids:
             raise HTTPException(status_code=404, detail="Parent folder not found")

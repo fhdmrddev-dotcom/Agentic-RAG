@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 from supabase import Client
 
 from app.services.embedding_service import embed_texts
+from app.utils.db import aexec
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -379,7 +380,7 @@ def extract_and_store_images(
 # query_tables tool service (MODAL-03, Phase 36)
 # ---------------------------------------------------------------------------
 
-def _fetch_document_tables(doc_id: str, user_id: str, page_filter: int | None, supabase: "Client") -> list[dict]:
+async def _fetch_document_tables(doc_id: str, user_id: str, page_filter: int | None, supabase: "Client") -> list[dict]:
     """Query document_tables for a given document_id, optional page filter.
 
     Extracted as a module-level function so tests can patch it cleanly.
@@ -393,11 +394,11 @@ def _fetch_document_tables(doc_id: str, user_id: str, page_filter: int | None, s
     )
     if page_filter is not None:
         query = query.eq("page", page_filter)
-    result = query.order("table_index").execute()
+    result = await aexec(query.order("table_index"))
     return result.data or []
 
 
-def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> str:
+async def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> str:
     """Service function for the query_tables tool (D-04/D-05/D-06).
 
     Resolves document_name → document_id, queries document_tables,
@@ -414,11 +415,11 @@ def handle_query_tables(args: dict, user_id: str, supabase: "Client") -> str:
     page_filter: int | None = args.get("page")
 
     # Pitfall 7: must resolve document_name → UUID first
-    doc_id = resolve_document_id(document_name, user_id, supabase)
+    doc_id = await resolve_document_id(document_name, user_id, supabase)
     if not doc_id:
         return json.dumps({"error": f"Document '{document_name}' not found."})
 
-    tables = _fetch_document_tables(doc_id, user_id, page_filter, supabase)
+    tables = await _fetch_document_tables(doc_id, user_id, page_filter, supabase)
     if not tables:
         return json.dumps({"error": f"No tables found for document '{document_name}'."})
 
