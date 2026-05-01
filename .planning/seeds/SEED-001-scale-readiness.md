@@ -1,0 +1,84 @@
+---
+seed_id: SEED-001
+title: Scale Readiness — multi-user concurrent load
+planted_during: v2.5 SSE Concurrency & Reconnect Stability (2026-05-01)
+trigger_when:
+  - Feature set declared "complete" (no major new feature milestones in flight)
+  - Concurrent-user load reported by >10 simultaneous active users in production
+  - Latency or queueing complaints from users (P95 response time degradation, "spinner stuck" reports)
+  - Backend logs show AnyIO threadpool saturation (queueing at the limiter)
+status: planted
+---
+
+# SEED-001: Scale Readiness — multi-user concurrent load
+
+## Idea
+
+Bring the backend to production-grade concurrent-user readiness by eliminating the AnyIO threadpool ceiling, planning a real multi-worker deployment, and treating Realtime as a tunable enhancement rather than a critical-path dependency.
+
+## Scope (when triggered)
+
+This seed becomes a milestone or set of phases when triggered. Likely scope:
+
+1. **CONCUR-03 — asyncpg migration for hot paths**
+   Migrate the streaming endpoint specifically (and any other hot paths) from sync `supabase-py` (`run_in_threadpool`-wrapped) to `asyncpg` directly, removing the AnyIO 40→200 threadpool ceiling entirely. Keep `supabase-py` for less-hot endpoints if RLS / metadata convenience justifies the threadpool dispatch.
+
+2. **Multi-worker production deployment**
+   - Validate `uvicorn --workers N` (N = CPU cores) safely with v2.5's blocking-call fixes in place.
+   - Audit any module-level globals that assume single-worker state (rare in this codebase, but verify).
+   - Move sessions / caches that need cross-worker coherence to Redis.
+
+3. **Sticky websocket sessions if Realtime returns as authoritative**
+   - Required only if STREAM-03 (Realtime as low-latency hint layer) is reintroduced as more than best-effort.
+   - Load balancer config: hash-based sticky session for Supabase Realtime channel WebSockets.
+
+4. **Backpressure + queueing instrumentation**
+   - Metric: AnyIO threadpool saturation (queue depth)
+   - Metric: SSE active stream count per worker
+   - Metric: Agent loop end-to-end latency P50/P95/P99
+   - Surface in Knowledge Health Dashboard or a new operations dashboard.
+
+5. **Rate limiting**
+   - Per-user concurrent SSE stream cap (currently no limit — one user could open N tabs and consume all worker slots)
+   - Per-user request-rate limit on the SSE endpoint specifically
+
+## Why This Matters
+
+The bug fixed in v2.5 (sync supabase calls blocking the event loop) was masked in dev by single-worker, but the **same bug shape** surfaces in production under load:
+
+- Each worker has a **default 40-thread AnyIO ceiling**
+- LLM agent loops issue 5–20 DB calls each (search, embed, persist, audit, …)
+- ~8–32 concurrent users saturate per cluster before queueing starts visibly hanging
+
+v2.5 buys 5× headroom by raising the AnyIO ceiling from 40 → 200 (D-058-01 in the Phase 058 plan). That's enough for a small user base but **not** for a production launch with hundreds of concurrent users. The proper fix — `asyncpg` direct — was deliberately deferred from v2.5 because:
+
+- v2.5 is a 5-phase bug-fix milestone; expanding it to include async migration would dilute focus
+- The threadpool wrap is mechanical and safe; the async migration touches every retrieval/persistence helper and needs its own milestone with its own test coverage
+- Without observability of actual queue depth, premature optimization risks the wrong thing
+
+The right time to do this work is **after** the feature surface stops moving, **before** scaling marketing or customer onboarding past ~10 active concurrent users.
+
+## What This Seed Avoids
+
+Planting this as a seed (rather than expanding v2.5 or planning it now) prevents:
+
+- Scope creep on v2.5 (already a hard fix-up milestone with two prior failures)
+- Over-engineering before real load data is available (the AnyIO bump may be sufficient longer than expected)
+- Locking in a multi-worker deployment topology before answering the Realtime/STREAM-03 question
+
+## Companion Documents
+
+- `.planning/research/058-sse-concurrency-research.md` — Section A2 (asyncpg vs run_in_threadpool tradeoff), Section A4 (Uvicorn workers tradeoffs)
+- `.planning/REQUIREMENTS.md` — Future Requirements section: CONCUR-03 already enumerated as deferred
+- `.planning/PROJECT.md` — Out of Scope: "Multi-worker uvicorn (`--workers N`)" with reason captured
+
+## Decision Triggers
+
+Surface this seed during `/gsd:new-milestone` if any of the following are true:
+- The current milestone is post-feature-complete (no new major capability work)
+- Production telemetry reports concurrent-user contention
+- A future "operations" or "platform" milestone is being scoped
+- A pre-launch readiness review is underway
+
+---
+*Planted 2026-05-01 during v2.5 milestone bootstrap by recommendation of research synthesis and user request.*
