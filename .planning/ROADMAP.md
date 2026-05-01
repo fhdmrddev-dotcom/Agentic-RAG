@@ -120,7 +120,7 @@ Full details: `.planning/milestones/v2.4-ROADMAP.md`
 <details open>
 <summary>🔄 v2.5 SSE Concurrency & Reconnect Stability (Phases 058–062) — IN PROGRESS, started 2026-05-01</summary>
 
-- [ ] **Phase 058: Backend SSE Concurrency Fix** — Wrap blocking supabase `.execute()` calls so cross-tab requests aren't queued behind streaming agents
+- [X] **Phase 058: Backend SSE Concurrency Fix** — Wrap blocking supabase `.execute()` calls so cross-tab requests aren't queued behind streaming agents (completed 2026-05-01)
 - [ ] **Phase 059: SSE Architecture Refactor** — `asyncio.Queue` + background task + `sse-starlette` so handler lifetime decouples from agent loop lifetime
 - [ ] **Phase 060: Frontend Race Fixes** — `setViewingThread` separation, `AbortController` cancellation, drop the `finally`-block reload that leaked tool-result JSON
 - [ ] **Phase 061: Reconnect Handlers** — `visibilitychange` + `pageshow` recovery for Symptom E; one-shot reconcile fetch + Resume button for Symptom F
@@ -233,7 +233,7 @@ Full details below in **Phase Details**.
 | 56. Agent Real-Time Feedback | v2.4 | 3/3 | Complete | 2026-04-29 |
 | 56.1. Agent Feedback Gaps | v2.4 | 3/3 | Complete | 2026-04-29 |
 | 57. SSE Realtime Reconnect Fix | v2.4 | 2/2 | Deferred | — |
-| 058. Backend SSE Concurrency Fix | v2.5 | 0/0 | Not started | — |
+| 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
 | 059. SSE Architecture Refactor | v2.5 | 0/0 | Not started | — |
 | 060. Frontend Race Fixes | v2.5 | 0/0 | Not started | — |
 | 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
