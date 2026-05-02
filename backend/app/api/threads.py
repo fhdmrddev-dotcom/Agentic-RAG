@@ -817,8 +817,8 @@ async def send_message(
                                     max_tokens=_ant_max_tokens,
                                     force_no_tools=force_no_tools,
                                 )
-                                tool_calls_buffer = {}
-                                finish_reason = None
+                                tool_calls_buffer: dict = {}
+                                finish_reason: str | None = None
                                 _announced_tools_ant: set[int] = set()
                                 for _ant_event in _ant_gen:
                                     _etype = _ant_event.get("type")
