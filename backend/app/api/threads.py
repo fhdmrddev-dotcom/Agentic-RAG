@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import json
+import logging
 import os
 import time as time_mod
 from datetime import datetime, timezone
@@ -40,6 +41,7 @@ from app.services.sub_agent_service import run_sub_agent
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
+logger = logging.getLogger(__name__)
 
 
 def _is_transient_provider_error(e: APIError) -> bool:
@@ -532,9 +534,6 @@ async def send_message(
         - After the shielded persist, CancelledError is re-raised per RESEARCH §A5.
         """
         try:                          # OUTER try → finally pushes sentinel (Pitfall 4)
-            import logging
-            logger = logging.getLogger(__name__)
-
             # Load user settings for this request (apply per-request provider override if sent)
             user_settings = load_user_settings(current_user["id"])
             if body.provider and body.provider != user_settings.active_provider:
@@ -1859,7 +1858,6 @@ async def send_message(
             except asyncio.CancelledError:
                 pass  # expected on disconnect — producer's finally already ran
             except Exception:
-                import logging
-                logging.getLogger(__name__).exception("agent_runner crashed")
+                logger.exception("agent_runner crashed")
 
     return EventSourceResponse(event_consumer(), ping=15)
