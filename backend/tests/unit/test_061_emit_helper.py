@@ -42,9 +42,9 @@ async def test_emit_terminal_no_maxlen():
 
 @pytest.mark.asyncio
 async def test_emit_terminal_rejects_non_terminal_type():
-    """_emit_terminal asserts type ∈ TERMINAL_TYPES — guard against accidental misuse."""
+    """_emit_terminal raises ValueError if type ∉ TERMINAL_TYPES (WR-03: was assert)."""
     from app.api.threads import _emit_terminal
 
     mock_redis = AsyncMock()
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="TERMINAL_TYPES"):
         await _emit_terminal(mock_redis, uuid.uuid4(), "delta")

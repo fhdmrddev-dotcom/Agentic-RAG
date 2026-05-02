@@ -114,7 +114,11 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     type MUST be in TERMINAL_TYPES. Called inside the producer's shielded
     finalizer BEFORE EXPIRE — Pitfall 2 ordering rule.
     """
-    assert type in TERMINAL_TYPES, f"_emit_terminal type must be in TERMINAL_TYPES, got {type!r}"
+    # WR-03: explicit raise (not assert) — assertions are stripped under `python -O`.
+    if type not in TERMINAL_TYPES:
+        raise ValueError(
+            f"_emit_terminal type must be in TERMINAL_TYPES, got {type!r}"
+        )
     await redis.xadd(
         f"run:{run_id}",
         {"data": json.dumps({"type": type, **fields})},
@@ -1984,10 +1988,15 @@ async def send_message(
                         # 2. TERMINAL SENTINEL XADD — MUST come BEFORE EXPIRE (Pitfall 2).
                         # Use _emit_terminal (no MAXLEN — sentinel must not be trimmed, Pitfall 5).
                         # Map runs.status enum → SSE TERMINAL_TYPES (D-061-09 vs D-061-12 namespaces).
+                        # CR-02 + WR-03: catch BaseException (incl. CancelledError) so a
+                        # lifespan-shutdown cancel mid-finalize doesn't leave runs row stuck
+                        # in 'streaming'. Also catches KeyError if an unmapped status sneaks
+                        # past the _RUN_STATUS_TO_TERMINAL_TYPE lookup, plus any future
+                        # ValueError from the _emit_terminal type guard.
                         try:
                             _terminal_type = _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status]
                             await _emit_terminal(redis, run_id, _terminal_type, error=_terminal_error)
-                        except Exception:
+                        except BaseException:
                             logger.exception("Terminal sentinel XADD failed for run %s", run_id)
 
                         # 3. UPDATE runs row — status/error/completed_at/message_id/tokens
@@ -1999,21 +2008,21 @@ async def send_message(
                                 "message_id": _persisted_msg_id,
                                 # input_tokens/output_tokens: filled if SDK surfaced usage; NULL otherwise (RESEARCH.md Q1)
                             }).eq("run_id", str(run_id)))
-                        except Exception:
+                        except BaseException:
                             logger.exception("runs row UPDATE failed for run %s", run_id)
 
                         # 4. EXPIRE Redis stream — 600s completed, 60s failed/cancelled (REDIS-SETUP.md TTL discipline)
                         _ttl = 600 if _terminal_status == "completed" else 60
                         try:
                             await redis.expire(f"run:{run_id}", _ttl)
-                        except Exception:
+                        except BaseException:
                             logger.exception("EXPIRE failed for run %s", run_id)
 
                         # 5. ZREM sorted-set indexes
                         try:
                             await redis.zrem("runs:active", str(run_id))
                             await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
-                        except Exception:
+                        except BaseException:
                             logger.exception("ZREM failed for run %s", run_id)
 
                     try:
