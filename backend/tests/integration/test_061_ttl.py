@@ -22,6 +22,7 @@ from tests.integration._run_helpers import (  # noqa: E402
     _make_result,
     _thread_row,
     _extract_run_id_from_mock,
+    await_producer_finalized,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _reset_sse_starlette_app_status,
@@ -99,6 +100,9 @@ async def test_failed_run_expires_60s(redis_client):
                 ) as r:
                     async for _line in r.aiter_lines():
                         pass
+
+            # D-061.1-01: deterministic await for _shielded_finalize completion
+            await await_producer_finalized(mock_supabase)
 
             run_id = _extract_run_id_from_mock(mock_supabase)
             ttl = await redis_client.ttl(f"run:{run_id}")

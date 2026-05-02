@@ -19,6 +19,7 @@ from app.services.openai_service import CallingMode
 from tests.integration._run_helpers import (  # noqa: E402
     _build_mock_supabase,
     _fast_chunks,
+    await_producer_finalized,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _reset_sse_starlette_app_status,
@@ -54,6 +55,9 @@ async def test_runs_lifecycle_row():
                 ) as r:
                     async for _line in r.aiter_lines():
                         pass
+
+            # D-061.1-01: deterministic await for _shielded_finalize completion
+            await await_producer_finalized(mock_supabase)
 
             runs_builder = mock_supabase.table("runs")
 

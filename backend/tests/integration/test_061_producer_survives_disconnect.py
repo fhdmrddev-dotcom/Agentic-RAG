@@ -37,6 +37,7 @@ from tests.integration._run_helpers import (  # noqa: E402
     _thread_row,
     _slow_chunks,
     _extract_run_id_from_mock,
+    await_producer_finalized,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _drive_sse_until_disconnect,
@@ -150,6 +151,9 @@ async def test_producer_continues_after_consumer_disconnect(redis_client):
                 f"Pitfall 1 parity: xrange count {xrange_count} must equal "
                 f"xlen {xlen_final} — any divergence indicates a stream-id race or trim."
             )
+
+            # D-061.1-01: deterministic await for _shielded_finalize completion
+            await await_producer_finalized(mock_supabase)
 
             # Assert runs.status='completed' UPDATE happened
             runs_builder = mock_supabase.table("runs")

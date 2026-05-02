@@ -22,6 +22,7 @@ from tests.integration._run_helpers import (  # noqa: E402
     _make_done_chunk,
     _make_sse_chunk,
     _extract_run_id_from_mock,
+    await_producer_finalized,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _reset_sse_starlette_app_status,
@@ -67,6 +68,9 @@ async def test_120s_timeout_fires_full_finally(redis_client, monkeypatch):
                 ) as r:
                     async for _line in r.aiter_lines():
                         pass   # drain (consumer will emit synthetic timeout error eventually)
+
+            # D-061.1-01: deterministic await for _shielded_finalize completion
+            await await_producer_finalized(mock_supabase)
 
             run_id = _extract_run_id_from_mock(mock_supabase)
             stream_key = f"run:{run_id}"

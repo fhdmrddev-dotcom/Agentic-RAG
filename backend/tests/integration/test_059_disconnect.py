@@ -53,6 +53,7 @@ from tests.integration._run_helpers import (
     _make_table_builder,
     _build_mock_supabase,
     _slow_chunks,
+    await_producer_finalized,
 )
 
 THREAD_A = str(uuid4())  # 059 is single-thread; no THREAD_B
@@ -278,12 +279,15 @@ async def test_agent_task_SURVIVES_on_disconnect(redis_client):
             # Snapshot XLEN at disconnect
             xlen_at_disconnect = await redis_client.xlen(stream_key)
 
-            # I1' INVERSION: producer keeps running for >= 5s post-disconnect
-            await asyncio.sleep(5.0)
+            # I1' INVERSION: producer keeps running after disconnect.
+            # WR-04 (D-061.1-14): await producer finalization deterministically
+            # instead of a fixed 5s sleep. D-061-16 contract preserved:
+            # producer SURVIVES disconnect; XLEN must grow post-disconnect.
+            await await_producer_finalized(mock_supabase)
             xlen_after = await redis_client.xlen(stream_key)
             assert xlen_after > xlen_at_disconnect, (
                 f"D-061-16 inversion: producer should KEEP RUNNING after disconnect. "
-                f"At disconnect: {xlen_at_disconnect}; after 5s: {xlen_after}"
+                f"At disconnect: {xlen_at_disconnect}; after finalize: {xlen_after}"
             )
 
             # I2' INVERSION: LLM calls AFTER disconnect are now allowed (>= 0).
@@ -363,6 +367,9 @@ async def test_normal_stream_unchanged():
                             types_seen.append(payload.get("type"))
     finally:
         app.dependency_overrides[get_supabase] = lambda: _conftest_supabase
+
+    # D-061.1-01: deterministic await for _shielded_finalize completion
+    await await_producer_finalized(mock_supabase)
 
     assert "delta" in types_seen, (
         f"Expected 'delta' event in stream; got types={types_seen}. "
