@@ -33,6 +33,7 @@ def _make_builder(execute_result):
     b.insert.return_value = b
     b.update.return_value = b
     b.delete.return_value = b
+    b.upsert.return_value = b   # WR-06 (D-061.1-13): user_memory.upsert(...) chain
     b.eq.return_value = b
     b.neq.return_value = b
     b.in_.return_value = b
@@ -88,7 +89,13 @@ def reset_mocks():
     Reset all mocks before each test to prevent state leakage.
     Critically, this clears side_effect so one test's side_effect list
     doesn't cause StopIteration in the next test.
+    Also restores dependency_overrides so tests that swap get_supabase
+    don't contaminate subsequent tests.
     """
+    # Restore canonical dependency overrides (tests may swap get_supabase locally)
+    app.dependency_overrides[get_current_user] = lambda: mock_user_data
+    app.dependency_overrides[get_supabase] = lambda: _supabase
+
     # Reset the execute result
     _execute_result.reset_mock()
     _execute_result.data = []
@@ -99,6 +106,7 @@ def reset_mocks():
     _builder.insert.return_value = _builder
     _builder.update.return_value = _builder
     _builder.delete.return_value = _builder
+    _builder.upsert.return_value = _builder   # WR-06 (D-061.1-13)
     _builder.eq.return_value = _builder
     _builder.neq.return_value = _builder
     _builder.in_.return_value = _builder
