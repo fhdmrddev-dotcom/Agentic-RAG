@@ -629,27 +629,27 @@ async def producer(queue: asyncio.Queue):
 
 **Conclusion:** 1 second is adequate but not generous. The CONCUR-02 acceptance test should ideally measure latency from `http.disconnect` to "no further LLM API calls" — KI-001's behaviour means that an in-flight chunk may complete after the disconnect, but no NEW LLM call (i.e. next iteration of the agent loop) starts. The 058's test pattern of a `slow_mock_llm` reused here keeps the test deterministic.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should the consumer await `task` after sentinel?**
    - What we know: The pattern in research §A3 spawns the task, never awaits it (it's "fire and forget"). However, anyio task groups inside sse-starlette will detect that the consumer's underlying task finished but the producer is still alive — depending on Python/uvicorn versions, this can leave a "Task was destroyed but it is pending!" warning in logs.
    - What's unclear: Does the `consumer()`'s `finally` block need an explicit `await task` (with a `try/except CancelledError: pass`) to drain the producer task cleanly?
-   - Recommendation: **Yes** — add it. The CONTEXT.md sketch already implies this; the planner should make it explicit. Also benefits: lets the consumer surface non-cancellation exceptions from the producer for logging.
+   - **RESOLVED:** **Yes** — add it. The CONTEXT.md sketch already implies this; the planner should make it explicit. Also benefits: lets the consumer surface non-cancellation exceptions from the producer for logging. (Implemented in `059-02-PLAN.md` consumer block — `try/await task/except CancelledError: pass`.)
 
 2. **Where exactly does the producer's `try/finally` need to be placed for the sentinel to be guaranteed?**
    - What we know: D-059-04 says "Producer's outermost `finally` always puts `None` last (after the shielded persist)." The sketch in this document uses the structure `async def agent_runner(): try: try: <body>; finally: shielded_persist; finally: queue.put(None)`.
    - What's unclear: Is the `try/finally`-wrapping mechanically faithful to the existing line 736-1791 structure?
-   - Recommendation: The current code at `threads.py:736-1791` ALREADY has the outer `try/finally` for the shielded persist. 059's change is to wrap the WHOLE producer body in ONE more outer `try/finally` whose only purpose is `await queue.put(None)`. Two finallys: outer = sentinel, inner = shielded persist. Planner verifies.
+   - **RESOLVED:** The current code at `threads.py:736-1791` ALREADY has the outer `try/finally` for the shielded persist. 059's change is to wrap the WHOLE producer body in ONE more outer `try/finally` whose only purpose is `await queue.put(None)`. Two finallys: outer = sentinel, inner = shielded persist. (Implemented in `059-02-PLAN.md` task 1 action — explicit two-finally structure verified.)
 
 3. **Does `EventSourceResponse` need a `Content-Type: text/event-stream; charset=utf-8` header explicitly, or does it set it itself?**
    - What we know: Looking at sse-starlette source (Context7), `EventSourceResponse` sets `media_type = "text/event-stream"` automatically. CORS is handled by FastAPI's existing middleware (verified `main.py` has `CORSMiddleware`).
    - What's unclear: Are there any required `Cache-Control: no-cache` or `X-Accel-Buffering: no` headers we need to manually pass via `headers={...}`?
-   - Recommendation: sse-starlette sets `Cache-Control: no-cache` automatically (verified in source). Don't override unless a future ngnix layer surfaces buffering. Defer.
+   - **RESOLVED:** sse-starlette sets `Cache-Control: no-cache` automatically (verified in source). Don't override unless a future nginx layer surfaces buffering. Deferred — no plan action.
 
 4. **Should 059 add a `pytest.ini` timeout to prevent the disconnect test hanging if the cancellation logic regresses?**
    - What we know: 058's test uses `timeout=30.0` on the httpx stream call, which limits ONE call. Pytest itself has no global test timeout in the project today.
    - What's unclear: Does `pytest-asyncio` have a default timeout? (No, it doesn't — defaults to none.)
-   - Recommendation: Add `pytest-timeout>=2.4.0` (already in many Python projects) and set a 10s timeout on the disconnect test. Belt-and-suspenders against Pitfall 4 (queue sentinel never sent → consumer hangs forever).
+   - **RESOLVED:** Add `pytest-timeout>=2.4.0` and set a 10s timeout on the disconnect test. Belt-and-suspenders against Pitfall 4 (queue sentinel never sent → consumer hangs forever). (Implemented in `059-01-PLAN.md` task 1 — `pytest-timeout>=2.4.0` pinned in `backend/requirements.txt`; `@pytest.mark.timeout(10)` decorator applied in `059-03-PLAN.md` test body.)
 
 ## Environment Availability
 
