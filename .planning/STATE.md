@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: ready_to_plan
-stopped_at: Phase 060 shipped (STREAM-02a closed); v2.5 rescoped for STREAM-04 (Claude/ChatGPT-class run-backed streaming); next is 061 Run-Backed Streaming Backend
-last_updated: "2026-05-02T07:45:00Z"
-last_activity: 2026-05-02 — v2.5 milestone rescoped; new phases 061-063 plus renumbered 064/065
+milestone: v2.5
+milestone_name: Deployment Strategy
+status: Ready to discuss
+stopped_at: Phase 061 context gathered
+last_updated: "2026-05-02T11:39:44.275Z"
+last_activity: 2026-05-02
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 9
   completed_plans: 9
-  percent: 38
+  percent: 100
 ---
 
 # Project State
@@ -129,7 +129,7 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 060 context gathered
+Stopped at: Phase 061 context gathered
 Next: `/gsd-discuss-phase 059` to begin SSE Architecture Refactor
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
