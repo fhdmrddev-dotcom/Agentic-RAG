@@ -237,7 +237,7 @@ Full details below in **Phase Details**.
 | 56.1. Agent Feedback Gaps | v2.4 | 3/3 | Complete | 2026-04-29 |
 | 57. SSE Realtime Reconnect Fix | v2.4 | 2/2 | Deferred | — |
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
-| 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete | 2026-05-02 |
+| 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 060. Frontend Race Fixes | v2.5 | 0/0 | Not started | — |
 | 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
 | 062. Validation Harness | v2.5 | 0/0 | Not started | — |

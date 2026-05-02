@@ -53,7 +53,7 @@ Deferred to later milestones. Tracked but not in v2.5 roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CONCUR-01 | Phase 058 | Pending |
-| CONCUR-02 | Phase 059 | Pending |
+| CONCUR-02 | Phase 059 | Complete |
 | STREAM-02a | Phase 060 | Pending |
 | STREAM-02b | Phase 061 | Pending |
 | TEST-01 | Phase 062 | Pending |
