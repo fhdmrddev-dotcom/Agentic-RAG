@@ -18,7 +18,8 @@ except ImportError:
     AnthropicAPIError = Exception  # fallback if SDK not installed
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, get_redis
+import redis.asyncio as aioredis
 from app.models.message import MessageCreate, MessageResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
@@ -62,6 +63,51 @@ def _spawn(coro) -> asyncio.Task:
     _BACKGROUND_TASKS.add(t)
     t.add_done_callback(_BACKGROUND_TASKS.discard)
     return t
+
+
+# ── Phase 061: per-run producer-task registry (D-061-11, D-v2.5-08) ──────
+# Module-level dict keyed by run_id. The route handler registers new
+# producer tasks; the producer's finally pops itself; the lifespan close
+# in main.py cancels all entries (Plan 01 — late-bound import). 062's
+# DELETE /runs/{id} will look up the run_id here and call task.cancel().
+# Single uvicorn worker (D-v2.5-02) means one registry per process — no
+# cross-process coordination needed.
+import uuid as _uuid_mod
+RUN_TASKS: dict[_uuid_mod.UUID, asyncio.Task] = {}
+
+# Terminal sentinel discriminator types (D-061-12). Consumer breaks when
+# it XREADs an entry whose data.type is in this set.
+TERMINAL_TYPES = frozenset({"done", "error", "cancelled"})
+
+
+async def _emit(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> None:
+    """One canonical XADD shape for all producer-side events (D-061-10).
+
+    Wire format byte-identical to 059's queue payload: single-field
+    `data` containing JSON-encoded {type, **fields}. MAXLEN ~ 10000 caps
+    per-run buffer at ~2MB (typical run emits <500 events). The terminal
+    sentinel XADD goes through _emit_terminal() instead so it's exempt
+    from MAXLEN trimming (Pitfall 5).
+    """
+    await redis.xadd(
+        f"run:{run_id}",
+        {"data": json.dumps({"type": type, **fields})},
+        maxlen=10000,
+        approximate=True,
+    )
+
+
+async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> None:
+    """Terminal sentinel XADD — exempt from MAXLEN trimming (Pitfall 5).
+
+    type MUST be in TERMINAL_TYPES. Called inside the producer's shielded
+    finalizer BEFORE EXPIRE — Pitfall 2 ordering rule.
+    """
+    assert type in TERMINAL_TYPES, f"_emit_terminal type must be in TERMINAL_TYPES, got {type!r}"
+    await redis.xadd(
+        f"run:{run_id}",
+        {"data": json.dumps({"type": type, **fields})},
+    )
 
 
 def _is_transient_provider_error(e: APIError) -> bool:
@@ -520,6 +566,7 @@ async def send_message(
     body: MessageCreate,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     thread_resp = await aexec(
         supabase.table("threads")
@@ -541,25 +588,75 @@ async def send_message(
         })
     )
 
-    queue: asyncio.Queue = asyncio.Queue(maxsize=100)   # D-059-04
+    # Phase 061 (D-061-05, D-061-10, D-061-11): generate run_id, INSERT
+    # the runs lifecycle row, register the producer task, and ZADD the
+    # sorted-set indexes — all BEFORE returning the consumer.
+    #
+    # NOTE: hoisted load_user_settings here from inside agent_runner so we
+    # can resolve model/provider for the runs INSERT before spawning the
+    # producer. Inside agent_runner, we shadow this with the same call so
+    # the producer's closure-captured user_settings is independent (cheap
+    # second call; load_user_settings is a settings-file read).
+    _user_settings = load_user_settings(current_user["id"])
+    if body.provider and body.provider != _user_settings.active_provider:
+        _user_settings = override_provider(_user_settings, body.provider)
 
-    async def agent_runner() -> None:
-        """Producer task — runs the agent loop and pushes JSON payloads onto the queue.
+    run_id = _uuid_mod.uuid4()
+    _resolved_model = body.model if getattr(body, "model", None) else _user_settings.llm_model
+    _resolved_provider = _user_settings.active_provider
 
-        Cancellation contract (D-059-02):
-        - Created via asyncio.create_task in the route handler.
-        - event_consumer cancels this task on client disconnect (sse-starlette
-          _listen_for_disconnect → consumer.finally → task.cancel()).
-        - Outer try/finally pushes None as a queue sentinel (Pitfall 4 guard).
-        - Inner try/finally runs asyncio.shield(_persist_assistant_message())
-          so the partial-response DB write completes even on cancel.
-        - After the shielded persist, CancelledError is re-raised per RESEARCH §A5.
+    try:
+        await aexec(
+            supabase.table("runs").insert({
+                "run_id": str(run_id),
+                "thread_id": thread_id,
+                "user_id": current_user["id"],
+                "status": "streaming",
+                "model": _resolved_model,
+                "provider": _resolved_provider,
+            })
+        )
+
+        # ZADD sorted-set indexes (REDIS-SETUP.md key conventions). Score is
+        # the started_at unix timestamp so 062's active-runs endpoint can
+        # ZRANGEBYSCORE for time-window queries.
+        _started_score = time_mod.time()
+        try:
+            await redis.zadd(f"runs_by_thread:{thread_id}", {str(run_id): _started_score})
+            await redis.zadd("runs:active", {str(run_id): _started_score})
+        except Exception:
+            logger.exception("ZADD failed for run %s; continuing (passive cleanup at query time)", run_id)
+    except Exception:
+        # Spawn-failure cleanup (RESEARCH.md Q2): don't leave orphan runs row + ZADD entries.
+        try:
+            await aexec(supabase.table("runs").update({
+                "status": "failed", "error": "spawn_failed",
+                "completed_at": "now()",
+            }).eq("run_id", str(run_id)))
+        except Exception:
+            logger.exception("Failed to mark spawn-failed run row")
+        try:
+            await redis.zrem("runs:active", str(run_id))
+            await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
+        except Exception:
+            pass
+        raise
+
+    async def agent_runner(run_id: _uuid_mod.UUID) -> None:
+        """Producer task — XADDs every SSE event to run:{run_id} Redis Stream.
+
+        Phase 061 (D-061-01, D-061-10, D-v2.5-08): replaces 059's
+        queue.put(...) producer. Lifetime decoupled from the SSE consumer
+        (D-061-03). Body wrapped in asyncio.timeout(120s) to bound
+        abandoned runs (D-061-01); on TimeoutError the outer except sets
+        error_value='hard_timeout' and the finally writes the terminal
+        error sentinel + runs UPDATE + EXPIRE 60.
         """
-        try:                          # OUTER try → finally pushes sentinel (Pitfall 4)
-            # Load user settings for this request (apply per-request provider override if sent)
-            user_settings = load_user_settings(current_user["id"])
-            if body.provider and body.provider != user_settings.active_provider:
-                user_settings = override_provider(user_settings, body.provider)
+        try:                          # OUTER try → finally runs shielded finalizer (Plan 03 Task 3)
+            # Reuse the user_settings already resolved by the route handler
+            # (hoisted from inside this function in Plan 03 Task 1 so the
+            # runs INSERT could populate model/provider before producer spawn).
+            user_settings = _user_settings
 
             # Load thread's folder scope
             thread_data = await aexec(
@@ -1858,7 +1955,16 @@ async def send_message(
                 pass
 
     # Spawn producer task — runs concurrently with the consumer below.
-    task = asyncio.create_task(agent_runner())
+    # D-061-11: register the producer in RUN_TASKS BEFORE returning the
+    # consumer. add_done_callback evicts on completion (defense-in-depth;
+    # the producer's own finally ALSO pops). 062's DELETE /runs/{id}
+    # looks up run_id here and calls task.cancel().
+    task = asyncio.create_task(agent_runner(run_id))
+    RUN_TASKS[run_id] = task
+
+    def _evict(_t, _rid=run_id):
+        RUN_TASKS.pop(_rid, None)
+    task.add_done_callback(_evict)
 
     async def event_consumer():
         """Thin consumer — yields queue payloads as SSE data dicts.
