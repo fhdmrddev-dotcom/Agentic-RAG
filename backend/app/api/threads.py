@@ -79,6 +79,17 @@ RUN_TASKS: dict[_uuid_mod.UUID, asyncio.Task] = {}
 # it XREADs an entry whose data.type is in this set.
 TERMINAL_TYPES = frozenset({"done", "error", "cancelled"})
 
+# D-061-09 runs.status enum → SSE TERMINAL_TYPES mapping. The runs table
+# uses {"streaming","completed","failed","cancelled"} per the migration
+# CHECK constraint; the SSE wire uses TERMINAL_TYPES. They overlap on
+# "cancelled" only, so the producer's finally must translate before
+# calling _emit_terminal.
+_RUN_STATUS_TO_TERMINAL_TYPE: dict[str, str] = {
+    "completed": "done",
+    "failed": "error",
+    "cancelled": "cancelled",
+}
+
 
 async def _emit(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> None:
     """One canonical XADD shape for all producer-side events (D-061-10).
@@ -1952,8 +1963,10 @@ async def send_message(
 
                         # 2. TERMINAL SENTINEL XADD — MUST come BEFORE EXPIRE (Pitfall 2).
                         # Use _emit_terminal (no MAXLEN — sentinel must not be trimmed, Pitfall 5).
+                        # Map runs.status enum → SSE TERMINAL_TYPES (D-061-09 vs D-061-12 namespaces).
                         try:
-                            await _emit_terminal(redis, run_id, _terminal_status, error=_terminal_error)
+                            _terminal_type = _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status]
+                            await _emit_terminal(redis, run_id, _terminal_type, error=_terminal_error)
                         except Exception:
                             logger.exception("Terminal sentinel XADD failed for run %s", run_id)
 
