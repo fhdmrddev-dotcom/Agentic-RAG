@@ -49,10 +49,10 @@ export function useMessages(): UseMessages {
   }, [])
 
   const clearMessages = useCallback(() => {
+    // D-060-10: clearMessages is a pure state reset. The caller (ChatArea, plan 060-02)
+    // is responsible for calling abortStream() first when it intends to cancel a stream.
     setMessages([])
     setIsStreaming(false)
-    abortControllerRef.current?.abort()
-    abortControllerRef.current = null
     isSendingRef.current = false
   }, [])
 
