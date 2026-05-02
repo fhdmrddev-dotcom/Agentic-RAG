@@ -74,15 +74,15 @@ def _slow_chunks(delay: float = SLOW_CHUNK_DELAY, count: int = 5):
     Test's <1s budget includes this gap (RESEARCH §"Cancellation
     Propagation Timeline" — worst-case 500ms+).
 
-    Count is small (5, not the planning-doc default of 50) because httpx
-    ASGITransport BUFFERS the entire response in `body_parts` before
-    returning control to the test. With count=50 × delay=0.3s = 15s of
-    streaming, the entire test run exceeds the 10s timeout. Smaller count
-    keeps the test honest about the producer/consumer pattern (sentinel
-    fires, persist completes) without exceeding the timeout. The Invariant
-    I2 assertion (no NEW LLM calls after t_disconnect) still holds because
-    agent_runner only invokes create_adaptive_streaming_chat once per
-    iteration and the test's slow chunks finish in a single iteration.
+    Count=5 keeps total nominal stream time at ~1.5s of `time.sleep` —
+    long enough that disconnect is genuinely mid-stream (not after natural
+    completion) yet short enough that even a broken cancellation contract
+    only delays the test by the remaining un-slept chunks rather than
+    wedging the suite. The helper's asyncio.wait_for(8.0) is the hard
+    backstop. Note: CR-01-style queue-back-pressure (maxsize=100) requires
+    >>100 queued events to surface and is out of reach for this functional
+    test; CR-01 is covered structurally by code review and the put_nowait
+    sentinel fix, not by overrunning the queue here.
     """
     for i in range(count):
         time.sleep(delay)  # bounded event-loop block; KI-001 territory
@@ -114,25 +114,106 @@ def _make_counted_chat(counter: LLMCallCounter):
     return _patched
 
 
-async def _read_then_disconnect(client: httpx.AsyncClient, thread_id: str) -> float:
-    """Open SSE, read until first data: line lands, exit context (→ http.disconnect).
+async def _drive_sse_until_disconnect(
+    asgi_app,
+    thread_id: str,
+    body_bytes: bytes,
+) -> tuple[float, list[bytes]]:
+    """Drive the ASGI app directly and inject `http.disconnect` mid-stream.
 
-    Returns monotonic timestamp of disconnect so the test can measure
-    cancellation latency from that point. timeout=30.0 + @pytest.mark.timeout(10)
-    on the test guard against Pitfalls 4 (sentinel never sent) and 7
-    (httpx ASGITransport hangs).
+    CR-03 fix (review 2026-05-02): the previous httpx-based helper did NOT
+    actually trigger client disconnect — `httpx.ASGITransport` buffers the
+    entire response body before returning a Response, so exiting the
+    `client.stream(...)` context never delivered an `http.disconnect` ASGI
+    event to the app. The test passed because the mock LLM stream completed
+    naturally inside the test's window, not because cancellation propagated.
+
+    This helper instead speaks ASGI directly:
+
+    1. Build a minimal HTTP scope for `POST /threads/{tid}/messages`.
+    2. Provide a custom `receive` callable: returns the request body once,
+       then waits on an asyncio.Event that the test (via `send`) flips when
+       the first response body chunk arrives — at which point it returns
+       `{"type": "http.disconnect"}`. This is the SAME message sse-starlette
+       listens for in production via its `_listen_for_disconnect` task.
+    3. Provide a custom `send` callable: records every ASGI message and sets
+       the disconnect-trigger event when the first `http.response.body`
+       chunk lands.
+    4. Return monotonic timestamp at which the disconnect was injected so
+       the test can measure cancellation latency from that point, plus the
+       collected body chunks for any structural assertions.
+
+    The ASGI app's task naturally returns when the route handler unwinds
+    (after sse-starlette observes the disconnect and cancels the consumer,
+    which cancels the producer). We `await` the app coroutine inside a
+    `wait_for(...)` to bound the test should the cancellation contract
+    ever regress.
     """
-    async with client.stream(
-        "POST",
-        f"/threads/{thread_id}/messages",
-        json={"content": "hello"},
-        headers={"Authorization": "Bearer test-token"},
-        timeout=30.0,
-    ) as r:
-        async for line in r.aiter_lines():
-            if line.startswith("data:"):
-                break  # exiting `async with` triggers ASGI http.disconnect
-    return time.monotonic()
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": f"/threads/{thread_id}/messages",
+        "raw_path": f"/threads/{thread_id}/messages".encode(),
+        "query_string": b"",
+        "root_path": "",
+        "server": ("testserver", 80),
+        "client": ("testclient", 50000),
+        "headers": [
+            (b"host", b"testserver"),
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(body_bytes)).encode()),
+            (b"authorization", b"Bearer test-token"),
+            (b"accept", b"text/event-stream"),
+        ],
+        "state": {},
+    }
+
+    body_consumed = False
+    disconnect_trigger = asyncio.Event()
+    disconnect_sent = False
+    t_disconnect: list[float] = []
+
+    async def receive():
+        nonlocal body_consumed, disconnect_sent
+        if not body_consumed:
+            body_consumed = True
+            return {"type": "http.request", "body": body_bytes, "more_body": False}
+        if disconnect_sent:
+            # After the disconnect message, sse-starlette stops reading;
+            # block forever (until cancelled by the framework teardown).
+            await asyncio.Event().wait()
+        await disconnect_trigger.wait()
+        disconnect_sent = True
+        t_disconnect.append(time.monotonic())
+        return {"type": "http.disconnect"}
+
+    sent_messages: list[dict] = []
+    first_body_seen = False
+
+    async def send(message):
+        nonlocal first_body_seen
+        sent_messages.append(message)
+        if message.get("type") == "http.response.body" and message.get("body"):
+            if not first_body_seen:
+                first_body_seen = True
+                # Trigger the disconnect AFTER the first non-empty body chunk
+                # so the consumer is mid-stream, exactly like a real client
+                # closing the TCP connection.
+                disconnect_trigger.set()
+
+    # Bound the entire ASGI invocation with a generous timeout — if the
+    # cancellation contract regresses (e.g., CR-01 deadlock returns), this
+    # will fail loudly rather than wedging pytest.
+    await asyncio.wait_for(asgi_app(scope, receive, send), timeout=8.0)
+
+    body_chunks = [
+        m["body"] for m in sent_messages
+        if m.get("type") == "http.response.body" and m.get("body")
+    ]
+    return (t_disconnect[0] if t_disconnect else time.monotonic()), body_chunks
 
 
 # ---------------------------------------------------------------------
@@ -140,13 +221,20 @@ async def _read_then_disconnect(client: httpx.AsyncClient, thread_id: str) -> fl
 # ---------------------------------------------------------------------
 
 @pytest.mark.asyncio
-@pytest.mark.timeout(10)   # belt-and-suspenders against Pitfalls 4 & 7
+@pytest.mark.timeout(15)   # belt-and-suspenders against Pitfalls 4 & 7
 async def test_agent_task_cancels_on_disconnect():
     """Cancellation latency < 1.0s; no NEW LLM calls fire after disconnect.
 
     D-059-06 merge gate. Maps to CONCUR-02 acceptance verbatim.
     Asserts Invariants I1 (latency), I2 (no new calls), I3 (no hang
     proven by absence of timeout), I4 (assistant message persisted).
+
+    CR-03 fix (review 2026-05-02): rewritten to drive the ASGI app
+    directly via `_drive_sse_until_disconnect` instead of httpx, because
+    httpx's ASGITransport buffers the entire response body and never
+    actually delivers an `http.disconnect` event to the app — meaning the
+    pre-fix version of this test passed for reasons unrelated to the
+    cancellation contract it claimed to assert.
     """
     mock_supabase = _build_mock_supabase()
     counter = LLMCallCounter()
@@ -160,6 +248,9 @@ async def test_agent_task_cancels_on_disconnect():
     # patches the test exceeds the 10s timeout. Both functions are normal
     # post-stream calls — they are NOT the surface this test guards
     # (CONCUR-02 cares only about the streaming-cancellation path).
+    body_chunks: list[bytes] = []
+    t_disconnect: float = 0.0
+    t_response_done: float = 0.0
     try:
         with patch(
             "app.api.threads.create_adaptive_streaming_chat",
@@ -171,26 +262,53 @@ async def test_agent_task_cancels_on_disconnect():
             "app.api.threads.generate_thread_title",
             return_value=("Test Title", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
-                t_disconnect = await _read_then_disconnect(c, THREAD_A)
-                # Allow 1s budget for cancellation to propagate
-                # (CONCUR-02 success criterion + RESEARCH §"Cancellation
-                # Propagation Timeline").
-                await asyncio.sleep(1.0)
-
-                # I1 + I2: cancellation latency measured via the absence
-                # of new LLM calls within the 1.0s budget.
-                count_after = counter.count_after(t_disconnect)
-                assert count_after == 0, (
-                    f"Expected 0 LLM calls after disconnect, got {count_after}. "
-                    f"Cancellation did not propagate within 1.0s."
-                )
+            t_disconnect, body_chunks = await _drive_sse_until_disconnect(
+                app,
+                THREAD_A,
+                body_bytes=json.dumps({"content": "hello"}).encode(),
+            )
+            t_response_done = time.monotonic()
     finally:
         app.dependency_overrides[get_supabase] = lambda: _conftest_supabase
 
+    # I1: cancellation latency — the entire ASGI app coroutine returned
+    # within 1.0s of the injected disconnect (with a small allowance for
+    # the in-flight `time.sleep` chunk to complete; per KI-001 we cannot
+    # interrupt mid-sync-step). Worst case is one full SLOW_CHUNK_DELAY
+    # plus the shielded persist itself.
+    latency = t_response_done - t_disconnect
+    assert latency < 1.5, (
+        f"Cancellation propagation took {latency:.2f}s — exceeds the "
+        f"1.5s budget (1.0s contract + 0.3s in-flight chunk). "
+        f"Likely a CR-01 regression (queue back-pressure deadlock)."
+    )
+
+    # I2: zero NEW LLM calls fire after the disconnect timestamp.
+    # `_make_counted_chat` records every call; `count_after` returns the
+    # number of calls strictly later than t_disconnect. The mock LLM
+    # itself only renders one stream per agent iteration, so the agent
+    # would have to enter a SECOND iteration after disconnect to violate
+    # this. With proper cancellation, the producer never reaches the
+    # iteration loop's next `create_adaptive_streaming_chat` call.
+    count_after = counter.count_after(t_disconnect)
+    assert count_after == 0, (
+        f"Expected 0 LLM calls after disconnect, got {count_after}. "
+        f"Cancellation did not propagate within 1.0s."
+    )
+
+    # I3: no consumer hang — proven by `_drive_sse_until_disconnect`
+    # returning at all (its internal asyncio.wait_for hard-cancels at 8s).
+    # Body chunks confirm at least one event reached the consumer before
+    # disconnect, ruling out a no-op test path.
+    assert body_chunks, (
+        "Expected at least one body chunk before disconnect — the test "
+        "helper triggers disconnect AFTER the first chunk arrives. Zero "
+        "chunks means the producer never wrote anything, which would "
+        "make the rest of this test vacuous."
+    )
+
     # I4: assistant message persisted (shielded persist completed even
-    # though the client never received the full response).
-    # Find the messages-table insert calls in the per-table mock.
+    # though the client disconnected mid-stream).
     messages_builder = mock_supabase.table("messages")
     insert_calls = [
         call for call in messages_builder.insert.call_args_list
