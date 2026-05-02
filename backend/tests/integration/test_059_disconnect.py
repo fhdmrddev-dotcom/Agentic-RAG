@@ -53,7 +53,19 @@ def _reset_sse_starlette_app_status():
 
     This fixture clears the cached event before each test so sse-starlette
     creates a fresh one per test loop.
+
+    WR-07: assert the sse-starlette version we validated this against — any
+    minor-version bump that renames or relocates AppStatus would silently
+    break the fixture without obvious failure mode otherwise. Currently
+    pinned to 2.4.x in requirements.txt; bump this guard alongside the pin.
     """
+    import sse_starlette
+    assert sse_starlette.__version__.startswith("2.4."), (
+        f"AppStatus reset fixture validated only for sse-starlette 2.4.x; "
+        f"installed version {sse_starlette.__version__!r} may have moved or "
+        f"renamed AppStatus. Re-validate fixture before bumping the version "
+        f"assertion."
+    )
     from sse_starlette.sse import AppStatus
     AppStatus.should_exit_event = None
     AppStatus.should_exit = False
