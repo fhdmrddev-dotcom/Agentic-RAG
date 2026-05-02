@@ -30,7 +30,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 **Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
 **Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
-**Known tech debt:** KI-001 (in-flight LLM runs to yield point on GeneratorExit); STREAM-02 (now scoped to v2.5 phases 058–062); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
+**Known tech debt:** STREAM-02 (now scoped to v2.5 phases 060–062 — 058 cross-tab unblock and 059 SSE refactor shipped: CONCUR-01/CONCUR-02 closed); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
 
 ## Requirements
 
@@ -259,4 +259,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-01 — v2.5 milestone started (SSE Concurrency & Reconnect Stability)*
+*Last updated: 2026-05-02 — Phase 059 (SSE Architecture Refactor) shipped; CONCUR-02 closed via asyncio.Queue producer + EventSourceResponse + shielded persist*
