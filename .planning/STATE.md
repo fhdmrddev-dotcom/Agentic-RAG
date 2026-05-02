@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 060 context gathered
-last_updated: "2026-05-02T06:19:16.437Z"
-last_activity: 2026-05-02 -- Phase --phase execution started
+stopped_at: Phase 060 shipped (STREAM-02a closed); next is 061 Reconnect Handlers
+last_updated: "2026-05-02T07:30:00Z"
+last_activity: 2026-05-02 — Phase 060 frontend race fixes complete
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 9
-  completed_plans: 6
+  completed_plans: 9
   percent: 50
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 060
+**Current focus:** Phase 061 — Reconnect Handlers (visibilitychange + pageshow recovery; Resume button)
 
 ## Current Position
 
-Phase: 063
+Phase: 061
 Plan: Not started
-Status: Ready to plan
+Status: Ready to discuss
 Last activity: 2026-05-02
-Next action: `/gsd-discuss-phase 059` to begin SSE Architecture Refactor (asyncio.Queue + sse-starlette)
+Next action: `/gsd:discuss-phase 061` to begin Reconnect Handlers (D-v2.5-05: visibilitychange + pageshow + reconcile fetch + Resume button)
 
 ## Recent Completed Phases
 
