@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: Ready to discuss
+status: executing
 stopped_at: Phase 061 context gathered
-last_updated: "2026-05-02T16:18:24.178Z"
-last_activity: 2026-05-02
+last_updated: "2026-05-02T16:21:20.309Z"
+last_activity: 2026-05-02 -- Phase --phase execution started
 progress:
   total_phases: 8
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 061 — Run-Backed Streaming (Backend) — durable per-run buffer in Redis Streams, agent producer task decoupled from any HTTP request
+**Current focus:** Phase --phase — 061
 
 ## Current Position
 
-Phase: 061
-Plan: Not started
-Status: Ready to discuss
-Last activity: 2026-05-02
+Phase: --phase (061) — EXECUTING
+Plan: 1 of --name
+Status: Executing Phase --phase
+Last activity: 2026-05-02 -- Phase --phase execution started
 Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch deployment + `runs` Postgres table for history). Phase 061 scope additions: migration 035_runs_table, redis>=5 dependency, /health Redis check, DELETE /runs/{id} cancel verb (in 062). Decisions to lock during discuss: D-v2.5-09 (Stop semantics specifics, server-side timeout default value, abandoned-run TTL specifics).
 
 ## Recent Completed Phases

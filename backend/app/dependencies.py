@@ -1,3 +1,4 @@
+import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import create_client, Client
@@ -14,6 +15,33 @@ def get_supabase() -> Client:
     if _supabase is None:
         _supabase = create_client(settings.supabase_url, settings.supabase_service_role_key)
     return _supabase
+
+
+_redis: aioredis.Redis | None = None
+
+
+def get_redis() -> aioredis.Redis:
+    """Return the singleton async Redis client (Phase 061 — D-061-13).
+
+    Mirrors get_supabase(): module-level cache, lazy init, no I/O at call
+    time (from_url only sets up pool config; the first awaited command
+    does the TCP connect). Closed in app lifespan via await aclose().
+
+    decode_responses=True: XREAD entries arrive as str (not bytes) so the
+    consumer can json.loads(entry['data']) without a manual .decode().
+    socket_timeout / socket_connect_timeout: defense against Pitfall 7
+    (producer's finally hanging on a half-dead Redis socket).
+    """
+    global _redis
+    if _redis is None:
+        _redis = aioredis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True,
+            socket_timeout=10,
+            socket_connect_timeout=5,
+        )
+    return _redis
 
 
 async def get_current_user(

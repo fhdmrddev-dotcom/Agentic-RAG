@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -9,6 +10,8 @@ import anyio
 # we're mid-write — our SSEStreamingResponse already handles the disconnect
 # gracefully at the ASGI layer, so these warnings are noise.
 logging.getLogger("asyncio").setLevel(logging.ERROR)
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -56,7 +59,42 @@ async def lifespan(app_instance):
     anyio.to_thread.current_default_thread_limiter().total_tokens = (
         settings.anyio_thread_tokens
     )
+
+    # Phase 061 (D-061-13, T-061-05): best-effort Redis startup PING.
+    # Do NOT block startup if Redis is unreachable — the warning log makes
+    # misconfiguration loud. Never log settings.redis_url verbatim (may
+    # contain credentials in cloud setups, e.g. rediss://default:PASSWORD@host).
+    from app.dependencies import get_redis
+    try:
+        await asyncio.wait_for(get_redis().ping(), timeout=1.0)
+        logger.info("Redis ping ok")
+    except Exception as e:
+        logger.warning("Redis unreachable (run-backed streaming will fail): %s", type(e).__name__)
+
     yield
+
+    # Phase 061 (D-061-11): cancel all in-flight producer tasks (registry
+    # lives in threads.py; late-bind import to avoid circular import at
+    # module load — same pattern as the sandbox_manager import below).
+    try:
+        from app.api.threads import RUN_TASKS
+        for task in list(RUN_TASKS.values()):
+            if not task.done():
+                task.cancel()
+        if RUN_TASKS:
+            await asyncio.gather(*RUN_TASKS.values(), return_exceptions=True)
+    except ImportError:
+        # Plan 03 hasn't landed yet — RUN_TASKS doesn't exist. Safe no-op.
+        pass
+
+    # Close the Redis client AFTER cancelling producer tasks (so producers
+    # finishing their finally blocks can still write terminal sentinels).
+    try:
+        from app.dependencies import get_redis
+        await get_redis().aclose()
+    except Exception:
+        logger.exception("Redis aclose failed at shutdown")
+
     # Shutdown: close all open sandbox sessions to free Docker containers
     if settings.sandbox_enabled:
         from app.services.sandbox_service import sandbox_manager
@@ -77,7 +115,13 @@ app.add_middleware(
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    from app.dependencies import get_redis
+    try:
+        await asyncio.wait_for(get_redis().ping(), timeout=1.0)
+        redis_status = "ok"
+    except Exception:
+        redis_status = "unreachable"
+    return {"status": "ok", "redis": redis_status}
 
 
 @app.get("/models")
