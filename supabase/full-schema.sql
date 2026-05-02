@@ -1,7 +1,19 @@
 -- ============================================================
--- FULL SCHEMA — Single fresh-install migration
--- Consolidates migrations 001–030 into final state.
--- Safe to run on a blank Supabase project.
+-- FULL SCHEMA — Generated bootstrap artifact
+-- Single-file consolidation of all numbered migrations.
+-- Use case: greenfield deploy (Hostinger fresh DB, brand-new
+-- Supabase cloud project) where you want to apply the entire
+-- schema in one shot instead of 30+ ordered migrations.
+--
+-- Source of truth: supabase/migrations/*.sql (numbered).
+-- This file is regenerated from those migrations — do NOT edit by hand.
+--
+-- To regenerate after adding a migration:
+--   bash scripts/regenerate-full-schema.sh
+--
+-- Status: STALE — reflects migrations 001–030 only.
+-- Pending regeneration to include 031_skill_embeddings.sql and
+-- 032_phase56_realtime.sql. Run the regenerate script to refresh.
 -- ============================================================
 
 -- ============================================================

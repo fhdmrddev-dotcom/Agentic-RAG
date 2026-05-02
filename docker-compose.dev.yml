@@ -1,0 +1,47 @@
+# Local dev infrastructure — Redis only.
+# Supabase is managed separately by the Supabase CLI (`supabase start`).
+#
+# Start Redis (auto-starts on Docker Desktop boot via `restart: unless-stopped`):
+#   docker compose -f docker-compose.dev.yml up -d
+#
+# Start Redis + Redis Insight web UI (debugging streams):
+#   docker compose -f docker-compose.dev.yml --profile insight up -d
+#
+# Stop everything:
+#   docker compose -f docker-compose.dev.yml down
+#
+# Switch app to cloud Redis: edit backend/.env REDIS_URL, restart backend. No Docker change needed.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: agentic-rag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    # No persistence: run-backed streaming buffers are ephemeral (per-run TTL ~10 min).
+    # If Docker restarts, restarting the affected run is the right behavior anyway.
+    # maxmemory + allkeys-lru bounds storage so a runaway producer can't OOM the host.
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: agentic-rag-redis-insight
+    restart: unless-stopped
+    ports:
+      - "5540:5540"
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - insight

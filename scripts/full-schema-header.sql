@@ -1,0 +1,13 @@
+-- ============================================================
+-- FULL SCHEMA — Generated bootstrap artifact
+-- Single-file consolidation of all numbered migrations.
+-- Use case: greenfield deploy (Hostinger fresh DB, brand-new
+-- Supabase cloud project) where you want to apply the entire
+-- schema in one shot instead of 30+ ordered migrations.
+--
+-- Source of truth: supabase/migrations/*.sql (numbered).
+-- This file is GENERATED — do NOT edit by hand.
+--
+-- To regenerate after adding a migration:
+--   bash scripts/regenerate-full-schema.sh
+-- ============================================================
