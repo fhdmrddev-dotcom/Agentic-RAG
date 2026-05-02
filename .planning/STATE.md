@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 061 context gathered
-last_updated: "2026-05-02T16:21:20.309Z"
-last_activity: 2026-05-02 -- Phase --phase execution started
+stopped_at: Phase 061 plan 03 (Producer/Consumer Redis Streams Rewrite) complete
+last_updated: "2026-05-02T17:03:08Z"
+last_activity: 2026-05-02 -- Phase 061 plan 03 complete (Producer/Consumer Redis Streams)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 14
-  completed_plans: 9
-  percent: 64
+  completed_plans: 10
+  percent: 71
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: --phase (061) — EXECUTING
-Plan: 1 of --name
-Status: Executing Phase --phase
-Last activity: 2026-05-02 -- Phase --phase execution started
-Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch deployment + `runs` Postgres table for history). Phase 061 scope additions: migration 035_runs_table, redis>=5 dependency, /health Redis check, DELETE /runs/{id} cancel verb (in 062). Decisions to lock during discuss: D-v2.5-09 (Stop semantics specifics, server-side timeout default value, abandoned-run TTL specifics).
+Phase: 061 (Run-Backed Streaming Backend) — EXECUTING
+Plan: 3 of 5 COMPLETE — Producer/Consumer Redis Streams Rewrite (commits b5411be, 22a814c)
+Status: Wave 2 complete; Wave 3 (Plan 04 test infra) in flight in separate worktree
+Last activity: 2026-05-02 17:03 UTC — Plan 03 (Producer/Consumer Redis Streams) complete
+Next action: Wait for Plan 04 (test infra) worktree to merge, then proceed to Plan 05 (binding tests + 061-VERIFICATION.md). After Plan 05, phase 061 verifies and closes; phase 062 (Replay & Tail API) unblocked. Plan 03 deliverable verified by static checks (ast.parse + grep counts); end-to-end smoke deferred to Plan 05 binding tests as planned. Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch + `runs` Postgres table). Plan 03 lands D-061-01 (asyncio.timeout 120s), D-061-03 (consumer disconnect doesn't cancel producer), D-061-04 (hard_timeout error sentinel + EXPIRE 60), D-061-10 (XADD producer), D-061-11 (RUN_TASKS registry), D-061-12 (two-mode XREAD), D-061-13 (closure-captured Redis client).
 
 ## Recent Completed Phases
 
@@ -64,6 +64,12 @@ Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Loc
 - Last phase fully shipped: Phase 56.1 (2026-04-29)
 - Trend: Stable
 
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 061 | 01 | 4min | 3 | 4 |
+| 061 | 02 | 1min | 2 | 2 |
+| 061 | 03 | 16min | 3 (2 commits — Tasks 2+3 atomic) | 1 |
+
 ## Accumulated Context
 
 ### Roadmap Evolution
@@ -89,6 +95,10 @@ Recent decisions affecting v2.5 work:
 - Phase 059 plan 03: rename inner sandbox queue to sandbox_queue (Rule 1 fix to plan 02 — UnboundLocalError shadowing bug)
 - Phase 059 plan 03: D-059-06 merge gate green; D-059-07 058 regression test still passes; D-059-08 059-VERIFICATION.md published mirroring 058 format
 - Phase 059 plan 03: httpx ASGITransport buffers entire SSE response — real mid-stream disconnect cannot be tested via this transport, manual verification (059-VERIFICATION.md) is the runbook for that
+- Phase 061 plan 03: Tasks 2+3 committed atomically — wrapping the agent_runner body in `async with asyncio.timeout(...)` requires re-indenting ~1100 lines, which inevitably touches the inner finally Task 3 was scoped to rewrite. Splitting into two commits would have left the file syntactically valid but semantically broken (timeout context with old asyncio.Queue sentinel). Single atomic commit (22a814c) with comprehensive message documents both task scopes.
+- Phase 061 plan 03: `_persist_assistant_message` modified to return `Optional[str]` (the inserted message_id) — used by the shielded finalizer to populate `runs.message_id` in the UPDATE. Idempotent re-call returns the cached id from a closure-captured `_persisted_msg_id` slot.
+- Phase 061 plan 03: token-counter accounting deferred (RESEARCH Q1 NULL fallback adopted) — runs UPDATE leaves input_tokens/output_tokens NULL; SDK usage capture scoped out of 061. Schema columns exist; future plan can populate without breaking 061's contract.
+- Phase 061 plan 03: D-061-03 contract inversion confirmed in code — event_consumer's finally is `pass` (no task.cancel, no await task). Producer survives consumer disconnect; bounded only by asyncio.timeout(120s) per D-061-01.
 
 ### Pending Todos
 
@@ -128,10 +138,10 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 061 context gathered
-Next: `/gsd-discuss-phase 059` to begin SSE Architecture Refactor
+Last session: 2026-05-02T17:03:08Z
+Stopped at: Phase 061 plan 03 (Producer/Consumer Redis Streams Rewrite) complete
+Next: Wait for Plan 04 (test infra) worktree merge, then proceed to Plan 05 (binding tests + 061-VERIFICATION.md)
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
 
-**Planned Phase:** 061 (Run-Backed Streaming (Backend)) — 5 plans — 2026-05-02T16:18:24.163Z
+**Planned Phase:** 061 (Run-Backed Streaming (Backend)) — 5 plans — 3/5 complete (Plans 01, 02, 03)
