@@ -1328,17 +1328,23 @@ async def send_message(
                                 try:
                                     session = sandbox_manager.get_or_create(thread_id)
                                     loop = asyncio.get_event_loop()
-                                    queue: asyncio.Queue = asyncio.Queue()
+                                    # Inner sandbox-event queue (separate from the outer producer
+                                    # queue used for SSE). Renamed from `queue` (D-059-Rule1 fix):
+                                    # the outer agent_runner queue is also named `queue`, so a
+                                    # local rebinding here would make Python treat `queue` as a
+                                    # function-local everywhere in agent_runner — every earlier
+                                    # `await queue.put(...)` would raise UnboundLocalError.
+                                    sandbox_queue: asyncio.Queue = asyncio.Queue()
 
                                     def on_stdout(chunk: str):
                                         loop.call_soon_threadsafe(
-                                            queue.put_nowait,
+                                            sandbox_queue.put_nowait,
                                             {"type": "code_stdout", "content": chunk}
                                         )
 
                                     def on_stderr(chunk: str):
                                         loop.call_soon_threadsafe(
-                                            queue.put_nowait,
+                                            sandbox_queue.put_nowait,
                                             {"type": "code_stderr", "content": chunk}
                                         )
 
@@ -1411,19 +1417,20 @@ async def send_message(
                                             on_stderr=on_stderr,
                                         )
                                         loop.call_soon_threadsafe(
-                                            queue.put_nowait,
+                                            sandbox_queue.put_nowait,
                                             {"type": "_done", "result": exec_result}
                                         )
                                         return exec_result
 
                                     fut = loop.run_in_executor(None, _run_sync)
 
-                                    # Drain queue, streaming SSE events (SAND-05).
-                                    # Emit keepalives every 10 s when sandbox produces no output
-                                    # to prevent SSE connection timeouts on long executions.
+                                    # Drain sandbox_queue, forwarding SSE events to the outer
+                                    # agent_runner queue (SAND-05). Emit keepalives every 10 s
+                                    # when sandbox produces no output to prevent SSE connection
+                                    # timeouts on long executions.
                                     while True:
                                         try:
-                                            item = await asyncio.wait_for(queue.get(), timeout=10.0)
+                                            item = await asyncio.wait_for(sandbox_queue.get(), timeout=10.0)
                                         except asyncio.TimeoutError:
                                             await queue.put(json.dumps({'type': 'keepalive'}))
                                             continue
