@@ -12,7 +12,8 @@ Active scope for v2.5. Each maps to exactly one phase below.
 ### Backend Concurrency
 
 - [ ] **CONCUR-01**: While Thread A is mid-SSE-stream, an authenticated `GET /threads/B/messages` request returns within 1 second (currently hangs ~30s until the SSE finishes). Verified by: open Thread A streaming → in another tab, fetch Thread B's messages endpoint → measure response time in DevTools network panel.
-- [ ] **CONCUR-02**: When the SSE client disconnects (tab close, F5, network drop), the backend agent task is cancelled within 1 second — no wasted LLM tokens generating responses no client will receive. Verified by: trigger a long-running agent loop → close the SSE connection mid-stream → confirm in backend logs that the agent task receives `CancelledError` and that no further LLM API calls fire after disconnect.
+- [x] **CONCUR-02
+**: When the SSE client disconnects (tab close, F5, network drop), the backend agent task is cancelled within 1 second — no wasted LLM tokens generating responses no client will receive. Verified by: trigger a long-running agent loop → close the SSE connection mid-stream → confirm in backend logs that the agent task receives `CancelledError` and that no further LLM API calls fire after disconnect.
 
 ### Frontend Streaming Reliability
 
