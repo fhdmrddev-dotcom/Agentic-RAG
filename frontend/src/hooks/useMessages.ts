@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from "react"
 import type { Message, ToolCall, OutputFile } from "../types"
 import { getMessages, streamMessage } from "../lib/api"
-import { supabase } from "../lib/supabase"
 
 interface UseMessages {
   messages: Message[]
@@ -12,8 +11,6 @@ interface UseMessages {
   stopStreaming: () => void
   abortStream: () => void
   clearMessages: () => void
-  subscribeToThread: (threadId: string) => void
-  unsubscribeFromThread: () => void
 }
 
 function makeTempId() {
@@ -29,11 +26,8 @@ export function useMessages(): UseMessages {
   const abortControllerRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const threadChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
-  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const stopStreaming = useCallback(() => {
     stoppedByUserRef.current = true
@@ -50,49 +44,6 @@ export function useMessages(): UseMessages {
     abortControllerRef.current?.abort()
     abortControllerRef.current = null
     isSendingRef.current = false
-  }, [])
-
-  const subscribeToThread = useCallback((threadId: string) => {
-    // Tear down any existing always-on subscription first (no-op if null)
-    if (threadChannelRef.current) {
-      supabase.removeChannel(threadChannelRef.current)
-      threadChannelRef.current = null
-    }
-
-    const channelName = `thread-always-on-${threadId}`
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `thread_id=eq.${threadId}`,
-        },
-        () => {
-          // Guard: skip while SSE is active — SSE delta events handle live updates.
-          // This subscription is recovery-only (for refresh/reconnect after F5).
-          if (isStreamingRef.current) return
-          // Debounce: multiple INSERTs (user msg + assistant msg) can fire in rapid
-          // succession. Batch them into one reload so we don't flood the backend.
-          if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current)
-          reloadTimerRef.current = setTimeout(() => {
-            reloadTimerRef.current = null
-            loadMessages(threadId).catch(console.error)
-          }, 300)
-        }
-      )
-      .subscribe()
-
-    threadChannelRef.current = channel
-  }, [])  // loadMessages has stable identity (useCallback with [] deps) — safe to omit
-
-  const unsubscribeFromThread = useCallback(() => {
-    if (threadChannelRef.current) {
-      supabase.removeChannel(threadChannelRef.current)
-      threadChannelRef.current = null
-    }
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
@@ -148,56 +99,6 @@ if (isSendingRef.current) return
     isStreamingRef.current = true
     const controller = new AbortController()
     abortControllerRef.current = controller
-
-    // D-03: Realtime subscription for SSE drop recovery.
-    // Subscribes filtered to this thread only. Torn down in finally.
-    // Only processes events when streaming is NOT active (isStreamingRef guard)
-    // to avoid racing with the live SSE delta updates.
-    const channelName = `messages-thread-${threadId}`
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-          filter: `thread_id=eq.${threadId}`,
-        },
-        (payload) => {
-          // D-04: Realtime is recovery-only. Skip events while SSE stream is active —
-          // SSE delta events handle live updates. Only process after SSE drops/ends.
-          if (isStreamingRef.current) return
-
-          if (payload.eventType === "INSERT") {
-            const newMsg = payload.new as Message
-            setMessages((prev) => {
-              // Replace the optimistic temp-id placeholder for assistant messages,
-              // or deduplicate by id for user messages.
-              if (newMsg.role === "assistant") {
-                const tempIdx = prev.findIndex(
-                  (m) => m.role === "assistant" && m.id.startsWith("temp-")
-                )
-                if (tempIdx !== -1) {
-                  const next = [...prev]
-                  next[tempIdx] = newMsg
-                  return next
-                }
-              }
-              // Deduplicate: skip if already present (normal path persisted it)
-              if (prev.some((m) => m.id === newMsg.id)) return prev
-              return [...prev, newMsg]
-            })
-          } else if (payload.eventType === "UPDATE") {
-            const updatedMsg = payload.new as Message
-            setMessages((prev) =>
-              prev.map((m) => m.id === updatedMsg.id ? updatedMsg : m)
-            )
-          }
-        }
-      )
-      .subscribe()
-    channelRef.current = channel
 
     try {
       await streamMessage(
@@ -430,19 +331,6 @@ if (isSendingRef.current) return
       setIsStreaming(false)
       isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
 
-      // Tear down the per-stream Realtime channel.
-      // If the user navigated away (activeThreadIdRef no longer points to this thread),
-      // remove immediately — the 2s window would let Thread A's INSERT corrupt Thread B's
-      // message list. Only keep the 2s grace period when the user stayed on the same thread.
-      const channelToRemove = channelRef.current
-      channelRef.current = null
-      if (channelToRemove) {
-        const navigatedAway = activeThreadIdRef.current !== threadId
-        setTimeout(() => {
-          supabase.removeChannel(channelToRemove)
-        }, navigatedAway ? 0 : 2000)
-      }
-
       // Always clear planning flag on stream end
       setMessages((prev) =>
         prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
@@ -486,17 +374,8 @@ if (isSendingRef.current) return
 
       // Reset stopped ref outside any state updater so it runs exactly once
       stoppedByUserRef.current = false
-
-      // Fix E (D-STREAM-01): Reload from DB after natural stream completion.
-      // The Realtime INSERT fires while isStreamingRef=true (blocked by guard).
-      // By the time finally runs, the event is gone — pull fresh from DB.
-      // Guard: user is still on the same thread (not navigated away).
-      // Stop path skipped: asyncio.shield already persists the partial message.
-      if (!wasStoppedByUser && activeThreadIdRef.current === threadId) {
-        loadMessages(threadId).catch(console.error)
-      }
     }
-  }, [loadMessages])
+  }, [])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
 }
