@@ -178,7 +178,10 @@ Full details below in **Phase Details**.
   2. `loadMessages` accepts an `AbortSignal`; a `loadAbortRef` cancels the previous in-flight `getMessages` fetch when a new `loadMessages` runs, so Thread A's pending fetch does not overwrite Thread B's data.
   3. The `loadMessages` call in `useMessages` `sendMessage`'s `finally` block is removed — streaming-format messages built up by SSE deltas remain authoritative and the Bug 3 raw-JSON regression (tool-result JSON leaking into chat content) does not recur.
   4. Browser MCP test: start streaming Thread A → click Thread B before stream ends → Thread B view shows only Thread B messages, no leak from A; Network tab shows Thread A's `getMessages` aborted.
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 060-01-PLAN.md — Wave 1: useMessages.ts surgery — setViewingThread + loadAbortRef + loadMessages rewrite + delete Phase-057 Realtime band-aids + clearMessages no longer aborts + drop finally-block reload (D-060-01..03, 05, 06, 07, 10, 11)
+  - [ ] 060-02-PLAN.md — Wave 2: api.ts getMessages signal parameter + ChatArea useEffect rewrite (setViewingThread→abortStream→clearMessages→loadMessages, dep array reduced, 8s timer + visibilitychange listener deleted) (D-060-04, 07b, 07c, 08, 09)
+  - [ ] 060-03-PLAN.md — Wave 3: Playwright e2e test at e2e/tests/060-thread-race.spec.ts + 060-VERIFICATION.md scaffold with manual two-tab DevTools backstop (D-060-12, D-060-13)
 **Risks / pitfalls** (from 057-DEFERRAL.md §1, §3):
   - Don't accept the "loadMessages writes the ref then reads it" pattern again — the v2.5-dev attempt proved concurrent calls overwrite each other's guards.
   - Don't put any reload logic inside a `setMessages` updater — Strict Mode double-invokes updaters and React can bail out, making side effects non-deterministic.
@@ -239,7 +242,7 @@ Full details below in **Phase Details**.
 | 57. SSE Realtime Reconnect Fix | v2.4 | 2/2 | Deferred | — |
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
 | 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
-| 060. Frontend Race Fixes | v2.5 | 0/0 | Not started | — |
+| 060. Frontend Race Fixes | v2.5 | 0/3 | Planned | — |
 | 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
 | 062. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 063. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
