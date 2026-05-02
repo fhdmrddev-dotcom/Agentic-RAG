@@ -7,8 +7,14 @@ class TestHealth:
         assert response.status_code == 200
 
     def test_health_returns_ok_status(self, client):
+        """Phase 061 SC#6: /health body is {status, redis} — was {status} pre-061."""
         response = client.get("/health")
-        assert response.json() == {"status": "ok"}
+        body = response.json()
+        assert body["status"] == "ok"
+        # Phase 061 added the `redis` discriminator — accept either ok or unreachable
+        # so the test is environment-agnostic (CI without Redis vs. local with Redis).
+        assert "redis" in body, f"Phase 061: /health body must include 'redis' key; got {body}"
+        assert body["redis"] in ("ok", "unreachable"), body
 
     def test_health_requires_no_auth(self, client):
         """Health endpoint should work without an Authorization header."""
