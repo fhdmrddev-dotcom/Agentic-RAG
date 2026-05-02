@@ -71,6 +71,7 @@ Next action: `/gsd-discuss-phase 059` to begin SSE Architecture Refactor (asynci
 - v2.5 milestone scoped 2026-05-01 to fix Phase 057 deferral via 5 phases (058–062)
 - Research synthesized at .planning/research/058-sse-concurrency-research.md before milestone start
 - ROADMAP.md authored 2026-05-01: 5 phases, 5/5 v1 requirements mapped, dependencies form valid DAG (058→059→060→061; 062 parallel-able with 058)
+- Phase 063 added 2026-05-02: Skills Test Infrastructure Repair — close TEST-DEBT discovered during 059-02 verification (13+ broken patches in test_threads_skills.py + 3 broken export tests). Standalone, parallel-able with 060-062. Prep for upcoming Skill Studio milestone (see SEED-002).
 
 ### Decisions
 

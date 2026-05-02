@@ -8,7 +8,7 @@
 - ✅ **v2.2 Trust & Compliance** — Phases 26–32 (shipped 2026-04-16)
 - ✅ **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (shipped 2026-04-19)
 - ✅ **v2.4 Stability, Polish & UX Fixes** — Phases 44–57 (shipped 2026-04-30)
-- 🔄 **v2.5 SSE Concurrency & Reconnect Stability** — Phases 058–062 (in progress, started 2026-05-01)
+- 🔄 **v2.5 SSE Concurrency & Reconnect Stability** — Phases 058–063 (in progress, started 2026-05-01)
 
 ## Phases
 
@@ -118,13 +118,14 @@ Full details: `.planning/milestones/v2.4-ROADMAP.md`
 </details>
 
 <details open>
-<summary>🔄 v2.5 SSE Concurrency & Reconnect Stability (Phases 058–062) — IN PROGRESS, started 2026-05-01</summary>
+<summary>🔄 v2.5 SSE Concurrency & Reconnect Stability (Phases 058–063) — IN PROGRESS, started 2026-05-01</summary>
 
 - [X] **Phase 058: Backend SSE Concurrency Fix** — Wrap blocking supabase `.execute()` calls so cross-tab requests aren't queued behind streaming agents (completed 2026-05-01)
 - [ ] **Phase 059: SSE Architecture Refactor** — `asyncio.Queue` + background task + `sse-starlette` so handler lifetime decouples from agent loop lifetime
 - [ ] **Phase 060: Frontend Race Fixes** — `setViewingThread` separation, `AbortController` cancellation, drop the `finally`-block reload that leaked tool-result JSON
 - [ ] **Phase 061: Reconnect Handlers** — `visibilitychange` + `pageshow` recovery for Symptom E; one-shot reconcile fetch + Resume button for Symptom F
 - [ ] **Phase 062: Validation Harness** — Reproducible chrome-in-browser MCP scripts for scenarios E, F, G, H, and navigate-during-stream
+- [ ] **Phase 063: Skills Test Infrastructure Repair** — Fix 13+ broken patches in `test_threads_skills.py` and 3 broken export tests in `test_skills_import_export.py` so the next milestone (Skill Studio) starts on a green test foundation
 
 Full details below in **Phase Details**.
 
@@ -241,3 +242,20 @@ Full details below in **Phase Details**.
 | 060. Frontend Race Fixes | v2.5 | 0/0 | Not started | — |
 | 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
 | 062. Validation Harness | v2.5 | 0/0 | Not started | — |
+| 063. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
+
+### Phase 063: Skills Test Infrastructure Repair
+
+**Goal**: Restore a green test foundation for the skills test suite so the next milestone (Skill Studio, see `PRD_Skill_Studio.md` and `.planning/seeds/SEED-002-skill-studio-milestone-prep.md`) can extend `tests/integration/test_threads_skills.py` and `tests/integration/test_skills_import_export.py` patterns without inheriting broken patches.
+**Depends on**: Nothing (parallel-able with 060–062 since it touches an isolated test surface)
+**Requirements**: TBD (no new REQUIREMENTS.md ID — pure maintenance closing TEST-DEBT discovered in 059)
+**Success Criteria** (what must be TRUE):
+  1. All tests in `backend/tests/integration/test_threads_skills.py` either PASS or are explicitly marked as `@pytest.mark.skip(reason=...)` with a documented out-of-scope justification — no `AttributeError: module 'app.api.threads' does not have the attribute 'create_streaming_chat'` failures remain.
+  2. All tests in `backend/tests/integration/test_skills_import_export.py` either PASS or are explicitly skipped with documented reason — the 3 currently-failing export tests are fixed or formally deferred.
+  3. The combined skills test run (`pytest tests/integration/test_threads_skills.py tests/integration/test_skills_import_export.py -q`) reports 0 errors and 0 unexpected failures.
+  4. No regression in 058 / 059 binding gates: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and the `test_059_disconnect.py` suite still pass.
+**Plans:** TBD (run `/gsd:plan-phase 063` to break down — likely 1 plan, ~1-2 hours)
+**Risks / pitfalls:**
+  - The `create_streaming_chat` patch target was likely removed in a refactor (current name is `create_adaptive_streaming_chat`). Some tests may have additional drift beyond just the name — they may also be testing call signatures, return shapes, or event emission patterns that have evolved. A pure mechanical rename is a starting point, not necessarily the finish line.
+  - The 3 export-test failures may share a root cause with the known MIME fidelity gap (skill files stored as `application/octet-stream` on import) — fixing the test may require fixing the export to preserve original MIME, which is a real behavioral change. Decide upfront: scope this phase to test-only fixes (skip-with-reason if the underlying behavior is wrong), or expand to fix the export path.
+  - These tests intersect heavily with the upcoming Skill Studio milestone — be careful not to absorb scope that belongs there. SEED-002 captures what should be deferred.
