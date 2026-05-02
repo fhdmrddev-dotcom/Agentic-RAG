@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 061 plan 03 (Producer/Consumer Redis Streams Rewrite) complete
-last_updated: "2026-05-02T17:03:08Z"
-last_activity: 2026-05-02 -- Phase 061 plan 03 complete (Producer/Consumer Redis Streams)
+stopped_at: Phase 061 plan 05 (binding tests + 061-VERIFICATION.md) complete
+last_updated: "2026-05-02T17:30:51Z"
+last_activity: 2026-05-02 -- Phase 061 plan 05 complete (binding tests + 061-VERIFICATION.md)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 14
-  completed_plans: 10
-  percent: 71
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 061 (Run-Backed Streaming Backend) — EXECUTING
-Plan: 3 of 5 COMPLETE — Producer/Consumer Redis Streams Rewrite (commits b5411be, 22a814c)
-Status: Wave 2 complete; Wave 3 (Plan 04 test infra) in flight in separate worktree
-Last activity: 2026-05-02 17:03 UTC — Plan 03 (Producer/Consumer Redis Streams) complete
-Next action: Wait for Plan 04 (test infra) worktree to merge, then proceed to Plan 05 (binding tests + 061-VERIFICATION.md). After Plan 05, phase 061 verifies and closes; phase 062 (Replay & Tail API) unblocked. Plan 03 deliverable verified by static checks (ast.parse + grep counts); end-to-end smoke deferred to Plan 05 binding tests as planned. Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch + `runs` Postgres table). Plan 03 lands D-061-01 (asyncio.timeout 120s), D-061-03 (consumer disconnect doesn't cancel producer), D-061-04 (hard_timeout error sentinel + EXPIRE 60), D-061-10 (XADD producer), D-061-11 (RUN_TASKS registry), D-061-12 (two-mode XREAD), D-061-13 (closure-captured Redis client).
+Phase: 061 (Run-Backed Streaming Backend) — EXECUTING (5/5 plans complete; verification pending)
+Plan: 5 of 5 COMPLETE — Binding tests + 061-VERIFICATION.md (commits e555ae6, 57b2cef, 9ab4cef, 9d1e8f5)
+Status: Wave 3 complete; phase 061 ready for /gsd:verify-work
+Last activity: 2026-05-02 17:30 UTC — Plan 05 (binding tests + 061-VERIFICATION.md) complete
+Next action: Run /gsd:verify-work on phase 061 — executes the 11 binding pytest commands documented in 061-VERIFICATION.md (TBD-01..11) plus the 060 e2e Playwright spec. After verification, phase 061 closes and phase 062 (Replay & Tail API) unblocks. Plan 05 deliverables verified by static checks (file presence + AST parse + grep counts on every plan acceptance criterion); runtime test execution is deferred to the verifier (sandbox-blocked from executor per prior wave experience). Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch + `runs` Postgres table). Plan 05 lands the Phase 061 merge gate: TBD-01..11 binding tests (8 test files), the D-061-16 contract inversion (test_059_disconnect.py rewrite carrying explicit D-v2.5-08 + Phase 061 references in both file docstring and commit message), and 061-VERIFICATION.md mirroring 058/059 format with binding-test results table + manual two-tab DevTools checklist.
 
 ## Recent Completed Phases
 
@@ -69,6 +69,8 @@ Next action: Wait for Plan 04 (test infra) worktree to merge, then proceed to Pl
 | 061 | 01 | 4min | 3 | 4 |
 | 061 | 02 | 1min | 2 | 2 |
 | 061 | 03 | 16min | 3 (2 commits — Tasks 2+3 atomic) | 1 |
+| 061 | 04 | 25min | 2 | 2 |
+| 061 | 05 | 10min | 4 | 12 (9 created, 3 modified) |
 
 ## Accumulated Context
 
@@ -99,6 +101,9 @@ Recent decisions affecting v2.5 work:
 - Phase 061 plan 03: `_persist_assistant_message` modified to return `Optional[str]` (the inserted message_id) — used by the shielded finalizer to populate `runs.message_id` in the UPDATE. Idempotent re-call returns the cached id from a closure-captured `_persisted_msg_id` slot.
 - Phase 061 plan 03: token-counter accounting deferred (RESEARCH Q1 NULL fallback adopted) — runs UPDATE leaves input_tokens/output_tokens NULL; SDK usage capture scoped out of 061. Schema columns exist; future plan can populate without breaking 061's contract.
 - Phase 061 plan 03: D-061-03 contract inversion confirmed in code — event_consumer's finally is `pass` (no task.cancel, no await task). Producer survives consumer disconnect; bounded only by asyncio.timeout(120s) per D-061-01.
+- Phase 061 plan 05: 8 test files landed for VALIDATION.md TBD-01..11 — 3 unit (test_061_emit_helper, test_061_consumer, test_health), 4 integration (test_061_producer_survives_disconnect with inline cross-tab D-061-15 assertion, test_061_ttl, test_061_runs_table with DDL-inspection RLS variant, test_061_hard_timeout), 1 rewritten integration (test_059_disconnect for D-061-16 contract inversion). Plus shared _run_helpers.py and _build_mock_supabase 'runs' branch. Static gates green; runtime execution deferred to /gsd:verify-work (sandbox blocks venv/Scripts/python).
+- Phase 061 plan 05: D-061-16 rewrite of test_059_disconnect.py committed atomically with explicit D-v2.5-08 + Phase 061 references in both file docstring and commit message body — protects future reviewers from misreading the inversion as a regression. Original `test_agent_task_cancels_on_disconnect` removed; new `test_agent_task_SURVIVES_on_disconnect` asserts XLEN growth post-disconnect.
+- Phase 061 plan 05: VALIDATION.md frontmatter (`nyquist_compliant: true`, `wave_0_complete: true`) NOT toggled by this commit — those flags require runtime green which the verifier owns. The 11 binding pytest commands are documented in 061-VERIFICATION.md as a single copy-paste block.
 
 ### Pending Todos
 
@@ -138,10 +143,10 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-02T17:03:08Z
-Stopped at: Phase 061 plan 03 (Producer/Consumer Redis Streams Rewrite) complete
-Next: Wait for Plan 04 (test infra) worktree merge, then proceed to Plan 05 (binding tests + 061-VERIFICATION.md)
+Last session: 2026-05-02T17:30:51Z
+Stopped at: Phase 061 plan 05 (binding tests + 061-VERIFICATION.md) complete — phase 061 ready for /gsd:verify-work
+Next: Run /gsd:verify-work on phase 061 to execute the 11 binding pytest commands documented in 061-VERIFICATION.md plus the 060 Playwright e2e spec; on green, phase 061 closes and phase 062 (Replay & Tail API) unblocks
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
 
-**Planned Phase:** 061 (Run-Backed Streaming (Backend)) — 5 plans — 3/5 complete (Plans 01, 02, 03)
+**Planned Phase:** 061 (Run-Backed Streaming (Backend)) — 5 plans — 5/5 complete (Plans 01, 02, 03, 04, 05); verification pending
