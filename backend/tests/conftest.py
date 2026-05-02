@@ -152,3 +152,65 @@ def mock_execute_result():
 def mock_builder():
     """Expose the shared builder mock for side_effect configuration."""
     return _builder
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 061 Redis fixtures (D-061-14, D-061-17, Pitfall 6)
+# ═══════════════════════════════════════════════════════════════════════
+import os as _os  # noqa: E402
+import pytest_asyncio as _pytest_asyncio  # noqa: E402
+
+_REDIS_TEST_URL = _os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+
+@_pytest_asyncio.fixture
+async def redis_client():
+    """Function-scoped real Redis client (D-061-14, no fakeredis).
+
+    Function scope is REQUIRED, not session: pytest-asyncio creates a
+    fresh event loop per test (asyncio_mode = auto in backend/pytest.ini),
+    and a session-scoped async client would bind to the FIRST loop —
+    same loop-binding trap that test_059_disconnect.py's
+    _reset_sse_starlette_app_status fixture works around for AppStatus
+    (RESEARCH.md Pitfall 6). UUID-based test isolation (D-061-17) means
+    we don't need to prefix keys; UUID v4 collisions across tests are
+    statistically impossible.
+
+    decode_responses=True so XREAD entries arrive as str (test bodies
+    do `entry['data']` and json.loads — no manual .decode() needed).
+    """
+    import redis.asyncio as aioredis
+    client = aioredis.from_url(
+        _REDIS_TEST_URL,
+        encoding="utf-8",
+        decode_responses=True,
+    )
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _flushdb_at_session_end():
+    """FLUSHDB at session end (D-061-14, D-061-17).
+
+    Synchronous Redis client at session teardown — avoids depending on
+    an asyncio event loop at session-end time (brittle in pytest-asyncio
+    when the last per-test loop has already closed). best-effort: CI
+    may not have Redis up at teardown if the docker-compose preamble
+    failed; we don't want flush failures to mask the real issue.
+
+    UUID isolation means leftover keys are harmless across tests within
+    a single run; this flush is hygiene only — runs:active and
+    runs_by_thread:* sorted-set entries accumulate during the session
+    and only matter for memory observability.
+    """
+    yield
+    try:
+        import redis as _redis_sync
+        _client = _redis_sync.from_url(_REDIS_TEST_URL)
+        _client.flushdb()
+        _client.close()
+    except Exception:
+        pass   # best-effort hygiene; do not mask real test failures
