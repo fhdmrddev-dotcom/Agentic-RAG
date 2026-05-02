@@ -30,9 +30,12 @@ from app.services.openai_service import create_adaptive_streaming_chat, get_llm_
 from app.services.anthropic_service import stream_anthropic
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
 
-# Lazy sandbox import — only if enabled
-if settings.sandbox_enabled:
-    from app.services.sandbox_service import sandbox_manager, harvest_output_files
+# Sandbox import — always available at module scope so per-request paths
+# (e.g. line ~1328 where get_or_create runs without re-importing) cannot
+# NameError when sandbox_enabled is False at startup but enabled per-user
+# via user_settings.sandbox_enabled (see WR-03 review fix). The module
+# itself has no side effects, so unconditional import is safe.
+from app.services.sandbox_service import sandbox_manager, harvest_output_files  # noqa: E402
 from app.services.context_window import trim_messages_to_fit, estimate_messages_tokens, resolve_context_budget
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
@@ -303,9 +306,11 @@ async def delete_thread(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    # Close sandbox session if sandbox is enabled (SAND-10)
+    # Close sandbox session if sandbox is enabled (SAND-10).
+    # sandbox_manager is imported unconditionally at module scope (WR-03);
+    # we still gate the call on settings.sandbox_enabled to skip work when
+    # the feature is off.
     if settings.sandbox_enabled:
-        from app.services.sandbox_service import sandbox_manager
         sandbox_manager.close_session(thread_id)
 
     # Clean up sandbox output files from storage before cascade deletes DB rows
