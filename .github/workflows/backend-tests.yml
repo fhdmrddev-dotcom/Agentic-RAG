@@ -1,0 +1,66 @@
+# CI workflow for the FastAPI backend test suite.
+# Phase 061 (D-061-14): boots Redis from docker-compose.dev.yml before
+# pytest so the run-backed streaming binding tests have a real Redis
+# to talk to (no fakeredis — Streams semantics drift).
+name: backend-tests
+
+on:
+  push:
+    branches: [master, main, v2.5-dev]
+    paths:
+      - "backend/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/backend-tests.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "supabase/migrations/**"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend deps
+        run: |
+          cd backend
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+
+      # Phase 061 (D-061-14): boot Redis from docker-compose.dev.yml.
+      # Streams semantics drift between Redis and fakeredis; tests run
+      # against the real thing.
+      - name: Start Redis (docker-compose)
+        run: docker compose -f docker-compose.dev.yml up -d redis
+
+      - name: Wait for Redis
+        run: |
+          for i in {1..30}; do
+            if docker exec agentic-rag-redis redis-cli ping 2>/dev/null | grep -q PONG; then
+              echo "Redis ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Redis did not become ready in 30s"; exit 1
+
+      - name: Run pytest
+        run: |
+          cd backend
+          source venv/bin/activate
+          pytest tests -q
+        env:
+          REDIS_URL: redis://localhost:6379
+          # Supabase test substrate: integration tests that hit real
+          # Postgres are conditionally skipped if SUPABASE_URL is unset.
+          # CI baseline runs unit + mock-Supabase integration tests only.
+
+      - name: Stop Redis
+        if: always()
+        run: docker compose -f docker-compose.dev.yml down redis
