@@ -123,7 +123,8 @@ Full details: `.planning/milestones/v2.4-ROADMAP.md`
 - [X] **Phase 058: Backend SSE Concurrency Fix** — Wrap blocking supabase `.execute()` calls so cross-tab requests aren't queued behind streaming agents (completed 2026-05-01)
 - [ ] **Phase 059: SSE Architecture Refactor** — `asyncio.Queue` + background task + `sse-starlette` so handler lifetime decouples from agent loop lifetime
 - [ ] **Phase 060: Frontend Race Fixes** — `setViewingThread` separation, `AbortController` cancellation, drop the `finally`-block reload that leaked tool-result JSON
-- [ ] **Phase 061: Run-Backed Streaming (Backend)** — Per-run durable stream buffer in Redis Streams; agent producer task writes tokens keyed by `run_id`; SSE handler is a *consumer* with offset cursor, lifecycle decoupled from any single HTTP request
+- [X] **Phase 061: Run-Backed Streaming (Backend)** — Per-run durable stream buffer in Redis Streams; agent producer task writes tokens keyed by `run_id`; SSE handler is a *consumer* with offset cursor, lifecycle decoupled from any single HTTP request (completed 2026-05-02)
+- [ ] **Phase 061.1: Run-Backed Streaming Cleanup** — Diagnose `ERR_INCOMPLETE_CHUNKED_ENCODING` consumer drop surfaced during 061 manual UAT; fix the 5 integration test-pattern races (mocks inspected before background `_shielded_finalize` completes); close out code-review WR-01 (consumer cursor `$` race), WR-04/06/07 + IN-01..04. Can run in parallel with 062.
 - [ ] **Phase 062: Replay & Tail API** — `GET /threads/{id}/active-runs` returns active `run_id` + current offset; `GET /runs/{id}/stream?since={offset}` replays from offset + live-tails new tokens + emits termination event on completion
 - [ ] **Phase 063: Frontend Stream Decoupling** — POST returns `run_id` immediately; frontend opens separate replay-and-tail subscription; on every (re)connect (page load, focus, visibilitychange, pageshow) query active-runs and reattach if found; multi-tab sync falls out for free
 - [ ] **Phase 064: Validation Harness** — Reproducible chrome-in-browser MCP scripts for scenarios E (tab switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation during stream), and multi-tab sync — all proving the run-backed architecture from 061–063
@@ -283,7 +284,8 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
 | 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 060. Frontend Race Fixes | v2.5 | 3/3 | Complete    | 2026-05-02 |
-| 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Verification pending | — |
+| 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Complete    | 2026-05-02 |
+| 061.1. Run-Backed Streaming Cleanup | v2.5 | 0/0 | Not started | — |
 | 062. Replay & Tail API | v2.5 | 0/0 | Not started | — |
 | 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |

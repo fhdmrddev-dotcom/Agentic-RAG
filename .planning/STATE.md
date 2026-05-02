@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: executing
+status: ready_to_plan
 stopped_at: Phase 061 plan 05 (binding tests + 061-VERIFICATION.md) complete
 last_updated: "2026-05-02T17:30:51Z"
 last_activity: 2026-05-02 -- Phase 061 plan 05 complete (binding tests + 061-VERIFICATION.md)
 progress:
   total_phases: 8
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 14
   completed_plans: 12
-  percent: 86
+  percent: 50
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 061
+**Current focus:** Phase 062 — Replay & Tail API
 
 ## Current Position
 
-Phase: 061 (Run-Backed Streaming Backend) — EXECUTING (5/5 plans complete; verification pending)
-Plan: 5 of 5 COMPLETE — Binding tests + 061-VERIFICATION.md (commits e555ae6, 57b2cef, 9ab4cef, 9d1e8f5)
-Status: Wave 3 complete; phase 061 ready for /gsd:verify-work
-Last activity: 2026-05-02 17:30 UTC — Plan 05 (binding tests + 061-VERIFICATION.md) complete
-Next action: Run /gsd:verify-work on phase 061 — executes the 11 binding pytest commands documented in 061-VERIFICATION.md (TBD-01..11) plus the 060 e2e Playwright spec. After verification, phase 061 closes and phase 062 (Replay & Tail API) unblocks. Plan 05 deliverables verified by static checks (file presence + AST parse + grep counts on every plan acceptance criterion); runtime test execution is deferred to the verifier (sandbox-blocked from executor per prior wave experience). Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch + `runs` Postgres table). Plan 05 lands the Phase 061 merge gate: TBD-01..11 binding tests (8 test files), the D-061-16 contract inversion (test_059_disconnect.py rewrite carrying explicit D-v2.5-08 + Phase 061 references in both file docstring and commit message), and 061-VERIFICATION.md mirroring 058/059 format with binding-test results table + manual two-tab DevTools checklist.
+Phase: 062
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-02
+Next action: Phase 061 closed-out 2026-05-02 — verifier returned 17/18 must-haves, manual UAT 5 passed + 1 partial + 2 deferred to 061.1. Persistence-leak bug surfaced and fixed inline (5d8ff10), code-review CR-01/02/03 + WR-03/05 fixed inline. Two follow-on phases now available: (a) `/gsd:discuss-phase 062` to plan Replay & Tail API (the GET /threads/{id}/active-runs + GET /runs/{id}/stream?since=N endpoints that 063's frontend reattach will consume), or (b) `/gsd:discuss-phase 061.1` to run the small parallel cleanup phase (ERR_INCOMPLETE_CHUNKED_ENCODING diagnosis + 5 test-pattern races + WR-01 cursor race + WR-04/06/07 + IN-01..04). 062 and 061.1 are independent and can ship in parallel.
 
 ## Recent Completed Phases
 
