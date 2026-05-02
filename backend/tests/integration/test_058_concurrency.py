@@ -209,9 +209,19 @@ def _build_mock_supabase():
         # Catch-all for skills, user_memory, audit, etc.
         return _make_result([])
 
+    def runs_execute(*args, **kwargs):
+        # Phase 061 (D-061-11): the runs table mock returns an empty result —
+        # tests assert against the INSERT/UPDATE call_args_list, not the body.
+        return _make_result([])
+
     builders = {
         "threads": _make_table_builder(threads_execute),
         "messages": _make_table_builder(messages_execute),
+        # Phase 061 (Plan 05 Step 0a): route the `runs` table through a
+        # per-table builder so test_061_*.py can inspect insert/update
+        # call_args_list. PATTERNS.md endorses extending in place rather
+        # than monkey-patching across the four 061 integration test files.
+        "runs": _make_table_builder(runs_execute),
     }
     default_builder = _make_table_builder(default_execute)
 
