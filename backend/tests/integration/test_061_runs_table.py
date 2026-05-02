@@ -15,7 +15,8 @@ from app.dependencies import get_supabase
 from app.main import app
 from app.services.openai_service import CallingMode
 
-from tests.integration.test_058_concurrency import (  # noqa: E402
+# IN-01 (D-061.1-11): import shared helpers directly from _run_helpers.
+from tests.integration._run_helpers import (  # noqa: E402
     _build_mock_supabase,
     _fast_chunks,
 )

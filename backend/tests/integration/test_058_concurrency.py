@@ -43,7 +43,7 @@ Test design (deviation from plan note 2 — see SUMMARY.md "Deviations"):
 """
 import asyncio
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import httpx
@@ -53,174 +53,81 @@ from app.dependencies import get_supabase
 from app.main import app
 from app.services.openai_service import CallingMode
 
+# IN-01 (D-061.1-11): mock infrastructure was relocated to
+# tests/integration/_run_helpers.py so this file stops being a defacto
+# helper-provider for downstream test files. Importers preserved here
+# under their original names for backward-compatibility — test_059 and
+# test_061_* still cross-import via this module per PATTERNS.md.
+from tests.integration._run_helpers import (  # noqa: F401 — re-exported
+    USER_ID,
+    SLOW_INSERT_DELAY,
+    _make_result,
+    _make_sse_chunk,
+    _make_done_chunk,
+    _fast_chunks,
+    _slow_chunks,
+    _thread_row as _thread_row_helper,
+    _message_row as _message_row_helper,
+    _make_table_builder,
+    _build_mock_supabase as _build_mock_supabase_helper,
+)
+
 
 # ---------------------------------------------------------------------------
-# Constants
+# Module-local thread ids (this test's cross-tab assertion needs two)
 # ---------------------------------------------------------------------------
 
-# conftest.mock_user_data uses this exact id; both Thread A and Thread B must
-# scope to it so the mock supabase responses match expectations.
-USER_ID = "00000000-0000-0000-0000-000000000001"
 THREAD_A = str(uuid4())
 THREAD_B = str(uuid4())
 
-# Slow window for the pre-stream INSERT — long enough that the GET MUST
-# overlap with it, short enough to keep the test under a few seconds.
-SLOW_INSERT_DELAY = 1.5
-
 
 # ---------------------------------------------------------------------------
-# Helpers (private to this module — keep test self-contained)
+# Module-local wrappers around relocated helpers
 # ---------------------------------------------------------------------------
-
-def _make_result(data):
-    """Mimic the supabase APIResponse contract used by aexec() consumers."""
-    r = MagicMock()
-    r.data = data
-    r.count = len(data) if isinstance(data, list) else None
-    return r
-
-
-def _make_sse_chunk(content: str):
-    """One delta SSE chunk in the shape create_adaptive_streaming_chat yields."""
-    chunk = MagicMock()
-    chunk.choices = [MagicMock()]
-    chunk.choices[0].finish_reason = None
-    chunk.choices[0].delta = MagicMock()
-    chunk.choices[0].delta.content = content
-    chunk.choices[0].delta.tool_calls = None
-    return chunk
-
-
-def _make_done_chunk():
-    """Final SSE chunk with finish_reason='stop' (signals stream end)."""
-    chunk = MagicMock()
-    chunk.choices = [MagicMock()]
-    chunk.choices[0].finish_reason = "stop"
-    chunk.choices[0].delta = MagicMock()
-    chunk.choices[0].delta.content = None
-    chunk.choices[0].delta.tool_calls = None
-    return chunk
-
-
-def _fast_chunks():
-    """Sync generator that yields a few tokens immediately, then DONE.
-
-    The LLM stream itself returns fast — we deliberately do NOT introduce
-    `time.sleep` here, because event_stream iterates the stream with a
-    sync `for chunk in stream:` loop directly on the event-loop thread.
-    A slow sync iterator would block the event loop regardless of aexec()
-    correctness (that is a Phase 059 concern — see CONTEXT.md "Out of scope").
-    """
-    for token in ("a", "b", "c"):
-        yield _make_sse_chunk(token)
-    yield _make_done_chunk()
-
+# The shared helpers live in _run_helpers.py with placeholder thread ids
+# (since most consumers don't care which thread row they get). This file's
+# 058 cross-tab test cares — it inspects the threads_execute alternation —
+# so we wrap with module-local THREAD_A/THREAD_B substitutions to preserve
+# the prior behaviour exactly.
 
 def _thread_row(thread_id: str):
-    """A minimal threads-table row matching production schema."""
-    return {
-        "id": thread_id,
-        "user_id": USER_ID,
-        "title": "058 concurrency test",
-        "folder_id": None,
-        "created_at": "2026-05-01T00:00:00+00:00",
-        "updated_at": "2026-05-01T00:00:00+00:00",
-    }
+    return _thread_row_helper(thread_id)
 
 
 def _message_row(role: str = "user", content: str = "hello", thread_id: str = None):
-    return {
-        "id": str(uuid4()),
-        "thread_id": thread_id or THREAD_A,
-        "user_id": USER_ID,
-        "role": role,
-        "content": content,
-        "tool_calls": None,
-        "created_at": "2026-05-01T00:00:00+00:00",
-        "updated_at": "2026-05-01T00:00:00+00:00",
-    }
-
-
-def _make_table_builder(execute_fn):
-    """Build a chainable mock that routes every chained method back to itself
-    and dispatches `.execute()` to the supplied callable."""
-    b = MagicMock()
-    b.select.return_value = b
-    b.insert.return_value = b
-    b.update.return_value = b
-    b.delete.return_value = b
-    b.upsert.return_value = b
-    b.eq.return_value = b
-    b.neq.return_value = b
-    b.in_.return_value = b
-    b.or_.return_value = b
-    b.is_.return_value = b
-    b.order.return_value = b
-    b.limit.return_value = b
-    b.single.return_value = b
-    b.maybe_single.return_value = b
-    b.gte.return_value = b
-    b.lt.return_value = b
-    b.range.return_value = b
-    b.execute.side_effect = execute_fn
-    return b
+    return _message_row_helper(role=role, content=content, thread_id=thread_id or THREAD_A)
 
 
 def _build_mock_supabase():
-    """Build a mock supabase client with per-table routing.
-
-    The `messages` table builder serves the pre-stream INSERT slowly (1.5s)
-    so the cross-tab GET races against an in-flight aexec(). All other
-    table calls return immediately.
-
-    Why per-table routing? asyncio interleaving makes Thread A and Thread B
-    DB calls non-deterministic in order. A flat side_effect queue triggers
-    response-validation errors when Thread B picks up a row meant for
-    Thread A. Per-table routing keeps each thread's responses well-shaped.
+    """058's cross-tab test wants threads_execute to alternate between
+    THREAD_A and THREAD_B. Compose a thin override around the shared
+    helper to preserve that behaviour without forking the helper.
     """
-    # Track call counts per table to vary responses if needed
+    from unittest.mock import MagicMock
+
     state = {"messages_select_count": 0, "threads_select_count": 0}
 
     def messages_execute(*args, **kwargs):
-        # The pre-stream INSERT is the FIRST messages-table .execute() call
-        # from Thread A's send_message handler. Make it slow.
-        # Subsequent calls (history SELECT, persist assistant, etc.) are fast.
         state["messages_select_count"] += 1
         if state["messages_select_count"] == 1:
-            time.sleep(SLOW_INSERT_DELAY)  # simulate slow DB INSERT
+            time.sleep(SLOW_INSERT_DELAY)
             return _make_result([_message_row(thread_id=THREAD_A)])
-        # Subsequent messages-table calls: empty list (history, GET-B messages)
         return _make_result([])
 
     def threads_execute(*args, **kwargs):
-        # Threads-table calls return either the thread row or an empty result.
-        # Both Thread A's ownership SELECT and Thread B's ownership SELECT
-        # need a successful row; we don't distinguish — both get one.
-        # Folder-scope SELECT (`.select("folder_id").eq("id", tid).single()`)
-        # also runs against threads — the same row works (folder_id=None).
         state["threads_select_count"] += 1
-        # Return alternately for A and B; both succeed because the handler
-        # only checks `.data` truthiness.
         thread_id = THREAD_A if state["threads_select_count"] % 2 == 1 else THREAD_B
         return _make_result(_thread_row(thread_id))
 
     def default_execute(*args, **kwargs):
-        # Catch-all for skills, user_memory, audit, etc.
         return _make_result([])
 
     def runs_execute(*args, **kwargs):
-        # Phase 061 (D-061-11): the runs table mock returns an empty result —
-        # tests assert against the INSERT/UPDATE call_args_list, not the body.
         return _make_result([])
 
     builders = {
         "threads": _make_table_builder(threads_execute),
         "messages": _make_table_builder(messages_execute),
-        # Phase 061 (Plan 05 Step 0a): route the `runs` table through a
-        # per-table builder so test_061_*.py can inspect insert/update
-        # call_args_list. PATTERNS.md endorses extending in place rather
-        # than monkey-patching across the four 061 integration test files.
         "runs": _make_table_builder(runs_execute),
     }
     default_builder = _make_table_builder(default_execute)

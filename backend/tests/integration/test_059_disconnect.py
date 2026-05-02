@@ -38,9 +38,11 @@ from app.dependencies import get_supabase
 from app.main import app
 from app.services.openai_service import CallingMode
 
-# Cross-import 058 helpers verbatim per PATTERNS.md "Default: Option 1"
-# (no extraction to _sse_helpers.py until a 3rd consumer materialises).
-from tests.integration.test_058_concurrency import (
+# IN-01 (D-061.1-11): cross-import the shared helpers directly from
+# _run_helpers.py rather than via test_058_concurrency. test_058 still
+# re-exports the same names for legacy callers, but new imports should
+# go to the canonical location.
+from tests.integration._run_helpers import (
     USER_ID,
     _make_result,
     _make_sse_chunk,
@@ -50,6 +52,7 @@ from tests.integration.test_058_concurrency import (
     _message_row,
     _make_table_builder,
     _build_mock_supabase,
+    _slow_chunks,
 )
 
 THREAD_A = str(uuid4())  # 059 is single-thread; no THREAD_B
@@ -90,32 +93,11 @@ def _reset_sse_starlette_app_status():
     AppStatus.should_exit = False
 
 # ---------------------------------------------------------------------
-# 059-specific helpers (slow LLM stream, call counter, mid-stream disconnect)
+# 059-specific helpers (call counter, mid-stream disconnect driver)
+#
+# Note: ``_slow_chunks`` was relocated to ``_run_helpers.py`` (D-061.1-11)
+# and is now imported above with the rest of the shared mock infrastructure.
 # ---------------------------------------------------------------------
-
-def _slow_chunks(delay: float = SLOW_CHUNK_DELAY, count: int = 5):
-    """Sync generator yielding tokens with a delay so the SSE stream stays
-    open long enough for the test to disconnect mid-stream.
-
-    SYNC iterator: per KI-001, task.cancel() cannot interrupt mid-step;
-    cancellation lands at the NEXT await (queue.put) after the chunk.
-    Test's <1s budget includes this gap (RESEARCH §"Cancellation
-    Propagation Timeline" — worst-case 500ms+).
-
-    Count=5 keeps total nominal stream time at ~1.5s of `time.sleep` —
-    long enough that disconnect is genuinely mid-stream (not after natural
-    completion) yet short enough that even a broken cancellation contract
-    only delays the test by the remaining un-slept chunks rather than
-    wedging the suite. The helper's asyncio.wait_for(8.0) is the hard
-    backstop. Note: CR-01-style queue-back-pressure (maxsize=100) requires
-    >>100 queued events to surface and is out of reach for this functional
-    test; CR-01 is covered structurally by code review and the put_nowait
-    sentinel fix, not by overrunning the queue here.
-    """
-    for i in range(count):
-        time.sleep(delay)  # bounded event-loop block; KI-001 territory
-        yield _make_sse_chunk(f"tok{i} ")
-    yield _make_done_chunk()
 
 
 class LLMCallCounter:

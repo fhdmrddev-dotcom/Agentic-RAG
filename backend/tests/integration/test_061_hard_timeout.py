@@ -16,15 +16,16 @@ from app.dependencies import get_supabase
 from app.main import app
 from app.services.openai_service import CallingMode
 
-from tests.integration.test_058_concurrency import (  # noqa: E402
+# IN-01 (D-061.1-11): import shared helpers directly from _run_helpers.
+from tests.integration._run_helpers import (  # noqa: E402
     _build_mock_supabase,
     _make_done_chunk,
     _make_sse_chunk,
+    _extract_run_id_from_mock,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _reset_sse_starlette_app_status,
 )
-from tests.integration._run_helpers import _extract_run_id_from_mock  # noqa: E402
 
 THREAD_A = str(uuid4())
 

@@ -22,8 +22,10 @@ from app.dependencies import get_supabase
 from app.main import app
 from app.services.openai_service import CallingMode
 
-# Cross-import 058 + 059 helpers verbatim (PATTERNS.md established convention).
-from tests.integration.test_058_concurrency import (  # noqa: E402
+# IN-01 (D-061.1-11): shared mock infrastructure now lives in _run_helpers.
+# 059-specific drivers (the disconnect harness, the AppStatus reset) stay
+# in test_059_disconnect.py since they are not generic mock builders.
+from tests.integration._run_helpers import (  # noqa: E402
     USER_ID,
     _build_mock_supabase,
     _fast_chunks,
@@ -33,16 +35,13 @@ from tests.integration.test_058_concurrency import (  # noqa: E402
     _make_table_builder,
     _message_row,
     _thread_row,
+    _slow_chunks,
+    _extract_run_id_from_mock,
 )
 from tests.integration.test_059_disconnect import (  # noqa: E402
     _drive_sse_until_disconnect,
     _reset_sse_starlette_app_status,
-    _slow_chunks,
 )
-
-# Absolute-path import (matches 058/059 cross-import convention; relative imports
-# across sibling test files break collect-time module resolution under pytest).
-from tests.integration._run_helpers import _extract_run_id_from_mock  # noqa: E402
 
 THREAD_A = str(uuid4())
 THREAD_B = str(uuid4())   # for cross-tab regression assertion (D-061-15 ask)
