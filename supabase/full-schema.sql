@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fq0hTgf2t6AO79WZVamrQHBYknUUsVViWGqTNTLaY2CvP7HTF39c6V2IhZ2KkFJ
+\restrict feXyLAfgkwHeX8duEbnyXHW1Lmdhw6gwe60eIjHhENuUUlEu5vdOPVm9FDfaiAN
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -446,6 +446,27 @@ CREATE TABLE public.profiles (
 
 
 --
+-- Name: runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runs (
+    run_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    message_id uuid,
+    status text NOT NULL,
+    model text NOT NULL,
+    provider text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    input_tokens integer,
+    output_tokens integer,
+    error text,
+    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+--
 -- Name: sandbox_files; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -631,6 +652,14 @@ ALTER TABLE ONLY public.profiles
 
 
 --
+-- Name: runs runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_pkey PRIMARY KEY (run_id);
+
+
+--
 -- Name: sandbox_files sandbox_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -775,6 +804,20 @@ CREATE INDEX folders_parent_id_idx ON public.folders USING btree (parent_id);
 --
 
 CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
+
+
+--
+-- Name: idx_runs_active; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runs_active ON public.runs USING btree (user_id, thread_id, status) WHERE (status = 'streaming'::text);
+
+
+--
+-- Name: idx_runs_history; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runs_history ON public.runs USING btree (user_id, thread_id, started_at DESC);
 
 
 --
@@ -1024,6 +1067,30 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runs runs_message_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_message_id_fkey FOREIGN KEY (message_id) REFERENCES public.messages(id) ON DELETE SET NULL;
+
+
+--
+-- Name: runs runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runs runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1454,6 +1521,19 @@ ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.runs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: runs runs_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY runs_select_own ON public.runs FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
 -- Name: sandbox_files; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1487,5 +1567,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fq0hTgf2t6AO79WZVamrQHBYknUUsVViWGqTNTLaY2CvP7HTF39c6V2IhZ2KkFJ
+\unrestrict feXyLAfgkwHeX8duEbnyXHW1Lmdhw6gwe60eIjHhENuUUlEu5vdOPVm9FDfaiAN
 

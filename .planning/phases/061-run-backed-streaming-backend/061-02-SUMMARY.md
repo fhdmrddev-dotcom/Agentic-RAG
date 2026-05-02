@@ -28,9 +28,8 @@ tech-stack:
 key-files:
   created:
     - "supabase/migrations/035_runs_table.sql"
-  modified: []
-  pending_at_checkpoint:
-    - "supabase/full-schema.sql (regen step belongs to checkpoint Task 2 Step C)"
+  modified:
+    - "supabase/full-schema.sql (regenerated post-SQL-editor application via scripts/regenerate-full-schema.sh)"
 
 key-decisions:
   - "Adopted PATTERNS.md (line 546) recommendation: message_id ON DELETE SET NULL (D-061-06 itself only locks thread_id + user_id behavior). Documented in plan frontmatter `deviations` and inline in migration header comment."
@@ -44,16 +43,16 @@ patterns-established:
 requirements-completed: [STREAM-04]
 
 # Metrics
-duration: 1min
+duration: 1min author + manual SQL editor application
 completed: 2026-05-02
-status: PARTIAL — checkpoint blocks completion
+status: COMPLETE — migration applied via Supabase SQL editor; full-schema.sql regenerated
 ---
 
 # Phase 061 Plan 02: Runs Table Migration Summary
 
 **`public.runs` Postgres table — durable lifecycle counterpart to the ephemeral Redis Stream per D-v2.5-11; implements 7 of 17 D-061 schema decisions in a single migration file.**
 
-> **Status: PARTIAL.** Plan 02 has `autonomous: false` because Task 2 is a `checkpoint:human-verify` gate. Task 1 (author migration file) is complete and committed. Task 2 (run `supabase db push` against the user's live local Postgres + regenerate `supabase/full-schema.sql` + sanity-check via the backend Supabase client) requires user action and was returned to the orchestrator as a checkpoint per the worktree-mode brief. Once the user (or the orchestrator post-merge) runs the checkpoint commands, this SUMMARY should be amended with the `supabase db push` log line for migration 035 and the `grep -c 'public.runs' supabase/full-schema.sql` count.
+> **Status: COMPLETE.** Plan 02 has `autonomous: false` because Task 2 is a `checkpoint:human-verify` gate. Task 1 (author migration file) was committed in `82df4ce`. Task 2 was resolved by the user applying the migration through the **Supabase SQL editor** (the project's standing rule for schema changes — see user feedback memory `feedback_apply_migrations_via_sql_editor`). After the SQL editor application, `scripts/regenerate-full-schema.sh` was run from the repo root to refresh `supabase/full-schema.sql`.
 
 ## Performance
 
@@ -80,16 +79,12 @@ All 14 acceptance gates from `<acceptance_criteria>` pass exactly (CREATE TABLE 
 Each task was committed atomically:
 
 1. **Task 1: Author migration 035_runs_table.sql** — `82df4ce` (feat)
-2. **Task 2: [BLOCKING] Push migration to local Supabase + regenerate full-schema.sql** — *PENDING (checkpoint:human-verify)*
-
-**Plan metadata commit:** to be added by `git_commit_metadata` step in execute-plan.md when this SUMMARY is committed (worktree-mode commits SUMMARY.md only — no STATE.md/ROADMAP.md per orchestrator brief).
+2. **Task 2: Apply migration via Supabase SQL editor + regenerate full-schema.sql** — applied manually by user; regen + SUMMARY amend committed in the post-checkpoint orchestrator commit (this commit).
 
 ## Files Created/Modified
 
 - `supabase/migrations/035_runs_table.sql` — Phase 061 per-run lifecycle metadata table (D-v2.5-11)
-
-**NOT modified yet (Task 2 owns these):**
-- `supabase/full-schema.sql` — must be regenerated via `bash scripts/regenerate-full-schema.sh` after `supabase db push` lands the migration
+- `supabase/full-schema.sql` — regenerated via `bash scripts/regenerate-full-schema.sh` after SQL editor application of 035; latest migration included confirmed as `035_runs_table.sql`
 
 ## Decisions Made
 
@@ -112,28 +107,30 @@ The frontmatter-declared deviation (`message_id ON DELETE SET NULL`) is the plan
 
 None during Task 1.
 
-## Checkpoint State (Task 2 — pending)
+## Checkpoint Resolution (Task 2 — resolved 2026-05-02)
 
-**Type:** checkpoint:human-verify (BLOCKING gate)
+**Type:** checkpoint:human-verify (BLOCKING gate) — RESOLVED.
 
-**What needs to happen** (the orchestrator should surface these to the user):
+**Application path used:** Supabase SQL editor (per `feedback_apply_migrations_via_sql_editor` user-memory rule). The user opened the local Supabase Studio SQL editor, pasted the contents of `supabase/migrations/035_runs_table.sql`, and ran the statement.
 
-1. `supabase db push` — applies migration 035 to the live local Supabase Postgres
-2. `bash scripts/regenerate-full-schema.sh` — regenerates `supabase/full-schema.sql` (CLAUDE.md mandatory after every migration)
-3. Sanity check via the backend Supabase client:
-   ```bash
-   cd backend && venv/Scripts/python -c "from app.dependencies import get_supabase; r = get_supabase().table('runs').select('run_id').limit(1).execute(); print('runs queryable:', r.data is not None)"
-   ```
-   Expected: `runs queryable: True`.
+**Verification query run by user (Step B):**
+```sql
+SELECT to_regclass('public.runs') AS exists,
+       (SELECT count(*) FROM pg_indexes  WHERE schemaname='public' AND tablename='runs') AS idx_count,
+       (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='runs') AS policy_count;
+```
+**Result:** `exists = "runs"`, `idx_count = 3` (PK + idx_runs_active + idx_runs_history), `policy_count = 1` — all gates pass.
 
-**Why the executor agent did not run these:**
-- The orchestrator brief (`<parallel_execution>`) explicitly directs: *"For the human-action checkpoint task: stop work, write a checkpoint marker, and return checkpoint state. Do not commit the migration SQL beforehand only as a partial — commit the SQL file as its own task (since it can be authored without the manual reset), then surface the checkpoint when the next task asks the human to run the reset."* That sequence was followed: SQL committed (`82df4ce`), then checkpoint surfaced.
-- Plan 02 has `autonomous: false` precisely because of this gate.
-- `supabase db push` requires Docker Desktop + Supabase CLI on the user's local machine and would mutate the user's live local dev DB. Not something a parallel-worktree executor can run without user consent.
+**Post-application steps (run by orchestrator):**
+- `bash scripts/regenerate-full-schema.sh` → 1571-line snapshot, latest migration included confirmed as `035_runs_table.sql`
+- Sanity-check `supabase/full-schema.sql` after regen:
+  - `grep -c "CREATE TABLE IF NOT EXISTS public.runs" supabase/full-schema.sql` = 1 ✓
+  - `grep -c "runs_select_own" supabase/full-schema.sql` = 2 ✓ (CREATE POLICY + ALTER POLICY OWNER)
+  - `grep -c "idx_runs_active" supabase/full-schema.sql` = 2 ✓
+  - `grep -c "idx_runs_history" supabase/full-schema.sql` = 2 ✓
+- Backend client smoke test: `runs table queryable: True` ✓ via `get_supabase().table('runs').select('run_id').limit(1).execute()`
 
-**Detailed verification steps:** see `<how-to-verify>` in `.planning/phases/061-run-backed-streaming-backend/061-02-PLAN.md` (Steps A–E, including troubleshooting for stale shadow DB / missing CLI / regen script not found).
-
-**After the user runs Steps A–E successfully:** amend this SUMMARY with the `supabase db push` "Applying migration 035_runs_table.sql..." log line and the regen output `grep -c 'CREATE TABLE IF NOT EXISTS public.runs' supabase/full-schema.sql` (expected: 1).
+**Migration is live in the local Postgres and Plan 03 (producer/consumer) can now INSERT/UPDATE `public.runs` rows.**
 
 ## User Setup Required
 
@@ -141,9 +138,8 @@ None for Task 1 (file authoring is offline). Task 2 is itself a "user setup" gat
 
 ## Next Phase Readiness
 
-- **Plan 03 (producer/consumer) is BLOCKED** until the Task 2 checkpoint completes — Plan 03's `INSERT into public.runs` and `UPDATE public.runs SET status=...` statements will fail with `relation public.runs does not exist` until the migration is pushed to the live local Postgres.
-- Once the checkpoint is approved: Plan 03 (Wave 2) can proceed without further DB-schema dependencies; the table is queryable via `get_supabase().table('runs')`.
-- Plan 02 is independent of Plan 01 (parallel-able in Wave 1) — both must complete before Wave 2.
+- **Plan 03 (producer/consumer) is unblocked** — the `public.runs` table is live in local Postgres (verified via backend client smoke test). Plan 03's `INSERT into public.runs` and `UPDATE public.runs SET status=...` statements can now execute without `relation does not exist` errors.
+- Plan 02 is independent of Plan 01 (parallel-able in Wave 1); both Wave 1 plans are now complete.
 
 ## Self-Check: PASSED
 
@@ -162,5 +158,5 @@ None — the migration introduces the exact `public.runs` table already enumerat
 ---
 *Phase: 061-run-backed-streaming-backend*
 *Plan: 02*
-*Status: PARTIAL — Task 1 complete and committed; Task 2 is a checkpoint:human-verify gate returned to orchestrator*
+*Status: COMPLETE — Task 1 committed in 82df4ce; Task 2 resolved via Supabase SQL editor application + regen on 2026-05-02*
 *Authored: 2026-05-02*
