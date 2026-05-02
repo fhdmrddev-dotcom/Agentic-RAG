@@ -1939,6 +1939,26 @@ async def send_message(
                   # Phase 32: True stream end — frontend returns from streamMessage
                   await _emit(redis, run_id, 'stream_end')
 
+                except asyncio.TimeoutError:
+                    # CR-01 fix: catch terminal classifications BEFORE the line-1942 finally
+                    # runs. Previously these branches lived at the outer try (~line 2007),
+                    # which ran AFTER the finally had already written 'completed' to Redis
+                    # and Postgres. D-061-01: producer body exceeded settings.run_hard_timeout_seconds.
+                    _terminal_status = "failed"
+                    _terminal_error = "hard_timeout"
+                    logger.warning("Run %s exceeded hard timeout %ds", run_id, settings.run_hard_timeout_seconds)
+                except asyncio.CancelledError:
+                    # CR-01 fix: classify before finally reads. Cancellation comes from app
+                    # lifespan shutdown OR (in 062+) from DELETE /runs/{id} cancel verb.
+                    # D-061-03: 061-only window has no cancel verb — only lifespan cancels.
+                    _terminal_status = "cancelled"
+                    _terminal_error = None
+                    raise   # MUST re-raise so timeout context + asyncio task state stay correct (Pitfall 3)
+                except Exception as e:
+                    # CR-01 fix: classify before finally reads. Generic failure path.
+                    _terminal_status = "failed"
+                    _terminal_error = type(e).__name__   # short discriminator string per D-061-09
+                    logger.exception("Run %s failed", run_id)
                 finally:
                     # Phase 061 (D-061-04, Pitfall 2): shielded finalizer with
                     # strict ordering — sentinel BEFORE expire, registry pop LAST.
@@ -2004,26 +2024,15 @@ async def send_message(
                         # 6. Self-evict from registry (done-callback also handles this; defense-in-depth)
                         RUN_TASKS.pop(run_id, None)
 
-        except asyncio.TimeoutError:
-            # D-061-01: producer body exceeded settings.run_hard_timeout_seconds (default 120s).
-            # The asyncio.timeout context manager translates the synthetic CancelledError into
-            # TimeoutError when the deadline elapses. The outer finally (above, inside the
-            # try) writes the terminal error sentinel + runs UPDATE (status='failed',
-            # error='hard_timeout') + EXPIRE 60.
-            _terminal_status = "failed"
-            _terminal_error = "hard_timeout"
-            logger.warning("Run %s exceeded hard timeout %ds", run_id, settings.run_hard_timeout_seconds)
-        except asyncio.CancelledError:
-            # Cancellation comes from app lifespan shutdown OR (in 062+) from
-            # DELETE /runs/{id} cancel verb. D-061-03: 061-only window has
-            # no cancel verb — only lifespan cancels. Mark as cancelled.
-            _terminal_status = "cancelled"
-            _terminal_error = None
-            raise   # MUST re-raise so the timeout context + asyncio task state stay correct (Pitfall 3)
-        except Exception as e:
-            _terminal_status = "failed"
-            _terminal_error = type(e).__name__   # short discriminator string per D-061-09
-            logger.exception("Run %s failed", run_id)
+        # CR-01 fix: classification of TimeoutError / CancelledError / Exception
+        # was moved INSIDE the inner try (just before its finally) so the finalizer
+        # at line 1942 reads the correct _terminal_status. The previous outer
+        # except branches at this level were redundant — they fired AFTER the
+        # finally had already committed status='completed' to Redis and Postgres.
+        # CancelledError still propagates out of agent_runner via the inner re-raise
+        # so the asyncio task transitions to CANCELLED state correctly (Pitfall 3).
+        finally:
+            pass  # outer try kept structurally; classification handled by inner except branches above.
 
     # Spawn producer task — runs concurrently with the consumer below.
     # D-061-11: register the producer in RUN_TASKS BEFORE returning the
