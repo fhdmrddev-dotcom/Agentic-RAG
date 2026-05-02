@@ -211,7 +211,12 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   6. Backend dependency: `redis>=5` added to `backend/requirements.txt`; `/health` endpoint extended with a Redis ping check that returns `{"redis": "ok" | "unreachable"}`.
   7. No regression in 058/059 binding tests: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and `test_059_disconnect.py` still pass — single-thread happy path latency profile unchanged.
   8. Existing tests in 060's e2e harness (`060-thread-race.spec.ts`) still pass — STREAM-02a guarantees preserved.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 061-01-PLAN.md — Foundation: redis>=5.2 dep + Settings (REDIS_URL, RUN_HARD_TIMEOUT_SECONDS) + get_redis() singleton + lifespan PING + /health Redis status
+  - [ ] 061-02-PLAN.md — Migration 035_runs_table.sql + [BLOCKING] supabase db push + regenerate full-schema.sql
+  - [ ] 061-03-PLAN.md — Producer XADD rewrite + asyncio.timeout(120) + RUN_TASKS registry + two-mode XREAD consumer + finally-ordering (sentinel→UPDATE→EXPIRE→ZREM→pop)
+  - [ ] 061-04-PLAN.md — Test infrastructure: redis_client function-scoped fixture + session-end FLUSHDB + CI workflow with docker-compose Redis preamble
+  - [ ] 061-05-PLAN.md — Binding tests (D-061-15), TTL/runs/hard-timeout integration tests, D-061-16 contract inversion of test_059, 061-VERIFICATION.md
 **Risks / pitfalls**:
   - Redis Stream is new infra. Add `REDIS_URL` env var; document Upstash free tier setup in DEPLOYMENT.md or equivalent. Confirm Redis client library choice (`redis-py` async API) early — `redis.asyncio.Redis` is the modern path.
   - Don't conflate `run_id` with `message_id`. A single run produces a single assistant message but emits many events. `run_id` is the buffer key.
@@ -278,7 +283,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
 | 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 060. Frontend Race Fixes | v2.5 | 3/3 | Complete    | 2026-05-02 |
-| 061. Run-Backed Streaming (Backend) | v2.5 | 0/0 | Not started | — |
+| 061. Run-Backed Streaming (Backend) | v2.5 | 0/5 | Not started | — |
 | 062. Replay & Tail API | v2.5 | 0/0 | Not started | — |
 | 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |

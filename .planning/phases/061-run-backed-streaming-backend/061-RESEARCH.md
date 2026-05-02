@@ -701,17 +701,19 @@ async def _flush_redis_at_session_end():
 
 **Two MEDIUM-confidence assumptions (A5, A8)** warrant a deliberate verification step in the binding test or its predecessor. Planner should add a wave-zero unit test for A5 (timeout interaction) and a smoke test for A8 (run the same fixture twice in one session).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Q1: Token-counter accounting source.**
    - What we know: Producer's `finally` UPDATEs `runs.input_tokens` / `runs.output_tokens`. The number must come from somewhere.
    - What's unclear: LLM SDKs return token counts in their final stream chunk (OpenAI: `usage` field on the last chunk if `stream_options={"include_usage": true}`; Anthropic: `usage` field on `message_stop` event). We could also estimate via `tiktoken`. CONTEXT.md "Deferred" explicitly says "planner picks the simplest path that gives a non-NULL number at completion."
    - Recommendation: For 061, capture the SDK-reported usage when available; fall back to NULL if the provider doesn't surface it (matches `INTEGER NULL` schema). Don't pull in `tiktoken` for estimation in this phase — that's a billing/usage concern that belongs alongside Phase 062's API surface.
+   - **RESOLVED:** Plan 03 deviation block — SDK-reported usage only, NULL fallback, no tiktoken. See `061-03-PLAN.md` deviation section.
 
 2. **Q2: Should `runs_by_thread:{thread_id}` and `runs:active` ZADD/ZREM happen in the producer's `finally`, or in the route handler's body before/after spawning the task?**
    - What we know: CONTEXT.md "Claude's Discretion" lists this. ZADD on start, ZREM on end. Both work.
    - What's unclear: Failure mode where ZADD happens but the producer task fails to spawn (e.g., resource exhaustion). Then the sorted set has an entry pointing at a non-existent run.
    - Recommendation: ZADD inside the route handler immediately AFTER `RUN_TASKS[run_id] = task` but BEFORE returning the consumer (atomic from request's perspective). ZREM inside producer's `finally`. If task spawn itself fails, the route handler raises and never returns the consumer; need a small `try/except` around the spawn that ZREMs on failure to prevent orphan sorted-set entries. Phase 062 will filter these by `runs.status='streaming'` from Postgres anyway, so even the orphan case is self-correcting.
+   - **RESOLVED:** Plan 03 Task 1 Step C+E — ZADD in route handler post-spawn with spawn-failure ZREM cleanup; ZREM in producer's `finally`.
 
 ## Environment Availability
 

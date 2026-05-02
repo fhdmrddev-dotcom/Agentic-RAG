@@ -4,14 +4,14 @@ milestone: v2.5
 milestone_name: Deployment Strategy
 status: Ready to discuss
 stopped_at: Phase 061 context gathered
-last_updated: "2026-05-02T11:39:44.275Z"
+last_updated: "2026-05-02T16:18:24.178Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 9
+  total_plans: 14
   completed_plans: 9
-  percent: 100
+  percent: 64
 ---
 
 # Project State
@@ -134,4 +134,4 @@ Next: `/gsd-discuss-phase 059` to begin SSE Architecture Refactor
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
 
-**Planned Phase:** 060 (frontend-race-fixes) — 3 plans — 2026-05-02T06:15:59.911Z
+**Planned Phase:** 061 (Run-Backed Streaming (Backend)) — 5 plans — 2026-05-02T16:18:24.163Z
