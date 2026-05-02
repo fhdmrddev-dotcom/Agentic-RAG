@@ -1804,7 +1804,18 @@ async def send_message(
                 except asyncio.CancelledError:
                     raise   # D-059-02, RESEARCH §A5: re-raise after cleanup
         finally:
-            await queue.put(None)   # SENTINEL — must be the LAST queue op, ALWAYS (Pitfall 4)
+            # SENTINEL — must be the LAST queue op, ALWAYS (Pitfall 4).
+            # Use put_nowait + swallow QueueFull so a cancelled / disconnected
+            # consumer (queue back-pressure with no remaining drain) cannot
+            # deadlock the producer's finally. The consumer's `await task`
+            # only awaits the producer task — it never re-checks the queue —
+            # so dropping the sentinel under back-pressure is safe.
+            # Fixes CR-01 (back-pressure deadlock) and CR-04 (fragile
+            # reliance on cancel re-raise to short-circuit a blocking put).
+            try:
+                queue.put_nowait(None)
+            except asyncio.QueueFull:
+                pass
 
     # Spawn producer task — runs concurrently with the consumer below.
     task = asyncio.create_task(agent_runner())
