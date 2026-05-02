@@ -1781,11 +1781,18 @@ async def send_message(
 
                             # GEN-03: Store full tool result — no character cap.
                             # trim_messages_to_fit() drops OLDER messages when context budget is exceeded.
-                            full_content = llm_tool_content if llm_tool_content is not None else tool_result
+                            # IMPORTANT: use a separate local — `full_content` is the assistant's
+                            # accumulated text response that gets persisted to messages.assistant.content.
+                            # Reusing it as a temp for the tool payload corrupted the persisted message
+                            # with the entire tool_result JSON (e.g., a full document dump). The bug was
+                            # latent pre-061 because the producer was cancelled on disconnect before
+                            # persist; 061's D-v2.5-08 contract inversion runs persist via the shielded
+                            # finalizer regardless of disconnect, surfacing the leak.
+                            _tool_message_content = llm_tool_content if llm_tool_content is not None else tool_result
                             messages.append({
                                 "role": "tool",
                                 "tool_call_id": tc["id"],
-                                "content": full_content,
+                                "content": _tool_message_content,
                             })
 
                             # Persist tool call — for execute_code rebuild from tool_result
