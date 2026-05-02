@@ -17,7 +17,7 @@ Active scope for v2.5. Each maps to exactly one phase below.
 
 ### Frontend Streaming Reliability
 
-- [ ] **STREAM-02a**: Switching from a streaming Thread A to Thread B does NOT corrupt Thread B's message list with Thread A's data (Symptom H). Concurrent `loadMessages` calls cannot overwrite each other's results. Verified by: start streaming on Thread A → click Thread B before stream ends → confirm Thread B shows only Thread B's messages, no leak from A.
+- [x] **STREAM-02a**: Switching from a streaming Thread A to Thread B does NOT corrupt Thread B's message list with Thread A's data (Symptom H). Concurrent `loadMessages` calls cannot overwrite each other's results. Verified by: start streaming on Thread A → click Thread B before stream ends → confirm Thread B shows only Thread B's messages, no leak from A.
 - [ ] **STREAM-02b**: After tab switch mid-stream (Symptom E) or F5 mid-stream (Symptom F), the assistant message recovers without a manual second F5 — either auto-displays via reconcile fetch, or a "Resume" button appears if the backend is still mid-generation. Stop button (Symptom G) does not trigger reload, and tool-result JSON does not leak into chat content (Bug 3 regression guard). Verified by: scripted scenarios E, F, G in browser MCP.
 
 ### Test Infrastructure
@@ -54,7 +54,7 @@ Deferred to later milestones. Tracked but not in v2.5 roadmap.
 |-------------|-------|--------|
 | CONCUR-01 | Phase 058 | Pending |
 | CONCUR-02 | Phase 059 | Complete |
-| STREAM-02a | Phase 060 | Pending |
+| STREAM-02a | Phase 060 | Complete |
 | STREAM-02b | Phase 061 | Pending |
 | TEST-01 | Phase 062 | Pending |
 
