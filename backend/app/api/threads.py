@@ -47,6 +47,23 @@ router = APIRouter(prefix="/threads", tags=["threads"])
 logger = logging.getLogger(__name__)
 
 
+# WR-05: retain strong references to fire-and-forget background tasks so the
+# event loop does not garbage-collect them mid-execution (Python docs:
+# asyncio.create_task only weakly references the returned task). Without a
+# strong reference, audit-log and memory writes can be silently dropped with
+# the warning "Task was destroyed but it is pending!". Tasks self-evict from
+# the set via the done-callback so it never grows unbounded.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+
+def _spawn(coro) -> asyncio.Task:
+    """Schedule a fire-and-forget coroutine and retain a strong reference."""
+    t = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(t)
+    t.add_done_callback(_BACKGROUND_TASKS.discard)
+    return t
+
+
 def _is_transient_provider_error(e: APIError) -> bool:
     """Return True if this is a transient provider failure safe to retry.
 
@@ -1133,7 +1150,7 @@ async def send_message(
                                     for h in (results or [])
                                     if h.get("document_id") or h.get("id")
                                 })
-                                asyncio.create_task(write_audit_entry(
+                                _spawn(write_audit_entry(
                                     user_id=current_user["id"],
                                     action_type="search.query",
                                     metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
@@ -1202,7 +1219,7 @@ async def send_message(
                                     tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                                 else:
                                     row = skill_row[0] if isinstance(skill_row, list) else skill_row
-                                    asyncio.create_task(write_audit_entry(
+                                    _spawn(write_audit_entry(
                                         user_id=current_user["id"],
                                         action_type="skill.load",
                                         metadata={"skill_id": row["id"], "skill_name": row["name"]},
@@ -1522,7 +1539,7 @@ async def send_message(
                                         "stdout": exec_result.stdout or "",
                                         "stderr": exec_result.stderr or "",
                                     })
-                                    asyncio.create_task(write_audit_entry(
+                                    _spawn(write_audit_entry(
                                         user_id=current_user["id"],
                                         action_type="code.execute",
                                         metadata={"thread_id": thread_id, "language": args.get("language", "python")},
@@ -1566,8 +1583,8 @@ async def send_message(
                                                 _uid, _key, exc,
                                             )
 
-                                    asyncio.create_task(_write_memory())
-                                    asyncio.create_task(write_audit_entry(
+                                    _spawn(_write_memory())
+                                    _spawn(write_audit_entry(
                                         user_id=current_user["id"],
                                         action_type="memory.remember",
                                         metadata={"key": key, "value": value, "action": "upsert"},
@@ -1610,7 +1627,7 @@ async def send_message(
                                     else:
                                         tool_result = "No memories stored yet."
 
-                                asyncio.create_task(write_audit_entry(
+                                _spawn(write_audit_entry(
                                     user_id=current_user["id"],
                                     action_type="memory.recall",
                                     metadata={"key": key or None},
