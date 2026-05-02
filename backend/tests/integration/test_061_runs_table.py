@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from httpx import ASGITransport
 
 from app.dependencies import get_supabase
 from app.main import app
@@ -42,7 +43,7 @@ async def test_runs_lifecycle_row():
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",

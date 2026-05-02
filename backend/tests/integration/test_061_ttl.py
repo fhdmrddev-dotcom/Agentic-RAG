@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from httpx import ASGITransport
 
 from app.dependencies import get_supabase
 from app.main import app
@@ -45,7 +46,7 @@ async def test_completed_run_expires_600s(redis_client):
             "app.api.threads.generate_thread_title",
             return_value=("Test Title", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -87,7 +88,7 @@ async def test_failed_run_expires_60s(redis_client):
             "app.api.threads.generate_thread_title",
             return_value=("Test Title", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
