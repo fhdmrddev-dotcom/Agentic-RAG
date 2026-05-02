@@ -236,6 +236,20 @@ class Settings(BaseSettings):
     # ANYIO_THREAD_TOKENS=<int>.
     anyio_thread_tokens: int = 200
 
+    # Run-backed streaming (Phase 061 — D-v2.5-08, D-061-13)
+    # URL of the Redis instance backing per-run SSE event streams.
+    # Defaults to the local docker-compose.dev.yml service. Override in
+    # .env: REDIS_URL=redis://… or rediss://… for TLS (Upstash). See
+    # REDIS-SETUP.md for cloud setup.
+    redis_url: str = "redis://localhost:6379"
+
+    # Server-side hard timeout for the agent producer task (Phase 061 — D-061-01).
+    # Wraps the producer body in `async with asyncio.timeout(...)`. 120s is
+    # ~2× the typical 12-iteration agent-loop ceiling. Bounds abandoned-run
+    # cost (Stop is intentionally a no-op backend-side in 061; cancel verb
+    # ships in 062 — D-061-03). Override in .env: RUN_HARD_TIMEOUT_SECONDS=<int>.
+    run_hard_timeout_seconds: int = 120
+
     @property
     def web_search_enabled(self) -> bool:
         return bool(self.tavily_api_key)
