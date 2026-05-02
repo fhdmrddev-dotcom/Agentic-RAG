@@ -30,7 +30,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 **Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
 **Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
-**Known tech debt:** STREAM-02a closed by Phase 060 (frontend race fixes — `setViewingThread` + `AbortController`-driven `loadMessages`, Phase-057 Realtime band-aids removed); STREAM-02 remaining work scoped to v2.5 phases 061 (reconnect handlers) and 062 (validation harness); SKILL-01/02 (catalog still full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
+**Known tech debt:** STREAM-02a closed by Phase 060 (frontend race fixes); STREAM-04 (run-backed streaming for Claude/ChatGPT-class refresh + multi-tab + navigate-away survival) scoped to v2.5 phases 061 (Run-Backed Streaming Backend with Redis Streams per D-v2.5-08), 062 (Replay & Tail API), 063 (Frontend Stream Decoupling — also delivers STREAM-02b); 064 validates the chain; 065 (Skills Test Infra Repair) parallel-able. SKILL-01/02 (catalog full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
 
 ## Requirements
 
@@ -136,9 +136,10 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 - [ ] CONCUR-01: Backend SSE handler does not block concurrent requests during long agent loops *(v2.5 Phase 058)*
 - [ ] CONCUR-02: SSE architecture decouples handler lifetime from agent loop lifetime *(v2.5 Phase 059)*
-- [ ] STREAM-02a: Frontend race conditions eliminated (setViewingThread, AbortController, finally-block reload removed) *(v2.5 Phase 060)*
-- [ ] STREAM-02b: Tab-switch (E) and F5 mid-stream (F) recover without breaking Stop (G) or navigation (H) *(v2.5 Phase 061)*
-- [ ] TEST-01: Reproducible browser-based test harness for SSE/reconnect scenarios *(v2.5 Phase 062)*
+- [x] STREAM-02a: Frontend race conditions eliminated (setViewingThread, AbortController, finally-block reload removed) *(v2.5 Phase 060 — shipped 2026-05-02)*
+- [ ] STREAM-02b: Tab-switch (E) and F5 mid-stream (F) recover without breaking Stop (G) or navigation (H) *(v2.5 Phase 063 — subsumed by STREAM-04)*
+- [ ] STREAM-04: Stream survives navigation, refresh, and multi-tab access — generation lifetime decoupled from any single HTTP request via Redis Streams + replay-and-tail API + frontend reconcile-on-(re)connect (Claude/ChatGPT-class behavior) *(v2.5 Phases 061 + 062 + 063)*
+- [ ] TEST-01: Reproducible browser-based test harness for SSE/reconnect scenarios including run-backed streaming + multi-tab sync + refresh-mid-stream *(v2.5 Phase 064)*
 - [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone)*
 - [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone)*
 
@@ -230,6 +231,9 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 | _announced_tools set[int] guard (D-056.1-01) | Guards tool_preparing SSE to emit exactly once per tool index in OpenAI path. Anthropic path has separate _announced_tools_ant guard. | ✓ Good — prevents duplicate preparing events on parallel same-name tool calls |
 | loadMessages outside React state updater (v2.4 Phase 57) | Side effects (loadMessages, stoppedByUserRef reset) must be outside setMessages updater — Strict Mode double-invokes updaters and bail-out optimization can skip them entirely. | ✓ Good — structural correctness; documented for future hook maintainers |
 | Realtime reconnect deferred (STREAM-02) | Supabase Realtime INSERT delivery timing unreliable for tab-switch and F5 scenarios. Use polling for F5 + visibilitychange for tab-switch in next attempt. Verify REPLICA IDENTITY on messages table first. | ⚠ Revisit — see 057-DEFERRAL.md |
+| **D-v2.5-08**: Run-backed streaming via Redis Streams (not pgmq, not LISTEN/NOTIFY) | Redis Streams provide native replay-from-offset + live-tail (`XREAD` with cursor), trivial multi-consumer fan-out (each tab is an independent reader), one-line per-key TTL, and battle-tested for chat-streaming infra at scale. pgmq is a queue (consume-once) which fights the use case; LISTEN/NOTIFY hits 8KB payload limits and requires a separate events table for replay. Free Upstash tier covers this app's scale; Redis is a one-line add when deploying to Hostinger (SEED-003). | New — locked 2026-05-02 by user before /gsd:discuss-phase 061 |
+| **D-v2.5-09**: LLM token cost shift on rescope | Run-backed streaming decouples generation from HTTP request lifetime, so navigating away no longer cancels the LLM call. Mitigations: explicit Stop button (cancel verb hits server, not just frontend abort), server-side hard timeout per generation (default 120s), abandoned-run TTL (no consumer for N minutes → cancel producer). Specific values to be locked in /gsd:discuss-phase 061. | New — flagged 2026-05-02 |
+| **D-v2.5-10**: STREAM-02b absorbed by STREAM-04 (run-backed streaming) | The original Reconnect Handlers approach (visibilitychange + pageshow + reconcile-fetch + Resume button) was the right symptom-treating layer for the legacy POST-streams architecture. Run-backed streaming makes recovery automatic at the architecture level — STREAM-02b's success criteria (E, F, G recover without manual F5) are met as a side-effect. Resume button retained only for `failed` runs, preserving D-v2.5-05's "no auto-retry of paid LLM calls" principle. | New — locked 2026-05-02 |
 
 ## Constraints
 
@@ -259,4 +263,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-02 — Phase 060 (Frontend Race Fixes) shipped; STREAM-02a closed via setViewingThread + AbortController-driven loadMessages; Phase-057 Realtime band-aids removed*
+*Last updated: 2026-05-02 — Phase 060 shipped (STREAM-02a closed); v2.5 milestone rescoped to deliver STREAM-04 (Claude/ChatGPT-class run-backed streaming): added Phase 063 (Frontend Stream Decoupling), rescoped Phase 061 (Run-Backed Streaming Backend) and Phase 062 (Replay & Tail API), renumbered prior 062→064 and 063→065; D-v2.5-08 (Redis Streams) and D-v2.5-10 (STREAM-02b absorbed) locked*

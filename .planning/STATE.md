@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 060 shipped (STREAM-02a closed); next is 061 Reconnect Handlers
-last_updated: "2026-05-02T07:30:00Z"
-last_activity: 2026-05-02 — Phase 060 frontend race fixes complete
+stopped_at: Phase 060 shipped (STREAM-02a closed); v2.5 rescoped for STREAM-04 (Claude/ChatGPT-class run-backed streaming); next is 061 Run-Backed Streaming Backend
+last_updated: "2026-05-02T07:45:00Z"
+last_activity: 2026-05-02 — v2.5 milestone rescoped; new phases 061-063 plus renumbered 064/065
 progress:
-  total_phases: 6
+  total_phases: 8
   completed_phases: 3
   total_plans: 9
   completed_plans: 9
-  percent: 50
+  percent: 38
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 061 — Reconnect Handlers (visibilitychange + pageshow recovery; Resume button)
+**Current focus:** Phase 061 — Run-Backed Streaming (Backend) — durable per-run buffer in Redis Streams, agent producer task decoupled from any HTTP request
 
 ## Current Position
 
@@ -29,7 +29,7 @@ Phase: 061
 Plan: Not started
 Status: Ready to discuss
 Last activity: 2026-05-02
-Next action: `/gsd:discuss-phase 061` to begin Reconnect Handlers (D-v2.5-05: visibilitychange + pageshow + reconcile fetch + Resume button)
+Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Locked decisions: D-v2.5-08 (Redis Streams as buffer backend). Decisions to lock during discuss: D-v2.5-09 (LLM cost mitigations — Stop button server cancel, server-side timeout default, abandoned-run TTL).
 
 ## Recent Completed Phases
 

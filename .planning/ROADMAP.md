@@ -123,9 +123,11 @@ Full details: `.planning/milestones/v2.4-ROADMAP.md`
 - [X] **Phase 058: Backend SSE Concurrency Fix** — Wrap blocking supabase `.execute()` calls so cross-tab requests aren't queued behind streaming agents (completed 2026-05-01)
 - [ ] **Phase 059: SSE Architecture Refactor** — `asyncio.Queue` + background task + `sse-starlette` so handler lifetime decouples from agent loop lifetime
 - [ ] **Phase 060: Frontend Race Fixes** — `setViewingThread` separation, `AbortController` cancellation, drop the `finally`-block reload that leaked tool-result JSON
-- [ ] **Phase 061: Reconnect Handlers** — `visibilitychange` + `pageshow` recovery for Symptom E; one-shot reconcile fetch + Resume button for Symptom F
-- [ ] **Phase 062: Validation Harness** — Reproducible chrome-in-browser MCP scripts for scenarios E, F, G, H, and navigate-during-stream
-- [ ] **Phase 063: Skills Test Infrastructure Repair** — Fix 13+ broken patches in `test_threads_skills.py` and 3 broken export tests in `test_skills_import_export.py` so the next milestone (Skill Studio) starts on a green test foundation
+- [ ] **Phase 061: Run-Backed Streaming (Backend)** — Per-run durable stream buffer in Redis Streams; agent producer task writes tokens keyed by `run_id`; SSE handler is a *consumer* with offset cursor, lifecycle decoupled from any single HTTP request
+- [ ] **Phase 062: Replay & Tail API** — `GET /threads/{id}/active-runs` returns active `run_id` + current offset; `GET /runs/{id}/stream?since={offset}` replays from offset + live-tails new tokens + emits termination event on completion
+- [ ] **Phase 063: Frontend Stream Decoupling** — POST returns `run_id` immediately; frontend opens separate replay-and-tail subscription; on every (re)connect (page load, focus, visibilitychange, pageshow) query active-runs and reattach if found; multi-tab sync falls out for free
+- [ ] **Phase 064: Validation Harness** — Reproducible chrome-in-browser MCP scripts for scenarios E (tab switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation during stream), and multi-tab sync — all proving the run-backed architecture from 061–063
+- [ ] **Phase 065: Skills Test Infrastructure Repair** — Fix 13+ broken patches in `test_threads_skills.py` and 3 broken export tests in `test_skills_import_export.py` so the next milestone (Skill Studio) starts on a green test foundation
 
 Full details below in **Phase Details**.
 
@@ -187,40 +189,62 @@ Full details below in **Phase Details**.
   - Don't put any reload logic inside a `setMessages` updater — Strict Mode double-invokes updaters and React can bail out, making side effects non-deterministic.
   - Keep an eye on `clearMessages` — it should NOT call `abortControllerRef.abort()`; ChatArea aborts explicitly via `abortStream()` first.
 
-### Phase 061: Reconnect Handlers (Symptoms E + F)
+### Phase 061: Run-Backed Streaming (Backend)
 
-**Goal**: Tab-switch and F5 mid-stream recover the assistant message without breaking Stop or thread navigation.
-**Depends on**: Phase 060
-**Requirements**: STREAM-02b
+**Goal**: Generation lifetime is decoupled from any single HTTP request — agent task writes tokens to a durable per-run buffer; the SSE handler becomes a *consumer* of that buffer rather than the producer. Foundation for STREAM-04.
+**Depends on**: Phase 059 (asyncio.Queue producer task already exists; this phase swaps the in-memory queue for a Redis Stream backing).
+**Requirements**: STREAM-04 (foundation layer)
 **Success Criteria** (what must be TRUE):
-  1. Symptom E (tab switch mid-stream): when the user returns to the tab and `isStreamingRef.current === false`, a single reconcile fetch via `loadMessages` pulls the latest persisted state. Listener registered for both `visibilitychange` (visibility transition) and `pageshow` (bfcache restore).
-  2. Symptom F (F5 mid-stream): on initial load, if the last message is `role === "user"` with no following assistant message and the thread `updated_at` is recent, a single reconcile fetch runs; if still in user-only state, a "Resume" button appears in the UI rather than auto-retrying the LLM call.
-  3. Symptom G regression guard: clicking Stop does NOT trigger `loadMessages` (`!stoppedByUserRef.current` guard preserved); Stop continues to persist partial responses via `asyncio.shield` (STREAM-01/STREAM-03 behavior intact).
-  4. Symptom H regression guard: thread navigation during a stream still produces correct Thread B view (validated by the 060 race fix) — reconnect handlers do not reintroduce cross-thread overwrite.
-  5. Bug 3 regression guard: no tool-result JSON ever leaks into chat content during natural stream completion — `loadMessages` is never called from `finally` on natural completion (only on explicit reconnect/Resume action).
+  1. A `runs` concept exists with a unique `run_id` per generation; the agent producer task writes every SSE event (token, tool, error, done) into a Redis Stream keyed by `run_id` with a monotonic offset.
+  2. The SSE response handler reads from the Redis Stream with `XREAD STREAMS run:{id} {offset}` semantics — the handler is a thin consumer; killing it does NOT kill the producer.
+  3. If the original POST connection drops (client navigates, refreshes, network blips), the agent task continues to completion and the buffer is filled. Verified via instrumentation: producer writes the full event sequence even when no consumer is attached.
+  4. Run TTL: a completed run's buffer auto-expires after a configurable retention window (default 10 min); aborted/failed runs expire faster (default 60s) to bound storage.
+  5. No regression in 058/059 binding tests: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and `test_059_disconnect.py` still pass — single-thread happy path latency profile unchanged.
+  6. Existing tests in 060's e2e harness (`060-thread-race.spec.ts`) still pass — STREAM-02a guarantees preserved.
 **Plans**: TBD
-**Risks / pitfalls** (from research §B1, §C1, §C2, 057-DEFERRAL.md):
-  - Do NOT reintroduce Supabase Realtime as a primary recovery path — confirmed best-effort by Supabase #21093, the reason both prior attempts failed.
-  - Don't use `EventSource` + `Last-Event-Id`: GET-only, no auth headers, and backend persists only at end-of-stream so there's nothing to replay.
-  - Don't auto-retry the LLM call after F5 — costs money, may produce duplicates. Resume button is the correct UX (research §C3).
-  - Verify `visibilitychange` listener is attached at the right scope (component lifetime, not stream lifetime) so it survives across stream completions.
+**Risks / pitfalls**:
+  - Redis Stream is new infra. Add `REDIS_URL` env var; document Upstash free tier setup in DEPLOYMENT.md or equivalent. Confirm Redis client library choice (`redis-py` async API) early — `redis.asyncio.Redis` is the modern path.
+  - Don't conflate `run_id` with `message_id`. A single run produces a single assistant message but emits many events. `run_id` is the buffer key.
+  - Auto-cleanup is non-trivial: per-key TTL via `EXPIRE` works but doesn't remove individual stream entries. Use `XTRIM MAXLEN` if buffers grow large, plus `EXPIRE` for the whole key on completion.
+  - LLM token cost shifts: with run-backed streaming, navigating away no longer cancels the LLM call. Mitigations (Stop button, server-side hard timeout, abandoned-run TTL) are scoped to D-v2.5-09 (to be locked in /gsd:discuss-phase 061).
 
-### Phase 062: Validation Harness
+### Phase 062: Replay & Tail API
 
-**Goal**: Each SSE/reconnect scenario (E, F, G, H, navigate-during-stream) is reproducible in browser MCP without writing new code per run, so regressions are caught before merge.
-**Depends on**: Nothing (parallel-able with 058 — different files)
-**Requirements**: TEST-01
+**Goal**: Surface the durable run buffer from Phase 061 as a clean HTTP API so any client can reattach to a stream at the right offset and tail to completion.
+**Depends on**: Phase 061
+**Requirements**: STREAM-04 (API layer)
 **Success Criteria** (what must be TRUE):
-  1. A developer can run any single scenario script (E, F, G, H, or navigate-during-stream) and observe pass/fail without writing new code — scripts exist and are runnable end-to-end via chrome-in-browser MCP.
-  2. The harness includes a fetch interceptor utility that logs each `getMessages` call with thread ID and timing, surfaced to the agent's console output for debugging.
-  3. Scripts cover at minimum: Symptom E (tab switch mid-stream), Symptom F (F5 mid-stream), Symptom G (Stop button does not reload), Symptom H (thread navigation during stream), and "navigate-during-stream" (the v2.5-dev cross-thread overwrite repro).
-  4. Scripts assume only that the dev server (frontend + backend) is running on default ports — no other manual setup.
-  5. Each script returns a clear PASS / FAIL signal (assertions on DOM state, message content, or network request outcomes) — no manual interpretation of screenshots required.
+  1. `GET /threads/{thread_id}/active-runs` returns either an empty list or `[{run_id, started_at, current_offset, status: "streaming" | "completed" | "failed"}]` for the requesting user's thread (RLS enforced).
+  2. `GET /runs/{run_id}/stream?since={offset}` opens an SSE response that: (a) replays events from `offset` (default 0) up to the current head of the stream, (b) live-tails new events as the producer writes them, (c) emits a terminal `done` (or `error`) event and closes when the producer finishes, (d) supports the same auth headers + `request.is_disconnected()` polling pattern as the existing endpoint.
+  3. Two concurrent consumers of the same `run_id` each receive the full event sequence independently — multi-tab fan-out works at the API layer.
+  4. Auth + RLS: a user can only query active-runs and replay streams for runs they own (verified by integration test against Supabase Auth + RLS policy).
+  5. The original `POST /threads/{thread_id}/messages` endpoint either returns `{message_id, run_id}` immediately (no streaming over POST) OR keeps backward-compatible streaming for a deprecation window — decision deferred to /gsd:discuss-phase 062.
 **Plans**: TBD
-**Risks / pitfalls** (from 057-DEFERRAL.md "Validation Strategy"):
-  - The v2.5-dev attempt failed partly because the team iterated on a complex hook with no browser feedback loop — 062 must land before 061 to break that cycle.
-  - chrome-in-browser MCP must be registered before scripts are run; document the prerequisite explicitly.
-  - Don't conflate scenario scripts with general E2E tests — keep this harness narrowly focused on SSE/reconnect.
+**Risks / pitfalls**:
+  - SSE consumer with offset cursor: `XREAD COUNT N STREAMS run:{id} {offset}` returns immediately if events exist; need to fall through to `XREAD BLOCK ms STREAMS run:{id} $` for live tail. Two-mode loop (replay-then-tail) is the canonical pattern.
+  - Don't leak Redis errors as 500s — wrap in domain errors and return 503 with retry hint if Redis is unreachable.
+  - Active-runs query must be cheap — keep an index `runs_by_thread` (Redis sorted set keyed by `thread:{id}` with `run_id` members) so listing is O(log N).
+  - For STREAM-04 verification, this phase is the API contract — Phase 063 wires the frontend; Phase 064 validates end-to-end.
+
+### Phase 063: Frontend Stream Decoupling
+
+**Goal**: Rewire the frontend so the assistant-message stream lives independently of the POST request that started it. On every (re)connect, the frontend reconciles state via `active-runs` and reattaches to the replay-and-tail endpoint. Multi-tab sync, refresh-mid-stream, and navigate-away-and-back all work as a side-effect.
+**Depends on**: Phase 062
+**Requirements**: STREAM-04 (frontend layer); also delivers STREAM-02b (recovery is automatic; Resume button optional fallback).
+**Success Criteria** (what must be TRUE):
+  1. Sending a message: `POST /threads/{id}/messages` returns `{message_id, run_id}` synchronously; the frontend then opens `GET /runs/{run_id}/stream?since=0` for the actual tokens. The POST request closes immediately.
+  2. On every page load, focus, `visibilitychange`, and `pageshow`, the frontend queries `active-runs` for the current thread; if a run is found and the local state is behind, it opens `GET /runs/{run_id}/stream?since={local_offset}` and resumes rendering with no manual user action.
+  3. Refresh mid-stream: F5 during streaming → page reloads → `active-runs` reports streaming run → frontend reattaches → assistant message continues animating from the offset where the local buffer left off. No "Resume" button required for the happy path.
+  4. Multi-tab sync: open same thread in two tabs while streaming → both render the same tokens with no leak between threads (regression guard for STREAM-02a).
+  5. Symptom G regression guard: clicking Stop sends `DELETE /runs/{run_id}` (or equivalent cancel verb) — server cancels producer, terminal event fires, all consumers close cleanly.
+  6. Bug 3 regression guard: no tool-result JSON leaks into chat content; the streaming-format messages built up by SSE deltas remain authoritative (Phase 060's invariants preserved).
+  7. Resume button: if `active-runs` returns a `failed` run (producer errored), surface a Resume button rather than silently retrying — preserves D-v2.5-05's principle of explicit user intent for paid LLM retries.
+**Plans**: TBD
+**Risks / pitfalls**:
+  - Don't keep two streaming code paths (legacy POST-streams + new run-stream) longer than one phase — choose one, deprecate the other, delete dead code in this phase.
+  - `active-runs` must be queried on the client *before* `loadMessages` settles, otherwise the local message list will appear "missing" the in-flight assistant message until the next reconcile tick. Wire ordering carefully.
+  - Stop button semantics change: today it aborts the in-flight HTTP request; with run-backed streaming, the request is detached, so Stop must call a server endpoint to cancel the producer. Test cross-tab Stop (clicking Stop in tab B while tab A initiated the stream).
+  - `pageshow` fires on bfcache restore — the local buffer may be hours stale. Treat bfcache restore as "always reconcile via active-runs," even if local state looks complete.
 
 ## Progress
 
@@ -243,14 +267,33 @@ Full details below in **Phase Details**.
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
 | 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 060. Frontend Race Fixes | v2.5 | 3/3 | Complete    | 2026-05-02 |
-| 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
-| 062. Validation Harness | v2.5 | 0/0 | Not started | — |
-| 063. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
+| 061. Run-Backed Streaming (Backend) | v2.5 | 0/0 | Not started | — |
+| 062. Replay & Tail API | v2.5 | 0/0 | Not started | — |
+| 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
+| 064. Validation Harness | v2.5 | 0/0 | Not started | — |
+| 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
 
-### Phase 063: Skills Test Infrastructure Repair
+### Phase 064: Validation Harness
+
+**Goal**: Each scenario that the run-backed streaming architecture must satisfy is reproducible in browser MCP without writing new code per run, so regressions are caught before merge — including the new ChatGPT/Claude-class behaviors (refresh-mid-stream, multi-tab sync) introduced by 061–063.
+**Depends on**: Phase 063
+**Requirements**: TEST-01
+**Success Criteria** (what must be TRUE):
+  1. A developer can run any single scenario script and observe pass/fail without writing new code — scripts exist and are runnable end-to-end via chrome-in-browser MCP (or Playwright as a fallback runner).
+  2. The harness includes a fetch interceptor utility that logs each `getMessages`, `active-runs`, and `runs/{id}/stream` call with thread ID, run_id, offset, and timing — surfaced to console for debugging.
+  3. Scripts cover at minimum: Symptom E (tab switch mid-stream — frontend reattaches via visibilitychange), Symptom F (F5 mid-stream — frontend replays from offset), Symptom G (Stop button cancels producer cleanly), Symptom H (thread navigation during stream — STREAM-02a guard), multi-tab sync (two tabs see same stream), and refresh-mid-stream (the headline ChatGPT/Claude parity scenario).
+  4. Scripts assume only that the dev server (frontend + backend + Redis) is running on default ports — no other manual setup. Document the Redis prerequisite.
+  5. Each script returns a clear PASS / FAIL signal (assertions on DOM state, message content, network outcomes, or run-buffer state) — no manual screenshot interpretation required.
+**Plans**: TBD
+**Risks / pitfalls**:
+  - Don't conflate scenario scripts with general E2E tests — keep this harness narrowly focused on streaming + reconnect.
+  - Multi-tab tests are inherently flaky — use deterministic fixtures (slow-mock LLM with fixed token cadence) rather than real LLM calls for the harness.
+  - Original v2.5-dev failure was attributed partly to "no browser feedback loop while iterating" — the rescope is architectural, not iterative-debugging, so 064 lands AFTER 063 here. Adjust the playbook for next iterative work.
+
+### Phase 065: Skills Test Infrastructure Repair
 
 **Goal**: Restore a green test foundation for the skills test suite so the next milestone (Skill Studio, see `PRD_Skill_Studio.md` and `.planning/seeds/SEED-002-skill-studio-milestone-prep.md`) can extend `tests/integration/test_threads_skills.py` and `tests/integration/test_skills_import_export.py` patterns without inheriting broken patches.
-**Depends on**: Nothing (parallel-able with 060–062 since it touches an isolated test surface)
+**Depends on**: Nothing (parallel-able with 061–064 since it touches an isolated test surface)
 **Requirements**: TBD (no new REQUIREMENTS.md ID — pure maintenance closing TEST-DEBT discovered in 059)
 **Success Criteria** (what must be TRUE):
   1. All tests in `backend/tests/integration/test_threads_skills.py` either PASS or are explicitly marked as `@pytest.mark.skip(reason=...)` with a documented out-of-scope justification — no `AttributeError: module 'app.api.threads' does not have the attribute 'create_streaming_chat'` failures remain.
