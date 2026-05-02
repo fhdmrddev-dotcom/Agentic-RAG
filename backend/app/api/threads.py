@@ -1798,11 +1798,27 @@ async def send_message(
                 # is cancelled (CancelledError) before the finally block finishes.
                 async def _shielded_persist():
                     # aexec runs in run_in_threadpool — not directly cancellable; shield is sufficient.
-                    await _persist_assistant_message()
+                    # Suppress all errors (including the unlikely BaseException) inside
+                    # the shielded coroutine so partial state never escapes into the
+                    # outer finally and so the inner persist always runs to completion.
+                    try:
+                        await _persist_assistant_message()
+                    except BaseException:
+                        logger.exception("Shielded persist failed")
                 try:
                     await asyncio.shield(_shielded_persist())
                 except asyncio.CancelledError:
-                    raise   # D-059-02, RESEARCH §A5: re-raise after cleanup
+                    # D-059-02, RESEARCH §A5: re-raise after cleanup.
+                    # CR-02 fix: the outer finally's queue.put_nowait(None) runs even
+                    # after this re-raise (finally executes regardless), but explicitly
+                    # enqueueing here makes the sentinel ordering deterministic in the
+                    # cancel path — the sentinel lands BEFORE the re-raise propagates,
+                    # so the consumer's queue.get() always observes a clean termination.
+                    try:
+                        queue.put_nowait(None)
+                    except asyncio.QueueFull:
+                        pass
+                    raise
         finally:
             # SENTINEL — must be the LAST queue op, ALWAYS (Pitfall 4).
             # Use put_nowait + swallow QueueFull so a cancelled / disconnected
