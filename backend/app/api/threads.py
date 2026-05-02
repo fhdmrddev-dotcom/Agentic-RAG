@@ -1331,7 +1331,7 @@ async def send_message(
 
                                 try:
                                     session = sandbox_manager.get_or_create(thread_id)
-                                    loop = asyncio.get_event_loop()
+                                    loop = asyncio.get_running_loop()  # WR-04: get_event_loop deprecated in 3.10+
                                     # Inner sandbox-event queue (separate from the outer producer
                                     # queue used for SSE). Renamed from `queue` (D-059-Rule1 fix):
                                     # the outer agent_runner queue is also named `queue`, so a
