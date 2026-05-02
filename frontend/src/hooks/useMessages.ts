@@ -11,6 +11,7 @@ interface UseMessages {
   stopStreaming: () => void
   abortStream: () => void
   clearMessages: () => void
+  setViewingThread: (threadId: string | null) => void
 }
 
 function makeTempId() {
@@ -24,6 +25,7 @@ export function useMessages(): UseMessages {
   const isSendingRef = useRef(false)
   const sendGenerationRef = useRef(0)   // increments each send; loadMessages checks it hasn't changed
   const abortControllerRef = useRef<AbortController | null>(null)
+  const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
   const isStreamingRef = useRef(false)
@@ -38,6 +40,14 @@ export function useMessages(): UseMessages {
     abortControllerRef.current?.abort()
   }, [])
 
+  // D-060-01: setViewingThread is the SOLE writer of activeThreadIdRef.
+  // ChatArea (Plan 060-02) calls this as the first action of its thread-selection useEffect,
+  // before clearMessages/abortStream/loadMessages, so the post-await guard inside
+  // loadMessages (D-060-02) sees the new thread id when comparing.
+  const setViewingThread = useCallback((threadId: string | null) => {
+    activeThreadIdRef.current = threadId
+  }, [])
+
   const clearMessages = useCallback(() => {
     setMessages([])
     setIsStreaming(false)
@@ -47,21 +57,26 @@ export function useMessages(): UseMessages {
   }, [])
 
   const loadMessages = useCallback(async (threadId: string) => {
-    activeThreadIdRef.current = threadId
-    const generation = sendGenerationRef.current
-    const data = await getMessages(threadId)
-    setMessages((prev) => {
-      // If a different thread is being requested, always allow the update
-      // so thread switching works even during active streaming.
-      if (streamingThreadIdRef.current && streamingThreadIdRef.current !== threadId) {
-        return data
-      }
-      // Same thread: don't wipe optimistic messages if a send is in flight
-      // or if a newer send started while this fetch was in-flight.
-      if (isSendingRef.current) return prev
-      if (sendGenerationRef.current !== generation) return prev
-      return data
-    })
+    // D-060-03: cancel the previous in-flight getMessages fetch before issuing a new one.
+    // The aborted fetch surfaces an AbortError that the catch below silently swallows.
+    loadAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadAbortRef.current = controller
+    try {
+      // @ts-expect-error - getMessages gains its `signal` parameter in plan 060-02
+      const data = await getMessages(threadId, controller.signal)
+      // D-060-02: read activeThreadIdRef ONLY after await — discards cross-thread responses.
+      // (setViewingThread, the sole writer, runs in ChatArea before any concurrent loadMessages
+      // resolves; if the ref no longer matches threadId, this fetch's response is stale.)
+      if (activeThreadIdRef.current !== threadId) return
+      // Protect optimistic placeholders if a send is in flight on the same thread.
+      if (isSendingRef.current) return
+      setMessages(data)
+    } catch (err) {
+      // D-060-11: silently swallow AbortError (mirrors sendMessage catch below).
+      if (err instanceof Error && err.name === "AbortError") return
+      throw err
+    }
   }, [])
 
   const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
@@ -377,5 +392,5 @@ if (isSendingRef.current) return
     }
   }, [])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages }
+  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, setViewingThread }
 }
