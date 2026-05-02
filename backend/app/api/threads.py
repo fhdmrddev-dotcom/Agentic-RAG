@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from app.responses import sse_response
+from sse_starlette import EventSourceResponse
 import openai
 from openai import APIError
 try:
@@ -517,1277 +517,1315 @@ async def send_message(
         })
     )
 
-    _stop_event = asyncio.Event()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)   # D-059-04
 
-    async def event_stream(stop_event: asyncio.Event = _stop_event) -> AsyncGenerator[str, None]:
-        import logging
-        logger = logging.getLogger(__name__)
+    async def agent_runner() -> None:
+        """Producer task — runs the agent loop and pushes JSON payloads onto the queue.
 
-        # Load user settings for this request (apply per-request provider override if sent)
-        user_settings = load_user_settings(current_user["id"])
-        if body.provider and body.provider != user_settings.active_provider:
-            user_settings = override_provider(user_settings, body.provider)
+        Cancellation contract (D-059-02):
+        - Created via asyncio.create_task in the route handler.
+        - event_consumer cancels this task on client disconnect (sse-starlette
+          _listen_for_disconnect → consumer.finally → task.cancel()).
+        - Outer try/finally pushes None as a queue sentinel (Pitfall 4 guard).
+        - Inner try/finally runs asyncio.shield(_persist_assistant_message())
+          so the partial-response DB write completes even on cancel.
+        - After the shielded persist, CancelledError is re-raised per RESEARCH §A5.
+        """
+        try:                          # OUTER try → finally pushes sentinel (Pitfall 4)
+            import logging
+            logger = logging.getLogger(__name__)
 
-        # Load thread's folder scope
-        thread_data = await aexec(
-            supabase.table("threads")
-            .select("folder_id")
-            .eq("id", thread_id)
-            .single()
-        )
-        thread_folder_id: str | None = thread_data.data.get("folder_id") if thread_data.data else None
+            # Load user settings for this request (apply per-request provider override if sent)
+            user_settings = load_user_settings(current_user["id"])
+            if body.provider and body.provider != user_settings.active_provider:
+                user_settings = override_provider(user_settings, body.provider)
 
-        # Resolve folder subtree if scoped
-        folder_subtree_ids: list[str] | None = None
-        scoped_folder_path: str | None = None
-        if thread_folder_id:
-            all_folders = await fetch_visible_folders(supabase, current_user["id"])
-
-            def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
-                result = [root_id]
-                for f in folders:
-                    if f["parent_id"] == root_id:
-                        result.extend(_get_subtree(f["id"], folders))
-                return result
-
-            folder_subtree_ids = _get_subtree(thread_folder_id, all_folders)
-
-            # Build scoped folder path for ls/tree/grep default path
-            folder_map = {f["id"]: f for f in all_folders}
-            path_parts = []
-            current_fid: str | None = thread_folder_id
-            while current_fid:
-                f = folder_map.get(current_fid)
-                if not f:
-                    break
-                path_parts.append(f.get("name", ""))
-                current_fid = f.get("parent_id")
-            # Only set a meaningful path — if traversal found nothing, leave as None
-            # so the scope note is not injected with a confusing "/" root path.
-            scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
-
-        # Load full message history (includes just-inserted user message)
-        history_resp = await aexec(
-            supabase.table("messages")
-            .select("role, content, tool_calls")
-            .eq("thread_id", thread_id)
-            .eq("user_id", current_user["id"])
-            .order("created_at")
-        )
-
-        # Select system prompt, tools, and iteration limit based on agent mode
-        if body.agent_mode == "explorer":
-            active_system_prompt = EXPLORER_SYSTEM_PROMPT
-            active_tools = get_explorer_tools()
-            max_iterations = 8   # GEN-04: was 6
-        else:
-            active_system_prompt = SYSTEM_PROMPT
-            active_tools = None  # None = use default get_tools() in create_streaming_chat
-            max_iterations = 15  # GEN-04: was 8
-
-        # Augment system prompt with folder scope context so LLM generates scoped queries
-        if scoped_folder_path:
-            folder_scope_note = (
-                f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
-                f"All tool calls should be restricted to this folder and its subfolders. "
-                f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
-                f"When using query_documents, always include a folder filter (e.g., "
-                f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
-                f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
+            # Load thread's folder scope
+            thread_data = await aexec(
+                supabase.table("threads")
+                .select("folder_id")
+                .eq("id", thread_id)
+                .single()
             )
-            active_system_prompt = active_system_prompt + folder_scope_note
+            thread_folder_id: str | None = thread_data.data.get("folder_id") if thread_data.data else None
 
-        # Inject enabled skills catalog (General Mode only) — SKIL-09
-        if body.agent_mode != "explorer":
-            _skills_resp = await aexec(
-                supabase.table("skills")
-                .select("name, description")
-                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                .eq("is_enabled", True)
-                .order("name")
-            )
-            enabled_skills = _skills_resp.data or []
+            # Resolve folder subtree if scoped
+            folder_subtree_ids: list[str] | None = None
+            scoped_folder_path: str | None = None
+            if thread_folder_id:
+                all_folders = await fetch_visible_folders(supabase, current_user["id"])
 
-            if enabled_skills:
-                catalog_lines = "\n".join(
-                    f"- **{s['name']}**: {s['description']}" for s in enabled_skills
-                )
-                catalog_note = (
-                    f"\n\n## Available Skills\n"
-                    f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
-                    f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
-                    f"description similarity — wait for an explicit request:\n{catalog_lines}"
-                )
-                active_system_prompt = active_system_prompt + catalog_note
+                def _get_subtree(root_id: str, folders: list[dict]) -> list[str]:
+                    result = [root_id]
+                    for f in folders:
+                        if f["parent_id"] == root_id:
+                            result.extend(_get_subtree(f["id"], folders))
+                    return result
 
-            # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
-            _memory_resp = await aexec(
-                supabase.table("user_memory")
-                .select("key, value")
+                folder_subtree_ids = _get_subtree(thread_folder_id, all_folders)
+
+                # Build scoped folder path for ls/tree/grep default path
+                folder_map = {f["id"]: f for f in all_folders}
+                path_parts = []
+                current_fid: str | None = thread_folder_id
+                while current_fid:
+                    f = folder_map.get(current_fid)
+                    if not f:
+                        break
+                    path_parts.append(f.get("name", ""))
+                    current_fid = f.get("parent_id")
+                # Only set a meaningful path — if traversal found nothing, leave as None
+                # so the scope note is not injected with a confusing "/" root path.
+                scoped_folder_path = ("/" + "/".join(reversed(path_parts))) if path_parts else None
+
+            # Load full message history (includes just-inserted user message)
+            history_resp = await aexec(
+                supabase.table("messages")
+                .select("role, content, tool_calls")
+                .eq("thread_id", thread_id)
                 .eq("user_id", current_user["id"])
-                .order("updated_at", desc=True)
-                .limit(10)
+                .order("created_at")
             )
-            memory_rows = _memory_resp.data or []
 
-            if memory_rows:
-                memory_lines = "\n".join(
-                    f"- {r['key']}: {r['value']}" for r in memory_rows
+            # Select system prompt, tools, and iteration limit based on agent mode
+            if body.agent_mode == "explorer":
+                active_system_prompt = EXPLORER_SYSTEM_PROMPT
+                active_tools = get_explorer_tools()
+                max_iterations = 8   # GEN-04: was 6
+            else:
+                active_system_prompt = SYSTEM_PROMPT
+                active_tools = None  # None = use default get_tools() in create_streaming_chat
+                max_iterations = 15  # GEN-04: was 8
+
+            # Augment system prompt with folder scope context so LLM generates scoped queries
+            if scoped_folder_path:
+                folder_scope_note = (
+                    f"\n\n**IMPORTANT: This chat is scoped to the folder '{scoped_folder_path}'. "
+                    f"All tool calls should be restricted to this folder and its subfolders. "
+                    f"When using ls, tree, or grep, default the path to '{scoped_folder_path}'. "
+                    f"When using query_documents, always include a folder filter (e.g., "
+                    f"JOIN folders or WHERE folder_id IN ...) to restrict to this folder scope. "
+                    f"When the user asks 'what documents do you have?' or similar, they mean within this folder scope only.**"
                 )
-                memory_note = (
-                    "\n\n## User Memory\n"
-                    "(Preferences and facts you've remembered about this user across conversations)\n"
-                    f"{memory_lines}"
+                active_system_prompt = active_system_prompt + folder_scope_note
+
+            # Inject enabled skills catalog (General Mode only) — SKIL-09
+            if body.agent_mode != "explorer":
+                _skills_resp = await aexec(
+                    supabase.table("skills")
+                    .select("name, description")
+                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                    .eq("is_enabled", True)
+                    .order("name")
                 )
-                active_system_prompt = active_system_prompt + memory_note
+                enabled_skills = _skills_resp.data or []
 
-            # Inform the agent about tools disabled via user settings so it
-            # doesn't attempt to call them or ask clarifying questions about them.
-            disabled_tools: list[str] = []
-            if not user_settings.web_search_enabled:
-                disabled_tools.append("web_search (disabled in Settings › Integrations › Web Search)")
-            if not user_settings.sandbox_enabled:
-                disabled_tools.append("execute_code (disabled in Settings › Integrations › Code Execution)")
-            if disabled_tools:
-                disabled_note = (
-                    "\n\n## Disabled Tools\n"
-                    "The following tools are currently disabled by the user and are NOT available. "
-                    "Do not attempt to call them. If a task requires one of these tools, "
-                    "clearly tell the user it is disabled and how to enable it:\n"
-                    + "\n".join(f"- {t}" for t in disabled_tools)
-                )
-                active_system_prompt = active_system_prompt + disabled_note
-
-        messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-        messages.extend(_reconstruct_history(history_resp.data))
-
-        # Trim conversation history to fit context window before the first LLM call
-        messages = trim_messages_to_fit(
-            messages,
-            max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
-            reserve_recent=settings.context_window_reserve_recent,
-        )
-        logger.debug(
-            "Pre-loop trim: ~%d tokens in %d messages",
-            estimate_messages_tokens(messages),
-            len(messages),
-        )
-
-        full_content = ""
-        persisted_tool_calls: list[dict] = []
-        source_refs: list[dict] = []  # {"document_id": str, "filename": str}
-        unique_sources: list[dict] = []
-        retrieved_citations: list[dict] = []    # Full citation objects per D-04
-        similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
-        unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
-        _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
-        _message_persisted = False  # guard against double-insert
-        _empty_retries = 0  # tracks empty-response retries across all iterations
-
-        async def _persist_assistant_message() -> None:
-            """Insert the assistant message row. Idempotent — only runs once."""
-            nonlocal _message_persisted
-            if _message_persisted:
-                return
-            _message_persisted = True
-            if not full_content and not persisted_tool_calls:
-                logger.warning(
-                    "Agent loop produced no content for thread %s — persisting empty assistant message",
-                    thread_id,
-                )
-            row: dict = {
-                "thread_id": thread_id,
-                "user_id": current_user["id"],
-                "role": "assistant",
-                "content": _strip_nul(full_content),
-            }
-            if persisted_tool_calls:
-                completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
-                if completed_tools:
-                    row["tool_calls"] = _strip_nul(completed_tools)
-            if unique_citations:
-                row["source_refs"] = unique_citations   # Full citation objects (D-13)
-            elif unique_sources:
-                row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
-            if _confidence_slot:
-                c = _confidence_slot[0]
-                row["confidence_level"] = c["level"]
-                row["confidence_avg_similarity"] = c["avg_similarity"]
-                row["confidence_disclaimer"] = c["disclaimer"]
-            try:
-                await aexec(supabase.table("messages").insert(row))
-            except Exception as e:
-                logger.error("Failed to persist assistant message: %s", e)
-
-        def _strip_nul(obj):
-            """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
-            if isinstance(obj, str):
-                return obj.replace('\x00', '')
-            if isinstance(obj, dict):
-                return {k: _strip_nul(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [_strip_nul(item) for item in obj]
-            return obj
-
-        # GEN-03: Tool results stored in full — no character caps.
-        # Context budget managed by trim_messages_to_fit() which drops OLDER messages
-        # when total context exceeds the model's budget.
-
-        try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
-          try:
-            # Pre-inject tool instructions only for OpenRouter XML strategy — the one
-            # deterministic structured-mode path. All other providers use native tool
-            # calling; unknown models get post-creation injection (next iteration).
-            _needs_pre_injection = (
-                getattr(user_settings, "active_provider", "") == "openrouter"
-                and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
-            )
-            _structured_tools_injected = False
-
-            for iteration in range(max_iterations):
-                if stop_event.is_set():
-                    return
-                # D-04 (Phase 56): emit iteration_start at the top of every iteration.
-                # Frontend uses this to increment the "Step N" counter (D-03).
-                # iteration is 0-indexed; frontend adds +1 for display (Pitfall 1).
-                yield f"data: {json.dumps({'type': 'iteration_start', 'iteration': iteration})}\n\n"
-                # Between tool-call rounds: signal to the frontend that the agent
-                # is deciding its next action (all prior tools are done).
-                if iteration > 0:
-                    yield f"data: {json.dumps({'type': 'planning', 'iteration': iteration})}\n\n"
-
-                # Re-trim after tool results have been appended (context grows each iteration)
-                messages = trim_messages_to_fit(
-                    messages,
-                    max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
-                    reserve_recent=settings.context_window_reserve_recent,
-                )
-                logger.debug(
-                    "Agent iteration %d: ~%d tokens in %d messages",
-                    iteration,
-                    estimate_messages_tokens(messages),
-                    len(messages),
-                )
-
-                # On the final iteration force a text response to avoid an infinite loop
-                force_no_tools = (iteration == max_iterations - 1)
-                tool_choice = "none" if force_no_tools else "auto"
-                _provider_retries = 0
-                _MAX_PROVIDER_RETRIES = 2
-                _retry_delays = [0.5, 1.5]
-
-                # OpenRouter XML: inject tool-format instructions BEFORE stream creation
-                # so the model sees them on the very first call.
-                if _needs_pre_injection and not _structured_tools_injected and tool_choice == "auto":
-                    _tl_text = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
-                    for _si, _sm in enumerate(messages):
-                        if _sm.get("role") == "system":
-                            messages[_si] = {
-                                "role": "system",
-                                "content": _sm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_text),
-                            }
-                            _structured_tools_injected = True
-                            break
-
-                while True:
-                    try:
-                        active_provider_name = getattr(user_settings, "active_provider", "") or ""
-
-                        if active_provider_name == "anthropic":
-                            # --- Anthropic native SDK path (GEN-02) ---
-                            from app.services.openai_service import _resolve_max_tokens
-                            _ant_max_tokens = _resolve_max_tokens(None, user_settings)
-                            _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
-                            _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
-                            _ant_gen = stream_anthropic(
-                                messages=messages,
-                                tools=_ant_tools,
-                                system_prompt=active_system_prompt,
-                                model=body.model or user_settings.llm_model,
-                                api_key=_ant_api_key,
-                                max_tokens=_ant_max_tokens,
-                                force_no_tools=force_no_tools,
-                            )
-                            tool_calls_buffer = {}
-                            finish_reason = None
-                            _announced_tools_ant: set[int] = set()
-                            for _ant_event in _ant_gen:
-                                if stop_event.is_set():
-                                    return
-                                _etype = _ant_event.get("type")
-                                if _etype == "delta":
-                                    _text = _ant_event.get("content", "")
-                                    if _text:
-                                        full_content += _text
-                                        yield f"data: {json.dumps({'type': 'delta', 'content': _text})}\n\n"
-                                elif _etype == "tool_preparing":
-                                    # D-01 (Phase 56.1, corrected): fired at content_block_start when
-                                    # tool name is first known — before arguments finish streaming.
-                                    _idx = _ant_event.get("index", len(tool_calls_buffer))
-                                    if _idx not in _announced_tools_ant:
-                                        _announced_tools_ant.add(_idx)
-                                        yield f"data: {json.dumps({'type': 'tool_preparing', 'name': _ant_event['name'], 'index': _idx})}\n\n"
-                                elif _etype == "tool_start":
-                                    # Fired at content_block_stop — arguments now complete.
-                                    # tool_preparing was already emitted above; just populate buffer.
-                                    _idx = len(tool_calls_buffer)
-                                    tool_calls_buffer[_idx] = {
-                                        "id": _ant_event["id"],
-                                        "name": _ant_event["name"],
-                                        "arguments": json.dumps(_ant_event.get("args", {})),
-                                    }
-                                elif _etype == "finish":
-                                    finish_reason = _ant_event.get("finish_reason", "stop")
-                            break  # stream completed
-
-                        else:
-                            # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
-                            stream, calling_mode = create_adaptive_streaming_chat(
-                                messages=messages,
-                                model=body.model,
-                                user_settings=user_settings,
-                                tool_choice=tool_choice,
-                                tools_override=active_tools,
-                            )
-
-                            # Fallback: inject for other structured-mode models (unknown models).
-                            # Happens after the first call; subsequent iterations will have instructions.
-                            if calling_mode == CallingMode.STRUCTURED and tool_choice == "auto" and not _structured_tools_injected:
-                                _tl_fb = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
-                                for _fi, _fm in enumerate(messages):
-                                    if _fm.get("role") == "system":
-                                        messages[_fi] = {
-                                            "role": "system",
-                                            "content": _fm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_fb),
-                                        }
-                                        _structured_tools_injected = True
-                                        break
-
-                            tool_calls_buffer: dict = {}
-                            finish_reason: str | None = None
-                            _announced_tools: set[int] = set()
-
-                            for chunk in stream:
-                                if stop_event.is_set():
-                                    return
-                                if not chunk.choices:
-                                    continue
-                                choice = chunk.choices[0]
-                                delta = choice.delta
-
-                                if choice.finish_reason:
-                                    finish_reason = normalize_finish_reason(choice.finish_reason)
-
-                                if delta.content:
-                                    full_content += delta.content
-                                    yield f"data: {json.dumps({'type': 'delta', 'content': delta.content})}\n\n"
-
-                                if delta.tool_calls:
-                                    for tc in delta.tool_calls:
-                                        idx = tc.index
-                                        if idx not in tool_calls_buffer:
-                                            tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                        if tc.id:
-                                            tool_calls_buffer[idx]["id"] = tc.id
-                                        if tc.function and tc.function.name:
-                                            tool_calls_buffer[idx]["name"] = tc.function.name
-                                            # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
-                                            # before arguments finish streaming. Fires exactly once per tool index.
-                                            if idx not in _announced_tools:
-                                                _announced_tools.add(idx)
-                                                yield f"data: {json.dumps({'type': 'tool_preparing', 'name': tc.function.name, 'index': idx})}\n\n"
-                                        if tc.function and tc.function.arguments:
-                                            tool_calls_buffer[idx]["arguments"] += tc.function.arguments
-
-                            # Parse tool calls based on calling mode
-                            if calling_mode == CallingMode.STRUCTURED:
-                                structured_calls = parse_structured_tool_calls(full_content)
-                                if structured_calls:
-                                    # Convert to tool_calls_buffer format for uniform execution
-                                    for idx, call in enumerate(structured_calls):
-                                        tool_calls_buffer[idx] = {
-                                            "id": call.id,
-                                            "name": call.function.name,
-                                            "arguments": call.function.arguments,
-                                        }
-                                    # D-05 (Phase 56.1): emit tool_preparing for each structured call.
-                                    # Structured mode has no streaming name delivery; this fires immediately
-                                    # after parse returns, before the tool execution loop.
-                                    for idx, call in enumerate(structured_calls):
-                                        yield f"data: {json.dumps({'type': 'tool_preparing', 'name': call.function.name, 'index': idx})}\n\n"
-                                    # Yield control so the SSE flush reaches the client before
-                                    # execution begins — otherwise preparing and running arrive in
-                                    # the same TCP packet and the preparing state is never rendered.
-                                    await asyncio.sleep(0)
-                                    # Clear content since it was a tool call, not a user-facing response
-                                    full_content = ""
-                                    finish_reason = "tool_calls"
-                                elif full_content.strip():
-                                    # Log parse failure for observability
-                                    logger.warning(
-                                        "structured_tool_parse_failed",
-                                        extra={
-                                            "model": body.model,
-                                            "provider": user_settings.active_provider if user_settings else "unknown",
-                                            "content_preview": full_content[:200],
-                                        }
-                                    )
-
-                            break  # stream completed successfully
-
-                    except (APIError, AnthropicAPIError) as provider_err:
-                        # Detect "request too large" 429 — distinct from a rate-limit 429.
-                        # This fires when the account's TPM ceiling (e.g. OpenAI Tier-1: 30k)
-                        # is smaller than the single request size. This is an account plan
-                        # limitation, not a model or app issue — do NOT trim content.
-                        _err_str = str(provider_err).lower()
-                        _is_request_too_large = (
-                            getattr(provider_err, "status_code", None) == 429
-                            and ("request too large" in _err_str or "tokens per min" in _err_str)
-                        )
-                        if _is_request_too_large:
-                            _tpm_msg = (
-                                "*This document is too large for your current OpenAI account plan. "
-                                "gpt-4.1 supports up to 1M tokens, but your account's TPM limit "
-                                "rejected this request. To fix: upgrade to OpenAI Tier 2 at "
-                                "platform.openai.com/account/rate-limits, switch to Anthropic "
-                                "(claude-sonnet-4-6), or use OpenRouter which has higher limits.*"
-                            )
-                            full_content += _tpm_msg
-                            yield f"data: {json.dumps({'type': 'delta', 'content': _tpm_msg})}\n\n"
-                            break
-
-                        if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
-                            _provider_retries += 1
-                            delay = _retry_delays[_provider_retries - 1]
-                            logger.warning(
-                                "Transient provider error on iteration %d (thread %s), "
-                                "attempt %d/%d — retrying in %.1fs. status=%s",
-                                iteration, thread_id,
-                                _provider_retries, _MAX_PROVIDER_RETRIES + 1,
-                                delay, getattr(provider_err, "status_code", "unknown"),
-                            )
-                            await asyncio.sleep(delay)
-                            continue
-                        raise  # non-retryable or retries exhausted → caught by outer except APIError
-
-                logger.debug(
-                    "Iteration %d finish_reason=%r tool_calls_buffered=%d",
-                    iteration, finish_reason, len(tool_calls_buffer),
-                )
-
-                if finish_reason == "length" and tool_calls_buffer:
-                    # length limit hit while streaming tool arguments — discard partial call
-                    err_msg = "*The conversation grew too large for this model's context window. Start a new chat and try the generation request again.*"
-                    full_content += err_msg
-                    yield f"data: {json.dumps({'type': 'delta', 'content': err_msg})}\n\n"
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'finish_reason=length during tool streaming'})}\n\n"
-                    break
-
-                if finish_reason == "length":
-                    # Detect "prose-before-code" anti-pattern: model wrote text instead of calling
-                    # execute_code, consumed the full token budget, and never made the tool call.
-                    # Recovery: inject a corrective user message and continue the loop so the model
-                    # can call execute_code on the next iteration.
-                    _generation_keywords = ("powerpoint", "pptx", "ppt", "presentation", "pdf",
-                                            "word", "excel", "report", "chart", "generate", "create",
-                                            "build", "python", "execute_code")
-                    _content_lower = full_content.lower()
-                    _looks_like_prose_not_code = (
-                        iteration > 0
-                        and not tool_calls_buffer
-                        and any(kw in _content_lower for kw in _generation_keywords)
-                        and len(full_content) > 500
+                if enabled_skills:
+                    catalog_lines = "\n".join(
+                        f"- **{s['name']}**: {s['description']}" for s in enabled_skills
                     )
-                    if _looks_like_prose_not_code:
-                        # Strip the truncated prose — inject a recovery prompt instead
-                        full_content = ""
-                        _recovery = (
-                            "You wrote a text response but hit the output token limit before calling execute_code. "
-                            "Do NOT write any more text. Call execute_code NOW with complete Python code to produce the file."
-                        )
-                        messages.append({"role": "assistant", "content": "[Response truncated — token limit reached before execute_code was called]"})
-                        messages.append({"role": "user", "content": _recovery})
-                        logger.warning("prose_before_code_recovery: iteration %d hit length limit without tool call — injecting recovery prompt", iteration)
-                        continue  # retry this iteration
-                    truncation_note = "\n\n*[Response truncated — output token limit reached. Start a new chat or reduce document length.]*"
-                    full_content += truncation_note
-                    yield f"data: {json.dumps({'type': 'delta', 'content': truncation_note})}\n\n"
-                    break
+                    catalog_note = (
+                        f"\n\n## Available Skills\n"
+                        f"The following skills are available. ONLY call `load_skill(skill_name)` when the user "
+                        f"explicitly names a skill or says 'use [skill name]'. Never auto-load based on "
+                        f"description similarity — wait for an explicit request:\n{catalog_lines}"
+                    )
+                    active_system_prompt = active_system_prompt + catalog_note
 
-                # Execute tools if any were buffered, regardless of finish_reason.
-                # Anthropic's compat layer sends "end_turn" (not "tool_calls") even when
-                # tool calls are present — checking finish_reason alone would silently drop them.
-                if not tool_calls_buffer:
-                    if finish_reason not in ("tool_calls", "stop", "end_turn", None):
-                        logger.warning(
-                            "Unexpected finish_reason %r on iteration %d — treating as stop",
-                            finish_reason, iteration,
-                        )
-                    # Guard: if LLM returned stop with no content and no tools at any
-                    # iteration, retry once — handles transient hiccups and reasoning
-                    # models (e.g. Kimi K2.5) that exhaust output budget on thinking
-                    # tokens and return empty content after a tool call.
-                    if not full_content and _empty_retries < 1:
-                        _empty_retries += 1
-                        logger.warning(
-                            "LLM returned empty response on iteration %d (thread %s) — retrying once",
-                            iteration, thread_id,
-                        )
-                        continue
-                    break
+                # Inject cross-thread user memory (General Mode only) — MEM-03, D-05, D-06, D-07
+                _memory_resp = await aexec(
+                    supabase.table("user_memory")
+                    .select("key, value")
+                    .eq("user_id", current_user["id"])
+                    .order("updated_at", desc=True)
+                    .limit(10)
+                )
+                memory_rows = _memory_resp.data or []
 
-                # --- Tool execution round ---
-                tool_calls = list(tool_calls_buffer.values())
+                if memory_rows:
+                    memory_lines = "\n".join(
+                        f"- {r['key']}: {r['value']}" for r in memory_rows
+                    )
+                    memory_note = (
+                        "\n\n## User Memory\n"
+                        "(Preferences and facts you've remembered about this user across conversations)\n"
+                        f"{memory_lines}"
+                    )
+                    active_system_prompt = active_system_prompt + memory_note
 
-                messages.append({
+                # Inform the agent about tools disabled via user settings so it
+                # doesn't attempt to call them or ask clarifying questions about them.
+                disabled_tools: list[str] = []
+                if not user_settings.web_search_enabled:
+                    disabled_tools.append("web_search (disabled in Settings › Integrations › Web Search)")
+                if not user_settings.sandbox_enabled:
+                    disabled_tools.append("execute_code (disabled in Settings › Integrations › Code Execution)")
+                if disabled_tools:
+                    disabled_note = (
+                        "\n\n## Disabled Tools\n"
+                        "The following tools are currently disabled by the user and are NOT available. "
+                        "Do not attempt to call them. If a task requires one of these tools, "
+                        "clearly tell the user it is disabled and how to enable it:\n"
+                        + "\n".join(f"- {t}" for t in disabled_tools)
+                    )
+                    active_system_prompt = active_system_prompt + disabled_note
+
+            messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
+            messages.extend(_reconstruct_history(history_resp.data))
+
+            # Trim conversation history to fit context window before the first LLM call
+            messages = trim_messages_to_fit(
+                messages,
+                max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+                reserve_recent=settings.context_window_reserve_recent,
+            )
+            logger.debug(
+                "Pre-loop trim: ~%d tokens in %d messages",
+                estimate_messages_tokens(messages),
+                len(messages),
+            )
+
+            full_content = ""
+            persisted_tool_calls: list[dict] = []
+            source_refs: list[dict] = []  # {"document_id": str, "filename": str}
+            unique_sources: list[dict] = []
+            retrieved_citations: list[dict] = []    # Full citation objects per D-04
+            similarity_scores: list[float] = []     # Per-call avg cosine values for confidence
+            unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
+            _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
+            _message_persisted = False  # guard against double-insert
+            _empty_retries = 0  # tracks empty-response retries across all iterations
+
+            async def _persist_assistant_message() -> None:
+                """Insert the assistant message row. Idempotent — only runs once."""
+                nonlocal _message_persisted
+                if _message_persisted:
+                    return
+                _message_persisted = True
+                if not full_content and not persisted_tool_calls:
+                    logger.warning(
+                        "Agent loop produced no content for thread %s — persisting empty assistant message",
+                        thread_id,
+                    )
+                row: dict = {
+                    "thread_id": thread_id,
+                    "user_id": current_user["id"],
                     "role": "assistant",
-                    "tool_calls": [
-                        {
-                            "id": tc["id"],
-                            "type": "function",
-                            "function": {"name": tc["name"], "arguments": tc["arguments"]},
-                        }
-                        for tc in tool_calls
-                    ],
-                })
+                    "content": _strip_nul(full_content),
+                }
+                if persisted_tool_calls:
+                    completed_tools = [tc for tc in persisted_tool_calls if tc.get("status") == "done"]
+                    if completed_tools:
+                        row["tool_calls"] = _strip_nul(completed_tools)
+                if unique_citations:
+                    row["source_refs"] = unique_citations   # Full citation objects (D-13)
+                elif unique_sources:
+                    row["source_refs"] = unique_sources     # Backward compat for non-RAG turns
+                if _confidence_slot:
+                    c = _confidence_slot[0]
+                    row["confidence_level"] = c["level"]
+                    row["confidence_avg_similarity"] = c["avg_similarity"]
+                    row["confidence_disclaimer"] = c["disclaimer"]
+                try:
+                    await aexec(supabase.table("messages").insert(row))
+                except Exception as e:
+                    logger.error("Failed to persist assistant message: %s", e)
 
-                for tc in tool_calls:
-                    tool_name = tc["name"]
-                    sub_agent_record: dict | None = None
-                    llm_tool_content: str | None = None  # overridden per-tool to strip URLs from LLM context
-                    try:
-                        args = json.loads(tc["arguments"])
-                        yield f"data: {json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args})}\n\n"
-                        if tool_name == "ls":
-                            path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                            result = await ls_path(path, current_user["id"], supabase)
-                            tool_result = json.dumps(result)
-                        elif tool_name == "tree":
-                            path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                            result = await tree_path(path, args.get("depth"), current_user["id"], supabase)
-                            tool_result = json.dumps(result)
-                        elif tool_name == "grep":
-                            path = args.get("path") or scoped_folder_path
-                            result = await grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
-                            tool_result = json.dumps(result)
-                        elif tool_name == "glob":
-                            result = await glob_path(args.get("pattern", ""), current_user["id"], supabase)
-                            # Scope glob results to folder subtree if thread is folder-scoped
-                            if folder_subtree_ids is not None and "matches" in result:
-                                result["matches"] = [
-                                    m for m in result["matches"]
-                                    if m.get("folder_id") in folder_subtree_ids
-                                ]
-                                result["total"] = len(result["matches"])
-                            tool_result = json.dumps(result)
-                        elif tool_name == "read_document":
-                            result = await read_path(
-                                args["document_id"],
-                                current_user["id"],
-                                supabase,
-                                args.get("start_line"),
-                                args.get("end_line"),
+            def _strip_nul(obj):
+                """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
+                if isinstance(obj, str):
+                    return obj.replace('\x00', '')
+                if isinstance(obj, dict):
+                    return {k: _strip_nul(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [_strip_nul(item) for item in obj]
+                return obj
+
+            # GEN-03: Tool results stored in full — no character caps.
+            # Context budget managed by trim_messages_to_fit() which drops OLDER messages
+            # when total context exceeds the model's budget.
+
+            try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
+              try:
+                # Pre-inject tool instructions only for OpenRouter XML strategy — the one
+                # deterministic structured-mode path. All other providers use native tool
+                # calling; unknown models get post-creation injection (next iteration).
+                _needs_pre_injection = (
+                    getattr(user_settings, "active_provider", "") == "openrouter"
+                    and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+                )
+                _structured_tools_injected = False
+
+                for iteration in range(max_iterations):
+                    # D-04 (Phase 56): emit iteration_start at the top of every iteration.
+                    # Frontend uses this to increment the "Step N" counter (D-03).
+                    # iteration is 0-indexed; frontend adds +1 for display (Pitfall 1).
+                    await queue.put(json.dumps({'type': 'iteration_start', 'iteration': iteration}))
+                    # Between tool-call rounds: signal to the frontend that the agent
+                    # is deciding its next action (all prior tools are done).
+                    if iteration > 0:
+                        await queue.put(json.dumps({'type': 'planning', 'iteration': iteration}))
+
+                    # Re-trim after tool results have been appended (context grows each iteration)
+                    messages = trim_messages_to_fit(
+                        messages,
+                        max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+                        reserve_recent=settings.context_window_reserve_recent,
+                    )
+                    logger.debug(
+                        "Agent iteration %d: ~%d tokens in %d messages",
+                        iteration,
+                        estimate_messages_tokens(messages),
+                        len(messages),
+                    )
+
+                    # On the final iteration force a text response to avoid an infinite loop
+                    force_no_tools = (iteration == max_iterations - 1)
+                    tool_choice = "none" if force_no_tools else "auto"
+                    _provider_retries = 0
+                    _MAX_PROVIDER_RETRIES = 2
+                    _retry_delays = [0.5, 1.5]
+
+                    # OpenRouter XML: inject tool-format instructions BEFORE stream creation
+                    # so the model sees them on the very first call.
+                    if _needs_pre_injection and not _structured_tools_injected and tool_choice == "auto":
+                        _tl_text = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
+                        for _si, _sm in enumerate(messages):
+                            if _sm.get("role") == "system":
+                                messages[_si] = {
+                                    "role": "system",
+                                    "content": _sm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_text),
+                                }
+                                _structured_tools_injected = True
+                                break
+
+                    while True:
+                        try:
+                            active_provider_name = getattr(user_settings, "active_provider", "") or ""
+
+                            if active_provider_name == "anthropic":
+                                # --- Anthropic native SDK path (GEN-02) ---
+                                from app.services.openai_service import _resolve_max_tokens
+                                _ant_max_tokens = _resolve_max_tokens(None, user_settings)
+                                _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
+                                _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                                _ant_gen = stream_anthropic(
+                                    messages=messages,
+                                    tools=_ant_tools,
+                                    system_prompt=active_system_prompt,
+                                    model=body.model or user_settings.llm_model,
+                                    api_key=_ant_api_key,
+                                    max_tokens=_ant_max_tokens,
+                                    force_no_tools=force_no_tools,
+                                )
+                                tool_calls_buffer = {}
+                                finish_reason = None
+                                _announced_tools_ant: set[int] = set()
+                                for _ant_event in _ant_gen:
+                                    _etype = _ant_event.get("type")
+                                    if _etype == "delta":
+                                        _text = _ant_event.get("content", "")
+                                        if _text:
+                                            full_content += _text
+                                            await queue.put(json.dumps({'type': 'delta', 'content': _text}))
+                                    elif _etype == "tool_preparing":
+                                        # D-01 (Phase 56.1, corrected): fired at content_block_start when
+                                        # tool name is first known — before arguments finish streaming.
+                                        _idx = _ant_event.get("index", len(tool_calls_buffer))
+                                        if _idx not in _announced_tools_ant:
+                                            _announced_tools_ant.add(_idx)
+                                            await queue.put(json.dumps({'type': 'tool_preparing', 'name': _ant_event['name'], 'index': _idx}))
+                                    elif _etype == "tool_start":
+                                        # Fired at content_block_stop — arguments now complete.
+                                        # tool_preparing was already emitted above; just populate buffer.
+                                        _idx = len(tool_calls_buffer)
+                                        tool_calls_buffer[_idx] = {
+                                            "id": _ant_event["id"],
+                                            "name": _ant_event["name"],
+                                            "arguments": json.dumps(_ant_event.get("args", {})),
+                                        }
+                                    elif _etype == "finish":
+                                        finish_reason = _ant_event.get("finish_reason", "stop")
+                                break  # stream completed
+
+                            else:
+                                # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
+                                stream, calling_mode = create_adaptive_streaming_chat(
+                                    messages=messages,
+                                    model=body.model,
+                                    user_settings=user_settings,
+                                    tool_choice=tool_choice,
+                                    tools_override=active_tools,
+                                )
+
+                                # Fallback: inject for other structured-mode models (unknown models).
+                                # Happens after the first call; subsequent iterations will have instructions.
+                                if calling_mode == CallingMode.STRUCTURED and tool_choice == "auto" and not _structured_tools_injected:
+                                    _tl_fb = _format_tool_list(active_tools if active_tools is not None else get_tools(user_settings))
+                                    for _fi, _fm in enumerate(messages):
+                                        if _fm.get("role") == "system":
+                                            messages[_fi] = {
+                                                "role": "system",
+                                                "content": _fm["content"] + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl_fb),
+                                            }
+                                            _structured_tools_injected = True
+                                            break
+
+                                tool_calls_buffer: dict = {}
+                                finish_reason: str | None = None
+                                _announced_tools: set[int] = set()
+
+                                for chunk in stream:
+                                    if not chunk.choices:
+                                        continue
+                                    choice = chunk.choices[0]
+                                    delta = choice.delta
+
+                                    if choice.finish_reason:
+                                        finish_reason = normalize_finish_reason(choice.finish_reason)
+
+                                    if delta.content:
+                                        full_content += delta.content
+                                        await queue.put(json.dumps({'type': 'delta', 'content': delta.content}))
+
+                                    if delta.tool_calls:
+                                        for tc in delta.tool_calls:
+                                            idx = tc.index
+                                            if idx not in tool_calls_buffer:
+                                                tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
+                                            if tc.id:
+                                                tool_calls_buffer[idx]["id"] = tc.id
+                                            if tc.function and tc.function.name:
+                                                tool_calls_buffer[idx]["name"] = tc.function.name
+                                                # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
+                                                # before arguments finish streaming. Fires exactly once per tool index.
+                                                if idx not in _announced_tools:
+                                                    _announced_tools.add(idx)
+                                                    await queue.put(json.dumps({'type': 'tool_preparing', 'name': tc.function.name, 'index': idx}))
+                                            if tc.function and tc.function.arguments:
+                                                tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+                                # Parse tool calls based on calling mode
+                                if calling_mode == CallingMode.STRUCTURED:
+                                    structured_calls = parse_structured_tool_calls(full_content)
+                                    if structured_calls:
+                                        # Convert to tool_calls_buffer format for uniform execution
+                                        for idx, call in enumerate(structured_calls):
+                                            tool_calls_buffer[idx] = {
+                                                "id": call.id,
+                                                "name": call.function.name,
+                                                "arguments": call.function.arguments,
+                                            }
+                                        # D-05 (Phase 56.1): emit tool_preparing for each structured call.
+                                        # Structured mode has no streaming name delivery; this fires immediately
+                                        # after parse returns, before the tool execution loop.
+                                        for idx, call in enumerate(structured_calls):
+                                            await queue.put(json.dumps({'type': 'tool_preparing', 'name': call.function.name, 'index': idx}))
+                                        # Yield control so the SSE flush reaches the client before
+                                        # execution begins — otherwise preparing and running arrive in
+                                        # the same TCP packet and the preparing state is never rendered.
+                                        await asyncio.sleep(0)
+                                        # Clear content since it was a tool call, not a user-facing response
+                                        full_content = ""
+                                        finish_reason = "tool_calls"
+                                    elif full_content.strip():
+                                        # Log parse failure for observability
+                                        logger.warning(
+                                            "structured_tool_parse_failed",
+                                            extra={
+                                                "model": body.model,
+                                                "provider": user_settings.active_provider if user_settings else "unknown",
+                                                "content_preview": full_content[:200],
+                                            }
+                                        )
+
+                                break  # stream completed successfully
+
+                        except (APIError, AnthropicAPIError) as provider_err:
+                            # Detect "request too large" 429 — distinct from a rate-limit 429.
+                            # This fires when the account's TPM ceiling (e.g. OpenAI Tier-1: 30k)
+                            # is smaller than the single request size. This is an account plan
+                            # limitation, not a model or app issue — do NOT trim content.
+                            _err_str = str(provider_err).lower()
+                            _is_request_too_large = (
+                                getattr(provider_err, "status_code", None) == 429
+                                and ("request too large" in _err_str or "tokens per min" in _err_str)
                             )
-                            tool_result = json.dumps(result)
-                        elif tool_name == "search_documents":
-                            metadata_filter = args.get("metadata_filter") or None
-                            results, avg_sim = await search_documents(
-                                args["query"], current_user["id"], supabase,
-                                metadata_filter=metadata_filter,
-                                user_settings=user_settings,
-                                folder_ids=folder_subtree_ids,
+                            if _is_request_too_large:
+                                _tpm_msg = (
+                                    "*This document is too large for your current OpenAI account plan. "
+                                    "gpt-4.1 supports up to 1M tokens, but your account's TPM limit "
+                                    "rejected this request. To fix: upgrade to OpenAI Tier 2 at "
+                                    "platform.openai.com/account/rate-limits, switch to Anthropic "
+                                    "(claude-sonnet-4-6), or use OpenRouter which has higher limits.*"
+                                )
+                                full_content += _tpm_msg
+                                await queue.put(json.dumps({'type': 'delta', 'content': _tpm_msg}))
+                                break
+
+                            if _is_transient_provider_error(provider_err) and _provider_retries < _MAX_PROVIDER_RETRIES:
+                                _provider_retries += 1
+                                delay = _retry_delays[_provider_retries - 1]
+                                logger.warning(
+                                    "Transient provider error on iteration %d (thread %s), "
+                                    "attempt %d/%d — retrying in %.1fs. status=%s",
+                                    iteration, thread_id,
+                                    _provider_retries, _MAX_PROVIDER_RETRIES + 1,
+                                    delay, getattr(provider_err, "status_code", "unknown"),
+                                )
+                                await asyncio.sleep(delay)
+                                continue
+                            raise  # non-retryable or retries exhausted → caught by outer except APIError
+
+                    logger.debug(
+                        "Iteration %d finish_reason=%r tool_calls_buffered=%d",
+                        iteration, finish_reason, len(tool_calls_buffer),
+                    )
+
+                    if finish_reason == "length" and tool_calls_buffer:
+                        # length limit hit while streaming tool arguments — discard partial call
+                        err_msg = "*The conversation grew too large for this model's context window. Start a new chat and try the generation request again.*"
+                        full_content += err_msg
+                        await queue.put(json.dumps({'type': 'delta', 'content': err_msg}))
+                        await queue.put(json.dumps({'type': 'error', 'message': 'finish_reason=length during tool streaming'}))
+                        break
+
+                    if finish_reason == "length":
+                        # Detect "prose-before-code" anti-pattern: model wrote text instead of calling
+                        # execute_code, consumed the full token budget, and never made the tool call.
+                        # Recovery: inject a corrective user message and continue the loop so the model
+                        # can call execute_code on the next iteration.
+                        _generation_keywords = ("powerpoint", "pptx", "ppt", "presentation", "pdf",
+                                                "word", "excel", "report", "chart", "generate", "create",
+                                                "build", "python", "execute_code")
+                        _content_lower = full_content.lower()
+                        _looks_like_prose_not_code = (
+                            iteration > 0
+                            and not tool_calls_buffer
+                            and any(kw in _content_lower for kw in _generation_keywords)
+                            and len(full_content) > 500
+                        )
+                        if _looks_like_prose_not_code:
+                            # Strip the truncated prose — inject a recovery prompt instead
+                            full_content = ""
+                            _recovery = (
+                                "You wrote a text response but hit the output token limit before calling execute_code. "
+                                "Do NOT write any more text. Call execute_code NOW with complete Python code to produce the file."
                             )
-                            tool_result = json.dumps(results) if results else "No relevant documents found."
-                            # Accumulate full citation objects for citations event (D-04, D-14)
-                            if results and isinstance(results, list):
-                                for hit in results:
-                                    doc_id = hit.get("document_id") or hit.get("id")
-                                    filename = hit.get("filename") or hit.get("document_name")
-                                    if doc_id and filename:
-                                        source_refs.append({"document_id": doc_id, "filename": filename})
+                            messages.append({"role": "assistant", "content": "[Response truncated — token limit reached before execute_code was called]"})
+                            messages.append({"role": "user", "content": _recovery})
+                            logger.warning("prose_before_code_recovery: iteration %d hit length limit without tool call — injecting recovery prompt", iteration)
+                            continue  # retry this iteration
+                        truncation_note = "\n\n*[Response truncated — output token limit reached. Start a new chat or reduce document length.]*"
+                        full_content += truncation_note
+                        await queue.put(json.dumps({'type': 'delta', 'content': truncation_note}))
+                        break
+
+                    # Execute tools if any were buffered, regardless of finish_reason.
+                    # Anthropic's compat layer sends "end_turn" (not "tool_calls") even when
+                    # tool calls are present — checking finish_reason alone would silently drop them.
+                    if not tool_calls_buffer:
+                        if finish_reason not in ("tool_calls", "stop", "end_turn", None):
+                            logger.warning(
+                                "Unexpected finish_reason %r on iteration %d — treating as stop",
+                                finish_reason, iteration,
+                            )
+                        # Guard: if LLM returned stop with no content and no tools at any
+                        # iteration, retry once — handles transient hiccups and reasoning
+                        # models (e.g. Kimi K2.5) that exhaust output budget on thinking
+                        # tokens and return empty content after a tool call.
+                        if not full_content and _empty_retries < 1:
+                            _empty_retries += 1
+                            logger.warning(
+                                "LLM returned empty response on iteration %d (thread %s) — retrying once",
+                                iteration, thread_id,
+                            )
+                            continue
+                        break
+
+                    # --- Tool execution round ---
+                    tool_calls = list(tool_calls_buffer.values())
+
+                    messages.append({
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": tc["id"],
+                                "type": "function",
+                                "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                            }
+                            for tc in tool_calls
+                        ],
+                    })
+
+                    for tc in tool_calls:
+                        tool_name = tc["name"]
+                        sub_agent_record: dict | None = None
+                        llm_tool_content: str | None = None  # overridden per-tool to strip URLs from LLM context
+                        try:
+                            args = json.loads(tc["arguments"])
+                            await queue.put(json.dumps({'type': 'tool_start', 'name': tool_name, 'args': args}))
+                            if tool_name == "ls":
+                                path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
+                                result = await ls_path(path, current_user["id"], supabase)
+                                tool_result = json.dumps(result)
+                            elif tool_name == "tree":
+                                path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
+                                result = await tree_path(path, args.get("depth"), current_user["id"], supabase)
+                                tool_result = json.dumps(result)
+                            elif tool_name == "grep":
+                                path = args.get("path") or scoped_folder_path
+                                result = await grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
+                                tool_result = json.dumps(result)
+                            elif tool_name == "glob":
+                                result = await glob_path(args.get("pattern", ""), current_user["id"], supabase)
+                                # Scope glob results to folder subtree if thread is folder-scoped
+                                if folder_subtree_ids is not None and "matches" in result:
+                                    result["matches"] = [
+                                        m for m in result["matches"]
+                                        if m.get("folder_id") in folder_subtree_ids
+                                    ]
+                                    result["total"] = len(result["matches"])
+                                tool_result = json.dumps(result)
+                            elif tool_name == "read_document":
+                                result = await read_path(
+                                    args["document_id"],
+                                    current_user["id"],
+                                    supabase,
+                                    args.get("start_line"),
+                                    args.get("end_line"),
+                                )
+                                tool_result = json.dumps(result)
+                            elif tool_name == "search_documents":
+                                metadata_filter = args.get("metadata_filter") or None
+                                results, avg_sim = await search_documents(
+                                    args["query"], current_user["id"], supabase,
+                                    metadata_filter=metadata_filter,
+                                    user_settings=user_settings,
+                                    folder_ids=folder_subtree_ids,
+                                )
+                                tool_result = json.dumps(results) if results else "No relevant documents found."
+                                # Accumulate full citation objects for citations event (D-04, D-14)
+                                if results and isinstance(results, list):
+                                    for hit in results:
+                                        doc_id = hit.get("document_id") or hit.get("id")
+                                        filename = hit.get("filename") or hit.get("document_name")
+                                        if doc_id and filename:
+                                            source_refs.append({"document_id": doc_id, "filename": filename})
+                                            retrieved_citations.append({
+                                                "document_id": doc_id,
+                                                "filename": filename,
+                                                "chunk_index": hit.get("chunk_index"),
+                                                "passage": hit.get("content"),  # Full text for persistence
+                                                "similarity": hit.get("similarity"),
+                                                "is_full_doc": False,
+                                                "version_number": hit.get("version_number", 1),
+                                            })
+                                    if avg_sim > 0.0:
+                                        similarity_scores.append(avg_sim)
+                                # Audit: fire-and-forget inside async generator (AUDIT-02)
+                                _audit_doc_ids = list({
+                                    h.get("document_id") or h.get("id")
+                                    for h in (results or [])
+                                    if h.get("document_id") or h.get("id")
+                                })
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="search.query",
+                                    metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
+                                    supabase=supabase,
+                                ))
+                            elif tool_name == "query_documents":
+                                tool_result = await query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
+                            elif tool_name == "web_search":
+                                tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
+                            elif tool_name == "analyze_document":
+                                doc_id = await resolve_document_id(args["filename"], current_user["id"], supabase)
+                                if not doc_id:
+                                    tool_result = f"Document '{args['filename']}' not found."
+                                else:
+                                    doc = await fetch_full_document(doc_id, current_user["id"], supabase)
+                                    if not doc:
+                                        tool_result = f"Could not retrieve content for '{args['filename']}'."
+                                    else:
+                                        # Track this document as a source reference
+                                        source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
                                         retrieved_citations.append({
                                             "document_id": doc_id,
-                                            "filename": filename,
-                                            "chunk_index": hit.get("chunk_index"),
-                                            "passage": hit.get("content"),  # Full text for persistence
-                                            "similarity": hit.get("similarity"),
-                                            "is_full_doc": False,
-                                            "version_number": hit.get("version_number", 1),
+                                            "filename": doc["filename"],
+                                            "chunk_index": None,
+                                            "passage": None,
+                                            "similarity": None,
+                                            "is_full_doc": True,
+                                            "version_number": doc.get("version_number", 1),
                                         })
-                                if avg_sim > 0.0:
-                                    similarity_scores.append(avg_sim)
-                            # Audit: fire-and-forget inside async generator (AUDIT-02)
-                            _audit_doc_ids = list({
-                                h.get("document_id") or h.get("id")
-                                for h in (results or [])
-                                if h.get("document_id") or h.get("id")
-                            })
-                            asyncio.create_task(write_audit_entry(
-                                user_id=current_user["id"],
-                                action_type="search.query",
-                                metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
-                                supabase=supabase,
-                            ))
-                        elif tool_name == "query_documents":
-                            tool_result = await query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
-                        elif tool_name == "web_search":
-                            tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
-                        elif tool_name == "analyze_document":
-                            doc_id = await resolve_document_id(args["filename"], current_user["id"], supabase)
-                            if not doc_id:
-                                tool_result = f"Document '{args['filename']}' not found."
-                            else:
-                                doc = await fetch_full_document(doc_id, current_user["id"], supabase)
-                                if not doc:
-                                    tool_result = f"Could not retrieve content for '{args['filename']}'."
-                                else:
-                                    # Track this document as a source reference
-                                    source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
-                                    retrieved_citations.append({
-                                        "document_id": doc_id,
-                                        "filename": doc["filename"],
-                                        "chunk_index": None,
-                                        "passage": None,
-                                        "similarity": None,
-                                        "is_full_doc": True,
-                                        "version_number": doc.get("version_number", 1),
-                                    })
-                                    yield f"data: {json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']})}\n\n"
-                                    sub_agent_content = ""
-                                    try:
-                                        for text_chunk in run_sub_agent(doc["content"], doc["filename"], args["task"], model=body.model, user_settings=user_settings):
-                                            # Detect fallback sentinel emitted by sub_agent_service
-                                            if text_chunk.startswith('{"__type": "fallback_model"'):
-                                                try:
-                                                    sentinel = json.loads(text_chunk)
-                                                    yield f"data: {json.dumps({'type': 'fallback_model', 'original_model': sentinel['original_model'], 'fallback_model': sentinel['fallback_model']})}\n\n"
-                                                except (json.JSONDecodeError, KeyError):
-                                                    pass
-                                                continue
-                                            sub_agent_content += text_chunk
-                                            yield f"data: {json.dumps({'type': 'sub_agent_delta', 'content': text_chunk})}\n\n"
-                                    except Exception as sa_err:
-                                        logger.error("Sub-agent failed: %s", sa_err)
-                                        if not sub_agent_content:
-                                            sub_agent_content = f"Sub-agent analysis failed: {sa_err}"
-                                    yield f"data: {json.dumps({'type': 'sub_agent_done'})}\n\n"
-                                    tool_result = sub_agent_content
-                                    sub_agent_record = {"filename": doc["filename"], "task": args["task"], "content": sub_agent_content}
-                        elif tool_name == "load_skill":
-                            skill_name = args.get("skill_name", "")
-                            # Emit skill_activated SSE event immediately (SKIL-12)
-                            yield f"data: {json.dumps({'type': 'skill_activated', 'skill_name': skill_name})}\n\n"
-                            # Resolve skill — prefer user-owned over global when names conflict
-                            _skill_resp = await aexec(
-                                supabase.table("skills")
-                                .select("id, name, description, instructions, user_id")
-                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                .eq("name", skill_name)
-                                .eq("is_enabled", True)
-                                .order("is_global")
-                            )
-                            skill_row = _skill_resp.data
-                            if not skill_row:
-                                tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
-                            else:
-                                row = skill_row[0] if isinstance(skill_row, list) else skill_row
-                                asyncio.create_task(write_audit_entry(
-                                    user_id=current_user["id"],
-                                    action_type="skill.load",
-                                    metadata={"skill_id": row["id"], "skill_name": row["name"]},
-                                    supabase=supabase,
-                                ))
-                                # Fetch attached filenames (FILE-04)
-                                _files_resp = await aexec(
-                                    supabase.table("skill_files")
-                                    .select("filename")
-                                    .eq("skill_id", row["id"])
-                                    .order("filename")
-                                )
-                                files_data = _files_resp.data or []
-                                file_names = [f["filename"] for f in files_data]
-                                tool_result = json.dumps({
-                                    "name": row["name"],
-                                    "instructions": row["instructions"],
-                                    "files": file_names,
-                                })
-                        elif tool_name == "save_skill":
-                            name = args.get("name", "").strip()
-                            description = args.get("description", "")
-                            instructions = args.get("instructions", "")
-                            if not name:
-                                tool_result = json.dumps({"error": "Skill name is required."})
-                            else:
-                                # Check if user already owns a skill with this name
-                                existing_resp = await aexec(
+                                        await queue.put(json.dumps({'type': 'sub_agent_start', 'filename': doc['filename'], 'task': args['task']}))
+                                        sub_agent_content = ""
+                                        try:
+                                            for text_chunk in run_sub_agent(doc["content"], doc["filename"], args["task"], model=body.model, user_settings=user_settings):
+                                                # Detect fallback sentinel emitted by sub_agent_service
+                                                if text_chunk.startswith('{"__type": "fallback_model"'):
+                                                    try:
+                                                        sentinel = json.loads(text_chunk)
+                                                        await queue.put(json.dumps({'type': 'fallback_model', 'original_model': sentinel['original_model'], 'fallback_model': sentinel['fallback_model']}))
+                                                    except (json.JSONDecodeError, KeyError):
+                                                        pass
+                                                    continue
+                                                sub_agent_content += text_chunk
+                                                await queue.put(json.dumps({'type': 'sub_agent_delta', 'content': text_chunk}))
+                                        except Exception as sa_err:
+                                            logger.error("Sub-agent failed: %s", sa_err)
+                                            if not sub_agent_content:
+                                                sub_agent_content = f"Sub-agent analysis failed: {sa_err}"
+                                        await queue.put(json.dumps({'type': 'sub_agent_done'}))
+                                        tool_result = sub_agent_content
+                                        sub_agent_record = {"filename": doc["filename"], "task": args["task"], "content": sub_agent_content}
+                            elif tool_name == "load_skill":
+                                skill_name = args.get("skill_name", "")
+                                # Emit skill_activated SSE event immediately (SKIL-12)
+                                await queue.put(json.dumps({'type': 'skill_activated', 'skill_name': skill_name}))
+                                # Resolve skill — prefer user-owned over global when names conflict
+                                _skill_resp = await aexec(
                                     supabase.table("skills")
-                                    .select("id")
-                                    .eq("user_id", current_user["id"])
-                                    .eq("name", name)
-                                    .limit(1)
+                                    .select("id, name, description, instructions, user_id")
+                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                    .eq("name", skill_name)
+                                    .eq("is_enabled", True)
+                                    .order("is_global")
                                 )
-                                existing = existing_resp.data[0] if existing_resp.data else None
-                                if existing:
-                                    row = existing
-                                    await aexec(
-                                        supabase.table("skills").update({
-                                            "description": description,
-                                            "instructions": instructions,
-                                        }).eq("id", row["id"]).eq("user_id", current_user["id"])
-                                    )
-                                    tool_result = json.dumps({"status": "updated", "name": name})
+                                skill_row = _skill_resp.data
+                                if not skill_row:
+                                    tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                                 else:
-                                    await aexec(
-                                        supabase.table("skills").insert({
-                                            "user_id": current_user["id"],
-                                            "name": name,
-                                            "description": description,
-                                            "instructions": instructions,
-                                        })
+                                    row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                    asyncio.create_task(write_audit_entry(
+                                        user_id=current_user["id"],
+                                        action_type="skill.load",
+                                        metadata={"skill_id": row["id"], "skill_name": row["name"]},
+                                        supabase=supabase,
+                                    ))
+                                    # Fetch attached filenames (FILE-04)
+                                    _files_resp = await aexec(
+                                        supabase.table("skill_files")
+                                        .select("filename")
+                                        .eq("skill_id", row["id"])
+                                        .order("filename")
                                     )
-                                    tool_result = json.dumps({"status": "created", "name": name})
-                        elif tool_name == "read_skill_file":
-                            skill_name = args.get("skill_name", "")
-                            filename = args.get("filename", "")
-                            # Resolve skill to get owner's user_id for storage path
-                            _sr_resp = await aexec(
-                                supabase.table("skills")
-                                .select("id, user_id")
-                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                .eq("name", skill_name)
-                                .maybe_single()
-                            )
-                            skill_row = _sr_resp.data if _sr_resp is not None else None
-                            if not skill_row:
-                                # Retry with normalized name for agent display-name mismatches
-                                _sr_norm = skill_name.lower().replace(" ", "-")
-                                if _sr_norm != skill_name:
-                                    _sr_resp2 = await aexec(
-                                        supabase.table("skills")
-                                        .select("id, user_id")
-                                        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                        .eq("name", _sr_norm)
-                                        .maybe_single()
-                                    )
-                                    skill_row = _sr_resp2.data if _sr_resp2 is not None else None
-                            if not skill_row:
-                                tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
-                            else:
-                                row = skill_row[0] if isinstance(skill_row, list) else skill_row
-                                storage_path = f"{row['user_id']}/{row['id']}/{filename}"
-                                try:
-                                    raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
-                                    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
-                                    if ext == "docx":
-                                        import docx as _docx  # python-docx
-                                        doc = _docx.Document(io.BytesIO(raw_bytes))
-                                        tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-                                    elif ext == "xlsx":
-                                        import openpyxl as _openpyxl
-                                        wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
-                                        rows = []
-                                        for sheet in wb.worksheets:
-                                            for row in sheet.iter_rows(values_only=True):
-                                                line = "\t".join(str(c) if c is not None else "" for c in row)
-                                                if line.strip():
-                                                    rows.append(line)
-                                        tool_result = "\n".join(rows)
-                                    elif ext == "pptx":
-                                        from pptx import Presentation as _Presentation  # python-pptx
-                                        prs = _Presentation(io.BytesIO(raw_bytes))
-                                        slides = []
-                                        for slide in prs.slides:
-                                            for shape in slide.shapes:
-                                                if hasattr(shape, "text") and shape.text.strip():
-                                                    slides.append(shape.text)
-                                        tool_result = "\n".join(slides)
-                                    elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
-                                        tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
-                                    else:
-                                        # Unrecognized or binary type
-                                        tool_result = json.dumps({
-                                            "error": f"File '{filename}' is a binary file that cannot be read as text. "
-                                                     "Upload a text-based version instead."
-                                        })
-                                except Exception as e:
-                                    tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
-                        elif tool_name == "execute_code":
-                            code = args.get("code", "")
-                            libraries = args.get("libraries") or []
-                            # Emit start event (SAND-04)
-                            yield f"data: {json.dumps({'type': 'code_execution_start', 'code_preview': code[:200]})}\n\n"
-
-                            try:
-                                session = sandbox_manager.get_or_create(thread_id)
-                                loop = asyncio.get_event_loop()
-                                queue: asyncio.Queue = asyncio.Queue()
-
-                                def on_stdout(chunk: str):
-                                    loop.call_soon_threadsafe(
-                                        queue.put_nowait,
-                                        {"type": "code_stdout", "content": chunk}
-                                    )
-
-                                def on_stderr(chunk: str):
-                                    loop.call_soon_threadsafe(
-                                        queue.put_nowait,
-                                        {"type": "code_stderr", "content": chunk}
-                                    )
-
-                                # Ensure /sandbox/output exists via shell (reliable across container
-                                # environments) and chdir so relative writes land there
-                                try:
-                                    session.execute_command("mkdir -p /sandbox/output")
-                                except Exception:
-                                    pass
-
-                                # Inject skill files into sandbox by embedding bytes as base64
-                                # in a preamble that runs before user code. More reliable than
-                                # copy_to_runtime which can fail silently on Windows Docker setups.
-                                skill_files_req = args.get("skill_files") or []
-                                file_preamble = ""
-                                for sf in skill_files_req:
-                                    sf_skill_name = sf.get("skill_name", "")
-                                    sf_filename = sf.get("filename", "")
-                                    if not sf_skill_name or not sf_filename:
-                                        continue
-                                    _sf_resp = await aexec(
-                                        supabase.table("skills")
-                                        .select("id, user_id")
-                                        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                        .eq("name", sf_skill_name)
-                                        .maybe_single()
-                                    )
-                                    sf_skill = _sf_resp.data if _sf_resp is not None else None
-                                    if not sf_skill:
-                                        # Retry with normalized name: agent often uses display name
-                                        # ("Weekly Report Writer") instead of stored slug ("weekly-report-writer")
-                                        _sf_norm = sf_skill_name.lower().replace(" ", "-")
-                                        if _sf_norm != sf_skill_name:
-                                            _sf_resp2 = await aexec(
-                                                supabase.table("skills")
-                                                .select("id, user_id")
-                                                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                                .eq("name", _sf_norm)
-                                                .maybe_single()
-                                            )
-                                            sf_skill = _sf_resp2.data if _sf_resp2 is not None else None
-                                    if not sf_skill:
-                                        logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
-                                        continue
-                                    sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
-                                    sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
-                                    try:
-                                        sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
-                                        b64 = base64.b64encode(sf_bytes).decode("ascii")
-                                        safe_name = sf_filename.replace("'", "\\'")
-                                        file_preamble += (
-                                            f"import base64 as _b64, os as _os\n"
-                                            f"_os.makedirs('/sandbox', exist_ok=True)\n"
-                                            f"with open('/sandbox/{safe_name}', 'wb') as _f:\n"
-                                            f"    _f.write(_b64.b64decode('{b64}'))\n"
-                                            f"print('Injected skill file: {safe_name}')\n"
-                                        )
-                                    except Exception as sf_err:
-                                        logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
-
-                                wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
-
-                                start_time = time_mod.time()
-
-                                def _run_sync():
-                                    exec_result = session.run(
-                                        wrapped_code,
-                                        libraries=libraries,
-                                        on_stdout=on_stdout,
-                                        on_stderr=on_stderr,
-                                    )
-                                    loop.call_soon_threadsafe(
-                                        queue.put_nowait,
-                                        {"type": "_done", "result": exec_result}
-                                    )
-                                    return exec_result
-
-                                fut = loop.run_in_executor(None, _run_sync)
-
-                                # Drain queue, streaming SSE events (SAND-05).
-                                # Emit keepalives every 10 s when sandbox produces no output
-                                # to prevent SSE connection timeouts on long executions.
-                                while True:
-                                    try:
-                                        item = await asyncio.wait_for(queue.get(), timeout=10.0)
-                                    except asyncio.TimeoutError:
-                                        yield f"data: {json.dumps({'type': 'keepalive'})}\n\n"
-                                        continue
-                                    if item["type"] == "_done":
-                                        break
-                                    yield f"data: {json.dumps(item)}\n\n"
-
-                                exec_result = await fut
-                                end_time = time_mod.time()
-                                duration_ms = int((end_time - start_time) * 1000)
-
-                                # Emit stdout/stderr lines from result (on_stdout callbacks
-                                # are no-ops in InteractiveSandboxSession — output only
-                                # available after execution completes)
-                                if exec_result.stdout:
-                                    for line in exec_result.stdout.splitlines():
-                                        yield f"data: {json.dumps({'type': 'code_stdout', 'content': line})}\n\n"
-                                if exec_result.stderr:
-                                    for line in exec_result.stderr.splitlines():
-                                        yield f"data: {json.dumps({'type': 'code_stderr', 'content': line})}\n\n"
-
-                                # Derive actual exit code — InteractiveSandboxSession may
-                                # return 0 even when Python raises an exception.
-                                # Check exec_result.exit_code first; if it's 0/None,
-                                # scan stdout for Python error signatures.
-                                actual_exit_code = getattr(exec_result, "exit_code", None) or 0
-                                if actual_exit_code == 0:
-                                    stdout_text = exec_result.stdout or ""
-                                    _error_markers = (
-                                        "Traceback (most recent call last)",
-                                        "Error:",
-                                        "Exception:",
-                                        "ModuleNotFoundError",
-                                        "ImportError",
-                                        "SyntaxError",
-                                        "NameError",
-                                        "TypeError",
-                                        "ValueError",
-                                        "RuntimeError",
-                                        "AttributeError",
-                                        "KeyError",
-                                        "IndexError",
-                                    )
-                                    if any(m in stdout_text for m in _error_markers):
-                                        actual_exit_code = 1
-
-                                # Log execution to DB (SAND-09)
-                                exec_row = await aexec(
-                                    supabase.table("code_executions").insert({
-                                        "thread_id": thread_id,
-                                        "user_id": current_user["id"],
-                                        "code": code,
-                                        "exit_code": actual_exit_code,
-                                        "duration_ms": duration_ms,
+                                    files_data = _files_resp.data or []
+                                    file_names = [f["filename"] for f in files_data]
+                                    tool_result = json.dumps({
+                                        "name": row["name"],
+                                        "instructions": row["instructions"],
+                                        "files": file_names,
                                     })
-                                )
-                                execution_id = exec_row.data[0]["id"] if exec_row.data else None
-
-                                # Harvest output files from container (SAND-07, SAND-08)
-                                output_file_list = []
-                                if execution_id and actual_exit_code == 0:
-                                    output_file_list = harvest_output_files(
-                                        session, execution_id, current_user["id"], supabase
+                            elif tool_name == "save_skill":
+                                name = args.get("name", "").strip()
+                                description = args.get("description", "")
+                                instructions = args.get("instructions", "")
+                                if not name:
+                                    tool_result = json.dumps({"error": "Skill name is required."})
+                                else:
+                                    # Check if user already owns a skill with this name
+                                    existing_resp = await aexec(
+                                        supabase.table("skills")
+                                        .select("id")
+                                        .eq("user_id", current_user["id"])
+                                        .eq("name", name)
+                                        .limit(1)
                                     )
-
-                                # Emit completion event (SAND-06) with file list
-                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': actual_exit_code, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': output_file_list})}\n\n"
-
-                                exec_status = "completed" if actual_exit_code == 0 else "error"
-                                tool_result = json.dumps({
-                                    "status": exec_status,
-                                    "exit_code": actual_exit_code,
-                                    "duration_ms": duration_ms,
-                                    "execution_id": execution_id,
-                                    "output_files": output_file_list,
-                                    "stdout": exec_result.stdout or "",
-                                    "stderr": exec_result.stderr or "",
-                                })
-                                # Strip signed URLs from LLM context — frontend shows download cards
-                                llm_tool_content = json.dumps({
-                                    "status": exec_status,
-                                    "exit_code": actual_exit_code,
-                                    "duration_ms": duration_ms,
-                                    "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
-                                    "stdout": exec_result.stdout or "",
-                                    "stderr": exec_result.stderr or "",
-                                })
-                                asyncio.create_task(write_audit_entry(
-                                    user_id=current_user["id"],
-                                    action_type="code.execute",
-                                    metadata={"thread_id": thread_id, "language": args.get("language", "python")},
-                                    supabase=supabase,
-                                ))
-                            except Exception as exec_err:
-                                logger.error("execute_code failed: %s", exec_err)
-                                yield f"data: {json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []})}\n\n"
-                                tool_result = json.dumps({"status": "error", "error": str(exec_err)})
-                        elif tool_name == "remember":
-                            # Phase 33 MEM-01: store user preference/fact across threads
-                            # D-01 upsert, D-02 case-insensitive, D-16 non-blocking, D-17 silent fail
-                            key = (args.get("key", "") or "").strip().lower()
-                            value = args.get("value", "") or ""
-
-                            if not key:
-                                # Pitfall 3: empty key must not reach DB
-                                tool_result = json.dumps({"error": "key cannot be empty"})
-                            else:
-                                tool_result = json.dumps({"status": "remembered", "key": key})
-
-                                async def _write_memory(
-                                    _key: str = key,
-                                    _value: str = value,
-                                    _uid: str = current_user["id"],
-                                ) -> None:
-                                    try:
+                                    existing = existing_resp.data[0] if existing_resp.data else None
+                                    if existing:
+                                        row = existing
                                         await aexec(
-                                            supabase.table("user_memory").upsert(
-                                                {
-                                                    "user_id": _uid,
-                                                    "key": _key,
-                                                    "value": _value,
-                                                },
-                                                on_conflict="user_id,key",
-                                            )
+                                            supabase.table("skills").update({
+                                                "description": description,
+                                                "instructions": instructions,
+                                            }).eq("id", row["id"]).eq("user_id", current_user["id"])
                                         )
-                                    except Exception as exc:
-                                        logger.warning(
-                                            "memory.remember write failed [user=%s key=%s]: %s",
-                                            _uid, _key, exc,
+                                        tool_result = json.dumps({"status": "updated", "name": name})
+                                    else:
+                                        await aexec(
+                                            supabase.table("skills").insert({
+                                                "user_id": current_user["id"],
+                                                "name": name,
+                                                "description": description,
+                                                "instructions": instructions,
+                                            })
                                         )
-
-                                asyncio.create_task(_write_memory())
-                                asyncio.create_task(write_audit_entry(
-                                    user_id=current_user["id"],
-                                    action_type="memory.remember",
-                                    metadata={"key": key, "value": value, "action": "upsert"},
-                                    supabase=supabase,
-                                ))
-
-                        elif tool_name == "recall":
-                            # Phase 33 MEM-01: retrieve stored memory entries
-                            # D-09 (all), D-10 (specific), D-11 (not found), D-12 (empty)
-                            key = (args.get("key", "") or "").strip().lower()
-
-                            if key:
-                                resp = await aexec(
-                                    supabase.table("user_memory")
-                                    .select("value")
-                                    .eq("user_id", current_user["id"])
-                                    .eq("key", key)
+                                        tool_result = json.dumps({"status": "created", "name": name})
+                            elif tool_name == "read_skill_file":
+                                skill_name = args.get("skill_name", "")
+                                filename = args.get("filename", "")
+                                # Resolve skill to get owner's user_id for storage path
+                                _sr_resp = await aexec(
+                                    supabase.table("skills")
+                                    .select("id, user_id")
+                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                    .eq("name", skill_name)
                                     .maybe_single()
                                 )
-                                row = resp.data if resp else None
-                                # Pitfall 5: maybe_single() mock compatibility
-                                if isinstance(row, list):
-                                    row = row[0] if row else None
-                                if row:
-                                    tool_result = row["value"]
+                                skill_row = _sr_resp.data if _sr_resp is not None else None
+                                if not skill_row:
+                                    # Retry with normalized name for agent display-name mismatches
+                                    _sr_norm = skill_name.lower().replace(" ", "-")
+                                    if _sr_norm != skill_name:
+                                        _sr_resp2 = await aexec(
+                                            supabase.table("skills")
+                                            .select("id, user_id")
+                                            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                            .eq("name", _sr_norm)
+                                            .maybe_single()
+                                        )
+                                        skill_row = _sr_resp2.data if _sr_resp2 is not None else None
+                                if not skill_row:
+                                    tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
                                 else:
-                                    tool_result = f"No memory entry found for key: {key}"
-                            else:
-                                _rows_resp = await aexec(
-                                    supabase.table("user_memory")
-                                    .select("key, value")
-                                    .eq("user_id", current_user["id"])
-                                    .order("updated_at", desc=True)
-                                )
-                                rows = _rows_resp.data or []
-                                if rows:
-                                    tool_result = "\n".join(
-                                        f"- {r['key']}: {r['value']}" for r in rows
+                                    row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                    storage_path = f"{row['user_id']}/{row['id']}/{filename}"
+                                    try:
+                                        raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
+                                        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+                                        if ext == "docx":
+                                            import docx as _docx  # python-docx
+                                            doc = _docx.Document(io.BytesIO(raw_bytes))
+                                            tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+                                        elif ext == "xlsx":
+                                            import openpyxl as _openpyxl
+                                            wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+                                            rows = []
+                                            for sheet in wb.worksheets:
+                                                for row in sheet.iter_rows(values_only=True):
+                                                    line = "\t".join(str(c) if c is not None else "" for c in row)
+                                                    if line.strip():
+                                                        rows.append(line)
+                                            tool_result = "\n".join(rows)
+                                        elif ext == "pptx":
+                                            from pptx import Presentation as _Presentation  # python-pptx
+                                            prs = _Presentation(io.BytesIO(raw_bytes))
+                                            slides = []
+                                            for slide in prs.slides:
+                                                for shape in slide.shapes:
+                                                    if hasattr(shape, "text") and shape.text.strip():
+                                                        slides.append(shape.text)
+                                            tool_result = "\n".join(slides)
+                                        elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
+                                            tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+                                        else:
+                                            # Unrecognized or binary type
+                                            tool_result = json.dumps({
+                                                "error": f"File '{filename}' is a binary file that cannot be read as text. "
+                                                         "Upload a text-based version instead."
+                                            })
+                                    except Exception as e:
+                                        tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
+                            elif tool_name == "execute_code":
+                                code = args.get("code", "")
+                                libraries = args.get("libraries") or []
+                                # Emit start event (SAND-04)
+                                await queue.put(json.dumps({'type': 'code_execution_start', 'code_preview': code[:200]}))
+
+                                try:
+                                    session = sandbox_manager.get_or_create(thread_id)
+                                    loop = asyncio.get_event_loop()
+                                    queue: asyncio.Queue = asyncio.Queue()
+
+                                    def on_stdout(chunk: str):
+                                        loop.call_soon_threadsafe(
+                                            queue.put_nowait,
+                                            {"type": "code_stdout", "content": chunk}
+                                        )
+
+                                    def on_stderr(chunk: str):
+                                        loop.call_soon_threadsafe(
+                                            queue.put_nowait,
+                                            {"type": "code_stderr", "content": chunk}
+                                        )
+
+                                    # Ensure /sandbox/output exists via shell (reliable across container
+                                    # environments) and chdir so relative writes land there
+                                    try:
+                                        session.execute_command("mkdir -p /sandbox/output")
+                                    except Exception:
+                                        pass
+
+                                    # Inject skill files into sandbox by embedding bytes as base64
+                                    # in a preamble that runs before user code. More reliable than
+                                    # copy_to_runtime which can fail silently on Windows Docker setups.
+                                    skill_files_req = args.get("skill_files") or []
+                                    file_preamble = ""
+                                    for sf in skill_files_req:
+                                        sf_skill_name = sf.get("skill_name", "")
+                                        sf_filename = sf.get("filename", "")
+                                        if not sf_skill_name or not sf_filename:
+                                            continue
+                                        _sf_resp = await aexec(
+                                            supabase.table("skills")
+                                            .select("id, user_id")
+                                            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                            .eq("name", sf_skill_name)
+                                            .maybe_single()
+                                        )
+                                        sf_skill = _sf_resp.data if _sf_resp is not None else None
+                                        if not sf_skill:
+                                            # Retry with normalized name: agent often uses display name
+                                            # ("Weekly Report Writer") instead of stored slug ("weekly-report-writer")
+                                            _sf_norm = sf_skill_name.lower().replace(" ", "-")
+                                            if _sf_norm != sf_skill_name:
+                                                _sf_resp2 = await aexec(
+                                                    supabase.table("skills")
+                                                    .select("id, user_id")
+                                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                                                    .eq("name", _sf_norm)
+                                                    .maybe_single()
+                                                )
+                                                sf_skill = _sf_resp2.data if _sf_resp2 is not None else None
+                                        if not sf_skill:
+                                            logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
+                                            continue
+                                        sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
+                                        sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
+                                        try:
+                                            sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
+                                            b64 = base64.b64encode(sf_bytes).decode("ascii")
+                                            safe_name = sf_filename.replace("'", "\\'")
+                                            file_preamble += (
+                                                f"import base64 as _b64, os as _os\n"
+                                                f"_os.makedirs('/sandbox', exist_ok=True)\n"
+                                                f"with open('/sandbox/{safe_name}', 'wb') as _f:\n"
+                                                f"    _f.write(_b64.b64decode('{b64}'))\n"
+                                                f"print('Injected skill file: {safe_name}')\n"
+                                            )
+                                        except Exception as sf_err:
+                                            logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
+
+                                    wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
+
+                                    start_time = time_mod.time()
+
+                                    def _run_sync():
+                                        exec_result = session.run(
+                                            wrapped_code,
+                                            libraries=libraries,
+                                            on_stdout=on_stdout,
+                                            on_stderr=on_stderr,
+                                        )
+                                        loop.call_soon_threadsafe(
+                                            queue.put_nowait,
+                                            {"type": "_done", "result": exec_result}
+                                        )
+                                        return exec_result
+
+                                    fut = loop.run_in_executor(None, _run_sync)
+
+                                    # Drain queue, streaming SSE events (SAND-05).
+                                    # Emit keepalives every 10 s when sandbox produces no output
+                                    # to prevent SSE connection timeouts on long executions.
+                                    while True:
+                                        try:
+                                            item = await asyncio.wait_for(queue.get(), timeout=10.0)
+                                        except asyncio.TimeoutError:
+                                            await queue.put(json.dumps({'type': 'keepalive'}))
+                                            continue
+                                        if item["type"] == "_done":
+                                            break
+                                        await queue.put(json.dumps(item))
+
+                                    exec_result = await fut
+                                    end_time = time_mod.time()
+                                    duration_ms = int((end_time - start_time) * 1000)
+
+                                    # Emit stdout/stderr lines from result (on_stdout callbacks
+                                    # are no-ops in InteractiveSandboxSession — output only
+                                    # available after execution completes)
+                                    if exec_result.stdout:
+                                        for line in exec_result.stdout.splitlines():
+                                            await queue.put(json.dumps({'type': 'code_stdout', 'content': line}))
+                                    if exec_result.stderr:
+                                        for line in exec_result.stderr.splitlines():
+                                            await queue.put(json.dumps({'type': 'code_stderr', 'content': line}))
+
+                                    # Derive actual exit code — InteractiveSandboxSession may
+                                    # return 0 even when Python raises an exception.
+                                    # Check exec_result.exit_code first; if it's 0/None,
+                                    # scan stdout for Python error signatures.
+                                    actual_exit_code = getattr(exec_result, "exit_code", None) or 0
+                                    if actual_exit_code == 0:
+                                        stdout_text = exec_result.stdout or ""
+                                        _error_markers = (
+                                            "Traceback (most recent call last)",
+                                            "Error:",
+                                            "Exception:",
+                                            "ModuleNotFoundError",
+                                            "ImportError",
+                                            "SyntaxError",
+                                            "NameError",
+                                            "TypeError",
+                                            "ValueError",
+                                            "RuntimeError",
+                                            "AttributeError",
+                                            "KeyError",
+                                            "IndexError",
+                                        )
+                                        if any(m in stdout_text for m in _error_markers):
+                                            actual_exit_code = 1
+
+                                    # Log execution to DB (SAND-09)
+                                    exec_row = await aexec(
+                                        supabase.table("code_executions").insert({
+                                            "thread_id": thread_id,
+                                            "user_id": current_user["id"],
+                                            "code": code,
+                                            "exit_code": actual_exit_code,
+                                            "duration_ms": duration_ms,
+                                        })
                                     )
+                                    execution_id = exec_row.data[0]["id"] if exec_row.data else None
+
+                                    # Harvest output files from container (SAND-07, SAND-08)
+                                    output_file_list = []
+                                    if execution_id and actual_exit_code == 0:
+                                        output_file_list = harvest_output_files(
+                                            session, execution_id, current_user["id"], supabase
+                                        )
+
+                                    # Emit completion event (SAND-06) with file list
+                                    await queue.put(json.dumps({'type': 'code_execution_complete', 'exit_code': actual_exit_code, 'duration_ms': duration_ms, 'execution_id': execution_id, 'output_files': output_file_list}))
+
+                                    exec_status = "completed" if actual_exit_code == 0 else "error"
+                                    tool_result = json.dumps({
+                                        "status": exec_status,
+                                        "exit_code": actual_exit_code,
+                                        "duration_ms": duration_ms,
+                                        "execution_id": execution_id,
+                                        "output_files": output_file_list,
+                                        "stdout": exec_result.stdout or "",
+                                        "stderr": exec_result.stderr or "",
+                                    })
+                                    # Strip signed URLs from LLM context — frontend shows download cards
+                                    llm_tool_content = json.dumps({
+                                        "status": exec_status,
+                                        "exit_code": actual_exit_code,
+                                        "duration_ms": duration_ms,
+                                        "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
+                                        "stdout": exec_result.stdout or "",
+                                        "stderr": exec_result.stderr or "",
+                                    })
+                                    asyncio.create_task(write_audit_entry(
+                                        user_id=current_user["id"],
+                                        action_type="code.execute",
+                                        metadata={"thread_id": thread_id, "language": args.get("language", "python")},
+                                        supabase=supabase,
+                                    ))
+                                except Exception as exec_err:
+                                    logger.error("execute_code failed: %s", exec_err)
+                                    await queue.put(json.dumps({'type': 'code_execution_complete', 'exit_code': 1, 'error': str(exec_err), 'duration_ms': 0, 'output_files': []}))
+                                    tool_result = json.dumps({"status": "error", "error": str(exec_err)})
+                            elif tool_name == "remember":
+                                # Phase 33 MEM-01: store user preference/fact across threads
+                                # D-01 upsert, D-02 case-insensitive, D-16 non-blocking, D-17 silent fail
+                                key = (args.get("key", "") or "").strip().lower()
+                                value = args.get("value", "") or ""
+
+                                if not key:
+                                    # Pitfall 3: empty key must not reach DB
+                                    tool_result = json.dumps({"error": "key cannot be empty"})
                                 else:
-                                    tool_result = "No memories stored yet."
+                                    tool_result = json.dumps({"status": "remembered", "key": key})
 
-                            asyncio.create_task(write_audit_entry(
-                                user_id=current_user["id"],
-                                action_type="memory.recall",
-                                metadata={"key": key or None},
-                                supabase=supabase,
-                            ))
-                        elif tool_name == "query_tables":
-                            # MODAL-03 Phase 36: query structured table data from documents
-                            from app.services.multimodal_service import handle_query_tables  # noqa: PLC0415
-                            tool_result = await handle_query_tables(args, current_user["id"], supabase)
+                                    async def _write_memory(
+                                        _key: str = key,
+                                        _value: str = value,
+                                        _uid: str = current_user["id"],
+                                    ) -> None:
+                                        try:
+                                            await aexec(
+                                                supabase.table("user_memory").upsert(
+                                                    {
+                                                        "user_id": _uid,
+                                                        "key": _key,
+                                                        "value": _value,
+                                                    },
+                                                    on_conflict="user_id,key",
+                                                )
+                                            )
+                                        except Exception as exc:
+                                            logger.warning(
+                                                "memory.remember write failed [user=%s key=%s]: %s",
+                                                _uid, _key, exc,
+                                            )
+
+                                    asyncio.create_task(_write_memory())
+                                    asyncio.create_task(write_audit_entry(
+                                        user_id=current_user["id"],
+                                        action_type="memory.remember",
+                                        metadata={"key": key, "value": value, "action": "upsert"},
+                                        supabase=supabase,
+                                    ))
+
+                            elif tool_name == "recall":
+                                # Phase 33 MEM-01: retrieve stored memory entries
+                                # D-09 (all), D-10 (specific), D-11 (not found), D-12 (empty)
+                                key = (args.get("key", "") or "").strip().lower()
+
+                                if key:
+                                    resp = await aexec(
+                                        supabase.table("user_memory")
+                                        .select("value")
+                                        .eq("user_id", current_user["id"])
+                                        .eq("key", key)
+                                        .maybe_single()
+                                    )
+                                    row = resp.data if resp else None
+                                    # Pitfall 5: maybe_single() mock compatibility
+                                    if isinstance(row, list):
+                                        row = row[0] if row else None
+                                    if row:
+                                        tool_result = row["value"]
+                                    else:
+                                        tool_result = f"No memory entry found for key: {key}"
+                                else:
+                                    _rows_resp = await aexec(
+                                        supabase.table("user_memory")
+                                        .select("key, value")
+                                        .eq("user_id", current_user["id"])
+                                        .order("updated_at", desc=True)
+                                    )
+                                    rows = _rows_resp.data or []
+                                    if rows:
+                                        tool_result = "\n".join(
+                                            f"- {r['key']}: {r['value']}" for r in rows
+                                        )
+                                    else:
+                                        tool_result = "No memories stored yet."
+
+                                asyncio.create_task(write_audit_entry(
+                                    user_id=current_user["id"],
+                                    action_type="memory.recall",
+                                    metadata={"key": key or None},
+                                    supabase=supabase,
+                                ))
+                            elif tool_name == "query_tables":
+                                # MODAL-03 Phase 36: query structured table data from documents
+                                from app.services.multimodal_service import handle_query_tables  # noqa: PLC0415
+                                tool_result = await handle_query_tables(args, current_user["id"], supabase)
+                            else:
+                                tool_result = f"Unknown tool: {tool_name}"
+                        except json.JSONDecodeError:
+                            tool_result = "Error parsing tool arguments"
+                            args = {}
+                        except (ValueError, RuntimeError) as e:
+                            logger.error("Tool %s failed: %s", tool_name, e)
+                            tool_result = f"Tool error: {e}"
+                        except Exception as e:
+                            logger.error("Tool %s unexpected error: %s", tool_name, e)
+                            tool_result = f"Tool execution failed: {e}"
+
+                        await queue.put(json.dumps({'type': 'tool_end', 'name': tool_name, 'result': tool_result[:2000]}))
+
+                        # GEN-03: Store full tool result — no character cap.
+                        # trim_messages_to_fit() drops OLDER messages when context budget is exceeded.
+                        full_content = llm_tool_content if llm_tool_content is not None else tool_result
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc["id"],
+                            "content": full_content,
+                        })
+
+                        # Persist tool call — for execute_code rebuild from tool_result
+                        # so output_files (with signed URLs) are never lost by string truncation.
+                        # Stdout/stderr are truncated since they're not needed for reload.
+                        if tool_name == "execute_code":
+                            try:
+                                _r = json.loads(tool_result)
+                                persisted_result = json.dumps({
+                                    "status": _r.get("status", "done"),
+                                    "exit_code": _r.get("exit_code", 0),
+                                    "duration_ms": _r.get("duration_ms", 0),
+                                    "output_files": _r.get("output_files", []),
+                                    "stdout": (_r.get("stdout", ""))[:800],
+                                    "stderr": (_r.get("stderr", ""))[:200],
+                                })
+                            except (json.JSONDecodeError, AttributeError):
+                                persisted_result = tool_result[:2000]
                         else:
-                            tool_result = f"Unknown tool: {tool_name}"
-                    except json.JSONDecodeError:
-                        tool_result = "Error parsing tool arguments"
-                        args = {}
-                    except (ValueError, RuntimeError) as e:
-                        logger.error("Tool %s failed: %s", tool_name, e)
-                        tool_result = f"Tool error: {e}"
-                    except Exception as e:
-                        logger.error("Tool %s unexpected error: %s", tool_name, e)
-                        tool_result = f"Tool execution failed: {e}"
-
-                    yield f"data: {json.dumps({'type': 'tool_end', 'name': tool_name, 'result': tool_result[:2000]})}\n\n"
-
-                    # GEN-03: Store full tool result — no character cap.
-                    # trim_messages_to_fit() drops OLDER messages when context budget is exceeded.
-                    full_content = llm_tool_content if llm_tool_content is not None else tool_result
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tc["id"],
-                        "content": full_content,
-                    })
-
-                    # Persist tool call — for execute_code rebuild from tool_result
-                    # so output_files (with signed URLs) are never lost by string truncation.
-                    # Stdout/stderr are truncated since they're not needed for reload.
-                    if tool_name == "execute_code":
-                        try:
-                            _r = json.loads(tool_result)
-                            persisted_result = json.dumps({
-                                "status": _r.get("status", "done"),
-                                "exit_code": _r.get("exit_code", 0),
-                                "duration_ms": _r.get("duration_ms", 0),
-                                "output_files": _r.get("output_files", []),
-                                "stdout": (_r.get("stdout", ""))[:800],
-                                "stderr": (_r.get("stderr", ""))[:200],
-                            })
-                        except (json.JSONDecodeError, AttributeError):
                             persisted_result = tool_result[:2000]
-                    else:
-                        persisted_result = tool_result[:2000]
 
-                    persisted_tool_calls.append({
-                        "tool_call_id": tc["id"],
-                        "name": tool_name,
-                        "args": args,
-                        "result": persisted_result,
-                        "status": "done",
-                        **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
-                    })
-                # Continue to next iteration to let LLM respond with tool results in context
+                        persisted_tool_calls.append({
+                            "tool_call_id": tc["id"],
+                            "name": tool_name,
+                            "args": args,
+                            "result": persisted_result,
+                            "status": "done",
+                            **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
+                        })
+                    # Continue to next iteration to let LLM respond with tool results in context
 
-            # Fallback: if the loop ended with no content produced, emit a safe message
-            if not full_content:
-                # GEN-07: two distinct messages — context overflow vs empty model response
-                # Context overflow is caught earlier (finish_reason == "length").
-                # This branch = model returned empty content after all iterations/retries.
-                fallback = (
-                    f"*The model returned an empty response after {max_iterations} iterations. "
-                    "Try breaking the request into smaller steps or switching to a different model.*"
-                )
-                full_content += fallback
-                yield f"data: {json.dumps({'type': 'delta', 'content': fallback})}\n\n"
+                # Fallback: if the loop ended with no content produced, emit a safe message
+                if not full_content:
+                    # GEN-07: two distinct messages — context overflow vs empty model response
+                    # Context overflow is caught earlier (finish_reason == "length").
+                    # This branch = model returned empty content after all iterations/retries.
+                    fallback = (
+                        f"*The model returned an empty response after {max_iterations} iterations. "
+                        "Try breaking the request into smaller steps or switching to a different model.*"
+                    )
+                    full_content += fallback
+                    await queue.put(json.dumps({'type': 'delta', 'content': fallback}))
 
-          except APIError as e:
-              logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
-              err_str = str(e)
-              err_lower = err_str.lower()
-              # Map common API errors to actionable user messages
-              if any(kw in err_lower for kw in ("credit balance", "billing", "quota", "insufficient_quota", "rate limit", "rate_limit")):
-                  user_msg = (
-                      "*API billing or rate-limit error: your account has insufficient credits "
-                      "or has hit a usage limit. Please check your provider's billing dashboard.*"
-                  )
-              elif any(kw in err_lower for kw in ("invalid api key", "invalid_api_key", "authentication", "unauthorized", "401")):
-                  user_msg = (
-                      "*Authentication error: the API key for this provider is invalid or expired. "
-                      "Please check your API key in Settings.*"
-                  )
-              elif any(kw in err_lower for kw in ("unsupported parameter", "unsupported_parameter")):
-                  user_msg = (
-                      f"*Model parameter error: {err_str}. "
-                      "This model may not support the current configuration.*"
-                  )
-              elif any(kw in err_lower for kw in ("context", "maximum", "too long", "too large", "token limit", "overloaded")):
-                  user_msg = (
-                      "*The conversation has grown too long for this model's context window. "
-                      "Please start a new chat or reduce the amount of history.*"
-                  )
-              elif _is_transient_provider_error(e):
-                  user_msg = (
-                      "*The AI provider is temporarily unavailable. Please try again in a moment.*"
-                  )
-              else:
-                  user_msg = f"*LLM API error: {err_str}*"
-              if not full_content:
-                  full_content += user_msg
-                  yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
-              yield f"data: {json.dumps({'type': 'error', 'message': err_str})}\n\n"
-          except Exception as e:
-              logger.error("Unexpected error in event stream (thread %s): %s [%s]", thread_id, e, type(e).__name__, exc_info=True)
-              user_msg = f"*An unexpected error occurred ({type(e).__name__}). Please try again.*"
-              if not full_content:
-                  full_content += user_msg
-                  yield f"data: {json.dumps({'type': 'delta', 'content': user_msg})}\n\n"
-              yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred'})}\n\n"
+              except APIError as e:
+                  logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
+                  err_str = str(e)
+                  err_lower = err_str.lower()
+                  # Map common API errors to actionable user messages
+                  if any(kw in err_lower for kw in ("credit balance", "billing", "quota", "insufficient_quota", "rate limit", "rate_limit")):
+                      user_msg = (
+                          "*API billing or rate-limit error: your account has insufficient credits "
+                          "or has hit a usage limit. Please check your provider's billing dashboard.*"
+                      )
+                  elif any(kw in err_lower for kw in ("invalid api key", "invalid_api_key", "authentication", "unauthorized", "401")):
+                      user_msg = (
+                          "*Authentication error: the API key for this provider is invalid or expired. "
+                          "Please check your API key in Settings.*"
+                      )
+                  elif any(kw in err_lower for kw in ("unsupported parameter", "unsupported_parameter")):
+                      user_msg = (
+                          f"*Model parameter error: {err_str}. "
+                          "This model may not support the current configuration.*"
+                      )
+                  elif any(kw in err_lower for kw in ("context", "maximum", "too long", "too large", "token limit", "overloaded")):
+                      user_msg = (
+                          "*The conversation has grown too long for this model's context window. "
+                          "Please start a new chat or reduce the amount of history.*"
+                      )
+                  elif _is_transient_provider_error(e):
+                      user_msg = (
+                          "*The AI provider is temporarily unavailable. Please try again in a moment.*"
+                      )
+                  else:
+                      user_msg = f"*LLM API error: {err_str}*"
+                  if not full_content:
+                      full_content += user_msg
+                      await queue.put(json.dumps({'type': 'delta', 'content': user_msg}))
+                  await queue.put(json.dumps({'type': 'error', 'message': err_str}))
+              except Exception as e:
+                  logger.error("Unexpected error in event stream (thread %s): %s [%s]", thread_id, e, type(e).__name__, exc_info=True)
+                  user_msg = f"*An unexpected error occurred ({type(e).__name__}). Please try again.*"
+                  if not full_content:
+                      full_content += user_msg
+                      await queue.put(json.dumps({'type': 'delta', 'content': user_msg}))
+                  await queue.put(json.dumps({'type': 'error', 'message': 'An unexpected error occurred'}))
 
-          # Emit sources SSE event (deduplicated by document_id)
-          if source_refs:
-              unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
-              yield f"data: {json.dumps({'type': 'sources', 'sources': unique_sources})}\n\n"
+              # Emit sources SSE event (deduplicated by document_id)
+              if source_refs:
+                  unique_sources[:] = list({s["document_id"]: s for s in source_refs}.values())
+                  await queue.put(json.dumps({'type': 'sources', 'sources': unique_sources}))
 
-          # Emit citations event (D-03, D-07: after sources, before confidence)
-          unique_citations[:] = _deduplicate_citations(retrieved_citations)
-          if unique_citations:
-              # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
-              sse_citations = []
-              for c in unique_citations:
-                  sse_c = dict(c)
-                  if sse_c.get("passage") and len(sse_c["passage"]) > 400:
-                      sse_c["passage"] = sse_c["passage"][:400]
-                  sse_citations.append(sse_c)
-              yield f"data: {json.dumps({'type': 'citations', 'citations': sse_citations})}\n\n"
+              # Emit citations event (D-03, D-07: after sources, before confidence)
+              unique_citations[:] = _deduplicate_citations(retrieved_citations)
+              if unique_citations:
+                  # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
+                  sse_citations = []
+                  for c in unique_citations:
+                      sse_c = dict(c)
+                      if sse_c.get("passage") and len(sse_c["passage"]) > 400:
+                          sse_c["passage"] = sse_c["passage"][:400]
+                      sse_citations.append(sse_c)
+                  await queue.put(json.dumps({'type': 'citations', 'citations': sse_citations}))
 
-          # Emit confidence event (D-05, D-07: after citations, before title)
-          if similarity_scores:
-              final_avg = sum(similarity_scores) / len(similarity_scores)
-              level = _compute_confidence(final_avg)
-              disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
-              _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
-              yield f"data: {json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer})}\n\n"
+              # Emit confidence event (D-05, D-07: after citations, before title)
+              if similarity_scores:
+                  final_avg = sum(similarity_scores) / len(similarity_scores)
+                  level = _compute_confidence(final_avg)
+                  disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
+                  _confidence_slot[:] = [{"level": level, "avg_similarity": round(final_avg, 4), "disclaimer": disclaimer}]
+                  await queue.put(json.dumps({'type': 'confidence', 'level': level, 'avg_similarity': round(final_avg, 4), 'disclaimer': disclaimer}))
 
-          # Persist assistant message (normal path — before [DONE])
-          await _persist_assistant_message()
+              # Persist assistant message (normal path — before [DONE])
+              await _persist_assistant_message()
 
-          # Touch thread so it rises in updated_at ordering
-          try:
-              await aexec(supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id))
-          except Exception:
-              pass
-
-          # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
-          if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
-              first_user_msg = history_resp.data[0]["content"]
-              title, title_fallback = generate_thread_title(first_user_msg, user_settings=user_settings)
-              if title_fallback:
-                  yield f"data: {json.dumps({'type': 'fallback_model', **title_fallback})}\n\n"
+              # Touch thread so it rises in updated_at ordering
               try:
-                  await aexec(supabase.table("threads").update({"title": title}).eq("id", thread_id))
-                  yield f"data: {json.dumps({'type': 'title', 'content': title})}\n\n"
+                  await aexec(supabase.table("threads").update({"updated_at": datetime.now(timezone.utc).isoformat()}).eq("id", thread_id))
               except Exception:
                   pass
 
-          # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
-          yield f"data: {json.dumps({'type': 'done'})}\n\n"
+              # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
+              if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
+                  first_user_msg = history_resp.data[0]["content"]
+                  title, title_fallback = generate_thread_title(first_user_msg, user_settings=user_settings)
+                  if title_fallback:
+                      await queue.put(json.dumps({'type': 'fallback_model', **title_fallback}))
+                  try:
+                      await aexec(supabase.table("threads").update({"title": title}).eq("id", thread_id))
+                      await queue.put(json.dumps({'type': 'title', 'content': title}))
+                  except Exception:
+                      pass
 
-          # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
-          try:
-              from app.services.suggestion_service import generate_suggestions
-              questions, sugg_fallback = generate_suggestions(
-                  user_message=body.content,       # the user's message
-                  assistant_response=full_content,  # accumulated full response text
-                  user_settings=user_settings,
-              )
-              if sugg_fallback:
-                  yield f"data: {json.dumps({'type': 'fallback_model', **sugg_fallback})}\n\n"
-              if questions:
-                  yield f"data: {json.dumps({'type': 'suggestions', 'questions': questions[:3]})}\n\n"
-          except Exception:
-              pass  # SUG-04: failure never affects main response
+              # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
+              await queue.put(json.dumps({'type': 'done'}))
 
-          # Phase 32: True stream end — frontend returns from streamMessage
-          yield f"data: {json.dumps({'type': 'stream_end'})}\n\n"
+              # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
+              try:
+                  from app.services.suggestion_service import generate_suggestions
+                  questions, sugg_fallback = generate_suggestions(
+                      user_message=body.content,       # the user's message
+                      assistant_response=full_content,  # accumulated full response text
+                      user_settings=user_settings,
+                  )
+                  if sugg_fallback:
+                      await queue.put(json.dumps({'type': 'fallback_model', **sugg_fallback}))
+                  if questions:
+                      await queue.put(json.dumps({'type': 'suggestions', 'questions': questions[:3]}))
+              except Exception:
+                  pass  # SUG-04: failure never affects main response
 
+              # Phase 32: True stream end — frontend returns from streamMessage
+              await queue.put(json.dumps({'type': 'stream_end'}))
+
+            finally:
+                # Safety net: runs on GeneratorExit (client disconnect) or any
+                # unhandled BaseException. The guard inside _persist_assistant_message
+                # prevents a double-insert when the normal path already persisted.
+                # asyncio.shield() ensures the DB write completes even if the ASGI task
+                # is cancelled (CancelledError) before the finally block finishes.
+                async def _shielded_persist():
+                    # aexec runs in run_in_threadpool — not directly cancellable; shield is sufficient.
+                    await _persist_assistant_message()
+                try:
+                    await asyncio.shield(_shielded_persist())
+                except asyncio.CancelledError:
+                    raise   # D-059-02, RESEARCH §A5: re-raise after cleanup
         finally:
-            # Safety net: runs on GeneratorExit (client disconnect) or any
-            # unhandled BaseException. The guard inside _persist_assistant_message
-            # prevents a double-insert when the normal path already persisted.
-            # asyncio.shield() ensures the DB write completes even if the ASGI task
-            # is cancelled (CancelledError) before the finally block finishes.
-            async def _shielded_persist():
-                await _persist_assistant_message()
-            try:
-                await asyncio.shield(_shielded_persist())
-            except asyncio.CancelledError:
-                pass
+            await queue.put(None)   # SENTINEL — must be the LAST queue op, ALWAYS (Pitfall 4)
 
-    return sse_response(event_stream(_stop_event), stop_event=_stop_event)
+    # Spawn producer task — runs concurrently with the consumer below.
+    task = asyncio.create_task(agent_runner())
+
+    async def event_consumer():
+        """Thin consumer — yields queue payloads as SSE data dicts.
+
+        sse-starlette adds the `data: {payload}\n\n` framing. Producer's
+        outermost finally pushes None as a sentinel so this loop can exit
+        cleanly on natural completion. On disconnect, sse-starlette cancels
+        this consumer; we cancel the producer here so its outer finally
+        (shielded persist) runs.
+        """
+        try:
+            while True:
+                payload = await queue.get()
+                if payload is None:
+                    break
+                yield {"data": payload}
+        finally:
+            if not task.done():
+                task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass  # expected on disconnect — producer's finally already ran
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("agent_runner crashed")
+
+    return EventSourceResponse(event_consumer(), ping=15)
