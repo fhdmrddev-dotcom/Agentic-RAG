@@ -676,10 +676,13 @@ async def send_message(
 
                 # Inform the agent about tools disabled via user settings so it
                 # doesn't attempt to call them or ask clarifying questions about them.
+                # WR-06: getattr defaults guard against older user_settings rows
+                # that predate one of these flags — without the default, a schema
+                # gap would AttributeError mid-request.
                 disabled_tools: list[str] = []
-                if not user_settings.web_search_enabled:
+                if not getattr(user_settings, "web_search_enabled", True):
                     disabled_tools.append("web_search (disabled in Settings › Integrations › Web Search)")
-                if not user_settings.sandbox_enabled:
+                if not getattr(user_settings, "sandbox_enabled", True):
                     disabled_tools.append("execute_code (disabled in Settings › Integrations › Code Execution)")
                 if disabled_tools:
                     disabled_note = (
