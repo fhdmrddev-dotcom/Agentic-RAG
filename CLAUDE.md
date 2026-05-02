@@ -20,7 +20,7 @@ interface; document ingestion is a manual file-upload flow.
 - Stream chat responses via SSE
 - Stateless chat completions — store and send chat history yourself, no provider-side thread state
 - Ingestion is manual file upload only — no connectors or automated pipelines
-- Schema changes ship as numbered SQL migrations under `supabase/migrations/`. After adding a migration, regenerate the bootstrap artifact: `bash scripts/regenerate-full-schema.sh` — this rebuilds `supabase/full-schema.sql` (single-file deploy artifact for greenfield envs). Never hand-edit `full-schema.sql`.
+- Schema changes ship as numbered SQL migrations under `supabase/migrations/` at the repo root (the legacy `backend/supabase/migrations.archive/` is dead — see its README). Filenames must match `<digits>_name.sql` (e.g., `035_my_change.sql`); letter suffixes like `007b` are silently skipped by the Supabase CLI. After adding a migration, regenerate the bootstrap artifact: `bash scripts/regenerate-full-schema.sh` — this rebuilds `supabase/full-schema.sql` (single-file deploy artifact for greenfield envs). Never hand-edit `full-schema.sql`. Full setup story: `supabase/SETUP.md`.
 - Supabase Realtime is a best-effort hint, **not** a source of truth — always reconcile via fetch on (re)connect (see decision D-v2.5-03)
 - Do not run blocking I/O (e.g. `supabase-py` calls) directly inside async handlers — wrap with `run_in_threadpool` (decision D-v2.5-01)
 - Single uvicorn worker — `--workers N` masks concurrency bugs and breaks in-memory state (decision D-v2.5-02)
