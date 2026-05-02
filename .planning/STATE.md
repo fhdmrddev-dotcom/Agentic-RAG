@@ -29,7 +29,7 @@ Phase: 061
 Plan: Not started
 Status: Ready to discuss
 Last activity: 2026-05-02
-Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Locked decisions: D-v2.5-08 (Redis Streams as buffer backend). Decisions to lock during discuss: D-v2.5-09 (LLM cost mitigations — Stop button server cancel, server-side timeout default, abandoned-run TTL).
+Next action: `/gsd:discuss-phase 061` to begin Run-Backed Streaming Backend. Locked decisions: D-v2.5-08 (Redis Streams), D-v2.5-10 (STREAM-02b absorbed), D-v2.5-11 (single-feature-branch deployment + `runs` Postgres table for history). Phase 061 scope additions: migration 035_runs_table, redis>=5 dependency, /health Redis check, DELETE /runs/{id} cancel verb (in 062). Decisions to lock during discuss: D-v2.5-09 (Stop semantics specifics, server-side timeout default value, abandoned-run TTL specifics).
 
 ## Recent Completed Phases
 

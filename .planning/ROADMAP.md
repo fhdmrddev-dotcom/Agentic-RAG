@@ -133,6 +133,14 @@ Full details below in **Phase Details**.
 
 </details>
 
+## v2.5 Deployment Strategy (D-v2.5-11)
+
+**Phases 061 + 062 + 063 ship as a single feature branch merged to main as one merge commit.** No feature flags, no dual code paths, no incremental cutover.
+
+Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (frontend cuts over to run_id flow) form an atomic architectural change. Shipping 061 alone would leave the frontend POSTing-and-streaming the legacy way while the backend silently fills a Redis buffer no one reads — a partial state that's a bug-magnet for half a sprint. Feature flags would add toggle logic + dual code paths that must both work indefinitely. For a dev-stage, single-developer change, a long-lived `v2.5-stream` feature branch with all three phases merged together is cleaner: no half-state on main, no flag-flip incidents, the legacy POST-streams path gets deleted in 063 with no compatibility shim left behind.
+
+**Phase 064 (Validation Harness) and Phase 065 (Skills Test Infra)** ship independently after 063 lands.
+
 ## Phase Details
 
 ### Phase 058: Backend SSE Concurrency Fix
@@ -199,8 +207,10 @@ Full details below in **Phase Details**.
   2. The SSE response handler reads from the Redis Stream with `XREAD STREAMS run:{id} {offset}` semantics — the handler is a thin consumer; killing it does NOT kill the producer.
   3. If the original POST connection drops (client navigates, refreshes, network blips), the agent task continues to completion and the buffer is filled. Verified via instrumentation: producer writes the full event sequence even when no consumer is attached.
   4. Run TTL: a completed run's buffer auto-expires after a configurable retention window (default 10 min); aborted/failed runs expire faster (default 60s) to bound storage.
-  5. No regression in 058/059 binding tests: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and `test_059_disconnect.py` still pass — single-thread happy path latency profile unchanged.
-  6. Existing tests in 060's e2e harness (`060-thread-race.spec.ts`) still pass — STREAM-02a guarantees preserved.
+  5. **Run history persistence (per D-v2.5-11):** a new Postgres table `public.runs` records run lifecycle metadata (`run_id`, `thread_id`, `user_id`, `message_id`, `status`, `model`, `provider`, `started_at`, `completed_at`, `input_tokens`, `output_tokens`, `error`) with full RLS. Producer task writes a row at run start and updates it at completion/failure/cancellation. This persists *after* the Redis buffer expires so audit, debugging, and future billing/usage UI have ground truth. Lands as migration `035_runs_table.sql` and is included in the regenerated `full-schema.sql`.
+  6. Backend dependency: `redis>=5` added to `backend/requirements.txt`; `/health` endpoint extended with a Redis ping check that returns `{"redis": "ok" | "unreachable"}`.
+  7. No regression in 058/059 binding tests: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and `test_059_disconnect.py` still pass — single-thread happy path latency profile unchanged.
+  8. Existing tests in 060's e2e harness (`060-thread-race.spec.ts`) still pass — STREAM-02a guarantees preserved.
 **Plans**: TBD
 **Risks / pitfalls**:
   - Redis Stream is new infra. Add `REDIS_URL` env var; document Upstash free tier setup in DEPLOYMENT.md or equivalent. Confirm Redis client library choice (`redis-py` async API) early — `redis.asyncio.Redis` is the modern path.
@@ -214,11 +224,12 @@ Full details below in **Phase Details**.
 **Depends on**: Phase 061
 **Requirements**: STREAM-04 (API layer)
 **Success Criteria** (what must be TRUE):
-  1. `GET /threads/{thread_id}/active-runs` returns either an empty list or `[{run_id, started_at, current_offset, status: "streaming" | "completed" | "failed"}]` for the requesting user's thread (RLS enforced).
+  1. `GET /threads/{thread_id}/active-runs` returns either an empty list or `[{run_id, started_at, current_offset, status: "streaming" | "completed" | "failed"}]` for the requesting user's thread. Backed by the `public.runs` table (Phase 061 deliverable) — query by `thread_id` + status filter — and falls back to Redis active-set check if Postgres write hasn't landed yet. RLS enforced via Supabase auth.
   2. `GET /runs/{run_id}/stream?since={offset}` opens an SSE response that: (a) replays events from `offset` (default 0) up to the current head of the stream, (b) live-tails new events as the producer writes them, (c) emits a terminal `done` (or `error`) event and closes when the producer finishes, (d) supports the same auth headers + `request.is_disconnected()` polling pattern as the existing endpoint.
-  3. Two concurrent consumers of the same `run_id` each receive the full event sequence independently — multi-tab fan-out works at the API layer.
-  4. Auth + RLS: a user can only query active-runs and replay streams for runs they own (verified by integration test against Supabase Auth + RLS policy).
-  5. The original `POST /threads/{thread_id}/messages` endpoint either returns `{message_id, run_id}` immediately (no streaming over POST) OR keeps backward-compatible streaming for a deprecation window — decision deferred to /gsd:discuss-phase 062.
+  3. **`DELETE /runs/{run_id}` cancel verb**: authenticated user can cancel an in-flight run they own. Endpoint cancels the producer task (asyncio cancellation), sets the `runs.status` row to `cancelled` in Postgres, writes a terminal `cancelled` event to the Redis Stream so all attached consumers close cleanly, and returns 204. Idempotent: cancelling an already-completed/failed/cancelled run returns 204 without side effects.
+  4. Two concurrent consumers of the same `run_id` each receive the full event sequence independently — multi-tab fan-out works at the API layer.
+  5. Auth + RLS: a user can only query active-runs, replay streams, or cancel runs they own (verified by integration test against Supabase Auth + RLS policy on `public.runs`).
+  6. The original `POST /threads/{thread_id}/messages` endpoint either returns `{message_id, run_id}` immediately (no streaming over POST) OR keeps backward-compatible streaming for a deprecation window — decision deferred to /gsd:discuss-phase 062.
 **Plans**: TBD
 **Risks / pitfalls**:
   - SSE consumer with offset cursor: `XREAD COUNT N STREAMS run:{id} {offset}` returns immediately if events exist; need to fall through to `XREAD BLOCK ms STREAMS run:{id} $` for live tail. Two-mode loop (replay-then-tail) is the canonical pattern.
