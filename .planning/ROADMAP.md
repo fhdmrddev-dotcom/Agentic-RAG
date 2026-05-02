@@ -158,7 +158,10 @@ Full details below in **Phase Details**.
   2. The custom `SSEStreamingResponse` subclass is replaced by `sse-starlette`'s `EventSourceResponse` with `request.is_disconnected()` polling for active disconnect detection.
   3. When a client disconnects mid-stream (close tab, F5, drop network), backend logs show the agent task receives `CancelledError` within 1 second of the disconnect, no further LLM API calls fire afterward, and `CancelledError` is re-raised after cleanup (not swallowed).
   4. Stop button (existing v2.4 behavior) and partial-response persistence via `asyncio.shield` continue to work — STREAM-01/STREAM-03 do not regress.
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 059-01-PLAN.md — Wave 0: Pin sse-starlette==2.4.1 + pytest-timeout in requirements.txt; create test_059_disconnect.py with helper scaffolding (slow-mock-LLM, LLMCallCounter, _read_then_disconnect) and failing placeholders.
+  - [ ] 059-02-PLAN.md — Wave 1: Lift event_stream body into agent_runner producer task; wire asyncio.Queue + EventSourceResponse(ping=15) consumer; change CancelledError pass→raise; delete backend/app/responses.py.
+  - [ ] 059-03-PLAN.md — Wave 2: Implement test_agent_task_cancels_on_disconnect (Invariants I1-I4) + test_normal_stream_unchanged smoke; create 059-VERIFICATION.md mirroring 058 format.
 **Risks / pitfalls** (from research §A3, §A5, 057-DEFERRAL.md):
   - KI-001 (in-flight LLM calls only stop at `yield` points) is structurally harder than `GeneratorExit` — confirm cancellation actually interrupts the agent loop, not just the queue consumer.
   - `asyncio.shield` end-of-stream persistence must still run; cancellation needs to flow only into the agent loop, not into the persistence write.
@@ -234,7 +237,7 @@ Full details below in **Phase Details**.
 | 56.1. Agent Feedback Gaps | v2.4 | 3/3 | Complete | 2026-04-29 |
 | 57. SSE Realtime Reconnect Fix | v2.4 | 2/2 | Deferred | — |
 | 058. Backend SSE Concurrency Fix | v2.5 | 3/3 | Complete | 2026-05-01 |
-| 059. SSE Architecture Refactor | v2.5 | 0/0 | Not started | — |
+| 059. SSE Architecture Refactor | v2.5 | 0/3 | Planned | — |
 | 060. Frontend Race Fixes | v2.5 | 0/0 | Not started | — |
 | 061. Reconnect Handlers | v2.5 | 0/0 | Not started | — |
 | 062. Validation Harness | v2.5 | 0/0 | Not started | — |
