@@ -24,7 +24,7 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread } = useMessages()
+  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, setViewingThread } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -65,47 +65,29 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-useEffect(() => {
+  useEffect(() => {
+    // D-060-08: setViewingThread is the FIRST action — it must run before any concurrent
+    // loadMessages resolution checks activeThreadIdRef. Sole writer per D-060-01.
+    setViewingThread(thread?.id ?? null)
     if (!thread) {
       clearMessages()
-      unsubscribeFromThread()
       return
     }
     // Skip clear+load when handleSend just created this thread — sendMessage is
     // already streaming into it and clearMessages() would wipe the optimistic
-    // messages and abort the SSE connection, causing a blank chat.
+    // messages, causing a blank chat.
     if (justCreatedThreadRef.current === thread.id) {
       justCreatedThreadRef.current = null
       return
     }
-    // Clear stale messages from previous thread before loading new ones
-    clearMessages()
     abortStream()
+    clearMessages()
     loadMessages(thread.id).catch(console.error)
-    subscribeToThread(thread.id)
-
-    // Fix F fallback: backend may still be persisting (asyncio.shield) when this
-    // effect runs after an F5 mid-stream. Reload once after 8s as a safety net in
-    // case the Realtime INSERT fires before the subscription is fully established.
-    const fallbackTimer = setTimeout(() => {
-      loadMessages(thread.id).catch(console.error)
-    }, 8000)
-
-    // Fix E: reload messages when the user switches back to this tab, in case the
-    // stream finished while the tab was in the background.
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        loadMessages(thread.id).catch(console.error)
-      }
-    }
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-
-    return () => {
-      unsubscribeFromThread()
-      clearTimeout(fallbackTimer)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [thread?.id, loadMessages, abortStream, clearMessages, subscribeToThread, unsubscribeFromThread])
+    // Phase 060 deletes the 8s fallback timer (D-060-07b) and the tab-visibility
+    // listener (D-060-07c). Phase 061 reintroduces tab-switch + F5 recovery via the
+    // proper polling/tab-visibility/pageshow mechanism on this clean foundation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread?.id])
 
   const handleSend = async (content: string) => {
     let activeThread = thread

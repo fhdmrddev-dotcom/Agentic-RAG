@@ -63,7 +63,6 @@ export function useMessages(): UseMessages {
     const controller = new AbortController()
     loadAbortRef.current = controller
     try {
-      // @ts-expect-error - getMessages gains its `signal` parameter in plan 060-02
       const data = await getMessages(threadId, controller.signal)
       // D-060-02: read activeThreadIdRef ONLY after await — discards cross-thread responses.
       // (setViewingThread, the sole writer, runs in ChatArea before any concurrent loadMessages
