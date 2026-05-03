@@ -30,7 +30,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 **Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
 **Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
-**Known tech debt:** STREAM-02a closed by Phase 060 (frontend race fixes); STREAM-04 (run-backed streaming for Claude/ChatGPT-class refresh + multi-tab + navigate-away survival) scoped to v2.5 phases 061 (Run-Backed Streaming Backend with Redis Streams per D-v2.5-08), 062 (Replay & Tail API), 063 (Frontend Stream Decoupling — also delivers STREAM-02b); 064 validates the chain; 065 (Skills Test Infra Repair) parallel-able. SKILL-01/02 (catalog full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
+**Known tech debt:** STREAM-02a closed by Phase 060 (frontend race fixes); STREAM-04 (run-backed streaming for Claude/ChatGPT-class refresh + multi-tab + navigate-away survival) scoped to v2.5 phases 061 (Run-Backed Streaming Backend with Redis Streams per D-v2.5-08 — closed 2026-05-02), 061.1 (residual cleanup — closed 2026-05-03; ERR_INCOMPLETE_CHUNKED_ENCODING root-caused as sse-starlette ping race and fixed via `ping=None`, live-validated through Chrome MCP), 062 (Replay & Tail API), 063 (Frontend Stream Decoupling — also delivers STREAM-02b); 064 validates the chain; 065 (Skills Test Infra Repair) parallel-able. SKILL-01/02 (catalog full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
 
 ## Requirements
 
@@ -264,4 +264,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-02 — Phase 060 shipped (STREAM-02a closed); v2.5 milestone rescoped to deliver STREAM-04 (Claude/ChatGPT-class run-backed streaming): added Phase 063 (Frontend Stream Decoupling), rescoped Phase 061 (Run-Backed Streaming Backend) and Phase 062 (Replay & Tail API), renumbered prior 062→064 and 063→065; D-v2.5-08 (Redis Streams) and D-v2.5-10 (STREAM-02b absorbed) locked*
+*Last updated: 2026-05-03 — Phase 061.1 shipped (Run-Backed Streaming Cleanup): S1 ERR_INCOMPLETE_CHUNKED_ENCODING root-caused as sse-starlette ping=15 race during burst→quiet sub-agent flows and fixed via `ping=None` (Branch B, live-validated through Chrome MCP); WR-01 cursor-`$`-race fixed with 3 regression tests; IN-03 nonlocal mutation eliminated; IN-04 event_consumer lifted to module level; redis-py pin tightened to <6; await_producer_finalized helper closes 5 S2 race windows. 12 atomic commits, 18/18 must-haves verified*
