@@ -835,7 +835,6 @@ async def send_message(
                 unique_citations: list[dict] = []       # Deduplicated citations (closure-accessible)
                 _confidence_slot: list[dict] = []       # Confidence result (closure-accessible for persist)
                 _message_persisted = False  # guard against double-insert
-                _persisted_msg_id: str | None = None  # captured by _persist_assistant_message for runs.message_id
                 _empty_retries = 0  # tracks empty-response retries across all iterations
 
                 async def _persist_assistant_message() -> str | None:
@@ -844,10 +843,16 @@ async def send_message(
                     Phase 061 (D-061-05): returns the inserted message_id (or the
                     cached one on subsequent calls) so the producer's shielded
                     finalizer can populate runs.message_id in the UPDATE.
+
+                    Phase 061.1 IN-03 (D-061.1-09): the cached id lives on the
+                    function object as `_persist_assistant_message._cached_id`
+                    instead of a `nonlocal` slot in send_message scope. The
+                    shielded finalizer captures the return value into its own
+                    local — no second nonlocal reaches into send_message.
                     """
-                    nonlocal _message_persisted, _persisted_msg_id
+                    nonlocal _message_persisted
                     if _message_persisted:
-                        return _persisted_msg_id
+                        return getattr(_persist_assistant_message, "_cached_id", None)
                     _message_persisted = True
                     if not full_content and not persisted_tool_calls:
                         logger.warning(
@@ -873,13 +878,15 @@ async def send_message(
                         row["confidence_level"] = c["level"]
                         row["confidence_avg_similarity"] = c["avg_similarity"]
                         row["confidence_disclaimer"] = c["disclaimer"]
+                    _cached_id: str | None = None
                     try:
                         _resp = await aexec(supabase.table("messages").insert(row))
                         if _resp and getattr(_resp, "data", None):
-                            _persisted_msg_id = _resp.data[0].get("id")
+                            _cached_id = _resp.data[0].get("id")
                     except Exception as e:
                         logger.error("Failed to persist assistant message: %s", e)
-                    return _persisted_msg_id
+                    _persist_assistant_message._cached_id = _cached_id  # type: ignore[attr-defined]
+                    return _cached_id
 
                 def _strip_nul(obj):
                     """Recursively strip PostgreSQL-illegal null bytes (\\x00) from strings."""
@@ -1981,14 +1988,15 @@ async def send_message(
                     # on the Redis client (Plan 01, Pitfall 7) prevents this block
                     # from hanging on a dead Redis socket.
                     async def _shielded_finalize():
-                        nonlocal _persisted_msg_id
+                        # IN-03 (D-061.1-09): _persist_assistant_message owns the
+                        # cached id on its own function attribute. We capture the
+                        # return value here as a local — no nonlocal reaches into
+                        # send_message scope. Idempotency is preserved via the
+                        # _message_persisted guard inside _persist_assistant_message.
                         # 1. SHIELDED PERSIST — preserves 058/059 contract.
-                        # _persist_assistant_message returns the inserted message_id (or
-                        # the cached one if already persisted on the normal path above).
+                        _msg_id_for_runs: str | None = None
                         try:
-                            _msg_id = await _persist_assistant_message()
-                            if _msg_id and not _persisted_msg_id:
-                                _persisted_msg_id = _msg_id
+                            _msg_id_for_runs = await _persist_assistant_message()
                         except BaseException:
                             logger.exception("Shielded persist failed for run %s", run_id)
 
@@ -2012,7 +2020,7 @@ async def send_message(
                                 "status": _terminal_status,
                                 "error": _terminal_error,
                                 "completed_at": "now()",
-                                "message_id": _persisted_msg_id,
+                                "message_id": _msg_id_for_runs,
                                 # input_tokens/output_tokens: filled if SDK surfaced usage; NULL otherwise (RESEARCH.md Q1)
                             }).eq("run_id", str(run_id)))
                         except BaseException:
