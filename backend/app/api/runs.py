@@ -119,8 +119,26 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                 for entry_id, fields in entries:
                     try:
                         last_id = entry_id  # advance cursor (Pitfall 1)
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
+                        # WR-05 fix: defensive .get("data") instead of fields["data"].
+                        # Producers always wrap payloads in {"data": <json>}, but a
+                        # future migration / misbehaving producer / cross-version
+                        # backfill that writes an envelope-less entry would raise
+                        # KeyError, get caught by the BaseException handler, and
+                        # kill the SSE stream silently mid-replay. Skip malformed
+                        # entries with a logged warning and continue — the consumer
+                        # still terminates cleanly on the next valid sentinel.
+                        data_field = fields.get("data")
+                        if data_field is None:
+                            logger.warning(
+                                "replay_tail_consumer skipping envelope-less entry "
+                                "%s for run %s (fields=%r)",
+                                entry_id,
+                                run_id,
+                                list(fields.keys()),
+                            )
+                            continue
+                        yield {"data": data_field}
+                        payload = json.loads(data_field)
                         if payload.get("type") in TERMINAL_TYPES:
                             return
                     except BaseException:
@@ -179,8 +197,19 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                 for entry_id, fields in entries:
                     try:
                         last_id = entry_id
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
+                        # WR-05 fix: same defensive .get("data") pattern as Phase 1.
+                        data_field = fields.get("data")
+                        if data_field is None:
+                            logger.warning(
+                                "replay_tail_consumer skipping envelope-less entry "
+                                "%s for run %s (fields=%r)",
+                                entry_id,
+                                run_id,
+                                list(fields.keys()),
+                            )
+                            continue
+                        yield {"data": data_field}
+                        payload = json.loads(data_field)
                         if payload.get("type") in TERMINAL_TYPES:
                             return
                     except BaseException:
