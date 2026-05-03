@@ -2129,4 +2129,13 @@ async def send_message(
             # inverted in 061; D-061-16 documents this in test_059.)
             pass
 
-    return EventSourceResponse(event_consumer(), ping=15)
+    # H2 (D-061.1-04): disable sse-starlette ping to eliminate the keep-alive
+    # injection race during burst→quiet patterns (e.g., sub-agent flows that
+    # emit ~1000 sub_agent_delta events then go briefly idle). The ping task
+    # writes a `:ping <ts>\n\n` comment-line on the same Send channel as the
+    # data generator and can interleave incorrectly under burst load,
+    # producing malformed chunked frames that the browser surfaces as
+    # ERR_INCOMPLETE_CHUNKED_ENCODING. We don't need keep-alive: the producer
+    # survives consumer disconnect (D-v2.5-08) and Phase 063 owns the frontend
+    # reattach mechanism (D-v2.5-05) for genuinely-idle reconnection.
+    return EventSourceResponse(event_consumer(), ping=None)
