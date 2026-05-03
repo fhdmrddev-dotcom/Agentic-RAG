@@ -1,21 +1,287 @@
-import { useState, useCallback, useRef } from "react"
-import type { Message, ToolCall, OutputFile } from "../types"
-import { getMessages, streamMessage } from "../lib/api"
+import { useState, useCallback, useRef, useEffect } from "react"
+import type { Message, ToolCall, OutputFile, SourceReference, Citation } from "../types"
+// eslint-disable-next-line prettier/prettier
+import { getMessages, postMessage, subscribeToRun, getActiveRuns, cancelRun, type StreamCallbacks } from "../lib/api"
 
 interface UseMessages {
   messages: Message[]
   isStreaming: boolean
   fallbackNotice: string | null
   loadMessages: (threadId: string) => Promise<void>
-  sendMessage: (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => Promise<void>
-  stopStreaming: () => void
+  sendMessage: (
+    threadId: string,
+    content: string,
+    model?: string,
+    onTitleUpdate?: (title: string) => void,
+    agentMode?: string,
+    provider?: string,
+  ) => Promise<void>
+  /** Phase 063 (D-063-03): server-side Stop via DELETE /runs/{rid}; now async. */
+  stopStreaming: () => Promise<void>
+  /** Kept for loadMessages-cancel paths only (D-060-03 invariants). NOT used for stream cancellation in Phase 063. */
   abortStream: () => void
   clearMessages: () => void
   setViewingThread: (threadId: string | null) => void
+  /** Phase 063 (Pattern 2): on (re)connect — fetches active-runs in PARALLEL with loadMessages and reattaches placeholder + SSE consumer for any in-flight runs not already in subscriptionsRef. */
+  reconcile: (threadId: string) => Promise<void>
+  /** Phase 063 (Pattern 4 / D-063-04): re-POSTs the user message immediately preceding the failed assistant message. Explicit user intent only — never auto-fired. */
+  resumeFromFailed: (failedMessage: Message) => Promise<void>
 }
 
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random()}`
+}
+
+/** Phase 063: shared callback factory for both sendMessage and reconcile. Builds a
+ * StreamCallbacks bag whose setMessages map-updates target a specific assistant
+ * message id (assistantId / placeholderId). The body mirrors the legacy
+ * POST-stream callback wiring one-for-one — same setMessages map-update shape
+ * for every event type — so MessageItem rendering is unchanged.
+ *
+ * onTerminal is ALWAYS provided (Phase 062 TERMINAL_TYPES contract). The caller
+ * (sendMessage / reconcile) wraps this to flip runStatus + handle Pitfall 8
+ * buffer_expired fallback BEFORE calling our internal default (which is a no-op).
+ */
+function makeStreamCallbacks(opts: {
+  assistantId: string
+  threadId: string
+  onTitleUpdate?: (title: string) => void
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  setFallbackNotice: React.Dispatch<React.SetStateAction<string | null>>
+}): StreamCallbacks {
+  const { assistantId, onTitleUpdate, setMessages, setFallbackNotice } = opts
+  return {
+    onDelta: (delta) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m,
+        ),
+      )
+    },
+    onDone: () => {
+      // Clear planning flag when stream ends — prevents stuck spinner
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
+      )
+    },
+    onTerminal: () => {
+      // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
+    },
+    onTitleUpdate,
+    // onToolPreparing — D-01/D-02 (Phase 56.1): creates a "preparing" placeholder entry
+    // immediately when the tool name is known, before arguments finish streaming.
+    onToolPreparing: (name: string, index: number) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          // Deduplicate on the synthetic id (preparing-{index}), not on name.
+          // Keying on name silently drops the second tool_preparing for same-named parallel calls.
+          const preparingId = `preparing-${index}`
+          const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
+          if (alreadyPreparing) return m
+          const preparingEntry: ToolCall = {
+            id: preparingId,
+            name,
+            args: {},
+            status: "preparing",
+            startedAt: undefined,
+          }
+          return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
+        }),
+      )
+    },
+    // onToolStart — clear planning flag; upgrade preparing entry to running, or append if none
+    onToolStart: (name, args) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const existingCalls = m.tool_calls ?? []
+          const preparingIdx = existingCalls.findIndex(
+            (tc) => tc.name === name && tc.status === "preparing",
+          )
+          let updatedCalls: ToolCall[]
+          if (preparingIdx !== -1) {
+            // Upgrade the preparing entry to running in place (preserves ordering)
+            updatedCalls = existingCalls.map((tc, i) =>
+              i === preparingIdx
+                ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
+                : tc,
+            )
+          } else {
+            // No preparing entry — append new running entry (fallback for race/reconnect).
+            // Include a stable id so tool_end's name-match still works if it tries to match by id.
+            updatedCalls = [
+              ...existingCalls,
+              {
+                id: `running-${Date.now()}`,
+                name,
+                args,
+                status: "running" as const,
+                startedAt: Date.now(),
+              },
+            ]
+          }
+          return { ...m, isPlanning: false, tool_calls: updatedCalls }
+        }),
+      )
+    },
+    // onToolEnd
+    onToolEnd: (name, result) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === name && tc.status === "running"
+              ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    // onSubAgentStart
+    onSubAgentStart: (filename, task) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
+            : m,
+        ),
+      )
+    },
+    // onSubAgentDelta
+    onSubAgentDelta: (text) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId || !m.sub_agent) return m
+          return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
+        }),
+      )
+    },
+    // onSubAgentDone
+    onSubAgentDone: () => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId || !m.sub_agent) return m
+          return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
+        }),
+      )
+    },
+    // onSkillActivated — Phase 56 D-08/D-09: append to ordered activatedSkills array
+    // for inline rendering in ToolCallPanel. Legacy activatedSkill field retained
+    // for backward compat with components that read the single-value form.
+    onSkillActivated: (skillName) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const newActivation = {
+            type: "skill_activation" as const,
+            skillName,
+            occurredAt: Date.now(),
+          }
+          return {
+            ...m,
+            activatedSkill: skillName,
+            activatedSkills: [...(m.activatedSkills ?? []), newActivation],
+          }
+        }),
+      )
+    },
+    // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
+    onCodeExecutionStart: undefined,
+    // onCodeStdout
+    onCodeStdout: (content: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stdout" as const, content }] }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    // onCodeStderr
+    onCodeStderr: (content: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stderr" as const, content }] }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    // onCodeExecutionComplete — sets data fields only; tool_end will set status="done"
+    onCodeExecutionComplete: (
+      exitCode: number,
+      durationMs: number,
+      outputFiles: OutputFile[],
+      error?: string,
+    ) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    // onSources
+    onSources: (sources: SourceReference[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
+      )
+    },
+    // onCitations
+    onCitations: (citations: Citation[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, citations } : m)),
+      )
+    },
+    // onConfidence
+    onConfidence: (level, avgSimilarity, disclaimer) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } }
+            : m,
+        ),
+      )
+    },
+    // onSuggestions — ephemeral, like confidence (not persisted)
+    onSuggestions: (questions: string[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, suggestions: questions } : m)),
+      )
+    },
+    // onPlanning — agent finished one tool-call round, deciding next action
+    onPlanning: () => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: true } : m)),
+      )
+    },
+    // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
+    onIterationStart: (iteration: number) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, iterationCount: iteration } : m)),
+      )
+    },
+    // onFallbackModel — sub-agent retried with provider default after 404
+    onFallbackModel: (original: string, fallback: string) => {
+      setFallbackNotice(`Model ${original} unavailable — using ${fallback}.`)
+      setTimeout(() => setFallbackNotice(null), 4000)
+    },
+  }
 }
 
 export function useMessages(): UseMessages {
@@ -30,11 +296,38 @@ export function useMessages(): UseMessages {
   const streamingThreadIdRef = useRef<string | null>(null)
   const isStreamingRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
+  // Phase 063 (Pitfall 1): in-flight subscriptions keyed by run_id. Reconcile
+  // short-circuits when the run_id is already a subscriptionsRef key —
+  // guards against StrictMode double-mount + rapid visibilitychange/focus
+  // double-fires opening duplicate consumers on the same run.
+  const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
 
-  const stopStreaming = useCallback(() => {
+  // D-063-03: Stop is server-side via DELETE /runs/{rid}. The terminal
+  // 'cancelled' sentinel arrives via the open SSE subscription; the parser
+  // loop in subscribeToRun closes naturally on receiving it; cross-tab Stop
+  // falls out for free because the sentinel propagates to all attached
+  // consumers via the same Redis Stream. We do NOT abort the fetch — that
+  // would only close the consumer-side socket; the producer would keep
+  // running until natural completion or the 120s hard timeout (D-061-01).
+  const stopStreaming = useCallback(async () => {
+    // Pitfall 3: derive run_id from message state (NOT a separate ref).
+    // Refs lose track of the active run when the user navigates threads
+    // and comes back; messages always reflect the latest streaming state.
+    const streamingMsg = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && m.runStatus === "streaming")
+    const runId = streamingMsg?.runId
+    if (!runId) return
     stoppedByUserRef.current = true
-    abortControllerRef.current?.abort()
-  }, [])
+    try {
+      await cancelRun(runId)
+      // Server cancels the producer; terminal 'cancelled' sentinel arrives
+      // via the still-open SSE in subscribeToRun. The onTerminal callback
+      // inside sendMessage's closure handles UI update. Nothing more to do here.
+    } catch (err) {
+      console.error("Stop failed:", err)
+    }
+  }, [messages])
 
   const abortStream = useCallback(() => {
     abortControllerRef.current?.abort()
@@ -78,13 +371,20 @@ export function useMessages(): UseMessages {
     }
   }, [])
 
-  const sendMessage = useCallback(async (threadId: string, content: string, model?: string, onTitleUpdate?: (title: string) => void, agentMode?: string, provider?: string) => {
-if (isSendingRef.current) return
+  const sendMessage = useCallback(async (
+    threadId: string,
+    content: string,
+    model?: string,
+    onTitleUpdate?: (title: string) => void,
+    agentMode?: string,
+    provider?: string,
+  ) => {
+    if (isSendingRef.current) return
     isSendingRef.current = true
     sendGenerationRef.current += 1
     streamingThreadIdRef.current = threadId
 
-    // Optimistic user message
+    // Optimistic user message — UNCHANGED from Phase 060 (makes the UI feel instant).
     const userMsg: Message = {
       id: makeTempId(),
       thread_id: threadId,
@@ -96,7 +396,8 @@ if (isSendingRef.current) return
     }
     setMessages((prev) => [...prev, userMsg])
 
-    // Placeholder assistant message for streaming
+    // Optimistic assistant placeholder — extended with runId/runStatus per
+    // RESEARCH Open Question 2. runId is filled in once postMessage returns.
     const assistantId = makeTempId()
     const assistantMsg: Message = {
       id: assistantId,
@@ -107,247 +408,94 @@ if (isSendingRef.current) return
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       tool_calls: [],
+      runStatus: "streaming",
     }
     setMessages((prev) => [...prev, assistantMsg])
     setIsStreaming(true)
     isStreamingRef.current = true
+
+    // Phase 063: AbortController is for the GET stream subscription ONLY for
+    // genuine timeout cases (e.g., user navigates away — close the open SSE
+    // without cancelling the run on the backend). Stop semantics use cancelRun
+    // (D-063-03), NOT this AbortController.
     const controller = new AbortController()
     abortControllerRef.current = controller
 
+    let registeredRunId: string | null = null
+
     try {
-      await streamMessage(
-      threadId,
-      content,
-      (delta) => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m)),
-        )
-      },
-      () => {
-        setIsStreaming(false)
-        // Clear planning flag when stream ends — prevents stuck spinner
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
-        )
-      },
-      model,
-      provider,
-      onTitleUpdate,
-      // onToolPreparing — D-01/D-02 (Phase 56.1): creates a "preparing" placeholder entry
-      // immediately when the tool name is known, before arguments finish streaming.
-      (name: string, index: number) => {
+      // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
+      const { run_id } = await postMessage(threadId, content, {
+        model,
+        provider,
+        agentMode,
+      })
+      registeredRunId = run_id
+
+      // Stamp run_id onto the placeholder so Stop can find it via stopStreaming.
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, runId: run_id } : m)),
+      )
+      subscriptionsRef.current.set(run_id, controller)
+
+      // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
+      // The callbacks pattern mirrors the legacy POST-stream closure — same
+      // setMessages map-update shape, but we now ALSO handle terminal events
+      // explicitly via onTerminal (NEW vs the previous one-call orchestrator).
+      const callbacks: StreamCallbacks = makeStreamCallbacks({
+        assistantId,
+        threadId,
+        onTitleUpdate,
+        setMessages,
+        setFallbackNotice,
+      })
+
+      // Override onTerminal to flip runStatus and clean up subscription map.
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        // Map TERMINAL_TYPES → runStatus enum value (literal-per-branch so future
+        // greps for `runStatus: "<value>"` find every branch).
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
-            // Deduplicate on the synthetic id (preparing-{index}), not on name.
-            // Keying on name silently drops the second tool_preparing for same-named parallel calls.
-            const preparingId = `preparing-${index}`
-            const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
-            if (alreadyPreparing) return m
-            const preparingEntry: ToolCall = {
-              id: `preparing-${index}`,
-              name,
-              args: {},
-              status: "preparing",
-              startedAt: undefined,
-            }
-            return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
+            if (kind === "done") return { ...m, runStatus: "completed" }
+            if (kind === "error") return { ...m, runStatus: "failed" }
+            // kind === "cancelled"
+            return { ...m, runStatus: "cancelled", stopped: true }
           }),
         )
-      },
-      // onToolStart — clear planning flag; upgrade preparing entry to running, or append if none
-      (name, args) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const existingCalls = m.tool_calls ?? []
-            const preparingIdx = existingCalls.findIndex(
-              (tc) => tc.name === name && tc.status === "preparing"
-            )
-            let updatedCalls: ToolCall[]
-            if (preparingIdx !== -1) {
-              // Upgrade the preparing entry to running in place (preserves ordering)
-              updatedCalls = existingCalls.map((tc, i) =>
-                i === preparingIdx
-                  ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
-                  : tc
-              )
-            } else {
-              // No preparing entry — append new running entry (fallback for race/reconnect).
-              // Include a stable id so tool_end's name-match still works if it tries to match by id.
-              updatedCalls = [...existingCalls, { id: `running-${Date.now()}`, name, args, status: "running" as const, startedAt: Date.now() }]
-            }
-            return { ...m, isPlanning: false, tool_calls: updatedCalls }
-          }),
-        )
-      },
-      // onToolEnd
-      (name, result) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const updated = (m.tool_calls ?? []).map((tc) =>
-              tc.name === name && tc.status === "running"
-                ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
-                : tc,
-            )
-            return { ...m, tool_calls: updated }
-          }),
-        )
-      },
-      // onSubAgentStart
-      (filename, task) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
-              : m,
-          ),
-        )
-      },
-      // onSubAgentDelta
-      (text) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId || !m.sub_agent) return m
-            return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
-          }),
-        )
-      },
-      // onSubAgentDone
-      () => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId || !m.sub_agent) return m
-            return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
-          }),
-        )
-      },
-      // onSkillActivated — Phase 56 D-08/D-09: append to ordered activatedSkills array
-      // for inline rendering in ToolCallPanel. Legacy activatedSkill field retained
-      // for backward compat with components that read the single-value form.
-      (skillName) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const newActivation = {
-              type: 'skill_activation' as const,
-              skillName,
-              occurredAt: Date.now(),
-            }
-            return {
-              ...m,
-              activatedSkill: skillName,
-              activatedSkills: [...(m.activatedSkills ?? []), newActivation],
-            }
-          }),
-        )
-      },
-      // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
-      undefined,
-      // onCodeStdout
-      (content: string) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const updated = (m.tool_calls ?? []).map((tc) =>
-              tc.name === "execute_code" && tc.status === "running"
-                ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stdout" as const, content }] }
-                : tc
-            )
-            return { ...m, tool_calls: updated }
-          })
-        )
-      },
-      // onCodeStderr
-      (content: string) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const updated = (m.tool_calls ?? []).map((tc) =>
-              tc.name === "execute_code" && tc.status === "running"
-                ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stderr" as const, content }] }
-                : tc
-            )
-            return { ...m, tool_calls: updated }
-          })
-        )
-      },
-      // onCodeExecutionComplete — sets data fields only; tool_end will set status="done"
-      (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => {
-        setMessages((prev) =>
-          prev.map((m) => {
-            if (m.id !== assistantId) return m
-            const updated = (m.tool_calls ?? []).map((tc) =>
-              tc.name === "execute_code" && tc.status === "running"
-                ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
-                : tc
-            )
-            return { ...m, tool_calls: updated }
-          })
-        )
-      },
-      agentMode,
-      // onSources
-      (sources) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, sources } : m)
-        )
-      },
-      // onCitations
-      (citations) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, citations } : m)
-        )
-      },
-      // onConfidence
-      (level, avgSimilarity, disclaimer) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } } : m)
-        )
-      },
-      // onSuggestions — ephemeral, like confidence (not persisted)
-      (questions) => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, suggestions: questions } : m)
-        )
-      },
-      // onPlanning — agent finished one tool-call round, deciding next action
-      () => {
-        setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, isPlanning: true } : m)
-        )
-      },
-      // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
-      (iteration: number) => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId ? { ...m, iterationCount: iteration } : m,
-          ),
-        )
-      },
-      // onFallbackModel — sub-agent retried with provider default after 404
-      (original: string, fallback: string) => {
-        setFallbackNotice(`Model ${original} unavailable — using ${fallback}.`)
-        setTimeout(() => setFallbackNotice(null), 4000)
-      },
-      controller.signal,
-    )
-    } catch (err) {
-      // Swallow abort errors — user intentionally stopped
-      if (!(err instanceof Error && err.name === "AbortError")) {
-        console.error(err)
+        // Pitfall 8: TTL-expired buffer (synthetic done with error='buffer_expired')
+        // — fall back to loadMessages so the persisted assistant message renders.
+        if (errorPayload === "buffer_expired") {
+          loadMessages(threadId).catch(console.error)
+        }
+        originalOnTerminal(kind, errorPayload)
       }
-} finally {
+
+      await subscribeToRun(run_id, "0", callbacks, controller.signal)
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        // Caller-initiated abort (rare in 063 — only for navigate-away timeouts).
+      } else {
+        console.error("sendMessage failed:", err)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, runStatus: "failed" } : m,
+          ),
+        )
+      }
+    } finally {
       abortControllerRef.current = null
       isSendingRef.current = false
       streamingThreadIdRef.current = null
       setIsStreaming(false)
-      isStreamingRef.current = false  // D-04: allow Realtime callbacks to process now
+      isStreamingRef.current = false
+      // Clean up subscriptions map entry for this run, if registered.
+      if (registeredRunId) subscriptionsRef.current.delete(registeredRunId)
 
       // Always clear planning flag on stream end
       setMessages((prev) =>
-        prev.map((m) => m.id === assistantId ? { ...m, isPlanning: false } : m)
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
       )
 
       const wasStoppedByUser = stoppedByUserRef.current
@@ -358,7 +506,7 @@ if (isSendingRef.current) return
           prev.map((m) => {
             if (m.id !== assistantId) return m
             const hasActiveTools = m.tool_calls?.some(
-              (tc) => tc.status === "running" || tc.status === "preparing"
+              (tc) => tc.status === "running" || tc.status === "preparing",
             )
             if (!hasActiveTools) return m
             return {
@@ -366,10 +514,10 @@ if (isSendingRef.current) return
               tool_calls: m.tool_calls!.map((tc) =>
                 tc.status === "running" || tc.status === "preparing"
                   ? { ...tc, status: "interrupted" as const }
-                  : tc
+                  : tc,
               ),
             }
-          })
+          }),
         )
       }
 
@@ -380,7 +528,7 @@ if (isSendingRef.current) return
           return prev.map((m) =>
             m.id === assistantId
               ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
-              : m
+              : m,
           )
         }
         return prev
@@ -388,8 +536,137 @@ if (isSendingRef.current) return
 
       // Reset stopped ref outside any state updater so it runs exactly once
       stoppedByUserRef.current = false
+      // CRITICAL Phase 060 invariant (Bug 3 guard): do NOT call loadMessages here.
+      // SSE-built content stays canonical; reconcile + onTerminal handle merge.
+    }
+  }, [loadMessages])
+
+  // Phase 063 (Pattern 2 + CONTEXT.md "Reconciliation Hook Ordering"): on
+  // every (re)connect (mount, focus, visibilitychange, pageshow), query
+  // active-runs IN PARALLEL with loadMessages (CONTEXT.md mandate: active-runs
+  // MUST resolve before loadMessages settles, otherwise the local message
+  // list will appear missing the in-flight assistant message until the next
+  // reconcile tick). For each active run not already subscribed, synthesize
+  // a placeholder assistant message and open subscribeToRun.
+  const reconcile = useCallback(async (threadId: string) => {
+    let activeRuns: Awaited<ReturnType<typeof getActiveRuns>>
+    try {
+      // CONTEXT.md "Reconciliation Hook Ordering": active-runs and messages MUST be fetched in parallel.
+      const [runs] = await Promise.all([getActiveRuns(threadId), loadMessages(threadId)])
+      activeRuns = runs
+    } catch (err) {
+      console.error("reconcile failed:", err)
+      return
+    }
+
+    for (const run of activeRuns) {
+      // Pitfall 1 short-circuit: skip if already subscribed.
+      if (subscriptionsRef.current.has(run.run_id)) continue
+      // Pitfall 3 cross-thread safety: only attach if this thread is still
+      // the viewing thread when reconcile started; setViewingThread is the
+      // sole writer (D-060-01).
+      if (activeThreadIdRef.current !== threadId) return
+
+      // Deterministic temp-id — idempotent React reconciliation (Pitfall 1).
+      // Same id across reconciles for the same run = StrictMode-safe.
+      const placeholderId = `temp-${run.run_id}`
+      const placeholder: Message = {
+        id: placeholderId,
+        thread_id: threadId,
+        user_id: "",
+        role: "assistant",
+        content: "",
+        created_at: run.started_at,
+        updated_at: run.started_at,
+        tool_calls: [],
+        runId: run.run_id,
+        runStatus: "streaming",
+      }
+      setMessages((prev) => {
+        // Idempotent insert.
+        if (prev.some((m) => m.id === placeholderId)) return prev
+        return [...prev, placeholder]
+      })
+
+      const controller = new AbortController()
+      subscriptionsRef.current.set(run.run_id, controller)
+
+      const callbacks: StreamCallbacks = makeStreamCallbacks({
+        assistantId: placeholderId,
+        threadId,
+        setMessages,
+        setFallbackNotice,
+      })
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== placeholderId) return m
+            if (kind === "done") return { ...m, runStatus: "completed" }
+            if (kind === "error") return { ...m, runStatus: "failed" }
+            // kind === "cancelled"
+            return { ...m, runStatus: "cancelled" }
+          }),
+        )
+        if (errorPayload === "buffer_expired") {
+          loadMessages(threadId).catch(console.error)
+        }
+        originalOnTerminal(kind, errorPayload)
+      }
+
+      subscribeToRun(run.run_id, "0", callbacks, controller.signal)
+        .catch((err) => {
+          if (!(err instanceof Error && err.name === "AbortError")) {
+            console.error("reconcile subscribeToRun failed:", err)
+          }
+        })
+        .finally(() => {
+          subscriptionsRef.current.delete(run.run_id)
+          // Pitfall 5 (terminal-time merge): SSE-built content stays canonical;
+          // reload DB-only fields once at terminal so confidence_*, suggestions,
+          // citations etc. land. loadMessages races against any Realtime upsert;
+          // either wins benignly per Phase 060 invariants.
+          loadMessages(threadId).catch(console.error)
+        })
+    }
+  }, [loadMessages])
+
+  // D-063-04: Resume = re-POST the original user message. The backend POST
+  // inserts a duplicate user-message row + spawns a fresh run; matches
+  // ChatGPT/Claude.ai "Regenerate" semantics. Explicit user intent only —
+  // never auto-fired (D-v2.5-05).
+  const resumeFromFailed = useCallback(async (failedMessage: Message) => {
+    // Find immediately-preceding user message in current state.
+    const idx = messages.findIndex((m) => m.id === failedMessage.id)
+    if (idx <= 0) return
+    const userMsg = messages[idx - 1]
+    if (userMsg.role !== "user") return
+    await sendMessage(failedMessage.thread_id, userMsg.content)
+  }, [messages, sendMessage])
+
+  // Hook unmount: abort all live subscriptions so we don't leak fetch readers.
+  // The producers continue server-side per D-061-15; this only closes
+  // consumer-side sockets. NEW in Phase 063 — pre-063 there was at most one
+  // long-lived stream and abortControllerRef.abort() handled it; with
+  // reconcile + multi-tab there can be N concurrent subscriptions per hook.
+  useEffect(() => {
+    return () => {
+      for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
+      subscriptionsRef.current.clear()
     }
   }, [])
 
-  return { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, setViewingThread }
+  return {
+    messages,
+    isStreaming,
+    fallbackNotice,
+    loadMessages,
+    sendMessage,
+    stopStreaming,
+    abortStream,
+    clearMessages,
+    setViewingThread,
+    reconcile,
+    resumeFromFailed,
+  }
 }
