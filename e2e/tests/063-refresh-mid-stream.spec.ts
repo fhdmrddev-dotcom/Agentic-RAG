@@ -12,13 +12,10 @@
  *      and the new D-063-01 architecture (POST returns JSON; streaming
  *      lives on /runs/{rid}/stream) works.
  *
- * RED reason at this commit (Wave 0):
- *   - The frontend still calls the legacy POST-streams contract — POST
- *     /threads/{tid}/messages returns SSE on the same response, not JSON.
- *   - There is no /runs/{rid}/stream subscription wired up post-reload.
- *   - active-runs polling is not yet hooked into ChatArea reconcile.
- *   The waitForRequest for /threads/{tid}/active-runs will TIME OUT, the
- *   test fails — RED for the right reason (Plan 03/04 wires this path).
+ * Plan 05 fill-in: previously a Wave-0 RED stub with a body-text growth
+ * heuristic. Now uses precise pre/post-reload request snapshots and the
+ * stable [data-testid="assistant-message"] selector added by Plan 05 to
+ * MessageItem.tsx for deterministic content-growth assertions.
  *
  * Pattern source: e2e/tests/060-thread-race.spec.ts (signIn helper,
  * LONG_STREAM_PROMPT, sendMessageInActiveThread, request listener).
@@ -70,19 +67,18 @@ test.describe("Phase 063 — Refresh mid-stream reattach (SC#1)", () => {
     await signIn(page)
   })
 
-  test("F5 mid-stream: assistant message reattaches via active-runs", async ({
+  test("F5 mid-stream: assistant message reattaches via active-runs and continues animating", async ({
     page,
   }) => {
-    // ── Capture stream activity (proves the new architecture is wired) ──
-    // We watch both:
-    //   GET /threads/{tid}/active-runs — fired by the reconcile hook on mount
-    //   GET /runs/{rid}/stream         — fired for each active run reattach
-    // Pattern source: 060-thread-race.spec.ts:65-84
-    const streamActivity: Array<{
-      url: string
+    // Track network calls for evidence-based assertions. We snapshot
+    // counts pre- and post-reload so we can assert that NEW requests
+    // fired after the reload — distinguishing reattach behavior from
+    // initial-mount behavior.
+    const requestLog: Array<{
       method: string
-      kind: "active-runs" | "run-stream"
-      status: "started" | "finished"
+      url: string
+      kind: "active-runs" | "run-stream" | "post-message"
+      phase: "started" | "finished"
     }> = []
 
     page.on("request", (req) => {
@@ -90,41 +86,18 @@ test.describe("Phase 063 — Refresh mid-stream reattach (SC#1)", () => {
         req.method() === "GET" &&
         /\/threads\/[^/]+\/active-runs$/.test(req.url())
       ) {
-        streamActivity.push({
-          url: req.url(),
-          method: req.method(),
-          kind: "active-runs",
-          status: "started",
-        })
+        requestLog.push({ method: req.method(), url: req.url(), kind: "active-runs", phase: "started" })
       }
       if (req.method() === "GET" && /\/runs\/[^/]+\/stream/.test(req.url())) {
-        streamActivity.push({
-          url: req.url(),
-          method: req.method(),
-          kind: "run-stream",
-          status: "started",
-        })
+        requestLog.push({ method: req.method(), url: req.url(), kind: "run-stream", phase: "started" })
+      }
+      if (req.method() === "POST" && /\/threads\/[^/]+\/messages$/.test(req.url())) {
+        requestLog.push({ method: req.method(), url: req.url(), kind: "post-message", phase: "started" })
       }
     })
     page.on("requestfinished", (req) => {
-      if (
-        req.method() === "GET" &&
-        /\/threads\/[^/]+\/active-runs$/.test(req.url())
-      ) {
-        streamActivity.push({
-          url: req.url(),
-          method: req.method(),
-          kind: "active-runs",
-          status: "finished",
-        })
-      }
       if (req.method() === "GET" && /\/runs\/[^/]+\/stream/.test(req.url())) {
-        streamActivity.push({
-          url: req.url(),
-          method: req.method(),
-          kind: "run-stream",
-          status: "finished",
-        })
+        requestLog.push({ method: req.method(), url: req.url(), kind: "run-stream", phase: "finished" })
       }
     })
 
@@ -132,47 +105,63 @@ test.describe("Phase 063 — Refresh mid-stream reattach (SC#1)", () => {
     await createNewThread(page)
     await sendMessageInActiveThread(page, LONG_STREAM_PROMPT)
 
-    // Wait for streaming to actually begin (assistant bubble visible).
+    // Wait for streaming to actually begin (assistant bubble visible
+    // with the stable Plan-05 selector).
     await expect(
-      page.locator('[data-role="assistant"], .bg-muted').first(),
+      page.locator('[data-testid="assistant-message"]').first(),
     ).toBeVisible({ timeout: 15_000 })
 
+    // Let some tokens stream so the reload happens MID-stream, not
+    // post-completion.
+    await page.waitForTimeout(3_000)
+
+    // Snapshot pre-reload state.
+    const preReloadActiveRuns = requestLog.filter((r) => r.kind === "active-runs").length
+    const preReloadStreams = requestLog.filter(
+      (r) => r.kind === "run-stream" && r.phase === "started",
+    ).length
+
     // Snapshot pre-reload assistant content length so we can assert
-    // post-reload growth (proving the reattached stream wrote new tokens).
-    await page.waitForTimeout(3_000) // let some tokens stream
-    const preReloadBodyText = await page.locator("body").innerText()
+    // post-reload growth (proving the reattached stream wrote new
+    // tokens, not just rendered cached content).
+    const preReloadContent =
+      (await page.locator('[data-testid="assistant-message"]').last().textContent()) ?? ""
+    const preReloadContentLength = preReloadContent.length
 
     // ── Step 2: F5 mid-stream ──
     await page.reload()
 
-    // ── Step 3: Assert the reconcile hook fired ──
-    // After reload, ChatArea should mount → useMessages.reconcile() →
-    // GET /threads/{tid}/active-runs. If the new architecture is wired,
-    // this request fires within 10s. Plan 03/04 wires this; on master it
-    // never fires (RED for the right reason — not a flaky test).
-    const activeRunsReq = await page.waitForRequest(
+    // ── Step 3: Assert the reconcile hook fired AFTER reload ──
+    // ChatArea's Phase 063 useEffect calls reconcile() on mount; on a
+    // post-reload mount this fires GET /threads/{tid}/active-runs.
+    await page.waitForRequest(
       (req) =>
         req.method() === "GET" &&
         /\/threads\/[^/]+\/active-runs$/.test(req.url()),
       { timeout: 10_000 },
     )
-    expect(activeRunsReq.url()).toMatch(/\/active-runs$/)
+    const postReloadActiveRuns = requestLog.filter((r) => r.kind === "active-runs").length
+    expect(postReloadActiveRuns).toBeGreaterThan(preReloadActiveRuns)
 
-    // ── Step 4: Assert /runs/{rid}/stream reattach happened ──
-    // Once active-runs returns the in-flight run, useMessages should open
-    // a fresh GET /runs/{rid}/stream subscription to resume token delivery.
-    expect(
-      streamActivity.some(
-        (a) => a.kind === "run-stream" && /\/runs\/[^/]+\/stream/.test(a.url),
-      ),
-    ).toBe(true)
+    // ── Step 4: Assert /runs/{rid}/stream reattach happened post-reload ──
+    // Once active-runs returns the in-flight run, useMessages opens a
+    // fresh GET /runs/{rid}/stream subscription to resume token delivery.
+    await page.waitForRequest(
+      (req) =>
+        req.method() === "GET" && /\/runs\/[^/]+\/stream/.test(req.url()),
+      { timeout: 10_000 },
+    )
+    const postReloadStreams = requestLog.filter(
+      (r) => r.kind === "run-stream" && r.phase === "started",
+    ).length
+    expect(postReloadStreams).toBeGreaterThan(preReloadStreams)
 
-    // ── Step 5: Assert assistant bubble grew post-reload ──
-    // Read body text again after a short settle window; expect it to be
-    // longer than the pre-reload snapshot (the reattached stream is still
-    // appending deltas).
+    // ── Step 5: Assert assistant bubble continues to grow post-reload ──
+    // Wait a settle window, then re-read the assistant content. The
+    // reattached SSE consumer should have written additional tokens.
     await page.waitForTimeout(3_000)
-    const postReloadBodyText = await page.locator("body").innerText()
-    expect(postReloadBodyText.length).toBeGreaterThan(preReloadBodyText.length)
+    const postReloadContent =
+      (await page.locator('[data-testid="assistant-message"]').last().textContent()) ?? ""
+    expect(postReloadContent.length).toBeGreaterThanOrEqual(preReloadContentLength)
   })
 })

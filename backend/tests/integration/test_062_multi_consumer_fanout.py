@@ -136,6 +136,15 @@ async def test_two_consumers_receive_identical_sequences(redis_client):
             # Step 2: extract the run_id from mock_supabase's runs INSERT
             run_id_str = _extract_run_id_from_mock(mock_supabase)
 
+            # Phase 063 D-063-01 / Pitfall 4: POST returns synchronously
+            # while the producer is still scheduling its first XADD. Give
+            # the producer a small window to enter its body so each GET
+            # stream consumer's replay phase has events to surface
+            # (otherwise consumer 2's slower start may observe an empty
+            # Redis key + runs.status='streaming' and synthesize
+            # 'buffer_expired_while_streaming' instead of tailing).
+            await asyncio.sleep(0.2)
+
             # Step 3: configure the runs SELECT mock so each consumer's
             # ownership SELECT in stream_run() returns a streaming row.
             runs_builder = mock_supabase.table("runs")

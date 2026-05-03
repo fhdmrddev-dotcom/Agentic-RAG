@@ -118,10 +118,22 @@ class LLMCallCounter:
 
 def _make_counted_chat(counter: LLMCallCounter):
     """Patch factory: each invocation records a timestamp and returns a
-    fresh slow-chunks iterator."""
+    fresh slow-chunks iterator.
+
+    Phase 063 update: extended slow-chunks lifetime (delay=0.4 × count=15
+    ≈ 6s) so the producer is reliably still running when the disconnect
+    fires. Default ``_slow_chunks()`` (5 × 0.3s ≈ 1.5s) used to suffice
+    when the disconnect was injected on the POST-SSE response within the
+    POST handler's timeline, but after 063-02 the disconnect happens on
+    a SEPARATE GET-stream request that takes time to set up; the
+    short-lived default occasionally finished BEFORE the disconnect
+    landed, making D-061-16's "XLEN grows post-disconnect" assertion
+    vacuous (xlen_at_disconnect == xlen_after because the producer was
+    already done).
+    """
     def _patched(*args, **kwargs):
         counter.record()
-        return (iter(_slow_chunks()), CallingMode.NATIVE)
+        return (iter(_slow_chunks(delay=0.4, count=15)), CallingMode.NATIVE)
     return _patched
 
 
