@@ -3,6 +3,38 @@
 **Gathered:** 2026-05-03
 **Status:** Ready for planning
 
+<inherited_concern>
+## Inherited Concern from Phase 061.1 — DEF-061.1-02
+
+**Source:** `.planning/phases/061.1-run-backed-streaming-cleanup/deferred-items.md` §DEF-061.1-02 (logged 2026-05-03 by Plan 01 executor).
+
+**Suspicion:** During the 061.1 verification sweep, 3 race tests still failed AFTER `await_producer_finalized` made them deterministic — pointing at a possible **production-code classifier bug** rather than a test-side race:
+
+- `test_failed_run_expires_60s` — asserts TTL ∈ (30, 65] for a failed run; got TTL=600 (the completed-run bucket).
+- `test_120s_timeout_fires_full_finally` — similar mismatch on terminal-status / TTL.
+- `test_producer_continues_after_consumer_disconnect` — assertion path interacts with the same finalize ordering.
+
+**Hypothesis:** the producer's exception classifier (around `threads.py:1003-1875` agent_runner) appears to coerce certain LLM exceptions into `_terminal_status='completed'` instead of `'failed'`, so the finalizer writes the wrong TTL bucket and `runs.status` enum value.
+
+**Why this matters for Phase 062:**
+- 062's `GET /threads/{thread_id}/active-runs` filters by `runs.status='streaming'` and uses the table as source of truth. If the classifier is wrong, terminal runs that should be `'failed'` may persist as `'streaming'` (because the wrong-bucket UPDATE may not happen) OR appear as `'completed'` (because they were misclassified). Either case produces phantom rows in 062's listing.
+- 062's `GET /runs/{run_id}/stream` fallback when `redis.exists` returns 0 maps `runs.status` → terminal SSE event via `_RUN_STATUS_TO_TERMINAL_TYPE`. A wrong status enum produces a wrong synthetic terminal event.
+- 062's DELETE zombie-heal path UPDATEs `status='cancelled'` — if the classifier already wrote `'completed'`, the cancel may be racey or no-op.
+
+**Recommendation for the 062 researcher / planner:**
+1. **Read** `.planning/phases/061.1-run-backed-streaming-cleanup/deferred-items.md` in full.
+2. **Investigate** whether the suspected classifier path actually mis-classifies. Concrete test: run `test_061_ttl.py::test_failed_run_expires_60s` in isolation against the current `threads.py` and inspect `mock_supabase.table("runs").update.call_args_list` to see what `status` value the producer actually writes when the LLM raises a stock `Exception`.
+3. **Decide one of three dispositions and document it in 062-PLAN.md:**
+   - **(a) Fix in 062 as a pre-requisite:** add a Plan 0 / Wave 0 task that fixes the classifier before the new endpoints land. 062's contract depends on `runs.status` being correct, so this may be the cleanest path.
+   - **(b) Insert a 061.2 cleanup phase before 062:** if the classifier fix is large enough to warrant its own atomic phase. Use `/gsd:insert-phase 061.2`.
+   - **(c) Defer further:** if investigation shows the classifier IS correct and the 3 tests fail for an orthogonal reason (e.g., the test mock raises wrong exception class). Update `deferred-items.md` with the actual root cause and proceed with 062 as currently scoped.
+
+**Disposition decision-maker:** the 062 planner. The 061.1 verifier passed 18/18 must-haves on 061.1's own scope, so DEF-061.1-02 is a real but not-061.1-blocking concern.
+
+DEF-061.1-01 (`test_normal_stream_unchanged` expects old `stream_end` event name) is pure test cleanup with no 062 implications — disposition stays "future test cleanup phase".
+
+</inherited_concern>
+
 <domain>
 ## Phase Boundary
 
