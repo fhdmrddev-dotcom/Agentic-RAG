@@ -403,15 +403,37 @@ async def cancel_run(
     # 2. Synthetic terminal sentinel — gives any attached consumer the event
     # it needs to break out of the XREAD loop. Only emitted if the buffer
     # still exists (TTL-expired runs have nothing to attach to).
+    # WR-04 fix: gate the XADD on a SETNX cancel-lock so concurrent DELETEs
+    # on the same run_id only write ONE sentinel. Two concurrent zombie-heal
+    # paths could both pass the ownership SELECT + status check, both reach
+    # this point, and both XADD a 'cancelled'+'zombie_healed' sentinel —
+    # not user-visible (consumer breaks on first), but a duplicate sentinel
+    # is still a code smell and could cause flaky tests with tight
+    # assertion counts. Lock TTL=60s matches the EXPIRE bucket below.
+    # SET NX EX is a single atomic Redis op; its own try/except per D-062-13.
+    sentinel_lock_acquired = False
     try:
-        if await redis.exists(stream_key):
-            await _emit_terminal(
-                redis, run_id, "cancelled", reason="zombie_healed"
-            )
+        sentinel_lock_acquired = bool(
+            await redis.set(f"run:{run_id}:cancel_lock", "1", nx=True, ex=60)
+        )
     except (RedisError, OSError):
         logger.exception(
-            "Zombie heal sentinel XADD failed for run %s", run_id
+            "Zombie heal cancel_lock SETNX failed for run %s", run_id
         )
+        # On lock failure, fall through and emit the sentinel anyway — the
+        # original best-effort behavior is preferred over silent degradation
+        # if Redis is misbehaving.
+        sentinel_lock_acquired = True
+    if sentinel_lock_acquired:
+        try:
+            if await redis.exists(stream_key):
+                await _emit_terminal(
+                    redis, run_id, "cancelled", reason="zombie_healed"
+                )
+        except (RedisError, OSError):
+            logger.exception(
+                "Zombie heal sentinel XADD failed for run %s", run_id
+            )
 
     # 3. ZREM both sorted sets — keeps active-runs listing honest even
     # though the producer never got to run its own ZREMs. Each in its own
