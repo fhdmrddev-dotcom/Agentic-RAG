@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sse_starlette import EventSourceResponse
 import openai
 from openai import APIError
@@ -328,101 +329,11 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
     return unique
 
 
-# Phase 061.1 IN-04 (D-061.1-10): event_consumer lifted from inside send_message
-# to module level so unit tests can drive it directly with a mock redis. Behavior
-# unchanged from the previous closure: same XREAD calls, same yield shape, same
-# deadline arithmetic, same TERMINAL_TYPES break logic. The defensive H1 wrapper
-# bundled by 061.1-DIAGNOSIS.md is included around the inner per-entry yield
-# bodies so future regressions of D-v2.5-08 (silent generator aborts) become
-# observable in logs.
-async def event_consumer(redis, run_id: _uuid_mod.UUID, settings):
-    """Two-mode XREAD consumer (D-061-12) — module-level (IN-04).
-
-    Phase 061 contract inversion (D-061-03): killing the consumer
-    does NOT kill the producer. This generator's finally MUST NOT
-    cancel the producer task — the producer's lifetime is independent
-    and bounded by asyncio.timeout (D-061-01).
-
-    Replay phase reads any backlog with COUNT 100 STREAMS run:{id} 0;
-    tail phase live-tails with BLOCK 5000 carrying last_id forward
-    (WR-01 D-061.1-07: no `$` reset between phases).
-    Breaks on first entry whose data.type is in TERMINAL_TYPES.
-    Defensive deadline = run_hard_timeout_seconds + 10 catches
-    producer-crash-without-sentinel.
-
-    H1 wrapper (061.1-DIAGNOSIS.md): the per-entry yield bodies are wrapped in
-    `try/except BaseException` that logs and re-raises. We don't suppress the
-    real error — we just instrument it so a future regression that lets a
-    BaseException silently abort the generator becomes observable.
-    """
-    stream_key = f"run:{run_id}"
-    last_id = "0"
-    deadline = time_mod.monotonic() + settings.run_hard_timeout_seconds + 10
-
-    try:
-        # Phase 1: replay backlog (no block; immediate return)
-        while True:
-            if time_mod.monotonic() > deadline:
-                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
-                return
-            result = await redis.xread(
-                streams={stream_key: last_id},
-                count=100,
-            )
-            if not result:
-                break
-            for _stream_name, entries in result:
-                for entry_id, fields in entries:
-                    try:
-                        last_id = entry_id   # advance cursor (Pitfall 1)
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
-                        if payload.get("type") in TERMINAL_TYPES:
-                            return
-                    except BaseException:
-                        # H1 (061.1-DIAGNOSIS.md): convert silent generator
-                        # aborts into observable log entries. Re-raise so the
-                        # caller still sees the original error (no suppression).
-                        logger.exception("event_consumer raised mid-yield (replay phase) for run %s", run_id)
-                        raise
-
-        # Phase 2: live-tail (BLOCK 5000)
-        # WR-01 (D-061.1-07): keep last_id at the last replayed entry id (or '0'
-        # if replay drained empty). Resetting to '$' opened a race window where
-        # entries XADDed between drain and first tail xread were silently missed.
-        # XREAD with a past id + BLOCK still returns only NEW entries arriving
-        # after the call — equivalent semantics, no race.
-        while True:
-            if time_mod.monotonic() > deadline:
-                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
-                return
-            result = await redis.xread(
-                streams={stream_key: last_id},
-                count=100,
-                block=5000,
-            )
-            if not result:
-                continue   # BLOCK timeout — re-check deadline
-            for _stream_name, entries in result:
-                for entry_id, fields in entries:
-                    try:
-                        last_id = entry_id   # CRITICAL: advance from $ to actual id (Pitfall 1)
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
-                        if payload.get("type") in TERMINAL_TYPES:
-                            return
-                    except BaseException:
-                        # H1 (061.1-DIAGNOSIS.md): see replay-phase comment above.
-                        logger.exception("event_consumer raised mid-yield (tail phase) for run %s", run_id)
-                        raise
-    finally:
-        # D-061-03: do NOT cancel the producer task here. The consumer
-        # disconnect must NOT kill the producer; producer survives
-        # until natural completion or asyncio.timeout fires.
-        # (Compare to 059's event_consumer at line ~1880-1888 which
-        # DID cancel the producer — that contract is intentionally
-        # inverted in 061; D-061-16 documents this in test_059.)
-        pass
+# Phase 063 (D-063-01): the module-level `event_consumer` async generator that
+# previously lived here was DELETED in the hard cutover. POST /threads/{tid}/messages
+# no longer returns SSE; the live equivalent for GET /runs/{rid}/stream is
+# `replay_tail_consumer` in `app.api.runs`. See 063-CONTEXT.md decision D-063-01
+# and the ROADMAP risk note "Don't keep two streaming code paths longer than one phase".
 
 
 @router.get("", response_model=list[ThreadResponse])
@@ -742,15 +653,42 @@ async def send_message(
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    # Insert user message (D-058-02: pre-stream INSERT in scope for 058)
-    await aexec(
+    # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
+    # Phase 063 (D-063-01): capture inserted user_message id for the new
+    # JSONResponse contract — the frontend uses this to deduplicate its
+    # optimistic placeholder against the persisted row. Per RESEARCH Open
+    # Question #1, this is the USER-message id (the only one that exists
+    # synchronously; the assistant message is persisted at terminal time).
+    _user_msg_resp = await aexec(
         supabase.table("messages").insert({
             "thread_id": thread_id,
             "user_id": current_user["id"],
             "role": "user",
             "content": body.content,
-        })
+        }).select("id").single()
     )
+    # PostgREST with .single() returns a single dict in `.data`; defensive list-
+    # unwrap supports test mocks that hand back `[{...}]` from a generic
+    # .execute() builder (Phase 061+ test infrastructure shapes responses as
+    # lists by default). Real-PostgREST path takes the dict branch; mocked
+    # tests take the list[0] branch — both yield the inserted row.
+    _user_msg_data = _user_msg_resp.data if _user_msg_resp is not None else None
+    if isinstance(_user_msg_data, list):
+        _user_msg_data = _user_msg_data[0] if _user_msg_data else None
+    _user_msg_id = (_user_msg_data or {}).get("id") if isinstance(_user_msg_data, dict) else None
+    if not _user_msg_id:
+        # Defensive: PostgREST should always return the inserted row when
+        # .select("id").single() is chained. If it doesn't, fail loudly here
+        # so the frontend never gets a partial {message_id: null, run_id: ...}
+        # response that would silently break optimistic placeholder dedup.
+        logger.error(
+            "User-message INSERT did not return id for thread %s — aborting send_message",
+            thread_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist user message",
+        )
 
     # Phase 061 (D-061-05, D-061-10, D-061-11): generate run_id, INSERT
     # the runs lifecycle row, register the producer task, and ZADD the
@@ -2225,20 +2163,24 @@ async def send_message(
         RUN_TASKS.pop(_rid, None)
     task.add_done_callback(_evict)
 
-    # H2 (D-061.1-04): disable sse-starlette ping to eliminate the keep-alive
-    # injection race during burst→quiet patterns (e.g., sub-agent flows that
-    # emit ~1000 sub_agent_delta events then go briefly idle). The ping task
-    # writes a `:ping <ts>\n\n` comment-line on the same Send channel as the
-    # data generator and can interleave incorrectly under burst load,
-    # producing malformed chunked frames that the browser surfaces as
-    # ERR_INCOMPLETE_CHUNKED_ENCODING. We don't need keep-alive: the producer
-    # survives consumer disconnect (D-v2.5-08) and Phase 063 owns the frontend
-    # reattach mechanism (D-v2.5-05) for genuinely-idle reconnection.
+    # Phase 063 (D-063-01): hard cutover. POST returns JSON synchronously
+    # with the user_message id and run_id; frontend opens GET /runs/{rid}/stream
+    # in a separate request to consume tokens. Replaces the legacy SSE-on-POST
+    # path that 062's replay_tail_consumer in runs.py made obsolete. No compat
+    # shim — both paths cannot coexist beyond this phase per ROADMAP risk note
+    # "Don't keep two streaming code paths longer than one phase".
     #
-    # IN-04 (D-061.1-10): event_consumer is now a module-level async generator
-    # (see definition above _deduplicate_citations). Pass redis/run_id/settings
-    # explicitly instead of relying on closure capture.
-    return EventSourceResponse(
-        event_consumer(redis=redis, run_id=run_id, settings=settings),
-        ping=None,
+    # CRITICAL ordering invariants preserved by lines above this return:
+    #   - messages INSERT happened (Task 1, _user_msg_id captured)
+    #   - public.runs row INSERTed (line ~793, status='streaming')
+    #   - runs:active + runs_by_thread:{tid} sorted-set ZADDs happened
+    #   - agent_runner task spawned + RUN_TASKS[run_id] registered
+    # Frontend's GET /runs/{rid}/stream relies on the runs row being
+    # SELECT-able by the time this response arrives (Pitfall 4).
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={
+            "message_id": str(_user_msg_id),
+            "run_id": str(run_id),
+        },
     )
