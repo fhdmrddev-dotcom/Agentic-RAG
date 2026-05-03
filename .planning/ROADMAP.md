@@ -236,11 +236,16 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   4. Two concurrent consumers of the same `run_id` each receive the full event sequence independently — multi-tab fan-out works at the API layer.
   5. Auth + RLS: a user can only query active-runs, replay streams, or cancel runs they own (verified by integration test against Supabase Auth + RLS policy on `public.runs`).
   6. The original `POST /threads/{thread_id}/messages` endpoint either returns `{message_id, run_id}` immediately (no streaming over POST) OR keeps backward-compatible streaming for a deprecation window — decision deferred to /gsd:discuss-phase 062.
-**Plans**: TBD
+**Plans**: 4 plans
+  - [ ] 062-01-PLAN.md — Wave 1: ActiveRunResponse Pydantic model + GET /threads/{tid}/active-runs route in threads.py + Wave 0 stubs for SC#1 + SC#5(active-runs) (D-062-02/03/04/12, T-062-01)
+  - [ ] 062-02-PLAN.md — Wave 1: New backend/app/api/runs.py module with replay_tail_consumer + GET /runs/{rid}/stream + register router in main.py + Wave 0 stubs for SC#2 (3 sub-paths) + SC#5(stream) (D-062-05/06/07/12/13/14, T-062-01/03/04)
+  - [ ] 062-03-PLAN.md — Wave 2: DELETE /runs/{rid} appended to runs.py with zombie heal + setup_zombie_state helper + Wave 0 stubs for SC#3 (3 sub-paths) + SC#5(delete) (D-062-08/09/10/11/12/13, T-062-01/02/03)
+  - [ ] 062-04-PLAN.md — Wave 2: SC#4 multi-consumer fan-out test + D-062-13 Redis-down tests + 062-VERIFICATION.md scaffold (SC#4, T-062-03/04)
+**DEF-061.1-02 disposition**: Carried forward to a future 061.2 phase — the producer exception classifier suspected fix lives at threads.py:2057-2076 (agent_runner), a region D-062-14 physically partitions OUT of 062's scope. The misclassification only affects audit metadata (filtered out by D-062-02 active-runs SELECT WHERE status='streaming'), so 062's user-visible contract is unaffected. 062's full-suite verify inherits 061.1's canonical -k exclusion clause.
 **Risks / pitfalls**:
-  - SSE consumer with offset cursor: `XREAD COUNT N STREAMS run:{id} {offset}` returns immediately if events exist; need to fall through to `XREAD BLOCK ms STREAMS run:{id} $` for live tail. Two-mode loop (replay-then-tail) is the canonical pattern.
-  - Don't leak Redis errors as 500s — wrap in domain errors and return 503 with retry hint if Redis is unreachable.
-  - Active-runs query must be cheap — keep an index `runs_by_thread` (Redis sorted set keyed by `thread:{id}` with `run_id` members) so listing is O(log N).
+  - SSE consumer with offset cursor: `XREAD COUNT N STREAMS run:{id} {offset}` returns immediately if events exist; need to fall through to `XREAD BLOCK ms STREAMS run:{id} $` for live tail. Two-mode loop (replay-then-tail) is the canonical pattern. *Resolved by 062-02 mirroring event_consumer (threads.py:336-423) verbatim with last_id=since parameterization.*
+  - Don't leak Redis errors as 500s — wrap in domain errors and return 503 with retry hint if Redis is unreachable. *Resolved per D-062-13 differentiated degradation: stream → 503 + Retry-After: 10; DELETE → 204 even if all Redis ops fail.*
+  - Active-runs query must be cheap — keep an index. *Resolved via partial index idx_runs_active (migration 035) per D-062-02; sorted-set stale entries invisible at API layer.*
   - For STREAM-04 verification, this phase is the API contract — Phase 063 wires the frontend; Phase 064 validates end-to-end.
 
 ### Phase 063: Frontend Stream Decoupling
@@ -286,7 +291,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 060. Frontend Race Fixes | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Complete    | 2026-05-02 |
 | 061.1. Run-Backed Streaming Cleanup | v2.5 | 2/2 | Complete    | 2026-05-03 |
-| 062. Replay & Tail API | v2.5 | 0/0 | Not started | — |
+| 062. Replay & Tail API | v2.5 | 0/4 | Planned     | — |
 | 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
