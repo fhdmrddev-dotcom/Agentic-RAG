@@ -1,5 +1,6 @@
-import { Bot, Loader2, Square, User, Zap } from "lucide-react"
+import { Bot, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
 import type { Message } from "@/types"
+import { Button } from "@/components/ui/button"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ConfidenceBadge } from "./ConfidenceBadge"
@@ -12,9 +13,11 @@ interface Props {
   message: Message
   isStreaming?: boolean
   onSendMessage?: (content: string) => void
+  /** Phase 063 (Pattern 4 / D-063-04): handler for the Resume button shown only on failed assistant runs. */
+  onResume?: (message: Message) => void
 }
 
-export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
+export function MessageItem({ message, isStreaming, onSendMessage, onResume }: Props) {
   const isUser = message.role === "user"
 
   if (isUser) {
@@ -86,6 +89,22 @@ export function MessageItem({ message, isStreaming, onSendMessage }: Props) {
             )}
             {!isStreaming && message.role === "assistant" && message.content && (
               <MessageFeedback messageId={message.id} />
+            )}
+            {/* Phase 063 (Pattern 4 / D-063-04): Resume button on failed runs.
+                Surfaces ONLY when runStatus === 'failed' — never on cancelled
+                (user explicitly stopped), completed, streaming, or undefined
+                (DB-loaded historical messages without run metadata). */}
+            {!isStreaming && message.role === "assistant" && message.runStatus === "failed" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onResume?.(message)}
+                className="mt-2 text-xs"
+                aria-label="Resume failed run"
+              >
+                <RotateCcw className="w-3 h-3 mr-1.5" />
+                Resume
+              </Button>
             )}
           </div>
         ) : isStreaming && !hasAnyTools ? (

@@ -8,9 +8,11 @@ interface Props {
   isStreaming: boolean
   onSendMessage?: (content: string) => void
   showSuggestions?: boolean
+  /** Phase 063 (Pattern 4 / D-063-04): forwarded to MessageItem; clicked from the Resume button on failed-run assistant bubbles. */
+  onResume?: (message: Message) => void
 }
 
-export function MessageList({ messages, isStreaming, onSendMessage, showSuggestions }: Props) {
+export function MessageList({ messages, isStreaming, onSendMessage, showSuggestions, onResume }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
   const isNearBottomRef = useRef(true)
@@ -55,6 +57,7 @@ export function MessageList({ messages, isStreaming, onSendMessage, showSuggesti
               message={msg}
               isStreaming={isStreaming && isLastAssistant}
               onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
+              onResume={onResume}
             />
           )
         })}
