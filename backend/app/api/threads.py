@@ -452,16 +452,23 @@ async def list_active_runs(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    # Ownership check — mirror get_messages:597-606. 404 (NOT 403) per D-062-12
-    # so we don't leak thread existence to other users (T-062-01 mitigation).
+    # Ownership check — mirror runs.py stream_run / cancel_run pattern. 404
+    # (NOT 403) per D-062-12 so we don't leak thread existence to other users
+    # (T-062-01 mitigation).
+    # CR-01 fix: use .maybe_single() instead of .single(). PostgREST's .single()
+    # raises APIError(code="PGRST116", HTTP 406) on no rows; the postgrest patch
+    # in main.py only converts code="204" to _Empty, so PGRST116 would propagate
+    # to the FastAPI default handler and surface as 500 — directly violating
+    # D-062-12 / T-062-01. .maybe_single() returns None on no-row instead.
     thread_resp = await aexec(
         supabase.table("threads")
         .select("id")
         .eq("id", str(thread_id))
         .eq("user_id", current_user["id"])
-        .single()
+        .maybe_single()
     )
-    if not thread_resp.data:
+    row = thread_resp.data if thread_resp is not None else None
+    if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     # D-062-02: streaming-only filter. Uses the partial index idx_runs_active
