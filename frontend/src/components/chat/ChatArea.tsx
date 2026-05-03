@@ -24,7 +24,19 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
-  const { messages, isStreaming, fallbackNotice, loadMessages, sendMessage, stopStreaming, abortStream, clearMessages, setViewingThread } = useMessages()
+  const {
+    messages,
+    isStreaming,
+    fallbackNotice,
+    loadMessages,
+    sendMessage,
+    stopStreaming,
+    abortStream,
+    clearMessages,
+    setViewingThread,
+    reconcile,
+    resumeFromFailed,
+  } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
@@ -88,6 +100,37 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // proper polling/tab-visibility/pageshow mechanism on this clean foundation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id])
+
+  // Phase 063 (Pattern 2 + CONTEXT.md "Reconciliation Hook Ordering"):
+  // Mount + visibility/focus/pageshow triggers → reconcile via active-runs.
+  // Pageshow MUST be additive to visibilitychange (Anti-Pattern: don't gate
+  // reconcile on pageshow alone — older browsers and some mobile contexts
+  // don't fire pageshow reliably). bfcache restore (event.persisted === true)
+  // ALWAYS reconciles regardless of local state per CONTEXT.md mandate.
+  useEffect(() => {
+    if (!thread?.id) return
+    reconcile(thread.id).catch(console.error)
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        reconcile(thread.id).catch(console.error)
+      }
+    }
+    const onFocus = () => reconcile(thread.id).catch(console.error)
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) reconcile(thread.id).catch(console.error)
+    }
+
+    document.addEventListener("visibilitychange", onVisibility)
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("pageshow", onPageShow)
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility)
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("pageshow", onPageShow)
+    }
+  }, [thread?.id, reconcile])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
@@ -206,6 +249,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         isStreaming={isStreaming}
         onSendMessage={handleSend}
         showSuggestions={agentMode !== "explorer"}
+        onResume={resumeFromFailed}
       />
       {inputBar}
     </div>
