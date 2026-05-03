@@ -94,45 +94,148 @@ export async function renameThread(id: string, title: string): Promise<Thread> {
   return res.json() as Promise<Thread>
 }
 
-export async function streamMessage(
+// ── Phase 063: Run-backed streaming API ──────────────────────────────────────
+//
+// The legacy POST-and-stream-on-the-same-request orchestrator was physically
+// removed in Phase 063 (D-063-01 hard cutover; no compat shim per RESEARCH
+// Open Question #3). The replacement is four explicit functions with clear
+// single responsibilities:
+//
+//   postMessage(...)       → POST /threads/{tid}/messages, returns {message_id, run_id}
+//   subscribeToRun(...)    → GET  /runs/{rid}/stream?since={cursor}, dispatches SSE events
+//   getActiveRuns(...)     → GET  /threads/{tid}/active-runs
+//   cancelRun(...)         → DELETE /runs/{rid}
+//
+// Wire format on `/runs/{rid}/stream` is byte-identical to the legacy POST-stream
+// (Phase 062 D-062-05); the parser body in subscribeToRun is therefore copied
+// verbatim from the previous parser, plus two NEW terminal branches (`error`
+// payload + `cancelled`) the legacy code did not need.
+
+/** Phase 063 (D-063-01): response shape from POST /threads/{tid}/messages.
+ * `message_id` is the USER-message UUID (the only one that exists synchronously
+ * — the assistant message is persisted at terminal time). `run_id` is the
+ * Redis Stream run identifier the frontend opens GET /runs/{rid}/stream against.
+ */
+export interface PostMessageResponse {
+  message_id: string
+  run_id: string
+}
+
+/** Phase 062 ActiveRunResponse mirror. Always status='streaming' per D-062-02. */
+export interface ActiveRun {
+  run_id: string
+  started_at: string
+  status: "streaming"
+}
+
+/** Phase 063: callback shape for subscribeToRun. Mirrors the legacy POST-stream
+ * callback signature (preserved for MessageItem rendering compat) plus the new
+ * `onTerminal` callback that handles Phase 062 TERMINAL_TYPES (done | error | cancelled).
+ */
+export interface StreamCallbacks {
+  onDelta: (text: string) => void
+  onDone: () => void
+  onTerminal: (kind: "done" | "error" | "cancelled", error?: string) => void
+  onTitleUpdate?: (title: string) => void
+  onToolPreparing?: (name: string, index: number) => void
+  onToolStart?: (name: string, args: Record<string, string>) => void
+  onToolEnd?: (name: string, result?: string) => void
+  onSubAgentStart?: (filename: string, task: string) => void
+  onSubAgentDelta?: (text: string) => void
+  onSubAgentDone?: () => void
+  onSkillActivated?: (skillName: string) => void
+  onCodeExecutionStart?: (codePreview: string) => void
+  onCodeStdout?: (content: string) => void
+  onCodeStderr?: (content: string) => void
+  onCodeExecutionComplete?: (
+    exitCode: number,
+    durationMs: number,
+    outputFiles: OutputFile[],
+    error?: string,
+  ) => void
+  onSources?: (sources: SourceReference[]) => void
+  onCitations?: (citations: Citation[]) => void
+  onConfidence?: (
+    level: "high" | "medium" | "low",
+    avgSimilarity: number,
+    disclaimer: string | null,
+  ) => void
+  onSuggestions?: (questions: string[]) => void
+  onPlanning?: (iteration: number) => void
+  onIterationStart?: (iteration: number) => void
+  onFallbackModel?: (originalModel: string, fallbackModel: string) => void
+}
+
+/** Phase 063 (D-063-01): POST a new chat message. Returns synchronously with
+ * the inserted user_message id and the Redis Stream run_id; the caller then
+ * opens GET /runs/{run_id}/stream?since=0 via subscribeToRun() for tokens.
+ * Replaces the legacy POST-and-stream-in-one orchestrator.
+ */
+export async function postMessage(
   threadId: string,
   content: string,
-  onDelta: (text: string) => void,
-  onDone: () => void,
-  model?: string,
-  provider?: string,
-  onTitleUpdate?: (title: string) => void,
-  onToolPreparing?: (name: string, index: number) => void,
-  onToolStart?: (name: string, args: Record<string, string>) => void,
-  onToolEnd?: (name: string, result?: string) => void,
-  onSubAgentStart?: (filename: string, task: string) => void,
-  onSubAgentDelta?: (text: string) => void,
-  onSubAgentDone?: () => void,
-  onSkillActivated?: (skillName: string) => void,
-  onCodeExecutionStart?: (codePreview: string) => void,
-  onCodeStdout?: (content: string) => void,
-  onCodeStderr?: (content: string) => void,
-  onCodeExecutionComplete?: (exitCode: number, durationMs: number, outputFiles: OutputFile[], error?: string) => void,
-  agentMode?: string,
-  onSources?: (sources: SourceReference[]) => void,
-  onCitations?: (citations: Citation[]) => void,
-  onConfidence?: (level: "high" | "medium" | "low", avgSimilarity: number, disclaimer: string | null) => void,
-  onSuggestions?: (questions: string[]) => void,
-  onPlanning?: (iteration: number) => void,
-  onIterationStart?: (iteration: number) => void,
-  onFallbackModel?: (originalModel: string, fallbackModel: string) => void,
-  signal?: AbortSignal,
-): Promise<void> {
+  options: {
+    model?: string
+    provider?: string
+    agentMode?: string
+  } = {},
+): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ content, model, provider, agent_mode: agentMode ?? "default" }),
-    signal,
+    body: JSON.stringify({
+      content,
+      model: options.model,
+      provider: options.provider,
+      agent_mode: options.agentMode ?? "default",
+    }),
   })
-
   if (!res.ok) throw new Error("Failed to send message")
-  if (!res.body) throw new Error("No response body")
+  return (await res.json()) as PostMessageResponse
+}
+
+/** Phase 063 (D-063-02): open GET /runs/{runId}/stream?since={since} and
+ * dispatch SSE events to callbacks. `since` is always "0" per D-063-02 (full
+ * replay is idempotent — React reconciliation handles duplicate setMessages
+ * with identical content as a no-op). Same parser as the legacy POST-stream
+ * (wire format byte-identical per Phase 062 D-062-05).
+ *
+ * Bearer auth attaches via getAuthHeaders / fetch — the native EventSource
+ * API cannot send custom headers (WHATWG html#2177) and was rejected as an
+ * anti-pattern in 063-RESEARCH.
+ *
+ * Error/terminal handling:
+ *   - 404 → onTerminal('error', 'run_not_found') and return (cross-user or expired)
+ *   - 503 → onTerminal('error', 'streaming_unavailable') and return (Redis down per D-062-13)
+ *   - non-OK other → throws Error
+ *   - SSE event {type:'error', error: ...} → onTerminal('error', error) and return
+ *   - SSE event {type:'cancelled'} → onTerminal('cancelled') and return (NEW vs legacy POST-stream)
+ *   - SSE event {type:'done'} → fires onDone() once; stream stays open for suggestions
+ *   - SSE event {type:'stream_end'} → onTerminal('done') and return
+ *   - AbortError on reader.read() → silent return (caller-initiated cancel via signal)
+ *   - Reader closes without explicit terminal → defensive onTerminal('done')
+ */
+export async function subscribeToRun(
+  runId: string,
+  since: string,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const url = `${API_BASE}/runs/${runId}/stream?since=${encodeURIComponent(since)}`
+  const res = await fetch(url, { headers, signal })
+
+  if (res.status === 404) {
+    callbacks.onTerminal("error", "run_not_found")
+    return
+  }
+  if (res.status === 503) {
+    callbacks.onTerminal("error", "streaming_unavailable")
+    return
+  }
+  if (!res.ok) throw new Error(`Failed to open run stream (status ${res.status})`)
+  if (!res.body) throw new Error("No response body on run stream")
 
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
@@ -144,7 +247,7 @@ export async function streamMessage(
     try {
       ;({ done, value } = await reader.read())
     } catch (err) {
-      // AbortError means user stopped — not a real error
+      // AbortError means caller-initiated cancel via signal — silent return
       if (err instanceof Error && err.name === "AbortError") return
       throw err
     }
@@ -159,68 +262,116 @@ export async function streamMessage(
       const raw = line.slice(6).trim()
       try {
         const parsed = JSON.parse(raw) as Record<string, unknown>
-        if (parsed.type === "delta") {
-          onDelta(parsed.content as string)
-        } else if (parsed.type === "title" && onTitleUpdate) {
-          onTitleUpdate(parsed.content as string)
-        } else if (parsed.type === "tool_preparing" && onToolPreparing) {
-          onToolPreparing(parsed.name as string, parsed.index as number)
-        } else if (parsed.type === "tool_start" && onToolStart) {
-          onToolStart(parsed.name as string, parsed.args as Record<string, string>)
-        } else if (parsed.type === "tool_end" && onToolEnd) {
-          onToolEnd(parsed.name as string, parsed.result as string | undefined)
-        } else if (parsed.type === "sub_agent_start" && onSubAgentStart) {
-          onSubAgentStart(parsed.filename as string, parsed.task as string)
-        } else if (parsed.type === "sub_agent_delta" && onSubAgentDelta) {
-          onSubAgentDelta(parsed.content as string)
-        } else if (parsed.type === "sub_agent_done" && onSubAgentDone) {
-          onSubAgentDone()
-        } else if (parsed.type === "skill_activated" && onSkillActivated) {
-          onSkillActivated(parsed.skill_name as string)
-        } else if (parsed.type === "code_execution_start" && onCodeExecutionStart) {
-          onCodeExecutionStart(parsed.code_preview as string)
-        } else if (parsed.type === "code_stdout" && onCodeStdout) {
-          onCodeStdout(parsed.content as string)
-        } else if (parsed.type === "code_stderr" && onCodeStderr) {
-          onCodeStderr(parsed.content as string)
-        } else if (parsed.type === "code_execution_complete" && onCodeExecutionComplete) {
-          onCodeExecutionComplete(
+        const t = parsed.type as string
+
+        if (t === "delta") callbacks.onDelta(parsed.content as string)
+        else if (t === "title" && callbacks.onTitleUpdate)
+          callbacks.onTitleUpdate(parsed.content as string)
+        else if (t === "tool_preparing" && callbacks.onToolPreparing)
+          callbacks.onToolPreparing(parsed.name as string, parsed.index as number)
+        else if (t === "tool_start" && callbacks.onToolStart)
+          callbacks.onToolStart(parsed.name as string, parsed.args as Record<string, string>)
+        else if (t === "tool_end" && callbacks.onToolEnd)
+          callbacks.onToolEnd(parsed.name as string, parsed.result as string | undefined)
+        else if (t === "sub_agent_start" && callbacks.onSubAgentStart)
+          callbacks.onSubAgentStart(parsed.filename as string, parsed.task as string)
+        else if (t === "sub_agent_delta" && callbacks.onSubAgentDelta)
+          callbacks.onSubAgentDelta(parsed.content as string)
+        else if (t === "sub_agent_done" && callbacks.onSubAgentDone)
+          callbacks.onSubAgentDone()
+        else if (t === "skill_activated" && callbacks.onSkillActivated)
+          callbacks.onSkillActivated(parsed.skill_name as string)
+        else if (t === "code_execution_start" && callbacks.onCodeExecutionStart)
+          callbacks.onCodeExecutionStart(parsed.code_preview as string)
+        else if (t === "code_stdout" && callbacks.onCodeStdout)
+          callbacks.onCodeStdout(parsed.content as string)
+        else if (t === "code_stderr" && callbacks.onCodeStderr)
+          callbacks.onCodeStderr(parsed.content as string)
+        else if (t === "code_execution_complete" && callbacks.onCodeExecutionComplete)
+          callbacks.onCodeExecutionComplete(
             parsed.exit_code as number,
             parsed.duration_ms as number,
             (parsed.output_files ?? []) as OutputFile[],
             parsed.error as string | undefined,
           )
-        } else if (parsed.type === "sources" && onSources) {
-          onSources((parsed.sources ?? []) as SourceReference[])
-        } else if (parsed.type === "citations" && onCitations) {
-          onCitations((parsed.citations ?? []) as Citation[])
-        } else if (parsed.type === "confidence" && onConfidence) {
-          onConfidence(
+        else if (t === "sources" && callbacks.onSources)
+          callbacks.onSources((parsed.sources ?? []) as SourceReference[])
+        else if (t === "citations" && callbacks.onCitations)
+          callbacks.onCitations((parsed.citations ?? []) as Citation[])
+        else if (t === "confidence" && callbacks.onConfidence)
+          callbacks.onConfidence(
             parsed.level as "high" | "medium" | "low",
             parsed.avg_similarity as number,
             parsed.disclaimer as string | null,
           )
-        } else if (parsed.type === "done") {
-          if (!doneFired) { doneFired = true; onDone() }
-          // Do NOT return — stream stays open for suggestions event (Phase 32)
-        } else if (parsed.type === "suggestions" && onSuggestions) {
-          onSuggestions((parsed.questions ?? []) as string[])
-        } else if (parsed.type === "stream_end") {
-          return  // True end of stream after optional suggestions event (Phase 32)
-        } else if (parsed.type === "planning" && onPlanning) {
-          onPlanning(parsed.iteration as number)
-        } else if (parsed.type === "iteration_start" && onIterationStart) {
-          onIterationStart(parsed.iteration as number)
-        } else if (parsed.type === "fallback_model" && onFallbackModel) {
-          onFallbackModel(parsed.original_model as string, parsed.fallback_model as string)
+        else if (t === "done") {
+          if (!doneFired) {
+            doneFired = true
+            callbacks.onDone()
+          }
+        } else if (t === "suggestions" && callbacks.onSuggestions) {
+          callbacks.onSuggestions((parsed.questions ?? []) as string[])
+        } else if (t === "stream_end") {
+          callbacks.onTerminal("done")
+          return
+        } else if (t === "error") {
+          callbacks.onTerminal("error", parsed.error as string | undefined)
+          return
+        } else if (t === "cancelled") {
+          callbacks.onTerminal("cancelled")
+          return
+        } else if (t === "planning" && callbacks.onPlanning) {
+          callbacks.onPlanning(parsed.iteration as number)
+        } else if (t === "iteration_start" && callbacks.onIterationStart) {
+          callbacks.onIterationStart(parsed.iteration as number)
+        } else if (t === "fallback_model" && callbacks.onFallbackModel) {
+          callbacks.onFallbackModel(
+            parsed.original_model as string,
+            parsed.fallback_model as string,
+          )
         }
       } catch {
-        // ignore malformed lines
+        // ignore malformed lines (mirrors legacy POST-stream behavior)
       }
     }
   }
 
-  if (!doneFired) onDone()
+  // Defensive: reader closed without explicit terminal SSE event.
+  callbacks.onTerminal("done")
+}
+
+/** Phase 063 / Phase 062 contract: list streaming runs the requesting user
+ * owns on the given thread. Empty array when nothing is in flight. RLS+
+ * defense-in-depth filtered server-side; cross-user → 404 (D-062-12).
+ */
+export async function getActiveRuns(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<ActiveRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/active-runs`, {
+    headers,
+    signal,
+  })
+  if (!res.ok) throw new Error("Failed to list active runs")
+  return (await res.json()) as ActiveRun[]
+}
+
+/** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the
+ * producer; the terminal sentinel arrives via the open SSE subscription;
+ * cross-tab Stop falls out for free. Idempotent — DELETE on already-terminal
+ * returns 204; on 404 we silently return (the run may have completed or been
+ * cancelled by another tab) so the UI doesn't surface a confusing error.
+ */
+export async function cancelRun(runId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/runs/${runId}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`Failed to cancel run (status ${res.status})`)
+  }
 }
 
 export async function listDocuments(): Promise<Document[]> {
