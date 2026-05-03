@@ -34,7 +34,15 @@ THREAD_A = str(uuid4())
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_completed_run_expires_600s(redis_client):
-    """SC#4: completed run gets EXPIRE 600 (10-min retention)."""
+    """SC#4: completed run gets EXPIRE 600 (10-min retention).
+
+    Phase 063 Plan 05 rewrite (D-063-01 hard cutover): POST returns JSON
+    synchronously; producer's finally still applies EXPIRE 600 on
+    successful completion (D-061-04). We POST, then ``await_producer_finalized``
+    to drive the producer's terminal sequence (UPDATE → EXPIRE → ZREM →
+    RUN_TASKS.pop). After that, the TTL on ``run:{run_id}`` is the
+    600s "completed" bucket.
+    """
     mock_supabase = _build_mock_supabase()
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
@@ -49,17 +57,22 @@ async def test_completed_run_expires_600s(redis_client):
             return_value=("Test Title", None),
         ):
             async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-                async with c.stream(
-                    "POST",
+                # Phase 063 D-063-01: POST returns 201 + JSON; producer
+                # detached. The TTL invariant is unchanged — D-061-04's
+                # finally ordering still applies EXPIRE 600 on completion.
+                resp = await c.post(
                     f"/threads/{THREAD_A}/messages",
                     json={"content": "hello"},
                     headers={"Authorization": "Bearer test-token"},
                     timeout=30.0,
-                ) as r:
-                    async for _line in r.aiter_lines():
-                        pass   # drain to natural completion
+                )
+                assert resp.status_code == 201, (
+                    f"D-063-01: expected 201; got {resp.status_code} body={resp.text[:200]}"
+                )
 
-            # Producer's finally has run by now
+            # Drive the producer's finally to terminal so EXPIRE has landed.
+            await await_producer_finalized(mock_supabase)
+
             run_id = _extract_run_id_from_mock(mock_supabase)
             ttl = await redis_client.ttl(f"run:{run_id}")
             assert 540 < ttl <= 600, (

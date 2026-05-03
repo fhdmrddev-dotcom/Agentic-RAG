@@ -120,6 +120,16 @@ async def test_post_then_get_stream_renders_full_response(redis_client):
                 )
                 run_id = body["run_id"]
 
+                # Phase 063 D-063-01 / Pitfall 4: POST returns synchronously
+                # while the producer is still scheduling its first XADD.
+                # Give the producer a small window to emit at least one
+                # event before the GET stream opens — otherwise the consumer
+                # may observe an empty Redis key + runs.status='streaming'
+                # and synthesize 'buffer_expired_while_streaming' instead of
+                # tailing actual deltas.
+                import asyncio as _asyncio_inner
+                await _asyncio_inner.sleep(0.2)
+
                 # Step 3: configure mock so GET stream's ownership SELECT
                 # succeeds (mirrors test_062_stream_replay.py:94-99).
                 runs_builder = mock_supabase.table("runs")

@@ -75,20 +75,34 @@ async def test_replay_then_tail_to_terminal(redis_client):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as ac:
-                # Step 1: POST → producer spins up
-                async with ac.stream(
-                    "POST", f"/threads/{THREAD_A}/messages",
+                # Step 1: POST → producer spins up.
+                # Phase 063 D-063-01 rewrite: POST returns 201 + JSON
+                # synchronously; producer detached via RUN_TASKS. We no
+                # longer drain a single SSE chunk to spawn — the runs
+                # INSERT (and hence RUN_TASKS registration) is complete
+                # by the time POST returns.
+                resp = await ac.post(
+                    f"/threads/{THREAD_A}/messages",
                     content=json.dumps({"content": "hello"}),
                     headers={"Authorization": "Bearer test-token",
                              "Content-Type": "application/json"},
                     timeout=30.0,
-                ) as r:
-                    # Read first chunk to confirm producer started, then disconnect
-                    async for _line in r.aiter_lines():
-                        break
+                )
+                assert resp.status_code == 201, (
+                    f"D-063-01: expected 201; got {resp.status_code} body={resp.text[:200]}"
+                )
 
                 # Step 2: extract run_id from the mock's runs INSERT
                 run_id = _extract_run_id_from_mock(mock_supabase)
+
+                # Phase 063: under the legacy POST-and-stream contract,
+                # reading the first SSE chunk proved the producer had
+                # XADDed at least once. After 063-02 POST returns
+                # synchronously while the producer is still scheduling
+                # its first XADD (Pitfall 4). Give the producer a small
+                # window to enter its body so the GET stream's replay
+                # phase has buffered events to surface.
+                await asyncio.sleep(0.2)
 
                 # Step 3: configure mock so GET stream's ownership SELECT succeeds
                 runs_builder = mock_supabase.table("runs")

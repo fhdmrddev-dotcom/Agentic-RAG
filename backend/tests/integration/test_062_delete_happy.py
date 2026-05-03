@@ -112,17 +112,35 @@ async def test_cancels_in_flight_producer(redis_client):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as ac:
-                # Step 1: POST → producer spins up
-                async with ac.stream(
-                    "POST", f"/threads/{THREAD_A}/messages",
+                # Step 1: POST → producer spins up.
+                # Phase 063 D-063-01 rewrite: POST returns 201 + JSON
+                # synchronously; the producer task is registered in
+                # RUN_TASKS during send_message and runs detached. We no
+                # longer need to drain the response body to "spawn" the
+                # producer — the runs INSERT (and hence RUN_TASKS
+                # registration) is complete by the time POST returns.
+                resp = await ac.post(
+                    f"/threads/{THREAD_A}/messages",
                     content=json.dumps({"content": "hello"}),
                     headers={"Authorization": "Bearer test-token",
                              "Content-Type": "application/json"},
                     timeout=30.0,
-                ) as r:
-                    # Read first line to confirm producer started, then disconnect
-                    async for _line in r.aiter_lines():
-                        break
+                )
+                assert resp.status_code == 201, (
+                    f"D-063-01: expected 201; got {resp.status_code} body={resp.text[:200]}"
+                )
+
+                # Phase 063 D-063-01: under the legacy SSE-on-POST contract,
+                # reading the first chunk off the response body proved the
+                # producer had run at least one iteration. After 063-02 the
+                # POST response is JSON and returns synchronously while the
+                # producer is still scheduling its first LLM call (Pitfall 4).
+                # Wait briefly for the producer to enter its body so DELETE
+                # observes a still-running task — task.cancel() arriving
+                # BEFORE the producer's first XADD can land outside the
+                # async-with-yield window and cancellation gets eaten by
+                # asyncio.shield without producing the terminal sentinel.
+                await asyncio.sleep(0.2)
 
                 # Step 2: extract run_id and capture the producer task BEFORE
                 # the DELETE so we can inspect cancellation state afterward

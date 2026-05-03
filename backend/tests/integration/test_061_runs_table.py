@@ -31,7 +31,16 @@ THREAD_A = str(uuid4())
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_runs_lifecycle_row():
-    """SC#5: runs row INSERT (status='streaming') + UPDATE (status terminal)."""
+    """SC#5: runs row INSERT (status='streaming') + UPDATE (status terminal).
+
+    Phase 063 Plan 05 rewrite (D-063-01 hard cutover): POST now returns
+    JSON {message_id, run_id} synchronously; the producer task spawned
+    by send_message runs to completion in the background. We POST,
+    capture run_id, then ``await_producer_finalized`` to drive the
+    producer's finally to terminal. The runs INSERT/UPDATE call_args
+    assertion below is unchanged — the producer's lifecycle bookkeeping
+    is decoupled from the POST response shape per Phase 063.
+    """
     mock_supabase = _build_mock_supabase()
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
@@ -46,17 +55,23 @@ async def test_runs_lifecycle_row():
             return_value=("T", None),
         ):
             async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-                async with c.stream(
-                    "POST",
+                # Phase 063 D-063-01: POST returns 201 + JSON envelope; the
+                # producer is detached and will run to terminal in the
+                # background. The legacy POST-and-stream-on-the-same-request
+                # shape is gone (Plan 02 hard cutover).
+                resp = await c.post(
                     f"/threads/{THREAD_A}/messages",
                     json={"content": "hello"},
                     headers={"Authorization": "Bearer test-token"},
                     timeout=30.0,
-                ) as r:
-                    async for _line in r.aiter_lines():
-                        pass
+                )
+                assert resp.status_code == 201, (
+                    f"D-063-01: expected 201; got {resp.status_code} body={resp.text[:200]}"
+                )
 
-            # D-061.1-01: deterministic await for _shielded_finalize completion
+            # D-061.1-01: deterministic await for _shielded_finalize completion.
+            # After POST returns, the producer continues in the background
+            # via RUN_TASKS — we must await it before inspecting call_args.
             await await_producer_finalized(mock_supabase)
 
             runs_builder = mock_supabase.table("runs")
