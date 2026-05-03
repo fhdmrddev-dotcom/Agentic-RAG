@@ -667,7 +667,15 @@ async def send_message(
             "content": body.content,
         }).select("id").single()
     )
-    _user_msg_id = (_user_msg_resp.data or {}).get("id") if _user_msg_resp is not None else None
+    # PostgREST with .single() returns a single dict in `.data`; defensive list-
+    # unwrap supports test mocks that hand back `[{...}]` from a generic
+    # .execute() builder (Phase 061+ test infrastructure shapes responses as
+    # lists by default). Real-PostgREST path takes the dict branch; mocked
+    # tests take the list[0] branch — both yield the inserted row.
+    _user_msg_data = _user_msg_resp.data if _user_msg_resp is not None else None
+    if isinstance(_user_msg_data, list):
+        _user_msg_data = _user_msg_data[0] if _user_msg_data else None
+    _user_msg_id = (_user_msg_data or {}).get("id") if isinstance(_user_msg_data, dict) else None
     if not _user_msg_id:
         # Defensive: PostgREST should always return the inserted row when
         # .select("id").single() is chained. If it doesn't, fail loudly here
