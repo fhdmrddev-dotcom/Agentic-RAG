@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: planning
-stopped_at: Phase 062 context gathered
-last_updated: "2026-05-03T10:01:19.625Z"
-last_activity: 2026-05-03
+status: executing
+stopped_at: Phase 062 plan 01 complete — next is 062-02
+last_updated: "2026-05-03T10:27:33.167Z"
+last_activity: 2026-05-03 — Phase 062 plan 01 complete (6/6 plan tests GREEN, 058/059/061 regression sweep clean)
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 18
-  completed_plans: 14
-  percent: 78
+  completed_plans: 15
+  percent: 83
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 061.1 — run-backed-streaming-cleanup
+**Current focus:** Phase 062 — Replay & Tail API
 
 ## Current Position
 
-Phase: 062
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-03
-Next action: Phase 061 closed-out 2026-05-02 — verifier returned 17/18 must-haves, manual UAT 5 passed + 1 partial + 2 deferred to 061.1. Persistence-leak bug surfaced and fixed inline (5d8ff10), code-review CR-01/02/03 + WR-03/05 fixed inline. Two follow-on phases now available: (a) `/gsd:discuss-phase 062` to plan Replay & Tail API (the GET /threads/{id}/active-runs + GET /runs/{id}/stream?since=N endpoints that 063's frontend reattach will consume), or (b) `/gsd:discuss-phase 061.1` to run the small parallel cleanup phase (ERR_INCOMPLETE_CHUNKED_ENCODING diagnosis + 5 test-pattern races + WR-01 cursor race + WR-04/06/07 + IN-01..04). 062 and 061.1 are independent and can ship in parallel.
+Phase: 062 (Replay & Tail API) — EXECUTING
+Plan: 2 of 4 (next: 062-02-PLAN.md)
+Status: Plan 01 shipped — list_active_runs route + ActiveRunResponse model committed (7534967 RED, 444bc2e GREEN)
+Last activity: 2026-05-03 — Phase 062 plan 01 complete (6/6 plan tests GREEN, 058/059/061 regression sweep clean)
+Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module with `replay_tail_consumer` + `GET /runs/{rid}/stream` + register router in main.py + Wave 0 stubs for SC#2 + SC#5(stream)). 062-01 shipped: `GET /threads/{tid}/active-runs` returns Pydantic-bound list filtered to status='streaming', ORDER BY started_at DESC; ownership SELECT runs first with 404 (NOT 403) per D-062-12. D-062-14 file-layout discipline confirmed (45 insertions / 0 deletions in threads.py; off-limits regions untouched).
 
 ## Recent Completed Phases
 
@@ -71,6 +71,7 @@ Next action: Phase 061 closed-out 2026-05-02 — verifier returned 17/18 must-ha
 | 061 | 03 | 16min | 3 (2 commits — Tasks 2+3 atomic) | 1 |
 | 061 | 04 | 25min | 2 | 2 |
 | 061 | 05 | 10min | 4 | 12 (9 created, 3 modified) |
+| 062 | 01 | 12min | 2 | 4 (3 created, 1 modified) |
 
 ## Accumulated Context
 
@@ -104,6 +105,7 @@ Recent decisions affecting v2.5 work:
 - Phase 061 plan 05: 8 test files landed for VALIDATION.md TBD-01..11 — 3 unit (test_061_emit_helper, test_061_consumer, test_health), 4 integration (test_061_producer_survives_disconnect with inline cross-tab D-061-15 assertion, test_061_ttl, test_061_runs_table with DDL-inspection RLS variant, test_061_hard_timeout), 1 rewritten integration (test_059_disconnect for D-061-16 contract inversion). Plus shared _run_helpers.py and _build_mock_supabase 'runs' branch. Static gates green; runtime execution deferred to /gsd:verify-work (sandbox blocks venv/Scripts/python).
 - Phase 061 plan 05: D-061-16 rewrite of test_059_disconnect.py committed atomically with explicit D-v2.5-08 + Phase 061 references in both file docstring and commit message body — protects future reviewers from misreading the inversion as a regression. Original `test_agent_task_cancels_on_disconnect` removed; new `test_agent_task_SURVIVES_on_disconnect` asserts XLEN growth post-disconnect.
 - Phase 061 plan 05: VALIDATION.md frontmatter (`nyquist_compliant: true`, `wave_0_complete: true`) NOT toggled by this commit — those flags require runtime green which the verifier owns. The 11 binding pytest commands are documented in 061-VERIFICATION.md as a single copy-paste block.
+- Phase 062 plan 01: anti-false-RED guards on ownership tests — assert detail='Thread not found' AND threads SELECT was actually called; without these the tests pass even before the route is registered
 
 ### Pending Todos
 
@@ -143,8 +145,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 062 context gathered
+Last session: 2026-05-03T10:27:33.158Z
+Stopped at: Phase 062 plan 01 complete
 Next: Run /gsd:verify-work on phase 061 to execute the 11 binding pytest commands documented in 061-VERIFICATION.md plus the 060 Playwright e2e spec; on green, phase 061 closes and phase 062 (Replay & Tail API) unblocks
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
