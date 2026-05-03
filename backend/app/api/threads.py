@@ -21,6 +21,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_supabase, get_redis
 import redis.asyncio as aioredis
 from app.models.message import MessageCreate, MessageResponse
+from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
@@ -73,6 +74,7 @@ def _spawn(coro) -> asyncio.Task:
 # Single uvicorn worker (D-v2.5-02) means one registry per process — no
 # cross-process coordination needed.
 import uuid as _uuid_mod
+from uuid import UUID  # Phase 062 D-062-04: typed path param for list_active_runs
 RUN_TASKS: dict[_uuid_mod.UUID, asyncio.Task] = {}
 
 # Terminal sentinel discriminator types (D-061-12). Consumer breaks when
@@ -436,6 +438,49 @@ async def list_threads(
         .execute()
     )
     return response.data
+
+
+# Phase 062 (D-062-02, D-062-03, D-062-04, D-062-12, D-062-14, T-062-01).
+# Surface the durable per-run lifecycle table as a streaming-only filter.
+# Lives in threads.py (under the /threads prefix) per D-062-14; the other
+# two 062 endpoints (GET /runs/{id}/stream + DELETE /runs/{id}) live in
+# the new app/api/runs.py module to minimize merge conflicts with any
+# parallel work in threads.py's event_consumer / agent_runner / send_message.
+@router.get("/{thread_id}/active-runs", response_model=list[ActiveRunResponse])
+async def list_active_runs(
+    thread_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    # Ownership check — mirror get_messages:597-606. 404 (NOT 403) per D-062-12
+    # so we don't leak thread existence to other users (T-062-01 mitigation).
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .single()
+    )
+    if not thread_resp.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    # D-062-02: streaming-only filter. Uses the partial index idx_runs_active
+    # shipped in supabase/migrations/035_runs_table.sql (lines 38-40) — the
+    # WHERE status='streaming' partial keeps the index physically tiny.
+    # Discretion: ORDER BY started_at DESC for deterministic ordering under
+    # concurrent INSERTs; otherwise insertion order is undefined.
+    # D-062-12: defense-in-depth alongside RLS policy runs_select_own
+    # (migration 035 lines 47-49) — the .eq("user_id", ...) below ALSO
+    # filters even though the service-role bypasses RLS.
+    runs_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, started_at, status")
+        .eq("thread_id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .eq("status", "streaming")
+        .order("started_at", desc=True)
+    )
+    return runs_resp.data or []
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
