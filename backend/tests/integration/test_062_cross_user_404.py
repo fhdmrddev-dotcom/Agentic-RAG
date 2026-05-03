@@ -67,3 +67,76 @@ async def test_active_runs_other_user_returns_404():
     finally:
         app.dependency_overrides.pop(get_supabase, None)
         app.dependency_overrides.pop(get_current_user, None)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 062 Plan 02 (D-062-12, T-062-01, SC#5 stream side):
+# cross-user GET /runs/{rid}/stream returns 404 (NOT 403).
+# ───────────────────────────────────────────────────────────────────────
+
+
+def _mock_runs_returning(mock_supabase, payload):
+    """Local helper: configure the runs SELECT to return `payload` (dict, list, or None).
+
+    Mirrors the helper in test_062_stream_ttl_expired.py — kept local rather than
+    extracted because the per-test mock-shaping is small and divergent enough that
+    centralizing would obscure intent. If a third caller appears, extract to
+    _run_helpers.py.
+    """
+    runs_builder = mock_supabase.table("runs")
+    if payload is None:
+        runs_builder.execute.side_effect = lambda *a, **k: _make_result(None)
+    else:
+        runs_builder.execute.side_effect = lambda *a, **k: type("R", (), {
+            "data": payload, "count": None,
+        })()
+    return runs_builder
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_get_stream_other_user_returns_404():
+    """D-062-12 / T-062-01 / SC#5: cross-user GET stream → 404 (NOT 403).
+
+    Override get_current_user to OTHER_USER; mock runs SELECT to return None
+    (RLS+ownership filter found no row); assert 404 (NOT 403, which would leak
+    that the run exists for someone else). Anti-false-RED guard: assert
+    detail='Run not found' (the route's HTTPException string) so the test fails
+    when the route is missing rather than silently passing on FastAPI's default
+    'Not Found'.
+    """
+    mock_supabase = _build_mock_supabase()
+    run_id = str(uuid4())
+    runs_execute_called = []
+
+    runs_builder = mock_supabase.table("runs")
+
+    def _runs_execute(*a, **k):
+        runs_execute_called.append((a, k))
+        return _make_result(None)
+
+    runs_builder.execute.side_effect = _runs_execute
+
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER
+    try:
+        async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            resp = await c.get(
+                f"/runs/{run_id}/stream?since=0",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        # D-062-12: cross-user run → 404, NOT 403, NOT 200
+        assert resp.status_code == 404, \
+            f"Expected 404 (NOT 403, NOT 200) on cross-user stream; got {resp.status_code} body={resp.text}"
+        # Anti-false-RED guard: route's HTTPException uses 'Run not found';
+        # FastAPI's default unregistered-route 404 uses 'Not Found' (different).
+        body = resp.json()
+        assert body.get("detail") == "Run not found", \
+            f"Expected detail='Run not found' (route's HTTPException); got {body!r}"
+        # Anti-false-RED guard: route must have actually executed the runs SELECT.
+        assert runs_execute_called, \
+            "Expected runs ownership SELECT to be called; route may not be registered"
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
