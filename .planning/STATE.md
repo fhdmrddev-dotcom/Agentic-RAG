@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 062 plan 01 complete — next is 062-02
-last_updated: "2026-05-03T10:27:33.167Z"
-last_activity: 2026-05-03 — Phase 062 plan 01 complete (6/6 plan tests GREEN, 058/059/061 regression sweep clean)
+stopped_at: Phase 062 plan 02 complete — next is 062-03
+last_updated: "2026-05-03T10:39:33.356Z"
+last_activity: 2026-05-03
 progress:
   total_phases: 8
   completed_phases: 4
   total_plans: 18
-  completed_plans: 15
-  percent: 83
+  completed_plans: 16
+  percent: 89
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 062 (Replay & Tail API) — EXECUTING
-Plan: 2 of 4 (next: 062-02-PLAN.md)
-Status: Plan 01 shipped — list_active_runs route + ActiveRunResponse model committed (7534967 RED, 444bc2e GREEN)
-Last activity: 2026-05-03 — Phase 062 plan 01 complete (6/6 plan tests GREEN, 058/059/061 regression sweep clean)
+Plan: 3 of 4 (next: 062-02-PLAN.md)
+Status: Ready to execute
+Last activity: 2026-05-03
 Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module with `replay_tail_consumer` + `GET /runs/{rid}/stream` + register router in main.py + Wave 0 stubs for SC#2 + SC#5(stream)). 062-01 shipped: `GET /threads/{tid}/active-runs` returns Pydantic-bound list filtered to status='streaming', ORDER BY started_at DESC; ownership SELECT runs first with 404 (NOT 403) per D-062-12. D-062-14 file-layout discipline confirmed (45 insertions / 0 deletions in threads.py; off-limits regions untouched).
 
 ## Recent Completed Phases
@@ -72,6 +72,7 @@ Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module
 | 061 | 04 | 25min | 2 | 2 |
 | 061 | 05 | 10min | 4 | 12 (9 created, 3 modified) |
 | 062 | 01 | 12min | 2 | 4 (3 created, 1 modified) |
+| Phase 062 P02 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Recent decisions affecting v2.5 work:
 - Phase 061 plan 05: D-061-16 rewrite of test_059_disconnect.py committed atomically with explicit D-v2.5-08 + Phase 061 references in both file docstring and commit message body — protects future reviewers from misreading the inversion as a regression. Original `test_agent_task_cancels_on_disconnect` removed; new `test_agent_task_SURVIVES_on_disconnect` asserts XLEN growth post-disconnect.
 - Phase 061 plan 05: VALIDATION.md frontmatter (`nyquist_compliant: true`, `wave_0_complete: true`) NOT toggled by this commit — those flags require runtime green which the verifier owns. The 11 binding pytest commands are documented in 061-VERIFICATION.md as a single copy-paste block.
 - Phase 062 plan 01: anti-false-RED guards on ownership tests — assert detail='Thread not found' AND threads SELECT was actually called; without these the tests pass even before the route is registered
+- Phase 062 plan 02: replay_tail_consumer mirrors event_consumer verbatim with last_id=since (D-062-07); zero-line modification of off-limits regions in threads.py confirmed via git diff
+- Phase 062 plan 02: top-level 'from redis.exceptions import RedisError' import to avoid the variable-shadowing trap on the route's 'redis' parameter (any 'redis.exceptions.X' inside the handler would AttributeError on the Redis instance); pattern documented in module docstring + inline comment + invariant noted for future maintainers
+- Phase 062 plan 02 deviation (Rule 3): added per-file '_reset_redis_singleton' autouse fixture to 3 new stream test files — singleton _redis is event-loop-bound, pytest-asyncio creates per-test loops, so subsequent tests hit a closed loop on the cached singleton (Pitfall 6 mirror); per-file scope avoids surprising 058/059/061 tests
 
 ### Pending Todos
 
@@ -145,8 +149,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-03T10:27:33.158Z
-Stopped at: Phase 062 plan 01 complete
+Last session: 2026-05-03T10:39:33.348Z
+Stopped at: Phase 062 plan 02 complete — next is 062-03
 Next: Run /gsd:verify-work on phase 061 to execute the 11 binding pytest commands documented in 061-VERIFICATION.md plus the 060 Playwright e2e spec; on green, phase 061 closes and phase 062 (Replay & Tail API) unblocks
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
