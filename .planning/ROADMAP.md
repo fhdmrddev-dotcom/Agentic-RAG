@@ -261,7 +261,12 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   5. Symptom G regression guard: clicking Stop sends `DELETE /runs/{run_id}` (or equivalent cancel verb) — server cancels producer, terminal event fires, all consumers close cleanly.
   6. Bug 3 regression guard: no tool-result JSON leaks into chat content; the streaming-format messages built up by SSE deltas remain authoritative (Phase 060's invariants preserved).
   7. Resume button: if `active-runs` returns a `failed` run (producer errored), surface a Resume button rather than silently retrying — preserves D-v2.5-05's principle of explicit user intent for paid LLM retries.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 063-01-PLAN.md — Wave 0: 5 stub test files (3 backend + 2 e2e) RED-failing for contract reasons + legacy POST-SSE test audit document
+  - [ ] 063-02-PLAN.md — Wave 1: Backend POST contract rewrite — JSONResponse {message_id, run_id} HTTP 201 + delete event_consumer (D-063-01 hard cutover)
+  - [ ] 063-03-PLAN.md — Wave 2: Frontend API layer — split streamMessage into postMessage + subscribeToRun + getActiveRuns + cancelRun; extend Message type with runId/runStatus
+  - [ ] 063-04-PLAN.md — Wave 3: Frontend hook + components — useMessages reconcile + Stop=DELETE + resumeFromFailed; ChatArea reconcile triggers (mount/focus/visibilitychange/pageshow w/ bfcache); MessageItem Resume button
+  - [ ] 063-05-PLAN.md — Wave 4: Legacy-test rewrites/deletions per audit + Wave 0 timing assertion fill-in + e2e fault-injection fixture + final regression sweep
 **Risks / pitfalls**:
   - Don't keep two streaming code paths (legacy POST-streams + new run-stream) longer than one phase — choose one, deprecate the other, delete dead code in this phase.
   - `active-runs` must be queried on the client *before* `loadMessages` settles, otherwise the local message list will appear "missing" the in-flight assistant message until the next reconcile tick. Wire ordering carefully.
@@ -292,7 +297,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Complete    | 2026-05-02 |
 | 061.1. Run-Backed Streaming Cleanup | v2.5 | 2/2 | Complete    | 2026-05-03 |
 | 062. Replay & Tail API | v2.5 | 4/4 | Complete    | 2026-05-03 |
-| 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
+| 063. Frontend Stream Decoupling | v2.5 | 0/5 | In progress | — |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
 
