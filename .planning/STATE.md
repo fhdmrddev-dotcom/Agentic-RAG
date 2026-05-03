@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: planning
+status: ready_to_plan
 stopped_at: Phase 062 context gathered
-last_updated: "2026-05-02T22:01:50.710Z"
-last_activity: 2026-05-02
+last_updated: "2026-05-02T22:05:40.164Z"
+last_activity: 2026-05-02 -- Phase 061.1 execution started
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
   completed_plans: 14
-  percent: 100
+  percent: 63
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 062 — Replay & Tail API
+**Current focus:** Phase 061.1 — run-backed-streaming-cleanup
 
 ## Current Position
 
 Phase: 062
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-05-02
+Last activity: 2026-05-03
 Next action: Phase 061 closed-out 2026-05-02 — verifier returned 17/18 must-haves, manual UAT 5 passed + 1 partial + 2 deferred to 061.1. Persistence-leak bug surfaced and fixed inline (5d8ff10), code-review CR-01/02/03 + WR-03/05 fixed inline. Two follow-on phases now available: (a) `/gsd:discuss-phase 062` to plan Replay & Tail API (the GET /threads/{id}/active-runs + GET /runs/{id}/stream?since=N endpoints that 063's frontend reattach will consume), or (b) `/gsd:discuss-phase 061.1` to run the small parallel cleanup phase (ERR_INCOMPLETE_CHUNKED_ENCODING diagnosis + 5 test-pattern races + WR-01 cursor race + WR-04/06/07 + IN-01..04). 062 and 061.1 are independent and can ship in parallel.
 
 ## Recent Completed Phases

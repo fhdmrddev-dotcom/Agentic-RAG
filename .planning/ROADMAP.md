@@ -285,7 +285,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 059. SSE Architecture Refactor | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 060. Frontend Race Fixes | v2.5 | 3/3 | Complete    | 2026-05-02 |
 | 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Complete    | 2026-05-02 |
-| 061.1. Run-Backed Streaming Cleanup | v2.5 | 0/0 | Not started | — |
+| 061.1. Run-Backed Streaming Cleanup | v2.5 | 2/2 | Complete    | 2026-05-03 |
 | 062. Replay & Tail API | v2.5 | 0/0 | Not started | — |
 | 063. Frontend Stream Decoupling | v2.5 | 0/0 | Not started | — |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
