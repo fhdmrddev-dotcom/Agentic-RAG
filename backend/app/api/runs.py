@@ -37,7 +37,7 @@ from typing import Optional
 from uuid import UUID
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from sse_starlette import EventSourceResponse
 from supabase import Client
@@ -240,3 +240,145 @@ async def stream_run(
         ),
         ping=None,
     )
+
+
+# ───────────────────────────────────────────────────────────────────────
+# DELETE /runs/{run_id}  — cancel verb (D-062-08/09/10/11/12/13).
+# Idempotent across all three sub-paths:
+#   - happy:      in-flight run (RUN_TASKS contains task) → task.cancel() → 204
+#                 (producer's CancelledError handler at threads.py:2110-2116
+#                 + _shielded_finalize finishes ASYNC; DELETE does NOT await)
+#   - zombie:     runs.status='streaming' but RUN_TASKS missing →
+#                 UPDATE Postgres + synthetic 'zombie_healed' sentinel +
+#                 ZREM × 2 + EXPIRE 60 → 204 (D-062-11)
+#   - terminal:   runs.status in {completed, failed, cancelled} →
+#                 204 silent (D-062-09 idempotent)
+#
+# Threats mitigated:
+#   T-062-01 (Information Disclosure): cross-user → 404 via .eq(user_id=...) + RLS
+#            (D-062-12 — never leak existence to other users)
+#   T-062-02 (Tampering / EoP): ownership SELECT runs BEFORE any RUN_TASKS lookup;
+#            cross-user attempts cannot reach task.cancel()
+#   T-062-03 (Information Disclosure stack-trace leak): every Redis op wrapped
+#            in try/except + logger.exception; 204 returned even when every
+#            Redis op fails (Postgres UPDATE is the durable cancel record;
+#            Redis ops are best-effort per D-062-13).
+#
+# IMPORTANT: same RedisError-shadowing rule as stream_run applies here — use
+# the top-level unqualified `RedisError` import, NOT `redis.exceptions.X`,
+# inside the route body (the `redis: aioredis.Redis = Depends(get_redis)`
+# parameter shadows the `redis` module name).
+# ───────────────────────────────────────────────────────────────────────
+@router.delete(
+    "/{run_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def cancel_run(
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    # ── Step 1: ownership SELECT (D-062-08 / D-062-12 / T-062-01 / T-062-02) ──
+    # maybe_single() returns None on no-row instead of raising APIError
+    # (postgrest patch in main.py:22-45 makes this safe). 404 (NOT 403) on
+    # missing row — never leak existence to other users.
+    row_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, status, thread_id")
+        .eq("run_id", str(run_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = row_resp.data if row_resp is not None else None
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found",
+        )
+
+    # ── Step 2: already-terminal → 204 silent (D-062-09 idempotent) ──
+    # NO UPDATE, NO Redis touch — the run is already finalized; re-call has
+    # no observable effect.
+    if row["status"] in ("completed", "failed", "cancelled"):
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # ── Step 3a: happy path — producer alive in RUN_TASKS (D-062-10) ──
+    # task.cancel() schedules the CancelledError; the producer's existing
+    # handler at threads.py:2110-2116 sets _terminal_status='cancelled' and
+    # _shielded_finalize at threads.py:~2123-2138 runs the 5-step finalize
+    # ordering (sentinel → UPDATE → EXPIRE → ZREM → RUN_TASKS.pop)
+    # ASYNCHRONOUSLY. DELETE does NOT await the task — return 204 immediately.
+    task = RUN_TASKS.get(run_id)
+    if task is not None and not task.done():
+        task.cancel()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # ── Step 3b: zombie heal (D-062-11) ──
+    # RUN_TASKS missing but runs.status='streaming' — process restarted,
+    # producer died without finalizing, etc. User intent ("Stop my run") is
+    # honored even when the producer is dead. Each Redis op gets its own
+    # try/except per D-062-13 (T-062-03) — DELETE returns 204 even if every
+    # Redis op fails.
+    thread_id = row["thread_id"]
+    stream_key = f"run:{run_id}"
+
+    # 1. UPDATE Postgres. Best-effort per D-062-13 — primary durability is
+    # the original happy-path cancel; zombie heal is a recovery surface,
+    # not a primary write. If Postgres UPDATE fails here, still return 204
+    # (the operator sees the failure in logger.exception output).
+    try:
+        await aexec(
+            supabase.table("runs").update({
+                "status": "cancelled",
+                "error": "cancelled_by_user",
+                "completed_at": "now()",
+            }).eq("run_id", str(run_id))
+        )
+    except Exception:
+        logger.exception(
+            "Zombie heal Postgres UPDATE failed for run %s", run_id
+        )
+
+    # 2. Synthetic terminal sentinel — gives any attached consumer the event
+    # it needs to break out of the XREAD loop. Only emitted if the buffer
+    # still exists (TTL-expired runs have nothing to attach to).
+    try:
+        if await redis.exists(stream_key):
+            await _emit_terminal(
+                redis, run_id, "cancelled", reason="zombie_healed"
+            )
+    except (RedisError, OSError):
+        logger.exception(
+            "Zombie heal sentinel XADD failed for run %s", run_id
+        )
+
+    # 3. ZREM both sorted sets — keeps active-runs listing honest even
+    # though the producer never got to run its own ZREMs. Each in its own
+    # try block per D-062-13 (don't let one failure mask the other).
+    try:
+        await redis.zrem("runs:active", str(run_id))
+    except (RedisError, OSError):
+        logger.exception(
+            "Zombie heal ZREM runs:active failed for run %s", run_id
+        )
+    try:
+        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
+    except (RedisError, OSError):
+        logger.exception(
+            "Zombie heal ZREM runs_by_thread failed for run %s", run_id
+        )
+
+    # 4. EXPIRE 60s (failed/cancelled bucket per D-061-04). Lets attached
+    # consumers drain the buffer before it disappears.
+    try:
+        await redis.expire(stream_key, 60)
+    except (RedisError, OSError):
+        logger.exception(
+            "Zombie heal EXPIRE failed for run %s", run_id
+        )
+
+    # 5. Always 204 — Postgres UPDATE is the source-of-truth cancel record;
+    # Redis ops are best-effort (D-062-13).
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
