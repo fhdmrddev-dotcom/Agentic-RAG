@@ -1,0 +1,242 @@
+"""Phase 062 — /runs/* endpoint module.
+
+Per D-062-14 file layout: this module owns the ephemeral-buffer surface
+(GET /runs/{id}/stream + DELETE /runs/{id}); GET /threads/{id}/active-runs
+lives in app.api.threads (under the /threads prefix). Imports the registry
+and helper constants from app.api.threads — single source of truth, no
+parallel registry per D-061-11 / D-v2.5-02 (single uvicorn worker).
+
+Contains:
+  - replay_tail_consumer(redis, run_id, since, settings): module-level
+    async generator (D-061.1-10 IN-04 lifted-to-module convention);
+    mirrors event_consumer at threads.py:336-423 with `last_id = since`
+    (D-062-07 cursor parameterization). Same WR-01 carry-forward,
+    TERMINAL_TYPES break, deadline guard, no-op finally (D-061-03).
+  - _synthetic_terminal_generator(runs_status, runs_error): yields exactly
+    one synthetic terminal SSE event mapped via _RUN_STATUS_TO_TERMINAL_TYPE
+    for the TTL-expired path (D-062-06).
+  - GET /runs/{run_id}/stream?since={offset} (D-062-05/06/07/12/13).
+  - DELETE /runs/{run_id} (added in Plan 03; D-062-08/09/10/11/12/13).
+
+Phase 062 ships ZERO new schema (uses public.runs from migration 035) and
+ZERO new dependencies (everything from Phase 061's requirements.txt).
+
+IMPORTANT — imports: `RedisError` is imported at the top of the file via
+`from redis.exceptions import RedisError` (NOT `import redis.exceptions`).
+The route declares `redis: aioredis.Redis = Depends(get_redis)`, which
+shadows the `redis` module name inside the route body. Any `redis.exceptions.X`
+reference inside the route would dereference `.exceptions` on the Redis
+INSTANCE (AttributeError), NOT the module. This convention matches the
+Phase 061 import style at the top of threads.py.
+"""
+import asyncio
+import json
+import logging
+import time as time_mod
+from typing import Optional
+from uuid import UUID
+
+import redis.asyncio as aioredis
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from sse_starlette import EventSourceResponse
+from supabase import Client
+# Top-level import — see module docstring for why `import redis.exceptions`
+# would break inside the route handler (variable shadowing on the `redis`
+# parameter). Phase 061 follows the same convention in threads.py.
+from redis.exceptions import RedisError
+
+from app.api.threads import (
+    RUN_TASKS,
+    TERMINAL_TYPES,
+    _emit_terminal,
+    _RUN_STATUS_TO_TERMINAL_TYPE,
+)
+from app.config import settings
+from app.dependencies import get_current_user, get_redis, get_supabase
+from app.utils.db import aexec
+
+router = APIRouter(prefix="/runs", tags=["runs"])
+logger = logging.getLogger(__name__)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# replay_tail_consumer — 062's analogue of event_consumer at
+# threads.py:336-423. Difference: last_id = since (D-062-07) instead of
+# hardcoded "0". All other invariants preserved verbatim:
+#   - WR-01 (D-061.1-07): carry last_id forward between phases; no `$` reset
+#   - H1 (061.1-DIAGNOSIS.md): BaseException wrapper around per-entry yield
+#   - Deadline = monotonic + run_hard_timeout_seconds + 10
+#   - Break on first TERMINAL_TYPES entry
+#   - finally: pass (D-061-03 — consumer disconnect MUST NOT cancel producer)
+# ───────────────────────────────────────────────────────────────────────
+async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
+    """Two-mode XREAD consumer with `since` cursor (D-062-05/07).
+
+    Mirrors app.api.threads.event_consumer verbatim except for the initial
+    last_id assignment. See that function's docstring for full semantics.
+    Multi-consumer fan-out is implicit at the Redis layer: XREAD is non-
+    destructive, so any number of replay_tail_consumer instances on the
+    same run_id receive identical sequences (foundation for SC#4).
+    """
+    stream_key = f"run:{run_id}"
+    last_id = since
+    deadline = time_mod.monotonic() + settings.run_hard_timeout_seconds + 10
+
+    try:
+        # Phase 1: replay backlog from `since` (no block; immediate return)
+        while True:
+            if time_mod.monotonic() > deadline:
+                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
+                return
+            result = await redis.xread(
+                streams={stream_key: last_id},
+                count=100,
+            )
+            if not result:
+                break
+            for _stream_name, entries in result:
+                for entry_id, fields in entries:
+                    try:
+                        last_id = entry_id  # advance cursor (Pitfall 1)
+                        yield {"data": fields["data"]}
+                        payload = json.loads(fields["data"])
+                        if payload.get("type") in TERMINAL_TYPES:
+                            return
+                    except BaseException:
+                        logger.exception(
+                            "replay_tail_consumer raised mid-yield (replay phase) for run %s",
+                            run_id,
+                        )
+                        raise
+
+        # Phase 2: live-tail (BLOCK 5000) — WR-01: keep last_id; NO `$` reset
+        while True:
+            if time_mod.monotonic() > deadline:
+                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
+                return
+            result = await redis.xread(
+                streams={stream_key: last_id},
+                count=100,
+                block=5000,
+            )
+            if not result:
+                continue   # BLOCK timeout — re-check deadline
+            for _stream_name, entries in result:
+                for entry_id, fields in entries:
+                    try:
+                        last_id = entry_id
+                        yield {"data": fields["data"]}
+                        payload = json.loads(fields["data"])
+                        if payload.get("type") in TERMINAL_TYPES:
+                            return
+                    except BaseException:
+                        logger.exception(
+                            "replay_tail_consumer raised mid-yield (tail phase) for run %s",
+                            run_id,
+                        )
+                        raise
+    finally:
+        # D-061-03: consumer disconnect MUST NOT cancel producer.
+        pass
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Synthetic terminal generator — for TTL-expired buffers (D-062-06).
+# Yields exactly one terminal SSE event then returns; EventSourceResponse
+# closes the response naturally on generator exhaustion.
+# ───────────────────────────────────────────────────────────────────────
+async def _synthetic_terminal_generator(runs_status: str, runs_error: Optional[str]):
+    """Yield ONE synthetic terminal event for a TTL-expired run (D-062-06).
+
+    Maps runs.status → SSE TERMINAL_TYPES via _RUN_STATUS_TO_TERMINAL_TYPE
+    (the same dict the producer's _shielded_finalize uses at threads.py:2109).
+    Defensive case: status='streaming' with redis.exists=0 shouldn't happen,
+    but emit type='error' rather than 500 so client still gets a clean close.
+    """
+    mapped = _RUN_STATUS_TO_TERMINAL_TYPE.get(runs_status)
+    if mapped is None:
+        yield {"data": json.dumps({
+            "type": "error",
+            "error": "buffer_expired_while_streaming",
+            "runs_status": runs_status,
+        })}
+        return
+    yield {"data": json.dumps({
+        "type": mapped,
+        "error": "buffer_expired",
+        "runs_status": runs_status,
+        "runs_error": runs_error,
+    })}
+
+
+# ───────────────────────────────────────────────────────────────────────
+# GET /runs/{run_id}/stream?since={offset}
+# D-062-05 (already-terminal replays naturally), D-062-06 (TTL-expired
+# synthetic terminal), D-062-07 (?since=any string), D-062-12 (404 not 403),
+# D-062-13 (Redis-down → 503 + Retry-After: 10).
+# T-062-01 (cross-user IDOR — mitigated via .eq user_id + 404).
+# T-062-03 (Redis error leak — mitigated via RedisError catch + generic 503).
+# T-062-04 (DoS via parallel consumers — bounded by deadline + bounded pool).
+# ───────────────────────────────────────────────────────────────────────
+@router.get("/{run_id}/stream")
+async def stream_run(
+    run_id: UUID,
+    since: str = "0",
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    # Step 1: ownership SELECT on runs row (D-062-12 / T-062-01).
+    # maybe_single() returns None on no-row instead of raising APIError
+    # (postgrest patch in main.py:22-45 makes this safe).
+    row_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, status, thread_id, error")
+        .eq("run_id", str(run_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = row_resp.data if row_resp is not None else None
+    if not row:
+        # 404 not 403 — don't leak resource existence to other users.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    # Step 2: Redis health probe — bounded by asyncio timeout.
+    # On RedisError or timeout, return 503 with Retry-After: 10 (D-062-13, T-062-03).
+    # NOTE: We use the unqualified `RedisError` (imported at top of file) — NOT
+    # `redis.exceptions.RedisError`. The `redis` parameter above shadows the
+    # `redis` module here, so `redis.exceptions.X` would raise AttributeError
+    # on the Redis instance (it has no `.exceptions` attribute).
+    try:
+        buffer_exists = await asyncio.wait_for(
+            redis.exists(f"run:{run_id}"), timeout=2.0
+        )
+    except (RedisError, asyncio.TimeoutError, OSError):
+        logger.exception("Redis unreachable on GET /runs/%s/stream", run_id)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "Streaming infrastructure unavailable"},
+            headers={"Retry-After": "10"},
+        )
+
+    # Step 3a: live or already-terminal run — buffer present.
+    # Both cases use the same consumer code path; the producer's terminal
+    # sentinel (D-061-12) is in the buffer in both cases, so the loop
+    # breaks naturally and the response closes (D-062-05).
+    if buffer_exists:
+        return EventSourceResponse(
+            replay_tail_consumer(redis=redis, run_id=run_id, since=since, settings=settings),
+            ping=None,
+        )
+
+    # Step 3b: TTL-expired run — emit synthetic terminal mapped from
+    # runs.status (D-062-06). The runs row already exists (validated above);
+    # synthesize a single terminal SSE event matching its status.
+    return EventSourceResponse(
+        _synthetic_terminal_generator(
+            runs_status=row.get("status"),
+            runs_error=row.get("error"),
+        ),
+        ping=None,
+    )

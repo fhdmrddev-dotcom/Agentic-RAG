@@ -20,6 +20,19 @@ from tests.integration.test_059_disconnect import _reset_sse_starlette_app_statu
 THREAD_A = str(uuid4())
 
 
+@pytest.fixture(autouse=True)
+def _reset_redis_singleton():
+    """Reset app.dependencies._redis between tests — see test_062_stream_replay.py
+    for full rationale. Per-file rather than session-wide because only the route
+    handler's `get_redis()` singleton is affected (tests using `redis_client`
+    fixture are unaffected — their client is per-test scoped already).
+    """
+    import app.dependencies as _deps
+    _deps._redis = None
+    yield
+    _deps._redis = None
+
+
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_terminal_run_replays_and_closes(redis_client):

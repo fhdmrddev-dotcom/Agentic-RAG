@@ -22,6 +22,18 @@ from tests.integration.test_059_disconnect import _reset_sse_starlette_app_statu
 THREAD_A = str(uuid4())
 
 
+@pytest.fixture(autouse=True)
+def _reset_redis_singleton():
+    """Reset app.dependencies._redis between tests — see test_062_stream_replay.py
+    for full rationale. Required because the stream route hits the real
+    `get_redis()` singleton (no Redis dependency override).
+    """
+    import app.dependencies as _deps
+    _deps._redis = None
+    yield
+    _deps._redis = None
+
+
 def _mock_runs_returning(mock_supabase, payload):
     """Local helper: configure the runs SELECT to return `payload` (a dict, list, or None)."""
     runs_builder = mock_supabase.table("runs")
