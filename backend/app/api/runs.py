@@ -90,10 +90,29 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
             if time_mod.monotonic() > deadline:
                 yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
                 return
-            result = await redis.xread(
-                streams={stream_key: last_id},
-                count=100,
-            )
+            # WR-03 fix: wrap xread in try/except RedisError. `since` is a free-form
+            # string at the route boundary (D-062-07 contract); a malformed value
+            # (anything not <ms>-<seq> / "0" / "$") makes Redis raise ResponseError
+            # (a RedisError subclass) on the FIRST xread. Without this guard the
+            # exception escapes the generator's outer try/finally (which is just
+            # `pass` per D-061-03) and EventSourceResponse closes the response
+            # with HTTP 200 + zero events — no terminal sentinel, no error event.
+            # Yield a synthetic invalid_since error event so the client gets a
+            # clean SSE termination instead of a silent drop.
+            try:
+                result = await redis.xread(
+                    streams={stream_key: last_id},
+                    count=100,
+                )
+            except RedisError:
+                logger.exception(
+                    "replay_tail_consumer xread (replay phase) raised RedisError "
+                    "for run %s (likely malformed since=%r)",
+                    run_id,
+                    since,
+                )
+                yield {"data": json.dumps({"type": "error", "error": "invalid_since"})}
+                return
             if not result:
                 break
             for _stream_name, entries in result:
@@ -116,11 +135,23 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
             if time_mod.monotonic() > deadline:
                 yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
                 return
-            result = await redis.xread(
-                streams={stream_key: last_id},
-                count=100,
-                block=5000,
-            )
+            # WR-03 fix (defense-in-depth): also wrap the live-tail xread. By the
+            # time we reach Phase 2, last_id has been advanced from `since` to a
+            # real entry id (so RedisError is unlikely here), but a transient
+            # Redis error mid-tail otherwise propagates the same way as Phase 1.
+            try:
+                result = await redis.xread(
+                    streams={stream_key: last_id},
+                    count=100,
+                    block=5000,
+                )
+            except RedisError:
+                logger.exception(
+                    "replay_tail_consumer xread (tail phase) raised RedisError for run %s",
+                    run_id,
+                )
+                yield {"data": json.dumps({"type": "error", "error": "redis_error"})}
+                return
             if not result:
                 # WR-02 fix: if the stream key vanished mid-stream (TTL race
                 # between the route's redis.exists probe and our first xread,
