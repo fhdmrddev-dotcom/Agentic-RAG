@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict feXyLAfgkwHeX8duEbnyXHW1Lmdhw6gwe60eIjHhENuUUlEu5vdOPVm9FDfaiAN
+\restrict DD9hRXqpfGYlU2zVfC2JxpHLyXAXefE30wlTqtysz7RImty2i4qQWVNDPiqlOs8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -108,31 +108,6 @@ BEGIN
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
   ORDER BY rank DESC
-  LIMIT match_count;
-END;
-$$;
-
-
---
--- Name: match_document_chunks(public.vector, uuid, integer, double precision, jsonb); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb) RETURNS TABLE(id uuid, document_id uuid, content text, similarity double precision)
-    LANGUAGE plpgsql SECURITY DEFINER
-    AS $$
-BEGIN
-  RETURN QUERY
-  SELECT
-    dc.id,
-    dc.document_id,
-    dc.content,
-    1 - (dc.embedding <=> query_embedding) AS similarity
-  FROM public.document_chunks dc
-  JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id
-    AND 1 - (dc.embedding <=> query_embedding) > match_threshold
-    AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
-  ORDER BY dc.embedding <=> query_embedding
   LIMIT match_count;
 END;
 $$;
@@ -374,7 +349,7 @@ CREATE TABLE public.documents (
     is_latest boolean DEFAULT true NOT NULL,
     full_markdown text,
     ingestion_step text,
-    CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'extracting_tables'::text, 'extracting_images'::text, 'completed'::text, 'failed'::text])))
+    CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
 
@@ -423,9 +398,6 @@ CREATE TABLE public.messages (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     tool_calls jsonb,
     source_refs jsonb,
-    confidence_level text,
-    confidence_avg_similarity double precision,
-    confidence_disclaimer text,
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text])))
 );
 
@@ -510,8 +482,7 @@ CREATE TABLE public.skills (
     is_enabled boolean DEFAULT true NOT NULL,
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    embedding public.vector(1536)
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -839,20 +810,6 @@ CREATE INDEX skill_files_skill_id_idx ON public.skill_files USING btree (skill_i
 --
 
 CREATE INDEX skill_files_user_id_idx ON public.skill_files USING btree (user_id);
-
-
---
--- Name: skills_embedding_hnsw_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX skills_embedding_hnsw_idx ON public.skills USING hnsw (embedding public.vector_cosine_ops);
-
-
---
--- Name: skills_enabled_user_idx; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX skills_enabled_user_idx ON public.skills USING btree (is_enabled, user_id) WHERE (is_enabled = true);
 
 
 --
@@ -1567,5 +1524,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict feXyLAfgkwHeX8duEbnyXHW1Lmdhw6gwe60eIjHhENuUUlEu5vdOPVm9FDfaiAN
+\unrestrict DD9hRXqpfGYlU2zVfC2JxpHLyXAXefE30wlTqtysz7RImty2i4qQWVNDPiqlOs8
 
