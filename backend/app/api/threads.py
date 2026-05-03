@@ -326,6 +326,103 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
     return unique
 
 
+# Phase 061.1 IN-04 (D-061.1-10): event_consumer lifted from inside send_message
+# to module level so unit tests can drive it directly with a mock redis. Behavior
+# unchanged from the previous closure: same XREAD calls, same yield shape, same
+# deadline arithmetic, same TERMINAL_TYPES break logic. The defensive H1 wrapper
+# bundled by 061.1-DIAGNOSIS.md is included around the inner per-entry yield
+# bodies so future regressions of D-v2.5-08 (silent generator aborts) become
+# observable in logs.
+async def event_consumer(redis, run_id: _uuid_mod.UUID, settings):
+    """Two-mode XREAD consumer (D-061-12) — module-level (IN-04).
+
+    Phase 061 contract inversion (D-061-03): killing the consumer
+    does NOT kill the producer. This generator's finally MUST NOT
+    cancel the producer task — the producer's lifetime is independent
+    and bounded by asyncio.timeout (D-061-01).
+
+    Replay phase reads any backlog with COUNT 100 STREAMS run:{id} 0;
+    tail phase live-tails with BLOCK 5000 carrying last_id forward
+    (WR-01 D-061.1-07: no `$` reset between phases).
+    Breaks on first entry whose data.type is in TERMINAL_TYPES.
+    Defensive deadline = run_hard_timeout_seconds + 10 catches
+    producer-crash-without-sentinel.
+
+    H1 wrapper (061.1-DIAGNOSIS.md): the per-entry yield bodies are wrapped in
+    `try/except BaseException` that logs and re-raises. We don't suppress the
+    real error — we just instrument it so a future regression that lets a
+    BaseException silently abort the generator becomes observable.
+    """
+    stream_key = f"run:{run_id}"
+    last_id = "0"
+    deadline = time_mod.monotonic() + settings.run_hard_timeout_seconds + 10
+
+    try:
+        # Phase 1: replay backlog (no block; immediate return)
+        while True:
+            if time_mod.monotonic() > deadline:
+                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
+                return
+            result = await redis.xread(
+                streams={stream_key: last_id},
+                count=100,
+            )
+            if not result:
+                break
+            for _stream_name, entries in result:
+                for entry_id, fields in entries:
+                    try:
+                        last_id = entry_id   # advance cursor (Pitfall 1)
+                        yield {"data": fields["data"]}
+                        payload = json.loads(fields["data"])
+                        if payload.get("type") in TERMINAL_TYPES:
+                            return
+                    except BaseException:
+                        # H1 (061.1-DIAGNOSIS.md): convert silent generator
+                        # aborts into observable log entries. Re-raise so the
+                        # caller still sees the original error (no suppression).
+                        logger.exception("event_consumer raised mid-yield (replay phase) for run %s", run_id)
+                        raise
+
+        # Phase 2: live-tail (BLOCK 5000)
+        # WR-01 (D-061.1-07): keep last_id at the last replayed entry id (or '0'
+        # if replay drained empty). Resetting to '$' opened a race window where
+        # entries XADDed between drain and first tail xread were silently missed.
+        # XREAD with a past id + BLOCK still returns only NEW entries arriving
+        # after the call — equivalent semantics, no race.
+        while True:
+            if time_mod.monotonic() > deadline:
+                yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
+                return
+            result = await redis.xread(
+                streams={stream_key: last_id},
+                count=100,
+                block=5000,
+            )
+            if not result:
+                continue   # BLOCK timeout — re-check deadline
+            for _stream_name, entries in result:
+                for entry_id, fields in entries:
+                    try:
+                        last_id = entry_id   # CRITICAL: advance from $ to actual id (Pitfall 1)
+                        yield {"data": fields["data"]}
+                        payload = json.loads(fields["data"])
+                        if payload.get("type") in TERMINAL_TYPES:
+                            return
+                    except BaseException:
+                        # H1 (061.1-DIAGNOSIS.md): see replay-phase comment above.
+                        logger.exception("event_consumer raised mid-yield (tail phase) for run %s", run_id)
+                        raise
+    finally:
+        # D-061-03: do NOT cancel the producer task here. The consumer
+        # disconnect must NOT kill the producer; producer survives
+        # until natural completion or asyncio.timeout fires.
+        # (Compare to 059's event_consumer at line ~1880-1888 which
+        # DID cancel the producer — that contract is intentionally
+        # inverted in 061; D-061-16 documents this in test_059.)
+        pass
+
+
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
     current_user: dict = Depends(get_current_user),
@@ -2070,77 +2167,6 @@ async def send_message(
         RUN_TASKS.pop(_rid, None)
     task.add_done_callback(_evict)
 
-    async def event_consumer():
-        """Two-mode XREAD consumer (D-061-12).
-
-        Phase 061 contract inversion (D-061-03): killing the consumer
-        does NOT kill the producer. This generator's finally MUST NOT
-        cancel the producer task — the producer's lifetime is independent
-        and bounded by asyncio.timeout (D-061-01).
-
-        Replay phase reads any backlog with COUNT 100 STREAMS run:{id} 0;
-        tail phase live-tails with BLOCK 5000 STREAMS run:{id} $.
-        Breaks on first entry whose data.type is in TERMINAL_TYPES.
-        Defensive deadline = run_hard_timeout_seconds + 10 catches
-        producer-crash-without-sentinel.
-        """
-        stream_key = f"run:{run_id}"
-        last_id = "0"
-        deadline = time_mod.monotonic() + settings.run_hard_timeout_seconds + 10
-
-        try:
-            # Phase 1: replay backlog (no block; immediate return)
-            while True:
-                if time_mod.monotonic() > deadline:
-                    yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
-                    return
-                result = await redis.xread(
-                    streams={stream_key: last_id},
-                    count=100,
-                )
-                if not result:
-                    break
-                for _stream_name, entries in result:
-                    for entry_id, fields in entries:
-                        last_id = entry_id   # advance cursor (Pitfall 1)
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
-                        if payload.get("type") in TERMINAL_TYPES:
-                            return
-
-            # Phase 2: live-tail (BLOCK 5000)
-            # WR-01 (D-061.1-07): keep last_id at the last replayed entry id (or '0'
-            # if replay drained empty). Resetting to '$' opened a race window where
-            # entries XADDed between drain and first tail xread were silently missed.
-            # XREAD with a past id + BLOCK still returns only NEW entries arriving
-            # after the call — equivalent semantics, no race.
-            while True:
-                if time_mod.monotonic() > deadline:
-                    yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
-                    return
-                result = await redis.xread(
-                    streams={stream_key: last_id},
-                    count=100,
-                    block=5000,
-                )
-                if not result:
-                    continue   # BLOCK timeout — re-check deadline
-                for _stream_name, entries in result:
-                    for entry_id, fields in entries:
-                        last_id = entry_id   # CRITICAL: advance from $ to actual id (Pitfall 1)
-                        yield {"data": fields["data"]}
-                        payload = json.loads(fields["data"])
-                        if payload.get("type") in TERMINAL_TYPES:
-                            return
-        finally:
-            # D-061-03: do NOT cancel the producer task here. The consumer
-            # disconnect must NOT kill the producer; producer survives
-            # until natural completion or asyncio.timeout fires.
-            # (Compare to 059's event_consumer at line ~1880-1888 which
-            # DID cancel the producer — that contract is intentionally
-            # inverted in 061; D-061-16 documents this in test_059.)
-            pass
-
     # H2 (D-061.1-04): disable sse-starlette ping to eliminate the keep-alive
     # injection race during burst→quiet patterns (e.g., sub-agent flows that
     # emit ~1000 sub_agent_delta events then go briefly idle). The ping task
@@ -2150,4 +2176,11 @@ async def send_message(
     # ERR_INCOMPLETE_CHUNKED_ENCODING. We don't need keep-alive: the producer
     # survives consumer disconnect (D-v2.5-08) and Phase 063 owns the frontend
     # reattach mechanism (D-v2.5-05) for genuinely-idle reconnection.
-    return EventSourceResponse(event_consumer(), ping=None)
+    #
+    # IN-04 (D-061.1-10): event_consumer is now a module-level async generator
+    # (see definition above _deduplicate_citations). Pass redis/run_id/settings
+    # explicitly instead of relying on closure capture.
+    return EventSourceResponse(
+        event_consumer(redis=redis, run_id=run_id, settings=settings),
+        ping=None,
+    )
