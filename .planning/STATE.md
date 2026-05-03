@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: executing
+status: ready_to_plan
 stopped_at: Phase 062 plan 02 complete — next is 062-03
 last_updated: "2026-05-03T10:39:33.356Z"
 last_activity: 2026-05-03
 progress:
   total_phases: 8
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
   completed_plans: 16
-  percent: 89
+  percent: 63
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 062 (Replay & Tail API) — EXECUTING
-Plan: 3 of 4 (next: 062-02-PLAN.md)
-Status: Ready to execute
+Phase: 063
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-03
 Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module with `replay_tail_consumer` + `GET /runs/{rid}/stream` + register router in main.py + Wave 0 stubs for SC#2 + SC#5(stream)). 062-01 shipped: `GET /threads/{tid}/active-runs` returns Pydantic-bound list filtered to status='streaming', ORDER BY started_at DESC; ownership SELECT runs first with 404 (NOT 403) per D-062-12. D-062-14 file-layout discipline confirmed (45 insertions / 0 deletions in threads.py; off-limits regions untouched).
 
