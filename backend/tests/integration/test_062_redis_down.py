@@ -58,6 +58,10 @@ def _build_dead_redis():
     dead.expire = _raise
     dead.xread = _raise
     dead.aclose = _raise
+    # WR-04 fix: cancel_run now SETNX-locks the zombie-heal sentinel XADD;
+    # the dead-redis simulator must fail SET too so the failure mode is
+    # consistent (every Redis op raises ConnectionError → DELETE still 204).
+    dead.set = _raise
     return dead
 
 
