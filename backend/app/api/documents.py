@@ -696,10 +696,10 @@ def ingest_document(
                 extract_and_store_tables,
                 extract_and_store_images,
             )
-            supabase.table("documents").update({"status": "extracting_tables"}).eq("id", document_id).execute()
+            supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute()
             extract_and_store_tables(raw, mime_type, document_id, user_id, supabase)
 
-            supabase.table("documents").update({"status": "extracting_images"}).eq("id", document_id).execute()
+            supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute()
             extract_and_store_images(raw, mime_type, document_id, user_id, supabase, app_settings)
 
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
