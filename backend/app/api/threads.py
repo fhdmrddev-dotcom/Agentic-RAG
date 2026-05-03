@@ -742,15 +742,34 @@ async def send_message(
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    # Insert user message (D-058-02: pre-stream INSERT in scope for 058)
-    await aexec(
+    # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
+    # Phase 063 (D-063-01): capture inserted user_message id for the new
+    # JSONResponse contract — the frontend uses this to deduplicate its
+    # optimistic placeholder against the persisted row. Per RESEARCH Open
+    # Question #1, this is the USER-message id (the only one that exists
+    # synchronously; the assistant message is persisted at terminal time).
+    _user_msg_resp = await aexec(
         supabase.table("messages").insert({
             "thread_id": thread_id,
             "user_id": current_user["id"],
             "role": "user",
             "content": body.content,
-        })
+        }).select("id").single()
     )
+    _user_msg_id = (_user_msg_resp.data or {}).get("id") if _user_msg_resp is not None else None
+    if not _user_msg_id:
+        # Defensive: PostgREST should always return the inserted row when
+        # .select("id").single() is chained. If it doesn't, fail loudly here
+        # so the frontend never gets a partial {message_id: null, run_id: ...}
+        # response that would silently break optimistic placeholder dedup.
+        logger.error(
+            "User-message INSERT did not return id for thread %s — aborting send_message",
+            thread_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist user message",
+        )
 
     # Phase 061 (D-061-05, D-061-10, D-061-11): generate run_id, INSERT
     # the runs lifecycle row, register the producer task, and ZADD the
