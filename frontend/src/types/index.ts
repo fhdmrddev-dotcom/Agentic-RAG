@@ -92,6 +92,10 @@ export interface Message {
   isPlanning?: boolean
   /** True if the user clicked Stop — shows "Response stopped" indicator instead of "Saving response…" */
   stopped?: boolean
+  /** Phase 063 (D-063-04 / RESEARCH Open Question 2): the Redis Stream run_id this assistant message is/was streamed from. Set by reconcile and sendMessage paths; absent for DB-only loaded messages until backfilled. Used by Stop semantics (DELETE /runs/{runId}) and Resume button visibility logic. */
+  runId?: string
+  /** Phase 063 (D-063-04): lifecycle status of the underlying run. Mirrors public.runs.status enum values. Resume button surfaces ONLY when runStatus === 'failed' (per D-063-04 / D-v2.5-05 — no auto-retry for paid LLM calls). */
+  runStatus?: "streaming" | "completed" | "failed" | "cancelled"
 }
 
 export interface DocumentMetadata {
