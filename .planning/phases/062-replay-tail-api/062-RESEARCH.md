@@ -946,10 +946,10 @@ async def test_delete_zombie_heals(redis_client):
 - **Expected pass criteria:** `events1 == events2`; both end with terminal type. Bonus: assert at least one event arrived AFTER both consumers connected (proves true live-tail).
 
 **Test: `test_062_cross_user_404.py` (multi-test file)**
-- Tests: `test_active_runs_other_user_returns_empty`, `test_get_stream_other_user_returns_404`, `test_delete_other_user_returns_404`.
-- **What it verifies:** D-062-12 — every endpoint applies `.eq("user_id", current_user["id"])`; cross-user → 404 (or `[]` for active-runs).
-- **Mock/fixture requirements:** Override `get_current_user` dependency with two distinct user IDs; insert runs row tagged with user A; query as user B.
-- **Expected pass criteria:** Active-runs returns `[]`; stream returns 404; DELETE returns 404. No 403 anywhere.
+- Tests: `test_active_runs_other_user_returns_404`, `test_get_stream_other_user_returns_404`, `test_delete_other_user_returns_404`.
+- **What it verifies:** D-062-12 — every endpoint applies `.eq("user_id", current_user["id"])` and the thread/runs ownership SELECT raises 404 (NOT 403, NOT 200) on missing row; don't leak resource existence to other users.
+- **Mock/fixture requirements:** Override `get_current_user` dependency with two distinct user IDs; the threads/runs ownership SELECT returns no row for user B (RLS + `.eq("user_id", ...)` filter); query as user B.
+- **Expected pass criteria:** Active-runs returns 404; stream returns 404; DELETE returns 404. No 403, no 200 with `[]`, anywhere.
 
 **Test: `test_062_redis_down.py::test_stream_returns_503_on_redis_unreachable`** (recommended optional)
 - **What it verifies:** D-062-13 — stream endpoint returns 503 with `Retry-After: 10` when Redis is down.
@@ -1086,27 +1086,31 @@ None. All claims tagged `[ASSUMED]` are listed in the Assumptions Log below.
 | A5 | `EventSourceResponse(generator, ping=None)` properly closes when the generator returns (consumer naturally exits the two-mode loop on terminal sentinel) | EventSourceResponse Pattern | Very Low — verified by 061's existing usage and 061.1's H2 fix; the disconnect mechanism is independent of ping |
 | A6 | The DEF-061.1-02 classifier bug is in `agent_runner`'s `except Exception` handler at `threads.py:2072-2076` (the bug is _terminal_status="failed" being correct in code but somehow producing "completed" in tests) — this research did not run the proposed isolation test (`pytest test_061_ttl.py::test_failed_run_expires_60s -x`) due to sandbox restrictions on starting Docker/Redis | Pitfall 3 + Open Questions | Medium — actual root cause may be elsewhere (e.g., the producer's `finally` is committing `_terminal_status='completed'` because the default at line 768 is "completed" and the except handler doesn't override under some race). The investigation work itself is the recommended Wave 0 task; this research surfaces the pattern, not the fix |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **What is the actual disposition for DEF-061.1-02 (producer exception classifier)?**
    - **What we know:** Three failing tests (`test_failed_run_expires_60s`, `test_120s_timeout_fires_full_finally`, `test_producer_continues_after_consumer_disconnect`) reproduce identically pre- and post-Plan 02, all asserting that a simulated LLM exception produces `_terminal_status='failed'` but the producer is writing `'completed'` in some path. The exception classifier in `agent_runner` (visible at `threads.py:2057-2076`) reads correctly in code, but the test mocks observe `'completed'` UPDATEs.
    - **What's unclear:** (i) whether the bug is in the classifier itself or in the order-of-operations between the inner try/finally and the assignment to `_terminal_status`; (ii) whether the fix is 1-line or larger; (iii) whether the failing tests have an orthogonal root cause (e.g., the simulated LLM exception class isn't reaching the `except Exception` handler because of a re-raise upstream).
-   - **Recommendation:** **Disposition (a) — investigate as Wave 0 / Plan 0.** Spend 1-2 hours running `pytest backend/tests/integration/test_061_ttl.py::test_failed_run_expires_60s -x -s` against the current `threads.py` and inspecting `mock_supabase.table("runs").update.call_args_list`. If the bug is a 1-line fix in `agent_runner`'s exception classifier, ship the fix in 062 Plan 0 (single commit, separate task) and remove the `-k` exclusion clause from 062's baseline regression sweep. If the fix is larger (>2 tasks), escalate to disposition (b) (insert 061.2 cleanup phase). If the test failures are orthogonal (e.g., wrong exception class in mock), update `deferred-items.md` and proceed with disposition (c) — keep the `-k` exclusion.
+   - **Recommendation:** Disposition (a) — investigate as Wave 0 / Plan 0; if fix is bounded, land in 062, otherwise escalate.
+   - **RESOLVED:** Disposition (b) — defer to a future 061.2 cleanup phase. See `062-01-PLAN.md` `must_haves.deferred` and ROADMAP Phase 062 entry. The classifier code at `threads.py:2057-2076` is partitioned OUT of 062 by D-062-14 to prevent merge conflicts on the long-lived `v2.5-stream` feature branch. The misclassification only affects audit metadata: a wrong-bucket 'completed' run is filtered out of active-runs anyway by D-062-02's `WHERE status='streaming'`, so 062's user-visible contract (active-runs / stream / DELETE UX) is unaffected. Until 061.2 lands, 062's full-suite verify inherits 061.1's canonical `-k "not (test_normal_stream_unchanged or test_failed_run_expires_60s or test_120s_timeout_fires_full_finally or test_producer_continues_after_consumer_disconnect)"` exclusion clause.
 
 2. **Should `RUN_TASKS` / `TERMINAL_TYPES` / etc. be extracted to `_run_registry.py` in 062?**
    - **What we know:** CONTEXT.md flags this as Claude's Discretion. Direct import from `app.api.threads` is the smallest diff; extraction is the cleaner long-term shape but adds two file moves and import-path updates across 5+ test files.
    - **What's unclear:** Whether the indirect import will create test isolation pain when 062's tests need to mock `RUN_TASKS` cleanly.
-   - **Recommendation:** **Direct import in 062.** Defer extraction unless the planner discovers test isolation pain during execution. This is consistent with the same Discretion call in 061 (D-061-09 follow-up).
+   - **Recommendation:** Direct import in 062.
+   - **RESOLVED:** Direct import from `app.api.threads` (no extraction). All four 062 plans use `from app.api.threads import RUN_TASKS, TERMINAL_TYPES, _emit_terminal, _RUN_STATUS_TO_TERMINAL_TYPE`. Smallest diff; matches the Discretion call in 061 (D-061-09 follow-up). Revisit only if test isolation pain surfaces during execution.
 
 3. **Should the multi-consumer fan-out test (SC#4) use `httpx.AsyncClient + ASGITransport` (canonical) or fall back to direct `redis_client.xread` polling?**
    - **What we know:** `[CITED: github.com/encode/httpx/discussions/1787]` documents same-loop hang with `c.stream()` on SSE endpoints. The test skeleton in Code Examples uses two parallel clients via `asyncio.gather`; this MAY work because the producer is already running independently (not a single-loop blocker).
    - **What's unclear:** Whether the parallel-client pattern actually demonstrates SC#4 end-to-end or hangs on the test's own event loop.
-   - **Recommendation:** Try the parallel-client pattern first (it's the truer end-to-end test). If it hangs, fall back to a data-layer verification: have one `httpx.AsyncClient` consume via the new GET endpoint and another `redis_client.xread` directly — both should see identical entries. Mark the chosen approach in the test docstring with a brief explanation.
+   - **Recommendation:** Try parallel-client pattern first; fall back to data-layer verification on hang.
+   - **RESOLVED:** Plan 04 ships the parallel `httpx.AsyncClient` pattern as primary, with a documented data-layer fallback in the test docstring (one client through the endpoint + one direct `redis_client.xread`). The chosen path is recorded in `test_062_multi_consumer_fanout.py::test_two_consumers_receive_identical_sequences` docstring at execution time.
 
 4. **Does the `replay_tail_consumer` need to actively check `request.is_disconnected()`?**
    - **What we know:** `[CITED: deepwiki.com/sysid/sse-starlette/3.5-client-disconnection-detection]` notes that without `ping`, sse-starlette still has passive disconnect detection via `_listen_for_disconnect`. But active checking is recommended for prompt cleanup.
    - **What's unclear:** Whether passive detection is sufficient for 062's deadline + sentinel architecture, or whether explicit `request.is_disconnected()` polling adds real value.
-   - **Recommendation:** Skip explicit `request.is_disconnected()` polling. The consumer's `finally: pass` (D-061-03 contract) means there's no producer-side cleanup that depends on prompt consumer disconnect. The deadline + sentinel mechanism handles termination. This matches the existing `event_consumer` at `threads.py:336-423`.
+   - **Recommendation:** Skip explicit polling.
+   - **RESOLVED:** Omitted. Plan 02's `replay_tail_consumer` uses the passive sse-starlette disconnect detection only — no `request.is_disconnected()` polling. The consumer's `finally: pass` (D-061-03 contract) means there's no producer-side cleanup that depends on prompt consumer disconnect; the deadline + sentinel mechanism handles termination. Matches the existing `event_consumer` at `threads.py:336-423`.
 
 ## Metadata
 
