@@ -867,29 +867,31 @@ useEffect(() => {
 
 **No high-risk assumptions remain unverified.** The only unverified item is A6 (bfcache + active fetch streams), which is a 064 harness concern, not a 063 implementation concern.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should the user-message INSERT return `messages.id`, or is `run_id` sufficient for the response?**
+> All five open questions resolved during planning (2026-05-03). Recommendations carried into Plans 01–05; see plan-checker verification report for traceability.
+
+1. **Should the user-message INSERT return `messages.id`, or is `run_id` sufficient for the response?** [RESOLVED]
    - What we know: D-063-01 mandates `{message_id, run_id}` response shape.
    - What's unclear: Whether `message_id` here means the user's message id (so the frontend can replace its optimistic placeholder) OR the assistant message id (which doesn't exist yet — the assistant message is persisted only at terminal time).
    - Recommendation: `message_id` = user-message id (it's the only one that exists synchronously). Planner confirms in PLAN.md.
 
-2. **Where does `currentRunId` state live for the Stop flow when reconciling existing runs?**
+2. **Where does `currentRunId` state live for the Stop flow when reconciling existing runs?** [RESOLVED]
    - What we know: Stop must `DELETE /runs/{rid}`; the rid is the run currently streaming for the active thread.
    - What's unclear: When a reconcile attaches to a run started by another tab, the local `currentRunIdRef` was never set by THIS tab's `sendMessage`. So the Stop button needs to read run_id from the placeholder message itself (or from a Map keyed by thread_id).
    - Recommendation: Store `runId` on the assistant Message object (extend the Message type with optional `runId: string` and `runStatus: 'streaming' | 'completed' | 'failed' | 'cancelled'`). Stop reads from the latest assistant message with `runStatus === 'streaming'`. Same source of truth for Resume button.
 
-3. **Should the legacy frontend `streamMessage` function be removed entirely or kept as a thin compat shim that delegates to `postMessage` + `subscribeToRun`?**
+3. **Should the legacy frontend `streamMessage` function be removed entirely or kept as a thin compat shim that delegates to `postMessage` + `subscribeToRun`?** [RESOLVED]
    - What we know: Single-developer dev project, no external API consumers. D-063-01's "no backwards compatibility shim" applies to backend.
    - What's unclear: Frontend doesn't need a shim — but rewriting all callers in one diff is cleaner than leaving an alias.
    - Recommendation: Delete `streamMessage` outright; rewrite the two callers (`useMessages.sendMessage` and any test fixtures) to use the new functions. Smaller surface area.
 
-4. **Backend integration test cleanup scope — which specific test files reference the legacy POST-stream contract?**
+4. **Backend integration test cleanup scope — which specific test files reference the legacy POST-stream contract?** [RESOLVED]
    - What we know: CONTEXT.md flags `test_058_*`, `test_059_*`, `test_061_*`. 062-VERIFICATION.md inherits 4 exclusions (DEF-061.1-01, DEF-061.1-02 carry-forward).
    - What's unclear: Whether the new tests (062's 9 test files) contain implicit references to the legacy POST shape that break post-cutover.
    - Recommendation: Wave 0 of 063 includes a test-audit task — `grep -rn 'EventSourceResponse\|streamMessage\|POST.*messages' backend/tests/integration/` and triage each match.
 
-5. **Resume button click handler — does it call `sendMessage(...)` (which inserts a NEW user message + new run) or a different "retry" path that reuses the failed run's user message?**
+5. **Resume button click handler — does it call `sendMessage(...)` (which inserts a NEW user message + new run) or a different "retry" path that reuses the failed run's user message?** [RESOLVED]
    - What we know: D-063-04 says "re-POSTs the original user message via the new POST contract".
    - What's unclear: Whether re-POSTing means literally INSERTing a duplicate user-message row in the messages table, or whether the backend deduplicates based on content+thread+timestamp.
    - Recommendation: Re-POST literally. The backend POST handler doesn't dedupe today; adding dedup here is scope creep. Two identical user-messages in the history is the correct semantic for "I want to retry this exact prompt with a fresh LLM call" — it's also what ChatGPT does when you click Regenerate.
