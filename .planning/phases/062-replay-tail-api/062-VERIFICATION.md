@@ -1,7 +1,7 @@
 ---
 phase: 062-replay-tail-api
 verified: 2026-05-03T00:00:00Z
-status: human_needed
+status: passed
 score: 20/21 must-haves verified
 nyquist_compliant: true
 last_updated: 2026-05-03
