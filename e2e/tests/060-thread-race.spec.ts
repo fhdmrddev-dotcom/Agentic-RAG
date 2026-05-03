@@ -35,7 +35,16 @@ async function signIn(page: Page) {
   await emailInput.fill(TEST_EMAIL)
   await page.locator('input[type="password"]').fill(TEST_PASSWORD)
   await page.getByRole("button", { name: /sign in/i }).click()
-  await expect(page.getByText(/new chat/i)).toBeVisible({ timeout: 15_000 })
+  // Plan 05 (063-05) signed-in landmark: the "New Chat" affordance lives
+  // in two places — visible text on mobile (ChatLayout.tsx:111) and an
+  // icon-only button with title="New Chat" on desktop (NavPanel.tsx:311).
+  // Match either via accessible role + name (Playwright's accessible-name
+  // computation reads `title` attributes), so the helper works across
+  // viewports. Falls back to the text matcher for layouts that ship a
+  // visible label.
+  await expect(
+    page.getByRole("button", { name: /new chat/i }).or(page.getByText(/new chat/i)).first(),
+  ).toBeVisible({ timeout: 15_000 })
 }
 
 async function createNewThread(page: Page): Promise<void> {
@@ -90,9 +99,14 @@ test.describe("Phase 060 — Thread navigation race (STREAM-02a)", () => {
     // We seed Thread A with a marker user message and then start the long stream.
     await sendMessageInActiveThread(page, `${THREAD_A_USER_MARKER}: ${LONG_STREAM_PROMPT}`)
 
-    // Wait for streaming to actually begin (assistant bubble appears with empty content)
+    // Wait for streaming to actually begin (assistant bubble appears with empty content).
+    // Plan 05 (063-05) added stable data-testid attributes to MessageItem; the original
+    // 060 selector ([data-role="assistant"], .bg-muted) never matched the assistant
+    // bubble in the current DOM (.bg-muted only appears on the user avatar wrapper),
+    // so the locator was relying on .bg-muted catching SOMETHING — not stable. Switch
+    // to the Plan-05 stable selector.
     await expect(
-      page.locator('[data-role="assistant"], .bg-muted').first(),
+      page.locator('[data-testid="assistant-message"]').first(),
     ).toBeVisible({ timeout: 15_000 })
 
     // Give the stream ~3-4 seconds to produce visible content so the abort is meaningful

@@ -22,7 +22,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
 
   if (isUser) {
     return (
-      <div className="flex justify-end py-2 animate-fadeSlideUp">
+      <div className="flex justify-end py-2 animate-fadeSlideUp" data-testid="user-message">
         <div className="flex items-end gap-2.5 max-w-[70%]">
           <div className="gradient-primary text-white rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-sm">
             <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -51,7 +51,11 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
     : null
 
   return (
-    <div className="group flex gap-3 py-3 animate-fadeSlideUp">
+    <div
+      className="group flex gap-3 py-3 animate-fadeSlideUp"
+      data-testid="assistant-message"
+      data-streaming={isStreaming ? "true" : "false"}
+    >
       <div className="flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20">
         <Bot className="w-4 h-4 text-white" />
       </div>

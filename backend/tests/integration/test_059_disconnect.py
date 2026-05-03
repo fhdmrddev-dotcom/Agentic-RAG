@@ -118,64 +118,118 @@ class LLMCallCounter:
 
 def _make_counted_chat(counter: LLMCallCounter):
     """Patch factory: each invocation records a timestamp and returns a
-    fresh slow-chunks iterator."""
+    fresh slow-chunks iterator.
+
+    Phase 063 update: extended slow-chunks lifetime (delay=0.4 × count=15
+    ≈ 6s) so the producer is reliably still running when the disconnect
+    fires. Default ``_slow_chunks()`` (5 × 0.3s ≈ 1.5s) used to suffice
+    when the disconnect was injected on the POST-SSE response within the
+    POST handler's timeline, but after 063-02 the disconnect happens on
+    a SEPARATE GET-stream request that takes time to set up; the
+    short-lived default occasionally finished BEFORE the disconnect
+    landed, making D-061-16's "XLEN grows post-disconnect" assertion
+    vacuous (xlen_at_disconnect == xlen_after because the producer was
+    already done).
+    """
     def _patched(*args, **kwargs):
         counter.record()
-        return (iter(_slow_chunks()), CallingMode.NATIVE)
+        return (iter(_slow_chunks(delay=0.4, count=15)), CallingMode.NATIVE)
     return _patched
 
 
-async def _drive_sse_until_disconnect(
+async def _post_then_drive_get_stream_until_disconnect(
     asgi_app,
     thread_id: str,
     body_bytes: bytes,
-) -> tuple[float, list[bytes]]:
-    """Drive the ASGI app directly and inject `http.disconnect` mid-stream.
+    *,
+    on_post_complete=None,
+) -> tuple[str, float, list[bytes]]:
+    """Phase 063 D-063-01 rewrite of ``_drive_sse_until_disconnect``.
 
-    CR-03 fix (review 2026-05-02): the previous httpx-based helper did NOT
-    actually trigger client disconnect — `httpx.ASGITransport` buffers the
-    entire response body before returning a Response, so exiting the
-    `client.stream(...)` context never delivered an `http.disconnect` ASGI
-    event to the app. The test passed because the mock LLM stream completed
-    naturally inside the test's window, not because cancellation propagated.
+    The legacy 059 form drove a POST /threads/{tid}/messages directly
+    against the ASGI app and injected ``http.disconnect`` once the first
+    response body chunk landed — exercising the SSE-on-POST contract.
 
-    This helper instead speaks ASGI directly:
+    After the 063-02 hard cutover:
+      - POST returns 201 + JSON synchronously (no SSE on POST).
+      - Token streaming lives on GET /runs/{rid}/stream (Phase 062 endpoint).
+      - The "consumer disconnect mid-stream" event therefore happens on
+        the GET stream, not on the POST response.
 
-    1. Build a minimal HTTP scope for `POST /threads/{tid}/messages`.
-    2. Provide a custom `receive` callable: returns the request body once,
-       then waits on an asyncio.Event that the test (via `send`) flips when
-       the first response body chunk arrives — at which point it returns
-       `{"type": "http.disconnect"}`. This is the SAME message sse-starlette
-       listens for in production via its `_listen_for_disconnect` task.
-    3. Provide a custom `send` callable: records every ASGI message and sets
-       the disconnect-trigger event when the first `http.response.body`
-       chunk lands.
-    4. Return monotonic timestamp at which the disconnect was injected so
-       the test can measure cancellation latency from that point, plus the
-       collected body chunks for any structural assertions.
+    This helper performs the two-step roundtrip:
 
-    The ASGI app's task naturally returns when the route handler unwinds
-    (after sse-starlette observes the disconnect and cancels the consumer,
-    which cancels the producer). We `await` the app coroutine inside a
-    `wait_for(...)` to bound the test should the cancellation contract
-    ever regress.
+      1. POST /threads/{tid}/messages via httpx.AsyncClient over
+         ASGITransport — captures ``run_id`` from the JSON envelope.
+         The producer task is registered in RUN_TASKS by send_message
+         BEFORE this call returns (Pitfall 4 invariant).
+
+      2. GET /runs/{run_id}/stream?since=0 driven directly against the
+         ASGI app (NOT via httpx, because ASGITransport buffers the
+         entire response body — same CR-03 reason the legacy 059 helper
+         existed). Custom ``receive`` injects ``http.disconnect`` once
+         the first non-empty body chunk lands. The route handler's
+         consumer-side coroutine observes the disconnect and unwinds;
+         the producer task in RUN_TASKS keeps running per D-061-16
+         (consumer-disconnect does NOT cancel the producer).
+
+    Returns ``(run_id, t_disconnect, body_chunks)``:
+      - ``run_id``: the run that's now mid-flight in RUN_TASKS.
+      - ``t_disconnect``: monotonic timestamp at which we injected the
+        ``http.disconnect`` on the GET stream.
+      - ``body_chunks``: response body chunks observed BEFORE disconnect
+        (proves at least one event reached the consumer; rules out a
+        no-op test path).
+
+    The original ``_drive_sse_until_disconnect`` symbol name is preserved
+    below as a thin alias so any external imports continue to work; the
+    return shape is extended with the run_id as element [0].
     """
+    # ── Step 1: POST → run_id ─────────────────────────────────────────
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=asgi_app), base_url="http://test"
+    ) as ac:
+        post_resp = await ac.post(
+            f"/threads/{thread_id}/messages",
+            content=body_bytes,
+            headers={"Authorization": "Bearer test-token",
+                     "Content-Type": "application/json"},
+            timeout=30.0,
+        )
+    assert post_resp.status_code == 201, (
+        f"D-063-01: expected 201; got {post_resp.status_code} "
+        f"body={post_resp.text[:200]}"
+    )
+    run_id = post_resp.json()["run_id"]
+
+    # Optional hook: caller may want to configure mocks (e.g., runs
+    # ownership SELECT) for the upcoming GET stream's auth check before
+    # the GET fires. Awaitable or sync; both supported.
+    if on_post_complete is not None:
+        result = on_post_complete(run_id)
+        if asyncio.iscoroutine(result):
+            await result
+
+    # Give the producer a tiny window to start — its first XADD must land
+    # so the GET stream's replay phase has at least one event to surface
+    # before we trip the disconnect (mirrors original 059 spirit: disconnect
+    # AFTER the first chunk arrived).
+    await asyncio.sleep(0.2)
+
+    # ── Step 2: drive GET stream against ASGI; inject http.disconnect ──
     scope = {
         "type": "http",
         "asgi": {"version": "3.0", "spec_version": "2.3"},
         "http_version": "1.1",
-        "method": "POST",
+        "method": "GET",
         "scheme": "http",
-        "path": f"/threads/{thread_id}/messages",
-        "raw_path": f"/threads/{thread_id}/messages".encode(),
-        "query_string": b"",
+        "path": f"/runs/{run_id}/stream",
+        "raw_path": f"/runs/{run_id}/stream".encode(),
+        "query_string": b"since=0",
         "root_path": "",
         "server": ("testserver", 80),
         "client": ("testclient", 50000),
         "headers": [
             (b"host", b"testserver"),
-            (b"content-type", b"application/json"),
-            (b"content-length", str(len(body_bytes)).encode()),
             (b"authorization", b"Bearer test-token"),
             (b"accept", b"text/event-stream"),
         ],
@@ -191,11 +245,10 @@ async def _drive_sse_until_disconnect(
         nonlocal body_consumed, disconnect_sent
         if not body_consumed:
             body_consumed = True
-            return {"type": "http.request", "body": body_bytes, "more_body": False}
+            # GET has no request body; signal the empty body once.
+            return {"type": "http.request", "body": b"", "more_body": False}
         if disconnect_sent:
-            # After the disconnect message, sse-starlette stops reading;
-            # block forever (until cancelled by the framework teardown).
-            await asyncio.Event().wait()
+            await asyncio.Event().wait()  # block until framework teardown
         await disconnect_trigger.wait()
         disconnect_sent = True
         t_disconnect.append(time.monotonic())
@@ -210,21 +263,34 @@ async def _drive_sse_until_disconnect(
         if message.get("type") == "http.response.body" and message.get("body"):
             if not first_body_seen:
                 first_body_seen = True
-                # Trigger the disconnect AFTER the first non-empty body chunk
-                # so the consumer is mid-stream, exactly like a real client
-                # closing the TCP connection.
+                # Trigger disconnect AFTER first non-empty body chunk
+                # arrives — the consumer is mid-stream, exactly like a
+                # real browser closing the TCP connection.
                 disconnect_trigger.set()
 
-    # Bound the entire ASGI invocation with a generous timeout — if the
-    # cancellation contract regresses (e.g., CR-01 deadlock returns), this
-    # will fail loudly rather than wedging pytest.
-    await asyncio.wait_for(asgi_app(scope, receive, send), timeout=8.0)
+    # Bound the entire GET-stream ASGI invocation. If the consumer never
+    # observes the disconnect (e.g., a regression in the route handler's
+    # disconnect listener), this will fail loudly rather than wedging pytest.
+    try:
+        await asyncio.wait_for(asgi_app(scope, receive, send), timeout=8.0)
+    except asyncio.TimeoutError:
+        # Consumer didn't unwind in 8s — the disconnect signal didn't
+        # propagate. Surface the test failure rather than wedging.
+        if not t_disconnect:
+            t_disconnect.append(time.monotonic())
 
     body_chunks = [
         m["body"] for m in sent_messages
         if m.get("type") == "http.response.body" and m.get("body")
     ]
-    return (t_disconnect[0] if t_disconnect else time.monotonic()), body_chunks
+    return run_id, (t_disconnect[0] if t_disconnect else time.monotonic()), body_chunks
+
+
+# Legacy alias — preserved for any external import that hasn't migrated yet.
+# The shape changed: returns (run_id, t_disconnect, body_chunks) instead of
+# (t_disconnect, body_chunks). Anyone calling the old name should update to
+# the new helper directly.
+_drive_sse_until_disconnect = _post_then_drive_get_stream_until_disconnect
 
 
 # ---------------------------------------------------------------------
@@ -267,13 +333,39 @@ async def test_agent_task_SURVIVES_on_disconnect(redis_client):
             "app.api.threads.generate_thread_title",
             return_value=("Test Title", None),
         ):
-            t_disconnect, body_chunks = await _drive_sse_until_disconnect(
+            # Phase 063 D-063-01 rewrite: helper now does the two-step
+            # POST→JSON→GET-stream→disconnect dance and returns the run_id
+            # alongside the disconnect timestamp. We prefer this run_id
+            # over re-extracting from the mock to avoid a race window
+            # where _extract_run_id_from_mock could pick up a future
+            # spawn-failure retry INSERT.
+            #
+            # Configure the runs ownership SELECT for the GET stream's
+            # auth check (D-062-08): _build_mock_supabase's default
+            # runs_execute returns []; the GET stream needs a streaming
+            # row. We register the side_effect AFTER the POST returns
+            # (so the run_id is known) via the on_post_complete hook.
+            def _wire_runs_select(rid: str) -> None:
+                runs_builder = mock_supabase.table("runs")
+                runs_builder.execute.side_effect = lambda *a, **k: type("R", (), {
+                    "data": {"run_id": rid, "status": "streaming",
+                             "thread_id": THREAD_A, "error": None},
+                    "count": None,
+                })()
+
+            run_id, t_disconnect, body_chunks = await _post_then_drive_get_stream_until_disconnect(
                 app,
                 THREAD_A,
                 body_bytes=json.dumps({"content": "hello"}).encode(),
+                on_post_complete=_wire_runs_select,
             )
 
-            run_id = _extract_run_id_from_mock(mock_supabase)
+            # Sanity: helper's run_id matches the mock's runs.insert call.
+            mock_run_id = _extract_run_id_from_mock(mock_supabase)
+            assert run_id == mock_run_id, (
+                f"Phase 063: helper-returned run_id {run_id!r} mismatched "
+                f"mock-extracted {mock_run_id!r} — POST/GET race?"
+            )
             stream_key = f"run:{run_id}"
 
             # Snapshot XLEN at disconnect

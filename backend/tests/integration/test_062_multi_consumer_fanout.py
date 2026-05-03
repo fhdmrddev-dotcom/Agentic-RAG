@@ -113,23 +113,37 @@ async def test_two_consumers_receive_identical_sequences(redis_client):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            # Step 1: POST → producer spins up; read first chunk to confirm
-            # producer started, then disconnect from the POST stream.
+            # Step 1: POST → producer spins up.
+            # Phase 063 D-063-01 rewrite: POST returns 201 + JSON envelope
+            # synchronously; the producer task runs detached. We no longer
+            # need to drain a single SSE chunk to "spawn" the producer —
+            # the runs INSERT (and RUN_TASKS registration) is complete by
+            # the time POST returns.
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as ac:
-                async with ac.stream(
-                    "POST", f"/threads/{THREAD_A}/messages",
+                resp = await ac.post(
+                    f"/threads/{THREAD_A}/messages",
                     content=json.dumps({"content": "hello"}),
                     headers={"Authorization": "Bearer test-token",
                              "Content-Type": "application/json"},
                     timeout=30.0,
-                ) as r:
-                    async for _line in r.aiter_lines():
-                        break
+                )
+                assert resp.status_code == 201, (
+                    f"D-063-01: expected 201; got {resp.status_code} body={resp.text[:200]}"
+                )
 
             # Step 2: extract the run_id from mock_supabase's runs INSERT
             run_id_str = _extract_run_id_from_mock(mock_supabase)
+
+            # Phase 063 D-063-01 / Pitfall 4: POST returns synchronously
+            # while the producer is still scheduling its first XADD. Give
+            # the producer a small window to enter its body so each GET
+            # stream consumer's replay phase has events to surface
+            # (otherwise consumer 2's slower start may observe an empty
+            # Redis key + runs.status='streaming' and synthesize
+            # 'buffer_expired_while_streaming' instead of tailing).
+            await asyncio.sleep(0.2)
 
             # Step 3: configure the runs SELECT mock so each consumer's
             # ownership SELECT in stream_run() returns a streaming row.

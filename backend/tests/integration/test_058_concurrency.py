@@ -145,16 +145,42 @@ def _build_mock_supabase():
 
 
 async def _consume_sse(client: httpx.AsyncClient, thread_id: str) -> None:
-    """Open the SSE stream and read until exhausted or cancelled.
+    """Phase 063 D-063-01 rewrite: POST → JSON, then open GET stream.
 
-    No assertions here — the only role of this coroutine is to keep the SSE
-    connection open while the cross-tab GET races against it.
+    Original 058 form drained SSE off a single POST request. After the
+    063-02 hard cutover, POST returns 201 + JSON synchronously, then the
+    client opens a separate GET /runs/{rid}/stream to consume tokens.
+    We replicate that two-step shape here so the cross-tab race in the
+    parent test exercises the GET stream's open period (the modern
+    equivalent of "while SSE is in-flight").
+
+    No assertions here — the only role of this coroutine is to keep the
+    GET stream connection open while the cross-tab GET races against it.
+
+    The slow messages.INSERT (058 SLOW_INSERT_DELAY) happens INSIDE the
+    POST handler, before this function gets the run_id. Under the 058
+    aexec wrapping, that INSERT is parked on a threadpool worker and the
+    event loop is free for the cross-tab GET — that's the original
+    D-058-09 invariant, and it still holds under 063 (the slow-INSERT
+    is on the POST path, not the GET stream path).
     """
     try:
-        async with client.stream(
-            "POST",
+        # Phase 063 step 1: POST returns JSON synchronously.
+        post_resp = await client.post(
             f"/threads/{thread_id}/messages",
             json={"content": "hello"},
+            headers={"Authorization": "Bearer test-token"},
+            timeout=30.0,
+        )
+        if post_resp.status_code != 201:
+            return  # nothing to subscribe to; let the parent assertion run
+        run_id = post_resp.json().get("run_id")
+        if not run_id:
+            return
+        # Phase 063 step 2: open GET stream and drain until done.
+        async with client.stream(
+            "GET",
+            f"/runs/{run_id}/stream?since=0",
             headers={"Authorization": "Bearer test-token"},
             timeout=30.0,
         ) as r:

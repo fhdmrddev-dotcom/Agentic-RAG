@@ -145,3 +145,17 @@ app.include_router(skills.router)
 app.include_router(audit.router)
 app.include_router(knowledge_health.router)
 app.include_router(feedback.router)
+
+
+# Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
+# Threat T-063-05-01: gated by ENABLE_TEST_FIXTURES=1 so the route does
+# NOT exist in production. CI/staging/prod env files MUST NOT set this
+# variable. The mount also emits a startup warning when enabled so any
+# misconfigured production deploy is loud.
+if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
+    from app.api.test_fixtures import router as test_fixtures_router  # noqa: E402
+    app.include_router(test_fixtures_router)
+    logger.warning(
+        "ENABLE_TEST_FIXTURES=1 — /__test__/inject-failed-run endpoint is "
+        "MOUNTED. This MUST NOT happen in production (Phase 063 T-063-05-01)."
+    )
