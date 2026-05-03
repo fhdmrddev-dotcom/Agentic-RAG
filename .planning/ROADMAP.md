@@ -266,7 +266,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   - [x] 063-02-PLAN.md — Wave 1: Backend POST contract rewrite — JSONResponse {message_id, run_id} HTTP 201 + delete event_consumer (D-063-01 hard cutover)
   - [x] 063-03-PLAN.md — Wave 2: Frontend API layer — split streamMessage into postMessage + subscribeToRun + getActiveRuns + cancelRun; extend Message type with runId/runStatus
   - [x] 063-04-PLAN.md — Wave 3: Frontend hook + components — useMessages reconcile + Stop=DELETE + resumeFromFailed; ChatArea reconcile triggers (mount/focus/visibilitychange/pageshow w/ bfcache); MessageItem Resume button
-  - [ ] 063-05-PLAN.md — Wave 4: Legacy-test rewrites/deletions per audit + Wave 0 timing assertion fill-in + e2e fault-injection fixture + final regression sweep
+  - [x] 063-05-PLAN.md — Wave 4: Legacy-test rewrites/deletions per audit + Wave 0 timing assertion fill-in + e2e fault-injection fixture + final regression sweep
 **Risks / pitfalls**:
   - Don't keep two streaming code paths (legacy POST-streams + new run-stream) longer than one phase — choose one, deprecate the other, delete dead code in this phase.
   - `active-runs` must be queried on the client *before* `loadMessages` settles, otherwise the local message list will appear "missing" the in-flight assistant message until the next reconcile tick. Wire ordering carefully.
