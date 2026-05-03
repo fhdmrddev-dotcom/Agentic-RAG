@@ -2101,7 +2101,11 @@ async def send_message(
                             return
 
             # Phase 2: live-tail (BLOCK 5000)
-            last_id = "$"
+            # WR-01 (D-061.1-07): keep last_id at the last replayed entry id (or '0'
+            # if replay drained empty). Resetting to '$' opened a race window where
+            # entries XADDed between drain and first tail xread were silently missed.
+            # XREAD with a past id + BLOCK still returns only NEW entries arriving
+            # after the call — equivalent semantics, no race.
             while True:
                 if time_mod.monotonic() > deadline:
                     yield {"data": json.dumps({"type": "error", "error": "consumer_timeout"})}
