@@ -347,3 +347,68 @@ async def await_producer_finalized(
             f"Producer task for run_id={run_id} did not finalize within {timeout}s. "
             f"RUN_TASKS keys: {list(RUN_TASKS.keys())}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 062 helpers (D-062-11 zombie-state setup; SC#3 zombie-heal coverage)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def setup_zombie_state(
+    redis_client,
+    mock_supabase,
+    run_id,
+    thread_id,
+    *,
+    n_entries: int = 1,
+):
+    """Set up a zombie state for DELETE testing (D-062-11).
+
+    Zombie = ``runs.status='streaming'`` in Postgres but ``RUN_TASKS[run_id]``
+    is missing (process restarted, producer died without finalizing, etc.).
+    The DELETE handler's "happy path" branch (RUN_TASKS lookup → task.cancel)
+    cannot run; it must fall through to the zombie-heal branch instead.
+
+    Effects:
+      1. XADD ``n_entries`` delta entries to ``run:{run_id}`` (no producer
+         involved — bypasses the normal producer XADD path entirely).
+      2. ZADD ``run_id`` to ``runs:active`` and ``runs_by_thread:{thread_id}``
+         sorted sets (mirrors the producer-side ZADDs from threads.py:642-643).
+      3. Configure ``mock_supabase.table('runs').execute`` to return a
+         streaming-status row so the DELETE auth check (D-062-08) passes.
+
+    After calling this, the test fires DELETE and asserts the 4 zombie-heal
+    effects per D-062-11:
+      (a) Postgres UPDATE called with ``status='cancelled'`` and
+          ``error='cancelled_by_user'``
+      (b) Synthetic terminal sentinel ``{type: 'cancelled', reason: 'zombie_healed'}``
+          landed in the Stream (gives any attached consumer a clean break)
+      (c) ZREM cleared the run_id from BOTH sorted sets (runs:active and
+          runs_by_thread:{thread_id})
+      (d) EXPIRE 60s applied to the stream key (failed/cancelled bucket per
+          D-061-04)
+    """
+    import json
+    import time as _time
+
+    stream_key = f"run:{run_id}"
+    for i in range(n_entries):
+        await redis_client.xadd(
+            stream_key,
+            {"data": json.dumps({"type": "delta", "content": f"tok{i}"})},
+        )
+    score = _time.time()
+    await redis_client.zadd("runs:active", {str(run_id): score})
+    await redis_client.zadd(f"runs_by_thread:{thread_id}", {str(run_id): score})
+
+    # Configure mock SELECT — returns the streaming row needed by the DELETE
+    # auth check (D-062-08). Mock-shape mirrors the live Postgres row from
+    # the producer's INSERT (threads.py:610) plus the maybe_single() unwrap.
+    runs_builder = mock_supabase.table("runs")
+    runs_builder.execute.side_effect = lambda *a, **k: type("R", (), {
+        "data": {
+            "run_id": str(run_id),
+            "status": "streaming",
+            "thread_id": str(thread_id),
+        },
+        "count": None,
+    })()

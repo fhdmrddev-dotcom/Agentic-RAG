@@ -140,3 +140,72 @@ async def test_get_stream_other_user_returns_404():
     finally:
         app.dependency_overrides.pop(get_supabase, None)
         app.dependency_overrides.pop(get_current_user, None)
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 062 Plan 03 (D-062-12, T-062-01, T-062-02, SC#5 delete side):
+# cross-user DELETE /runs/{rid} returns 404 (NOT 403, NOT 204).
+# ───────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_delete_other_user_returns_404():
+    """D-062-12 / T-062-01 + T-062-02 / SC#5: cross-user DELETE → 404 (NOT 403).
+
+    Critical for T-062-02 (Tampering / EoP): the ownership SELECT in Step 1
+    of the DELETE handler MUST run BEFORE any RUN_TASKS lookup. A user who
+    does not own a runs row cannot reach the ``task = RUN_TASKS.get(run_id)``
+    line — they get a 404 first. Even if RUN_TASKS contained a run_id from
+    another user, the ownership SELECT 404s the request before ``task.cancel()``
+    could run, so cross-user cancel attacks are defeated at Step 1.
+
+    Anti-false-RED guards:
+      - assert detail == 'Run not found' (route's HTTPException), not
+        FastAPI's default 'Not Found' for unregistered routes
+      - assert runs_execute_called (the route actually ran the SELECT)
+    """
+    mock_supabase = _build_mock_supabase()
+    run_id = uuid4()
+    runs_execute_called = []
+
+    runs_builder = mock_supabase.table("runs")
+
+    def _runs_execute(*a, **k):
+        runs_execute_called.append((a, k))
+        return _make_result(None)  # RLS+ownership filter found no row
+
+    runs_builder.execute.side_effect = _runs_execute
+
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    app.dependency_overrides[get_current_user] = lambda: OTHER_USER
+    try:
+        async with httpx.AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            resp = await c.delete(
+                f"/runs/{run_id}",
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+        # D-062-12: cross-user DELETE → 404, NOT 403, NOT 204
+        assert resp.status_code == 404, (
+            f"Expected 404 (NOT 403, NOT 204) on cross-user DELETE; "
+            f"got {resp.status_code} body={resp.text}"
+        )
+        # Anti-false-RED guard: route's HTTPException uses 'Run not found';
+        # FastAPI's default unregistered-route 404 uses 'Not Found' (different).
+        body = resp.json()
+        assert body.get("detail") == "Run not found", (
+            f"Expected detail='Run not found' (route's HTTPException); got {body!r}"
+        )
+        # Anti-false-RED guard: route must have actually executed the runs SELECT.
+        # If the DELETE route is missing entirely, FastAPI returns 405 or default
+        # 404 BEFORE the SELECT runs.
+        assert runs_execute_called, (
+            "Expected runs ownership SELECT to be called; "
+            "DELETE route may not be registered"
+        )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
