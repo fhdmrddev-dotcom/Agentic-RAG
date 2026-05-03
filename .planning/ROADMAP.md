@@ -262,8 +262,8 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   6. Bug 3 regression guard: no tool-result JSON leaks into chat content; the streaming-format messages built up by SSE deltas remain authoritative (Phase 060's invariants preserved).
   7. Resume button: if `active-runs` returns a `failed` run (producer errored), surface a Resume button rather than silently retrying — preserves D-v2.5-05's principle of explicit user intent for paid LLM retries.
 **Plans**: 5 plans
-  - [ ] 063-01-PLAN.md — Wave 0: 5 stub test files (3 backend + 2 e2e) RED-failing for contract reasons + legacy POST-SSE test audit document
-  - [ ] 063-02-PLAN.md — Wave 1: Backend POST contract rewrite — JSONResponse {message_id, run_id} HTTP 201 + delete event_consumer (D-063-01 hard cutover)
+  - [x] 063-01-PLAN.md — Wave 0: 5 stub test files (3 backend + 2 e2e) RED-failing for contract reasons + legacy POST-SSE test audit document
+  - [x] 063-02-PLAN.md — Wave 1: Backend POST contract rewrite — JSONResponse {message_id, run_id} HTTP 201 + delete event_consumer (D-063-01 hard cutover)
   - [ ] 063-03-PLAN.md — Wave 2: Frontend API layer — split streamMessage into postMessage + subscribeToRun + getActiveRuns + cancelRun; extend Message type with runId/runStatus
   - [ ] 063-04-PLAN.md — Wave 3: Frontend hook + components — useMessages reconcile + Stop=DELETE + resumeFromFailed; ChatArea reconcile triggers (mount/focus/visibilitychange/pageshow w/ bfcache); MessageItem Resume button
   - [ ] 063-05-PLAN.md — Wave 4: Legacy-test rewrites/deletions per audit + Wave 0 timing assertion fill-in + e2e fault-injection fixture + final regression sweep
