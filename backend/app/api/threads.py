@@ -2164,11 +2164,17 @@ async def send_message(
                             logger.exception("Terminal sentinel XADD failed for run %s", run_id)
 
                         # 3. UPDATE runs row — status/error/completed_at/message_id/tokens
+                        # WR-01 fix: Python-side ISO-8601 timestamp instead of the literal string
+                        # "now()". PostgREST sends update payloads as JSON over the wire; "now()"
+                        # arrives as a JSON string and timestamptz only treats the bare token 'now'
+                        # (no parens) as a special literal. The "now()" form may store a literal
+                        # string, return NULL, or error depending on column/version — silently
+                        # corrupting the canonical run completion timestamp.
                         try:
                             await aexec(supabase.table("runs").update({
                                 "status": _terminal_status,
                                 "error": _terminal_error,
-                                "completed_at": "now()",
+                                "completed_at": datetime.now(timezone.utc).isoformat(),
                                 "message_id": _msg_id_for_runs,
                                 # input_tokens/output_tokens: filled if SDK surfaced usage; NULL otherwise (RESEARCH.md Q1)
                             }).eq("run_id", str(run_id)))

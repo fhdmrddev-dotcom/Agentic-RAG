@@ -33,6 +33,7 @@ import asyncio
 import json
 import logging
 import time as time_mod
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -328,12 +329,18 @@ async def cancel_run(
     # the original happy-path cancel; zombie heal is a recovery surface,
     # not a primary write. If Postgres UPDATE fails here, still return 204
     # (the operator sees the failure in logger.exception output).
+    # WR-01 fix: Python-side ISO-8601 timestamp instead of the literal string
+    # "now()". PostgREST sends update payloads as JSON over the wire; "now()"
+    # arrives as a JSON string and timestamptz only treats the bare token 'now'
+    # (no parens) as a special literal. The "now()" form may store a literal
+    # string, return NULL, or error depending on column/version — silently
+    # degrading the zombie-heal contract. Symmetric with _shielded_finalize.
     try:
         await aexec(
             supabase.table("runs").update({
                 "status": "cancelled",
                 "error": "cancelled_by_user",
-                "completed_at": "now()",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
             }).eq("run_id", str(run_id))
         )
     except Exception:
