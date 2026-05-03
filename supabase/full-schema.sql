@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict DD9hRXqpfGYlU2zVfC2JxpHLyXAXefE30wlTqtysz7RImty2i4qQWVNDPiqlOs8
+\restrict qPLUHuo1GcgCXeKcC2LORugO4UMxe1VOPVRjdFL2o7ylfnviUGPwhXvhbDzSOrT
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -398,6 +398,9 @@ CREATE TABLE public.messages (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     tool_calls jsonb,
     source_refs jsonb,
+    confidence_level text,
+    confidence_avg_similarity double precision,
+    confidence_disclaimer text,
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text])))
 );
 
@@ -1524,5 +1527,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DD9hRXqpfGYlU2zVfC2JxpHLyXAXefE30wlTqtysz7RImty2i4qQWVNDPiqlOs8
+\unrestrict qPLUHuo1GcgCXeKcC2LORugO4UMxe1VOPVRjdFL2o7ylfnviUGPwhXvhbDzSOrT
 
