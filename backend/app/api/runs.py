@@ -122,6 +122,27 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                 block=5000,
             )
             if not result:
+                # WR-02 fix: if the stream key vanished mid-stream (TTL race
+                # between the route's redis.exists probe and our first xread,
+                # or producer finalize → EXPIRE 60 → TTL-zero arriving inside
+                # the BLOCK window), don't keep BLOCKing until the hard
+                # deadline. Emit a synthetic terminal-shaped error event and
+                # return so the client gets a clean close instead of waiting
+                # the full run_hard_timeout_seconds + 10 for consumer_timeout.
+                try:
+                    if not await redis.exists(stream_key):
+                        yield {"data": json.dumps({
+                            "type": "error",
+                            "error": "buffer_expired_during_tail",
+                        })}
+                        return
+                except (RedisError, OSError):
+                    # Best-effort probe; if it fails, fall through to the
+                    # original deadline-based behavior rather than dying.
+                    logger.exception(
+                        "replay_tail_consumer post-BLOCK exists probe failed for run %s",
+                        run_id,
+                    )
                 continue   # BLOCK timeout — re-check deadline
             for _stream_name, entries in result:
                 for entry_id, fields in entries:
