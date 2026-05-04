@@ -594,14 +594,64 @@ async def get_messages(
     if not thread.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    response = await aexec(
+    # 1. Fetch messages — UNCHANGED from the pre-063.1 implementation.
+    msgs_resp = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
         .order("created_at")
     )
-    return response.data
+    messages = msgs_resp.data or []
+
+    # 2. D-063.1-13 / Gap-002 fix: enrich each assistant row with run_id +
+    # run_status from public.runs via the message_id FK (migration 035 line 24,
+    # ON DELETE SET NULL). Two queries + Python merge per project convention —
+    # the codebase has NO precedent for PostgREST embedded selects (verified
+    # via grep audit in 063.1-PATTERNS.md line 1001).
+    #
+    # Both queries hit existing indexes — messages: thread_id; runs:
+    # idx_runs_history on (user_id, thread_id, started_at DESC) per migration
+    # 035 line 44. Result-set sizes are bounded by thread length.
+    #
+    # Defense-in-depth: .eq("user_id", ...) alongside RLS policy
+    # runs_select_own (migration 035 lines 47-49). Mirrors list_active_runs
+    # at threads.py:393-401 (D-062-12).
+    #
+    # T-063.1-01 mitigation: the threads ownership SELECT above runs FIRST,
+    # so cross-user requests 404 before reaching this runs SELECT. Verified
+    # by tests/integration/test_063_1_messages_runs_join.py
+    # (test_cross_user_messages_get_404_no_leak).
+    #
+    # T-063.1-04 mitigation: runs SELECT explicitly enumerates
+    # "run_id, message_id, status" — does NOT include error/model/provider/
+    # input_tokens/output_tokens. Pydantic MessageResponse only carries
+    # run_id and run_status, so no accidental field leakage.
+    #
+    # D-062-14 file-layout: this endpoint lives at line 580; the new merge
+    # extends to ~line 640 — well outside the off-limits 2057-2076 region.
+    runs_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, message_id, status")
+        .eq("thread_id", thread_id)
+        .eq("user_id", current_user["id"])
+    )
+    runs_by_message = {
+        r["message_id"]: r
+        for r in (runs_resp.data or [])
+        if r.get("message_id") is not None
+    }
+
+    # 3. Zip — assistant rows with FK matches get run_id/run_status populated;
+    # user rows and pre-run-backed assistant rows return null (Resume button
+    # only renders when runStatus === "failed", so null is the correct
+    # "no Resume" signal).
+    for m in messages:
+        run = runs_by_message.get(m["id"])
+        m["run_id"] = run["run_id"] if run else None
+        m["run_status"] = run["status"] if run else None
+
+    return messages
 
 
 def _reconstruct_history(history_rows: list[dict]) -> list[dict]:
