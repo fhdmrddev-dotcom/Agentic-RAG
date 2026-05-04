@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
-last_updated: "2026-05-04T21:27:25Z"
-last_activity: 2026-05-04 -- Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+stopped_at: Completed 063.1-03-PLAN.md (thread-switch SSE persistence — drop abortStream + guardedSetMessages in sendMessage)
+last_updated: "2026-05-04T21:44:49.368Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 28
-  completed_plans: 25
-  percent: 89
+  completed_plans: 26
+  percent: 93
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 063.1 (frontend-stream-decoupling-gap-closure) — EXECUTING
-Plan: 3 of 5
-Status: Executing Phase 063.1 — Wave 2 done; Wave 3 next
-Last activity: 2026-05-04 -- Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+Plan: 4 of 5
+Status: Ready to execute
+Last activity: 2026-05-04
 Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from `ChatArea.tsx:95` thread-change useEffect; lift `guardedSetMessages` into sendMessage gating on `streamingThreadIdRef.current === activeThreadIdRef.current`; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10). 063.1-02 shipped: lastSeenOffsetRef Map declared adjacent to subscriptionsRef; api.ts getMessages snake→camel mapper for run_id/run_status; subscribeToRun parser captures Redis Stream `id:` lines and fires optional onCursor callback after each successful data: dispatch (terminal branches return early); reconcile rewritten with runId-match dedup (Gap-001), narrowed `subscriptionsRef.has()` short-circuit (Gap-003 partial), and cached cursor in subscribeToRun (Gap-004). ChatArea.tsx untouched (Plan 03's scope). 3 atomic commits (b011db8 RED test, e4a00fb api.ts GREEN, 454125d useMessages.ts) + SUMMARY/STATE/ROADMAP commit. tsc --build --noEmit clean for the 3 touched files. Vitest can't run locally (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); tests committed and gated via TypeScript per the plan's `<verify>` block.
 
 ## Recent Completed Phases
@@ -75,6 +75,7 @@ Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence:
 | Phase 062 P02 | 7min | 2 tasks | 5 files |
 | 063.1 | 01 | 13min | 3 | 3 (1 created, 2 modified) |
 | 063.1 | 02 | 12min | 2 (3 commits — RED + 2 GREEN) | 3 (modified) |
+| Phase 063.1 P03 | 18min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,11 @@ Recent decisions affecting v2.5 work:
 - Phase 063.1 plan 02: onCursor fires AFTER the type-specific dispatch and is SKIPPED on terminal branches (stream_end/error/cancelled return early) — cursor advancement is meaningless once the run has ended; lastEventId resets to undefined after each fire so cursor-less legacy frames don't inherit stale ids
 - Phase 063.1 plan 02: reused messagesRef.current (already declared at useMessages.ts:316-319 for stopStreaming WR-03 fix) for the runId-match dedup; same pattern, same justification, no second ref needed
 - Phase 063.1 plan 02 (Rule 3 deferred-item): vitest cannot run locally on this machine due to missing rolldown native binding cascade (npm optional-dep bug — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec not installed); tests committed and gated via TypeScript compilation per the plan's `<verify>` block; runtime test execution deferred to CI / freshly `npm install`-ed environment
+- Phase 063.1 plan 03: inline guardedSetMessages in sendMessage rather than lifting WR-05 to a hook-level helper — reconcile's guard captures activeThreadIdRef !== threadId-snapshot while sendMessage's guard captures streamingThreadIdRef !== activeThreadIdRef; semantically different signatures, so a unified helper would just add indirection
+- Phase 063.1 plan 03: dropped abortStream from ChatArea destructure since the only call site is the one being removed (D-063.1-07); abortStream stays exported from useMessages and consumed by genuine-timeout paths (loadMessages's loadAbortRef)
+- Phase 063.1 plan 03: D-063.1-10 audit confirmed single useMessages consumer (ChatArea.tsx:39) and stable mount lifetime (no key=thread.id on ChatArea); hook unmount effect only fires on logout/route change — documented in a comment block above the unmount effect
+- Phase 063.1 plan 03 (Rule 1 verify-command bug): plan's grep -rn 'useMessages()' src | wc -l == 1 check is too broad — matches the function declaration too; semantically the audit (single consumer in ChatArea) passes via grep -v 'export function useMessages' precision filter
+- Phase 063.1 plan 03 (Rule 3 deferred-item carried forward from Plan 02): vitest runtime unavailable on this machine (npm optional-dep cascade); TDD ceremony simplified to TypeScript-gated single commit with behavior cases documented in commit body — matches plan's actual <verify> gate (tsc + grep)
 
 ### Pending Todos
 
@@ -154,8 +160,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-04T21:27:25Z
-Stopped at: Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+Last session: 2026-05-04T21:44:49.359Z
+Stopped at: Completed 063.1-03-PLAN.md (thread-switch SSE persistence — drop abortStream + guardedSetMessages in sendMessage)
 Next: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from ChatArea.tsx:95 thread-change useEffect; lift guardedSetMessages into sendMessage gating on streamingThreadIdRef === activeThreadIdRef; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10).
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
