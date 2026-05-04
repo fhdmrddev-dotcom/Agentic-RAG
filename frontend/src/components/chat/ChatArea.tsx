@@ -138,6 +138,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // that recreates reconcile mid-stream would tear down + re-add the
   // visibility/focus/pageshow listeners and re-fire reconcile while the
   // previous one is still resolving.
+  //
+  // WR-08 invariant (load-bearing — read before refactoring):
+  //   This ref-update effect is correct ONLY because `reconcile` is
+  //   currently stable across re-renders — its useCallback deps are
+  //   `[loadMessages]`, and loadMessages's deps are `[]`, so its
+  //   identity never changes after first mount. If a future change
+  //   adds a dep to either useCallback that mutates between renders,
+  //   `reconcile` will gain a new identity per render. React runs
+  //   effects in declaration order on each render, so the listener
+  //   effect below could fire `reconcileRef.current(...)` in response
+  //   to (e.g.) visibilitychange BEFORE this ref-update effect has
+  //   committed the latest `reconcile` — invoking the OLD captured
+  //   reconcile with stale closure-state. Fixes available if that
+  //   ever lands: either commit the ref synchronously via a direct
+  //   `reconcileRef.current = reconcile` at the top of render (no
+  //   effect), or accept the listener re-attach cost by making
+  //   `reconcile` a dep of the listener effect below.
   const reconcileRef = useRef(reconcile)
   useEffect(() => {
     reconcileRef.current = reconcile
