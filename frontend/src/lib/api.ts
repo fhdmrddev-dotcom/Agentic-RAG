@@ -54,13 +54,23 @@ export async function getMessages(threadId: string, signal?: AbortSignal): Promi
   // assistant rows return null for both. Extend the inline response shape and
   // map snake → camel in the same destructure pass that already converts
   // confidence_* and source_refs.
+  //
+  // WR-02 fix: backend Pydantic MessageResponse declares
+  // `run_id: UUID | None = None`, so the wire JSON carries `null` for
+  // user rows and pre-run-backed assistant rows. The frontend Message
+  // type declares `runId?: string` (optional, NOT `| null`), so we MUST
+  // coerce null → undefined here in the mapper. Without coercion,
+  // consumers doing `m.runId === undefined` would mis-classify a `null`
+  // as "present-but-null" rather than "absent." Truthy checks
+  // (`m.runId && ...`) currently happen to work, but this hardens
+  // against future call sites assuming the type contract literally.
   const data = await res.json() as Array<Message & {
     source_refs?: Citation[]
     confidence_level?: string
     confidence_avg_similarity?: number
     confidence_disclaimer?: string | null
-    run_id?: string
-    run_status?: "streaming" | "completed" | "failed" | "cancelled"
+    run_id?: string | null
+    run_status?: "streaming" | "completed" | "failed" | "cancelled" | null
   }>
   // Map DB column names to frontend field names
   return data.map((m) => {
@@ -76,8 +86,8 @@ export async function getMessages(threadId: string, signal?: AbortSignal): Promi
     const mapped: Message = {
       ...rest,
       citations: (source_refs ?? []) as Citation[],
-      runId: run_id,
-      runStatus: run_status,
+      runId: run_id ?? undefined,
+      runStatus: run_status ?? undefined,
     }
     if (confidence_level) {
       mapped.confidence = {
