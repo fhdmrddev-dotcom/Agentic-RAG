@@ -28,7 +28,13 @@ from httpx import ASGITransport
 from app.dependencies import get_supabase, get_current_user
 from app.main import app
 from tests.integration._run_helpers import _build_mock_supabase, _make_result, USER_ID
-from tests.integration.test_059_disconnect import _reset_sse_starlette_app_status  # noqa: F401, E402
+
+# WR-09 fix: dropped the side-effect import of _reset_sse_starlette_app_status.
+# This test exercises only GET /threads/{tid}/messages, which does NOT use
+# sse-starlette — so the per-test AppStatus-reset fixture is irrelevant
+# here. Importing it suggested cargo-cult adoption rather than a real
+# dependency; if the fixture's auto-use semantics ever change, that import
+# could regress this test in confusing ways. Removed for clarity.
 
 THREAD_A = str(uuid4())
 OTHER_USER = {"id": "00000000-0000-0000-0000-000000000099", "email": "other@example.com"}
