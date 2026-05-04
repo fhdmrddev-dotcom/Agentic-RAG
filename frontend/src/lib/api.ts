@@ -401,6 +401,15 @@ export async function subscribeToRun(
         // WR-02 fix: log malformed lines so a backend wire-format regression
         // is at least visible in the console (legacy code silently dropped).
         console.warn("subscribeToRun: malformed SSE line", { raw, parseErr })
+        // WR-05 fix: reset lastEventId on parse failure too. Otherwise, a
+        // malformed `data:` frame following a valid `id:` line would leave
+        // lastEventId set; the NEXT well-formed data event would then fire
+        // onCursor with the WRONG (stale) id, advancing the consumer's
+        // lastSeenOffsetRef past events that were never dispatched. The
+        // next reconcile reattach would skip those events. Pair the reset
+        // with the success-path reset directly above so cursor advancement
+        // is symmetric across success and failure branches.
+        lastEventId = undefined
       }
     }
   }
