@@ -107,18 +107,30 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // reconcile on pageshow alone — older browsers and some mobile contexts
   // don't fire pageshow reliably). bfcache restore (event.persisted === true)
   // ALWAYS reconciles regardless of local state per CONTEXT.md mandate.
+  //
+  // WR-07 fix: route reconcile through a ref so the effect's dep array
+  // does NOT include the function identity. Otherwise any future change
+  // that recreates reconcile mid-stream would tear down + re-add the
+  // visibility/focus/pageshow listeners and re-fire reconcile while the
+  // previous one is still resolving.
+  const reconcileRef = useRef(reconcile)
+  useEffect(() => {
+    reconcileRef.current = reconcile
+  }, [reconcile])
+
   useEffect(() => {
     if (!thread?.id) return
-    reconcile(thread.id).catch(console.error)
+    const tid = thread.id
+    reconcileRef.current(tid).catch(console.error)
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        reconcile(thread.id).catch(console.error)
+        reconcileRef.current(tid).catch(console.error)
       }
     }
-    const onFocus = () => reconcile(thread.id).catch(console.error)
+    const onFocus = () => reconcileRef.current(tid).catch(console.error)
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) reconcile(thread.id).catch(console.error)
+      if (e.persisted) reconcileRef.current(tid).catch(console.error)
     }
 
     document.addEventListener("visibilitychange", onVisibility)
@@ -130,7 +142,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       window.removeEventListener("focus", onFocus)
       window.removeEventListener("pageshow", onPageShow)
     }
-  }, [thread?.id, reconcile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread?.id])
 
   const handleSend = async (content: string) => {
     let activeThread = thread
