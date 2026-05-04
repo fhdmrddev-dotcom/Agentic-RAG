@@ -434,16 +434,25 @@ export function useMessages(): UseMessages {
 
     try {
       // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
-      const { run_id } = await postMessage(threadId, content, {
+      const { message_id, run_id } = await postMessage(threadId, content, {
         model,
         provider,
         agentMode,
       })
       registeredRunId = run_id
 
-      // Stamp run_id onto the placeholder so Stop can find it via stopStreaming.
+      // WR-04 fix: swap the optimistic user placeholder's temp id for the
+      // real persisted user_message UUID returned from POST. Without this,
+      // a Realtime upsert that arrives BEFORE the next loadMessages refetch
+      // can side-by-side a duplicate persisted user message with the temp
+      // placeholder. Also: stamp run_id onto the assistant placeholder so
+      // Stop can find it via stopStreaming.
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, runId: run_id } : m)),
+        prev.map((m) => {
+          if (m.id === userMsg.id) return { ...m, id: message_id }
+          if (m.id === assistantId) return { ...m, runId: run_id }
+          return m
+        }),
       )
       subscriptionsRef.current.set(run_id, controller)
 
