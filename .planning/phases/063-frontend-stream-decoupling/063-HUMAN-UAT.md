@@ -112,3 +112,45 @@ description: Per Plan 04, Resume button on `MessageItem.tsx:101-112` renders whe
 - It is unclear how `message.runStatus` gets set to `"failed"` after a reload when the run terminated as failed
 
 needs: live exercise with `ENABLE_TEST_FIXTURES=1` to confirm whether the Resume button actually renders for fixture-injected failed runs. If it doesn't, this is a real gap requiring a `runs.status` join on the messages query or a separate "failed runs for thread" endpoint.
+
+### Gap-003: Thread switch mid-stream — blank window + duplicate Redis Stream replay
+
+severity: **major** (user-reported UX issue + Redis bandwidth waste)
+discovered: live UAT 2026-05-04, thread-switch test
+network evidence: reqid 409 (sendMessage SSE) + reqid 418 (reconcile SSE) both for run_id=108874ad with `since=0`
+
+repro:
+1. In thread A, send a long-streaming message.
+2. While the stream is producing tokens, click thread B in the sidebar.
+3. After ~1s, click thread A again to return.
+4. **Observed**: Main area is BLANK (just the heading) for ~1-2 seconds.
+5. Then the persisted user message + a fresh-from-zero SSE replay appear, populating content from the start.
+6. Network tab shows TWO SSE GETs to `/runs/{rid}/stream?since=0` for the SAME run id.
+
+root cause:
+- `sendMessage` (useMessages.ts:498) opens an SSE consumer and registers it in `subscriptionsRef`. The `controller` is NOT explicitly aborted on thread switch; React effect cleanup likely fires `controller.abort()` indirectly during `useMessages` hook teardown when ChatArea remounts with a new thread.id.
+- That AbortError trips the `finally` safety net at line 524 → `subscriptionsRef.delete(run_id)`.
+- When user clicks back, ChatArea's reconcile fires for thread A. `subscriptionsRef.has(run_id)` returns FALSE (just deleted) → reconcile creates a NEW temp placeholder and opens a FRESH SSE with `since=0`, replaying the entire stream from the beginning of the Redis Stream.
+- During the replay window, the temp placeholder is empty and no persisted assistant message exists yet → user sees blank.
+- Wasted Redis bandwidth: every back-navigation = full stream re-read from Redis.
+
+related Redis-efficiency concerns surfaced by this finding:
+- `since=0` is hard-coded everywhere a subscribeToRun is called (sendMessage, reconcile, resumeFromFailed). There is no offset checkpoint anywhere on the client.
+- Backend `event_consumer` clone in 062-02 supports the `last_id=since` parameter — the API surface IS there, the frontend just doesn't use it.
+- Each thread switch with active streams = full stream re-replay = `XREAD COUNT N STREAMS run:{id} 0` against Redis. For long streams this is many KB of network + Redis CPU.
+
+suggested fix (063.1):
+- Track the highest-seen Redis stream offset on the client side (e.g., `eventCount` per run on the in-memory message, or `lastSeenOffset` on the temp placeholder).
+- When sendMessage's SSE is aborted on navigate-away, do NOT delete the subscriptionsRef entry — keep the controller alive so reconcile sees it as "live" and short-circuits. OR: snapshot the lastSeenOffset before aborting, store it in a map keyed by run_id, and pass that as `since` on reconcile reattach.
+- Alternative architectural fix: don't abort the SSE on thread switch at all. The user-visible state goes inactive, but the SSE keeps reading deltas in the background, mutating the placeholder (still in messages array). When user navigates back, `subscribeToRun` is already running and producing updates — no replay needed.
+
+### Gap-004: Hard-coded `since="0"` — no offset checkpointing
+
+severity: minor by itself, but compounds with Gap-001 + Gap-003
+
+call sites in useMessages.ts:
+- Line 498: `await subscribeToRun(run_id, "0", callbacks, controller.signal)` (sendMessage)
+- Line 680: `subscribeToRun(run.run_id, "0", callbacks, controller.signal)` (reconcile)
+- resumeFromFailed (line 703+): also passes `"0"`
+
+fix: thread a `lastSeenOffset` ref through. Backend already supports `since={ms-id}` per the legacy event_consumer signature.

@@ -273,6 +273,28 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   - Stop button semantics change: today it aborts the in-flight HTTP request; with run-backed streaming, the request is detached, so Stop must call a server endpoint to cancel the producer. Test cross-tab Stop (clicking Stop in tab B while tab A initiated the stream).
   - `pageshow` fires on bfcache restore — the local buffer may be hours stale. Treat bfcache restore as "always reconcile via active-runs," even if local state looks complete.
 
+**Phase 063 status**: BLOCKED on 063.1 gap closure. All 5 plans landed and verifier scored 7/7 must-haves at code level, but live UAT 2026-05-04 surfaced 4 real gaps (see `.planning/phases/063-frontend-stream-decoupling/063-HUMAN-UAT.md`). Phase 063 is NOT complete in the Progress table until 063.1 ships and the failing UAT items re-pass.
+
+### Phase 063.1: Frontend Stream Decoupling — Gap Closure
+
+**Goal**: Resolve the 4 gaps surfaced by Phase 063's live UAT so the navigate-away-during-stream and refresh-mid-stream flows are visually clean and Redis-efficient. Confirms the Resume-button data path against a live failed run via the `ENABLE_TEST_FIXTURES=1` harness.
+**Depends on**: Phase 063 (all 5 plans landed)
+**Requirements**: STREAM-04 polish (no new requirement — finishes the user-visible side of STREAM-04 that Phase 063 left rough); also confirms STREAM-02b Resume-button data flow is live-correct.
+**Success Criteria** (what must be TRUE):
+  1. Switching threads mid-stream no longer shows a blank window on switch-back. The persisted/in-flight assistant content is visible within ≤ 200ms of switching back.
+  2. There is at most ONE active SSE consumer per `run_id` at any time. Verifiable in DevTools Network: navigating away and back does NOT open a second `GET /runs/{rid}/stream`.
+  3. SSE reattach uses `since={highest-seen-ms-id}` (or equivalent offset cursor), not hard-coded `since="0"`. The Redis Stream is NOT re-replayed from the beginning on every reconnect.
+  4. Refresh-mid-stream no longer shows the duplicate-bubble flicker (Gap-001). After F5 + thread-click, exactly ONE assistant bubble exists at all times.
+  5. Resume button confirmed working live: with `ENABLE_TEST_FIXTURES=1`, injecting a failed run + reload makes the Resume button render on the failed assistant message; clicking it fires a fresh POST. If the data flow is broken (verifier-flagged Gap-002), this phase wires it correctly (e.g. join `runs.status` into `loadMessages`, or surface failed runs via a new `getRecentlyFailedRuns(threadId)` endpoint).
+**Plans**: TBD via `/gsd:plan-phase 063.1` — likely 2–3 plans:
+  - 063.1-01: Offset-cursor checkpointing — track `highest-seen-ms-id` per run on the client, thread it through `subscribeToRun(runId, since, ...)` at all 3 call sites in useMessages.ts (sendMessage, reconcile, resumeFromFailed). Backend already supports the parameter.
+  - 063.1-02: Don't abort SSE on thread switch — keep the in-flight `subscribeToRun` alive when ChatArea remounts with a different thread.id. Reuse the existing `subscriptionsRef` short-circuit so reconcile finds the live subscription instead of opening a new one. WR-05's `guardedSetMessages` already prevents cross-thread bleed.
+  - 063.1-03: Wire Resume button data flow + live UAT — confirm `runStatus="failed"` reaches the Message object after reload (likely needs a `runs` join in `loadMessages` or a sibling endpoint). Manual UAT with `ENABLE_TEST_FIXTURES=1`.
+**Risks / pitfalls**:
+  - Keeping the SSE alive across thread switches means the response body keeps streaming in the background. If the user opens many threads with active streams, the browser holds many open EventSource connections. Mitigate: cap concurrent subscriptions (LRU?) or accept the cost — long-stream count is naturally low.
+  - The offset-cursor change must not skip events. Test the boundary: switch away after event N, switch back, verify event N+1 onward arrives (no off-by-one).
+  - Ensure `ENABLE_TEST_FIXTURES` test endpoint is NOT mounted in production env. Plan 05 added the env-gate; verify it during 063.1 UAT.
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
