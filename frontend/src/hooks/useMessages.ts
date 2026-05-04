@@ -467,11 +467,35 @@ export function useMessages(): UseMessages {
       // The callbacks pattern mirrors the legacy POST-stream closure — same
       // setMessages map-update shape, but we now ALSO handle terminal events
       // explicitly via onTerminal (NEW vs the previous one-call orchestrator).
+      //
+      // Phase 063.1 (D-063.1-08 / Gap-003): gate sendMessage's per-event
+      // setMessages on the streaming thread still being the one in view.
+      // streamingThreadIdRef is set above (line 401) to threadId at send-start
+      // and reset to null in the finally block. activeThreadIdRef tracks the
+      // user's current viewing thread (D-060-01 sole writer). When they
+      // diverge (user navigated away mid-stream), per-event setMessages is a
+      // no-op; the in-flight SSE keeps writing through this still-live guard
+      // and updates resume the moment the user navigates back (because
+      // activeThreadIdRef === streamingThreadIdRef again). Mirrors reconcile's
+      // WR-05 guardedSetMessages pattern (line 681-686).
+      //
+      // Critical: terminal-status flip (callbacks.onTerminal override below)
+      // and the runId stamp (already executed line 457-463) use plain
+      // setMessages — those must run regardless of viewing thread (the run
+      // actually ended; the placeholder needs the correct runStatus when the
+      // user navigates back). PATTERNS.md note line 134.
+      const guardedSetMessages: typeof setMessages = ((
+        update: Parameters<typeof setMessages>[0],
+      ) => {
+        if (streamingThreadIdRef.current !== activeThreadIdRef.current) return
+        setMessages(update)
+      }) as typeof setMessages
+
       const callbacks: StreamCallbacks = makeStreamCallbacks({
         assistantId,
         threadId,
         onTitleUpdate,
-        setMessages,
+        setMessages: guardedSetMessages,
         setFallbackNotice,
       })
 

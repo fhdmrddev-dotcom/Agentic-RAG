@@ -31,7 +31,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     loadMessages,
     sendMessage,
     stopStreaming,
-    abortStream,
     clearMessages,
     setViewingThread,
     reconcile,
@@ -92,7 +91,19 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       justCreatedThreadRef.current = null
       return
     }
-    abortStream()
+    // D-063.1-07 / Gap-003: abortStream() removed here. Lets the in-flight
+    // sendMessage SSE consumer survive thread switch. The consumer keeps
+    // writing through the guardedSetMessages no-op (D-063.1-08) until the
+    // user navigates back. Cleanup of consumer-side sockets remains owned by:
+    //   1. loadAbortRef.current?.abort() inside loadMessages — cancels stale
+    //      getMessages fetches; UNCHANGED.
+    //   2. Hook unmount effect (useMessages.ts:805-815) — aborts all
+    //      subscriptions on hook teardown (logout/route); UNCHANGED.
+    //   3. onTerminal cleanup in sendMessage / reconcile — deletes from
+    //      subscriptionsRef when SSE actually terminates server-side; UNCHANGED.
+    // abortStream STAYS exported from useMessages — still used by genuine
+    // timeout cases (loadMessages's loadAbortRef path). Only THIS call site
+    // is removed.
     clearMessages()
     loadMessages(thread.id).catch(console.error)
     // Phase 060 deletes the 8s fallback timer (D-060-07b) and the tab-visibility
