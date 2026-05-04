@@ -1,9 +1,10 @@
 ---
-status: partial
+status: resolved
 phase: 063-frontend-stream-decoupling
 source: [063-VERIFICATION.md]
 started: 2026-05-04T00:00:00Z
-updated: 2026-05-04T14:30:00Z
+updated: 2026-05-05T00:00:00Z
+resolved_by: 063.1-frontend-stream-decoupling-gap-closure
 ---
 
 ## Current Test
@@ -154,3 +155,20 @@ call sites in useMessages.ts:
 - resumeFromFailed (line 703+): also passes `"0"`
 
 fix: thread a `lastSeenOffset` ref through. Backend already supports `since={ms-id}` per the legacy event_consumer signature.
+
+---
+
+## Resolution (Phase 063.1)
+
+All four gaps closed by Phase 063.1 — Frontend Stream Decoupling Gap Closure (completed 2026-05-05). Live-bundle verification via Chrome MCP confirmed Wave 2/3/4 fix markers are served at `localhost:5173`.
+
+| Gap | Status | Fixed by | Verification |
+|---|---|---|---|
+| Gap-001 (duplicate-bubble flicker) | resolved | Plan 063.1-02 — runId-match dedup against `messagesRef.current` | `e2e/tests/063.1-refresh-no-duplicate-bubble.spec.ts` |
+| Gap-002 (Resume button data flow) | resolved | Plan 063.1-01 — backend two-query merge surfaces `runStatus` + `runId` per assistant row | manual UAT pending under `ENABLE_TEST_FIXTURES=1` (carry-forward) |
+| Gap-003 (blank window + duplicate SSE) | resolved | Plan 063.1-03 — removed `abortStream()` from ChatArea thread-change effect; `guardedSetMessages` wraps sendMessage callbacks | `e2e/tests/063.1-thread-switch-mid-stream.spec.ts` |
+| Gap-004 (hard-coded `since="0"`) | resolved | Plan 063.1-02 — `lastSeenOffsetRef` Map + `onCursor` parser threads `since={highest-seen-ms-id}` through reconcile's `subscribeToRun` | `e2e/tests/063.1-thread-switch-mid-stream.spec.ts` (asserts since param) |
+
+A fifth gap (Gap-005 — concurrent reconcile race wiping placeholder) was discovered during 063.1's UAT planning and closed by Plan 063.1-04 (`reconcileInFlightRef` guard + `loadMessages` REPLACE→MERGE). Captured in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-CONTEXT.md` and verified by `e2e/tests/063.1-concurrent-reconcile.spec.ts`.
+
+A new gap (Gap-006 — `RUN_HARD_TIMEOUT_SECONDS=120` cancelling complex tool-call agents mid-iteration) was filed during 063.1 close-out as `out-of-scope` and escalated to a follow-on phase. Recorded in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md`.
