@@ -25,3 +25,15 @@ class MessageResponse(BaseModel):
     confidence_level: str | None = None
     confidence_avg_similarity: float | None = None
     confidence_disclaimer: str | None = None
+    # D-063.1-15 / Gap-002 fix: extend the response shape so the frontend Resume
+    # button has runStatus on every assistant row from getMessages (single
+    # round-trip — no separate getActiveRuns/getFailedRuns endpoint needed).
+    # Pre-run-backed messages (predate migration 035) get null — fine, the
+    # Resume button only renders when runStatus === 'failed'.
+    #
+    # Snake_case on the wire (this Pydantic model); the frontend api.ts
+    # getMessages mapper converts to camelCase runId/runStatus on the
+    # Message type. The 4-value Literal mirrors the CHECK constraint on
+    # public.runs.status (migration 035 line 25).
+    run_id: UUID | None = None
+    run_status: Literal["streaming", "completed", "failed", "cancelled"] | None = None
