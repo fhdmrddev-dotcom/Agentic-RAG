@@ -330,8 +330,10 @@ export async function subscribeToRun(
             parsed.fallback_model as string,
           )
         }
-      } catch {
-        // ignore malformed lines (mirrors legacy POST-stream behavior)
+      } catch (parseErr) {
+        // WR-02 fix: log malformed lines so a backend wire-format regression
+        // is at least visible in the console (legacy code silently dropped).
+        console.warn("subscribeToRun: malformed SSE line", { raw, parseErr })
       }
     }
   }
