@@ -630,17 +630,30 @@ async def get_messages(
     #
     # D-062-14 file-layout: this endpoint lives at line 580; the new merge
     # extends to ~line 640 — well outside the off-limits 2057-2076 region.
+    # WR-01 fix: order by started_at DESC and prefer the FIRST run per
+    # message_id. public.runs.message_id has no UNIQUE constraint
+    # (migration 035 line 24 — only an FK with ON DELETE SET NULL), so in
+    # rare collision cases (buffer-expired retries, partial failure paths,
+    # producer races) multiple runs can share message_id. Without an
+    # explicit ORDER BY the dict comprehension was last-write-wins under
+    # the supabase-py response's implementation-defined order, and the
+    # response could attach an arbitrary (e.g. older `failed`) run's
+    # status to the assistant row. With DESC + first-wins-and-skip, the
+    # most recently started run wins deterministically — the one whose
+    # status is most likely to drive the correct Resume UX.
     runs_resp = await aexec(
         supabase.table("runs")
         .select("run_id, message_id, status")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
+        .order("started_at", desc=True)
     )
-    runs_by_message = {
-        r["message_id"]: r
-        for r in (runs_resp.data or [])
-        if r.get("message_id") is not None
-    }
+    runs_by_message: dict[str, dict] = {}
+    for r in (runs_resp.data or []):
+        mid = r.get("message_id")
+        if mid is None or mid in runs_by_message:
+            continue  # keep the first (most recent) per message_id
+        runs_by_message[mid] = r
 
     # 3. Zip — assistant rows with FK matches get run_id/run_status populated;
     # user rows and pre-run-backed assistant rows return null (Resume button
