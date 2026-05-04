@@ -104,6 +104,20 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // abortStream STAYS exported from useMessages — still used by genuine
     // timeout cases (loadMessages's loadAbortRef path). Only THIS call site
     // is removed.
+    //
+    // WR-07 acknowledgement: clearMessages() IS still called below on every
+    // thread switch. The D-063.1-07 SSE-survival guarantee is "the in-flight
+    // sendMessage SSE consumer keeps writing to the dropped placeholder
+    // (under guardedSetMessages no-op) until the user navigates back, at
+    // which point reconcile + loadMessages converge on the persisted DB row
+    // (via the runId-match dedup at D-063.1-04)". The cost is wasted SSE
+    // writes between switch-away and switch-back AND a re-fetch on
+    // switch-back. A per-thread message cache (Map<threadId, Message[]>)
+    // would close that gap, but it is a substantial refactor and the
+    // current behavior is functionally correct. Tracked as a future
+    // optimization, NOT a blocker; do NOT remove clearMessages() here
+    // without first hoisting a thread-keyed cache that re-hydrates on
+    // switch-back.
     clearMessages()
     loadMessages(thread.id).catch(console.error)
     // Phase 060 deletes the 8s fallback timer (D-060-07b) and the tab-visibility
