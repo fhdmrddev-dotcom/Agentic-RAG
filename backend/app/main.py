@@ -152,7 +152,18 @@ app.include_router(feedback.router)
 # NOT exist in production. CI/staging/prod env files MUST NOT set this
 # variable. The mount also emits a startup warning when enabled so any
 # misconfigured production deploy is loud.
+#
+# BL-04 fix: hard refusal-to-start when ENABLE_TEST_FIXTURES is on AND the
+# environment looks like production. Belt-and-suspenders so an accidental
+# env var flip in a prod-like deploy crashes loudly at startup rather than
+# silently exposing the route.
 if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
+    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+        raise RuntimeError(
+            "ENABLE_TEST_FIXTURES=1 in production environment — refusing to start. "
+            "This env var is for local Playwright e2e harness use only "
+            "(Phase 063 T-063-05-01)."
+        )
     from app.api.test_fixtures import router as test_fixtures_router  # noqa: E402
     app.include_router(test_fixtures_router)
     logger.warning(

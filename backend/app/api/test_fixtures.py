@@ -27,6 +27,7 @@ Why a separate module rather than inlining in main.py:
 """
 import logging
 import uuid
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
@@ -41,7 +42,10 @@ router = APIRouter()
 
 @router.post("/__test__/inject-failed-run/{thread_id}")
 async def inject_failed_run(
-    thread_id: str,
+    # BL-04 fix: type as UUID so FastAPI returns 422 on non-UUID input,
+    # rather than letting the path string flow into PostgREST and surface
+    # as a generic 500. Cleaner contract for an auth-gated endpoint.
+    thread_id: UUID,
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ) -> dict:
@@ -71,6 +75,11 @@ async def inject_failed_run(
     ``ENABLE_TEST_FIXTURES=1`` at process startup; see ``app.main``
     bottom-of-file conditional.
     """
+    # BL-04 fix: thread_id is now a UUID instance from FastAPI's path
+    # validation; serialize to str at the PostgREST boundary so existing
+    # string-eq filters and INSERT payloads work unchanged.
+    thread_id_str = str(thread_id)
+
     # Validate the caller actually owns the target thread before injecting
     # rows on it. Without this check, a user with valid auth could inject
     # failed runs on someone else's threads — though RLS would also block
@@ -79,7 +88,7 @@ async def inject_failed_run(
     thread_resp = await aexec(
         supabase.table("threads")
         .select("id")
-        .eq("id", thread_id)
+        .eq("id", thread_id_str)
         .eq("user_id", current_user["id"])
         .maybe_single()
     )
@@ -93,7 +102,7 @@ async def inject_failed_run(
     await aexec(
         supabase.table("messages").insert({
             "id": str(msg_id),
-            "thread_id": thread_id,
+            "thread_id": thread_id_str,
             "user_id": current_user["id"],
             "role": "assistant",
             "content": "[test-injected failed run]",
@@ -105,7 +114,7 @@ async def inject_failed_run(
     await aexec(
         supabase.table("runs").insert({
             "run_id": str(run_id),
-            "thread_id": thread_id,
+            "thread_id": thread_id_str,
             "user_id": current_user["id"],
             "message_id": str(msg_id),
             "status": "failed",
@@ -118,7 +127,7 @@ async def inject_failed_run(
     logger.warning(
         "test_fixtures.inject_failed_run: injected failed run %s on thread %s "
         "(message %s) for user %s",
-        run_id, thread_id, msg_id, current_user.get("id"),
+        run_id, thread_id_str, msg_id, current_user.get("id"),
     )
 
     return {"run_id": str(run_id), "message_id": str(msg_id)}
