@@ -128,7 +128,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
           <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
             {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
             <span className="italic">
-{isStreaming
+              {isStreaming
                 ? (allToolsDone ? "Synthesizing answer" : "Working")
                 : message.stopped
                   ? "Response stopped"
@@ -142,7 +142,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
               </span>
             )}
           </span>
-) : null}
+        ) : null}
         {/* Stopped indicator — shown after content when user stopped mid-stream */}
         {message.stopped && !isStreaming && (
           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
