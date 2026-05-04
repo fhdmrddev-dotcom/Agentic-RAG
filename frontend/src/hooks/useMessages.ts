@@ -408,12 +408,32 @@ export function useMessages(): UseMessages {
       // leak possible. Order: DB rows first (sorted by created_at backend-
       // side), placeholders appended (most recent run_id by definition; React
       // keys on `id` are stable so no collision risk).
+      //
+      // CR-01 fix: gate the drop on `subscriptionsRef.has(m.runId)`. The
+      // backend persists the assistant DB row BEFORE emitting `stream_end`
+      // (threads.py: persist → done → stream_end). During that narrow window
+      // a loadMessages can return a DB row with the same runId as a still-
+      // live SSE consumer's `assistantId = "temp-${makeTempId}"` (sendMessage
+      // line 454) or `targetId = "temp-${run.run_id}"` (reconcile line 702).
+      // Dropping the placeholder here makes the consumer's
+      // `setMessages(prev.map(m => m.id === assistantId ? ... : m))` calls
+      // silent no-ops — terminal-status flip, suggestions, title, confidence
+      // and fallback_model deltas would be dropped. Keeping the placeholder
+      // while a live subscription owns the runId means two bubbles render
+      // briefly; the next loadMessages after the consumer terminates (at
+      // which point `subscriptionsRef.delete(runId)` has fired in onTerminal)
+      // collapses back to one. Strictly better than swallowing terminals.
       setMessages((prev) => {
         const dbRunIds = new Set(
           data.filter((m) => m.runId).map((m) => m.runId),
         )
         const liveTempPlaceholders = prev.filter(
-          (m) => m.id.startsWith("temp-") && m.runId && !dbRunIds.has(m.runId),
+          (m) =>
+            m.id.startsWith("temp-") &&
+            m.runId &&
+            // Keep when the DB doesn't have this runId yet OR a live SSE
+            // consumer is still bound to the placeholder via this runId.
+            (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
         )
         return [...data, ...liveTempPlaceholders]
       })
