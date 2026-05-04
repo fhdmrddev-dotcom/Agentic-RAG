@@ -625,14 +625,32 @@ export function useMessages(): UseMessages {
       const controller = new AbortController()
       subscriptionsRef.current.set(run.run_id, controller)
 
+      // WR-05 fix: gate live setMessages updates on the user still viewing
+      // this thread. The placeholder INSERT above is fine to write in either
+      // case (so it appears when the user navigates back), but per-event
+      // updates from the consumer should NOT mutate visible state on a
+      // different thread (Phase 060 D-060-01 invariant). State updates are
+      // resumed automatically when the user navigates back via reconcile()
+      // re-attaching to the same run (subscriptionsRef short-circuit
+      // continues to gate duplicate consumers).
+      const guardedSetMessages: typeof setMessages = ((
+        update: Parameters<typeof setMessages>[0],
+      ) => {
+        if (activeThreadIdRef.current !== threadId) return
+        setMessages(update)
+      }) as typeof setMessages
+
       const callbacks: StreamCallbacks = makeStreamCallbacks({
         assistantId: placeholderId,
         threadId,
-        setMessages,
+        setMessages: guardedSetMessages,
         setFallbackNotice,
       })
       const originalOnTerminal = callbacks.onTerminal
       callbacks.onTerminal = (kind, errorPayload) => {
+        // Terminal status flip is unconditional (the run actually ended;
+        // the placeholder needs the correct runStatus when the user
+        // navigates back).
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== placeholderId) return m
