@@ -324,7 +324,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 061.1. Run-Backed Streaming Cleanup | v2.5 | 2/2 | Complete    | 2026-05-03 |
 | 062. Replay & Tail API | v2.5 | 4/4 | Complete    | 2026-05-03 |
 | 063. Frontend Stream Decoupling | v2.5 | 5/5 | Complete (gap-closed by 063.1) | 2026-05-03 |
-| 063.1. Frontend Stream Decoupling — Gap Closure | v2.5 | 5/5 | Complete (UAT `partial`, project-level approved; Gap-006 escalated to new phase) | 2026-05-04 |
+| 063.1. Frontend Stream Decoupling — Gap Closure | v2.5 | 5/5 | Complete    | 2026-05-04 |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
 
@@ -355,7 +355,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   2. All tests in `backend/tests/integration/test_skills_import_export.py` either PASS or are explicitly skipped with documented reason — the 3 currently-failing export tests are fixed or formally deferred.
   3. The combined skills test run (`pytest tests/integration/test_threads_skills.py tests/integration/test_skills_import_export.py -q`) reports 0 errors and 0 unexpected failures.
   4. No regression in 058 / 059 binding gates: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and the `test_059_disconnect.py` suite still pass.
-**Plans:** 4/4 plans complete
+**Plans:** 5/5 plans complete
 **Risks / pitfalls:**
   - The `create_streaming_chat` patch target was likely removed in a refactor (current name is `create_adaptive_streaming_chat`). Some tests may have additional drift beyond just the name — they may also be testing call signatures, return shapes, or event emission patterns that have evolved. A pure mechanical rename is a starting point, not necessarily the finish line.
   - The 3 export-test failures may share a root cause with the known MIME fidelity gap (skill files stored as `application/octet-stream` on import) — fixing the test may require fixing the export to preserve original MIME, which is a real behavioral change. Decide upfront: scope this phase to test-only fixes (skip-with-reason if the underlying behavior is wrong), or expand to fix the export path.
