@@ -99,6 +99,25 @@ async def test_get_messages_includes_run_id_and_run_status_for_assistant_rows():
         assert asst_row["run_status"] == "completed", (
             f"Expected assistant run_status='completed'; got {asst_row.get('run_status')!r}"
         )
+
+        # WR-03 fix: assert the runs builder chain was filtered on BOTH
+        # thread_id AND user_id. The mock's .execute returns the same
+        # payload regardless of how the production code chains its .eq()
+        # calls, so this assertion is the only thing that catches a
+        # regression that drops the .eq("user_id", ...) defense-in-depth
+        # filter (production source line 637, T-063.1-04 mitigation).
+        # The eq() builder is a Mock — call_args_list captures every call;
+        # we extract (col_name, value) tuples and test for membership.
+        eq_kwargs = {(c.args[0], c.args[1]) for c in runs_builder.eq.call_args_list}
+        assert ("thread_id", THREAD_A) in eq_kwargs, (
+            f"Expected runs SELECT filtered on thread_id={THREAD_A}; "
+            f"got eq() calls={eq_kwargs!r}"
+        )
+        assert ("user_id", USER_ID) in eq_kwargs, (
+            f"Expected runs SELECT filtered on user_id={USER_ID} "
+            f"(defense-in-depth alongside RLS, T-063.1-04 mitigation); "
+            f"got eq() calls={eq_kwargs!r}"
+        )
     finally:
         app.dependency_overrides.pop(get_supabase, None)
 
