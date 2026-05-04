@@ -1,184 +1,191 @@
 ---
 phase: 063-frontend-stream-decoupling
-verified: 2026-05-03T00:00:00Z
-status: passed
-score: 7/7 success criteria verified
-nyquist_compliant: true
-last_updated: 2026-05-03
-overrides: []
-inherited_exclusions:
-  - test_normal_stream_unchanged              # DEF-061.1-01 carried forward (in-scope deferred-items.md flag resolved at audit level)
-  - test_failed_run_expires_60s               # DEF-061.1-02 carried forward
-  - test_120s_timeout_fires_full_finally      # DEF-061.1-02 carried forward
-  - test_producer_continues_after_consumer_disconnect  # DEF-061.1-02 carried forward
-gaps: []
+verified: 2026-05-03T18:00:00Z
+status: human_needed
+score: 7/7 must-haves verified
+overrides_applied: 0
 human_verification:
-  - test: "Open Tab A on a thread → send a long message → confirm SSE streaming begins; press F5 mid-stream"
-    expected: "After reload, ChatArea reconcile fires GET /threads/{tid}/active-runs; for each active run, GET /runs/{rid}/stream?since=0 reattaches; the assistant message bubble continues filling with token deltas (D-063-01 SC#1 — Symptom F resolved)"
-    why_human: "Playwright headless reload + reconcile sequencing can be exercised programmatically (063-refresh-mid-stream.spec.ts), but full visual sync of token streaming under bfcache restore (event.persisted === true) requires real browser navigation"
-  - test: "Open same thread in Tab A and Tab B; click Stop in Tab B"
-    expected: "Both tabs receive 'cancelled' terminal SSE event; Tab A's stream closes cleanly without raw JSON leak (D-063-03 server-only Stop + Phase 060 Bug 3 regression guard preserved)"
-    why_human: "Multi-tab orchestration cannot be reliably exercised in headless Playwright; deferred to Phase 064 browser harness"
-  - test: "Trigger a real LLM error (e.g., invalid model selection) so a run completes with status='failed'; navigate to the thread"
-    expected: "Resume button (RotateCcw icon, aria-label='Resume failed run') renders next to the failed assistant message; clicking it issues a fresh POST /threads/{tid}/messages and a new streaming run begins"
-    why_human: "Test-fixture-injected failed run is exercised programmatically (063-resume-failed.spec.ts requires ENABLE_TEST_FIXTURES=1), but real-LLM-failure user flow requires a manual 'oh no' moment to reproduce"
+  - test: "Live POST /threads/{id}/messages returns HTTP 201 JSON {message_id, run_id} against a real Supabase instance"
+    expected: "201 application/json body with two UUID fields; no text/event-stream response; message_id is a real UUID from the messages table"
+    why_human: "BL-02 fix changed the INSERT pattern from .select('id').single() to plain .insert() + .data[0]['id']. All integration tests run against _build_mock_supabase; the real PostgREST/supabase-py path for the messages INSERT has never been exercised against a live DB. REVIEW flagged: 'Verify against a real Supabase instance before shipping.' If real supabase-py .data shape differs from mocks, every POST 500s."
+  - test: "Refresh mid-stream (SC3): F5 during a long stream → reload → assistant message continues animating"
+    expected: "active-runs call fires after reload; GET /runs/{rid}/stream opens; assistant bubble text grows post-reload"
+    why_human: "e2e spec 063-refresh-mid-stream.spec.ts exists and parses but was not run against a live browser (worktree dev-server constraint — dev server reads from main-repo path, not worktree). Post-merge gsd:verify-work required."
+  - test: "Resume button on failed run (SC7): inject failed run → reload → Resume button visible → click fires fresh POST"
+    expected: "Resume button with aria-label='Resume failed run' appears; clicking triggers POST /threads/{id}/messages"
+    why_human: "e2e spec 063-resume-failed.spec.ts exists and parses but requires ENABLE_TEST_FIXTURES=1 on backend + live browser. Additionally: getActiveRuns only returns status='streaming' runs; how the injected status='failed' run surfaces as runStatus='failed' on the Message object through loadMessages needs confirmation (loadMessages returns raw DB rows without runStatus). The data-flow path for the Resume button on fixture-injected runs is uncertain without a live run."
+  - test: "Multi-tab sync (SC4): open same thread in two tabs while streaming → both render same tokens, no cross-thread leak"
+    expected: "Both tabs show identical token sequence; switching to another thread and back shows no corruption from the other tab's stream"
+    why_human: "Multi-tab behavior cannot be automated in the current e2e harness (single-browser context). subscriptionsRef is per-hook-instance so each tab independently calls active-runs + attaches. Live browser verification with two tabs required."
+  - test: "Stop semantics cross-tab (SC5): clicking Stop sends DELETE /runs/{run_id}; terminal event fires; all consumers close cleanly"
+    expected: "Stop button click → DELETE /runs/{rid} → cancelled event received by all open SSE consumers including other tabs → stream stops everywhere"
+    why_human: "Cross-tab Stop relies on backend Redis XADD of the cancelled sentinel being consumed by all open subscribeToRun consumers. Requires a live streaming session with two tabs simultaneously open."
 ---
 
-# Phase 063: Frontend Stream Decoupling — Verification Report
+# Phase 063: Frontend Stream Decoupling Verification Report
 
-**Phase Goal:** Decouple the frontend's POST `/threads/{tid}/messages` from token streaming. POST returns JSON `{message_id, run_id}` synchronously; tokens flow over GET `/runs/{rid}/stream` (Phase 062 endpoint). The legacy `event_consumer` SSE-on-POST generator is physically deleted; `streamMessage` orchestrator on the frontend is replaced with `postMessage + subscribeToRun + getActiveRuns + cancelRun`. Reconciliation hook (active-runs + reattach) handles refresh-mid-stream, multi-tab, and resume-from-failed flows.
-**Verified:** 2026-05-03
-**Status:** passed (initial verification)
+**Phase Goal:** Rewire the frontend so the assistant-message stream lives independently of the POST request that started it. On every (re)connect, the frontend reconciles state via `active-runs` and reattaches to the replay-and-tail endpoint. Multi-tab sync, refresh-mid-stream, and navigate-away-and-back all work as a side-effect.
+
+**Verified:** 2026-05-03T18:00:00Z
+**Status:** human_needed
+**Re-verification:** No — initial verification (overwrites Plan 05 executor's interim file)
 
 ---
 
 ## Goal Achievement
 
-### Success Criteria
+### Observable Truths
 
-| #   | Criterion | Status | Evidence |
-|-----|-----------|--------|----------|
-| SC1 | Backend POST returns 201 + JSON `{message_id, run_id}` synchronously; legacy `event_consumer` deleted | ✅ VERIFIED | `test_063_post_contract.py::test_post_returns_message_and_run_ids` GREEN; `test_063_legacy_path_deleted.py` (2 tests) GREEN; `grep '^async def event_consumer' backend/app/api/threads.py` → 0 |
-| SC2 | POST returns BEFORE the producer's first XADD (Pitfall 4) | ✅ VERIFIED | `test_063_post_contract.py::test_post_returns_before_producer_first_xadd` GREEN with real Redis fixture + slow-mock LLM; asserts wall-clock < 0.5s + XLEN < 5 immediately after response |
-| SC3 | POST → JSON → GET stream end-to-end roundtrip GREEN | ✅ VERIFIED | `test_063_post_then_subscribe.py::test_post_then_get_stream_renders_full_response` GREEN (5/5 stability); drains real producer to terminal |
-| SC4 | Frontend api.ts split (postMessage / subscribeToRun / getActiveRuns / cancelRun) + Message type extended with runId? + runStatus? | ✅ VERIFIED (per 063-03-SUMMARY) | 7 new exports in `frontend/src/lib/api.ts`; legacy `streamMessage` deleted; tsc clean |
-| SC5 | useMessages hook + ChatArea reconcile + MessageItem Resume button shipped | ✅ VERIFIED (per 063-04-SUMMARY) | useMessages tsc clean (16 errors → 0); ChatArea has visibilitychange/focus/pageshow listeners; MessageItem renders Resume button on `runStatus === 'failed'` |
-| SC6 | Legacy POST-SSE test audit fully resolved (rewrite/inherit/keep dispositions executed) | ✅ VERIFIED | 27 audit rows checkmarked (4 inherited + 23 new findings); 6 rewrite-to-get-stream tests rewritten; `c.stream("POST"` / `ac.stream("POST"` patterns gone from in-scope test files |
-| SC7 | Backend full regression sweep GREEN with canonical -k filter | ✅ VERIFIED | 33 passed / 4 deselected (DEF-061.1-01/02) / 3 xfailed (pre-existing in test_061_consumer_cursor_race) / 0 failed; 4/4 sequential stability runs |
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | POST /threads/{id}/messages returns 201 JSON {message_id, run_id}; frontend opens GET /runs/{run_id}/stream for tokens | VERIFIED | `threads.py:2210-2215` — `return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message_id": str(_user_msg_id), "run_id": str(run_id)})`. `api.ts:226` — `subscribeToRun` opens `${API_BASE}/runs/${runId}/stream?since=...`. `useMessages.ts:437,510` — `const { message_id, run_id } = await postMessage(...)` then `await subscribeToRun(run_id, "0", callbacks, controller.signal)`. Backend test sweep: 33 passed with canonical -k filter. |
+| 2 | On every page load, focus, visibilitychange, pageshow, frontend queries active-runs and reattaches automatically | VERIFIED | `ChatArea.tsx:121-146` — second useEffect (WR-07 fix: uses reconcileRef, dep array is `[thread?.id]` only) wires reconcile to mount, visibilitychange (document.visibilityState === "visible" check), focus, and pageshow (e.persisted gate). `useMessages.ts:585-701` — `reconcile()` calls `Promise.all([getActiveRuns(threadId), loadMessages(threadId)])` in parallel then synthesizes `temp-${run.run_id}` placeholder and fires `subscribeToRun`. |
+| 3 | Refresh mid-stream: F5 → reload → active-runs reports streaming → reattach → assistant message continues | VERIFIED (code) | Logic confirmed: reconcile fires on mount (ChatArea.tsx:124), getActiveRuns queries live runs, subscribeToRun reattaches. e2e spec `063-refresh-mid-stream.spec.ts` exists (network-snapshot assertions, content-delta check). Live browser run needed. |
+| 4 | Multi-tab sync: two tabs on same thread render same tokens, no cross-thread leak | VERIFIED (code) | Each tab's hook instance independently opens `subscribeToRun` for active run_ids. `guardedSetMessages` in reconcile gates writes on `activeThreadIdRef.current === threadId` (WR-05 fix). Cross-user run_id non-leak test exists (`test_063_cross_user_no_runid_leak.py`). Live multi-tab verification needed. |
+| 5 | Stop: clicking Stop sends DELETE /runs/{run_id}; producer cancels; terminal fires; consumers close | VERIFIED | `useMessages.ts:321-338` — `stopStreaming` reads `messagesRef.current` (WR-03 fix: stable callback via ref, no messages dep), finds streaming msg's `runId`, calls `await cancelRun(runId)`. `api.ts:372-383` — `cancelRun` issues `DELETE ${API_BASE}/runs/${runId}`. SSE parser closes on `cancelled` event (`api.ts:317-320`). |
+| 6 | Bug 3 regression guard: no tool-result JSON leaks into chat content | VERIFIED | `useMessages.ts:573-574` — finally block comment: "CRITICAL Phase 060 invariant (Bug 3 guard): do NOT call loadMessages here." No `loadMessages` call in sendMessage finally (grep: `finally.*loadMessages` count = 0 in useMessages). SSE-built content stays canonical. |
+| 7 | Resume button surfaces on failed runs; clicking fires a fresh POST | VERIFIED (code) | `MessageItem.tsx:101-112` — renders `!isStreaming && role==="assistant" && runStatus==="failed"`. `useMessages.ts:703+` — `resumeFromFailed` walks backward for preceding user message (BL-06 fix). e2e spec `063-resume-failed.spec.ts` exists with fixture-injection + click assertion. Live browser run needed. |
 
-**Score:** 7/7 success criteria verified.
-
----
-
-## Observable Truths (Plan-Level Must-Have Mappings)
-
-| Plan | Truth | Status | Evidence |
-|------|-------|--------|----------|
-| 063-01 | 5 RED-stub test files binding D-063-01 contract | ✅ VERIFIED (Plan 01) | `test_063_post_contract.py`, `test_063_post_then_subscribe.py`, `test_063_legacy_path_deleted.py`, `e2e/tests/063-*.spec.ts` (2) — all 5 files exist and parse; 5 tests collected |
-| 063-01 | Audit document with 23 audit-row dispositions | ✅ VERIFIED (Plan 05 finalized) | `063-LEGACY-TEST-AUDIT.md` resolved; 27 rows checkmarked |
-| 063-02 | POST returns 201 + JSON synchronously | ✅ VERIFIED | `test_063_post_contract.py` GREEN; `test_063_post_then_subscribe.py` GREEN; `grep -c 'EventSourceResponse(' backend/app/api/threads.py` → 0 |
-| 063-02 | event_consumer deleted | ✅ VERIFIED | `grep '^async def event_consumer' backend/app/api/threads.py` → 0; `test_event_consumer_not_importable` GREEN |
-| 063-03 | Frontend api.ts has 4 new functions + 3 new types | ✅ VERIFIED (per 063-03-SUMMARY) | 7 exports counted in api.ts; legacy `streamMessage` deleted (count: 0); tsc clean for api.ts and types/index.ts |
-| 063-04 | useMessages reconcile + resumeFromFailed; ChatArea triggers; Resume button | ✅ VERIFIED (per 063-04-SUMMARY) | All 31 acceptance grep criteria pass (17 Task 1 + 14 Task 2); useMessages tsc errors: 16 → 0 |
-| 063-04 | Phase 060 thread-switch invariants preserved verbatim | ✅ VERIFIED (per 063-04-SUMMARY) | Per-test verifier: `activeThreadIdRef.current = (sole writer) → 1`; no finally-block reload; loadAbortRef pattern intact |
-| 063-05 | Audit dispositions executed | ✅ VERIFIED | 6 rewrite-to-get-stream rewrites in commit `7524dda`; 4 inherit preserved (canonical `-k` filter); 0 deletions; 13+ keep-as-is unchanged |
-| 063-05 | Wave-0 timing assertion filled in (no TODO) | ✅ VERIFIED | `grep -cE 'TODO\|FIXME' backend/tests/integration/test_063_post_contract.py` → 0; XLEN assertion present |
-| 063-05 | E2E specs wired to fault-injection fixture (Resume button) | ✅ VERIFIED | `backend/app/api/test_fixtures.py` env-gated; `063-resume-failed.spec.ts` calls `/__test__/inject-failed-run/{thread_id}` and asserts Resume button + POST on click |
-| 063-05 | Final regression sweep GREEN | ✅ VERIFIED | 33 passed / 4 deselected / 3 xfailed; 4/4 sequential stability runs |
+**Score:** 7/7 truths verified (5 fully in code + tests, 2 code-verified with human confirmation needed for runtime behavior)
 
 ---
 
-## Threat Register Dispositions
+### Required Artifacts
 
-| Threat ID | Category | Component | Disposition | Status | Mitigation Evidence |
-|-----------|----------|-----------|-------------|--------|---------------------|
-| T-063-01-01 | T | Wave-0 stub assertion drift | mitigate | ✅ resolved | Plan 05 filled the TODO with real Redis xlen + wall-clock assertions |
-| T-063-01-02 | I | Static-source contract check via `inspect.getsource` | accept | ✅ accepted | Read-only inspection — cannot mutate state |
-| T-063-IDOR-active-runs | I | Cross-user GET /threads/{tid}/active-runs | mitigate | ✅ inherited | Phase 062 endpoint unchanged; D-062-12 ownership SELECT runs first → 404; partial CR-01 known limit (.single vs .maybe_single) carried forward |
-| T-063-IDOR-stream | I | Cross-user GET /runs/{rid}/stream | mitigate | ✅ inherited | Phase 062 stream_run uses .maybe_single() correctly per 062-VERIFICATION.md T17 |
-| T-063-IDOR-cancel | I | Cross-user DELETE /runs/{rid} | mitigate | ✅ inherited | Phase 062 cancel_run uses .maybe_single() per 062-VERIFICATION.md T18 |
-| T-063-05-01 | E | Test-fixture endpoint reachable in production | mitigate | ✅ resolved | `ENABLE_TEST_FIXTURES` env gate at main.py mount site (line 162); lifespan-time warning log when enabled (line 165); CI/staging/prod env files MUST NOT set the variable; `backend/.env.example` does NOT include it |
-| T-063-05-02 | T | Audit-driven test deletion accidentally removes unique coverage | mitigate | ✅ resolved | Zero `delete-redundant-with-062` or `delete-bound-to-removed-code` rows in the audit; all 6 rewrite-to-get-stream rows have explicit per-row execution notes |
-| T-063-05-03 | I | Test fixture endpoint allows cross-user run injection | accept | ✅ accepted | Endpoint requires `Depends(get_current_user)`; ownership SELECT validates thread; insert scoped to `current_user["id"]` — same surface as production endpoints |
-| T-063-05-04 | T | Regression sweep failure suppressed by adding new -k exclusions | accept | ✅ resolved | Zero new exclusions added beyond the 4 inherited from 062-VERIFICATION.md (verified by `grep -c 'test_normal_stream_unchanged\|test_failed_run_expires_60s\|test_120s_timeout_fires_full_finally\|test_producer_continues_after_consumer_disconnect' .planning/phases/063-frontend-stream-decoupling/063-VALIDATION.md` matching the canonical 4-name pattern) |
-
----
-
-## Verification Commands (canonical)
-
-### Backend full sweep
-
-```bash
-cd backend && ./venv/Scripts/python.exe -m pytest \
-  tests/integration/test_058_*.py \
-  tests/integration/test_059_*.py \
-  tests/integration/test_061_*.py \
-  tests/integration/test_062_*.py \
-  tests/integration/test_063_*.py \
-  -p no:cacheprovider \
-  -k 'not (test_normal_stream_unchanged or test_failed_run_expires_60s or test_120s_timeout_fires_full_finally or test_producer_continues_after_consumer_disconnect)'
-```
-
-**Expected:** `33 passed, 4 deselected, 3 xfailed, N warnings in ~25s`
-
-**Stability:** 4/4 sequential runs all GREEN.
-
-### E2E spec parse-list
-
-```bash
-cd e2e && npx playwright test --list \
-  tests/060-thread-race.spec.ts \
-  tests/063-refresh-mid-stream.spec.ts \
-  tests/063-resume-failed.spec.ts
-```
-
-**Expected:** `Total: 3 tests in 3 files` with 0 parse errors.
-
-**Live runtime:** owned by post-merge `gsd:verify-work`. The local Vite dev server reads from the main-repo path, not the worktree path, so frontend changes in this worktree cannot be observed by a browser pointed at `localhost:5173` until the merge lands. The Playwright `--list` parse check passes; the spec bodies' network-snapshot + selector logic is structurally correct.
-
-### Env-var gating verification
-
-```bash
-ENABLE_TEST_FIXTURES=0 python -c "from app.main import app; print([r.path for r in app.routes if '__test__' in str(r.path)])"
-# → []
-
-ENABLE_TEST_FIXTURES=1 python -c "from app.main import app; print([r.path for r in app.routes if '__test__' in str(r.path)])"
-# → ['/__test__/inject-failed-run/{thread_id}']
-# + WARNING log: ENABLE_TEST_FIXTURES=1 — /__test__/inject-failed-run endpoint is MOUNTED. ...
-```
-
-### Audit document resolution
-
-```bash
-grep -cE '\| ✅' .planning/phases/063-frontend-stream-decoupling/063-LEGACY-TEST-AUDIT.md
-# → 27 (4 inherited + 23 new findings)
-
-grep -cE '^\*\*Audit status:\*\* resolved\b' .planning/phases/063-frontend-stream-decoupling/063-LEGACY-TEST-AUDIT.md
-# → 1
-```
+| Artifact | Expected | Status | Details |
+|----------|----------|--------|---------|
+| `backend/app/api/threads.py` | POST returns 201 JSON; event_consumer deleted | VERIFIED | `return JSONResponse(...)` at line 2210. `^async def event_consumer` count = 0. `EventSourceResponse(` count = 0. Dead imports (AsyncGenerator, EventSourceResponse) removed (WR-01 fix). BL-02 fix: plain `.insert()` + `.data[0].get("id")` pattern at lines 693-704. |
+| `frontend/src/lib/api.ts` | 4 new functions + 3 types; streamMessage deleted | VERIFIED | `postMessage` (L174), `subscribeToRun` (L219), `getActiveRuns` (L349), `cancelRun` (L372, with optional `signal` per WR-03). `PostMessageResponse`, `ActiveRun`, `StreamCallbacks` interfaces present. `grep streamMessage api.ts` = 0. WR-02 fix: parse errors now warn to console. |
+| `frontend/src/types/index.ts` | Message.runId? + Message.runStatus? | VERIFIED | Lines 96-98: `runId?: string` and `runStatus?: "streaming" \| "completed" \| "failed" \| "cancelled"`. |
+| `frontend/src/hooks/useMessages.ts` | reconcile, resumeFromFailed, subscriptionsRef, server-only Stop | VERIFIED | All present. BL-03 fix: cleanup in onTerminal not finally. BL-06 fix: backward-walk for preceding user message. WR-03 fix: messagesRef for stable stopStreaming. WR-04 fix: `message_id` used to swap optimistic user placeholder (L452). WR-05 fix: guardedSetMessages in reconcile callbacks. |
+| `frontend/src/components/chat/ChatArea.tsx` | Second useEffect with 4 triggers + WR-07 reconcileRef | VERIFIED | Lines 116-146: reconcileRef pattern + visibilitychange + focus + pageshow (e.persisted) + cleanup parity. Existing Phase 060 thread-switch effect at L80-102 unchanged. |
+| `frontend/src/components/chat/MessageItem.tsx` | Resume button on runStatus==='failed' | VERIFIED | Lines 101-112. `data-testid="assistant-message"` (L56) and `data-testid="user-message"` (L25) present. WR-08 JSX indentation fixed. |
+| `frontend/src/components/chat/MessageList.tsx` | onResume prop drill; BL-05 scroll fix | VERIFIED | `onResume?` in Props (L12), forwarded to MessageItem (L97). BL-05: `useLayoutEffect` + rAF retry for scroll listener; `isNearBottomRef` guard on all auto-scroll branches. |
+| `backend/app/api/test_fixtures.py` | env-gated inject-failed-run; UUID validation | VERIFIED | `thread_id: UUID` (BL-04 fix at L48). Auth via `Depends(get_current_user)`. Ownership SELECT before insert. Both messages + runs rows inserted. 122 lines. |
+| `backend/app/main.py` | ENABLE_TEST_FIXTURES gate + production refusal | VERIFIED | Lines 160-172: env check + nested `if ENVIRONMENT in ("production","prod"): raise RuntimeError(...)`. |
+| `backend/tests/integration/test_063_cross_user_no_runid_leak.py` | Cross-user 404 + no run_id leak | VERIFIED | File present (WR-09 fix, commit a0aaf06). |
 
 ---
 
-## Inherited Exclusions
+### Key Link Verification
 
-The 4 tests excluded from the canonical sweep are preserved verbatim from 062-VERIFICATION.md:
-
-| Test | Source | Phase 063 Disposition |
-|------|--------|----------------------|
-| `test_normal_stream_unchanged` | DEF-061.1-01 | Inherit (audit row marked ✅; `deferred-items.md` flagged this as contract-incompatible — resolved at audit level by inheriting the exclusion) |
-| `test_failed_run_expires_60s` | DEF-061.1-02 | Inherit |
-| `test_120s_timeout_fires_full_finally` | DEF-061.1-02 | Inherit |
-| `test_producer_continues_after_consumer_disconnect` | DEF-061.1-02 | Inherit |
-
-No new exclusions were added in Phase 063 (T-063-05-04 mitigated).
-
----
-
-## Pre-Existing Issues Documented
-
-The following test failures predate Phase 063 and are explicitly out-of-scope per the parallel_execution context note:
-
-- `test_061_hard_timeout.py::test_120s_timeout_fires_full_finally` — Redis TTL timing (excluded by canonical -k filter)
-- `test_061_ttl.py::test_failed_run_expires_60s` — Redis TTL (excluded by canonical -k filter)
-
-Both are on the inherited-exclusion list and do NOT appear as new failures in the regression sweep.
+| From | To | Via | Status | Details |
+|------|----|-----|--------|---------|
+| `threads.py::send_message` | JSONResponse 201 return | `return JSONResponse(status_code=status.HTTP_201_CREATED, ...)` | WIRED | Confirmed at threads.py:2210-2215 |
+| `threads.py::send_message` | `_user_msg_id` from messages INSERT | `await aexec(supabase.table("messages").insert({...}))` + `.data[0].get("id")` | WIRED | Lines 693-704. Standard supabase-py pattern per BL-02 fix. Note: not live-DB verified. |
+| `api.ts::subscribeToRun` | GET /runs/{runId}/stream | `fetch(url)` where `url = ${API_BASE}/runs/${runId}/stream?since=...` | WIRED | api.ts:226 |
+| `api.ts::cancelRun` | DELETE /runs/{runId} | `fetch(${API_BASE}/runs/${runId}, {method: "DELETE"})` | WIRED | api.ts:374-376. Optional `signal` added (WR-03). |
+| `api.ts::getActiveRuns` | GET /threads/{threadId}/active-runs | `fetch(${API_BASE}/threads/${threadId}/active-runs)` | WIRED | api.ts:354 |
+| `useMessages.sendMessage` | `postMessage + subscribeToRun` | import from ../lib/api | WIRED | useMessages.ts:4 (single-line import). L437: postMessage call. L510: subscribeToRun call. message_id used at L452 (WR-04 fix). |
+| `useMessages.reconcile` | `Promise.all([getActiveRuns, loadMessages])` | parallel fetch | WIRED | useMessages.ts:589 — single-line `const [runs] = await Promise.all([getActiveRuns(threadId), loadMessages(threadId)])` |
+| `useMessages.stopStreaming` | `cancelRun(runId)` via DELETE /runs/{rid} | messagesRef read + cancelRun | WIRED | useMessages.ts:332. WR-03 fix: messagesRef.current instead of messages dep. |
+| `ChatArea reconcile useEffect` | `reconcileRef.current(tid)` on 4 events | useEffect([thread?.id]) with reconcileRef | WIRED | ChatArea.tsx:121-146. WR-07 fix: reconcileRef stabilizes the dep array. |
+| `MessageItem Resume button` | `onResume?.(message)` → resumeFromFailed | onClick prop chain ChatArea → MessageList → MessageItem | WIRED | MessageItem.tsx:105. MessageList.tsx:12,97. ChatArea.tsx:38,174 (onResume={resumeFromFailed}). |
 
 ---
 
-## Sign-Off
+### Data-Flow Trace (Level 4)
 
-- [x] All 7 success criteria verified
-- [x] All 11 plan-level observable truths verified
-- [x] All 9 threat dispositions implemented or accepted
-- [x] Audit document fully resolved (27/27 rows checkmarked)
-- [x] No new -k exclusions added
-- [x] Backend full sweep stable (4/4 runs GREEN)
-- [x] E2E specs parse-list cleanly (3 tests, 0 errors)
-- [x] Env-gate live-verified (route mounted only when ENABLE_TEST_FIXTURES=1)
+| Artifact | Data Variable | Source | Produces Real Data | Status |
+|----------|--------------|--------|-------------------|--------|
+| `ChatArea.tsx` reconcile | `activeRuns` | getActiveRuns → GET /threads/{tid}/active-runs → threads.py:list_active_runs → public.runs WHERE status='streaming' | Yes — Phase 062 endpoint queries live DB | FLOWING |
+| `useMessages.ts::sendMessage` | `run_id` | postMessage → POST /threads/{tid}/messages → `return JSONResponse({run_id: str(run_id)})` | Yes — run_id is UUID from public.runs INSERT | FLOWING (mock-verified; live-DB unconfirmed per BL-02 note) |
+| `MessageItem.tsx` | `message.runStatus` (during streaming) | SSE terminal events → `onTerminal` wrapper → `setMessages({...m, runStatus: "completed"/"failed"/"cancelled"})` | Yes — events from Redis XADD producer | FLOWING |
+| `MessageItem.tsx` | `message.runStatus === "failed"` for Resume | Via test fixture: inject-failed-run inserts assistant message + failed runs row. After reload, loadMessages fetches the message row. But raw DB messages rows do NOT carry runStatus — runStatus is only set when a run streams + terminates. | Uncertain — see note | UNCERTAIN |
 
-**Phase 063 verification: PASSED.**
+**Resume button data-flow note:** `getActiveRuns` only returns `status='streaming'` runs per D-062-02. A `status='failed'` injected run will NOT appear in active-runs. Therefore `runStatus: "failed"` on a Message can only be set by: (a) an SSE `error` terminal event during live streaming, OR (b) the page reading a failed run's status from the `runs` table and correlating with the message. The current codebase does not show a path where `loadMessages` → messages array → `runStatus` is populated from the `runs` table after reload. The e2e spec may rely on the reconcile/subscribeToRun path detecting the failed run, but the active-runs filter precludes this. This is a live-verification gap for SC#7.
 
 ---
 
-*Phase: 063-frontend-stream-decoupling*
-*Verified: 2026-05-03*
+### Behavioral Spot-Checks
+
+| Behavior | Evidence | Status |
+|----------|---------|--------|
+| event_consumer deleted at module level | `grep -c '^async def event_consumer' threads.py` = 0 (confirmed in source inspection) | PASS |
+| EventSourceResponse construction gone | `grep -c 'EventSourceResponse(' threads.py` = 0 | PASS |
+| Dead imports removed (WR-01) | No `from sse_starlette import` or `from typing import AsyncGenerator` in threads.py | PASS |
+| JSONResponse 201 present | threads.py:2210-2215 confirmed | PASS |
+| streamMessage deleted from api.ts | `grep -c streamMessage api.ts` = 0 | PASS |
+| 4 new API functions present | postMessage L174, subscribeToRun L219, getActiveRuns L349, cancelRun L372 | PASS |
+| subscribeToRun URL | `${API_BASE}/runs/${runId}/stream?since=` at api.ts:226 | PASS |
+| reconcile function in useMessages | `const reconcile = useCallback` at useMessages.ts:585 | PASS |
+| visibilitychange + pageshow + e.persisted | ChatArea.tsx:136,138,133 | PASS |
+| Resume button condition | `!isStreaming && role==="assistant" && runStatus==="failed"` at MessageItem.tsx:101 | PASS |
+| BL-02 fix: plain INSERT + data[0] | threads.py:693-704 — no .select("id").single() chain | PASS |
+| BL-03 fix: cleanup in onTerminal | useMessages.ts:669-673 — `subscriptionsRef.current.delete(run.run_id)` inside onTerminal wrapper | PASS |
+| WR-04 fix: message_id used | useMessages.ts:452 — `if (m.id === userMsg.id) return { ...m, id: message_id }` | PASS |
+| WR-07 fix: reconcileRef in ChatArea | ChatArea.tsx:116-119 | PASS |
+| ENABLE_TEST_FIXTURES gate | main.py:160-172 — env check + production refusal | PASS |
+| Backend regression sweep | Plan 05 confirmed: 33 passed, 4 deselected, 3 xfailed (4/4 stability runs) | PASS |
+| E2E specs parse | Plan 05 confirmed: 3 tests in 3 files, 0 parse errors | PASS |
+
+---
+
+### Requirements Coverage
+
+| Requirement | Source Plans | Description | Status | Evidence |
+|-------------|-------------|-------------|--------|----------|
+| STREAM-04 | 063-01 through 063-05 | A streaming response survives client navigation, refresh, and multi-tab access; generation lifetime decoupled from any single HTTP request | SATISFIED (code) / HUMAN NEEDED (live) | Full implementation present. Backend sweep GREEN. Live browser scenarios (SC3, SC4) require human verification. |
+| STREAM-02b | 063-01 through 063-05 | Recovery automatic via reconcile; Resume button optional fallback | SATISFIED (code) / HUMAN NEEDED (live) | Reconcile wired to all triggers. Resume button in DOM. Live SC3/SC7 scenarios need human browser run. |
+
+**Orphaned requirements check:** REQUIREMENTS.md traceability table maps STREAM-04 and STREAM-02b to Phase 063. Both accounted for. TEST-01 maps to Phase 064 (later phase — not orphaned). CONCUR-01 maps to Phase 058 (complete). CONCUR-02 maps to Phase 059 (complete). STREAM-02a maps to Phase 060 (complete). No orphaned requirements for Phase 063.
+
+---
+
+### Anti-Patterns Found
+
+| File | Line | Pattern | Severity | Impact |
+|------|------|---------|----------|--------|
+| `useMessages.ts` | 585-701 | `reconcile` does not populate `runStatus` on messages loaded from DB via `loadMessages`. Raw DB messages have no `runStatus`. Resume button for fixture-injected failed runs requires a data path that is not confirmed. | Warning | SC#7 e2e test may rely on a data path that doesn't exist; live verification will confirm or expose this |
+| `backend/tests/integration/` | — | No live-DB integration test for messages INSERT id-capture | Warning | BL-02 is the most consequential fix; if real PostgREST .data differs from mocks, every POST 500s. Human: run one POST against real Supabase. |
+
+---
+
+### Human Verification Required
+
+#### 1. Live-DB POST Contract Validation (Critical — BL-02 Fix)
+
+**Test:** With Supabase running locally, authenticate and POST to `/threads/{id}/messages` with a valid Bearer token and content body.
+**Expected:** HTTP 201 `Content-Type: application/json` body `{"message_id": "<uuid>", "run_id": "<uuid>"}` where both are valid UUIDs and `message_id` matches the row inserted into `messages`.
+**Why human:** All integration tests use `_build_mock_supabase`. The BL-02 fix rewrote the messages INSERT to use `await aexec(supabase.table("messages").insert({...}))` then read `.data[0].get("id")`. Real supabase-py 2.x behavior for `.data` on a plain INSERT (without `Prefer: return=representation`) may return `None` or an empty list. REVIEW explicitly warned: "Verify against a real Supabase instance before shipping — none of the new tests exercise the real PostgREST path for this code shape."
+
+#### 2. Refresh Mid-Stream (SC#3)
+
+**Test:** Start a long stream → wait ~3 seconds → press F5.
+**Expected:** After reload: GET /threads/{id}/active-runs fires; GET /runs/{rid}/stream opens; assistant bubble continues filling with tokens.
+**Why human:** e2e spec `063-refresh-mid-stream.spec.ts` parses and has correct assertion structure but was not run against a live browser (worktree dev-server constraint).
+
+#### 3. Resume Button via Test Fixture (SC#7)
+
+**Test:** Start backend with `ENABLE_TEST_FIXTURES=1`. Log in, navigate to a thread. In a second terminal, POST to `/__test__/inject-failed-run/{thread_id}` with the Bearer token. Reload the page.
+**Expected:** A Resume button appears on the last assistant message. Clicking it fires POST /threads/{id}/messages in Network DevTools.
+**Why human:** (1) Requires `ENABLE_TEST_FIXTURES=1`. (2) The data-flow gap: `getActiveRuns` only returns streaming runs; `loadMessages` returns raw DB rows without `runStatus`; unclear how the injected failed run's status flows onto the Message object's `runStatus` field to trigger the Resume button render condition (`message.runStatus === "failed"`). This path needs live confirmation.
+
+#### 4. Multi-Tab Sync (SC#4)
+
+**Test:** Open same thread in two browser tabs. Start streaming in Tab 1. Observe Tab 2.
+**Expected:** Both tabs show same tokens. Switching to another thread in Tab 1 does not corrupt Tab 2.
+**Why human:** Cannot automate two simultaneous browser contexts in current harness. Requires manual multi-tab test.
+
+#### 5. Cross-Tab Stop (SC#5)
+
+**Test:** Open same thread in two tabs while streaming. Click Stop in Tab 1.
+**Expected:** Both tabs receive `cancelled` terminal event and stop rendering.
+**Why human:** Cross-tab Stop requires a live Redis Stream with two simultaneous SSE consumers. Needs manual verification.
+
+---
+
+### Gaps Summary
+
+No blocking code-level gaps found. All 7 success criteria have confirmed implementation in the codebase with correct wiring. The human verification items are behavioral/runtime concerns:
+
+**Priority 1 (most consequential):** BL-02 live-DB validation — if the real `supabase.table("messages").insert({...}).execute()` via `aexec` does not return the inserted row id under `.data[0]["id"]`, every POST to `/threads/{id}/messages` raises HTTP 500. This has not been tested outside of mocks. Run one live POST before declaring Phase 063 production-ready.
+
+**Priority 2:** SC#7 data-flow clarification — confirm how `runStatus: "failed"` appears on a Message object after page reload when the failure comes from a fixture-injected runs row rather than a live SSE error terminal event. The current reconcile path only watches active (streaming) runs; if `loadMessages` doesn't carry `runStatus` from the DB, the Resume button may not render after reload even when a failed run exists.
+
+**Priority 3:** Live e2e runs (SC#3 refresh-mid-stream, SC#4 multi-tab sync, SC#5 cross-tab Stop).
+
+---
+
+_Verified: 2026-05-03T18:00:00Z_
+_Verifier: Claude (gsd-verifier)_
