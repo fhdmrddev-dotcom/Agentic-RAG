@@ -601,6 +601,15 @@ export function useMessages(): UseMessages {
       // sole writer (D-060-01).
       if (activeThreadIdRef.current !== threadId) return
 
+      // WR-06 fix: RESERVE the subscription slot BEFORE the placeholder
+      // insert and BEFORE firing subscribeToRun. The previous order
+      // (insert → set → fire) left a synchronous window where a StrictMode
+      // double-invoke could race past the `has(run_id)` short-circuit and
+      // open a duplicate consumer. Setting first makes subsequent
+      // reconcile ticks short-circuit deterministically.
+      const controller = new AbortController()
+      subscriptionsRef.current.set(run.run_id, controller)
+
       // Deterministic temp-id — idempotent React reconciliation (Pitfall 1).
       // Same id across reconciles for the same run = StrictMode-safe.
       const placeholderId = `temp-${run.run_id}`
@@ -621,9 +630,6 @@ export function useMessages(): UseMessages {
         if (prev.some((m) => m.id === placeholderId)) return prev
         return [...prev, placeholder]
       })
-
-      const controller = new AbortController()
-      subscriptionsRef.current.set(run.run_id, controller)
 
       // WR-05 fix: gate live setMessages updates on the user still viewing
       // this thread. The placeholder INSERT above is fine to write in either
