@@ -802,6 +802,14 @@ export function useMessages(): UseMessages {
   // consumer-side sockets. NEW in Phase 063 — pre-063 there was at most one
   // long-lived stream and abortControllerRef.abort() handled it; with
   // reconcile + multi-tab there can be N concurrent subscriptions per hook.
+  //
+  // D-063.1-10 audit (plan 063.1-03):
+  //   Single hook consumer: ChatArea.tsx (line 39) — verified via grep.
+  //   ChatArea mount lifetime: tied to App-level routing, NOT keyed on
+  //   thread.id (thread switches via useEffect, not remount). So this
+  //   unmount effect only fires on logout/route change.
+  //   If a future surface adds a second consumer of this hook or keys
+  //   ChatArea on thread.id, the cleanup semantics need re-review.
   useEffect(() => {
     return () => {
       for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
