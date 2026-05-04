@@ -875,23 +875,33 @@ export function useMessages(): UseMessages {
   // isSendingRef gate (the user gets no feedback otherwise).
   const resumeInFlightRef = useRef(false)
   const resumeFromFailed = useCallback(async (failedMessage: Message) => {
+    // CR-02 fix: claim the in-flight bit SYNCHRONOUSLY before any other
+    // guard so a rapid double-click cannot pass two callers through the
+    // `resumeInFlightRef.current` check. Mirrors the in-flight-first
+    // pattern that reconcileInFlightRef applies at lines 675-676. The
+    // previous order (check → sync findIndex/loop → set) left a TOCTOU
+    // window where two synchronous handlers in the same task both passed
+    // the guard, both flipped the bit, and both called sendMessage — the
+    // second call no-op'd by sendMessage's isSendingRef guard, leaving
+    // the user with no feedback (the failure mode the comment block
+    // above explicitly anticipates).
     if (resumeInFlightRef.current) return
-    const idx = messages.findIndex((m) => m.id === failedMessage.id)
-    if (idx < 0) return
-    // Walk backward to find the most recent user message before this failure.
-    let userMsg: Message | undefined
-    for (let i = idx - 1; i >= 0; i--) {
-      if (messages[i].role === "user") {
-        userMsg = messages[i]
-        break
-      }
-    }
-    if (!userMsg) {
-      console.warn("resumeFromFailed: no preceding user message for", failedMessage.id)
-      return
-    }
     resumeInFlightRef.current = true
     try {
+      const idx = messages.findIndex((m) => m.id === failedMessage.id)
+      if (idx < 0) return
+      // Walk backward to find the most recent user message before this failure.
+      let userMsg: Message | undefined
+      for (let i = idx - 1; i >= 0; i--) {
+        if (messages[i].role === "user") {
+          userMsg = messages[i]
+          break
+        }
+      }
+      if (!userMsg) {
+        console.warn("resumeFromFailed: no preceding user message for", failedMessage.id)
+        return
+      }
       await sendMessage(failedMessage.thread_id, userMsg.content)
     } finally {
       resumeInFlightRef.current = false
