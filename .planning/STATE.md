@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 063.1 context gathered
-last_updated: "2026-05-04T17:38:32.519Z"
-last_activity: 2026-05-03 -- Phase 063 execution started
+stopped_at: Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+last_updated: "2026-05-04T21:27:25Z"
+last_activity: 2026-05-04 -- Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 28
-  completed_plans: 23
-  percent: 82
+  completed_plans: 25
+  percent: 89
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 063 — frontend-stream-decoupling
+**Current focus:** Phase 063.1 — frontend-stream-decoupling-gap-closure
 
 ## Current Position
 
-Phase: 063 (frontend-stream-decoupling) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 063
-Last activity: 2026-05-03 -- Phase 063 execution started
-Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module with `replay_tail_consumer` + `GET /runs/{rid}/stream` + register router in main.py + Wave 0 stubs for SC#2 + SC#5(stream)). 062-01 shipped: `GET /threads/{tid}/active-runs` returns Pydantic-bound list filtered to status='streaming', ORDER BY started_at DESC; ownership SELECT runs first with 404 (NOT 403) per D-062-12. D-062-14 file-layout discipline confirmed (45 insertions / 0 deletions in threads.py; off-limits regions untouched).
+Phase: 063.1 (frontend-stream-decoupling-gap-closure) — EXECUTING
+Plan: 3 of 5
+Status: Executing Phase 063.1 — Wave 2 done; Wave 3 next
+Last activity: 2026-05-04 -- Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from `ChatArea.tsx:95` thread-change useEffect; lift `guardedSetMessages` into sendMessage gating on `streamingThreadIdRef.current === activeThreadIdRef.current`; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10). 063.1-02 shipped: lastSeenOffsetRef Map declared adjacent to subscriptionsRef; api.ts getMessages snake→camel mapper for run_id/run_status; subscribeToRun parser captures Redis Stream `id:` lines and fires optional onCursor callback after each successful data: dispatch (terminal branches return early); reconcile rewritten with runId-match dedup (Gap-001), narrowed `subscriptionsRef.has()` short-circuit (Gap-003 partial), and cached cursor in subscribeToRun (Gap-004). ChatArea.tsx untouched (Plan 03's scope). 3 atomic commits (b011db8 RED test, e4a00fb api.ts GREEN, 454125d useMessages.ts) + SUMMARY/STATE/ROADMAP commit. tsc --build --noEmit clean for the 3 touched files. Vitest can't run locally (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); tests committed and gated via TypeScript per the plan's `<verify>` block.
 
 ## Recent Completed Phases
 
@@ -73,6 +73,8 @@ Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module
 | 061 | 05 | 10min | 4 | 12 (9 created, 3 modified) |
 | 062 | 01 | 12min | 2 | 4 (3 created, 1 modified) |
 | Phase 062 P02 | 7min | 2 tasks | 5 files |
+| 063.1 | 01 | 13min | 3 | 3 (1 created, 2 modified) |
+| 063.1 | 02 | 12min | 2 (3 commits — RED + 2 GREEN) | 3 (modified) |
 
 ## Accumulated Context
 
@@ -110,6 +112,9 @@ Recent decisions affecting v2.5 work:
 - Phase 062 plan 02: replay_tail_consumer mirrors event_consumer verbatim with last_id=since (D-062-07); zero-line modification of off-limits regions in threads.py confirmed via git diff
 - Phase 062 plan 02: top-level 'from redis.exceptions import RedisError' import to avoid the variable-shadowing trap on the route's 'redis' parameter (any 'redis.exceptions.X' inside the handler would AttributeError on the Redis instance); pattern documented in module docstring + inline comment + invariant noted for future maintainers
 - Phase 062 plan 02 deviation (Rule 3): added per-file '_reset_redis_singleton' autouse fixture to 3 new stream test files — singleton _redis is event-loop-bound, pytest-asyncio creates per-test loops, so subsequent tests hit a closed loop on the cached singleton (Pitfall 6 mirror); per-file scope avoids surprising 058/059/061 tests
+- Phase 063.1 plan 02: onCursor fires AFTER the type-specific dispatch and is SKIPPED on terminal branches (stream_end/error/cancelled return early) — cursor advancement is meaningless once the run has ended; lastEventId resets to undefined after each fire so cursor-less legacy frames don't inherit stale ids
+- Phase 063.1 plan 02: reused messagesRef.current (already declared at useMessages.ts:316-319 for stopStreaming WR-03 fix) for the runId-match dedup; same pattern, same justification, no second ref needed
+- Phase 063.1 plan 02 (Rule 3 deferred-item): vitest cannot run locally on this machine due to missing rolldown native binding cascade (npm optional-dep bug — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec not installed); tests committed and gated via TypeScript compilation per the plan's `<verify>` block; runtime test execution deferred to CI / freshly `npm install`-ed environment
 
 ### Pending Todos
 
@@ -149,10 +154,10 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 063.1 context gathered
-Next: Run `/gsd:plan-phase 063.1` to break the 15 locked decisions into wave-parallel plans (suggested ordering in CONTEXT.md code_context: backend JOIN → offset cursor + dedup → thread-switch persistence → in-flight guard + merge → e2e + manual UAT)
+Last session: 2026-05-04T21:27:25Z
+Stopped at: Phase 063.1 plan 02 shipped (frontend offset cursor + reconcile dedup + narrowed short-circuit)
+Next: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from ChatArea.tsx:95 thread-change useEffect; lift guardedSetMessages into sendMessage gating on streamingThreadIdRef === activeThreadIdRef; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10).
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
 
-**Planned Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5 plans — 2026-05-04T17:38:32.503Z
+**Planned Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5 plans — 2026-05-04T17:38:32.503Z (2/5 plans complete; 3/5 next)
