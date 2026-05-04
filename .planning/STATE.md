@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Completed 063.1-03-PLAN.md (thread-switch SSE persistence — drop abortStream + guardedSetMessages in sendMessage)
-last_updated: "2026-05-04T21:44:49.368Z"
+stopped_at: Completed 063.1-04-PLAN.md (concurrent-reconcile guard + loadMessages MERGE — Gap-005 closed)
+last_updated: "2026-05-04T21:54:05.768Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 28
-  completed_plans: 26
-  percent: 93
+  completed_plans: 27
+  percent: 96
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 ## Current Position
 
 Phase: 063.1 (frontend-stream-decoupling-gap-closure) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-04
 Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from `ChatArea.tsx:95` thread-change useEffect; lift `guardedSetMessages` into sendMessage gating on `streamingThreadIdRef.current === activeThreadIdRef.current`; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10). 063.1-02 shipped: lastSeenOffsetRef Map declared adjacent to subscriptionsRef; api.ts getMessages snake→camel mapper for run_id/run_status; subscribeToRun parser captures Redis Stream `id:` lines and fires optional onCursor callback after each successful data: dispatch (terminal branches return early); reconcile rewritten with runId-match dedup (Gap-001), narrowed `subscriptionsRef.has()` short-circuit (Gap-003 partial), and cached cursor in subscribeToRun (Gap-004). ChatArea.tsx untouched (Plan 03's scope). 3 atomic commits (b011db8 RED test, e4a00fb api.ts GREEN, 454125d useMessages.ts) + SUMMARY/STATE/ROADMAP commit. tsc --build --noEmit clean for the 3 touched files. Vitest can't run locally (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); tests committed and gated via TypeScript per the plan's `<verify>` block.
@@ -76,6 +76,7 @@ Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence:
 | 063.1 | 01 | 13min | 3 | 3 (1 created, 2 modified) |
 | 063.1 | 02 | 12min | 2 (3 commits — RED + 2 GREEN) | 3 (modified) |
 | Phase 063.1 P03 | 18min | 2 tasks | 2 files |
+| Phase 063.1 P04 | 4min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -121,6 +122,10 @@ Recent decisions affecting v2.5 work:
 - Phase 063.1 plan 03: D-063.1-10 audit confirmed single useMessages consumer (ChatArea.tsx:39) and stable mount lifetime (no key=thread.id on ChatArea); hook unmount effect only fires on logout/route change — documented in a comment block above the unmount effect
 - Phase 063.1 plan 03 (Rule 1 verify-command bug): plan's grep -rn 'useMessages()' src | wc -l == 1 check is too broad — matches the function declaration too; semantically the audit (single consumer in ChatArea) passes via grep -v 'export function useMessages' precision filter
 - Phase 063.1 plan 03 (Rule 3 deferred-item carried forward from Plan 02): vitest runtime unavailable on this machine (npm optional-dep cascade); TDD ceremony simplified to TypeScript-gated single commit with behavior cases documented in commit body — matches plan's actual <verify> gate (tsc + grep)
+- Phase 063.1 plan 04: reconcileInFlightRef as bool not Map (D-063.1-11) — only one viewing thread at a time, single in-flight bit suffices; mirrors resumeInFlightRef shape verbatim. Sync set BEFORE Promise.all dispatch ensures the second concurrent caller (also synchronous to same tick before its own await) reads true and bails at top guard. Outer try/finally wraps entire body; every early-return path flows through finally to release the lock (T-063.1-13 mitigation).
+- Phase 063.1 plan 04: loadMessages MERGE three-clause filter (D-063.1-12) — m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId). Each clause necessary: temp- prefix scopes to placeholders only, runId presence rejects pre-run-backed legacy temps, !dbRunIds.has guards against dup-bubble when DB has caught up (reconcile's runId-dedup at D-063.1-04 will route SSE deltas to the DB row). Spread order [...data, ...liveTempPlaceholders] — DB rows first (chronological from server), placeholders appended (most recent run_id by definition). React keys stable on id field, no collision risk.
+- Phase 063.1 plan 04: reconcile for-loop body kept BYTE-IDENTICAL inside new outer try/finally — only structural wrapping changed. Inner indentation preserved at original level (TypeScript whitespace-insensitive); re-indenting ~150 lines would balloon diff and risk subtle drift in dedup/cursor/onTerminal blocks. Plan acceptance criterion explicitly required byte-identical for-loop content vs Plan 02 result.
+- Phase 063.1 plan 04 (Rule 3 deferred-item carried forward from Plans 02/03): vitest runtime unavailable on this machine (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); TDD ceremony simplified to TypeScript-gated single commit with the six behavior cases (Tests 1-6) documented in commit body — matches plan's actual <verify> gate (tsc + grep). Plan 05 E2E specs (063.1-concurrent-reconcile.spec.ts, 063.1-refresh-no-duplicate-bubble.spec.ts) provide cross-stream regression coverage.
 
 ### Pending Todos
 
@@ -160,8 +165,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-04T21:44:49.359Z
-Stopped at: Completed 063.1-03-PLAN.md (thread-switch SSE persistence — drop abortStream + guardedSetMessages in sendMessage)
+Last session: 2026-05-04T21:54:05.759Z
+Stopped at: Completed 063.1-04-PLAN.md (concurrent-reconcile guard + loadMessages MERGE — Gap-005 closed)
 Next: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from ChatArea.tsx:95 thread-change useEffect; lift guardedSetMessages into sendMessage gating on streamingThreadIdRef === activeThreadIdRef; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10).
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
