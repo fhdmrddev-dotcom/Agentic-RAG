@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useLayoutEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageItem } from "./MessageItem"
 import type { Message } from "@/types"
@@ -17,6 +17,12 @@ export function MessageList({ messages, isStreaming, onSendMessage, showSuggesti
   const prevCountRef = useRef(0)
   const isNearBottomRef = useRef(true)
   const containerRef = useRef<HTMLDivElement>(null)
+  // BL-05 fix: track whether the scroll listener has actually attached.
+  // Until it has, we cannot trust isNearBottomRef.current — it would stay
+  // at its initial `true` and the auto-follow would fight a user who has
+  // scrolled up. (Symptom: smooth scroll → instant snap → smooth scroll
+  // during reconcile + send.)
+  const scrollListenerAttachedRef = useRef(false)
 
   // Track whether user has scrolled up so we don't fight them during streaming
   const handleScroll = () => {
@@ -26,19 +32,50 @@ export function MessageList({ messages, isStreaming, onSendMessage, showSuggesti
     isNearBottomRef.current = distFromBottom < 120
   }
 
-  useEffect(() => {
-    const el = containerRef.current?.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null
-    if (!el) return
-    el.addEventListener("scroll", handleScroll, { passive: true })
-    return () => el.removeEventListener("scroll", handleScroll)
+  // BL-05 fix: useLayoutEffect + retry — the Radix ScrollArea viewport may
+  // not be in the DOM on the first render pass; useEffect's lookup returns
+  // null and the listener never attaches. Use useLayoutEffect to run before
+  // paint and retry on the next animation frame if the viewport isn't
+  // mounted yet.
+  useLayoutEffect(() => {
+    let cleanup: (() => void) | null = null
+    let cancelled = false
+    const tryAttach = () => {
+      if (cancelled) return
+      const el = containerRef.current?.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null
+      if (!el) {
+        // Viewport not mounted yet — try again next frame.
+        requestAnimationFrame(tryAttach)
+        return
+      }
+      el.addEventListener("scroll", handleScroll, { passive: true })
+      scrollListenerAttachedRef.current = true
+      cleanup = () => {
+        el.removeEventListener("scroll", handleScroll)
+        scrollListenerAttachedRef.current = false
+      }
+    }
+    tryAttach()
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
   }, [])
 
   useEffect(() => {
     const newCount = messages.length
     if (newCount > prevCountRef.current) {
-      // New message added — always scroll to bottom
       prevCountRef.current = newCount
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+      // BL-05 fix: only auto-scroll when the user is actually near the
+      // bottom (or the listener hasn't attached yet so we have no signal —
+      // the initial-render case where defaulting to scroll feels right).
+      // Use "instant" while streaming to avoid the smooth→instant→smooth
+      // visual jitter on every reconcile / token tick.
+      if (isNearBottomRef.current) {
+        bottomRef.current?.scrollIntoView({
+          behavior: isStreaming ? "instant" : "smooth",
+        })
+      }
     } else if (isStreaming && isNearBottomRef.current) {
       // Existing message growing — only follow if user is near the bottom
       bottomRef.current?.scrollIntoView({ behavior: "instant" })
