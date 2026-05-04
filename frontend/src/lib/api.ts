@@ -49,16 +49,36 @@ export async function getMessages(threadId: string, signal?: AbortSignal): Promi
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers, signal })
   if (!res.ok) throw new Error("Failed to get messages")
+  // Phase 063.1 (D-063.1-13/15): backend now LEFT JOINs public.runs and returns
+  // run_id + run_status (snake_case) on assistant rows; user rows + pre-run-backed
+  // assistant rows return null for both. Extend the inline response shape and
+  // map snake → camel in the same destructure pass that already converts
+  // confidence_* and source_refs.
   const data = await res.json() as Array<Message & {
     source_refs?: Citation[]
     confidence_level?: string
     confidence_avg_similarity?: number
     confidence_disclaimer?: string | null
+    run_id?: string
+    run_status?: "streaming" | "completed" | "failed" | "cancelled"
   }>
   // Map DB column names to frontend field names
   return data.map((m) => {
-    const { source_refs, confidence_level, confidence_avg_similarity, confidence_disclaimer, ...rest } = m
-    const mapped: Message = { ...rest, citations: (source_refs ?? []) as Citation[] }
+    const {
+      source_refs,
+      confidence_level,
+      confidence_avg_similarity,
+      confidence_disclaimer,
+      run_id,
+      run_status,
+      ...rest
+    } = m
+    const mapped: Message = {
+      ...rest,
+      citations: (source_refs ?? []) as Citation[],
+      runId: run_id,
+      runStatus: run_status,
+    }
     if (confidence_level) {
       mapped.confidence = {
         level: confidence_level as "high" | "medium" | "low",
@@ -164,6 +184,18 @@ export interface StreamCallbacks {
   onPlanning?: (iteration: number) => void
   onIterationStart?: (iteration: number) => void
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void
+  /**
+   * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
+   * Fires AFTER each successfully-dispatched `data:` event with the most
+   * recent SSE `id:` line value (e.g. "1234567890-0"). The hook layer stores
+   * this in `lastSeenOffsetRef.current` keyed by run_id so the next reconcile
+   * cycle can call `subscribeToRun(runId, lastSeenOffsetRef.current.get(runId)
+   * ?? "0", ...)` instead of replaying the entire stream from offset 0.
+   *
+   * If no `id:` line precedes a `data:` event (legacy frames), this callback
+   * is NOT invoked — the cursor never advances on cursor-less events.
+   */
+  onCursor?: (msId: string) => void
 }
 
 /** Phase 063 (D-063-01): POST a new chat message. Returns synchronously with
@@ -241,6 +273,12 @@ export async function subscribeToRun(
   const decoder = new TextDecoder()
   let buffer = ""
   let doneFired = false
+  // Phase 063.1 (D-063.1-01/02): track the most recent Redis Stream `id:` line
+  // seen in the wire. Reset to undefined after each data: event dispatch so
+  // legacy frames without an id: prefix don't bleed cursor values from the
+  // previous event. See onCursor docstring on StreamCallbacks for the cursor
+  // advancement contract.
+  let lastEventId: string | undefined
 
   while (true) {
     let done: boolean, value: Uint8Array | undefined
@@ -258,6 +296,13 @@ export async function subscribeToRun(
     buffer = lines.pop() ?? ""
 
     for (const line of lines) {
+      if (line.startsWith("id: ")) {
+        // Phase 063.1: capture Redis Stream entry id; consumed by onCursor
+        // after the matching `data:` line is dispatched below. Trim handles
+        // both LF and CRLF wire formats.
+        lastEventId = line.slice(4).trim()
+        continue
+      }
       if (!line.startsWith("data: ")) continue
       const raw = line.slice(6).trim()
       try {
@@ -330,6 +375,18 @@ export async function subscribeToRun(
             parsed.fallback_model as string,
           )
         }
+
+        // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
+        // type-specific callback so the consumer's lastSeenOffsetRef only
+        // advances once the event content has been committed to state. We
+        // skip terminal branches above (stream_end / error / cancelled)
+        // because they `return` directly — the cursor is irrelevant once
+        // the run has ended. Reset lastEventId so a subsequent cursor-less
+        // data: line doesn't double-fire onCursor with a stale id.
+        if (lastEventId !== undefined && callbacks.onCursor) {
+          callbacks.onCursor(lastEventId)
+        }
+        lastEventId = undefined
       } catch (parseErr) {
         // WR-02 fix: log malformed lines so a backend wire-format regression
         // is at least visible in the console (legacy code silently dropped).
