@@ -684,28 +684,33 @@ async def send_message(
     # optimistic placeholder against the persisted row. Per RESEARCH Open
     # Question #1, this is the USER-message id (the only one that exists
     # synchronously; the assistant message is persisted at terminal time).
+    # BL-02 fix: supabase-py `.insert(...)` does not chain `.select("id").single()`
+    # (`.single()` is a query-builder method, not an insert-builder method). The
+    # standard pattern — used elsewhere in this module (line ~970 for the assistant
+    # INSERT) — is to call `.insert(row)` alone; PostgREST returns the inserted
+    # row(s) under `.data` as a list (Prefer: return=representation is the
+    # supabase-py default). Read the id from `.data[0]["id"]`.
     _user_msg_resp = await aexec(
         supabase.table("messages").insert({
             "thread_id": thread_id,
             "user_id": current_user["id"],
             "role": "user",
             "content": body.content,
-        }).select("id").single()
+        })
     )
-    # PostgREST with .single() returns a single dict in `.data`; defensive list-
-    # unwrap supports test mocks that hand back `[{...}]` from a generic
-    # .execute() builder (Phase 061+ test infrastructure shapes responses as
-    # lists by default). Real-PostgREST path takes the dict branch; mocked
-    # tests take the list[0] branch — both yield the inserted row.
     _user_msg_data = _user_msg_resp.data if _user_msg_resp is not None else None
+    # Real-PostgREST path: list[dict]; some test mocks hand back a single dict.
     if isinstance(_user_msg_data, list):
-        _user_msg_data = _user_msg_data[0] if _user_msg_data else None
-    _user_msg_id = (_user_msg_data or {}).get("id") if isinstance(_user_msg_data, dict) else None
+        _user_msg_id = _user_msg_data[0].get("id") if _user_msg_data else None
+    elif isinstance(_user_msg_data, dict):
+        _user_msg_id = _user_msg_data.get("id")
+    else:
+        _user_msg_id = None
     if not _user_msg_id:
-        # Defensive: PostgREST should always return the inserted row when
-        # .select("id").single() is chained. If it doesn't, fail loudly here
-        # so the frontend never gets a partial {message_id: null, run_id: ...}
-        # response that would silently break optimistic placeholder dedup.
+        # Defensive: PostgREST should always return the inserted row by default.
+        # If it doesn't, fail loudly so the frontend never gets a partial
+        # {message_id: null, run_id: ...} response that would silently break
+        # optimistic placeholder dedup.
         logger.error(
             "User-message INSERT did not return id for thread %s — aborting send_message",
             thread_id,
