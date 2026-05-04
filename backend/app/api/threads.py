@@ -6,11 +6,11 @@ import logging
 import os
 import time as time_mod
 from datetime import datetime, timezone
-from typing import AsyncGenerator
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from sse_starlette import EventSourceResponse
+# WR-01 fix: removed dead imports `AsyncGenerator` and `EventSourceResponse`
+# left over from the legacy SSE-on-POST path (deleted in D-063-01).
 import openai
 from openai import APIError
 try:
