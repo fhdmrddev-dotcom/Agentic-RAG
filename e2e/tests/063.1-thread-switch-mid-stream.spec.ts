@@ -99,8 +99,16 @@ test.describe("063.1: thread switch mid-stream survives SSE", () => {
     })
 
     // ── Step 1: Create Thread A and send long prompt ──
+    // CR-03 fix: capture `threadAUrl` AFTER the user message is in DOM and
+    // SSE streaming has started — by that point the app routing has assigned
+    // the URL to /threads/<thread_id> (was: captured immediately after
+    // createNewThread, when the URL could still be /, /new, or otherwise
+    // pre-route-assignment depending on the thread-creation lifecycle, so
+    // page.goto(threadAUrl) in Step 3 might not actually navigate back to
+    // Thread A). Also assert the URL shape so a future routing change that
+    // breaks this premise produces a clean test failure instead of a
+    // misleading distinctRuns / bubble-count mismatch.
     await createNewThread(page)
-    const threadAUrl = page.url()
     await sendMessageInActiveThread(page, LONG_STREAM_PROMPT)
 
     // Wait for streaming to be in flight and for some tokens to arrive so
@@ -109,6 +117,9 @@ test.describe("063.1: thread switch mid-stream survives SSE", () => {
       page.locator('[data-testid="assistant-message"]').first(),
     ).toBeVisible({ timeout: 15_000 })
     await page.waitForTimeout(2_000)
+    const threadAUrl = page.url()
+    expect(threadAUrl, `expected /threads/<uuid> URL after first message; got ${threadAUrl}`)
+      .toMatch(/\/threads\/[0-9a-f-]{36}/)
 
     // ── Step 2: Switch to Thread B (create new thread) ──
     await createNewThread(page)
