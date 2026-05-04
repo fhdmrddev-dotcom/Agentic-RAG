@@ -301,6 +301,13 @@ export function useMessages(): UseMessages {
   // guards against StrictMode double-mount + rapid visibilitychange/focus
   // double-fires opening duplicate consumers on the same run.
   const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
+  // Phase 063.1 (D-063.1-01 / Gap-004): per-run replay cursor. Updated as each
+  // delta SSE entry arrives (Redis Stream `id` field captured by the api.ts
+  // parser and exposed via StreamCallbacks.onCursor). Hook-local Map; survives
+  // tab switches and reconcile cycles within a page lifetime; F5 wipes it
+  // (back to since='0' on reload — the runId-match dedup of D-063.1-04
+  // handles the F5-replay flicker, not the offset cursor).
+  const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
 
   // D-063-03: Stop is server-side via DELETE /runs/{rid}. The terminal
   // 'cancelled' sentinel arrives via the open SSE subscription; the parser
@@ -495,6 +502,18 @@ export function useMessages(): UseMessages {
         originalOnTerminal(kind, errorPayload)
       }
 
+      // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement. The api.ts
+      // parser fires onCursor AFTER each successful event dispatch with the
+      // most recent Redis Stream `id:` line value. We stash it in
+      // lastSeenOffsetRef keyed by run_id so a subsequent reconcile cycle on
+      // this run (e.g. tab switch + return) passes the cached cursor as the
+      // `since` arg instead of replaying from "0". sendMessage itself starts
+      // at "0" because this is a fresh run — the cursor only matters once a
+      // RECONCILE re-attaches mid-run.
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(run_id, msId)
+      }
+
       await subscribeToRun(run_id, "0", callbacks, controller.signal)
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -594,42 +613,62 @@ export function useMessages(): UseMessages {
     }
 
     for (const run of activeRuns) {
-      // Pitfall 1 short-circuit: skip if already subscribed.
-      if (subscriptionsRef.current.has(run.run_id)) continue
       // Pitfall 3 cross-thread safety: only attach if this thread is still
       // the viewing thread when reconcile started; setViewingThread is the
-      // sole writer (D-060-01).
+      // sole writer (D-060-01). Kept at top of the iteration body — runs
+      // BEFORE the dedup/insert so we don't write into a stale thread.
       if (activeThreadIdRef.current !== threadId) return
 
-      // WR-06 fix: RESERVE the subscription slot BEFORE the placeholder
-      // insert and BEFORE firing subscribeToRun. The previous order
-      // (insert → set → fire) left a synchronous window where a StrictMode
-      // double-invoke could race past the `has(run_id)` short-circuit and
-      // open a duplicate consumer. Setting first makes subsequent
-      // reconcile ticks short-circuit deterministically.
-      const controller = new AbortController()
-      subscriptionsRef.current.set(run.run_id, controller)
+      // Phase 063.1 (D-063.1-04 / Gap-001): runId-match dedup. If a message
+      // already in current state carries this run_id (e.g. post-F5 the LEFT
+      // JOIN runs delivered a persisted assistant row with runId from
+      // getMessages), reuse THAT message's id as the SSE callback target —
+      // no second bubble. messagesRef.current is the current state (declared
+      // at line 316-319 for stopStreaming's WR-03 fix; same pattern reused).
+      const existingByRunId = messagesRef.current.find((m) => m.runId === run.run_id)
+      const targetId = existingByRunId?.id ?? `temp-${run.run_id}`
 
+      // Idempotent placeholder insert ONLY when no existing row found.
       // Deterministic temp-id — idempotent React reconciliation (Pitfall 1).
       // Same id across reconciles for the same run = StrictMode-safe.
-      const placeholderId = `temp-${run.run_id}`
-      const placeholder: Message = {
-        id: placeholderId,
-        thread_id: threadId,
-        user_id: "",
-        role: "assistant",
-        content: "",
-        created_at: run.started_at,
-        updated_at: run.started_at,
-        tool_calls: [],
-        runId: run.run_id,
-        runStatus: "streaming",
+      if (!existingByRunId) {
+        const placeholder: Message = {
+          id: targetId,
+          thread_id: threadId,
+          user_id: "",
+          role: "assistant",
+          content: "",
+          created_at: run.started_at,
+          updated_at: run.started_at,
+          tool_calls: [],
+          runId: run.run_id,
+          runStatus: "streaming",
+        }
+        setMessages((prev) => {
+          // Idempotent insert.
+          if (prev.some((m) => m.id === targetId)) return prev
+          return [...prev, placeholder]
+        })
       }
-      setMessages((prev) => {
-        // Idempotent insert.
-        if (prev.some((m) => m.id === placeholderId)) return prev
-        return [...prev, placeholder]
-      })
+
+      // Phase 063.1 (D-063.1-09 / Gap-003): NARROWED short-circuit. Pre-063.1
+      // this `continue` lived ABOVE the placeholder insert, which meant
+      // switching back to a thread mid-stream would skip the whole iteration
+      // (no re-render of the assistant bubble) because subscriptionsRef
+      // already had the run_id from sendMessage's still-live SSE consumer.
+      // New behavior: ALWAYS render the placeholder/dedup; only skip the
+      // subscribeToRun call itself when a live subscription already exists.
+      // BL-03 invariant preserved: subscription cleanup remains owned by
+      // onTerminal (and the .finally() safety net below).
+      if (subscriptionsRef.current.has(run.run_id)) continue
+
+      // WR-06 fix: RESERVE the subscription slot BEFORE firing subscribeToRun.
+      // The previous order (insert → set → fire) left a synchronous window
+      // where a StrictMode double-invoke could race past the has(run_id)
+      // short-circuit and open a duplicate consumer. Setting first makes
+      // subsequent reconcile ticks short-circuit deterministically.
+      const controller = new AbortController()
+      subscriptionsRef.current.set(run.run_id, controller)
 
       // WR-05 fix: gate live setMessages updates on the user still viewing
       // this thread. The placeholder INSERT above is fine to write in either
@@ -646,8 +685,11 @@ export function useMessages(): UseMessages {
         setMessages(update)
       }) as typeof setMessages
 
+      // Phase 063.1 (D-063.1-04): pass `targetId` (the dedup-resolved id) as
+      // the assistantId so all event callbacks route SSE deltas to the
+      // persisted DB row when one exists, not to a parallel temp placeholder.
       const callbacks: StreamCallbacks = makeStreamCallbacks({
-        assistantId: placeholderId,
+        assistantId: targetId,
         threadId,
         setMessages: guardedSetMessages,
         setFallbackNotice,
@@ -659,7 +701,7 @@ export function useMessages(): UseMessages {
         // navigates back).
         setMessages((prev) =>
           prev.map((m) => {
-            if (m.id !== placeholderId) return m
+            if (m.id !== targetId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
             // kind === "cancelled"
@@ -677,7 +719,26 @@ export function useMessages(): UseMessages {
         originalOnTerminal(kind, errorPayload)
       }
 
-      subscribeToRun(run.run_id, "0", callbacks, controller.signal)
+      // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement. Each
+      // delta event from the api.ts parser carries the most recent Redis
+      // Stream `id:` value via onCursor. Stash it in lastSeenOffsetRef
+      // keyed by run_id so the next reconcile cycle re-attaching to this
+      // run passes the cached cursor as `since` instead of replaying from
+      // "0" (idempotent on the React side, but wasteful on the network).
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(run.run_id, msId)
+      }
+
+      // Phase 063.1 (D-063.1-02): pass cached cursor (or "0" on first attach)
+      // instead of hard-coding "0". Backend already accepts `since` per
+      // Phase 062 (event_consumer clone with last_id=since) — no backend
+      // change required for Gap-004 (D-063.1-03).
+      subscribeToRun(
+        run.run_id,
+        lastSeenOffsetRef.current.get(run.run_id) ?? "0",
+        callbacks,
+        controller.signal,
+      )
         .catch((err) => {
           if (!(err instanceof Error && err.name === "AbortError")) {
             console.error("reconcile subscribeToRun failed:", err)
