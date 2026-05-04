@@ -118,9 +118,17 @@ test.describe("063.1: concurrent reconcile triggers do not wipe placeholder (Gap
     // Post-fix: D-063.1-11 in-flight ref ensures only ONE reconcile body
     // executes; D-063.1-12 MERGE preserves placeholders; bubble is
     // visible at all times.
-    await expect(page.locator('[data-testid="assistant-message"]')).toBeVisible({
-      timeout: 2_000,
-    })
+    //
+    // CR-04 fix: use .first() to avoid Playwright strict-mode violation
+    // when the locator resolves to >1 elements (would surface as
+    // "strict mode violation: ... resolved to N elements" instead of
+    // the meaningful "two bubbles" failure). Then assert toHaveCount(1)
+    // — that's the actual test invariant per the test rationale ("exactly
+    // one bubble survives the concurrent reconcile").
+    await expect(
+      page.locator('[data-testid="assistant-message"]').first(),
+    ).toBeVisible({ timeout: 2_000 })
+    await expect(page.locator('[data-testid="assistant-message"]')).toHaveCount(1)
 
     // Assertion B — exactly ONE distinct run_id across all run-stream URLs.
     // The reconcileInFlightRef guard (Plan 04) ensures only ONE reconcile

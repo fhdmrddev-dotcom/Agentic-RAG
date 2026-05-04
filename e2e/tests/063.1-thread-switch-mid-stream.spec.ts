@@ -131,9 +131,16 @@ test.describe("063.1: thread switch mid-stream survives SSE", () => {
     // Assertion A — no blank window: assistant bubble visible within 2s
     // of switching back. Pre-fix (Gap-003): main area was blank for 1-2s
     // until reconcile re-fetched + reopened SSE from since=0.
-    await expect(page.locator('[data-testid="assistant-message"]')).toBeVisible({
-      timeout: 2_000,
-    })
+    //
+    // CR-04 fix: use .first() to avoid Playwright strict-mode violation
+    // if the locator transiently resolves to >1 elements (would surface
+    // as "strict mode violation: ... resolved to N elements" instead of
+    // a meaningful failure). Bubble-count is not part of this assertion's
+    // rationale — the cross-bubble single-consumer invariant is captured
+    // by Assertion B (distinctRuns.size === 1) below.
+    await expect(
+      page.locator('[data-testid="assistant-message"]').first(),
+    ).toBeVisible({ timeout: 2_000 })
 
     // Let any post-reattach activity settle so all stream URLs are logged.
     await page.waitForTimeout(2_000)
