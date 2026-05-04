@@ -411,7 +411,9 @@ async def create_thread(
     insert_data: dict = {"user_id": current_user["id"], "title": body.title}
     if body.folder_id:
         insert_data["folder_id"] = str(body.folder_id)
-    response = supabase.table("threads").insert(insert_data).execute()
+    # BL-01 fix: wrap sync .execute() with aexec so the event loop is not blocked
+    # (D-v2.5-01 / Phase 058 D-058-09 — cross-tab unblocking invariant).
+    response = await aexec(supabase.table("threads").insert(insert_data))
     new_thread = response.data[0]
     background_tasks.add_task(
         write_audit_entry,
@@ -430,8 +432,20 @@ async def rename_thread(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    supabase.table("threads").update({"title": body.title.strip() or "New Chat"}).eq("id", thread_id).eq("user_id", current_user["id"]).execute()
-    result = supabase.table("threads").select("*").eq("id", thread_id).eq("user_id", current_user["id"]).single().execute()
+    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
+    await aexec(
+        supabase.table("threads")
+        .update({"title": body.title.strip() or "New Chat"})
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+    )
+    result = await aexec(
+        supabase.table("threads")
+        .select("*")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .single()
+    )
     if not result.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
     return result.data
@@ -451,30 +465,42 @@ async def delete_thread(
     if settings.sandbox_enabled:
         sandbox_manager.close_session(thread_id)
 
-    # Clean up sandbox output files from storage before cascade deletes DB rows
+    # Clean up sandbox output files from storage before cascade deletes DB rows.
+    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01). The supabase.storage
+    # call is also sync but is best-effort and only fires when there are files,
+    # so we wrap it in run_in_threadpool too to keep the event loop responsive.
     try:
-        exec_rows = (
+        exec_resp = await aexec(
             supabase.table("code_executions")
             .select("id")
             .eq("thread_id", thread_id)
             .eq("user_id", current_user["id"])
-            .execute()
-        ).data or []
+        )
+        exec_rows = exec_resp.data or []
         if exec_rows:
             exec_ids = [r["id"] for r in exec_rows]
-            file_rows = (
+            file_resp = await aexec(
                 supabase.table("sandbox_files")
                 .select("storage_path")
                 .in_("execution_id", exec_ids)
-                .execute()
-            ).data or []
+            )
+            file_rows = file_resp.data or []
             if file_rows:
+                from starlette.concurrency import run_in_threadpool
                 paths = [f["storage_path"] for f in file_rows]
-                supabase.storage.from_("sandbox-outputs").remove(paths)
+                await run_in_threadpool(
+                    supabase.storage.from_("sandbox-outputs").remove, paths
+                )
     except Exception:
         pass  # Best-effort cleanup — don't block thread deletion
 
-    supabase.table("threads").delete().eq("id", thread_id).eq("user_id", current_user["id"]).execute()
+    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
+    await aexec(
+        supabase.table("threads")
+        .delete()
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+    )
     background_tasks.add_task(
         write_audit_entry,
         user_id=current_user["id"],
@@ -557,24 +583,23 @@ async def get_messages(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    thread = (
+    # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
+    thread = await aexec(
         supabase.table("threads")
         .select("id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
-        .execute()
     )
     if not thread.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    response = (
+    response = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
         .order("created_at")
-        .execute()
     )
     return response.data
 
