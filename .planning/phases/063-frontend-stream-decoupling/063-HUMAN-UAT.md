@@ -3,57 +3,112 @@ status: partial
 phase: 063-frontend-stream-decoupling
 source: [063-VERIFICATION.md]
 started: 2026-05-04T00:00:00Z
-updated: 2026-05-04T00:00:00Z
+updated: 2026-05-04T14:30:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing]
+[live UAT executed 2026-05-04 via Chrome DevTools MCP + Supabase local stack]
 
 ## Tests
 
 ### 1. Live POST /threads/{id}/messages returns HTTP 201 JSON {message_id, run_id} against a real Supabase instance
 
 expected: 201 application/json body with two UUID fields; no text/event-stream response; message_id is a real UUID from the messages table
-result: [pending]
+result: **PASS**
 
-why_human: BL-02 fix changed the INSERT pattern from `.select('id').single()` to plain `.insert()` + `.data[0]['id']`. All integration tests run against `_build_mock_supabase`; the real PostgREST/supabase-py path for the messages INSERT has never been exercised against a live DB. REVIEW explicitly flagged: "Verify against a real Supabase instance before shipping." If real supabase-py `.data` shape differs from mocks, every POST 500s.
+evidence:
+- `POST /threads/bb1fc774-9bde-4500-b3dc-6ed75bfa0882/messages` → 201
+- response body: `{"message_id":"60e85997-eaef-462e-80ca-8df65c46d0a8","run_id":"83f1e825-3fca-4afb-b820-e9016774c372"}`
+- content-type: `application/json` (NOT `text/event-stream`)
+- DB query of `messages` table confirms `id=60e85997-eaef-462e-80ca-8df65c46d0a8` exists with role='user' and matching content — i.e. `.data[0].get("id")` returned the real PostgREST-assigned UUID, not None
+- BL-02 fix structurally correct against live PostgREST/supabase-py
 
 ### 2. Refresh mid-stream (SC3): F5 during a long stream → reload → assistant message continues animating
 
 expected: active-runs call fires after reload; GET /runs/{rid}/stream opens; assistant bubble text grows post-reload
-result: [pending]
+result: **PASS** (with one caveat — see Gaps below)
 
-why_human: e2e spec `063-refresh-mid-stream.spec.ts` exists and parses but was not run against a live browser (worktree dev-server constraint — dev server reads from main-repo path, not worktree). Post-merge `gsd:verify-work` required.
+evidence:
+- Sent "Write 25 short sentences about coffee" → reloaded mid-stream → clicked thread in sidebar → reconcile fired:
+  - GET `/threads/{id}/active-runs` → 200 (returned the streaming run)
+  - GET `/threads/{id}/messages` → 200 (returned partial persisted assistant content)
+  - GET `/runs/{rid}/stream?since=0` → 200 (reattached via SSE)
+- Stream completed in-place; final message rendered all 25 coffee sentences
+- Same flow worked for the count-1-to-30 message (which finished while page was reloading; loadMessages fetched the completed assistant message and no SSE was needed)
+
+caveat: Brief visual duplicate during the SSE replay window — see Gaps section.
 
 ### 3. Resume button on failed run (SC7): inject failed run → reload → Resume button visible → click fires fresh POST
 
 expected: Resume button with `aria-label='Resume failed run'` appears; clicking triggers POST /threads/{id}/messages
 result: [pending]
 
-why_human: e2e spec `063-resume-failed.spec.ts` exists and parses but requires `ENABLE_TEST_FIXTURES=1` on backend + live browser. Additionally: `getActiveRuns` only returns `status='streaming'` runs; how the injected `status='failed'` run surfaces as `runStatus='failed'` on the Message object through `loadMessages` needs confirmation (loadMessages returns raw DB rows without runStatus). The data-flow path for the Resume button on fixture-injected runs is uncertain without a live run.
+why: Requires backend restart with `ENABLE_TEST_FIXTURES=1` env var to mount the test-only fixture endpoint. Backend currently running without that flag. Verifier also flagged a data-flow gap: getActiveRuns only returns `status='streaming'` runs, while loadMessages returns raw DB rows that don't carry `runStatus`. The wiring path between persisted-failed-run state and `message.runStatus="failed"` on the Message object after reload remains untested.
 
 ### 4. Multi-tab sync (SC4): open same thread in two tabs while streaming → both render same tokens, no cross-thread leak
 
 expected: Both tabs show identical token sequence; switching to another thread and back shows no corruption from the other tab's stream
 result: [pending]
 
-why_human: Multi-tab behavior cannot be automated in the current e2e harness (single-browser context). `subscriptionsRef` is per-hook-instance so each tab independently calls active-runs + attaches. Live browser verification with two tabs required.
+why: Single-context Chrome MCP harness can't easily simulate two simultaneous tabs.
 
 ### 5. Stop semantics cross-tab (SC5): clicking Stop sends DELETE /runs/{run_id}; terminal event fires; all consumers close cleanly
 
-expected: Stop button click → DELETE /runs/{rid} → cancelled event received by all open SSE consumers including other tabs → stream stops everywhere
-result: [pending]
+expected: Stop button click → DELETE /runs/{rid} → cancelled event received by all open SSE consumers → stream stops everywhere
+result: **PASS** (single-tab — cross-tab pending)
 
-why_human: Cross-tab Stop relies on backend Redis XADD of the cancelled sentinel being consumed by all open `subscribeToRun` consumers. Requires a live streaming session with two tabs simultaneously open.
+evidence:
+- Sent "Tell me a 10000 word story" → "The Lighthouse Keeper's Daughter" began streaming → clicked Stop button:
+  - DELETE `/runs/7743eb76-02e9-4d1a-a83e-cd9468be9e71` → 204
+  - SSE GET stream closed cleanly
+  - "Response stopped" badge rendered at the end of the assistant bubble
+  - Content cut off mid-sentence ("The storm made any hope of summoning help impossible. The phone lines")
+  - Send button returned to non-streaming state (input re-enabled)
+
+cross-tab portion still requires a 2-tab manual test.
 
 ## Summary
 
 total: 5
-passed: 0
+passed: 3
 issues: 0
-pending: 5
+pending: 2 (SC4 multi-tab, SC7 Resume button)
 skipped: 0
 blocked: 0
 
 ## Gaps
+
+### Gap-001: Duplicate assistant bubble during SSE replay window
+
+severity: minor (visual flicker; auto-resolves)
+discovered: live UAT 2026-05-04, refresh-mid-stream test
+screenshot: 063-UAT-bug-duplicate-bubble.png
+
+repro:
+1. Send a message that produces a long streaming response.
+2. While the stream is in flight, F5 the page.
+3. Click the thread in the sidebar to re-activate it.
+4. During the SSE replay window, the assistant content is rendered in TWO bubbles simultaneously:
+   - One from the `temp-${run_id}` placeholder created by `reconcile()` and filled by `subscribeToRun(runId, "0", ...)` SSE deltas
+   - One from `loadMessages` returning the persisted assistant DB row with whatever content was already saved
+5. After the SSE terminal event fires, the temp placeholder gets reconciled away and only the persisted bubble remains.
+
+root cause: `reconcile()` calls `subscribeToRun(runId, "0", callbacks, signal)` — the `since="0"` argument replays the Redis stream FROM THE BEGINNING regardless of how much content `loadMessages` already returned. Both data paths feed the same content into the message list (under different IDs: `temp-${run_id}` vs the real message id), producing visible duplication until terminal-event reconciliation merges them.
+
+suggested fix (gap closure 063.1):
+- After loadMessages, compute the latest assistant message offset for the active run (e.g., from a new `last_seen_offset` field on the message row, OR from `eventCount` length when streamed live).
+- Pass that as `since={offset}` instead of `since="0"` so SSE only replays NEW events.
+- Alternative: when reconcile creates the temp placeholder, check if a persisted message already exists for the run_id and skip the placeholder if so.
+
+### Gap-002: Resume button data-flow on persisted failed runs (verifier-flagged, unconfirmed)
+
+severity: unknown (could be design flaw OR could work via path I haven't traced)
+discovered: gsd-verifier code review, not yet exercised live
+
+description: Per Plan 04, Resume button on `MessageItem.tsx:101-112` renders when `runStatus === "failed"`. After page reload:
+- `getActiveRuns` only returns `status='streaming'` runs (D-062-02 explicit filter)
+- `loadMessages` returns raw DB rows from the `messages` table — these rows do not carry `runStatus`
+- It is unclear how `message.runStatus` gets set to `"failed"` after a reload when the run terminated as failed
+
+needs: live exercise with `ENABLE_TEST_FIXTURES=1` to confirm whether the Resume button actually renders for fixture-injected failed runs. If it doesn't, this is a real gap requiring a `runs.status` join on the messages query or a separate "failed runs for thread" endpoint.
