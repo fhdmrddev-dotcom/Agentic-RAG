@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: executing
-stopped_at: Completed 063.1-04-PLAN.md (concurrent-reconcile guard + loadMessages MERGE — Gap-005 closed)
-last_updated: "2026-05-04T21:54:05.768Z"
+status: phase-complete
+stopped_at: Phase 063.1 complete — HUMAN-UAT scoreboard filled, project-level approved, Gap-006 (run hard-timeout) escalated to follow-on phase
+last_updated: "2026-05-05T02:30:00.000Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 28
-  completed_plans: 27
-  percent: 96
+  completed_plans: 28
+  percent: 100
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 063.1 (frontend-stream-decoupling-gap-closure) — EXECUTING
-Plan: 5 of 5
-Status: Ready to execute
+Phase: 063.1 (frontend-stream-decoupling-gap-closure) — **COMPLETE** (approved-with-carry-forward)
+Plan: 5 of 5 complete
+Status: Phase closed; awaiting `/gsd:verify-work` and `/gsd:plan-phase` for the new follow-on phase
 Last activity: 2026-05-04
-Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from `ChatArea.tsx:95` thread-change useEffect; lift `guardedSetMessages` into sendMessage gating on `streamingThreadIdRef.current === activeThreadIdRef.current`; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10). 063.1-02 shipped: lastSeenOffsetRef Map declared adjacent to subscriptionsRef; api.ts getMessages snake→camel mapper for run_id/run_status; subscribeToRun parser captures Redis Stream `id:` lines and fires optional onCursor callback after each successful data: dispatch (terminal branches return early); reconcile rewritten with runId-match dedup (Gap-001), narrowed `subscriptionsRef.has()` short-circuit (Gap-003 partial), and cached cursor in subscribeToRun (Gap-004). ChatArea.tsx untouched (Plan 03's scope). 3 atomic commits (b011db8 RED test, e4a00fb api.ts GREEN, 454125d useMessages.ts) + SUMMARY/STATE/ROADMAP commit. tsc --build --noEmit clean for the 3 touched files. Vitest can't run locally (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); tests committed and gated via TypeScript per the plan's `<verify>` block.
+Next action: (1) Run `/gsd:verify-work` on Phase 063.1 to gate completion. (2) Plan the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** (Gap-006 escalation) — addresses LLM agent stopping mid-iteration on complex tool-calling prompts; user-preferred fix paths are per-iteration timeout budget + split `cancelled` (user) vs `timed_out` (system) lifecycle states. (3) Carry-forward UAT items (SC#5 cross-tab Stop, SC#6 Resume live, SC#7 full 063 regression) belong to next manual UAT pass — non-blocking per Phase 063 precedent. Plan 05 deliverables: 3 e2e specs (`2ce760f`, `183b041`) + filled HUMAN-UAT.md + 063.1-05-SUMMARY.md. Live-bundle verification via Chrome MCP confirmed all four Wave 2/3/4 markers (`lastSeenOffsetRef`, `m.runId === run.run_id`, `abortStream` removal in ChatArea.tsx, `reconcileInFlightRef` + `temp-` MERGE filter) are served at `localhost:5173`. User's earlier observations of "delays / blank-on-fast-nav / late-stream rendering" predated Wave 3 + Wave 4 commits — they were testing pre-fix bundle in a stale tab.
 
 ## Recent Completed Phases
 
@@ -77,6 +77,7 @@ Next action: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence:
 | 063.1 | 02 | 12min | 2 (3 commits — RED + 2 GREEN) | 3 (modified) |
 | Phase 063.1 P03 | 18min | 2 tasks | 2 files |
 | Phase 063.1 P04 | 4min | 1 tasks | 1 files |
+| Phase 063.1 P05 | ~70min total (across 2 sessions: spec authoring + close-out) | 3 tasks (2 e2e batches + UAT scoreboard fill) | 5 files (3 e2e specs + HUMAN-UAT.md + SUMMARY) |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Recent decisions affecting v2.5 work:
 - Phase 063.1 plan 04: loadMessages MERGE three-clause filter (D-063.1-12) — m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId). Each clause necessary: temp- prefix scopes to placeholders only, runId presence rejects pre-run-backed legacy temps, !dbRunIds.has guards against dup-bubble when DB has caught up (reconcile's runId-dedup at D-063.1-04 will route SSE deltas to the DB row). Spread order [...data, ...liveTempPlaceholders] — DB rows first (chronological from server), placeholders appended (most recent run_id by definition). React keys stable on id field, no collision risk.
 - Phase 063.1 plan 04: reconcile for-loop body kept BYTE-IDENTICAL inside new outer try/finally — only structural wrapping changed. Inner indentation preserved at original level (TypeScript whitespace-insensitive); re-indenting ~150 lines would balloon diff and risk subtle drift in dedup/cursor/onTerminal blocks. Plan acceptance criterion explicitly required byte-identical for-loop content vs Plan 02 result.
 - Phase 063.1 plan 04 (Rule 3 deferred-item carried forward from Plans 02/03): vitest runtime unavailable on this machine (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); TDD ceremony simplified to TypeScript-gated single commit with the six behavior cases (Tests 1-6) documented in commit body — matches plan's actual <verify> gate (tsc + grep). Plan 05 E2E specs (063.1-concurrent-reconcile.spec.ts, 063.1-refresh-no-duplicate-bubble.spec.ts) provide cross-stream regression coverage.
+- Phase 063.1 plan 05: HUMAN-UAT.md closed `status: partial` with project-level `approved` — splits the two concerns. Project-level approval reflects that Wave 2/3/4 fixes are live and load-bearing (verified via Chrome MCP — all four markers `lastSeenOffsetRef` / `m.runId === run.run_id` / no `abortStream` in ChatArea / `reconcileInFlightRef` + `temp-` filter served at localhost:5173); UAT-file `partial` reflects three SCs that need an end-to-end manual run depending on Phase 064's `ENABLE_TEST_FIXTURES=1` harness (SC#5 cross-tab Stop, SC#6 Resume live, SC#7 full 063 regression). Mirrors Phase 063's precedent where UAT shipped `partial` with similar carry-forwards.
+- Phase 063.1 plan 05: Gap-006 (LLM agent stops mid-iteration on complex tool-calling prompts) escalated to a new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** rather than patched in 063.1. Root cause: `RUN_HARD_TIMEOUT_SECONDS = 120s` (`backend/app/config.py:251`) wraps the entire agent loop via `asyncio.timeout` (`backend/app/api/threads.py:842`); when the timeout fires it cancels the producer task and the cancellation propagates through every nested await including the LangSmith-wrapped LLM stream iterator (surfaces in trace as `GeneratorExit`). Live `runs` table evidence (12-hour window, 24 runs): 5 of 11 cancellations clustered at 120–152s with `error: null`. Out-of-scope rationale: 063.1's scope is frontend gap closure; the timeout pipeline is untouched by 063.1. User-preferred fix paths: (path 2) per-iteration timeout budget that resets on each tool-call boundary + (path 3) split `cancelled` (user) vs `timed_out` (system) lifecycle states with `runs.error = "timed_out after Ns"` populated. Phase number TBD by orchestrator.
 
 ### Pending Todos
 
@@ -165,10 +168,15 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-04T21:54:05.759Z
-Stopped at: Completed 063.1-04-PLAN.md (concurrent-reconcile guard + loadMessages MERGE — Gap-005 closed)
-Next: Execute 063.1-03-PLAN.md (Wave 3 — Thread-switch SSE persistence: delete `abortStream()` from ChatArea.tsx:95 thread-change useEffect; lift guardedSetMessages into sendMessage gating on streamingThreadIdRef === activeThreadIdRef; audit useMessages hook unmount semantics — D-063.1-06..08, D-063.1-10).
+Last session: 2026-05-05T02:30:00.000Z
+Stopped at: Phase 063.1 closed — 5/5 plans complete, project-level **approved**, HUMAN-UAT scoreboard filled with live-bundle verification evidence (Chrome MCP), Gap-006 (run hard-timeout) escalated to follow-on phase. Final commit: `docs(063.1-05): close plan with HUMAN-UAT approval + Gap-006 escalation`.
+Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:discuss-phase`) for the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** to address Gap-006.
 
-**Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
+**Completed Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5/5 plans — closed 2026-05-04 (UAT `partial`, project-level `approved`)
 
-**Planned Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5 plans — 2026-05-04T17:38:32.503Z (2/5 plans complete; 3/5 next)
+**Carry-forward (non-blocking):**
+- SC#5 cross-tab Stop end-to-end (Phase 064 fixture harness)
+- SC#6 Resume button live test under `ENABLE_TEST_FIXTURES=1` (Phase 064)
+- SC#7 full Phase 063 SC#1–#6 manual regression (next manual UAT pass)
+
+**New phase queued (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness which is test infrastructure, not a fix). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`.

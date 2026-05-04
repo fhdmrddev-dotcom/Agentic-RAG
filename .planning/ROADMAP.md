@@ -273,7 +273,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   - Stop button semantics change: today it aborts the in-flight HTTP request; with run-backed streaming, the request is detached, so Stop must call a server endpoint to cancel the producer. Test cross-tab Stop (clicking Stop in tab B while tab A initiated the stream).
   - `pageshow` fires on bfcache restore — the local buffer may be hours stale. Treat bfcache restore as "always reconcile via active-runs," even if local state looks complete.
 
-**Phase 063 status**: BLOCKED on 063.1 gap closure. All 5 plans landed and verifier scored 7/7 must-haves at code level, but live UAT 2026-05-04 surfaced 4 real gaps (see `.planning/phases/063-frontend-stream-decoupling/063-HUMAN-UAT.md`). Phase 063 is NOT complete in the Progress table until 063.1 ships and the failing UAT items re-pass.
+**Phase 063 status**: UNBLOCKED — Phase 063.1 shipped 2026-05-04 closing all 5 surfaced gaps (Gap-001..005). Live-bundle verification (Chrome MCP) confirmed Wave 2/3/4 fixes are served at `localhost:5173`. Phase 063 + 063.1 marked Complete in the Progress table; carry-forward UAT items belong to next manual UAT pass per Phase 063 precedent.
 
 ### Phase 063.1: Frontend Stream Decoupling — Gap Closure
 
@@ -291,8 +291,8 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   - [x] 063.1-01-PLAN.md — Wave 1: Backend JOIN — extend GET /threads/{tid}/messages with run_id + run_status from public.runs via two-query Python merge; extend MessageResponse Pydantic; integration tests for happy path + pre-run-backed null + cross-user RLS guard (D-063.1-13/14/15)
   - [x] 063.1-02-PLAN.md — Wave 2: Frontend offset cursor + reconcile dedup + narrowed short-circuit — add lastSeenOffsetRef Map; thread `since` cursor through reconcile call site; runId-match dedup against messagesRef.current; api.ts getMessages mapper renames snake → camel for runId/runStatus; SSE parser captures `id:` lines via onCursor callback (D-063.1-01..05, D-063.1-09) — completed 2026-05-04
   - [x] 063.1-03-PLAN.md — Wave 3: Thread-switch SSE persistence — remove abortStream() from ChatArea thread-change useEffect; wrap sendMessage's makeStreamCallbacks setMessages with guardedSetMessages gating on streamingThreadIdRef === activeThreadIdRef; audit hook unmount semantics (D-063.1-06..08, D-063.1-10) — completed 2026-05-04
-  - [ ] 063.1-04-PLAN.md — Wave 4: Concurrent-reconcile guard + loadMessages MERGE — add reconcileInFlightRef bool guard at top of reconcile(); change loadMessages line 375 from setMessages(data) REPLACE to MERGE preserving live temp- placeholders whose runId not yet in DB result (D-063.1-11..12)
-  - [ ] 063.1-05-PLAN.md — Wave 5: E2E + manual UAT — three Playwright specs (063.1-thread-switch-mid-stream, 063.1-concurrent-reconcile, 063.1-refresh-no-duplicate-bubble) + 063.1-HUMAN-UAT.md scaffold for ENABLE_TEST_FIXTURES Resume button + cross-tab Stop + production env-gate verification
+  - [x] 063.1-04-PLAN.md — Wave 4: Concurrent-reconcile guard + loadMessages MERGE — add reconcileInFlightRef bool guard at top of reconcile(); change loadMessages line 375 from setMessages(data) REPLACE to MERGE preserving live temp- placeholders whose runId not yet in DB result (D-063.1-11..12) — completed 2026-05-04
+  - [x] 063.1-05-PLAN.md — Wave 5: E2E + manual UAT — three Playwright specs (063.1-thread-switch-mid-stream, 063.1-concurrent-reconcile, 063.1-refresh-no-duplicate-bubble) + 063.1-HUMAN-UAT.md filled with live-bundle Chrome MCP verification + Gap-006 escalation to new phase — completed 2026-05-04 (project-level approved; UAT `partial` with carry-forward items per Phase 063 precedent)
 **Risks / pitfalls**:
   - Keeping the SSE alive across thread switches means the response body keeps streaming in the background. If the user opens many threads with active streams, the browser holds many open EventSource connections. Mitigate: cap concurrent subscriptions (LRU?) or accept the cost — long-stream count is naturally low.
   - The offset-cursor change must not skip events. Test the boundary: switch away after event N, switch back, verify event N+1 onward arrives (no off-by-one).
@@ -323,7 +323,8 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 061. Run-Backed Streaming (Backend) | v2.5 | 5/5 | Complete    | 2026-05-02 |
 | 061.1. Run-Backed Streaming Cleanup | v2.5 | 2/2 | Complete    | 2026-05-03 |
 | 062. Replay & Tail API | v2.5 | 4/4 | Complete    | 2026-05-03 |
-| 063. Frontend Stream Decoupling | v2.5 | 0/5 | In progress | — |
+| 063. Frontend Stream Decoupling | v2.5 | 5/5 | Complete (gap-closed by 063.1) | 2026-05-03 |
+| 063.1. Frontend Stream Decoupling — Gap Closure | v2.5 | 5/5 | Complete (UAT `partial`, project-level approved; Gap-006 escalated to new phase) | 2026-05-04 |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
 
