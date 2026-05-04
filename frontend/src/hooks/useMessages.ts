@@ -308,6 +308,19 @@ export function useMessages(): UseMessages {
   // (back to since='0' on reload — the runId-match dedup of D-063.1-04
   // handles the F5-replay flicker, not the offset cursor).
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
+  // Phase 063.1 (D-063.1-11 / Gap-005): serialize concurrent reconcile calls.
+  // Multi-tab activation fires BOTH visibilitychange + focus in <50ms; without
+  // this guard the two reconciles race — A inserts the temp placeholder, B's
+  // loadMessages overwrites it via setMessages(data), B's for-loop
+  // short-circuits on subscriptionsRef.has(), net result: no placeholder
+  // rendered despite SSE being open. Bool guard (not Map): only one viewing
+  // thread at a time, so a single in-flight bit suffices. The active reconcile
+  // picks up the latest state when it finishes; subsequent triggers fire a
+  // fresh reconcile only AFTER the lock releases — coalescing, not skipping.
+  // No debounce (rejected per CONTEXT.md): fragile against pageshow lateness
+  // and adds latency to single legit triggers. Mirrors resumeInFlightRef
+  // pattern at line 799 (same useRef(false) shape).
+  const reconcileInFlightRef = useRef(false)
 
   // D-063-03: Stop is server-side via DELETE /runs/{rid}. The terminal
   // 'cancelled' sentinel arrives via the open SSE subscription; the parser
@@ -379,7 +392,31 @@ export function useMessages(): UseMessages {
       if (activeThreadIdRef.current !== threadId) return
       // Protect optimistic placeholders if a send is in flight on the same thread.
       if (isSendingRef.current) return
-      setMessages(data)
+      // Phase 063.1 (D-063.1-12 / Gap-005): MERGE instead of REPLACE. Belt-and-
+      // braces protection for any code path that calls loadMessages while a
+      // reconcile-inserted temp-${run_id} placeholder is in flight (terminal-
+      // time refetch in reconcile's outer .finally(), buffer_expired fallback
+      // inside onTerminal, future code paths). The reconcile in-flight ref
+      // (D-063.1-11) is the primary fix; this is the safety net. Preserves any
+      // temp- placeholder whose runId is NOT yet a DB row (live in-flight run
+      // that hasn't persisted yet); discards any temp- placeholder whose runId
+      // IS already in the DB result (DB caught up; reconcile's runId-match
+      // dedup at D-063.1-04 will route SSE deltas to the DB row, so preserving
+      // the placeholder would cause a duplicate bubble — Test 6 invariant).
+      // T-063.1-12 mitigation: the post-await thread-id guard above ensures
+      // prev is already scoped to the current viewing thread; no cross-thread
+      // leak possible. Order: DB rows first (sorted by created_at backend-
+      // side), placeholders appended (most recent run_id by definition; React
+      // keys on `id` are stable so no collision risk).
+      setMessages((prev) => {
+        const dbRunIds = new Set(
+          data.filter((m) => m.runId).map((m) => m.runId),
+        )
+        const liveTempPlaceholders = prev.filter(
+          (m) => m.id.startsWith("temp-") && m.runId && !dbRunIds.has(m.runId),
+        )
+        return [...data, ...liveTempPlaceholders]
+      })
     } catch (err) {
       // D-060-11: silently swallow AbortError (mirrors sendMessage catch below).
       if (err instanceof Error && err.name === "AbortError") return
@@ -626,17 +663,29 @@ export function useMessages(): UseMessages {
   // reconcile tick). For each active run not already subscribed, synthesize
   // a placeholder assistant message and open subscribeToRun.
   const reconcile = useCallback(async (threadId: string) => {
-    let activeRuns: Awaited<ReturnType<typeof getActiveRuns>>
+    // Phase 063.1 (D-063.1-11 / Gap-005): top-of-function in-flight guard MUST
+    // come BEFORE Promise.all dispatch. If a reconcile body is already running
+    // (e.g. visibilitychange + focus fire in the same tick on multi-tab
+    // activation), return immediately; the active reconcile picks up the
+    // latest state when it finishes. The next legitimate trigger (the next
+    // visibilitychange / focus / pageshow / mount) fires a fresh reconcile
+    // AFTER the lock releases — coalescing, not permanent skip. Set the bit
+    // synchronously BEFORE any await so the second call (also synchronous to
+    // the same tick before its own await) reads `true` and bails.
+    if (reconcileInFlightRef.current) return
+    reconcileInFlightRef.current = true
     try {
-      // CONTEXT.md "Reconciliation Hook Ordering": active-runs and messages MUST be fetched in parallel.
-      const [runs] = await Promise.all([getActiveRuns(threadId), loadMessages(threadId)])
-      activeRuns = runs
-    } catch (err) {
-      console.error("reconcile failed:", err)
-      return
-    }
+      let activeRuns: Awaited<ReturnType<typeof getActiveRuns>>
+      try {
+        // CONTEXT.md "Reconciliation Hook Ordering": active-runs and messages MUST be fetched in parallel.
+        const [runs] = await Promise.all([getActiveRuns(threadId), loadMessages(threadId)])
+        activeRuns = runs
+      } catch (err) {
+        console.error("reconcile failed:", err)
+        return
+      }
 
-    for (const run of activeRuns) {
+      for (const run of activeRuns) {
       // Pitfall 3 cross-thread safety: only attach if this thread is still
       // the viewing thread when reconcile started; setViewingThread is the
       // sole writer (D-060-01). Kept at top of the iteration body — runs
@@ -782,6 +831,14 @@ export function useMessages(): UseMessages {
           // either wins benignly per Phase 060 invariants.
           loadMessages(threadId).catch(console.error)
         })
+    }
+    } finally {
+      // Phase 063.1 (D-063.1-11 / Gap-005): ALWAYS reset in finally so the next
+      // trigger isn't permanently locked out by an exception inside the body
+      // (every early-return path above — the cross-thread guard at line 669,
+      // the inner Promise.all catch at line 661 — flows through this finally
+      // because they're inside the outer try). T-063.1-13 mitigation.
+      reconcileInFlightRef.current = false
     }
   }, [loadMessages])
 
