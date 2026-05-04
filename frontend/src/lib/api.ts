@@ -364,12 +364,17 @@ export async function getActiveRuns(
  * cross-tab Stop falls out for free. Idempotent — DELETE on already-terminal
  * returns 204; on 404 we silently return (the run may have completed or been
  * cancelled by another tab) so the UI doesn't surface a confusing error.
+ *
+ * WR-03 fix: accept an optional AbortSignal so the UI can cancel an
+ * in-flight DELETE if the user navigates away mid-click. Matches the
+ * signal-accepting shape of every other API helper in this module.
  */
-export async function cancelRun(runId: string): Promise<void> {
+export async function cancelRun(runId: string, signal?: AbortSignal): Promise<void> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/runs/${runId}`, {
     method: "DELETE",
     headers,
+    signal,
   })
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to cancel run (status ${res.status})`)

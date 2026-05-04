@@ -309,11 +309,20 @@ export function useMessages(): UseMessages {
   // consumers via the same Redis Stream. We do NOT abort the fetch — that
   // would only close the consumer-side socket; the producer would keep
   // running until natural completion or the 120s hard timeout (D-061-01).
+  //
+  // WR-03 fix: read latest messages from a ref instead of putting `messages`
+  // in the dep array. Otherwise stopStreaming gets recreated on every token
+  // delta and any closure that captured the previous reference goes stale.
+  const messagesRef = useRef(messages)
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
   const stopStreaming = useCallback(async () => {
     // Pitfall 3: derive run_id from message state (NOT a separate ref).
     // Refs lose track of the active run when the user navigates threads
     // and comes back; messages always reflect the latest streaming state.
-    const streamingMsg = [...messages]
+    const streamingMsg = [...messagesRef.current]
       .reverse()
       .find((m) => m.role === "assistant" && m.runStatus === "streaming")
     const runId = streamingMsg?.runId
@@ -327,7 +336,7 @@ export function useMessages(): UseMessages {
     } catch (err) {
       console.error("Stop failed:", err)
     }
-  }, [messages])
+  }, [])
 
   const abortStream = useCallback(() => {
     abortControllerRef.current?.abort()
