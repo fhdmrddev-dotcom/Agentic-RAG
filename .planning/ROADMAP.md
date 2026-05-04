@@ -277,23 +277,26 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 
 ### Phase 063.1: Frontend Stream Decoupling — Gap Closure
 
-**Goal**: Resolve the 4 gaps surfaced by Phase 063's live UAT so the navigate-away-during-stream and refresh-mid-stream flows are visually clean and Redis-efficient. Confirms the Resume-button data path against a live failed run via the `ENABLE_TEST_FIXTURES=1` harness.
+**Goal**: Resolve the 5 gaps surfaced by Phase 063's live UAT so the navigate-away-during-stream, refresh-mid-stream, AND multi-tab-activation flows are visually clean and Redis-efficient. Confirms the Resume-button data path against a live failed run via the `ENABLE_TEST_FIXTURES=1` harness.
 **Depends on**: Phase 063 (all 5 plans landed)
 **Requirements**: STREAM-04 polish (no new requirement — finishes the user-visible side of STREAM-04 that Phase 063 left rough); also confirms STREAM-02b Resume-button data flow is live-correct.
 **Success Criteria** (what must be TRUE):
   1. Switching threads mid-stream no longer shows a blank window on switch-back. The persisted/in-flight assistant content is visible within ≤ 200ms of switching back.
-  2. There is at most ONE active SSE consumer per `run_id` at any time. Verifiable in DevTools Network: navigating away and back does NOT open a second `GET /runs/{rid}/stream`.
+  2. There is at most ONE active SSE consumer per `run_id` per tab at any time. Verifiable in DevTools Network: navigating away and back does NOT open a second `GET /runs/{rid}/stream`. (Multi-tab fanout — one SSE per tab — is correct and stays.)
   3. SSE reattach uses `since={highest-seen-ms-id}` (or equivalent offset cursor), not hard-coded `since="0"`. The Redis Stream is NOT re-replayed from the beginning on every reconnect.
   4. Refresh-mid-stream no longer shows the duplicate-bubble flicker (Gap-001). After F5 + thread-click, exactly ONE assistant bubble exists at all times.
   5. Resume button confirmed working live: with `ENABLE_TEST_FIXTURES=1`, injecting a failed run + reload makes the Resume button render on the failed assistant message; clicking it fires a fresh POST. If the data flow is broken (verifier-flagged Gap-002), this phase wires it correctly (e.g. join `runs.status` into `loadMessages`, or surface failed runs via a new `getRecentlyFailedRuns(threadId)` endpoint).
-**Plans**: TBD via `/gsd:plan-phase 063.1` — likely 2–3 plans:
+  6. **(NEW — Gap-005)** Concurrent reconcile calls (e.g. `visibilitychange` + `focus` firing in the same tick) do NOT wipe the temp `${run_id}` placeholder. The placeholder bubble renders within ≤ 200ms of any reconcile that finds an active run, regardless of how many reconciles fire concurrently.
+**Plans**: TBD via `/gsd:plan-phase 063.1` — likely 3–4 plans:
   - 063.1-01: Offset-cursor checkpointing — track `highest-seen-ms-id` per run on the client, thread it through `subscribeToRun(runId, since, ...)` at all 3 call sites in useMessages.ts (sendMessage, reconcile, resumeFromFailed). Backend already supports the parameter.
   - 063.1-02: Don't abort SSE on thread switch — keep the in-flight `subscribeToRun` alive when ChatArea remounts with a different thread.id. Reuse the existing `subscriptionsRef` short-circuit so reconcile finds the live subscription instead of opening a new one. WR-05's `guardedSetMessages` already prevents cross-thread bleed.
-  - 063.1-03: Wire Resume button data flow + live UAT — confirm `runStatus="failed"` reaches the Message object after reload (likely needs a `runs` join in `loadMessages` or a sibling endpoint). Manual UAT with `ENABLE_TEST_FIXTURES=1`.
+  - **063.1-03: Concurrent-reconcile race fix (Gap-005)** — Pick one of: (a) `reconcileInFlightRef` guard so a second concurrent reconcile is a no-op, (b) make `loadMessages` MERGE rather than REPLACE state to preserve in-memory placeholders, or (c) debounce reconcile triggers (50ms trailing). Probably (a)+(b) for belt-and-braces. Add e2e regression `063.1-concurrent-reconcile.spec.ts` that fires `visibilitychange` + `focus` in the same tick and asserts placeholder visibility + single SSE.
+  - 063.1-04: Wire Resume button data flow + live UAT — confirm `runStatus="failed"` reaches the Message object after reload (likely needs a `runs` join in `loadMessages` or a sibling endpoint). Manual UAT with `ENABLE_TEST_FIXTURES=1`.
 **Risks / pitfalls**:
   - Keeping the SSE alive across thread switches means the response body keeps streaming in the background. If the user opens many threads with active streams, the browser holds many open EventSource connections. Mitigate: cap concurrent subscriptions (LRU?) or accept the cost — long-stream count is naturally low.
   - The offset-cursor change must not skip events. Test the boundary: switch away after event N, switch back, verify event N+1 onward arrives (no off-by-one).
   - Ensure `ENABLE_TEST_FIXTURES` test endpoint is NOT mounted in production env. Plan 05 added the env-gate; verify it during 063.1 UAT.
+  - The Gap-005 fix must not regress SC#2: `visibilitychange` and `focus` listeners must STILL fire reconcile — just not duplicate it. The fix is about coalescing, not skipping.
 
 ## Progress
 
