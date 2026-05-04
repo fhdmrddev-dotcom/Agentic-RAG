@@ -662,13 +662,36 @@ export function useMessages(): UseMessages {
   // inserts a duplicate user-message row + spawns a fresh run; matches
   // ChatGPT/Claude.ai "Regenerate" semantics. Explicit user intent only —
   // never auto-fired (D-v2.5-05).
+  //
+  // BL-06 fix: walk BACKWARD from the failed assistant message to find the
+  // most recent user message rather than blindly indexing idx-1, which
+  // breaks if any tool/system row was interleaved before the failure.
+  // Also guards against double-click via an in-flight ref so a rapid
+  // second click does not silently no-op against sendMessage's
+  // isSendingRef gate (the user gets no feedback otherwise).
+  const resumeInFlightRef = useRef(false)
   const resumeFromFailed = useCallback(async (failedMessage: Message) => {
-    // Find immediately-preceding user message in current state.
+    if (resumeInFlightRef.current) return
     const idx = messages.findIndex((m) => m.id === failedMessage.id)
-    if (idx <= 0) return
-    const userMsg = messages[idx - 1]
-    if (userMsg.role !== "user") return
-    await sendMessage(failedMessage.thread_id, userMsg.content)
+    if (idx < 0) return
+    // Walk backward to find the most recent user message before this failure.
+    let userMsg: Message | undefined
+    for (let i = idx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        userMsg = messages[i]
+        break
+      }
+    }
+    if (!userMsg) {
+      console.warn("resumeFromFailed: no preceding user message for", failedMessage.id)
+      return
+    }
+    resumeInFlightRef.current = true
+    try {
+      await sendMessage(failedMessage.thread_id, userMsg.content)
+    } finally {
+      resumeInFlightRef.current = false
+    }
   }, [messages, sendMessage])
 
   // Hook unmount: abort all live subscriptions so we don't leak fetch readers.
