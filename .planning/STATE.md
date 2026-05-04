@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: planning
-stopped_at: Phase 063 context gathered
-last_updated: "2026-05-03T16:08:41.861Z"
-last_activity: 2026-05-03
+status: executing
+stopped_at: Phase 063.1 context gathered
+last_updated: "2026-05-04T20:35:00.000Z"
+last_activity: 2026-05-04 -- Phase 063.1 discuss-phase complete (15 decisions locked)
 progress:
   total_phases: 8
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 062 — Replay & Tail API
+**Current focus:** Phase 063 — frontend-stream-decoupling
 
 ## Current Position
 
-Phase: 063
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-03
+Phase: 063 (frontend-stream-decoupling) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 063
+Last activity: 2026-05-03 -- Phase 063 execution started
 Next action: Execute 062-02-PLAN.md (Wave 1 sibling — `app/api/runs.py` module with `replay_tail_consumer` + `GET /runs/{rid}/stream` + register router in main.py + Wave 0 stubs for SC#2 + SC#5(stream)). 062-01 shipped: `GET /threads/{tid}/active-runs` returns Pydantic-bound list filtered to status='streaming', ORDER BY started_at DESC; ownership SELECT runs first with 404 (NOT 403) per D-062-12. D-062-14 file-layout discipline confirmed (45 insertions / 0 deletions in threads.py; off-limits regions untouched).
 
 ## Recent Completed Phases
@@ -150,8 +150,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 063 context gathered
-Next: Run /gsd:verify-work on phase 061 to execute the 11 binding pytest commands documented in 061-VERIFICATION.md plus the 060 Playwright e2e spec; on green, phase 061 closes and phase 062 (Replay & Tail API) unblocks
+Stopped at: Phase 063.1 context gathered
+Next: Run `/gsd:plan-phase 063.1` to break the 15 locked decisions into wave-parallel plans (suggested ordering in CONTEXT.md code_context: backend JOIN → offset cursor + dedup → thread-switch persistence → in-flight guard + merge → e2e + manual UAT)
 
 **Completed Phase:** 058 (Backend SSE Concurrency Fix) — 3/3 plans — verified 2026-05-01
 
