@@ -25,8 +25,18 @@
  */
 import { test, expect, type Page } from "@playwright/test"
 
-const TEST_EMAIL = process.env.TEST_USER_EMAIL ?? ""
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD ?? ""
+// WR-04 fix: fail loudly at module load if creds are missing. Empty-string
+// defaults caused confusing downstream failures (sign-in form errors) and
+// — worse — a pre-existing test session in the browser context would let
+// the test run all the way through with the wrong user via signIn's
+// "already signed in" early-return.
+const TEST_EMAIL = process.env.TEST_USER_EMAIL
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD
+if (!TEST_EMAIL || !TEST_PASSWORD) {
+  throw new Error(
+    "TEST_USER_EMAIL and TEST_USER_PASSWORD must be set to run 063.1 e2e tests",
+  )
+}
 
 // Deterministic prompt that yields >= 5s of streaming via multi-tool
 // retrieval + extended reasoning. Mirrors 063-refresh-mid-stream.spec.ts.
