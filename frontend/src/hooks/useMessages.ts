@@ -464,6 +464,11 @@ export function useMessages(): UseMessages {
             return { ...m, runStatus: "cancelled", stopped: true }
           }),
         )
+        // BL-03 fix: subscriptionsRef cleanup belongs to the terminal event
+        // (the moment the producer is actually done), NOT to sendMessage's
+        // finally — otherwise reconcile() ticks during the still-draining
+        // window can't see the subscription and open a duplicate consumer.
+        if (registeredRunId) subscriptionsRef.current.delete(registeredRunId)
         // Pitfall 8: TTL-expired buffer (synthetic done with error='buffer_expired')
         // — fall back to loadMessages so the persisted assistant message renders.
         if (errorPayload === "buffer_expired") {
@@ -490,8 +495,19 @@ export function useMessages(): UseMessages {
       streamingThreadIdRef.current = null
       setIsStreaming(false)
       isStreamingRef.current = false
-      // Clean up subscriptions map entry for this run, if registered.
-      if (registeredRunId) subscriptionsRef.current.delete(registeredRunId)
+      // BL-03 fix: do NOT delete subscriptionsRef entry here — onTerminal
+      // (above) is the canonical cleanup point. Deleting in `finally` runs
+      // before the SSE reader has actually closed in some edge cases and
+      // lets reconcile() open a duplicate consumer for the still-live run.
+      // On error/abort paths where onTerminal never fires, we still need a
+      // safety net: delete only if the entry is still present AND no error
+      // was a normal terminal (covered by the catch block flipping
+      // runStatus to 'failed' which user can resume from).
+      if (registeredRunId && subscriptionsRef.current.has(registeredRunId)) {
+        // Safety net for catch paths where onTerminal didn't fire.
+        // (Happy path already deleted in onTerminal.)
+        subscriptionsRef.current.delete(registeredRunId)
+      }
 
       // Always clear planning flag on stream end
       setMessages((prev) =>
@@ -608,6 +624,11 @@ export function useMessages(): UseMessages {
             return { ...m, runStatus: "cancelled" }
           }),
         )
+        // BL-03 fix: subscription cleanup belongs to the terminal event, not
+        // the .finally() chain on the promise (which can race in StrictMode
+        // double-invoke scenarios where the second reconcile sees the entry
+        // already gone before its onTerminal merges state).
+        subscriptionsRef.current.delete(run.run_id)
         if (errorPayload === "buffer_expired") {
           loadMessages(threadId).catch(console.error)
         }
@@ -621,7 +642,13 @@ export function useMessages(): UseMessages {
           }
         })
         .finally(() => {
-          subscriptionsRef.current.delete(run.run_id)
+          // BL-03 safety net: if onTerminal didn't fire (AbortError, thrown
+          // network error mid-stream, etc.), make sure the entry is removed
+          // so the next reconcile tick can resubscribe instead of being
+          // blocked by a stale Map key.
+          if (subscriptionsRef.current.has(run.run_id)) {
+            subscriptionsRef.current.delete(run.run_id)
+          }
           // Pitfall 5 (terminal-time merge): SSE-built content stays canonical;
           // reload DB-only fields once at terminal so confidence_*, suggestions,
           // citations etc. land. loadMessages races against any Realtime upsert;
