@@ -2120,6 +2120,18 @@ async def send_message(
                     full_content += fallback
                     await _emit(redis, run_id, 'delta', content=fallback)
 
+              except (asyncio.TimeoutError, asyncio.CancelledError):
+                  # Phase 066 Plan 04 Rule 1 fix: TimeoutError + CancelledError MUST
+                  # propagate past this inner try so the outer partition-guard branches
+                  # (lines ~2237 / ~2258) can set the correct _terminal_status
+                  # ('timed_out' / 'cancelled'). Without this re-raise the broad
+                  # `except Exception as e:` below would swallow them, leaving
+                  # _terminal_status at its default 'completed' — D-066-05 partition
+                  # guard violation. The outer handler is also responsible for
+                  # `_ant_gen.close()` / `stream.close()` (already done in the inner
+                  # `async with asyncio.timeout(...)` blocks at lines 1240/1327
+                  # before re-raise — see D-066-11).
+                  raise
               except APIError as e:
                   logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
                   err_str = str(e)
@@ -2155,6 +2167,11 @@ async def send_message(
                       full_content += user_msg
                       await _emit(redis, run_id, 'delta', content=user_msg)
                   await _emit(redis, run_id, 'error', message=err_str)
+                  # Phase 066 Plan 04 Rule 1 fix: re-raise so the OUTER classifier
+                  # at lines ~2249-2294 sets _terminal_status='failed' on
+                  # provider-side APIErrors. Mirrors the broad Exception
+                  # handler below — friendly SSE events first, then propagate.
+                  raise
               except Exception as e:
                   logger.error("Unexpected error in event stream (thread %s): %s [%s]", thread_id, e, type(e).__name__, exc_info=True)
                   user_msg = f"*An unexpected error occurred ({type(e).__name__}). Please try again.*"
@@ -2162,6 +2179,16 @@ async def send_message(
                       full_content += user_msg
                       await _emit(redis, run_id, 'delta', content=user_msg)
                   await _emit(redis, run_id, 'error', message='An unexpected error occurred')
+                  # Phase 066 Plan 04 Rule 1 fix: re-raise so the OUTER classifier
+                  # at lines ~2249-2294 sets _terminal_status='failed' (not the
+                  # default 'completed'). Without this re-raise the producer's
+                  # runs row UPDATE writes status='completed' on real producer
+                  # failures — D-066-05 partition guard violation. The friendly
+                  # `delta` + `error` SSE events above are still flushed first
+                  # (consumers see the user-visible message), then the outer
+                  # `except Exception as e` branch sets the terminal lifecycle
+                  # state correctly per D-066-07.
+                  raise
 
               # Emit sources SSE event (deduplicated by document_id)
               if source_refs:

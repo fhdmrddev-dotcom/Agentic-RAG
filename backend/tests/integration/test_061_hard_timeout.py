@@ -1,112 +1,79 @@
-"""D-061-01 + D-061-04: 120s asyncio.timeout end-to-end with full finally ordering.
+"""Phase 061 D-061-01 -> Phase 066 D-066-01: legacy 120s wrapper deletion guard.
 
-Phase 061 Plan 05 Task 2 — TBD-08.
+Phase 061 introduced `async with asyncio.timeout(settings.run_hard_timeout_seconds)`
+at threads.py:855 to bound abandoned producer runs (D-061-01). Phase 066
+DELETES that wrapper (D-066-01) and replaces it with per-LLM-call timers
+inside the iteration loop (D-066-02). The agent loop now has no hard
+total cap — matches Claude/ChatGPT UX.
+
+This file used to verify the wrapper's behavior (`test_120s_timeout_fires_full_finally`).
+Phase 066 repurposes it to a deletion guard: the wrapper line is gone, AND
+the legacy setting `Settings.run_hard_timeout_seconds` is gone. Re-introduction
+of either would silently regress to the Gap-006 architecture.
+
+The new lifecycle behavior is covered by:
+- tests/integration/test_066_per_call_timer.py (per-call timer fires correctly)
+- tests/integration/test_066_terminal_classification.py (timed_out terminal mapping)
+- tests/integration/test_066_sse_terminal.py (SSE wire-format)
+- tests/integration/test_066_langsmith_clean.py (no GeneratorExit leak)
 """
-import json
-import time
-from unittest.mock import patch
-from uuid import uuid4
-
-import httpx
-import pytest
-
-from app.api.threads import TERMINAL_TYPES
-from app.config import settings
-from app.dependencies import get_supabase
-from app.main import app
-from app.services.openai_service import CallingMode
-
-# IN-01 (D-061.1-11): import shared helpers directly from _run_helpers.
-from tests.integration._run_helpers import (  # noqa: E402
-    _build_mock_supabase,
-    _make_done_chunk,
-    _make_sse_chunk,
-    _extract_run_id_from_mock,
-    await_producer_finalized,
-)
-from tests.integration.test_059_disconnect import (  # noqa: E402
-    _reset_sse_starlette_app_status,
-)
-
-THREAD_A = str(uuid4())
+from pathlib import Path
 
 
-def _too_slow_chunks():
-    """Generator that sleeps far longer than the test's lowered timeout."""
-    time.sleep(5.0)   # exceeds monkeypatched run_hard_timeout_seconds=2
-    yield _make_sse_chunk("never_emitted ")
-    yield _make_done_chunk()
+# Resolve project root from this test file's location:
+# backend/tests/integration/test_061_hard_timeout.py -> ../../../
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_THREADS_PY = _PROJECT_ROOT / "backend" / "app" / "api" / "threads.py"
+_CONFIG_PY = _PROJECT_ROOT / "backend" / "app" / "config.py"
 
 
-@pytest.mark.asyncio
-@pytest.mark.timeout(15)
-async def test_120s_timeout_fires_full_finally(redis_client, monkeypatch):
-    """D-061-01 + D-061-04: timeout fires → terminal error sentinel → runs.status='failed' error='hard_timeout' → EXPIRE 60."""
-    # Cut the 120s default to 2s for this test
-    monkeypatch.setattr(settings, "run_hard_timeout_seconds", 2)
+def test_legacy_outer_wrapper_is_gone():
+    """D-066-01: the asyncio.timeout(settings.run_hard_timeout_seconds) wrapper at threads.py:~855 is DELETED."""
+    src = _THREADS_PY.read_text(encoding="utf-8")
+    # The exact source line that used to live at threads.py:855
+    assert "asyncio.timeout(settings.run_hard_timeout_seconds)" not in src, (
+        "Phase 066 D-066-01 deletion regression: the outer 120s asyncio.timeout "
+        "wrapper at threads.py:~855 is back. This is the bug Gap-006 reported "
+        "and Plan 02 fixed. Re-deletion required."
+    )
 
-    mock_supabase = _build_mock_supabase()
-    app.dependency_overrides[get_supabase] = lambda: mock_supabase
-    try:
-        with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
-            side_effect=lambda *a, **k: (iter(_too_slow_chunks()), CallingMode.NATIVE),
-        ), patch(
-            "app.services.suggestion_service.generate_suggestions",
-            return_value=([], None),
-        ), patch(
-            "app.api.threads.generate_thread_title",
-            return_value=("T", None),
-        ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
-                async with c.stream(
-                    "POST",
-                    f"/threads/{THREAD_A}/messages",
-                    json={"content": "hello"},
-                    headers={"Authorization": "Bearer test-token"},
-                    timeout=30.0,
-                ) as r:
-                    async for _line in r.aiter_lines():
-                        pass   # drain (consumer will emit synthetic timeout error eventually)
 
-            # D-061.1-01: deterministic await for _shielded_finalize completion
-            await await_producer_finalized(mock_supabase)
+def test_legacy_setting_run_hard_timeout_seconds_is_gone():
+    """D-066-01 + Plan 02 SUMMARY: Settings.run_hard_timeout_seconds field is removed.
 
-            run_id = _extract_run_id_from_mock(mock_supabase)
-            stream_key = f"run:{run_id}"
+    The env var name `RUN_HARD_TIMEOUT_SECONDS` is silently parsed-and-ignored
+    by Pydantic Settings (`extra='ignore'` at config.py:129) so legacy deploys
+    don't error at startup. But the field itself is gone — references should
+    fail at import time.
+    """
+    src = _CONFIG_PY.read_text(encoding="utf-8")
+    # The class-attribute declaration line
+    assert "run_hard_timeout_seconds: int" not in src, (
+        "Phase 066 deletion regression: Settings.run_hard_timeout_seconds field "
+        "is back. Plan 02 removed it; per-call budgets live on MODEL_CAPABILITIES "
+        "now. Re-deletion required."
+    )
 
-            # Assert (a): terminal entry has type='error' AND error='hard_timeout'
-            entries = await redis_client.xrange(stream_key)
-            terminal_errors = [
-                json.loads(e[1]["data"]) for e in entries
-                if json.loads(e[1]["data"]).get("type") == "error"
-                and json.loads(e[1]["data"]).get("error") == "hard_timeout"
-            ]
-            assert terminal_errors, (
-                f"Expected terminal error=hard_timeout entry; "
-                f"got: {[json.loads(e[1]['data']) for e in entries]}"
-            )
 
-            # Assert (b): runs.status='failed' AND error='hard_timeout'
-            runs_builder = mock_supabase.table("runs")
-            hard_timeout_updates = [
-                c for c in runs_builder.update.call_args_list
-                if (
-                    c.args
-                    and isinstance(c.args[0], dict)
-                    and c.args[0].get("status") == "failed"
-                    and c.args[0].get("error") == "hard_timeout"
-                )
-            ]
-            assert hard_timeout_updates, (
-                f"Expected runs UPDATE with status='failed' error='hard_timeout'; "
-                f"got: {runs_builder.update.call_args_list}"
-            )
+def test_per_call_timer_replacements_present():
+    """Defense-in-depth: the per-call asyncio.timeout(per_call_budget) wraps appear at least once each."""
+    src = _THREADS_PY.read_text(encoding="utf-8")
+    n = src.count("async with asyncio.timeout(per_call_budget)")
+    assert n >= 2, (
+        f"Expected >=2 occurrences of `async with asyncio.timeout(per_call_budget)` "
+        f"(Anthropic + OpenAI paths per D-066-02); found {n}. The wrapper deletion "
+        f"in test_legacy_outer_wrapper_is_gone passing without these replacements "
+        f"means the per-call timer is missing — runs would never time out."
+    )
 
-            # Assert (c): EXPIRE TTL ≈ 60s (failed bucket; D-061-04)
-            ttl = await redis_client.ttl(stream_key)
-            assert 30 < ttl <= 65, (
-                f"Expected ~60s TTL on failed run; got {ttl}"
-            )
-    finally:
-        app.dependency_overrides.pop(get_supabase, None)
+
+def test_sdk_close_methods_present():
+    """D-066-11: stream.close() and _ant_gen.close() appear in threads.py."""
+    src = _THREADS_PY.read_text(encoding="utf-8")
+    assert "stream.close()" in src, (
+        "D-066-11 regression: OpenAI Stream.close() call missing. LangSmith "
+        "would record GeneratorExit on TimeoutError without this."
+    )
+    assert "_ant_gen.close()" in src, (
+        "D-066-11 regression: Anthropic _ant_gen.close() call missing."
+    )
