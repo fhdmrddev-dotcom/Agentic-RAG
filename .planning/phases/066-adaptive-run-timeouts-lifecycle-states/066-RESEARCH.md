@@ -760,22 +760,22 @@ def get_per_call_timeout(model_id: str, settings_override: int | None = None) ->
 
 **Plan-phase action:** Treat A1 as a starting matrix the user reviews; A2 as a pre-migration verification step; A3/A4 as integration-test assertions (red-first); A5 as a live UAT observation; A6 as a CI version pin already satisfied.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Anthropic SDK clean-close timing across the generator boundary**
    - What we know: `_ant_gen` is a Python generator wrapping `with client.messages.stream(...) as stream:`. Calling `_ant_gen.close()` raises `GeneratorExit` inside the `with` block, triggering `__exit__` → `MessageStream.close()` → `response.close()`.
    - What's unclear: Does LangSmith's `wrap_openai`-style decorator (NOT used on Anthropic — Anthropic uses native SDK without a LangSmith wrapper today) interact differently? The current symptom is OpenAI-path-specific.
-   - Recommendation: Plan-phase verifies LangSmith tracing on the Anthropic native path — the trace cleanliness contract may be one-sided (only OpenAI path needs the close-then-raise; Anthropic native may already be clean).
+   - **RESOLVED:** Plan 02 Subtask 2b confirms the Anthropic native path uses _ant_gen.close() + raises TimeoutError; LangSmith trace cleanliness contract is verified by Plan 04 Task 3 (test_066_langsmith_clean.py) which asserts via caplog that no log line contains GeneratorExit on the TimeoutError path. The close-then-raise is applied symmetrically to both providers (Plan 02 Subtask 2b for Anthropic, Subtask 2c for OpenAI/Google/OpenRouter) — defense-in-depth even if Anthropic-native happened to be clean today.
 
 2. **Whether to delete `RUN_HARD_TIMEOUT_SECONDS` setting symbol entirely**
    - What we know: After D-066-01 deletes the wrapper consumer, the setting is unused. Lifespan/health refs at `runs.py:70,85,180` (per CONTEXT.md) may also reference it.
    - What's unclear: Are there external runbooks / observability dashboards / deploy configs that read the env var name? If yes, removing the setting symbol would break them silently (Pydantic-settings rejects unknown env vars only at startup if `extra="forbid"`; current model_config uses `extra="ignore"` per `config.py:129` — safe).
-   - Recommendation: Plan-phase deletes the Settings field AND audits `runs.py:70,85,180` references. Leaves the env var symbol parsed-and-ignored (no startup failure on legacy deploys).
+   - **RESOLVED:** Plan 02 deletes the Settings.run_hard_timeout_seconds field (Subtask 1d) AND swaps the three runs.py references at lines 70, 85, 180 to a new settings.consumer_timeout_seconds (default 610s). The env var symbol RUN_HARD_TIMEOUT_SECONDS remains parsed-and-ignored via the existing Pydantic-settings extra="ignore" config at config.py:129 — legacy deploys with the env var set do not error at startup, the value simply has no effect.
 
 3. **`LLM_CALL_TIMEOUT_OVERRIDES` parser semantics**
    - What we know: Mirrors `MODEL_CONTEXT_LIMITS` / `MODEL_OUTPUT_LIMITS` (config.py:267, 278) — `model-id=int,model-id=int` syntax.
    - What's unclear: Should the parser also support a `_default=int` row to override the 180s baseline globally? (Useful for "I want all unknown models to use 300s" without enumerating them.)
-   - Recommendation: Out of scope for 066 — start without it; add if the user requests. KISS.
+   - **RESOLVED:** Out of scope for Phase 066 per KISS. _parse_llm_call_timeout_overrides() in Plan 02 Subtask 1c implements only the per-model entry syntax (model-id=seconds) — no _default= row. Deferred to a follow-up phase if the user explicitly requests global override capability.
 
 ## Sources
 

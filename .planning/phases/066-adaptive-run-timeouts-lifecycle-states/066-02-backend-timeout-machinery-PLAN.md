@@ -429,7 +429,7 @@ DELETE lines 246-251 (the `run_hard_timeout_seconds` block) and INSERT in their 
 </task>
 
 <task type="auto">
-  <name>Task 2: Wrap each LLM stream block in per-call asyncio.timeout + close-then-raise; delete outer wrapper at line 855; refine TimeoutError error string; update runs.py consumer deadline references</name>
+  <name>Task 2 (Phase A + Phase B): Per-call timer + close-then-raise + outer-wrapper deletion + runs.py rename. Phase A = outer wrapper deletion + Anthropic per-call timer + closure-var init at function scope (Subtasks 2a-2b + closure-var declaration). Phase B = OpenAI per-call timer + outer-except error-string refinement + runs.py consumer-deadline rename (Subtasks 2c-2e). Both phases ship in the same atomic commit (Task 3) — the file-edit ordering is structural; the work is split logically for clarity, not chronologically</name>
   <files>backend/app/api/threads.py, backend/app/api/runs.py</files>
   <read_first>
     - C:/Vibe Apps/Agentic RAG/.planning/phases/066-adaptive-run-timeouts-lifecycle-states/066-CONTEXT.md (D-066-01, 02, 11)
@@ -441,6 +441,16 @@ DELETE lines 246-251 (the `run_hard_timeout_seconds` block) and INSERT in their 
     - C:/Vibe Apps/Agentic RAG/backend/app/services/anthropic_service.py lines 128-220 (stream_anthropic generator — its `with client.messages.stream() as stream:` is what _ant_gen.close() unwinds)
   </read_first>
   <action>
+**Action structure (Phase A / Phase B logical split per checker WARNING #4):**
+
+- **Phase A (Subtasks 2a + 2b + closure-var init at function scope):** outer wrapper deletion at threads.py:855 (Subtask 2a) + Anthropic per-call timer wrap with `_ant_gen.close()` (Subtask 2b) + closure-variable declarations (`_last_iteration`, `_last_model_id`, `_last_per_call_budget`) at function scope before the `try:` block on line 854. This phase prepares the function-scope state that Phase B's outer-except branch will read.
+
+- **Phase B (Subtasks 2c + 2d + 2e):** OpenAI/Google/OpenRouter per-call timer wrap with `stream.close()` (Subtask 2c) + outer-except `_terminal_error` refinement using the closure vars from Phase A (Subtask 2d) + runs.py consumer-deadline reference rename (Subtask 2e — 2 line-replacements + 1 comment-only replacement at lines 70, 85, 180).
+
+Both phases ship in the same atomic git commit (Task 3) so threads.py never lands in a half-edited state. The phase split is for executor cognitive load only — read all 5 subtasks before starting; apply Phase A subtasks first; verify the AST parses; then apply Phase B subtasks; verify again before committing.
+
+---
+
 **Subtask 2a — DELETE the outer wrapper at threads.py:855** (D-066-01).
 
 Find this exact block in `agent_runner`:
@@ -469,13 +479,20 @@ Replace with:
             # for unknown models; per-model overrides in MODEL_CAPABILITIES tune this).
             # The replay-tail consumer's deadline at runs.py:85 (settings.consumer_timeout_seconds)
             # is independent from this scope — it bounds the CONSUMER, not the producer.
-            if True:  # preserve indentation of the existing body — minimal diff strategy
-                # Reuse the user_settings already resolved by the route handler
+            # (FALLBACK ONLY — see "Indentation strategy" below; LOCKED choice is the
+            # full LEFT re-indent shown in the dedented block immediately below.)
+            # Reuse the user_settings already resolved by the route handler
 ```
 
-The `if True:` is a deliberate indentation-preserving wrapper so the entire ~1100-line agent loop body does NOT need reflowing. The Phase 061 plan precedent (atomic re-indent) was 22a814c; this plan avoids that by using `if True:` instead. The closing block structure remains identical.
+**Indentation strategy — LOCKED: full LEFT re-indent.** Do NOT use `if True:` as a primary strategy — it leaves a dead-conditional code smell (`if True:` is always-true and confuses future readers). Per Phase 061 precedent (commit 22a814c — atomic re-indent of the same agent_runner body), the executor MUST:
 
-Alternatively (cleaner — recommended), if the executor judges the diff cost acceptable: remove the `async with` line entirely and re-indent the entire body LEFT by one level (4 spaces). Use `python` AST parse before commit to verify syntax. Choose ONE strategy; document the choice in the SUMMARY.md.
+1. Remove the `async with asyncio.timeout(settings.run_hard_timeout_seconds):` line entirely.
+2. Re-indent the ENTIRE agent loop body (everything that was previously inside that `async with` block) LEFT by exactly 4 spaces.
+3. Run `python -c "import ast; ast.parse(open('backend/app/api/threads.py').read())"` to verify the file still parses as valid Python.
+4. If the AST parse fails, re-attempt the re-indent (most likely cause: a tab/space mix or an unintended deeper nesting). Use `python -m black --diff backend/app/api/threads.py` as a secondary syntax check if needed.
+5. **Fallback (only after >3 failed AST attempts):** wrap the body in `if True:` as a temporary indentation-preserving structure. Document the fallback in the SUMMARY.md as a known-tech-debt item with an explicit follow-up task to do the proper re-indent in a later commit. This is intended as an emergency escape hatch only — the full re-indent is what ships.
+
+Rationale: the `if True:` wrapper introduces a code smell (dead conditional, misleading control flow) that future readers will have to mentally skip past every time they read agent_runner. The atomic re-indent (Phase 061 precedent) is cleaner and the diff cost is one-time. Document the chosen strategy in 066-02-SUMMARY.md.
 
 **Subtask 2b — Wrap the Anthropic native path (threads.py:1149-1186) in per-call timer + close-then-raise.**
 
@@ -656,19 +673,39 @@ Plan 01 wrote:
                     )
 ```
 
-Replace with the D-066-07 final format. Note: `iteration`, `_model_id`, and `per_call_budget` are local variables inside the agent loop body. They go OUT OF SCOPE by the time control reaches this `except` at the agent_runner top level — so capture them via closure variables initialized before the while-True loop:
+Replace with the D-066-07 final format. Note: `iteration`, `_model_id`, and `per_call_budget` are local variables inside the agent loop body. They go OUT OF SCOPE by the time control reaches this `except` at the agent_runner top level — so capture them via closure variables initialized at FUNCTION SCOPE, BEFORE the `try:` block.
 
-At the top of `agent_runner` (just after `_terminal_error: str | None = None` at threads.py:852), add:
+**CRITICAL — function-scope placement (correctness, not style):** The closure variables MUST be declared at the SAME indentation level as `_terminal_status` and `_terminal_error` — i.e., at function scope BEFORE the `try:` keyword on line 854. If they were declared inside the `try:` block, an early `asyncio.TimeoutError` raised before the agent loop iterates (e.g., during `user_settings = _user_settings` resolution on line 859) would hit the outer `except` branch with `_last_iteration` / `_last_model_id` / `_last_per_call_budget` UNBOUND — `UnboundLocalError` at the very moment we are trying to format the error string.
 
+Pre-Plan-02 layout at threads.py:850-854 (current):
 ```python
+        # State for the finally — set inside the body, read by the finally (Task 3).
+        _terminal_status: str = "completed"  # default — set on natural completion
+        _terminal_error: str | None = None
+
+        try:                          # OUTER try → finally runs shielded finalizer (Plan 03 Task 3)
+```
+
+Post-Plan-02 layout (insert BETWEEN line 852 `_terminal_error: str | None = None` AND line 854 `try:`):
+```python
+        # State for the finally — set inside the body, read by the finally (Task 3).
+        _terminal_status: str = "completed"  # default — set on natural completion
+        _terminal_error: str | None = None
         # Phase 066 D-066-07: capture per-iteration context for the timed_out
         # error string. Updated each iteration BEFORE the LLM stream block
         # (around line ~1149 / ~1213) so the outer except sees the iteration
-        # at which the timer fired.
+        # at which the timer fired. MUST be declared at function scope (same
+        # indent as _terminal_status / _terminal_error, BEFORE the try: at line
+        # 854) — declaring inside try: would cause UnboundLocalError if a
+        # TimeoutError fires before the agent loop iterates.
         _last_iteration: int = 0
         _last_model_id: str = ""
         _last_per_call_budget: int = 0
+
+        try:                          # OUTER try → finally runs shielded finalizer (Plan 03 Task 3)
 ```
+
+All five state variables (`_terminal_status`, `_terminal_error`, `_last_iteration`, `_last_model_id`, `_last_per_call_budget`) are now guaranteed-bound when the outer `except` branch runs, regardless of where the exception originated within the `try:` body.
 
 Inside the agent loop, RIGHT AFTER `_model_id` and `per_call_budget` are computed (in BOTH provider paths — once in the Anthropic block, once in the OpenAI block, AND tracking iteration), update the trio:
 
@@ -727,7 +764,7 @@ Replace with:
     deadline = time_mod.monotonic() + settings.consumer_timeout_seconds
 ```
 
-Find at runs.py:180 (within the `try:` block):
+Find at runs.py:180 (within the `try:` block — note: this is a COMMENT-only edit; the only code edit in runs.py is at line 85):
 ```python
                 # the full run_hard_timeout_seconds + 10 for consumer_timeout.
 ```
@@ -736,12 +773,14 @@ Replace with:
 ```python
                 # the full consumer_timeout_seconds for this consumer.
 ```
+
+**Executor expectation:** runs.py changes total exactly 2 line-replacements + 1 comment-line-replacement: line 70 (comment), line 85 (code — the deadline assignment), line 180 (comment). No other runs.py modifications. The cancel handler at lines 386, 422-424 is BYTE-IDENTICAL to its pre-Plan-02 state (T-066-01 partition guard).
   </action>
   <verify>
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -c "import ast; t = ast.parse(open('app/api/threads.py').read()); print('threads.py parses OK')"</automated>
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -c "import ast; t = ast.parse(open('app/api/runs.py').read()); print('runs.py parses OK')"</automated>
     <automated>! grep -n "asyncio.timeout(settings.run_hard_timeout_seconds)" "C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py"</automated>
-    <automated>grep -c "async with asyncio.timeout(per_call_budget)" "C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py" | grep -E "^2$"</automated>
+    <automated>[ "$(grep -v '^#' 'C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py' | grep -c 'async with asyncio.timeout(per_call_budget)')" -ge 2 ]</automated>
     <automated>grep -q "_ant_gen.close()" "C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py"</automated>
     <automated>grep -q "stream.close()" "C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py"</automated>
     <automated>grep -q "from app.config import get_per_call_timeout" "C:/Vibe Apps/Agentic RAG/backend/app/api/threads.py"</automated>
@@ -754,14 +793,21 @@ Replace with:
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -c "from app.api.threads import agent_runner_module_marker if False else None; from app.api import threads, runs; print('imports OK')" 2>&amp;1 || cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -c "from app.api import threads, runs; print('imports OK')"</automated>
   </verify>
   <done>
-    - Outer `async with asyncio.timeout(settings.run_hard_timeout_seconds)` at threads.py:855 is GONE
-    - Per-LLM-call `async with asyncio.timeout(per_call_budget)` appears EXACTLY 2 times (Anthropic path + OpenAI path)
-    - `_ant_gen.close()` and `stream.close()` both appear in the file (sync — no `await`)
-    - TimeoutError outer-except branch at threads.py:~2140 uses the refined format `f"timed_out: {_last_per_call_budget}s per-call deadline exceeded at iteration {_last_iteration} (model={_last_model_id})"`
-    - threads.py + runs.py both parse as valid Python
-    - All 3 `settings.run_hard_timeout_seconds` references in runs.py are now `settings.consumer_timeout_seconds`
-    - runs.py cancel handler still writes `status="cancelled"` (T-066-01 partition guard intact — verified by negation grep)
-    - Backend imports cleanly (no startup ImportError)
+    - **Phase A done:**
+      - Outer `async with asyncio.timeout(settings.run_hard_timeout_seconds)` at threads.py:855 is GONE
+      - Anthropic per-call `async with asyncio.timeout(per_call_budget)` wrap present at threads.py:~1149-1186
+      - `_ant_gen.close()` (sync — no `await`) appears in the Anthropic timeout-handler branch
+      - Closure variables `_last_iteration`, `_last_model_id`, `_last_per_call_budget` declared at FUNCTION SCOPE (before `try:` on line 854, same indent as `_terminal_status` / `_terminal_error`)
+    - **Phase B done:**
+      - OpenAI per-call `async with asyncio.timeout(per_call_budget)` wrap present at threads.py:~1213-1244
+      - `stream.close()` (sync — no `await`) appears in the OpenAI timeout-handler branch
+      - Total per-call timer occurrences in threads.py: at least 2 (one per provider path) — non-comment lines only
+      - TimeoutError outer-except branch at threads.py:~2140 uses the refined format `f"timed_out: {_last_per_call_budget}s per-call deadline exceeded at iteration {_last_iteration} (model={_last_model_id})"`
+      - All 3 `settings.run_hard_timeout_seconds` references in runs.py are now `settings.consumer_timeout_seconds` (lines 70, 85, 180 — line 85 is the only code edit; 70 + 180 are comment-only)
+    - **Cross-phase invariants:**
+      - threads.py + runs.py both parse as valid Python (AST gate passes after each phase)
+      - runs.py cancel handler at lines 386, 422-424 BYTE-IDENTICAL to pre-Plan-02 state (T-066-01 partition guard intact — verified by negation grep + `git diff HEAD~1 backend/app/api/runs.py | grep -E "^[+-].*status.*cancelled"` returning no NEW lines for the cancel-handler region)
+      - Backend imports cleanly (no startup ImportError)
   </done>
 </task>
 
@@ -833,7 +879,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 <verification>
 - All Task 2 grep gates pass:
   - 0 hits for `asyncio.timeout(settings.run_hard_timeout_seconds)`
-  - exactly 2 hits for `async with asyncio.timeout(per_call_budget)`
+  - at least 2 hits (>=2) for `async with asyncio.timeout(per_call_budget)` — one per provider path; future provider additions may add more
   - both `_ant_gen.close()` and `stream.close()` present
   - 0 hits for `run_hard_timeout_seconds` anywhere in `backend/app/`
   - threads.py uses `settings.consumer_timeout_seconds` in runs.py only (it never appears in threads.py)

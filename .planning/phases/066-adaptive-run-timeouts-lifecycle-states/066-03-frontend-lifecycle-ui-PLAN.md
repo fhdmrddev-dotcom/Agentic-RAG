@@ -448,7 +448,19 @@ with:
 {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && (
 ```
 
-(Keep `aria-label="Resume failed run"` as-is — accessibility-acceptable; or update to `"Resume run"` for accuracy. Choose ONE; document choice in SUMMARY. Default: leave `"Resume failed run"` for minimal diff and accept the small a11y wording lag.)
+**LOCKED — update aria-label to `"Resume run"`** (accuracy with new gating). Find the existing line:
+
+```tsx
+aria-label="Resume failed run"
+```
+
+Replace with:
+
+```tsx
+aria-label="Resume run"
+```
+
+Rationale: with Resume now gating on `(failed || timed_out)`, the existing `"Resume failed run"` label is inaccurate (it would announce "Resume failed run" via screen reader for a `timed_out` message, misrepresenting the message state). The shorter `"Resume run"` label is both accurate and concise — matches the visible button text "Resume". This is a one-character-string-replacement with no functional risk.
 
 **Subtask 2d — `frontend/src/components/chat/MessageItem.tsx:130-145` banner copy switch:** Replace:
 
@@ -483,6 +495,8 @@ The condition order matters: `timed_out` must check BEFORE `cancelled` (otherwis
     <automated>grep -c 'kind === "timed_out"' "C:/Vibe Apps/Agentic RAG/frontend/src/hooks/useMessages.ts" | grep -E "^2$"</automated>
     <automated>grep -q 'runStatus: "timed_out", stopped: true' "C:/Vibe Apps/Agentic RAG/frontend/src/hooks/useMessages.ts"</automated>
     <automated>grep -q 'message.runStatus === "failed" || message.runStatus === "timed_out"' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
+    <automated>grep -q 'aria-label="Resume run"' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
+    <automated>! grep -q 'aria-label="Resume failed run"' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
     <automated>grep -q 'Agent reached time limit' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
     <automated>grep -q 'message.runStatus === "timed_out"' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
     <automated>grep -q 'Response stopped' "C:/Vibe Apps/Agentic RAG/frontend/src/components/chat/MessageItem.tsx"</automated>
@@ -492,6 +506,7 @@ The condition order matters: `timed_out` must check BEFORE `cancelled` (otherwis
     - useMessages.ts has TWO `kind === "timed_out"` branches (sendMessage + reconcile callsites) — verified by `grep -c` returning 2
     - sendMessage path sets `stopped: true` on timed_out; reconcile path does NOT
     - MessageItem.tsx Resume gating uses `(message.runStatus === "failed" || message.runStatus === "timed_out")`
+    - MessageItem.tsx Resume button aria-label updated to `"Resume run"` (was `"Resume failed run"` — inaccurate with the expanded gating)
     - MessageItem.tsx banner switch keys on `runStatus === "timed_out"` BEFORE `runStatus === "cancelled" || message.stopped`
     - "Response stopped" string preserved (cancelled path)
     - "Agent reached time limit" string introduced (timed_out path)
@@ -587,7 +602,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 <output>
 After completion, create `.planning/phases/066-adaptive-run-timeouts-lifecycle-states/066-03-SUMMARY.md` documenting:
 - Confirmation of `tsc --noEmit` exit-0 output
-- Whether `aria-label="Resume failed run"` was updated to `"Resume run"` (accessibility nicety)
+- Confirmation aria-label was updated to `"Resume run"` (LOCKED per plan revision — was discretionary in pre-revision draft)
 - Banner-copy choice ("Agent reached time limit" — chosen per Aether voice; alternatives considered)
 - Plan 05 UAT prerequisite: with `ENABLE_TEST_FIXTURES=1`, force a synthetic timeout and verify the banner + Resume button render
 </output>

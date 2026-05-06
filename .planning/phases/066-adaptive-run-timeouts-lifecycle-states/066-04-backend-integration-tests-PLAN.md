@@ -19,7 +19,7 @@ must_haves:
   truths:
     - "5 new integration test files exist under backend/tests/integration/test_066_*.py covering SC#2, SC#3, SC#4, SC#5, SC#7 from VALIDATION.md"
     - "test_066_status_enum.py asserts CHECK constraint admits 'timed_out' AND Pydantic Literal accepts 'timed_out' (SC#3)"
-    - "test_066_per_call_timer.py asserts per-call timer fires within ε of budget AND timer resets per iteration AND tool execution time does NOT count against budget (SC#2)"
+    - "test_066_per_call_timer.py asserts per-call timer fires within ε of budget (test_per_call_timer_fires_at_budget) AND timer resets per iteration (test_timer_resets_per_iteration) AND tool execution time does NOT count against budget (test_tool_exec_outside_timer) (SC#2 + D-066-02 + T-066-13)"
     - "test_066_terminal_classification.py is table-driven over (TimeoutError, CancelledError, Exception) → asserts terminal_status mapping AND DELETE-write-cancelled-not-timed_out partition guard (SC#4 + T-066-01)"
     - "test_066_sse_terminal.py asserts SSE consumer receives a `data: {\"type\": \"timed_out\", ...}` event distinct from `error` and `cancelled` (SC#5)"
     - "test_066_langsmith_clean.py asserts via caplog that no log line contains 'GeneratorExit' on TimeoutError path (SC#7)"
@@ -28,7 +28,7 @@ must_haves:
   artifacts:
     - path: "backend/tests/integration/test_066_status_enum.py"
       provides: "DB CHECK + Pydantic Literal admits 'timed_out' (SC#3)"
-      contains: "test_runs_status_check_admits_timed_out"
+      contains: "test_pydantic_literal_admits_timed_out"
     - path: "backend/tests/integration/test_066_per_call_timer.py"
       provides: "Per-call timer fires at budget; resets on iteration; tool exec outside budget (SC#2)"
       contains: "test_per_call_timer_fires_at_budget"
@@ -449,11 +449,9 @@ async def test_delete_writes_cancelled_not_timed_out(redis_client):
     thread_id = THREAD_A
 
     # Configure the mock_supabase("runs").select(...).maybe_single() to return
-    # an in-flight row owned by the test user. Reuse the helper's existing
-    # 'runs' table branch shape — see _run_helpers.py for setup hooks.
-    # (The exact shape depends on _build_mock_supabase's runs branch — adapt
-    # to whatever pattern test_062_delete_zombie.py uses for zombie heal.)
-    from tests.integration.test_062_delete_zombie import setup_zombie_state  # noqa: E402
+    # an in-flight row owned by the test user. setup_zombie_state lives in
+    # _run_helpers.py:356 (test_062_delete_zombie.py:29 only re-imports it).
+    from tests.integration._run_helpers import setup_zombie_state  # noqa: E402
     setup_zombie_state(mock_supabase, run_id, thread_id)
 
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
@@ -488,7 +486,7 @@ async def test_delete_writes_cancelled_not_timed_out(redis_client):
         app.dependency_overrides.pop(get_supabase, None)
 ```
 
-**Note on `setup_zombie_state` import:** If `test_062_delete_zombie.py` does not export `setup_zombie_state` as a public helper, replicate the relevant pre-population pattern inline in this test (read test_062_delete_zombie.py to find the right MagicMock setup; copy the minimum needed). DO NOT modify test_062_delete_zombie.py.
+**Note on `setup_zombie_state` import:** Verified — the helper is a public `async def setup_zombie_state(...)` at `tests/integration/_run_helpers.py:356`. Import directly from `_run_helpers` (NOT from `test_062_delete_zombie`, which only re-imports it). DO NOT modify either file.
   </action>
   <verify>
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -m pytest tests/integration/test_066_status_enum.py -x -q 2>&amp;1 | tail -5 | grep -E "passed|^OK"</automated>
@@ -504,7 +502,7 @@ async def test_delete_writes_cancelled_not_timed_out(redis_client):
 </task>
 
 <task type="auto">
-  <name>Task 2: Author test_066_per_call_timer.py (SC#2) and test_066_sse_terminal.py (SC#5)</name>
+  <name>Task 2: Author test_066_per_call_timer.py — 4 subtests covering SC#2 (timer fires, quick call within budget, timer resets per iteration, tool exec outside timer) — and test_066_sse_terminal.py (SC#5)</name>
   <files>backend/tests/integration/test_066_per_call_timer.py, backend/tests/integration/test_066_sse_terminal.py</files>
   <read_first>
     - C:/Vibe Apps/Agentic RAG/.planning/phases/066-adaptive-run-timeouts-lifecycle-states/066-CONTEXT.md (D-066-01, 02, 06)
@@ -656,7 +654,243 @@ async def test_quick_call_within_budget_completes(redis_client, monkeypatch):
         assert completed, f"Expected status='completed'; got: {runs_builder.update.call_args_list}"
     finally:
         app.dependency_overrides.pop(get_supabase, None)
+
+
+# Multi-iteration mock — yields enough chunks per iteration to drive a tool call,
+# then a second iteration's chunks. Used to prove asyncio.timeout's per-iteration
+# reset semantics (RESEARCH.md Pattern 1) — D-066-02.
+def _two_iterations_each_within_budget():
+    """First iteration emits a chunk that triggers a tool call (1.5s wall),
+    second iteration emits a final chunk + done (1.5s wall). With per_call_budget=2s
+    each iteration is within budget; the cumulative wall-time (~3s) is NOT --
+    proves the timer resets at the start of each `async with asyncio.timeout(...)`
+    block (one wrap per iteration in threads.py:~1149/1213 per Plan 02 Subtask 2b/2c).
+    """
+    # Iteration 1: stall 1.5s then yield a tool_call chunk + finish_reason='tool_calls'
+    time.sleep(1.5)
+    # Synthesize an OpenAI-shaped tool_call chunk (helper builders take only delta text;
+    # we build inline so we can drive the tool path).
+    from types import SimpleNamespace
+    yield SimpleNamespace(
+        choices=[SimpleNamespace(
+            delta=SimpleNamespace(
+                content=None,
+                tool_calls=[SimpleNamespace(
+                    index=0,
+                    id="tc_1",
+                    function=SimpleNamespace(name="echo", arguments='{"x":1}'),
+                )],
+            ),
+            finish_reason=None,
+        )],
+    )
+    yield SimpleNamespace(
+        choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=None, tool_calls=None),
+            finish_reason="tool_calls",
+        )],
+    )
+
+
+def _second_iteration_quick_done():
+    """Second iteration: 1.5s stall then final delta + done. Within 2s budget."""
+    time.sleep(1.5)
+    yield _make_sse_chunk("answer ")
+    yield _make_done_chunk()
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(20)
+async def test_timer_resets_per_iteration(redis_client, monkeypatch):
+    """SC#2 (b) -- D-066-02: per-iteration reset.
+
+    per_call_budget=2s. Iteration 1 takes 1.5s (within budget) + tool dispatch.
+    Iteration 2 takes 1.5s (within budget). Total wall-time ~3s > 2s budget.
+
+    If the timer did NOT reset between iterations, the cumulative 3s would
+    fire the deadline. asyncio.timeout's contract is per-`async with` block --
+    Plan 02 Subtask 2b/2c emit a fresh `async with asyncio.timeout(per_call_budget)`
+    on EACH while-True iteration. This test proves it.
+    """
+    monkeypatch.setattr("app.config.get_per_call_timeout", lambda *a, **k: 2)
+
+    # Each call to create_adaptive_streaming_chat returns a fresh iterator
+    # (one per agent loop iteration). Use a side_effect list to drive two
+    # distinct streams.
+    streams = [
+        (iter(_two_iterations_each_within_budget()), CallingMode.NATIVE),
+        (iter(_second_iteration_quick_done()), CallingMode.NATIVE),
+    ]
+
+    # Use a real (cheap) tool dispatch -- patch dispatch_tool to a no-op fast return
+    # so we exercise the agent loop's tool->next-iteration boundary.
+    mock_supabase = _build_mock_supabase()
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    try:
+        with patch(
+            "app.api.threads.create_adaptive_streaming_chat",
+            side_effect=lambda *a, **k: streams.pop(0),
+        ), patch(
+            "app.api.threads.dispatch_tool",
+            new=lambda *a, **k: {"ok": True, "result": "tool done"},
+        ), patch(
+            "app.services.suggestion_service.generate_suggestions",
+            return_value=([], None),
+        ), patch(
+            "app.api.threads.generate_thread_title",
+            return_value=("T", None),
+        ):
+            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+                async with c.stream(
+                    "POST",
+                    f"/threads/{THREAD_A}/messages",
+                    json={"content": "hello"},
+                    headers={"Authorization": "Bearer test-token"},
+                    timeout=30.0,
+                ) as r:
+                    async for _line in r.aiter_lines():
+                        pass
+            await await_producer_finalized(mock_supabase)
+
+        runs_builder = mock_supabase.table("runs")
+        # MUST NOT be timed_out -- per-iteration reset proves cumulative > budget OK
+        timed_out = [
+            c for c in runs_builder.update.call_args_list
+            if c.args and c.args[0].get("status") == "timed_out"
+        ]
+        assert not timed_out, (
+            f"D-066-02 regression: cumulative wall-time exceeded per-iteration "
+            f"budget but timer did NOT reset between iterations. "
+            f"Updates: {runs_builder.update.call_args_list}"
+        )
+        completed = [
+            c for c in runs_builder.update.call_args_list
+            if c.args and c.args[0].get("status") == "completed"
+        ]
+        assert completed, (
+            f"Expected status='completed' after two within-budget iterations; "
+            f"got: {runs_builder.update.call_args_list}"
+        )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+
+
+def _quick_call_then_tool_call():
+    """First iteration LLM stream: 0.5s, yields a tool call. Within 2s budget."""
+    time.sleep(0.5)
+    from types import SimpleNamespace
+    yield SimpleNamespace(
+        choices=[SimpleNamespace(
+            delta=SimpleNamespace(
+                content=None,
+                tool_calls=[SimpleNamespace(
+                    index=0,
+                    id="tc_2",
+                    function=SimpleNamespace(name="slow_tool", arguments='{}'),
+                )],
+            ),
+            finish_reason=None,
+        )],
+    )
+    yield SimpleNamespace(
+        choices=[SimpleNamespace(
+            delta=SimpleNamespace(content=None, tool_calls=None),
+            finish_reason="tool_calls",
+        )],
+    )
+
+
+def _quick_call_then_done():
+    """Second iteration LLM stream: 0.5s, final answer + done. Within 2s budget."""
+    time.sleep(0.5)
+    yield _make_sse_chunk("done ")
+    yield _make_done_chunk()
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(120)
+async def test_tool_exec_outside_timer(redis_client, monkeypatch):
+    """SC#2 (c) -- D-066-02 + T-066-13: tool execution does NOT count against per-call budget.
+
+    per_call_budget=2s. Iteration 1 LLM call: 0.5s (well within budget).
+    Tool dispatch: sleeps 90s (way past budget). Iteration 2 LLM call: 0.5s
+    (within budget). Total wall-time ~91s.
+
+    If the tool dispatch were INSIDE the asyncio.timeout block, the 90s sleep
+    would fire the 2s deadline. Plan 02 Subtask 2b/2c places the per-call
+    timer ONLY around the SDK iteration block (`for chunk in stream:` /
+    `for _ant_event in _ant_gen:`) -- tool dispatch happens OUTSIDE the
+    `async with asyncio.timeout(...)` block, between iterations.
+    """
+    import asyncio as _asyncio_mod
+    monkeypatch.setattr("app.config.get_per_call_timeout", lambda *a, **k: 2)
+
+    streams = [
+        (iter(_quick_call_then_tool_call()), CallingMode.NATIVE),
+        (iter(_quick_call_then_done()), CallingMode.NATIVE),
+    ]
+
+    async def _slow_tool_dispatch(*args, **kwargs):
+        # Real wall-time sleep -- proves tool exec time does NOT count against
+        # the LLM-call timer scope (D-066-02). Use asyncio.sleep so we don't
+        # block the event loop entirely; the assertion is that no timed_out
+        # is written despite total wall-time >> per_call_budget.
+        await _asyncio_mod.sleep(90)
+        return {"ok": True, "result": "slow tool done"}
+
+    mock_supabase = _build_mock_supabase()
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    try:
+        with patch(
+            "app.api.threads.create_adaptive_streaming_chat",
+            side_effect=lambda *a, **k: streams.pop(0),
+        ), patch(
+            "app.api.threads.dispatch_tool",
+            new=_slow_tool_dispatch,
+        ), patch(
+            "app.services.suggestion_service.generate_suggestions",
+            return_value=([], None),
+        ), patch(
+            "app.api.threads.generate_thread_title",
+            return_value=("T", None),
+        ):
+            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+                async with c.stream(
+                    "POST",
+                    f"/threads/{THREAD_A}/messages",
+                    json={"content": "hello"},
+                    headers={"Authorization": "Bearer test-token"},
+                    timeout=120.0,
+                ) as r:
+                    async for _line in r.aiter_lines():
+                        pass
+            await await_producer_finalized(mock_supabase)
+
+        runs_builder = mock_supabase.table("runs")
+        # T-066-13 + D-066-02: 90s tool exec MUST NOT cause timed_out
+        timed_out = [
+            c for c in runs_builder.update.call_args_list
+            if c.args and c.args[0].get("status") == "timed_out"
+        ]
+        assert not timed_out, (
+            f"D-066-02/T-066-13 regression: tool exec time was counted against "
+            f"per-call budget. 90s tool sleep with 2s budget produced timed_out -- "
+            f"timer scope must be LLM stream block ONLY. "
+            f"Updates: {runs_builder.update.call_args_list}"
+        )
+        completed = [
+            c for c in runs_builder.update.call_args_list
+            if c.args and c.args[0].get("status") == "completed"
+        ]
+        assert completed, (
+            f"Expected status='completed' (tool exec outside timer scope); "
+            f"got: {runs_builder.update.call_args_list}"
+        )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
 ```
+
+**Note on real `asyncio.timeout` semantics:** Both new tests use real `asyncio.timeout` (NOT mocked) and real `time.sleep` / `asyncio.sleep` durations to prove the per-iteration reset and tool-outside-scope contracts. Mocking `asyncio.timeout` itself would defeat the test purpose — Plan 02 Subtask 2b/2c emits real `async with asyncio.timeout(per_call_budget)` calls; the test must exercise the real implementation. The slow-mock-LLM fixture pattern (`_two_iterations_each_within_budget`, `_quick_call_then_tool_call`) extends the Phase 058 pattern of using `time.sleep` inside the synchronous chunk generator to drive deterministic stream timings.
 
 **File 2 — `backend/tests/integration/test_066_sse_terminal.py`**:
 
@@ -772,11 +1006,19 @@ async def test_consumer_receives_timed_out_sentinel(redis_client, monkeypatch):
 ```
   </action>
   <verify>
+    <automated>grep -q "def test_per_call_timer_fires_at_budget" "C:/Vibe Apps/Agentic RAG/backend/tests/integration/test_066_per_call_timer.py"</automated>
+    <automated>grep -q "def test_quick_call_within_budget_completes" "C:/Vibe Apps/Agentic RAG/backend/tests/integration/test_066_per_call_timer.py"</automated>
+    <automated>grep -q "def test_timer_resets_per_iteration" "C:/Vibe Apps/Agentic RAG/backend/tests/integration/test_066_per_call_timer.py"</automated>
+    <automated>grep -q "def test_tool_exec_outside_timer" "C:/Vibe Apps/Agentic RAG/backend/tests/integration/test_066_per_call_timer.py"</automated>
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -m pytest tests/integration/test_066_per_call_timer.py -x -q 2>&amp;1 | tail -5 | grep -E "passed"</automated>
     <automated>cd "C:/Vibe Apps/Agentic RAG/backend" &amp;&amp; venv/Scripts/python.exe -m pytest tests/integration/test_066_sse_terminal.py -x -q 2>&amp;1 | tail -5 | grep -E "passed"</automated>
   </verify>
   <done>
-    - test_066_per_call_timer.py passes: timer fires within budget+ε, quick call completes
+    - test_066_per_call_timer.py contains 4 test functions: test_per_call_timer_fires_at_budget, test_quick_call_within_budget_completes, test_timer_resets_per_iteration, test_tool_exec_outside_timer
+    - test_per_call_timer_fires_at_budget passes: timer fires within budget+ε on stalled stream
+    - test_quick_call_within_budget_completes passes: quick call within budget completes (does NOT timed_out)
+    - test_timer_resets_per_iteration passes: cumulative wall-time > budget across 2 iterations does NOT fire timer (D-066-02 per-iteration reset proven)
+    - test_tool_exec_outside_timer passes: 90s tool sleep with 2s budget does NOT fire timer (D-066-02 + T-066-13 — tool exec outside scope proven)
     - test_066_sse_terminal.py passes: consumer sees {type:'timed_out', error:'timed_out: ...'} sentinel; no `error`/`cancelled` partition violations
   </done>
 </task>

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: ready_to_plan
-stopped_at: Phase 063.1 complete — HUMAN-UAT scoreboard filled, project-level approved, Gap-006 (run hard-timeout) escalated to follow-on phase
-last_updated: "2026-05-05T02:30:00.000Z"
+status: planning
+stopped_at: "Phase 063.1 closed — 5/5 plans complete, project-level **approved**, HUMAN-UAT scoreboard filled with live-bundle verification evidence (Chrome MCP), Gap-006 (run hard-timeout) escalated to follow-on phase. Final commit: `docs(063.1-05): close plan with HUMAN-UAT approval + Gap-006 escalation`."
+last_updated: "2026-05-06T17:00:08.081Z"
 last_activity: 2026-05-04
 progress:
-  total_phases: 9
-  completed_phases: 8
-  total_plans: 28
+  total_phases: 10
+  completed_phases: 7
+  total_plans: 33
   completed_plans: 28
-  percent: 89
+  percent: 85
 ---
 
 # Project State
@@ -175,8 +175,11 @@ Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:dis
 **Completed Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5/5 plans — closed 2026-05-04 (UAT `partial`, project-level `approved`)
 
 **Carry-forward (non-blocking):**
+
 - SC#5 cross-tab Stop end-to-end (Phase 064 fixture harness)
 - SC#6 Resume button live test under `ENABLE_TEST_FIXTURES=1` (Phase 064)
 - SC#7 full Phase 063 SC#1–#6 manual regression (next manual UAT pass)
 
 **New phase queued (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness which is test infrastructure, not a fix). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`.
+
+**Planned Phase:** 066 (Adaptive Run Timeouts & Lifecycle States) — 5 plans — 2026-05-06T17:00:08.068Z
