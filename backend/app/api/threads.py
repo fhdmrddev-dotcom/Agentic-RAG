@@ -80,17 +80,22 @@ RUN_TASKS: dict[_uuid_mod.UUID, asyncio.Task] = {}
 
 # Terminal sentinel discriminator types (D-061-12). Consumer breaks when
 # it XREADs an entry whose data.type is in this set.
-TERMINAL_TYPES = frozenset({"done", "error", "cancelled"})
+# Phase 066 D-066-06: 5th SSE terminal type 'timed_out' — distinct wire-format
+# value from 'error' so the frontend's onTerminal callback can route to a
+# dedicated "Agent reached time limit" banner (D-066-10) and the Resume
+# button gating extends to runStatus === 'timed_out' (D-066-09).
+TERMINAL_TYPES = frozenset({"done", "error", "cancelled", "timed_out"})
 
 # D-061-09 runs.status enum → SSE TERMINAL_TYPES mapping. The runs table
-# uses {"streaming","completed","failed","cancelled"} per the migration
-# CHECK constraint; the SSE wire uses TERMINAL_TYPES. They overlap on
-# "cancelled" only, so the producer's finally must translate before
+# uses {"streaming","completed","failed","cancelled","timed_out"} per the
+# migration CHECK constraint (035 + 038); the SSE wire uses TERMINAL_TYPES.
+# The producer's finally must translate runs.status → wire type before
 # calling _emit_terminal.
 _RUN_STATUS_TO_TERMINAL_TYPE: dict[str, str] = {
     "completed": "done",
     "failed": "error",
     "cancelled": "cancelled",
+    "timed_out": "timed_out",  # Phase 066 D-066-06 — system-timeout sentinel
 }
 
 
@@ -2138,24 +2143,38 @@ async def send_message(
                   await _emit(redis, run_id, 'stream_end')
 
                 except asyncio.TimeoutError:
-                    # CR-01 fix: catch terminal classifications BEFORE the line-1942 finally
-                    # runs. Previously these branches lived at the outer try (~line 2007),
-                    # which ran AFTER the finally had already written 'completed' to Redis
-                    # and Postgres. D-061-01: producer body exceeded settings.run_hard_timeout_seconds.
-                    _terminal_status = "failed"
-                    _terminal_error = "hard_timeout"
-                    logger.warning("Run %s exceeded hard timeout %ds", run_id, settings.run_hard_timeout_seconds)
+                    # Phase 066 D-066-05: per-LLM-call asyncio.timeout(per_call_budget)
+                    # fired (Plan 02 wraps the timer around the SDK iteration loop).
+                    # Strict partition guard: timer fire = system = 'timed_out'.
+                    # The user-Stop write at runs.py:422 stays 'cancelled' (UNCHANGED).
+                    #
+                    # D-066-07 error format — Plan 01 writes a stable static-prefix
+                    # string here. Plan 02 refines this to include per_call_budget,
+                    # iteration, and _model_id values once the per-call timer is in
+                    # place: f"timed_out: {per_call_budget}s per-call deadline ..."
+                    _terminal_status = "timed_out"
+                    _terminal_error = "timed_out: per-call deadline exceeded"
+                    logger.warning(
+                        "Run %s timed out (Plan 01 placeholder — Plan 02 will refine)",
+                        run_id,
+                    )
                 except asyncio.CancelledError:
-                    # CR-01 fix: classify before finally reads. Cancellation comes from app
-                    # lifespan shutdown OR (in 062+) from DELETE /runs/{id} cancel verb.
-                    # D-061-03: 061-only window has no cancel verb — only lifespan cancels.
+                    # D-066-05 UNCHANGED: cancellation comes from app lifespan shutdown
+                    # OR DELETE /runs/{id} (cancel verb). The DELETE handler writes its
+                    # own error string ('cancelled_by_user') in runs.py:423; this branch
+                    # leaves _terminal_error = None and lets the finalizer write NULL,
+                    # which is the legacy contract for in-process producer cancellation.
                     _terminal_status = "cancelled"
                     _terminal_error = None
                     raise   # MUST re-raise so timeout context + asyncio task state stay correct (Pitfall 3)
                 except Exception as e:
-                    # CR-01 fix: classify before finally reads. Generic failure path.
+                    # D-066-07 extended format: 'failed: <ExceptionClass>: <truncated≤200chars>'
+                    # supersedes today's bare type(e).__name__. The 200-char cap (T-066-02
+                    # mitigation) prevents accidental traceback / API-key-fragment leakage
+                    # via RLS-readable runs.error column.
                     _terminal_status = "failed"
-                    _terminal_error = type(e).__name__   # short discriminator string per D-061-09
+                    _truncated_msg = (str(e) or "")[:200]
+                    _terminal_error = f"failed: {type(e).__name__}: {_truncated_msg}"
                     logger.exception("Run %s failed", run_id)
                 finally:
                     # Phase 061 (D-061-04, Pitfall 2): shielded finalizer with

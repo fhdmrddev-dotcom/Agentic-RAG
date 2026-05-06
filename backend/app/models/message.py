@@ -36,4 +36,9 @@ class MessageResponse(BaseModel):
     # Message type. The 4-value Literal mirrors the CHECK constraint on
     # public.runs.status (migration 035 line 25).
     run_id: UUID | None = None
-    run_status: Literal["streaming", "completed", "failed", "cancelled"] | None = None
+    # Phase 066 D-066-04: 5-value Literal mirrors public.runs CHECK constraint
+    # post-migration 038. The 5th value 'timed_out' (NEW) is written by the
+    # producer's TimeoutError handler (threads.py:agent_runner) when the
+    # per-LLM-call asyncio.timeout fires. NEVER written by runs.py:cancel_run
+    # (partition guard per D-066-05).
+    run_status: Literal["streaming", "completed", "failed", "cancelled", "timed_out"] | None = None
