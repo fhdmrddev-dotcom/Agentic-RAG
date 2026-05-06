@@ -67,7 +67,9 @@ logger = logging.getLogger(__name__)
 # hardcoded "0". All other invariants preserved verbatim:
 #   - WR-01 (D-061.1-07): carry last_id forward between phases; no `$` reset
 #   - H1 (061.1-DIAGNOSIS.md): BaseException wrapper around per-entry yield
-#   - Deadline = monotonic + run_hard_timeout_seconds + 10
+#   - Deadline = monotonic + consumer_timeout_seconds (Phase 066: 610s default;
+#     was run_hard_timeout_seconds + 10 = 130s pre-066. Bumped to outlast the
+#     producer's max_iterations × per_call_budget worst-case wall-time.)
 #   - Break on first TERMINAL_TYPES entry
 #   - finally: pass (D-061-03 — consumer disconnect MUST NOT cancel producer)
 # ───────────────────────────────────────────────────────────────────────
@@ -82,7 +84,7 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
     """
     stream_key = f"run:{run_id}"
     last_id = since
-    deadline = time_mod.monotonic() + settings.run_hard_timeout_seconds + 10
+    deadline = time_mod.monotonic() + settings.consumer_timeout_seconds
 
     try:
         # Phase 1: replay backlog from `since` (no block; immediate return)
@@ -177,7 +179,7 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                 # the BLOCK window), don't keep BLOCKing until the hard
                 # deadline. Emit a synthetic terminal-shaped error event and
                 # return so the client gets a clean close instead of waiting
-                # the full run_hard_timeout_seconds + 10 for consumer_timeout.
+                # the full consumer_timeout_seconds for this consumer.
                 try:
                     if not await redis.exists(stream_key):
                         yield {"data": json.dumps({

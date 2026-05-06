@@ -1,7 +1,10 @@
+import logging
 from typing import TypedDict
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 _PROVIDER_BASE_URLS: dict[str, str] = {
     "openai": "",
@@ -60,57 +63,170 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
 }
 
 
-class ModelCapability(TypedDict):
+class ModelCapability(TypedDict, total=False):
+    """Per-model capability registry entry.
+
+    ``total=False`` so partial entries are allowed — only ``native_tools`` and
+    ``provider`` were previously required; Phase 066 D-066-03 adds
+    ``llm_call_timeout_seconds`` as optional. Models without this field fall
+    back to the 180s unknown-model default at the lookup site
+    (``get_per_call_timeout`` below).
+    """
     native_tools: bool
     provider: str  # documentation only; actual provider from user settings
+    llm_call_timeout_seconds: int  # Phase 066 D-066-03 — per-LLM-call deadline
 
 
 # Capability registry: which models support native API tool calling.
 # Unknown models default to native_tools=False (structured mode).
 # User-extensible: add new models here after testing.
+#
+# Phase 066 D-066-03: per-model `llm_call_timeout_seconds` carries the
+# per-LLM-call deadline (seconds). The matrix follows RESEARCH.md A1:
+#   60s   — fast non-reasoning (nano-class)
+#   90s   — fast / mini-tier
+#   180s  — default capable models
+#   240s  — agentic / capable models
+#   600s  — slow reasoning (extended thinking; Anthropic Issue #51568)
+# Resolved by ``get_per_call_timeout(model_id, settings)`` below.
 MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # OpenAI — proven native tool support
-    "gpt-4o": {"native_tools": True, "provider": "openai"},
-    "gpt-4o-mini": {"native_tools": True, "provider": "openai"},
-    "gpt-4.1": {"native_tools": True, "provider": "openai"},
-    "gpt-4.1-mini": {"native_tools": True, "provider": "openai"},
-    "gpt-4.1-nano": {"native_tools": True, "provider": "openai"},
-    "gpt-5": {"native_tools": True, "provider": "openai"},
-    "gpt-5.4": {"native_tools": True, "provider": "openai"},
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai"},
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai"},
-    "gpt-5.5": {"native_tools": True, "provider": "openai"},
-    "o1": {"native_tools": True, "provider": "openai"},
-    "o3": {"native_tools": True, "provider": "openai"},
-    "o4": {"native_tools": True, "provider": "openai"},
+    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
+    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
+    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60},
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240},
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60},
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
+    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
+    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
     # Anthropic direct — native tool_use
-    "claude-opus-4-7": {"native_tools": True, "provider": "anthropic"},
-    "claude-opus-4-6": {"native_tools": True, "provider": "anthropic"},
-    "claude-sonnet-4-6": {"native_tools": True, "provider": "anthropic"},
-    "claude-sonnet-4-5": {"native_tools": True, "provider": "anthropic"},
-    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic"},
+    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600},  # extended thinking — Issue #51568
+    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600},
+    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240},
+    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240},
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90},
     # Google direct — native function calling
-    "gemini-2.5-pro": {"native_tools": True, "provider": "google"},
-    "gemini-2.5-flash": {"native_tools": True, "provider": "google"},
-    "gemini-2.5-flash-lite": {"native_tools": True, "provider": "google"},
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google"},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google"},
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240},
     # OpenRouter — mixed; start safe with structured mode
-    "deepseek/deepseek-chat": {"native_tools": False, "provider": "openrouter"},
-    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter"},
-    "deepseek/deepseek-r1": {"native_tools": False, "provider": "openrouter"},
-    "z-ai/glm-5.1": {"native_tools": False, "provider": "openrouter"},
-    "moonshotai/kimi-k2.5": {"native_tools": False, "provider": "openrouter"},
-    "moonshotai/kimi-k2.6": {"native_tools": False, "provider": "openrouter"},
-    "minimax/minimax-01": {"native_tools": False, "provider": "openrouter"},
-    "minimax/minimax-m2.7": {"native_tools": False, "provider": "openrouter"},
-    "minimax/minimax-m2.5:free": {"native_tools": False, "provider": "openrouter"},
+    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
+    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
+    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
+    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
+    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
+    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
+    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
+    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
+    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
 }
 
 
 def get_model_capability(model_id: str) -> ModelCapability:
     """Return capability for a model. Unknown models default to structured mode (safe)."""
     return MODEL_CAPABILITIES.get(model_id, {"native_tools": False, "provider": "unknown"})
+
+
+# ── Phase 066 D-066-03: per-LLM-call timeout resolution ─────────────────
+# Default per-LLM-call timeout for models not enumerated in
+# MODEL_CAPABILITIES. 180s is the conservative middle ground (per
+# RESEARCH.md A1) — wide enough to accommodate typical agent calls
+# without false-positive `timed_out`, narrow enough that
+# pathologically-stalling streams terminate within a reasonable window.
+DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 180
+
+# T-066-05 mitigation: lower / upper bounds for the
+# LLM_CALL_TIMEOUT_OVERRIDES env-var parser. Operator misconfiguration
+# to 0 / negative integer would cause the per-call timer to fire
+# instantly, making all runs `timed_out` (DoS). 3600s upper bound is a
+# soft sanity cap.
+_LLM_CALL_TIMEOUT_MIN_S: int = 1
+_LLM_CALL_TIMEOUT_MAX_S: int = 3600
+
+
+def get_per_call_timeout(model_id: str, settings_obj: "Settings | None" = None) -> int:
+    """Resolve the per-LLM-call deadline (seconds) for a given model.
+
+    Phase 066 D-066-03. Lookup precedence:
+      1. ``settings_obj.llm_call_timeout_overrides`` (operator env override)
+         — if ``settings_obj`` is provided AND the model_id has an override.
+      2. ``MODEL_CAPABILITIES[model_id].llm_call_timeout_seconds`` —
+         registered per-model default.
+      3. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (180s) — unknown-model fallback.
+
+    Called inside ``agent_runner`` once per iteration just before each LLM
+    stream block. The result is bounded to
+    ``[_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S]`` as a
+    defense-in-depth check on the env-var path.
+    """
+    # 1. Env override
+    if settings_obj is not None:
+        overrides = _parse_llm_call_timeout_overrides(
+            settings_obj.llm_call_timeout_overrides
+        )
+        if model_id in overrides:
+            return overrides[model_id]
+
+    # 2. Per-model registered default
+    cap = MODEL_CAPABILITIES.get(model_id, {})
+    if "llm_call_timeout_seconds" in cap:
+        return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
+
+    # 3. Unknown-model fallback
+    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+
+
+def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
+    """Parse LLM_CALL_TIMEOUT_OVERRIDES env-var value.
+
+    Phase 066 D-066-03. Syntax mirrors MODEL_CONTEXT_LIMITS /
+    MODEL_OUTPUT_LIMITS: ``model-id=seconds,model-id=seconds`` (uses ``=``
+    not ``:`` because some model ids contain colons, e.g.
+    ``minimax/minimax-m2.5:free``).
+
+    T-066-05 mitigation: every value is integer-coerced and bounded to
+    ``[1, 3600]``. Out-of-range values are dropped with a logged warning.
+    """
+    out: dict[str, int] = {}
+    if not raw or not raw.strip():
+        return out
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry or "=" not in entry:
+            continue
+        # rsplit handles colon-in-model-id (e.g. minimax/minimax-m2.5:free)
+        model_id, val_str = entry.rsplit("=", 1)
+        model_id = model_id.strip()
+        try:
+            val = int(val_str.strip())
+        except ValueError:
+            logger.warning(
+                "LLM_CALL_TIMEOUT_OVERRIDES: ignoring non-integer value for %r: %r",
+                model_id, val_str,
+            )
+            continue
+        if val < _LLM_CALL_TIMEOUT_MIN_S or val > _LLM_CALL_TIMEOUT_MAX_S:
+            logger.warning(
+                "LLM_CALL_TIMEOUT_OVERRIDES: ignoring out-of-range value for %r: %d "
+                "(must be in [%d, %d])",
+                model_id, val, _LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S,
+            )
+            continue
+        if val < 30:
+            logger.warning(
+                "LLM_CALL_TIMEOUT_OVERRIDES: tight per-call budget for %r: %ds "
+                "(consider >=30s)",
+                model_id, val,
+            )
+        out[model_id] = val
+    return out
 
 
 # Sub-agent model defaults: cheapest stable model per provider.
@@ -243,12 +359,33 @@ class Settings(BaseSettings):
     # REDIS-SETUP.md for cloud setup.
     redis_url: str = "redis://localhost:6379"
 
-    # Server-side hard timeout for the agent producer task (Phase 061 — D-061-01).
-    # Wraps the producer body in `async with asyncio.timeout(...)`. 120s is
-    # ~2× the typical 12-iteration agent-loop ceiling. Bounds abandoned-run
-    # cost (Stop is intentionally a no-op backend-side in 061; cancel verb
-    # ships in 062 — D-061-03). Override in .env: RUN_HARD_TIMEOUT_SECONDS=<int>.
-    run_hard_timeout_seconds: int = 120
+    # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout
+    # wrapper at threads.py:855 has been DELETED. The agent loop now has no
+    # hard total cap (matches Claude/ChatGPT UX where complex tool-calling
+    # workflows can run as long as needed within max_iterations). Per-LLM-call
+    # budgets live on MODEL_CAPABILITIES.llm_call_timeout_seconds +
+    # LLM_CALL_TIMEOUT_OVERRIDES env (resolved via get_per_call_timeout()).
+    # The legacy `RUN_HARD_TIMEOUT_SECONDS` env-var symbol is silently
+    # parsed-and-ignored (Pydantic Settings `extra="ignore"` at line 129) so
+    # legacy deploys with the env set don't error at startup, but the value
+    # has no effect.
+
+    # Phase 066: consumer-side deadline for the replay-tail consumer at
+    # runs.py. Independent from the producer's per-LLM-call budget — this
+    # bounds how long a CONSUMER (frontend SSE client) will wait without an
+    # event before emitting buffer_expired_during_tail. Worst-case agent
+    # wall-time is max_iterations × per_call_budget; the consumer must
+    # outlast that. Default 610s = 600s budget + 10s slack mirrors the
+    # legacy `<run-hard-timeout> + 10` shape but with the new horizon.
+    # Override in .env: CONSUMER_TIMEOUT_SECONDS=<int>.
+    consumer_timeout_seconds: int = 610
+
+    # Phase 066 D-066-03: optional per-model per-LLM-call timeout overrides.
+    # Syntax: model-id=seconds,model-id=seconds (rsplit on '=' handles model
+    # ids containing ':' like ``minimax/minimax-m2.5:free``). Bounded to
+    # [1, 3600]. Mirrors MODEL_CONTEXT_LIMITS / MODEL_OUTPUT_LIMITS pattern.
+    # Example: LLM_CALL_TIMEOUT_OVERRIDES=claude-opus-4-7=900,gpt-5.4=300
+    llm_call_timeout_overrides: str = ""
 
     @property
     def web_search_enabled(self) -> bool:
