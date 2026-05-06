@@ -561,11 +561,16 @@ export function useMessages(): UseMessages {
       callbacks.onTerminal = (kind, errorPayload) => {
         // Map TERMINAL_TYPES → runStatus enum value (literal-per-branch so future
         // greps for `runStatus: "<value>"` find every branch).
+        // Phase 066 D-066-06: 5th kind 'timed_out' added BEFORE the cancelled
+        // fallback. Sets stopped: true so MessageItem.tsx:147 banner renders
+        // (matches the cancelled branch — both timed_out and cancelled are
+        // user-visible "this stopped before completing" terminal states).
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
+            if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled", stopped: true }
           }),
@@ -792,11 +797,19 @@ export function useMessages(): UseMessages {
         // Terminal status flip is unconditional (the run actually ended;
         // the placeholder needs the correct runStatus when the user
         // navigates back).
+        // Phase 066 D-066-06: 5th kind 'timed_out' added BEFORE the cancelled
+        // fallback. Reconcile path does NOT set stopped: true here (unlike
+        // sendMessage) — reconcile re-attaches to a possibly-not-yet-stopped
+        // run, and stopped: true would mis-render mid-stream. MessageItem
+        // banner switch keys on runStatus first, falling back to stopped only
+        // for legacy rows pre-D-063.1-15 — so runStatus="timed_out" alone is
+        // sufficient to render the "Agent reached time limit" banner.
         setMessages((prev) =>
           prev.map((m) => {
             if (m.id !== targetId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
+            if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled" }
           }),
