@@ -328,7 +328,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 063.1. Frontend Stream Decoupling — Gap Closure | v2.5 | 5/5 | Complete    | 2026-05-04 |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
-| 066. Adaptive Run Timeouts & Lifecycle States | v2.5 | 0/5 | Planned | — |
+| 066. Adaptive Run Timeouts & Lifecycle States | v2.5 | 5/5 | Complete    | 2026-05-06 |
 
 ### Phase 064: Validation Harness
 
