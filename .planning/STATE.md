@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: planning
+status: executing
 stopped_at: "Phase 063.1 closed — 5/5 plans complete, project-level **approved**, HUMAN-UAT scoreboard filled with live-bundle verification evidence (Chrome MCP), Gap-006 (run hard-timeout) escalated to follow-on phase. Final commit: `docs(063.1-05): close plan with HUMAN-UAT approval + Gap-006 escalation`."
-last_updated: "2026-05-06T17:00:08.081Z"
-last_activity: 2026-05-04
+last_updated: "2026-05-06T17:27:38.128Z"
+last_activity: 2026-05-06 -- Phase 066 execution started
 progress:
   total_phases: 10
   completed_phases: 7
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 063.1 — frontend-stream-decoupling-gap-closure
+**Current focus:** Phase 066 — adaptive-run-timeouts-lifecycle-states
 
 ## Current Position
 
-Phase: 065
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-04
+Phase: 066 (adaptive-run-timeouts-lifecycle-states) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 066
+Last activity: 2026-05-06 -- Phase 066 execution started
 Next action: (1) Run `/gsd:verify-work` on Phase 063.1 to gate completion. (2) Plan the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** (Gap-006 escalation) — addresses LLM agent stopping mid-iteration on complex tool-calling prompts; user-preferred fix paths are per-iteration timeout budget + split `cancelled` (user) vs `timed_out` (system) lifecycle states. (3) Carry-forward UAT items (SC#5 cross-tab Stop, SC#6 Resume live, SC#7 full 063 regression) belong to next manual UAT pass — non-blocking per Phase 063 precedent. Plan 05 deliverables: 3 e2e specs (`2ce760f`, `183b041`) + filled HUMAN-UAT.md + 063.1-05-SUMMARY.md. Live-bundle verification via Chrome MCP confirmed all four Wave 2/3/4 markers (`lastSeenOffsetRef`, `m.runId === run.run_id`, `abortStream` removal in ChatArea.tsx, `reconcileInFlightRef` + `temp-` MERGE filter) are served at `localhost:5173`. User's earlier observations of "delays / blank-on-fast-nav / late-stream rendering" predated Wave 3 + Wave 4 commits — they were testing pre-fix bundle in a stale tab.
 
 ## Recent Completed Phases
