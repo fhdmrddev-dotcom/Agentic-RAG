@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: milestone_complete
-stopped_at: "Phase 063.1 closed — 5/5 plans complete, project-level **approved**, HUMAN-UAT scoreboard filled with live-bundle verification evidence (Chrome MCP), Gap-006 (run hard-timeout) escalated to follow-on phase. Final commit: `docs(063.1-05): close plan with HUMAN-UAT approval + Gap-006 escalation`."
-last_updated: "2026-05-06T17:27:38.128Z"
-last_activity: 2026-05-06 -- Phase 066 execution started
+status: completed
+stopped_at: Phase 067 context gathered
+last_updated: "2026-05-06T21:07:58.297Z"
+last_activity: 2026-05-06
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 8
   total_plans: 33
-  completed_plans: 28
-  percent: 80
+  completed_plans: 33
+  percent: 100
 ---
 
 # Project State
@@ -87,6 +87,7 @@ Next action: (1) Run `/gsd:verify-work` on Phase 063.1 to gate completion. (2) P
 - Research synthesized at .planning/research/058-sse-concurrency-research.md before milestone start
 - ROADMAP.md authored 2026-05-01: 5 phases, 5/5 v1 requirements mapped, dependencies form valid DAG (058→059→060→061; 062 parallel-able with 058)
 - Phase 063 added 2026-05-02: Skills Test Infrastructure Repair — close TEST-DEBT discovered during 059-02 verification (13+ broken patches in test_threads_skills.py + 3 broken export tests). Standalone, parallel-able with 060-062. Prep for upcoming Skill Studio milestone (see SEED-002).
+- Phase 067 added 2026-05-07: Frontend Streaming-UX Fix — close the 5-issue carry-forward dossier (UX-067-01..05) surfaced by Phase 066's live UAT (empty first-paint, "Saving response…" thrash, refresh-required first-paint, redis log noise on tab cycle, tool-call iteration boundary surfacing). Re-runs Phase 066 Plan 05 Task 2 protocol to close out SC#6 live verification deferred from 066.
 
 ### Decisions
 
@@ -168,8 +169,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-05T02:30:00.000Z
-Stopped at: Phase 063.1 closed — 5/5 plans complete, project-level **approved**, HUMAN-UAT scoreboard filled with live-bundle verification evidence (Chrome MCP), Gap-006 (run hard-timeout) escalated to follow-on phase. Final commit: `docs(063.1-05): close plan with HUMAN-UAT approval + Gap-006 escalation`.
+Last session: --stopped-at
+Stopped at: Phase 067 context gathered
 Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:discuss-phase`) for the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** to address Gap-006.
 
 **Completed Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5/5 plans — closed 2026-05-04 (UAT `partial`, project-level `approved`)
