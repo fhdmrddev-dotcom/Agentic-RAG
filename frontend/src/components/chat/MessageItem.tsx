@@ -94,17 +94,20 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
             {!isStreaming && message.role === "assistant" && message.content && (
               <MessageFeedback messageId={message.id} />
             )}
-            {/* Phase 063 (Pattern 4 / D-063-04): Resume button on failed runs.
-                Surfaces ONLY when runStatus === 'failed' — never on cancelled
-                (user explicitly stopped), completed, streaming, or undefined
-                (DB-loaded historical messages without run metadata). */}
-            {!isStreaming && message.role === "assistant" && message.runStatus === "failed" && (
+            {/* Phase 063 (Pattern 4 / D-063-04) + Phase 066 D-066-09: Resume
+                button on failed OR timed_out runs. Surfaces when runStatus
+                ∈ {failed, timed_out} — never on cancelled (user explicitly
+                stopped), completed, streaming, or undefined (DB-loaded
+                historical messages without run metadata). Same onResume
+                callback re-POSTs the original prompt with full conversation
+                context (today's failed-state Resume code path). */}
+            {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onResume?.(message)}
                 className="mt-2 text-xs"
-                aria-label="Resume failed run"
+                aria-label="Resume run"
               >
                 <RotateCcw className="w-3 h-3 mr-1.5" />
                 Resume
@@ -130,9 +133,11 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
             <span className="italic">
               {isStreaming
                 ? (allToolsDone ? "Synthesizing answer" : "Working")
-                : message.stopped
-                  ? "Response stopped"
-                  : "Saving response…"}
+                : message.runStatus === "timed_out"
+                  ? "Agent reached time limit"   /* Phase 066 D-066-10 — system per-LLM-call deadline fired */
+                  : message.runStatus === "cancelled" || message.stopped
+                    ? "Response stopped"          /* user clicked Stop (D-066-10); stopped fallback for legacy pre-runStatus rows */
+                    : "Saving response…"}
             </span>
             {isStreaming && (
               <span className="flex gap-1 items-center">
@@ -143,11 +148,20 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
             )}
           </span>
         ) : null}
-        {/* Stopped indicator — shown after content when user stopped mid-stream */}
-        {message.stopped && !isStreaming && (
+        {/* Phase 066 D-066-10: stopped/timed-out indicator — shown after content
+            when the run ended without completing. Banner copy mirrors the
+            in-content banner switch (lines 130-145): runStatus === 'timed_out'
+            renders "Agent reached time limit"; otherwise (cancelled or legacy
+            stopped rows pre-D-063.1-15) renders "Response stopped". Without
+            this dual update, a timed_out run with content would show
+            contradictory copy (in-content banner suppressed because content
+            present; bottom indicator says "Response stopped"). */}
+        {(message.stopped || message.runStatus === "timed_out") && !isStreaming && (
           <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
             <Square className="w-3 h-3" />
-            <span className="italic">Response stopped</span>
+            <span className="italic">
+              {message.runStatus === "timed_out" ? "Agent reached time limit" : "Response stopped"}
+            </span>
           </div>
         )}
         {/* Active tool indicator — shown below content when a tool is running alongside text */}

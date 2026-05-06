@@ -70,7 +70,7 @@ export async function getMessages(threadId: string, signal?: AbortSignal): Promi
     confidence_avg_similarity?: number
     confidence_disclaimer?: string | null
     run_id?: string | null
-    run_status?: "streaming" | "completed" | "failed" | "cancelled" | null
+    run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
   }>
   // Map DB column names to frontend field names
   return data.map((m) => {
@@ -158,14 +158,18 @@ export interface ActiveRun {
   status: "streaming"
 }
 
-/** Phase 063: callback shape for subscribeToRun. Mirrors the legacy POST-stream
- * callback signature (preserved for MessageItem rendering compat) plus the new
- * `onTerminal` callback that handles Phase 062 TERMINAL_TYPES (done | error | cancelled).
+/** Phase 063 / Phase 066: callback shape for subscribeToRun. Mirrors the legacy POST-stream
+ * callback signature (preserved for MessageItem rendering compat) plus the
+ * `onTerminal` callback that handles Phase 062 TERMINAL_TYPES extended by D-066-06
+ * to 4 values (done | error | cancelled | timed_out).
  */
 export interface StreamCallbacks {
   onDelta: (text: string) => void
   onDone: () => void
-  onTerminal: (kind: "done" | "error" | "cancelled", error?: string) => void
+  // Phase 066 D-066-06: 4th kind 'timed_out' — distinct from 'error' (LLM/system failure)
+  // and 'cancelled' (user-Stop). Hooks set runStatus='timed_out' on this; MessageItem
+  // renders the "Agent reached time limit" banner + Resume button per D-066-09/10.
+  onTerminal: (kind: "done" | "error" | "cancelled" | "timed_out", error?: string) => void
   onTitleUpdate?: (title: string) => void
   onToolPreparing?: (name: string, index: number) => void
   onToolStart?: (name: string, args: Record<string, string>) => void
@@ -371,6 +375,16 @@ export async function subscribeToRun(
           return
         } else if (t === "error") {
           callbacks.onTerminal("error", parsed.error as string | undefined)
+          return
+        } else if (t === "timed_out") {
+          // Phase 066 D-066-06: distinct system-timeout terminal sentinel —
+          // wire-format value matches backend `_RUN_STATUS_TO_TERMINAL_TYPE`
+          // map at threads.py:90-94 (Plan 01). The `error` payload is the
+          // backend-formatted string (D-066-07: "timed_out: Ns per-call ...");
+          // not displayed to the user (banner uses static "Agent reached time
+          // limit" copy per D-066-10 / T-066-10) but passed through to the
+          // hook layer for debugging if needed.
+          callbacks.onTerminal("timed_out", parsed.error as string | undefined)
           return
         } else if (t === "cancelled") {
           callbacks.onTerminal("cancelled")

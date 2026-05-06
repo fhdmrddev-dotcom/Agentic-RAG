@@ -94,8 +94,8 @@ export interface Message {
   stopped?: boolean
   /** Phase 063 (D-063-04 / RESEARCH Open Question 2): the Redis Stream run_id this assistant message is/was streamed from. Set by reconcile and sendMessage paths; absent for DB-only loaded messages until backfilled. Used by Stop semantics (DELETE /runs/{runId}) and Resume button visibility logic. */
   runId?: string
-  /** Phase 063 (D-063-04): lifecycle status of the underlying run. Mirrors public.runs.status enum values. Resume button surfaces ONLY when runStatus === 'failed' (per D-063-04 / D-v2.5-05 — no auto-retry for paid LLM calls). */
-  runStatus?: "streaming" | "completed" | "failed" | "cancelled"
+  /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
+  runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
 }
 
 export interface DocumentMetadata {
