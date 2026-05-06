@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qPLUHuo1GcgCXeKcC2LORugO4UMxe1VOPVRjdFL2o7ylfnviUGPwhXvhbDzSOrT
+\restrict dh3VO2YiP6GoHieadxxaclH2EtQ16oA2eNz5rvyqKHmVZ0k37g6dvSxkIqo6RLX
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -437,7 +437,7 @@ CREATE TABLE public.runs (
     input_tokens integer,
     output_tokens integer,
     error text,
-    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
 
@@ -1527,5 +1527,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qPLUHuo1GcgCXeKcC2LORugO4UMxe1VOPVRjdFL2o7ylfnviUGPwhXvhbDzSOrT
+\unrestrict dh3VO2YiP6GoHieadxxaclH2EtQ16oA2eNz5rvyqKHmVZ0k37g6dvSxkIqo6RLX
 
