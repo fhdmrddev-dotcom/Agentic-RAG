@@ -242,3 +242,62 @@ async def test_delete_writes_cancelled_not_timed_out(redis_client):
         )
     finally:
         app.dependency_overrides.pop(get_supabase, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_delete_on_timed_out_row_short_circuits_silently(redis_client):
+    """D-066-04 partition guard (inverse of T-066-01): DELETE on already-`timed_out`
+    row MUST short-circuit at runs.py:388 with 204 and NO update — must not fall
+    through to the zombie-heal path which would overwrite status to 'cancelled'.
+
+    Regression test for the BLOCKER raised in 066-REVIEW.md: the cancel_run
+    already-terminal short-circuit was missed when Plan 01 added the 5th
+    lifecycle value. Without the fix, a late DELETE on `timed_out` silently
+    rewrites the partition to 'cancelled'.
+    """
+    mock_supabase = _build_mock_supabase()
+    run_id = uuid4()
+
+    # Configure mock SELECT to return an already-`timed_out` row.
+    runs_builder = mock_supabase.table("runs")
+    runs_builder.execute.side_effect = lambda *a, **k: type("R", (), {
+        "data": {
+            "run_id": str(run_id),
+            "status": "timed_out",
+            "thread_id": str(THREAD_A),
+        },
+        "count": None,
+    })()
+
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    try:
+        async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            r = await c.delete(
+                f"/runs/{run_id}",
+                headers={"Authorization": "Bearer test-token"},
+                timeout=10.0,
+            )
+        assert r.status_code == 204, (
+            f"DELETE on `timed_out` row expected 204; got {r.status_code} body={r.text}"
+        )
+
+        # Short-circuit at runs.py:388 must fire — NO update should occur.
+        # If the fix is missing, the zombie-heal path runs and writes status='cancelled'.
+        cancel_updates = [
+            c for c in runs_builder.update.call_args_list
+            if c.args and isinstance(c.args[0], dict)
+            and c.args[0].get("status") == "cancelled"
+        ]
+        assert not cancel_updates, (
+            f"DELETE on `timed_out` row MUST NOT write status='cancelled' "
+            f"(D-066-04 partition guard violated; cancel_run short-circuit at runs.py:388 "
+            f"failed to admit `timed_out`); got: {cancel_updates}"
+        )
+        # Defense-in-depth: no update of any kind should fire.
+        assert not runs_builder.update.call_args_list, (
+            f"DELETE on `timed_out` row MUST short-circuit silently with NO update; "
+            f"got: {runs_builder.update.call_args_list}"
+        )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)

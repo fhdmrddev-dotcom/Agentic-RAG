@@ -335,8 +335,8 @@ async def stream_run(
 #   - zombie:     runs.status='streaming' but RUN_TASKS missing →
 #                 UPDATE Postgres + synthetic 'zombie_healed' sentinel +
 #                 ZREM × 2 + EXPIRE 60 → 204 (D-062-11)
-#   - terminal:   runs.status in {completed, failed, cancelled} →
-#                 204 silent (D-062-09 idempotent)
+#   - terminal:   runs.status in {completed, failed, cancelled, timed_out} →
+#                 204 silent (D-062-09 idempotent; timed_out added per D-066-04)
 #
 # Threats mitigated:
 #   T-062-01 (Information Disclosure): cross-user → 404 via .eq(user_id=...) + RLS
@@ -385,7 +385,7 @@ async def cancel_run(
     # ── Step 2: already-terminal → 204 silent (D-062-09 idempotent) ──
     # NO UPDATE, NO Redis touch — the run is already finalized; re-call has
     # no observable effect.
-    if row["status"] in ("completed", "failed", "cancelled"):
+    if row["status"] in ("completed", "failed", "cancelled", "timed_out"):
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     # ── Step 3a: happy path — producer alive in RUN_TASKS (D-062-10) ──
