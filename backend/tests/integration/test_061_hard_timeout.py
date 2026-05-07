@@ -56,24 +56,57 @@ def test_legacy_setting_run_hard_timeout_seconds_is_gone():
 
 
 def test_per_call_timer_replacements_present():
-    """Defense-in-depth: the per-call asyncio.timeout(per_call_budget) wraps appear at least once each."""
+    """Defense-in-depth: per-call deadline reaches BOTH provider branches.
+
+    Phase 067.1 Plan 01 Track A: the per-call asyncio.timeout previously
+    appeared verbatim as `async with asyncio.timeout(per_call_budget)` in
+    each branch. Track A factored it into the
+    ``_drain_stream_with_close_on_cancel`` helper (threads.py:~155). The
+    contract is preserved: both Anthropic and OpenAI branches still bound
+    SDK iteration by the per-call deadline — the bind happens via the
+    helper's second positional arg ``per_call_budget`` at the call sites.
+    """
     src = _THREADS_PY.read_text(encoding="utf-8")
-    n = src.count("async with asyncio.timeout(per_call_budget)")
-    assert n >= 2, (
-        f"Expected >=2 occurrences of `async with asyncio.timeout(per_call_budget)` "
-        f"(Anthropic + OpenAI paths per D-066-02); found {n}. The wrapper deletion "
-        f"in test_legacy_outer_wrapper_is_gone passing without these replacements "
-        f"means the per-call timer is missing — runs would never time out."
+    # Track A invariant: helper exists exactly once.
+    assert src.count("async def _drain_stream_with_close_on_cancel(") == 1, (
+        "Track A regression: helper _drain_stream_with_close_on_cancel "
+        "missing or duplicated. Both provider branches must route iteration "
+        "through the helper (PATTERNS.md parity rule)."
+    )
+    # Both branches must call the helper with per_call_budget bound. The
+    # helper's per-iteration `async with asyncio.timeout(timeout_seconds)`
+    # consumes that arg — same effective contract as the inline form.
+    n_calls = src.count("await _drain_stream_with_close_on_cancel(")
+    assert n_calls >= 2, (
+        f"Expected >=2 call sites of `await _drain_stream_with_close_on_cancel(...)` "
+        f"(Anthropic + OpenAI paths per D-066-02 + Track A parity rule); "
+        f"found {n_calls}. Without these the per-call timer is missing — "
+        f"runs would never time out."
+    )
+    # The helper itself wraps the iteration in an asyncio.timeout.
+    assert "async with asyncio.timeout(timeout_seconds)" in src, (
+        "Track A regression: _drain_stream_with_close_on_cancel must wrap "
+        "queue consumption in `async with asyncio.timeout(timeout_seconds)`. "
+        "Without it the helper would never raise TimeoutError on stalled streams."
     )
 
 
 def test_sdk_close_methods_present():
-    """D-066-11: stream.close() and _ant_gen.close() appear in threads.py."""
+    """D-066-11 + Phase 067.1 Plan 01 Track A: SDK close() bind reaches both branches.
+
+    Track A binds the close call via ``close_fn=`` keyword on the helper
+    invocation: ``close_fn=stream.close`` (OpenAI) and
+    ``close_fn=_ant_gen.close`` (Anthropic). The helper invokes the bound
+    callable from the main thread on cancel BEFORE the producer's
+    for-loop cleanup propagates GeneratorExit into _TracedStream.__iter__.
+    """
     src = _THREADS_PY.read_text(encoding="utf-8")
-    assert "stream.close()" in src, (
-        "D-066-11 regression: OpenAI Stream.close() call missing. LangSmith "
-        "would record GeneratorExit on TimeoutError without this."
+    assert "close_fn=stream.close" in src, (
+        "D-066-11 regression: OpenAI Stream.close() bind missing on the "
+        "_drain_stream_with_close_on_cancel call. LangSmith would record "
+        "GeneratorExit on TimeoutError without this."
     )
-    assert "_ant_gen.close()" in src, (
-        "D-066-11 regression: Anthropic _ant_gen.close() call missing."
+    assert "close_fn=_ant_gen.close" in src, (
+        "D-066-11 regression: Anthropic _ant_gen.close() bind missing on the "
+        "_drain_stream_with_close_on_cancel call."
     )
