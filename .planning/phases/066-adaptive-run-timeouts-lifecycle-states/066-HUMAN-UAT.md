@@ -1,8 +1,10 @@
 ---
 phase: 066-adaptive-run-timeouts-lifecycle-states
-status: partial
-reviewed_at: 2026-05-06T19:15:00Z
+status: green
+reviewed_at: 2026-05-07T19:30:00Z
 project_level_approval: approved
+sc6_promoted_by: 067.1
+sc6_promoted_at: 2026-05-07
 ---
 
 # Phase 066 — HUMAN-UAT Scoreboard
@@ -47,7 +49,7 @@ not block Phase 066's architectural deliverable.
 | SC#3 | `runs.status` admits 5 values; Pydantic Literal mirrors | green | Plan 04 `test_066_status_enum.py` (4 tests, all pass) + Plan 01 Task 2 SQL editor smoke test (status='timed_out' INSERT then ROLLBACK succeeded) |
 | SC#4 | `runs.error` non-NULL with discriminator prefix on every non-completed terminal | green | Plan 04 `test_066_terminal_classification.py` (3 tests, all pass — including `test_delete_writes_cancelled_not_timed_out` partition guard and `test_timeout_branch_writes_timed_out`) |
 | SC#5 | SSE consumer receives distinct `timed_out` terminal event | green | Plan 04 `test_066_sse_terminal.py` (2 tests, all pass) |
-| SC#6 | Frontend renders "Agent reached time limit" banner + Resume on `timed_out` | partial | **Phase 067 Plan 05 Task 4 closed live (2026-05-07).** run_id `7558735c-3a2f-446f-b678-2c735be91871` produced `runs.status='timed_out'` with `runs.error='timed_out: 10s per-call deadline exceeded at iteration 0 (model=gpt-5.4)'`. Frontend banner "Agent reached time limit" rendered via Chrome MCP, Resume button visible + clickable (re-POSTed thread message → new run `cf9caaee-35ec-489e-b1d4-04d6ce96ef2c`). **However:** LangSmith ChatOpenAI sub-trace `f40572ae-61a3-4cfd-9c19-fe88e9feaed8` shows `GeneratorExit` at `run_helpers.py:1680` (`yield from self.__ls__gen__`) — the EXACT line the D-066-11 invariant requires absent. 4-of-5 sub-criteria green; LangSmith hygiene dimension red. See `Gap-007` below. |
+| SC#6 | Frontend renders "Agent reached time limit" banner + Resume on `timed_out` | green | **Phase 067 Plan 05 Task 4 closed live (2026-05-07)** — 4-of-5 sub-criteria green at the user-visible level. **Phase 067.1 Plan 05 Task 1 closed the trace-hygiene 5th sub-criterion live (2026-05-07)** via Track A drain-into-queue helper. New evidence run: `RUN_ID_PLAN05_TASK1=80f2860a-bcd3-4622-a795-019f975f8501` (thread `29db8cd1-0b30-475b-bc03-d24ed63919af`), Resume re-POST `RUN_ID_PLAN05_TASK1_RESUME=a2aef4ca-77a0-4442-ab12-1daa267ff608`. Supabase row: `status='timed_out'` + `error='timed_out: 10s per-call deadline exceeded at iteration 0 (model=gpt-5.4)'`. Frontend banner + Resume button DOM captures green. **LangSmith ChatOpenAI sub-trace `efe58ab3-c5cc-412d-8f2e-18bcb79730f4` exception column shows `RemoteProtocolError('peer closed connection without sen…` — NOT `GeneratorExit at run_helpers.py:1680`.** Phase 067.1 Plan 01 Track A re-architected the OpenAI + Anthropic timeout branches via `_drain_stream_with_close_on_cancel` helper at `backend/app/api/threads.py:155-249`; the producer thread exits cleanly via `stream.close()` BEFORE the consumer's `asyncio.timeout` cancellation propagates back into the langsmith `@traceable` async-generator wrapper, bypassing the `_TracedStream.__iter__` BaseException-catch that was recording `GeneratorExit` in 0.2.3..0.8.2. 5-of-5 sub-criteria now green. Gap-007 closed. |
 | SC#7 | LangSmith trace shows clean termination (no `GeneratorExit`) | green | Plan 04 `test_066_langsmith_clean.py` (1 test green); LangSmith dashboard confirms backend emitted events cleanly during the Task 1 9m02s run. |
 | Gap-006 regression | User's verbatim prompt completes end-to-end | **green / closed** | Task 1 live UAT — see SC#1 evidence row. |
 
@@ -239,7 +241,7 @@ Phase 066's deliverable (backend timeout/lifecycle architecture)._
 
 - [x] SC#1 — Gap-006 regression closed: prompt completed in 9m02s, multi-tool agent worked end-to-end (Task 1 evidence — run `95e3447c-cf9b-448b-9e0d-22c30e40670d`)
 - [x] SC#2-#5, #7 — automated tests green per Plan 04 (`pytest tests/integration/test_066_*.py` — committed in `066-04-SUMMARY.md`)
-- [~] SC#6 — banner + Resume + DB lifecycle live-verified by Phase 067 Plan 05 Task 4 on 2026-05-07 (4-of-5 sub-criteria green); LangSmith trace hygiene at `run_helpers.py:1680` red (D-066-11 invariant violated under synthetic-timeout conditions) — escalated as **Gap-007** for follow-on phase
+- [x] SC#6 — banner + Resume + DB lifecycle live-verified by Phase 067 Plan 05 Task 4 on 2026-05-07 (4-of-5 sub-criteria green); LangSmith trace hygiene 5th sub-criterion closed by **Phase 067.1 Plan 01 Track A on 2026-05-07** — `_drain_stream_with_close_on_cancel` helper in `backend/app/api/threads.py:155-249` produces clean `RemoteProtocolError` exception (sub-trace `efe58ab3-c5cc-412d-8f2e-18bcb79730f4`) instead of `GeneratorExit at run_helpers.py:1680`. Gap-007 closed. 5-of-5 sub-criteria green.
 - [x] SC#7 — LangSmith trace clean (no `GeneratorExit`) confirmed live during Task 1 9m02s run
 - [x] Gap-006 regression confirmed CLOSED at the architectural / run-row level
 - [ ] Stopgap removal: D-066-12 `RUN_HARD_TIMEOUT_SECONDS=600` line in `backend/.env` (optional documentation cleanup; no functional effect — left in place; remove during Phase 067 cleanup if desired)
@@ -257,3 +259,33 @@ Phase 066's deliverable (backend timeout/lifecycle architecture)._
    (UX-067-05).
 4. **Re-run Plan 05 Task 2 protocol** (synthetic 10s per-call budget +
    slow prompt) once the above land, to close out SC#6 live verification.
+
+---
+
+## Closing Note (2026-05-07 — Phase 067.1)
+
+Phase 067.1 Plan 01 Track A drain-into-queue helper closed Gap-007 (the
+SC#6 5th sub-criterion that Phase 067 escalated). Re-running the
+synthetic-timeout protocol on 2026-05-07 against the post-Track-A backend
+produced LangSmith ChatOpenAI sub-trace
+`efe58ab3-c5cc-412d-8f2e-18bcb79730f4` with exception column
+`RemoteProtocolError('peer closed connection without sen…` — the clean
+httpx connection-closed exception that `stream.close()` produces when the
+producer thread exits before the consumer cancellation propagates. The
+prior `GeneratorExit at run_helpers.py:1680` artifact (recorded by the
+langsmith `_TracedStream.__iter__` BaseException-catch wrapper across
+versions 0.2.3..0.8.2) no longer appears on the cancellation path because
+Track A's helper bypasses the implicit `for chunk in stream:` cleanup
+shape entirely.
+
+**SC#6 status: green (5-of-5 sub-criteria live-verified).**
+
+Evidence: `RUN_ID_PLAN05_TASK1=80f2860a-bcd3-4622-a795-019f975f8501`,
+sub-trace `efe58ab3-c5cc-412d-8f2e-18bcb79730f4`, Phase 067.1
+`067.1-HUMAN-UAT.md` § SC#1 + SC#5 row.
+
+References:
+- `.planning/phases/067.1-agent-streaming-and-behavior-polish/067.1-CONTEXT.md` § Plan 01 Track Decision
+- `.planning/phases/067.1-agent-streaming-and-behavior-polish/067.1-HUMAN-UAT.md` § SC#1 + SC#5
+- Phase 067.1 Plan 01 commit `f3b83fa` (Track A helper) + commit `cab2a11` (Track decision)
+
