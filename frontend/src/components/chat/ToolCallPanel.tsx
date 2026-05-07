@@ -642,6 +642,19 @@ const [expanded, setExpanded] = useState(true)
                 </div>
               )
             }
+            // D-067-03: get the previous tool item's iteration for boundary detection.
+            // Skill rows don't partition iterations; walk back past consecutive skills
+            // to find the most recent tool kind. undefined if no prior tool.
+            let prevToolIteration: number | undefined = undefined
+            if (item.kind === 'tool') {
+              for (let j = i - 1; j >= 0; j--) {
+                const candidate = displayItems[j]
+                if (candidate.kind === 'tool') {
+                  prevToolIteration = candidate.tc.iteration
+                  break
+                }
+              }
+            }
             const tc = item.tc
             // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
@@ -651,8 +664,26 @@ const [expanded, setExpanded] = useState(true)
 
             return (
               <div key={i} className="pt-2.5 animate-toolSlideIn" style={{ animationDelay: `${i * 80}ms` }}>
-                {/* Connecting line between tools */}
-                {i > 0 && (
+                {/* D-067-03: Step N divider on iteration boundary; plain inter-tool separator otherwise.
+                    Renders ONLY when (a) not the first item, (b) both current and previous tool items
+                    have a defined iteration, (c) iterations differ. Pitfall 4: NEVER above first iteration.
+                    WRN-3: stricter than PATTERNS.md Pattern F — also gate on prevToolIteration !== undefined
+                    to handle DB-loaded historical messages whose ToolCall objects have no `iteration` field
+                    (Pitfall 5). PATTERNS.md Pattern F's looser conditional would render a spurious divider
+                    on a thread where exactly one DB-loaded tool call precedes a fresh SSE-stamped tool call. */}
+                {i > 0 && tc.iteration !== undefined && prevToolIteration !== undefined && tc.iteration !== prevToolIteration ? (
+                  <div
+                    className="flex items-center gap-2 my-3 mx-1"
+                    data-testid="iteration-divider"
+                    data-iteration={tc.iteration}
+                  >
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                    <span className="text-[10px] font-semibold text-muted-foreground/70 tracking-wider uppercase">
+                      Step {tc.iteration + 1}
+                    </span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                  </div>
+                ) : i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
                 {tc.name === "execute_code" && tc.status !== "preparing" ? (
