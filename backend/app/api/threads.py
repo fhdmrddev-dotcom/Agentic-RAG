@@ -1787,6 +1787,22 @@ async def send_message(
                                     tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
                                 else:
                                     row = skill_row[0] if isinstance(skill_row, list) else skill_row
+                                    # Phase 067.1 Plan 04: follow-up emit with skill description as
+                                    # upcoming-context hint. Fires AFTER the DB query (so we have the
+                                    # description) and BEFORE the audit/files fetch (so the SSE arrives
+                                    # promptly). Guard on truthy description per Pitfall 4 — empty/null
+                                    # skip avoids "Loading skill 'docx' — " trailing-em-dash render bug.
+                                    # V7 mitigation: emit ONLY skill_name + description; NEVER
+                                    # instructions (skill instructions can be arbitrarily long user
+                                    # content — out of scope for SSE hint).
+                                    if row.get("description"):
+                                        await _emit(
+                                            redis,
+                                            run_id,
+                                            'skill_loaded',
+                                            skill_name=skill_name,
+                                            description=row["description"],
+                                        )
                                     _spawn(write_audit_entry(
                                         user_id=current_user["id"],
                                         action_type="skill.load",
