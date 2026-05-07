@@ -64,6 +64,8 @@ The 6 success criteria in ROADMAP.md for Phase 067, each verified live:
 5. Multi-iteration agent runs surface clear iteration boundaries — user recognizes intended multi-step work rather than perceiving a runaway loop. Verified in Chrome MCP visual inspection of the Gap-006 prompt's multi-`execute_code` run.
 6. Phase 066 SC#6 closed: synthetic per-call timeout (`per_call_budget=1` against `slow_llm_response_seconds=2`) renders the "Agent reached time limit" banner, Resume button click re-POSTs the original prompt, LangSmith trace shows clean closure (no `GeneratorExit`). Verified via Chrome MCP + LangSmith MCP. Updates `066-HUMAN-UAT.md` SC#6 row from `deferred` → `green`.
 
+> **2026-05-07 BLK-6 / RESEARCH-correction note (Plan 05 Task 7):** SC#6 line 6 above references the obsolete protocol `per_call_budget=1` against `slow_llm_response_seconds=2` — that is INACCURATE per `067-RESEARCH.md` correction #3. The corrected protocol uses `LLM_CALL_TIMEOUT_OVERRIDES=<active-model>=10` against the real LLM (no synthetic mock fixture); the `slow_llm_response_seconds` symbol does not exist in the codebase. Plan 05 Task 4 used the corrected protocol verbatim. SC#6 closure outcome was **partial** (4-of-5 sub-criteria green; LangSmith trace still shows `GeneratorExit` at `run_helpers.py:1680`, contradicting the original "no GeneratorExit" expectation) — escalated as Gap-007. See `067-HUMAN-UAT.md`.
+
 <decisions>
 ## Implementation Decisions
 

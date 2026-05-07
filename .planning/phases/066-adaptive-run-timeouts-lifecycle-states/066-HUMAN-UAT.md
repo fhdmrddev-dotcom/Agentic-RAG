@@ -47,7 +47,7 @@ not block Phase 066's architectural deliverable.
 | SC#3 | `runs.status` admits 5 values; Pydantic Literal mirrors | green | Plan 04 `test_066_status_enum.py` (4 tests, all pass) + Plan 01 Task 2 SQL editor smoke test (status='timed_out' INSERT then ROLLBACK succeeded) |
 | SC#4 | `runs.error` non-NULL with discriminator prefix on every non-completed terminal | green | Plan 04 `test_066_terminal_classification.py` (3 tests, all pass — including `test_delete_writes_cancelled_not_timed_out` partition guard and `test_timeout_branch_writes_timed_out`) |
 | SC#5 | SSE consumer receives distinct `timed_out` terminal event | green | Plan 04 `test_066_sse_terminal.py` (2 tests, all pass) |
-| SC#6 | Frontend renders "Agent reached time limit" banner + Resume on `timed_out` | carry-forward | **Live verification deferred to Phase 067.** Backend `timed_out` lifecycle covered by `test_066_terminal_classification.py::test_timeout_branch_writes_timed_out` (PASSED). Live UX confirmation blocked — see Task 2 rationale below. |
+| SC#6 | Frontend renders "Agent reached time limit" banner + Resume on `timed_out` | partial | **Phase 067 Plan 05 Task 4 closed live (2026-05-07).** run_id `7558735c-3a2f-446f-b678-2c735be91871` produced `runs.status='timed_out'` with `runs.error='timed_out: 10s per-call deadline exceeded at iteration 0 (model=gpt-5.4)'`. Frontend banner "Agent reached time limit" rendered via Chrome MCP, Resume button visible + clickable (re-POSTed thread message → new run `cf9caaee-35ec-489e-b1d4-04d6ce96ef2c`). **However:** LangSmith ChatOpenAI sub-trace `f40572ae-61a3-4cfd-9c19-fe88e9feaed8` shows `GeneratorExit` at `run_helpers.py:1680` (`yield from self.__ls__gen__`) — the EXACT line the D-066-11 invariant requires absent. 4-of-5 sub-criteria green; LangSmith hygiene dimension red. See `Gap-007` below. |
 | SC#7 | LangSmith trace shows clean termination (no `GeneratorExit`) | green | Plan 04 `test_066_langsmith_clean.py` (1 test green); LangSmith dashboard confirms backend emitted events cleanly during the Task 1 9m02s run. |
 | Gap-006 regression | User's verbatim prompt completes end-to-end | **green / closed** | Task 1 live UAT — see SC#1 evidence row. |
 
@@ -97,9 +97,11 @@ multi-tool agent execution. The architectural goal of Phase 066 — replace
 the 120s total-deadline wrapper with a per-LLM-call budget that resets on
 tool-call boundaries — is verified end-to-end at the run-row level.
 
-### SC#6 + SC#7 (Task 2 — DEFERRED to Phase 067)
+### SC#6 + SC#7 (Task 2 — partially closed by Phase 067 Plan 05 on 2026-05-07)
 
-**Status:** DEFERRED. Synthetic-timeout live UAT NOT executed.
+**Status:** PARTIAL. Phase 067 Plan 05 Task 4 re-ran the synthetic-timeout protocol verbatim against the post-067 fixed frontend. 4-of-5 sub-criteria green; 1 red (`GeneratorExit` at `run_helpers.py:1680`). See `Gap-007` in Phase 067 UAT. The architectural Gap-006 fix (Phase 066) remains end-to-end live-verified at the run-row + frontend-banner level.
+
+**Original deferral rationale (preserved for context):** DEFERRED. Synthetic-timeout live UAT NOT executed in Phase 066.
 
 **Rationale:**
 
@@ -237,7 +239,7 @@ Phase 066's deliverable (backend timeout/lifecycle architecture)._
 
 - [x] SC#1 — Gap-006 regression closed: prompt completed in 9m02s, multi-tool agent worked end-to-end (Task 1 evidence — run `95e3447c-cf9b-448b-9e0d-22c30e40670d`)
 - [x] SC#2-#5, #7 — automated tests green per Plan 04 (`pytest tests/integration/test_066_*.py` — committed in `066-04-SUMMARY.md`)
-- [ ] SC#6 — banner + Resume live verification **deferred to Phase 067** (frontend streaming-UX issues would mask the test result; backend lifecycle covered by `test_066_terminal_classification.py::test_timeout_branch_writes_timed_out`)
+- [~] SC#6 — banner + Resume + DB lifecycle live-verified by Phase 067 Plan 05 Task 4 on 2026-05-07 (4-of-5 sub-criteria green); LangSmith trace hygiene at `run_helpers.py:1680` red (D-066-11 invariant violated under synthetic-timeout conditions) — escalated as **Gap-007** for follow-on phase
 - [x] SC#7 — LangSmith trace clean (no `GeneratorExit`) confirmed live during Task 1 9m02s run
 - [x] Gap-006 regression confirmed CLOSED at the architectural / run-row level
 - [ ] Stopgap removal: D-066-12 `RUN_HARD_TIMEOUT_SECONDS=600` line in `backend/.env` (optional documentation cleanup; no functional effect — left in place; remove during Phase 067 cleanup if desired)
