@@ -205,6 +205,39 @@ function makeStreamCallbacks(opts: {
         }),
       )
     },
+    // onSkillLoaded — Phase 067.1 Plan 04: merge `description` into the most-recent
+    // matching SkillActivation entry on the streaming message. Does NOT append a new
+    // entry — the activated→loaded sequence is one card, not two. Defensive no-op if
+    // no matching activation exists (would mean skill_loaded arrived without a prior
+    // skill_activated — backend ordering at threads.py:1775→1802 should prevent this
+    // but the guard keeps live UI safe against reordering / late frames after thread
+    // navigation).
+    onSkillLoaded: (skillName, description) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const activations = m.activatedSkills
+          if (!activations || activations.length === 0) return m
+          // Find LAST matching activation by skillName (most recent) — reverse,
+          // map-with-once-flag, reverse back. Avoids mutating in-place and keeps
+          // chronological ordering intact for downstream rendering.
+          let updated = false
+          const next = activations
+            .slice()
+            .reverse()
+            .map((act) => {
+              if (!updated && act.skillName === skillName) {
+                updated = true
+                return { ...act, description }
+              }
+              return act
+            })
+            .reverse()
+          if (!updated) return m
+          return { ...m, activatedSkills: next }
+        }),
+      )
+    },
     // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
     onCodeExecutionStart: undefined,
     // onCodeStdout

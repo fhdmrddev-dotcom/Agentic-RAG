@@ -71,6 +71,11 @@ export interface SkillActivation {
   type: 'skill_activation'
   skillName: string
   occurredAt: number  // Date.now() at SSE event arrival; preserves D-09 ordering
+  /** Phase 067.1 Plan 04: optional skill description from skill_loaded SSE follow-up event.
+   * Surfaces in SkillRow as the upcoming-tool hint. May be undefined if the skill row has
+   * an empty description column or if the skill_loaded follow-up never arrives (historical
+   * messages loaded from DB do not flow through live SSE). */
+  description?: string
 }
 
 export interface Message {

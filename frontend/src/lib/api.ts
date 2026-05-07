@@ -178,6 +178,9 @@ export interface StreamCallbacks {
   onSubAgentDelta?: (text: string) => void
   onSubAgentDone?: () => void
   onSkillActivated?: (skillName: string) => void
+  /** Phase 067.1 Plan 04: skill description hint from skill_loaded follow-up SSE event.
+   * Fires AFTER skill_activated when the skill row's description column is non-empty. */
+  onSkillLoaded?: (skillName: string, description: string) => void
   onCodeExecutionStart?: (codePreview: string) => void
   onCodeStdout?: (content: string) => void
   onCodeStderr?: (content: string) => void
@@ -340,6 +343,8 @@ export async function subscribeToRun(
           callbacks.onSubAgentDone()
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
+        else if (t === "skill_loaded" && callbacks.onSkillLoaded)
+          callbacks.onSkillLoaded(parsed.skill_name as string, parsed.description as string)
         else if (t === "code_execution_start" && callbacks.onCodeExecutionStart)
           callbacks.onCodeExecutionStart(parsed.code_preview as string)
         else if (t === "code_stdout" && callbacks.onCodeStdout)
