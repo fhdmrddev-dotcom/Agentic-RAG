@@ -42,10 +42,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from sse_starlette import EventSourceResponse
 from supabase import Client
-# Top-level import — see module docstring for why `import redis.exceptions`
-# would break inside the route handler (variable shadowing on the `redis`
-# parameter). Phase 061 follows the same convention in threads.py.
-from redis.exceptions import RedisError
+# Phase 067 D-067-04: alias TimeoutError as RedisTimeoutError to differentiate
+# the redis-py async_timeout wrapper conversion (cancellation-equivalent on
+# xread BLOCK) from genuine RedisError. Variable-shadowing-safe: the `redis`
+# module is shadowed inside the route body by `redis: aioredis.Redis =
+# Depends(get_redis)`, so writing `redis.exceptions.TimeoutError` would
+# AttributeError. Module-level alias is the canonical safe approach.
+# Phase 061 follows the same convention in threads.py.
+from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError
 
 from app.api.threads import (
     RUN_TASKS,
@@ -106,6 +110,28 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                     streams={stream_key: last_id},
                     count=100,
                 )
+            except asyncio.CancelledError:
+                # D-067-04: cooperative cancellation — never swallow (Phase 059 D-059-04).
+                # Client disconnected; log INFO and re-raise so the asyncio task state
+                # stays correct. No yield — the generator is being torn down.
+                logger.info(
+                    "replay_tail_consumer xread (replay phase) cancelled by client "
+                    "disconnect for run %s",
+                    run_id,
+                )
+                raise
+            except RedisTimeoutError:
+                # D-067-04: redis-py's async_timeout wrapper converted a socket-read
+                # deadline / cancellation into TimeoutError. Cancellation-equivalent at
+                # this site — INFO-only, no traceback. Yield a clean SSE error event
+                # so the consumer-side socket closes naturally; do NOT propagate as 503.
+                logger.info(
+                    "replay_tail_consumer xread (replay phase) socket timeout for run %s "
+                    "(consumer disconnected; xread cancellation-equivalent)",
+                    run_id,
+                )
+                yield {"data": json.dumps({"type": "error", "error": "redis_timeout"})}
+                return
             except RedisError:
                 logger.exception(
                     "replay_tail_consumer xread (replay phase) raised RedisError "
@@ -165,6 +191,26 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                     count=100,
                     block=5000,
                 )
+            except asyncio.CancelledError:
+                # D-067-04: cooperative cancellation — never swallow (Phase 059 D-059-04).
+                logger.info(
+                    "replay_tail_consumer xread (tail phase) cancelled by client "
+                    "disconnect for run %s",
+                    run_id,
+                )
+                raise
+            except RedisTimeoutError:
+                # D-067-04: redis-py async_timeout wrapper conversion;
+                # cancellation-equivalent at this site (the only thing it means here is
+                # the consumer's blocking xread was interrupted while no client was
+                # actively listening). INFO-only, no traceback.
+                logger.info(
+                    "replay_tail_consumer xread (tail phase) socket timeout for run %s "
+                    "(consumer disconnected; xread cancellation-equivalent)",
+                    run_id,
+                )
+                yield {"data": json.dumps({"type": "error", "error": "redis_timeout"})}
+                return
             except RedisError:
                 logger.exception(
                     "replay_tail_consumer xread (tail phase) raised RedisError for run %s",
@@ -187,9 +233,28 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                             "error": "buffer_expired_during_tail",
                         })}
                         return
+                except asyncio.CancelledError:
+                    # D-067-04: cooperative cancellation — never swallow (Phase 059 D-059-04).
+                    # Symmetric defense per RESEARCH Open Question 4: same shape as the two
+                    # xread sites above so a tab-cycle interrupt during the post-BLOCK probe
+                    # does not surface a stack trace either.
+                    logger.info(
+                        "replay_tail_consumer post-BLOCK exists probe cancelled by client "
+                        "disconnect for run %s",
+                        run_id,
+                    )
+                    raise
+                except RedisTimeoutError:
+                    # D-067-04: cancellation-equivalent at this site too. Best-effort probe;
+                    # fall through to deadline-based loop rather than yielding an error.
+                    logger.info(
+                        "replay_tail_consumer post-BLOCK exists probe socket timeout for run %s "
+                        "(consumer disconnected; xread cancellation-equivalent)",
+                        run_id,
+                    )
                 except (RedisError, OSError):
-                    # Best-effort probe; if it fails, fall through to the
-                    # original deadline-based behavior rather than dying.
+                    # Best-effort probe; if it fails (genuine Redis failure or socket OSError),
+                    # fall through to the original deadline-based behavior rather than dying.
                     logger.exception(
                         "replay_tail_consumer post-BLOCK exists probe failed for run %s",
                         run_id,
