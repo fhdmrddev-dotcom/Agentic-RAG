@@ -497,6 +497,23 @@ export function useMessages(): UseMessages {
     let registeredRunId: string | null = null
 
     try {
+      // D-067-01 first-paint setMessages audit (sendMessage POST→subscribe window):
+      // Site                              | Line | Guard                         | Rationale
+      // -----------------------------------+------+-------------------------------+--------------------------------------------------
+      // Optimistic user message insert     | 470  | exempt — pre-subscription     | canonical first-write; nothing yet to guard against
+      // Optimistic assistant placeholder   | 486  | exempt — pre-subscription     | placeholder downstream guards protect
+      // RunId stamp + user temp-id swap    | 514  | exempt — fires AFTER Edit 2   | subscription slot already held by line 506 (this edit)
+      // Terminal-flip onTerminal override  | 568  | guarded by Task 2 existence   | late-fired terminal cannot stomp stale assistantId
+      // isPlanning: false finally cleanup  | 636  | exempt — map no-op if absent  | runs regardless; harmless when placeholder gone
+      // Reconcile race surface (the worth-fixing case): four ChatArea triggers
+      // (mount/visibilitychange/focus/pageshow at ChatArea.tsx:163-188) could
+      // fire reconcile BETWEEN postMessage returning and subscriptionsRef.set.
+      // Edit 2 below moves the subscription-slot reservation to fire IMMEDIATELY
+      // after postMessage resolves — BEFORE the runId-stamping setMessages — so
+      // any racing reconcile's `subscriptionsRef.current.has(run.run_id)` check
+      // at useMessages.ts:761 short-circuits deterministically. The placeholder
+      // + first SSE-attach are then guaranteed-visible BEFORE any reconcile
+      // fetch settles (D-067-01 verbatim).
       // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
       const { message_id, run_id } = await postMessage(threadId, content, {
         model,
@@ -505,6 +522,14 @@ export function useMessages(): UseMessages {
       })
       registeredRunId = run_id
 
+      // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages
+      // so any reconcile racing in via ChatArea's mount/visibilitychange/focus/
+      // pageshow triggers (ChatArea.tsx:163-188) finds the slot already held by
+      // its `subscriptionsRef.current.has(run.run_id)` short-circuit at line 761
+      // and skips the duplicate-consumer + parallel-loadMessages path. This is
+      // the SAME ordering pattern reconcile itself uses at line 769 (WR-06 fix:
+      // "RESERVE the subscription slot BEFORE firing subscribeToRun").
+      subscriptionsRef.current.set(run_id, controller)
       // WR-04 fix: swap the optimistic user placeholder's temp id for the
       // real persisted user_message UUID returned from POST. Without this,
       // a Realtime upsert that arrives BEFORE the next loadMessages refetch
@@ -518,7 +543,6 @@ export function useMessages(): UseMessages {
           return m
         }),
       )
-      subscriptionsRef.current.set(run_id, controller)
 
       // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
       // The callbacks pattern mirrors the legacy POST-stream closure — same
