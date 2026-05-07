@@ -22,6 +22,8 @@ Active scope for v2.5. Each maps to exactly one phase below.
  and validated in scenarios E/F/G of TEST-01.
 - [x] **STREAM-04**: A streaming response survives client navigation, refresh, and multi-tab access. The user can leave and return mid-generation, refresh the page mid-generation, or open a second tab on the same thread, and see the in-progress or completed result. Generation lifetime is decoupled from any single HTTP request. Verified by: (a) start streaming → refresh page → see continued streaming with no manual action; (b) start streaming → close tab → reopen thread in new tab → see live continuation; (c) open same thread in two tabs while streaming → both tabs render the same tokens in sync. Implementation: per-run ephemeral buffer (Redis Streams per D-v2.5-08) + per-run durable metadata (`public.runs` Postgres table per D-v2.5-11) + `GET /threads/{id}/active-runs` + `GET /runs/{id}/stream?since={offset}` replay-and-tail endpoints + `DELETE /runs/{id}` cancel verb + frontend reconcile-on-(re)connect.
 
+- [ ] **STREAM-04-polish**: Following STREAM-04, the user-perceived streaming feel and agent autonomy match a Claude.ai-class chat surface for the RAG-tool domain. Specifically: (a) every latency phase (pre-first-delta, inter-iteration silence, tool-preparing) surfaces a context-aware in-flight label reflecting the actual operation ("Searching knowledge base…", "Spinning up sandbox…", "Loading skill 'docx'…") rather than a generic "Thinking…"/"Working" placeholder; (b) when the user submits a clear multi-step intent (e.g. "search → report → charts → docx"), the agent executes the FULL pipeline end-to-end without intermediate "If you want, I can also…" / "Shall I proceed to…" confirmation prompts, while preserving confirmation for genuinely-ambiguous intents and irreversible/destructive actions; (c) skill-load tool cards explain WHY the skill is being loaded, with a description hint sourced from the `skills.description` column. Additionally, this requirement closes Phase 066 SC#6 (D-066-11 stream-close-on-timeout invariant) — the LangSmith ChatOpenAI sub-trace exception column shows a clean exception type (TimeoutError / CancelledError) rather than `GeneratorExit` at `langsmith/run_helpers.py:1680`, OR the invariant is formally retired in 066-HUMAN-UAT.md with explicit rationale if the upstream langsmith-py BaseException-catch wrapper makes it unfixable. Verified by: re-running the synthetic-timeout protocol + 5 consecutive Fahed-Mrad multi-tool runs via Chrome MCP + DOM assertion `data-testid="skill-load-card"` carries a description hint. Implementation: surgical edits to `backend/app/api/threads.py` (SYSTEM_PROMPT, OpenAI/Anthropic timeout branches, `skill_loaded` follow-up SSE emit), `frontend/src/lib/toolMeta.ts` (new `outerBannerLabel` export), `frontend/src/lib/api.ts` (`onSkillLoaded` callback), `frontend/src/types/index.ts` (`SkillActivation.description?`), `frontend/src/hooks/useMessages.ts` (description merge handler), `frontend/src/components/chat/MessageItem.tsx` (placeholder copy via `outerBannerLabel`), `frontend/src/components/chat/ToolCallPanel.tsx` (skill-load card variant + `data-testid="skill-load-card"`).
+
 ### Test Infrastructure
 
 - [ ] **TEST-01**: A reproducible browser-driven test harness exists for the SSE/reconnect scenarios — at minimum scripts covering E (tab switch), F (F5 mid-stream), G (Stop regression), H (thread navigation), and "navigate during stream." Each scenario runnable in isolation via chrome-in-browser MCP without manual setup beyond launching the dev server. Verified by: developer can run any single scenario script and observe pass/fail without writing new code.
@@ -59,11 +61,12 @@ Deferred to later milestones. Tracked but not in v2.5 roadmap.
 | STREAM-02a | Phase 060 | Complete |
 | STREAM-02b | Phase 063 (subsumed by STREAM-04) | Complete |
 | STREAM-04 | Phases 061 + 062 + 063 | Complete |
+| STREAM-04-polish | Phase 067.1 (sub-phase of Phase 067) | Pending |
 | TEST-01 | Phase 064 | Pending |
 
 **Coverage:**
-- v1 requirements: 6 total
-- Mapped to phases: 6
+- v1 requirements: 7 total
+- Mapped to phases: 7
 - Unmapped: 0 ✓
 
 ## Phase Sequencing

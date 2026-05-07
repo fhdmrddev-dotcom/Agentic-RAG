@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: milestone_complete
+status: completed
 stopped_at: Phase 067 context gathered
-last_updated: "2026-05-07T13:36:26.092Z"
-last_activity: 2026-05-07 -- Phase 067 execution started
+last_updated: "2026-05-07T17:58:46.241Z"
+last_activity: 2026-05-07
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 9
-  total_plans: 38
-  completed_plans: 33
-  percent: 82
+  total_plans: 43
+  completed_plans: 38
+  percent: 88
 ---
 
 # Project State
@@ -183,4 +183,4 @@ Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:dis
 
 **New phase queued (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness which is test infrastructure, not a fix). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`.
 
-**Planned Phase:** 067 (Frontend Streaming-UX Fix) — 5 plans — 2026-05-06T22:19:55.571Z
+**Planned Phase:** 067.1 (Agent Streaming & Behavior Polish) — 5 plans — 2026-05-07T17:58:46.227Z
