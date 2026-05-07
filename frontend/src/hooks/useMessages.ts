@@ -50,6 +50,14 @@ function makeStreamCallbacks(opts: {
   setFallbackNotice: React.Dispatch<React.SetStateAction<string | null>>
 }): StreamCallbacks {
   const { assistantId, onTitleUpdate, setMessages, setFallbackNotice } = opts
+  // D-067-03: closure-tracked iteration counter, stamped onto each ToolCall
+  // created in onToolPreparing/onToolStart. Updated on every iteration_start
+  // SSE event BEFORE setMessages (no side-effects inside setMessages
+  // updaters per Phase 057 deferral §1 / Phase 060 D-060-11). Default 0 —
+  // covers tools that start BEFORE the first iteration_start callback fires
+  // (rare with mock streams; backend's threads.py emits iteration_start at
+  // iteration boundaries from the first iteration onward).
+  let currentIteration = 0
   return {
     onDelta: (delta) => {
       setMessages((prev) =>
@@ -85,6 +93,7 @@ function makeStreamCallbacks(opts: {
             args: {},
             status: "preparing",
             startedAt: undefined,
+            iteration: currentIteration,   // D-067-03: stamp current iteration on new tool call
           }
           return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
         }),
@@ -104,7 +113,15 @@ function makeStreamCallbacks(opts: {
             // Upgrade the preparing entry to running in place (preserves ordering)
             updatedCalls = existingCalls.map((tc, i) =>
               i === preparingIdx
-                ? { ...tc, args, status: "running" as const, startedAt: Date.now() }
+                ? {
+                    ...tc,
+                    args,
+                    status: "running" as const,
+                    startedAt: Date.now(),
+                    // D-067-03: tc already carries iteration from onToolPreparing (Edit 3a),
+                    // but if preparing was missed (race / reconnect), stamp from counter.
+                    iteration: tc.iteration ?? currentIteration,
+                  }
                 : tc,
             )
           } else {
@@ -118,6 +135,7 @@ function makeStreamCallbacks(opts: {
                 args,
                 status: "running" as const,
                 startedAt: Date.now(),
+                iteration: currentIteration,   // D-067-03: fallback path — no preparing entry; stamp directly
               },
             ]
           }
@@ -272,6 +290,10 @@ function makeStreamCallbacks(opts: {
     },
     // onIterationStart — Phase 56 D-03/D-04: increment Step N counter on each loop pass
     onIterationStart: (iteration: number) => {
+      // D-067-03: track latest iteration so subsequent onToolPreparing/onToolStart
+      // can stamp it on new ToolCall objects. Update counter BEFORE setMessages
+      // so next React batch sees consistent state.
+      currentIteration = iteration
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, iterationCount: iteration } : m)),
       )

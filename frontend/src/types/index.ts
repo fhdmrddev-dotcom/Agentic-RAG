@@ -40,6 +40,10 @@ export interface ToolCall {
   executionDurationMs?: number
   exitCode?: number
   errorMessage?: string
+  /** D-067-03: 0-based iteration index from iteration_start SSE event. Used by
+   * ToolCallPanel to render "Step N" gradient dividers between iteration groups.
+   * Undefined for tool calls loaded from DB (historical messages — no divider). */
+  iteration?: number
 }
 
 export interface SourceReference {
