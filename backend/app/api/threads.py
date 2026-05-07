@@ -133,6 +133,127 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     )
 
 
+# Phase 067.1 Plan 01 Track A: drain-into-queue helper.
+#
+# Why this exists: langsmith-py 0.2.3..0.8.2's `_TracedStream.__iter__` is a
+# generator (`yield from self.__ls__gen__`) wrapped in `except BaseException`.
+# When an outer `for chunk in stream:` loop exits via asyncio cancellation
+# (asyncio.timeout fires), Python's for-loop semantics call `iterator.close()`
+# on the generator AS PART OF THE LOOP'S OWN CLEANUP — `GeneratorExit` is
+# thrown INTO `_TracedStream.__iter__` at the `yield from` point, caught by
+# `except BaseException as e:`, and recorded via `_end_trace(error=e)`. By
+# the time control reaches our `except asyncio.TimeoutError:` block, the
+# trace has already been closed with `error=GeneratorExit`. Calling
+# `stream.close()` from the except handler is too late — Pitfall 1, Phase
+# 067.1 RESEARCH.md.
+#
+# The fix: own the iteration ourselves. Run the sync `for chunk in stream:`
+# loop on the default executor; the for-loop runs to natural StopIteration
+# when we close the underlying SDK stream from the OUTSIDE (main thread).
+# Our async-side timeout cancels OUR queue consumer (a clean asyncio
+# CancelledError caught locally) — the langsmith generator never sees a
+# close-from-outside, takes the `else: self._end_trace()` branch, and
+# closes the trace cleanly with `error=None`.
+async def _drain_stream_with_close_on_cancel(
+    stream,
+    timeout_seconds,
+    on_chunk_async,
+    close_fn=None,
+):
+    """Iterate ``stream`` under ``asyncio.timeout``; on cancel, close the
+    underlying SDK stream (sync, idempotent) BEFORE the producer's for-loop
+    cleanup propagates GeneratorExit into langsmith's _TracedStream.__iter__.
+
+    Args:
+        stream: A sync iterable (OpenAI ``Stream`` / langsmith ``_TracedStream``
+            wrapper / ``stream_anthropic`` generator). The for-loop runs in a
+            thread pool worker so its implicit cleanup is decoupled from our
+            async timeout.
+        timeout_seconds: Per-call deadline in seconds. ``asyncio.timeout``
+            wraps OUR queue consumer (the `await q.get()` line below). When
+            the deadline fires, we cancel the producer by closing the SDK
+            stream — NOT by raising into the producer thread.
+        on_chunk_async: Async callable invoked per chunk in the consumer loop.
+            Runs on the event-loop thread, so all ``_emit(...)`` / Supabase
+            calls Just Work.
+        close_fn: Optional sync callable to close the underlying SDK stream
+            on timeout. If None, falls back to ``stream.close()``. Anthropic
+            uses ``_ant_gen.close()`` (the wrapping generator) — pass that
+            here for the Anthropic branch. SYNC method (openai 2.28.0 /
+            anthropic 0.97.0); do NOT ``await``.
+    """
+    q: asyncio.Queue = asyncio.Queue(maxsize=64)
+    SENTINEL = object()
+    EXC_SENTINEL = object()
+    producer_exception: list[BaseException] = []
+
+    loop = asyncio.get_running_loop()
+
+    def _producer():
+        # Sync producer — drives _TracedStream.__iter__ to completion.
+        # When stream.close() is called from the consumer's except-block
+        # (main thread), the underlying httpx response closes; the
+        # `for chunk in stream:` loop exits via natural StopIteration;
+        # _TracedStream.__iter__ takes the `else: self._end_trace()`
+        # branch — clean trace closure with error=None.
+        try:
+            for chunk in stream:
+                # call_soon_threadsafe: queue is event-loop-bound; producer
+                # is on a thread, so put_nowait would race with the consumer.
+                fut = asyncio.run_coroutine_threadsafe(q.put(chunk), loop)
+                try:
+                    fut.result()  # block this worker thread until queued
+                except BaseException:
+                    # consumer-side cancellation observed by run_coroutine_threadsafe
+                    return
+        except BaseException as e:
+            producer_exception.append(e)
+        finally:
+            # Always signal end-of-stream. asyncio.run_coroutine_threadsafe
+            # is safe even if the loop is closing — fut.result() will raise
+            # but we ignore it; the consumer is already past q.get() at that
+            # point (cancel path) or will pick up the SENTINEL (clean path).
+            try:
+                fut = asyncio.run_coroutine_threadsafe(q.put(SENTINEL), loop)
+                fut.result(timeout=2.0)
+            except BaseException:
+                pass
+
+    producer_fut = loop.run_in_executor(None, _producer)
+
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            while True:
+                chunk = await q.get()
+                if chunk is SENTINEL:
+                    break
+                await on_chunk_async(chunk)
+    except (asyncio.TimeoutError, asyncio.CancelledError):
+        # Close the underlying SDK stream from the MAIN THREAD. The producer
+        # thread's `for chunk in stream:` then exits via StopIteration —
+        # _TracedStream.__iter__ closes cleanly via `else: self._end_trace()`.
+        try:
+            (close_fn or stream.close)()
+        except Exception:
+            logger.debug(
+                "stream close raised during Track A drain cancel — non-fatal",
+                exc_info=True,
+            )
+        # Wait briefly for producer to drain & post SENTINEL — bounded so a
+        # genuinely-stuck SDK call cannot wedge the request handler.
+        try:
+            await asyncio.wait_for(asyncio.wrap_future(producer_fut), timeout=2.0)
+        except Exception:
+            logger.debug(
+                "producer await raised during Track A drain cancel — non-fatal",
+                exc_info=True,
+            )
+        raise
+    # Re-raise any non-cancel error captured from the producer thread.
+    if producer_exception:
+        raise producer_exception[0]
+
+
 def _is_transient_provider_error(e: APIError) -> bool:
     """Return True if this is a transient provider failure safe to retry.
 
@@ -1199,61 +1320,62 @@ async def send_message(
                                 tool_calls_buffer: dict = {}
                                 finish_reason: str | None = None
                                 _announced_tools_ant: set[int] = set()
-                                # Phase 066 D-066-02 + D-066-11: per-LLM-call timer wraps
-                                # ONLY the SDK iteration block (tool execution stays
-                                # OUTSIDE — D-066-02). On TimeoutError, close the
-                                # generator BEFORE re-raising so anthropic_service.py
-                                # `with client.messages.stream():` __exit__ fires
-                                # (calling MessageStream.close() → response.close() —
-                                # all sync methods per anthropic 0.97.0 venv probe).
-                                # This converts the LangSmith trace from "unexpected
-                                # GeneratorExit at run_helpers.py:1680" to a clean
-                                # stream-end + raised TimeoutError.
-                                try:
-                                    async with asyncio.timeout(per_call_budget):
-                                        for _ant_event in _ant_gen:
-                                            _etype = _ant_event.get("type")
-                                            if _etype == "delta":
-                                                _text = _ant_event.get("content", "")
-                                                if _text:
-                                                    full_content += _text
-                                                    await _emit(redis, run_id, 'delta', content=_text)
-                                            elif _etype == "tool_preparing":
-                                                # D-01 (Phase 56.1, corrected): fired at content_block_start when
-                                                # tool name is first known — before arguments finish streaming.
-                                                _idx = _ant_event.get("index", len(tool_calls_buffer))
-                                                if _idx not in _announced_tools_ant:
-                                                    _announced_tools_ant.add(_idx)
-                                                    await _emit(redis, run_id, 'tool_preparing', name=_ant_event['name'], index=_idx)
-                                            elif _etype == "tool_start":
-                                                # Fired at content_block_stop — arguments now complete.
-                                                # tool_preparing was already emitted above; just populate buffer.
-                                                _idx = len(tool_calls_buffer)
-                                                tool_calls_buffer[_idx] = {
-                                                    "id": _ant_event["id"],
-                                                    "name": _ant_event["name"],
-                                                    "arguments": json.dumps(_ant_event.get("args", {})),
-                                                }
-                                            elif _etype == "finish":
-                                                finish_reason = _ant_event.get("finish_reason", "stop")
-                                    break  # stream completed
-                                except asyncio.TimeoutError:
-                                    # Phase 066 D-066-11: clean termination contract.
-                                    # _ant_gen.close() raises GeneratorExit inside
-                                    # anthropic_service.py's `with` block →
-                                    # MessageStream.__exit__ → response.close().
-                                    # SYNC method (anthropic 0.97.0); do NOT `await`.
-                                    try:
-                                        _ant_gen.close()
-                                    except Exception:
-                                        logger.debug(
-                                            "_ant_gen.close() raised during timeout — non-fatal",
-                                            exc_info=True,
-                                        )
-                                    # Re-raise — propagates to the outer `except
-                                    # asyncio.TimeoutError` at agent_runner top level
-                                    # which sets _terminal_status='timed_out' (Plan 01).
-                                    raise
+
+                                # Phase 067.1 Plan 01 Track A: drain-into-queue
+                                # parity with the OpenAI branch (PATTERNS.md
+                                # parity rule). The Anthropic path is NOT
+                                # langsmith-wrapped today (anthropic_service.py
+                                # uses raw anthropic.Anthropic — see
+                                # SUMMARY.md "Symmetry check"), so the
+                                # GeneratorExit-trace pollution is OpenAI-only;
+                                # but symmetric structure prevents future
+                                # langsmith-anthropic adoption from regressing
+                                # to the inline-for-loop shape.
+                                #
+                                # On timeout the helper closes _ant_gen
+                                # (`_ant_gen.close()` raises GeneratorExit
+                                # inside anthropic_service.py's `with` block
+                                # → MessageStream.__exit__ → response.close());
+                                # SYNC method (anthropic 0.97.0); do NOT
+                                # `await`. The outer agent_runner's
+                                # `except asyncio.TimeoutError` catches the
+                                # propagated TimeoutError and sets
+                                # _terminal_status='timed_out' (Phase 066
+                                # D-066-06/07).
+                                async def _on_chunk_anthropic(_ant_event):
+                                    nonlocal full_content, finish_reason
+                                    _etype = _ant_event.get("type")
+                                    if _etype == "delta":
+                                        _text = _ant_event.get("content", "")
+                                        if _text:
+                                            full_content += _text
+                                            await _emit(redis, run_id, 'delta', content=_text)
+                                    elif _etype == "tool_preparing":
+                                        # D-01 (Phase 56.1, corrected): fired at content_block_start when
+                                        # tool name is first known — before arguments finish streaming.
+                                        _idx = _ant_event.get("index", len(tool_calls_buffer))
+                                        if _idx not in _announced_tools_ant:
+                                            _announced_tools_ant.add(_idx)
+                                            await _emit(redis, run_id, 'tool_preparing', name=_ant_event['name'], index=_idx)
+                                    elif _etype == "tool_start":
+                                        # Fired at content_block_stop — arguments now complete.
+                                        # tool_preparing was already emitted above; just populate buffer.
+                                        _idx = len(tool_calls_buffer)
+                                        tool_calls_buffer[_idx] = {
+                                            "id": _ant_event["id"],
+                                            "name": _ant_event["name"],
+                                            "arguments": json.dumps(_ant_event.get("args", {})),
+                                        }
+                                    elif _etype == "finish":
+                                        finish_reason = _ant_event.get("finish_reason", "stop")
+
+                                await _drain_stream_with_close_on_cancel(
+                                    _ant_gen,
+                                    per_call_budget,
+                                    _on_chunk_anthropic,
+                                    close_fn=_ant_gen.close,
+                                )
+                                break  # stream completed
 
                             else:
                                 # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
@@ -1293,51 +1415,63 @@ async def send_message(
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
-                                try:
-                                    async with asyncio.timeout(per_call_budget):
-                                        for chunk in stream:
-                                            if not chunk.choices:
-                                                continue
-                                            choice = chunk.choices[0]
-                                            delta = choice.delta
 
-                                            if choice.finish_reason:
-                                                finish_reason = normalize_finish_reason(choice.finish_reason)
+                                # Phase 067.1 Plan 01 Track A: drain-into-queue.
+                                # Wraps the per-chunk body so that the sync
+                                # `for chunk in stream:` loop runs in a thread
+                                # pool worker — when timeout fires, we close
+                                # the underlying SDK stream from outside the
+                                # for-loop, so _TracedStream.__iter__ takes
+                                # the `else: self._end_trace()` clean-closure
+                                # branch (no GeneratorExit recorded). Variables
+                                # `_last_iteration` / `_last_model_id` /
+                                # `_last_per_call_budget` (captured above) are
+                                # consumed by the outer agent_runner's
+                                # `except asyncio.TimeoutError` formatter.
+                                async def _on_chunk_openai(chunk):
+                                    nonlocal full_content, finish_reason
+                                    if not chunk.choices:
+                                        return
+                                    choice = chunk.choices[0]
+                                    delta = choice.delta
 
-                                            if delta.content:
-                                                full_content += delta.content
-                                                await _emit(redis, run_id, 'delta', content=delta.content)
+                                    if choice.finish_reason:
+                                        finish_reason = normalize_finish_reason(choice.finish_reason)
 
-                                            if delta.tool_calls:
-                                                for tc in delta.tool_calls:
-                                                    idx = tc.index
-                                                    if idx not in tool_calls_buffer:
-                                                        tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                                    if tc.id:
-                                                        tool_calls_buffer[idx]["id"] = tc.id
-                                                    if tc.function and tc.function.name:
-                                                        tool_calls_buffer[idx]["name"] = tc.function.name
-                                                        # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
-                                                        # before arguments finish streaming. Fires exactly once per tool index.
-                                                        if idx not in _announced_tools:
-                                                            _announced_tools.add(idx)
-                                                            await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
-                                                    if tc.function and tc.function.arguments:
-                                                        tool_calls_buffer[idx]["arguments"] += tc.function.arguments
-                                except asyncio.TimeoutError:
-                                    # Phase 066 D-066-11: openai 2.28.0 Stream.close() is sync
-                                    # and idempotent — closes underlying httpx response.
-                                    # SYNC method; do NOT `await`. Suppresses GeneratorExit at
-                                    # langsmith/run_helpers.py:1680 because the wrap_openai
-                                    # generator sees a normal stream-end.
-                                    try:
-                                        stream.close()
-                                    except Exception:
-                                        logger.debug(
-                                            "stream.close() raised during timeout — non-fatal",
-                                            exc_info=True,
-                                        )
-                                    raise
+                                    if delta.content:
+                                        full_content += delta.content
+                                        await _emit(redis, run_id, 'delta', content=delta.content)
+
+                                    if delta.tool_calls:
+                                        for tc in delta.tool_calls:
+                                            idx = tc.index
+                                            if idx not in tool_calls_buffer:
+                                                tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
+                                            if tc.id:
+                                                tool_calls_buffer[idx]["id"] = tc.id
+                                            if tc.function and tc.function.name:
+                                                tool_calls_buffer[idx]["name"] = tc.function.name
+                                                # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
+                                                # before arguments finish streaming. Fires exactly once per tool index.
+                                                if idx not in _announced_tools:
+                                                    _announced_tools.add(idx)
+                                                    await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
+                                            if tc.function and tc.function.arguments:
+                                                tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+
+                                await _drain_stream_with_close_on_cancel(
+                                    stream,
+                                    per_call_budget,
+                                    _on_chunk_openai,
+                                    # openai 2.28.0 Stream.close() is sync and
+                                    # idempotent (closes underlying httpx
+                                    # response). Bound here so the helper's
+                                    # except-block calls it from the main
+                                    # thread BEFORE the producer's for-loop
+                                    # cleanup ever propagates GeneratorExit
+                                    # into _TracedStream.__iter__.
+                                    close_fn=stream.close,
+                                )
 
                                 # Parse tool calls based on calling mode
                                 if calling_mode == CallingMode.STRUCTURED:
