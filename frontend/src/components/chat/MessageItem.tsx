@@ -137,7 +137,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
                   ? "Agent reached time limit"   /* Phase 066 D-066-10 — system per-LLM-call deadline fired */
                   : message.runStatus === "cancelled" || message.stopped
                     ? "Response stopped"          /* user clicked Stop (D-066-10); stopped fallback for legacy pre-runStatus rows */
-                    : "Saving response…"}
+                    : null /* D-067-02: no mid-stream chrome — terminal states only carry text. Match Claude/ChatGPT. */}
             </span>
             {isStreaming && (
               <span className="flex gap-1 items-center">

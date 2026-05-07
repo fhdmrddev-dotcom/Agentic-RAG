@@ -90,7 +90,7 @@ export interface Message {
   suggestions?: string[]   // Set by suggestions SSE event; ephemeral — not persisted, not loaded
   /** True while the agent has finished one tool-call round and is deciding its next action. */
   isPlanning?: boolean
-  /** True if the user clicked Stop — shows "Response stopped" indicator instead of "Saving response…" */
+  /** True if the user clicked Stop — shows "Response stopped" indicator (D-067-02: no fallback chrome between SSE end and DB persistence). */
   stopped?: boolean
   /** Phase 063 (D-063-04 / RESEARCH Open Question 2): the Redis Stream run_id this assistant message is/was streamed from. Set by reconcile and sendMessage paths; absent for DB-only loaded messages until backfilled. Used by Stop semantics (DELETE /runs/{runId}) and Resume button visibility logic. */
   runId?: string
