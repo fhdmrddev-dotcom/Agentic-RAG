@@ -497,6 +497,23 @@ export function useMessages(): UseMessages {
     let registeredRunId: string | null = null
 
     try {
+      // D-067-01 first-paint setMessages audit (sendMessage POST→subscribe window):
+      // Site                              | Line | Guard                         | Rationale
+      // -----------------------------------+------+-------------------------------+--------------------------------------------------
+      // Optimistic user message insert     | 470  | exempt — pre-subscription     | canonical first-write; nothing yet to guard against
+      // Optimistic assistant placeholder   | 486  | exempt — pre-subscription     | placeholder downstream guards protect
+      // RunId stamp + user temp-id swap    | 514  | exempt — fires AFTER Edit 2   | subscription slot already held by line 506 (this edit)
+      // Terminal-flip onTerminal override  | 568  | guarded by Task 2 existence   | late-fired terminal cannot stomp stale assistantId
+      // isPlanning: false finally cleanup  | 636  | exempt — map no-op if absent  | runs regardless; harmless when placeholder gone
+      // Reconcile race surface (the worth-fixing case): four ChatArea triggers
+      // (mount/visibilitychange/focus/pageshow at ChatArea.tsx:163-188) could
+      // fire reconcile BETWEEN postMessage returning and subscriptionsRef.set.
+      // Edit 2 below moves the subscription-slot reservation to fire IMMEDIATELY
+      // after postMessage resolves — BEFORE the runId-stamping setMessages — so
+      // any racing reconcile's `subscriptionsRef.current.has(run.run_id)` check
+      // at useMessages.ts:761 short-circuits deterministically. The placeholder
+      // + first SSE-attach are then guaranteed-visible BEFORE any reconcile
+      // fetch settles (D-067-01 verbatim).
       // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
       const { message_id, run_id } = await postMessage(threadId, content, {
         model,
@@ -505,6 +522,14 @@ export function useMessages(): UseMessages {
       })
       registeredRunId = run_id
 
+      // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages
+      // so any reconcile racing in via ChatArea's mount/visibilitychange/focus/
+      // pageshow triggers (ChatArea.tsx:163-188) finds the slot already held by
+      // its `subscriptionsRef.current.has(run.run_id)` short-circuit at line 761
+      // and skips the duplicate-consumer + parallel-loadMessages path. This is
+      // the SAME ordering pattern reconcile itself uses at line 769 (WR-06 fix:
+      // "RESERVE the subscription slot BEFORE firing subscribeToRun").
+      subscriptionsRef.current.set(run_id, controller)
       // WR-04 fix: swap the optimistic user placeholder's temp id for the
       // real persisted user_message UUID returned from POST. Without this,
       // a Realtime upsert that arrives BEFORE the next loadMessages refetch
@@ -518,7 +543,6 @@ export function useMessages(): UseMessages {
           return m
         }),
       )
-      subscriptionsRef.current.set(run_id, controller)
 
       // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
       // The callbacks pattern mirrors the legacy POST-stream closure — same
@@ -565,16 +589,24 @@ export function useMessages(): UseMessages {
         // fallback. Sets stopped: true so MessageItem.tsx:147 banner renders
         // (matches the cancelled branch — both timed_out and cancelled are
         // user-visible "this stopped before completing" terminal states).
-        setMessages((prev) =>
-          prev.map((m) => {
+        // D-067-02: existence-check guard. If a thread switch + reconcile (Phase
+        // 063.1 D-063.1-12 MERGE-preserve filter or DB-row swap via D-063.1-04
+        // runId-match dedup) collapsed the placeholder identified by `assistantId`,
+        // the terminal flip is a no-op AND the next reconcile picks up the
+        // correct DB-row runStatus via Phase 063.1 D-063.1-13/15 LEFT JOIN.
+        // Avoids the unguarded setMessages race documented in 067-RESEARCH.md
+        // §"useMessages.ts state-machine cleanup".
+        setMessages((prev) => {
+          if (!prev.some((m) => m.id === assistantId)) return prev
+          return prev.map((m) => {
             if (m.id !== assistantId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
             if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled", stopped: true }
-          }),
-        )
+          })
+        })
         // BL-03 fix: subscriptionsRef cleanup belongs to the terminal event
         // (the moment the producer is actually done), NOT to sendMessage's
         // finally — otherwise reconcile() ticks during the still-draining
@@ -804,16 +836,21 @@ export function useMessages(): UseMessages {
         // banner switch keys on runStatus first, falling back to stopped only
         // for legacy rows pre-D-063.1-15 — so runStatus="timed_out" alone is
         // sufficient to render the "Agent reached time limit" banner.
-        setMessages((prev) =>
-          prev.map((m) => {
+        // D-067-02: existence-check guard, mirrors sendMessage's terminal flip.
+        // If loadMessages's MERGE-preserve filter (Phase 063.1 D-063.1-12) dropped
+        // the placeholder because the DB row caught up, the flip is a no-op and
+        // the next reconcile picks up the DB-row runStatus via D-063.1-13/15.
+        setMessages((prev) => {
+          if (!prev.some((m) => m.id === targetId)) return prev
+          return prev.map((m) => {
             if (m.id !== targetId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
             if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled" }
-          }),
-        )
+          })
+        })
         // BL-03 fix: subscription cleanup belongs to the terminal event, not
         // the .finally() chain on the promise (which can race in StrictMode
         // double-invoke scenarios where the second reconcile sees the entry
