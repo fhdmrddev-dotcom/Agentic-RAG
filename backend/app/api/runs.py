@@ -42,10 +42,14 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 from sse_starlette import EventSourceResponse
 from supabase import Client
-# Top-level import — see module docstring for why `import redis.exceptions`
-# would break inside the route handler (variable shadowing on the `redis`
-# parameter). Phase 061 follows the same convention in threads.py.
-from redis.exceptions import RedisError
+# Phase 067 D-067-04: alias TimeoutError as RedisTimeoutError to differentiate
+# the redis-py async_timeout wrapper conversion (cancellation-equivalent on
+# xread BLOCK) from genuine RedisError. Variable-shadowing-safe: the `redis`
+# module is shadowed inside the route body by `redis: aioredis.Redis =
+# Depends(get_redis)`, so writing `redis.exceptions.TimeoutError` would
+# AttributeError. Module-level alias is the canonical safe approach.
+# Phase 061 follows the same convention in threads.py.
+from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError
 
 from app.api.threads import (
     RUN_TASKS,
