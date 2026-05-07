@@ -836,16 +836,21 @@ export function useMessages(): UseMessages {
         // banner switch keys on runStatus first, falling back to stopped only
         // for legacy rows pre-D-063.1-15 — so runStatus="timed_out" alone is
         // sufficient to render the "Agent reached time limit" banner.
-        setMessages((prev) =>
-          prev.map((m) => {
+        // D-067-02: existence-check guard, mirrors sendMessage's terminal flip.
+        // If loadMessages's MERGE-preserve filter (Phase 063.1 D-063.1-12) dropped
+        // the placeholder because the DB row caught up, the flip is a no-op and
+        // the next reconcile picks up the DB-row runStatus via D-063.1-13/15.
+        setMessages((prev) => {
+          if (!prev.some((m) => m.id === targetId)) return prev
+          return prev.map((m) => {
             if (m.id !== targetId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
             if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled" }
-          }),
-        )
+          })
+        })
         // BL-03 fix: subscription cleanup belongs to the terminal event, not
         // the .finally() chain on the promise (which can race in StrictMode
         // double-invoke scenarios where the second reconcile sees the entry
