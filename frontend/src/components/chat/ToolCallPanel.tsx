@@ -507,14 +507,17 @@ function SubAgentBlock({ agent }: { agent: SubAgentState }) {
 
 function SkillRow({ activation }: { activation: SkillActivation }) {
   return (
-    <div className="pt-2.5 animate-toolSlideIn">
+    <div className="pt-2.5 animate-toolSlideIn" data-testid="skill-load-card">
       <div className="flex items-center gap-2.5">
         <span className="flex-shrink-0 p-1 rounded-md bg-muted/50 text-violet-400">
           <Zap className="w-3.5 h-3.5" />
         </span>
         <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
-          <span className="font-semibold text-foreground/80">Using skill</span>
+          <span className="font-semibold text-foreground/80">Loading skill</span>
           <span className="ml-1.5 opacity-50">"{activation.skillName}"</span>
+          {activation.description && (
+            <span className="ml-1.5 opacity-40 italic">— {activation.description}</span>
+          )}
         </span>
         <span className="flex-shrink-0">
           <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
