@@ -1,3 +1,5 @@
+import type { ToolCall } from "@/types"
+
 /**
  * Shared tool metadata helpers — used by ToolCallPanel and MessageItem.
  * Keeps labels and summaries in one place so they don't drift.
@@ -49,4 +51,38 @@ export function taskPhaseLabel(toolName: string): string {
   if (toolName === "execute_code") return "Running code"
   if (toolName === "load_skill") return "Loading skill"
   return "Thinking…"
+}
+
+/**
+ * Phase 067.1 Plan 02: derive outer-banner placeholder copy from in-flight state.
+ * Used by MessageItem outer placeholder to replace generic "Thinking" / "Working".
+ * Pure frontend logic — no new backend events; derives from already-emitted SSE state
+ * (iteration_start, tool_preparing, tool_start, code_execution_start, skill_activated).
+ *
+ * State precedence (most-specific first):
+ * - No tools and no isPlanning → "Setting up agent…" (pre-first-delta silence)
+ * - isPlanning (true) → "Thinking…"
+ * - hasAnyTools but no activeTool → "Synthesizing answer…" (all-tools-done state)
+ * - activeTool present → tool-specific copy from the per-tool branches below
+ */
+export function outerBannerLabel(
+  activeTool: ToolCall | null,
+  hasAnyTools: boolean,
+  isPlanning: boolean,
+): string {
+  if (!hasAnyTools && !isPlanning) return "Setting up agent…"
+  if (isPlanning) return "Thinking…"
+  if (!activeTool) return "Synthesizing answer…"
+  if (activeTool.name === "search_documents") return "Searching knowledge base…"
+  if (activeTool.name === "query_documents") return "Querying document metadata…"
+  if (activeTool.name === "web_search") return "Searching the web…"
+  if (activeTool.name === "analyze_document") return "Analyzing document…"
+  if (activeTool.name === "execute_code") {
+    return activeTool.status === "preparing" ? "Preparing code…" : "Running code…"
+  }
+  if (activeTool.name === "load_skill") {
+    const skillName = (activeTool.args?.skill_name as string | undefined) ?? ""
+    return `Loading skill "${skillName}"…`
+  }
+  return "Working…"
 }

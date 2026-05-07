@@ -7,7 +7,7 @@ import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
-import { toolLabel, toolSummary } from "@/lib/toolMeta"
+import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 
 interface Props {
   message: Message
@@ -38,7 +38,12 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
   const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
   const allToolsDone = hasAnyTools && !hasRunningTools
-  const activeTool = message.tool_calls?.find((tc) => tc.status === "running")
+  // Phase 067.1 Plan 02: extend activeTool to include "preparing" so outerBannerLabel
+  // can render the ~2s sandbox-warmup copy ("Preparing code…") before tool_start fires.
+  // Mirror of ToolCallPanel.tsx:540 active-tool detection (PATTERNS.md).
+  const activeTool = message.tool_calls?.find(
+    (tc) => tc.status === "running" || tc.status === "preparing"
+  ) ?? null
 
   // Label shown when the agent is actively running a tool alongside existing content
   const activeToolLabel = activeTool
@@ -118,7 +123,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">Thinking</span>
+            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false)}</span>
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
@@ -132,7 +137,7 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
             {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
             <span className="italic">
               {isStreaming
-                ? (allToolsDone ? "Synthesizing answer" : "Working")
+                ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
                 : message.runStatus === "timed_out"
                   ? "Agent reached time limit"   /* Phase 066 D-066-10 — system per-LLM-call deadline fired */
                   : message.runStatus === "cancelled" || message.stopped
