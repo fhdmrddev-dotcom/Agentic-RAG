@@ -589,16 +589,24 @@ export function useMessages(): UseMessages {
         // fallback. Sets stopped: true so MessageItem.tsx:147 banner renders
         // (matches the cancelled branch — both timed_out and cancelled are
         // user-visible "this stopped before completing" terminal states).
-        setMessages((prev) =>
-          prev.map((m) => {
+        // D-067-02: existence-check guard. If a thread switch + reconcile (Phase
+        // 063.1 D-063.1-12 MERGE-preserve filter or DB-row swap via D-063.1-04
+        // runId-match dedup) collapsed the placeholder identified by `assistantId`,
+        // the terminal flip is a no-op AND the next reconcile picks up the
+        // correct DB-row runStatus via Phase 063.1 D-063.1-13/15 LEFT JOIN.
+        // Avoids the unguarded setMessages race documented in 067-RESEARCH.md
+        // §"useMessages.ts state-machine cleanup".
+        setMessages((prev) => {
+          if (!prev.some((m) => m.id === assistantId)) return prev
+          return prev.map((m) => {
             if (m.id !== assistantId) return m
             if (kind === "done") return { ...m, runStatus: "completed" }
             if (kind === "error") return { ...m, runStatus: "failed" }
             if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
             // kind === "cancelled"
             return { ...m, runStatus: "cancelled", stopped: true }
-          }),
-        )
+          })
+        })
         // BL-03 fix: subscriptionsRef cleanup belongs to the terminal event
         // (the moment the producer is actually done), NOT to sendMessage's
         // finally — otherwise reconcile() ticks during the still-draining
