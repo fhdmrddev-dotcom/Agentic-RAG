@@ -1719,7 +1719,14 @@ async def send_message(
                         ],
                     })
 
-                    for tc in tool_calls:
+                    # Phase 067.4 (D-067.4-R5-01 amended — Plan 03 Rule 3 deviation):
+                    # introduced enumerate(tool_calls) so tool_index is in scope inside
+                    # the per-tool body (specifically the sandbox_queue drain loop's
+                    # heartbeat emit at the `code_executing` SSE event below). Plan
+                    # 03 PATTERNS.md asserted tool_index was already in scope; static
+                    # audit at execution time showed it was not — surfaced as Rule 3
+                    # deviation in 067.4-03-SUMMARY.md.
+                    for tool_index, tc in enumerate(tool_calls):
                         tool_name = tc["name"]
                         sub_agent_record: dict | None = None
                         llm_tool_content: str | None = None  # overridden per-tool to strip URLs from LLM context
@@ -2104,11 +2111,30 @@ async def send_message(
                                     # (SAND-05 + Phase 061 D-061-10). Emit keepalives every 10 s
                                     # when sandbox produces no output to prevent SSE connection
                                     # timeouts on long executions.
+                                    #
+                                    # Phase 067.4 (D-067.4-R5-01 amended): emit code_executing
+                                    # heartbeat every ~1 s during sandbox execution. Reuses the
+                                    # existing wait_for drain loop with a tighter inner cycle.
+                                    # `start_time` was captured at line 2086. The pre-existing
+                                    # 10 s keepalive cadence (D-061-10 SSE-timeout protection) is
+                                    # preserved by tracking `_heartbeat_last`.
+                                    _heartbeat_last = time_mod.time()
+                                    _HEARTBEAT_INTERVAL_S = 1.0
                                     while True:
                                         try:
-                                            item = await asyncio.wait_for(sandbox_queue.get(), timeout=10.0)
+                                            # D-067.4-R5-01: tighten the wait_for budget to
+                                            # honor the heartbeat cadence; the 10 s keepalive
+                                            # is preserved by tracking last keepalive below.
+                                            item = await asyncio.wait_for(sandbox_queue.get(), timeout=_HEARTBEAT_INTERVAL_S)
                                         except asyncio.TimeoutError:
-                                            await _emit(redis, run_id, 'keepalive')
+                                            now = time_mod.time()
+                                            elapsed = now - start_time
+                                            await _emit(redis, run_id, 'code_executing',
+                                                        tool_index=tool_index, elapsed_seconds=round(elapsed, 1))
+                                            # Preserve 10 s keepalive cadence (D-061-10).
+                                            if now - _heartbeat_last >= 10.0:
+                                                await _emit(redis, run_id, 'keepalive')
+                                                _heartbeat_last = now
                                             continue
                                         if item["type"] == "_done":
                                             break

@@ -230,3 +230,133 @@ describe("useMessages — R-4 active-thread tool-stage", () => {
     void sendPromise
   })
 })
+
+// ── Phase 067.4 Plan 03 — R-5 code-execution heartbeat (additive) ─────────────
+/**
+ * D-067.4-R5-01 (amended — orchestrator-resolved decision #1):
+ *   "Plan 03 ships a heartbeat strategy (NOT line-by-line streaming): the
+ *    backend's sandbox_queue drain loop emits a `code_executing` SSE event
+ *    every ~1 second carrying tool_index + elapsed_seconds. The frontend
+ *    handler updates tool_calls[N].elapsedSeconds for the matching
+ *    execute_code tool with status==='running' on the active thread's
+ *    bucket. Strictly additive — the post-completion line emit at
+ *    threads.py:2123-2128 is preserved unchanged; outputLines write
+ *    semantics MUST NOT be altered."
+ *
+ * Two regression tests guard the heartbeat:
+ *   - Test 3 (additive guard): outputLines unchanged + elapsedSeconds tracks
+ *     last heartbeat (last-write-wins).
+ *   - Test 4 (status gate): a late-arriving onCodeExecuting after status flips
+ *     to "complete" MUST NOT mutate elapsedSeconds — the matcher is
+ *     `tc.name === "execute_code" && tc.status === "running"`.
+ */
+describe("useMessages — R-5 code-execution heartbeat (additive)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetMessages.mockResolvedValue([])
+    mockGetActiveRuns.mockResolvedValue([])
+    mockCancelRun.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * D-067.4-R5-01 amended: "Strictly additive — outputLines write semantics
+   * preserved (post-completion line emit at threads.py:2123-2128 unchanged)."
+   *
+   * Sequence: tool_start → onCodeExecuting(0, 0.5) → onCodeExecuting(0, 1.5)
+   *           → onCodeStdout("hi") → onCodeExecutionComplete → tool_end
+   *
+   * Asserts: outputLines === [{kind:"stdout", content:"hi"}] (unchanged)
+   *          AND elapsedSeconds === 1.5 (last heartbeat wins).
+   */
+  it("code_executing handler does NOT alter outputLines write semantics (R-5 additive)", async () => {
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValue({
+      run_id: "run-A",
+      message_id: "user-msg-1",
+    })
+
+    const { result } = renderHook(() => useMessages())
+
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+
+    let sendPromise!: Promise<void>
+    act(() => {
+      sendPromise = result.current.sendMessage("thread-A", "run code")
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.last() as StreamCallbacks
+    expect(cb).toBeTruthy()
+
+    act(() => {
+      cb.onToolStart?.("execute_code", { code: "print('hi')" })
+      cb.onCodeExecuting?.(0, 0.5)         // R-5 heartbeat tick #1
+      cb.onCodeExecuting?.(0, 1.5)         // R-5 heartbeat tick #2 (last wins)
+      cb.onCodeStdout?.("hi")              // post-completion line emit
+      cb.onCodeExecutionComplete?.(0, 100, [])
+      cb.onToolEnd?.("execute_code")
+    })
+
+    await waitFor(() => {
+      const tc = result.current.messages
+        .find((m) => m.role === "assistant")?.tool_calls?.[0]
+      // R-5 additive: outputLines write semantics preserved (Rule).
+      expect(tc?.outputLines).toEqual([{ kind: "stdout", content: "hi" }])
+      // R-5 last-heartbeat-wins: 1.5s overwrote 0.5s.
+      expect(tc?.elapsedSeconds).toBe(1.5)
+    })
+
+    void sendPromise
+  })
+
+  /**
+   * D-067.4-R5-01 amended (status gate): once onCodeExecutionComplete fires,
+   * tool status flips to "complete"; subsequent late-arriving onCodeExecuting
+   * heartbeats MUST be no-op (matcher only updates running tools).
+   */
+  it("R-5 elapsed_seconds — only updates execute_code tools with status=running", async () => {
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValue({
+      run_id: "run-A",
+      message_id: "user-msg-1",
+    })
+
+    const { result } = renderHook(() => useMessages())
+
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+
+    let sendPromise!: Promise<void>
+    act(() => {
+      sendPromise = result.current.sendMessage("thread-A", "run code")
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.last() as StreamCallbacks
+    expect(cb).toBeTruthy()
+
+    act(() => {
+      cb.onToolStart?.("execute_code", { code: "print('hi')" })
+      cb.onCodeExecuting?.(0, 0.5)              // status=running → updates
+      cb.onCodeExecutionComplete?.(0, 100, [])  // sets exec data; tool_end will flip status
+      cb.onToolEnd?.("execute_code")            // status -> "done"
+      cb.onCodeExecuting?.(0, 99.0)             // late arrival, status !== "running" → MUST be no-op
+    })
+
+    await waitFor(() => {
+      const tc = result.current.messages
+        .find((m) => m.role === "assistant")?.tool_calls?.[0]
+      // First heartbeat preserved; the late one was rejected by the status gate.
+      expect(tc?.elapsedSeconds).toBe(0.5)
+    })
+
+    void sendPromise
+  })
+})
