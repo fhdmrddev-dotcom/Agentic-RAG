@@ -113,9 +113,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // abortStream STAYS exported from useMessages — still used by genuine
     // timeout cases (loadMessages's loadAbortRef path).
     //
-    // Per-thread message cache (Map<threadId, Message[]>) is the proper
-    // structural fix for the wasted-write window; tracked as future
-    // optimization at this site, OUT OF SCOPE for Phase 067.2.
+    // Phase 067.3 (D-067.3-R1-01) per-thread store now LIVE: useMessages.ts
+    // holds messagesByThread: Map<string, Message[]>. Deltas write to their
+    // streamingThreadIdRef bucket regardless of viewing thread; the visible
+    // `messages` array derives via useMemo against viewedThreadId. The race
+    // this comment used to flag (cross-thread switch loses streamed-into
+    // thread's render) is structurally closed. clearMessages() below now
+    // clears only the active thread's bucket (D-067.3-R1-07).
     clearMessages()
     loadMessages(thread.id).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
