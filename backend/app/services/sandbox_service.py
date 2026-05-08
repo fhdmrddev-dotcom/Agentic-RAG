@@ -130,20 +130,17 @@ def harvest_output_files(
                         "file_size": file_size,
                     }).execute()
 
-                    # Generate signed download URL (1 hour expiry).
-                    # storage3 2.x returns a SignedUrlResponse dataclass, not a dict —
-                    # use attribute access; fall back to dict .get() for older versions.
-                    signed = supabase.storage.from_(
-                        "sandbox-outputs"
-                    ).create_signed_url(storage_path, 3600)
-                    if isinstance(signed, dict):
-                        url = signed.get("signedURL") or signed.get("signedUrl") or signed.get("signed_url", "")
-                    else:
-                        url = getattr(signed, "signedURL", None) or getattr(signed, "signedUrl", None) or ""
-
+                    # D-067.2-03: store the relative re-sign URL instead of the long-form 1h
+                    # signed URL. Each click on this URL goes through GET /sandbox-outputs/{path}
+                    # which authenticates the user, performs the ownership fence, and re-signs
+                    # with a 60s TTL — keeps downloads alive indefinitely beyond the legacy
+                    # 1h cap. Frontend (ExecuteCodeBlock.tsx) prepends VITE_API_BASE_URL when
+                    # url.startsWith("/"); legacy http URLs (already-stored) pass through
+                    # unchanged and decay after 1h as before (legacy decay accepted per
+                    # CONTEXT.md § Claude's Discretion).
                     output_files.append({
                         "filename": fname,
-                        "url": url,
+                        "url": f"/sandbox-outputs/{storage_path}",
                         "size": file_size,
                     })
     except Exception as e:
