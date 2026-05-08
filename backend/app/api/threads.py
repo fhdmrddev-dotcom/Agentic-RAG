@@ -2496,8 +2496,29 @@ async def send_message(
                       await _emit(redis, run_id, 'fallback_model', **sugg_fallback)
                   if questions:
                       await _emit(redis, run_id, 'suggestions', questions=questions[:3])
+                  else:
+                      # Phase 067.3 (D-067.3-R3-03 Task 1b): explicit log when
+                      # generate_suggestions returns []. Distinguishes the
+                      # empty-model-output path (this branch) from the
+                      # silent-swallow path (Task 1a logger.warning below).
+                      logger.info(
+                          "suggestions empty for run %s — generate_suggestions returned [] "
+                          "(no emit; not an error)",
+                          run_id,
+                      )
               except Exception:
-                  pass  # SUG-04: failure never affects main response
+                  # Phase 067.3 (D-067.3-R3-03 Task 1a): observability-first.
+                  # Swap the silent `pass` for logger.warning(exc_info=True).
+                  # SUG-04 invariant preserved — exception still does NOT affect
+                  # the main response (no re-raise; the producer continues to
+                  # stream_end). The log line disambiguates Task 2a (silent
+                  # backend path) from Task 2b (empty model output) when
+                  # correlated with the run_id.
+                  logger.warning(
+                      "suggestion generation failed for run %s — main response unaffected",
+                      run_id,
+                      exc_info=True,
+                  )
 
               # Phase 32: True stream end — frontend returns from streamMessage
               await _emit(redis, run_id, 'stream_end')
