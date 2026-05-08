@@ -62,12 +62,17 @@ def generate_suggestions(
     token_param = "max_completion_tokens" if _uses_max_completion_tokens(effective_model) else "max_tokens"
     _original_model = effective_model
     fallback_info: dict | None = None
+    # Phase 067.4 (D-067.4-R3-01 branch b): GPT-5+ family uses max_completion_tokens
+    # as a UNIFIED budget covering both visible content AND chain-of-thought reasoning.
+    # At 200 tokens reasoning consumes the cap and content="" (finish_reason="length").
+    # 2000 is the empirical floor for `gpt-5.4-mini` on a 3-instruction system prompt.
+    # Non-reasoning models (gpt-4.1-mini, gpt-4o) still fit easily.
     try:
         resp = client.chat.completions.create(
             model=effective_model,
             messages=messages,
             stream=False,
-            **{token_param: 200},
+            **{token_param: 2000},
         )
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
@@ -80,11 +85,13 @@ def generate_suggestions(
             raise
         fallback_info = {"original_model": _original_model, "fallback_model": fallback}
         token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
+        # Phase 067.4 (D-067.4-R3-01 branch b): same unified-budget rationale
+        # applies to the NotFoundError fallback retry — bump 200 → 2000 here too.
         resp = client.chat.completions.create(
             model=fallback,
             messages=messages,
             stream=False,
-            **{token_param2: 200},
+            **{token_param2: 2000},
         )
     content = resp.choices[0].message.content or ""
     # Parse: one question per line, strip empty lines, clamp to 3

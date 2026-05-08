@@ -132,10 +132,17 @@ async def test_always_emit_when_empty(redis_client):
             f"Expected questions=[] (D-067.4-R3-02 empty-emit); "
             f"got {suggestions_events[0].get('questions')!r}"
         )
-        # SUG-04 invariant: stream_end MUST follow
+        # SUG-04 invariant: 'done' terminal MUST be emitted (consumer's
+        # contractual exit). 'stream_end' is emitted by the producer immediately
+        # after 'done' but is NOT visible via SSE replay because the consumer
+        # at runs.py:170 breaks on TERMINAL_TYPES (which includes 'done').
+        # The SUG-04 invariant is the in-process producer contract — verified
+        # via 'done' presence in the wire, with `stream_end` covered by the
+        # static-source check (Plan 01 grep gate: `await _emit(redis, run_id,
+        # 'stream_end')` line preserved in threads.py).
         types_emitted = {e.get("type") for e in events}
-        assert "stream_end" in types_emitted, (
-            f"SUG-04 invariant violated: no 'stream_end' event in stream. "
+        assert "done" in types_emitted, (
+            f"SUG-04 invariant violated: no 'done' terminal in stream. "
             f"Types observed: {types_emitted}"
         )
     finally:
@@ -214,8 +221,12 @@ async def test_narrowed_exception_logs_warning(redis_client):
             "SUG-04 violated: 'suggestions' emitted despite RateLimitError. "
             f"Types observed: {types_emitted}"
         )
-        assert "stream_end" in types_emitted, (
-            "SUG-04 violated: 'stream_end' missing — main response NOT unaffected. "
+        # SUG-04 invariant: main response unaffected. The 'done' terminal
+        # MUST still be emitted (consumer's contractual exit). 'stream_end'
+        # is emitted by the producer post-'done' but not visible via SSE
+        # replay due to the TERMINAL_TYPES break — see test_always_emit_when_empty.
+        assert "done" in types_emitted, (
+            "SUG-04 violated: 'done' missing — main response NOT unaffected. "
             f"Types observed: {types_emitted}"
         )
     finally:
