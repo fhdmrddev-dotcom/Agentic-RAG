@@ -501,6 +501,83 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
   return { doc, isDuplicate: res.status === 200 }
 }
 
+// Phase 067.3 (D-067.3-R2-01/02/04): JS blob fetch+download for
+// /sandbox-outputs/{path}. Plain <a href> clicks send only cookies and
+// the FastAPI get_current_user dependency reads Authorization: Bearer
+// headers exclusively → 401. This helper injects the Bearer token via
+// fetch, follows the 302 to Supabase CDN, downloads as Blob, triggers
+// programmatic <a download> click. NO backend changes (sandbox_outputs.py
+// stays as-is). Right-click "Save link as" falls back to the default
+// browser behavior (raw anchor click → 401) — accepted UX trade-off
+// for chat-history context (D-067.3-R2-03 + Specifics §"R-2 right-click").
+export class DownloadError extends Error {
+  readonly status: number | "network"
+  constructor(status: number | "network", message: string) {
+    super(message)
+    this.status = status
+    this.name = "DownloadError"
+  }
+}
+
+export async function downloadSandboxOutput(
+  relativeUrl: string,
+  filename: string,
+): Promise<void> {
+  // Normalize: prepend API_BASE only for relative URLs (matches
+  // ExecuteCodeBlock.tsx resolveOutputUrl shape — keeps the call site
+  // simple by accepting either form).
+  const url = relativeUrl.startsWith("/") ? `${API_BASE}${relativeUrl}` : relativeUrl
+
+  let token: string
+  try {
+    token = await getAuthToken()
+  } catch {
+    throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+  }
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      // redirect: "follow" is the default; the 302 → Supabase CDN is
+      // auto-followed and the final response carries the file bytes.
+    })
+  } catch {
+    // Network failure (offline, DNS, CORS preflight reject) → status="network".
+    throw new DownloadError("network", "Download failed — try again.")
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+    }
+    if (res.status === 404) {
+      // Backend collapses missing-and-IDOR to 404 (sandbox_outputs.py:48-67
+      // existence-leak prevention) — frontend mirrors that message verbatim.
+      throw new DownloadError(404, "File not found.")
+    }
+    // 5xx + any other non-2xx
+    throw new DownloadError(res.status, "Download failed — try again.")
+  }
+
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement("a")
+    a.href = blobUrl
+    a.download = filename
+    // Append-then-click-then-remove pattern — required by Firefox.
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    // Revoke after a short delay — some browsers are async about the
+    // download trigger and revoking immediately can race the save dialog.
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+  }
+}
+
 export async function deleteDocument(id: string, scope?: "version" | "all"): Promise<void> {
   const headers = await getAuthHeaders()
   const url = scope
