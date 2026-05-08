@@ -4,14 +4,14 @@ milestone: v2.5
 milestone_name: Deployment Strategy
 status: Phase 067.3 OPEN — UAT 9 GREEN / 2 RED (R-3 family) / 2 deferred. Phase 067.2 also stays OPEN alongside (cross-phase D-067.3-WAVE-03 rule).
 stopped_at: Phase 067.4 context gathered
-last_updated: "2026-05-08T21:51:50.415Z"
+last_updated: "2026-05-08T22:54:25.934Z"
 last_activity: 2026-05-09 -- Phase 067.3 UAT executed; 9/12 GREEN, R-3 RED → escalating to Phase 067.4
 progress:
   total_phases: 15
   completed_phases: 12
-  total_plans: 54
+  total_plans: 59
   completed_plans: 54
-  percent: 100
+  percent: 92
 ---
 
 # Project State
@@ -225,4 +225,4 @@ Next: `/gsd:discuss-phase 067.4` → `/gsd:plan-phase 067.4` for the follow-on p
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 067.3 (Streaming Render & Storage Fixes — Round 2) — 5 plans — 2026-05-08T19:52:03.820Z (executed 2026-05-09, OPEN with gaps)
+**Planned Phase:** 067.4 (Streaming Suggestions, Tool-Stage Render & Code-Execution Stream) — 5 plans — 2026-05-08T22:54:25.918Z
