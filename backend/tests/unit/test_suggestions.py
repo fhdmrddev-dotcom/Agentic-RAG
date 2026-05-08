@@ -171,3 +171,72 @@ def test_generate_suggestions_raises_propagated():
                 user_message="What is the answer?",
                 assistant_response="The answer is 42.",
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 067.4 (D-067.4-R3-01 branch b): max_completion_tokens budget bump
+# ---------------------------------------------------------------------------
+
+def test_max_completion_tokens_budget_is_2000_for_gpt5_family():
+    """D-067.4-R3-01 branch (b): when effective_model resolves to gpt-5.4-mini,
+    the call to client.chat.completions.create uses max_completion_tokens=2000
+    (post-fix), NOT 200 (pre-fix; reasoning-token starvation cause).
+
+    GPT-5+ family uses max_completion_tokens as a UNIFIED budget covering both
+    visible content AND chain-of-thought reasoning. At 200 tokens reasoning
+    consumes the cap and content="" (finish_reason="length"). 2000 is the
+    empirical floor for `gpt-5.4-mini` on a 3-instruction system prompt.
+
+    RED on master (token_param=200 at suggestion_service.py:70 and :87).
+    GREEN after Plan 01 budget bump.
+    """
+    mock_client = _make_mock_client("Q1?\nQ2?\nQ3?")
+    user_settings = _make_user_settings(provider="openai", llm_model="gpt-4o")
+
+    with patch("app.services.suggestion_service.get_llm_client", return_value=mock_client), \
+         patch("app.services.suggestion_service.settings") as mock_settings:
+        mock_settings.sub_agent_model = ""
+        mock_settings.llm_model = "fallback-model"
+
+        from app.services import suggestion_service
+        suggestion_service.generate_suggestions(
+            user_message="Search for documents about Fahed Mrad",
+            assistant_response="Found 3 documents about Fahed Mrad: ...",
+            user_settings=user_settings,
+        )
+
+    create_call = mock_client.chat.completions.create.call_args
+    # gpt-5.4-mini → token_param == "max_completion_tokens" (reasoning model)
+    assert create_call.kwargs.get("max_completion_tokens") == 2000, (
+        f"Expected max_completion_tokens=2000 (D-067.4-R3-01 branch b); "
+        f"got kwargs={create_call.kwargs!r}"
+    )
+    assert "max_tokens" not in create_call.kwargs, (
+        "gpt-5.4-mini should use max_completion_tokens (reasoning model), not max_tokens"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 067.4 (D-067.4-R3-01 branch b symptom): empty content clean return
+# ---------------------------------------------------------------------------
+
+def test_empty_content_returns_clean_empty_no_exception():
+    """D-067.4-R3-01 branch (b) symptom: simulate gpt-5.4-mini returning
+    content="" with finish_reason="length" (reasoning-token starvation).
+    generate_suggestions should return ([], None) — no exception.
+
+    GREEN on master today; serves as regression guard against future changes
+    that might raise on empty content (which would trip the broad except
+    upstream and silently swallow suggestions for ANY user).
+    """
+    mock_client = _make_mock_client("")  # empty content
+
+    with patch("app.services.suggestion_service.get_llm_client", return_value=mock_client):
+        from app.services.suggestion_service import generate_suggestions
+        questions, fallback = generate_suggestions(
+            user_message="Hi",
+            assistant_response="Hello",
+        )
+
+    assert questions == [], f"Expected []; got {questions!r}"
+    assert fallback is None, f"Expected None; got {fallback!r}"
