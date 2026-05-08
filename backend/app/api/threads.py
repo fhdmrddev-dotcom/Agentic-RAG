@@ -29,7 +29,7 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
-from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
@@ -946,7 +946,28 @@ async def send_message(
 
     run_id = _uuid_mod.uuid4()
     _resolved_model = body.model if getattr(body, "model", None) else _user_settings.llm_model
-    _resolved_provider = _user_settings.active_provider
+    # D-067.3-N01-01: Resolution order — explicit body.provider (already
+    # applied to _user_settings.active_provider above via override_provider) >
+    # MODEL_CAPABILITIES[model]["provider"] > active_provider fallback.
+    # Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d (claude model + openai
+    # default active_provider → routed to OpenAI SDK → 404). Fix uses the
+    # existing get_model_capability helper which returns provider='unknown'
+    # for unknown models so the fallback chain is naturally safe (D-067.3-N01-02).
+    if body.provider:
+        # Explicit override already applied to _user_settings.active_provider above.
+        _resolved_provider = _user_settings.active_provider
+    else:
+        _capability_provider = get_model_capability(_resolved_model).get("provider", "unknown")
+        if _capability_provider != "unknown":
+            _resolved_provider = _capability_provider
+            # Align _user_settings so downstream agent_runner reads see the
+            # resolved provider for SDK selection (D-067.3-N01-04). The
+            # inner-shadowed `user_settings = _user_settings` at the top of
+            # agent_runner picks this mutation up for free. Use override_provider
+            # to keep the canonical mutation path.
+            _user_settings = override_provider(_user_settings, _resolved_provider)
+        else:
+            _resolved_provider = _user_settings.active_provider
 
     try:
         await aexec(
