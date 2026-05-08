@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: blocked
-stopped_at: Phase 067.2 UAT blocked (3 RED + 1 HIGH new finding) — escalating to Phase 067.3
-last_updated: "2026-05-08T19:05:00.000Z"
-last_activity: 2026-05-08 -- Phase 067.2 UAT closed Branch B; Phase 067.3 queued
+status: Phase OPEN — strict UAT gate not met (7 GREEN, 3 RED, 3 deferred + 2 new findings)
+stopped_at: Phase 067.3 context gathered
+last_updated: "2026-05-08T19:21:53.263Z"
+last_activity: 2026-05-08 -- Plan 06 UAT outcome captured; Phase 067.3 queued
 progress:
-  total_phases: 13
-  completed_phases: 10
+  total_phases: 14
+  completed_phases: 11
   total_plans: 49
-  completed_plans: 43
-  percent: 88
+  completed_plans: 49
+  percent: 100
 ---
 
 # Project State
@@ -30,21 +30,27 @@ Plan: 6/6 plans executed (Plan 06 SUMMARY at .planning/phases/067.2-streaming-re
 Status: Phase OPEN — strict UAT gate not met (7 GREEN, 3 RED, 3 deferred + 2 new findings)
 Last activity: 2026-05-08 -- Plan 06 UAT outcome captured; Phase 067.3 queued
 Blockers (escalated to Phase 067.3):
+
   - **R-1** Row 3 — D-067.2-02b cross-thread switch loses streaming render on the thread you return to (per-thread streaming cache; CONTEXT.md flagged this scope as out-of-scope for 067.2).
   - **R-2** Row 4 — D-067.2-03a sandbox-outputs `/sandbox-outputs/{path}` returns 401 on browser `<a href>` click. Endpoint reads `Authorization: Bearer` header; anchor clicks send only cookies. Fix: token-in-URL pattern (signed short-lived JWT in query param) OR JS blob download via fetch+Bearer.
   - **R-3** Row 6 — D-067.2-04 confidence badge renders, suggestion pills don't. Confirms Plan 04 INVESTIGATION-NOTES side observation: post-`done` suggestions block at threads.py:2477 either silently errors or returns empty; OR frontend gate filters render. Investigation needed.
   - **N-01** (HIGH) Model→provider router at threads.py:949 uses `user_settings.active_provider`, ignoring `MODEL_CAPABILITIES[model]["provider"]`. Anthropic models routed through OpenAI SDK → 404. ~5-line fix: prefer capability registry. Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d.
+
 Deferred:
+
   - Row 5 (D-067.2-03b 90-min wait) blocked by R-2.
   - Rows 11/12 (kimi/minimax live timeout) — Plan 05 smoke ✓; symmetric Track A evidence via Row 9 (sonnet timeout `runs.error='timed_out: 10s per-call deadline exceeded at iteration 4'`, clean cancellation, NOT `GeneratorExit at run_helpers.py:1680`).
   - **N-02** (UX/cost concern, defer) Multi-step pipeline self-QA = 8 of 14 tool_calls on opus pptx run. Cap via SYSTEM_PROMPT or MAX_SELF_QA_ITERATIONS in a future UX phase.
+
 Phase 067.2 GREEN summary (working, do not regress):
+
   - Plan 01 streaming-render race fix (useLayoutEffect alignment) — Rows 1, 2 confirmed; new-thread + F5 mid-stream paths.
   - Plan 02 auto-title hoist — Rows 7, 8 confirmed (Stop + synthetic timeout titles).
   - Plan 03 sandbox-outputs endpoint LOGIC works (path-segment fence, sandbox_files lookup, 60s TTL re-sign, 302 redirect) — but the auth integration is broken for `<a href>` clicks (R-2).
   - Plan 04 audit predicted no-op for confidence; confidence ✓, suggestions ✗ (R-3).
   - Plan 05 multi-provider smoke ✓ for all 4 models; Plan 01 Track A helper symmetry confirmed via Row 9.
   - NR-1, NR-2 — Phase 067.1 / 066 contracts still hold.
+
 Next action: Plan Phase 067.3 (`/gsd:plan-phase 067.3`) — Plan 01 N-01 routing fix (HIGH) → Plan 02 R-2 sandbox-outputs auth (token-in-URL or JS blob) → Plan 03 R-3 suggestions render investigation → Plan 04 R-1 per-thread streaming cache. After 067.3 ships, re-run rows 3/4/5/6 + complete deferred 11/12 to close 067.2's UAT gate.
 
 ## Recent Completed Phases
@@ -186,7 +192,7 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 067 context gathered
+Stopped at: Phase 067.3 context gathered
 Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:discuss-phase`) for the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** to address Gap-006.
 
 **Completed Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5/5 plans — closed 2026-05-04 (UAT `partial`, project-level `approved`)
