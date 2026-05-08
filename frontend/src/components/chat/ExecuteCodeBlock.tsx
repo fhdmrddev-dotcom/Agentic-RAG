@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react"
+import type { MouseEvent } from "react"
 import { Terminal, CheckCircle2, XCircle, Loader2, Download, Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { downloadSandboxOutput, DownloadError } from "@/lib/api"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
 
 // D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
@@ -35,17 +37,64 @@ interface ExecuteCodeBlockProps {
   tc: ToolCall
 }
 
+// Phase 067.3 (D-067.3-R2-03/04): JS blob fetch+download click intercept.
+// onClick prevents the default anchor navigation (which would hit 401 because
+// browsers send only cookies, not Authorization: Bearer), runs the helper
+// from lib/api.ts which injects the Bearer token via fetch, follows the
+// 302 to Supabase CDN, and triggers a programmatic <a download> click.
+// The static <a href> is preserved so right-click "Save link as" still
+// has a real target — the resulting raw click will 401, which is an
+// accepted UX trade-off (rare in chat-history context).
 function OutputFileCard({ file }: { file: OutputFile }) {
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
+
+  const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    if (downloading) return
+    setDownloading(true)
+    setDownloadError(null)
+    try {
+      await downloadSandboxOutput(file.url, file.filename)
+    } catch (err) {
+      // D-067.3-R2-04 status-specific copy; messages already set inside the helper.
+      if (err instanceof DownloadError) {
+        setDownloadError({ status: err.status, message: err.message })
+      } else {
+        setDownloadError({ status: "network", message: "Download failed — try again." })
+      }
+      // Auto-clear after 3s — non-blocking, lightweight feedback (no toast lib in repo).
+      setTimeout(() => setDownloadError(null), 3000)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
     <a
-      href={resolveOutputUrl(file.url)}
+      href={resolveOutputUrl(file.url)} /* preserved so right-click 'Save link as' has a real target — accepted 401 trade-off (D-067.3-R2-03) */
       download={file.filename}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2.5 rounded-md bg-muted/30 ghost-border px-3 py-2 text-xs hover:bg-accent/40 transition-colors group"
+      onClick={handleClick}
+      aria-disabled={downloading}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md ghost-border px-3 py-2 text-xs transition-colors group",
+        downloading ? "bg-muted/30 opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
+        downloadError ? "border border-red-500/40" : "",
+      )}
     >
-      <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-      <span className="flex-1 font-mono text-foreground/80 truncate">{file.filename}</span>
+      {downloading ? (
+        <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
+      ) : (
+        <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+      )}
+      <span className="flex-1 min-w-0 flex flex-col">
+        <span className="font-mono text-foreground/80 truncate">{file.filename}</span>
+        {downloadError && (
+          <span className="text-red-400 text-[10px] truncate">{downloadError.message}</span>
+        )}
+      </span>
       <span className="text-muted-foreground/50 flex-shrink-0">{formatBytes(file.size)}</span>
     </a>
   )
