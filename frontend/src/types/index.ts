@@ -40,6 +40,12 @@ export interface ToolCall {
   executionDurationMs?: number
   exitCode?: number
   errorMessage?: string
+  /** Phase 067.4 R-5 (D-067.4-R5-01 amended): live elapsed seconds during sandbox
+   * execution. Updated by `onCodeExecuting` heartbeat ticks (~1 Hz) while
+   * `status === "running"`; `ExecuteCodeBlock` renders this as a tabular-nums
+   * counter next to the spinner. Replaced by the post-completion duration badge
+   * (`executionDurationMs`) once execution completes. */
+  elapsedSeconds?: number
   /** D-067-03: 0-based iteration index from iteration_start SSE event. Used by
    * ToolCallPanel to render "Step N" gradient dividers between iteration groups.
    * Undefined for tool calls loaded from DB (historical messages — no divider). */

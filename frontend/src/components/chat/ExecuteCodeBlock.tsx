@@ -207,6 +207,17 @@ export function ExecuteCodeBlock({ tc }: ExecuteCodeBlockProps) {
             {formatDuration(executionDurationMs)}
           </span>
         )}
+        {/* Phase 067.4 R-5 (D-067.4-R5-01 amended): live elapsed counter during
+            execution. Hidden once `executionDurationMs` lands (post-completion
+            duration badge above takes over). Mirrors the post-completion badge
+            shape verbatim — same Clock icon, same formatDuration helper, same
+            Tailwind classes. */}
+        {isRunning && !isComplete && tc.elapsedSeconds != null && tc.elapsedSeconds > 0 && (
+          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
+            <Clock className="w-2.5 h-2.5" />
+            {formatDuration(tc.elapsedSeconds * 1000)}
+          </span>
+        )}
         {/* Status indicator */}
         <span className="flex-shrink-0">
           {isRunning && !isComplete ? (

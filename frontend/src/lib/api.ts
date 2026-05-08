@@ -182,6 +182,12 @@ export interface StreamCallbacks {
    * Fires AFTER skill_activated when the skill row's description column is non-empty. */
   onSkillLoaded?: (skillName: string, description: string) => void
   onCodeExecutionStart?: (codePreview: string) => void
+  /** Phase 067.4 R-5 (D-067.4-R5-01 amended): heartbeat tick during sandbox execution.
+   * Backend emits `code_executing` SSE every ~1 s carrying tool_index + elapsed_seconds;
+   * the hook handler updates tool_calls[N].elapsedSeconds for the matching execute_code
+   * tool with status==='running'. Strictly additive — does NOT replace post-completion
+   * line emit (`onCodeStdout` / `onCodeStderr` still fire after `code_execution_complete`). */
+  onCodeExecuting?: (toolIndex: number, elapsedSeconds: number) => void
   onCodeStdout?: (content: string) => void
   onCodeStderr?: (content: string) => void
   onCodeExecutionComplete?: (
@@ -347,6 +353,12 @@ export async function subscribeToRun(
           callbacks.onSkillLoaded(parsed.skill_name as string, parsed.description as string)
         else if (t === "code_execution_start" && callbacks.onCodeExecutionStart)
           callbacks.onCodeExecutionStart(parsed.code_preview as string)
+        // Phase 067.4 R-5 (D-067.4-R5-01 amended): code_executing heartbeat —
+        // backend emits ~every 1 s during sandbox execution carrying tool_index
+        // + elapsed_seconds. Inserted before code_stdout to keep heartbeat dispatch
+        // contiguous with execution-lifecycle events.
+        else if (t === "code_executing" && callbacks.onCodeExecuting)
+          callbacks.onCodeExecuting(parsed.tool_index as number, parsed.elapsed_seconds as number)
         else if (t === "code_stdout" && callbacks.onCodeStdout)
           callbacks.onCodeStdout(parsed.content as string)
         else if (t === "code_stderr" && callbacks.onCodeStderr)

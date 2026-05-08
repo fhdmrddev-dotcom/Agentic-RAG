@@ -253,6 +253,31 @@ function makeStreamCallbacks(opts: {
     },
     // onCodeExecutionStart — no-op (tool_start already created the ToolCall entry)
     onCodeExecutionStart: undefined,
+    // Phase 067.4 R-5 (D-067.4-R5-01 amended): heartbeat tick during sandbox
+    // execution. Updates tool_calls[N].elapsedSeconds; ExecuteCodeBlock renders
+    // this next to the spinner. Strictly additive — does NOT touch tc.outputLines
+    // (preserved post-completion path).
+    //
+    // toolIndex is accepted in the signature but not used in the matcher:
+    // matching by `name === "execute_code" && status === "running"` is more
+    // robust because the server-side tool_index may not align with the client
+    // tool_calls[] array index when retries / skips occur. Once `tool_end`
+    // flips status to "done", late-arriving heartbeats are no-op (status gate
+    // enforced by Test 4 in the Wave 0 vitest).
+    onCodeExecuting: (toolIndex: number, elapsedSeconds: number) => {
+      void toolIndex // intentionally unused — see comment above.
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, elapsedSeconds }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
     // onCodeStdout
     onCodeStdout: (content: string) => {
       setMessages((prev) =>
