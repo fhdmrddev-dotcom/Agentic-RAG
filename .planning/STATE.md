@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: executing
-stopped_at: Phase 067 context gathered
-last_updated: "2026-05-08T13:26:24.951Z"
-last_activity: 2026-05-08 -- Phase 067.2 execution started
+status: blocked
+stopped_at: Phase 067.2 UAT blocked (3 RED + 1 HIGH new finding) — escalating to Phase 067.3
+last_updated: "2026-05-08T19:05:00.000Z"
+last_activity: 2026-05-08 -- Phase 067.2 UAT closed Branch B; Phase 067.3 queued
 progress:
   total_phases: 13
   completed_phases: 10
@@ -21,15 +21,31 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 067.2 — streaming-render-and-storage-fixes
+**Current focus:** Phase 067.2 — streaming-render-and-storage-fixes (UAT BLOCKED — escalating to 067.3)
 
 ## Current Position
 
-Phase: 067.2 (streaming-render-and-storage-fixes) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 067.2
-Last activity: 2026-05-08 -- Phase 067.2 execution started
-Next action: (1) Run `/gsd:verify-work` on Phase 063.1 to gate completion. (2) Plan the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** (Gap-006 escalation) — addresses LLM agent stopping mid-iteration on complex tool-calling prompts; user-preferred fix paths are per-iteration timeout budget + split `cancelled` (user) vs `timed_out` (system) lifecycle states. (3) Carry-forward UAT items (SC#5 cross-tab Stop, SC#6 Resume live, SC#7 full 063 regression) belong to next manual UAT pass — non-blocking per Phase 063 precedent. Plan 05 deliverables: 3 e2e specs (`2ce760f`, `183b041`) + filled HUMAN-UAT.md + 063.1-05-SUMMARY.md. Live-bundle verification via Chrome MCP confirmed all four Wave 2/3/4 markers (`lastSeenOffsetRef`, `m.runId === run.run_id`, `abortStream` removal in ChatArea.tsx, `reconcileInFlightRef` + `temp-` MERGE filter) are served at `localhost:5173`. User's earlier observations of "delays / blank-on-fast-nav / late-stream rendering" predated Wave 3 + Wave 4 commits — they were testing pre-fix bundle in a stale tab.
+Phase: 067.2 (streaming-render-and-storage-fixes) — UAT BLOCKED (Branch B closure)
+Plan: 6/6 plans executed (Plan 06 SUMMARY at .planning/phases/067.2-streaming-render-and-storage-fixes/067.2-06-SUMMARY.md)
+Status: Phase OPEN — strict UAT gate not met (7 GREEN, 3 RED, 3 deferred + 2 new findings)
+Last activity: 2026-05-08 -- Plan 06 UAT outcome captured; Phase 067.3 queued
+Blockers (escalated to Phase 067.3):
+  - **R-1** Row 3 — D-067.2-02b cross-thread switch loses streaming render on the thread you return to (per-thread streaming cache; CONTEXT.md flagged this scope as out-of-scope for 067.2).
+  - **R-2** Row 4 — D-067.2-03a sandbox-outputs `/sandbox-outputs/{path}` returns 401 on browser `<a href>` click. Endpoint reads `Authorization: Bearer` header; anchor clicks send only cookies. Fix: token-in-URL pattern (signed short-lived JWT in query param) OR JS blob download via fetch+Bearer.
+  - **R-3** Row 6 — D-067.2-04 confidence badge renders, suggestion pills don't. Confirms Plan 04 INVESTIGATION-NOTES side observation: post-`done` suggestions block at threads.py:2477 either silently errors or returns empty; OR frontend gate filters render. Investigation needed.
+  - **N-01** (HIGH) Model→provider router at threads.py:949 uses `user_settings.active_provider`, ignoring `MODEL_CAPABILITIES[model]["provider"]`. Anthropic models routed through OpenAI SDK → 404. ~5-line fix: prefer capability registry. Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d.
+Deferred:
+  - Row 5 (D-067.2-03b 90-min wait) blocked by R-2.
+  - Rows 11/12 (kimi/minimax live timeout) — Plan 05 smoke ✓; symmetric Track A evidence via Row 9 (sonnet timeout `runs.error='timed_out: 10s per-call deadline exceeded at iteration 4'`, clean cancellation, NOT `GeneratorExit at run_helpers.py:1680`).
+  - **N-02** (UX/cost concern, defer) Multi-step pipeline self-QA = 8 of 14 tool_calls on opus pptx run. Cap via SYSTEM_PROMPT or MAX_SELF_QA_ITERATIONS in a future UX phase.
+Phase 067.2 GREEN summary (working, do not regress):
+  - Plan 01 streaming-render race fix (useLayoutEffect alignment) — Rows 1, 2 confirmed; new-thread + F5 mid-stream paths.
+  - Plan 02 auto-title hoist — Rows 7, 8 confirmed (Stop + synthetic timeout titles).
+  - Plan 03 sandbox-outputs endpoint LOGIC works (path-segment fence, sandbox_files lookup, 60s TTL re-sign, 302 redirect) — but the auth integration is broken for `<a href>` clicks (R-2).
+  - Plan 04 audit predicted no-op for confidence; confidence ✓, suggestions ✗ (R-3).
+  - Plan 05 multi-provider smoke ✓ for all 4 models; Plan 01 Track A helper symmetry confirmed via Row 9.
+  - NR-1, NR-2 — Phase 067.1 / 066 contracts still hold.
+Next action: Plan Phase 067.3 (`/gsd:plan-phase 067.3`) — Plan 01 N-01 routing fix (HIGH) → Plan 02 R-2 sandbox-outputs auth (token-in-URL or JS blob) → Plan 03 R-3 suggestions render investigation → Plan 04 R-1 per-thread streaming cache. After 067.3 ships, re-run rows 3/4/5/6 + complete deferred 11/12 to close 067.2's UAT gate.
 
 ## Recent Completed Phases
 
