@@ -3,6 +3,23 @@ import { Terminal, CheckCircle2, XCircle, Loader2, Download, Clock, ChevronDown,
 import { cn } from "@/lib/utils"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
 
+// D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
+// by the backend's harvest_output_files (e.g. "/sandbox-outputs/{path}"). The
+// `API_BASE` constant inside lib/api.ts is not exported, so we read the env
+// var directly here. Kept module-local because ExecuteCodeBlock is currently
+// the only consumer that resolves OutputFile.url.
+const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ""
+
+function resolveOutputUrl(url: string): string {
+  // D-067.2-03: new sandbox outputs store relative URLs (`/sandbox-outputs/{path}`);
+  // prepend API_BASE for those. Legacy outputs (already-stored long-form
+  // signed URLs starting with "http") pass through unchanged — they decay
+  // after 1h as before (legacy decay accepted per CONTEXT.md § Claude's
+  // Discretion).
+  if (url.startsWith("/")) return `${API_BASE}${url}`
+  return url
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -21,7 +38,7 @@ interface ExecuteCodeBlockProps {
 function OutputFileCard({ file }: { file: OutputFile }) {
   return (
     <a
-      href={file.url}
+      href={resolveOutputUrl(file.url)}
       download={file.filename}
       target="_blank"
       rel="noopener noreferrer"
