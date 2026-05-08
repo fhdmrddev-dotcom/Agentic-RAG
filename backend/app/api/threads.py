@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 # WR-01 fix: removed dead imports `AsyncGenerator` and `EventSourceResponse`
 # left over from the legacy SSE-on-POST path (deleted in D-063-01).
 import openai
@@ -983,6 +984,55 @@ async def send_message(
         except Exception:
             pass
         raise
+
+    # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
+    # but BEFORE the agent producer task starts (asyncio.create_task at the bottom
+    # of this handler). Title is derived from the user message alone — independent
+    # of run outcome — so the title persists regardless of success / failure /
+    # timeout / cancellation / exception (closes D-067.2-05a + D-067.2-05b).
+    #
+    # Option B placeholder check (PATTERNS.md § 6 recommendation): only auto-title
+    # when threads.title is the canonical "New Chat" default. Avoids re-titling an
+    # existing thread whose user added a follow-up message AND avoids the
+    # count-query race when the agent retries with the same thread_id.
+    try:
+        _title_check = await aexec(
+            supabase.table("threads").select("title").eq("id", thread_id).single()
+        )
+        _existing_title = (_title_check.data or {}).get("title") if _title_check is not None else None
+        if _existing_title == "New Chat":
+            # generate_thread_title is sync (def at line ~660) and makes a blocking
+            # provider SDK call (client.chat.completions.create) — wrap with
+            # run_in_threadpool per CLAUDE.md D-v2.5-01.
+            _title, _title_fallback = await run_in_threadpool(
+                generate_thread_title,
+                body.content,
+                _user_settings,
+            )
+            # Ordering invariant (preserved from the original :2398-2408 block):
+            # fallback_model emit fires BEFORE title emit when title_fallback is
+            # non-empty.
+            if _title_fallback:
+                await _emit(redis, run_id, 'fallback_model', **_title_fallback)
+            try:
+                await aexec(
+                    supabase.table("threads").update({"title": _title}).eq("id", thread_id)
+                )
+                await _emit(redis, run_id, 'title', content=_title)
+            except Exception as e:
+                logger.warning(
+                    "D-067.2-05 title persist/emit failed at run start: %s", e,
+                    exc_info=True,
+                )
+    except Exception as e:
+        # Outer try guards the title-check query AND the run_in_threadpool call —
+        # never block the run on title-generation failure (matches the original
+        # :2398-2408 block's exception-swallow stance, with a logger.warning
+        # upgrade per CONTEXT.md D-067.2-05 fix shape).
+        logger.warning(
+            "D-067.2-05 title generation skipped due to setup error: %s", e,
+            exc_info=True,
+        )
 
     async def agent_runner(run_id: _uuid_mod.UUID) -> None:
         """Producer task — XADDs every SSE event to run:{run_id} Redis Stream.
@@ -2395,17 +2445,16 @@ async def send_message(
               except Exception:
                   pass
 
-              # Auto-title: generate on first exchange (history had exactly 1 message = first user msg)
-              if len(history_resp.data) == 1 and history_resp.data[0]["role"] == "user":
-                  first_user_msg = history_resp.data[0]["content"]
-                  title, title_fallback = generate_thread_title(first_user_msg, user_settings=user_settings)
-                  if title_fallback:
-                      await _emit(redis, run_id, 'fallback_model', **title_fallback)
-                  try:
-                      await aexec(supabase.table("threads").update({"title": title}).eq("id", thread_id))
-                      await _emit(redis, run_id, 'title', content=title)
-                  except Exception:
-                      pass
+              # D-067.2-05: title generation moved to send_message handler (fires
+              # AFTER the user-message INSERT, BEFORE this producer task spawns).
+              # See the hoisted block at the bottom of send_message (just before
+              # `async def agent_runner`). Title now persists regardless of run
+              # outcome — success / failure / timeout / cancellation / exception.
+              # The original block that previously lived here only fired on the
+              # success path (between _persist_assistant_message and the 'done'
+              # _emit), causing "stuck on 'New Chat' forever after a failed/
+              # cancelled run" (D-067.2-05a + D-067.2-05b). Deleted in plan
+              # 067.2-02 so title cannot fire twice on success.
 
               # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
               # Phase 061: this 'done' event flows through the regular MAXLEN-bounded _emit path.
