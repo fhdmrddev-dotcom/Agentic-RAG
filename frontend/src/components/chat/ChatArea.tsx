@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
@@ -76,10 +76,17 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-  useEffect(() => {
-    // D-060-08: setViewingThread is the FIRST action — it must run before any concurrent
-    // loadMessages resolution checks activeThreadIdRef. Sole writer per D-060-01.
+  // D-067.2-02: useLayoutEffect commits the activeThreadIdRef write SYNCHRONOUSLY
+  // after DOM mutation but BEFORE any sibling useEffect (including the
+  // reconcile-trigger useEffect at :163). Guarantees activeThreadIdRef.current === thread.id
+  // before reconcileRef.current(tid) fires, so guardedSetMessages at useMessages.ts:866-871
+  // does NOT no-op the replay-from-offset-0 events on F5 / mid-stream navigation.
+  // D-060-08: setViewingThread remains the SOLE writer of activeThreadIdRef per D-060-01.
+  useLayoutEffect(() => {
     setViewingThread(thread?.id ?? null)
+  }, [thread?.id])
+
+  useEffect(() => {
     if (!thread) {
       clearMessages()
       return
@@ -91,38 +98,26 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       justCreatedThreadRef.current = null
       return
     }
-    // D-063.1-07 / Gap-003: abortStream() removed here. Lets the in-flight
-    // sendMessage SSE consumer survive thread switch. The consumer keeps
-    // writing through the guardedSetMessages no-op (D-063.1-08) until the
-    // user navigates back. Cleanup of consumer-side sockets remains owned by:
+    // D-063.1-07 / Gap-003 (PRESERVED — DO NOT RE-ADD abortStream() HERE):
+    // abortStream() is DELIBERATELY NOT called in this effect. Letting the
+    // in-flight sendMessage SSE consumer survive thread switch is load-bearing:
+    // the consumer keeps writing through the guardedSetMessages no-op
+    // (D-063.1-08) until the user navigates back. Cleanup of consumer-side
+    // sockets remains owned by:
     //   1. loadAbortRef.current?.abort() inside loadMessages — cancels stale
     //      getMessages fetches; UNCHANGED.
-    //   2. Hook unmount effect (useMessages.ts:805-815) — aborts all
-    //      subscriptions on hook teardown (logout/route); UNCHANGED.
+    //   2. Hook unmount effect (useMessages.ts) — aborts all subscriptions
+    //      on hook teardown (logout/route); UNCHANGED.
     //   3. onTerminal cleanup in sendMessage / reconcile — deletes from
     //      subscriptionsRef when SSE actually terminates server-side; UNCHANGED.
     // abortStream STAYS exported from useMessages — still used by genuine
-    // timeout cases (loadMessages's loadAbortRef path). Only THIS call site
-    // is removed.
+    // timeout cases (loadMessages's loadAbortRef path).
     //
-    // WR-07 acknowledgement: clearMessages() IS still called below on every
-    // thread switch. The D-063.1-07 SSE-survival guarantee is "the in-flight
-    // sendMessage SSE consumer keeps writing to the dropped placeholder
-    // (under guardedSetMessages no-op) until the user navigates back, at
-    // which point reconcile + loadMessages converge on the persisted DB row
-    // (via the runId-match dedup at D-063.1-04)". The cost is wasted SSE
-    // writes between switch-away and switch-back AND a re-fetch on
-    // switch-back. A per-thread message cache (Map<threadId, Message[]>)
-    // would close that gap, but it is a substantial refactor and the
-    // current behavior is functionally correct. Tracked as a future
-    // optimization, NOT a blocker; do NOT remove clearMessages() here
-    // without first hoisting a thread-keyed cache that re-hydrates on
-    // switch-back.
+    // Per-thread message cache (Map<threadId, Message[]>) is the proper
+    // structural fix for the wasted-write window; tracked as future
+    // optimization at this site, OUT OF SCOPE for Phase 067.2.
     clearMessages()
     loadMessages(thread.id).catch(console.error)
-    // Phase 060 deletes the 8s fallback timer (D-060-07b) and the tab-visibility
-    // listener (D-060-07c). Phase 061 reintroduces tab-switch + F5 recovery via the
-    // proper polling/tab-visibility/pageshow mechanism on this clean foundation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id])
 
@@ -192,6 +187,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
       justCreatedThreadRef.current = activeThread.id
+      // D-067.2-01: synchronously align activeThreadIdRef BEFORE sendMessage
+      // begins. sendMessage sets streamingThreadIdRef.current = threadId at
+      // useMessages.ts:513 and the first onDelta arrives ms later;
+      // guardedSetMessages at useMessages.ts:623-628 no-ops the delta unless
+      // streamingThreadIdRef === activeThreadIdRef. Without this line the
+      // useLayoutEffect at the top of this component does not fire until the
+      // parent re-renders with the new `thread` prop (50-500ms after
+      // onCreateThread resolves), and every delta in the gap is silently
+      // dropped — the empty-until-end-of-run user-observable failure.
+      setViewingThread(activeThread.id)
     }
     await sendMessage(
       activeThread.id,
