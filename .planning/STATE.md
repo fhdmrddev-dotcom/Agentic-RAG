@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: Phase 067.3 OPEN — strict UAT gate not met (R-3 RED, 067.2 Row 6 RED mirror); follow-on phase 067.4 needed for suggestion-emit fix + carry-forward 067.2 OpenRouter timeout rows
-stopped_at: Phase 067.3 Plan 05 — UAT executed with gaps; escalating to Phase 067.4
-last_updated: "2026-05-09T00:00:00.000Z"
+status: Phase 067.3 OPEN — UAT 9 GREEN / 2 RED (R-3 family) / 2 deferred. Phase 067.2 also stays OPEN alongside (cross-phase D-067.3-WAVE-03 rule).
+stopped_at: Phase 067.4 context gathered
+last_updated: "2026-05-08T21:51:50.415Z"
 last_activity: 2026-05-09 -- Phase 067.3 UAT executed; 9/12 GREEN, R-3 RED → escalating to Phase 067.4
 progress:
-  total_phases: 14
-  completed_phases: 11
+  total_phases: 15
+  completed_phases: 12
   total_plans: 54
-  completed_plans: 49
-  percent: 91
+  completed_plans: 54
+  percent: 100
 ---
 
 # Project State
@@ -200,8 +200,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-09
-Stopped at: Phase 067.3 Plan 05 closed — UAT executed with gaps; escalating to Phase 067.4
+Last session: --stopped-at
+Stopped at: Phase 067.4 context gathered
 Next: `/gsd:discuss-phase 067.4` → `/gsd:plan-phase 067.4` for the follow-on phase covering (a) R-3 suggestion-emit fix [primary, gate-blocking] and (b) carry-forward 067.2-11 + 067.2-12 OpenRouter timeout regression checks [secondary]. After 067.4 ships, BOTH Phase 067.2 AND Phase 067.3 close alongside Phase 067.4 via the cross-phase D-067.3-WAVE-03 closure rule (now extended to 067.4).
 
 **Phases OPEN (cross-phase blocked):**
