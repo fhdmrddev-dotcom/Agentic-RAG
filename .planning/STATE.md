@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: executing
-stopped_at: Phase 067.3 context gathered
-last_updated: "2026-05-08T19:54:09.672Z"
-last_activity: 2026-05-08 -- Phase 067.3 execution started
+status: Phase 067.3 OPEN — strict UAT gate not met (R-3 RED, 067.2 Row 6 RED mirror); follow-on phase 067.4 needed for suggestion-emit fix + carry-forward 067.2 OpenRouter timeout rows
+stopped_at: Phase 067.3 Plan 05 — UAT executed with gaps; escalating to Phase 067.4
+last_updated: "2026-05-09T00:00:00.000Z"
+last_activity: 2026-05-09 -- Phase 067.3 UAT executed; 9/12 GREEN, R-3 RED → escalating to Phase 067.4
 progress:
   total_phases: 14
   completed_phases: 11
@@ -25,22 +25,29 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 
 ## Current Position
 
-Phase: 067.3 (streaming-render-and-storage-fixes-round-2) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 067.3
-Last activity: 2026-05-08 -- Phase 067.3 execution started
-Blockers (escalated to Phase 067.3):
+Phase: 067.3 (streaming-render-and-storage-fixes-round-2) — **EXECUTED-WITH-GAPS** (Plan 05 closing UAT shipped; strict 12/12 GREEN gate NOT met; escalating to Phase 067.4)
+Plan: 5 of 5 (Plan 05 closed; gap-escalation branch)
+Status: Phase 067.3 OPEN — UAT 9 GREEN / 2 RED (R-3 family) / 2 deferred. Phase 067.2 also stays OPEN alongside (cross-phase D-067.3-WAVE-03 rule).
+Last activity: 2026-05-09 -- Phase 067.3 UAT executed; 9/12 GREEN, R-3 RED → escalating to Phase 067.4
 
-  - **R-1** Row 3 — D-067.2-02b cross-thread switch loses streaming render on the thread you return to (per-thread streaming cache; CONTEXT.md flagged this scope as out-of-scope for 067.2).
-  - **R-2** Row 4 — D-067.2-03a sandbox-outputs `/sandbox-outputs/{path}` returns 401 on browser `<a href>` click. Endpoint reads `Authorization: Bearer` header; anchor clicks send only cookies. Fix: token-in-URL pattern (signed short-lived JWT in query param) OR JS blob download via fetch+Bearer.
-  - **R-3** Row 6 — D-067.2-04 confidence badge renders, suggestion pills don't. Confirms Plan 04 INVESTIGATION-NOTES side observation: post-`done` suggestions block at threads.py:2477 either silently errors or returns empty; OR frontend gate filters render. Investigation needed.
-  - **N-01** (HIGH) Model→provider router at threads.py:949 uses `user_settings.active_provider`, ignoring `MODEL_CAPABILITIES[model]["provider"]`. Anthropic models routed through OpenAI SDK → 404. ~5-line fix: prefer capability registry. Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d.
+Blockers (escalated to Phase 067.4):
 
-Deferred:
+  - **R-3** Row R-3 + Row 067.2-6 (cross-phase mirror) — Suggestion pills not emitted to SSE for Fahed-Mrad search-only prompts. Two separate run_ids confirmed: `36b509e2-b281-4de2-af79-70d9df73334d` (initial) + `00dcf270-3773-44e2-8181-6ee36169dc03` (retest after `max_tokens` 200→800 hypothesis bump). SSE replay (`/runs/{id}/stream?since=0`) `uniqueKinds` shows: `[title, iteration_start, tool_preparing, tool_start, tool_end, planning, delta, sources, citations, confidence, done]` — NO `suggestions` event, NO `fallback_model` event. The emit at `backend/app/api/threads.py:2477` is never reached, OR is reached with `questions=[]`. Confidence indicator renders correctly across both runs ("Low confidence" / "Medium confidence"); only the suggestion-pills rendering is broken. **Hypothesis disconfirmed:** `max_tokens` budget bump 200→800 in `backend/app/services/suggestion_service.py:75/92` did NOT fix it. Retest run `00dcf270-3773-…` ALSO produced no `suggestions` event in SSE. Root cause is elsewhere. Phase 067.4 must investigate `backend/app/services/suggestion_service.py` + threads.py 2487-2526 emit-path. Likely candidate causes for 067.4: (1) `client.chat.completions.create(...)` raising a non-`NotFoundError` exception that the broad `except Exception:` at threads.py:2509 swallows (Plan 04 instrumentation `logger.warning("suggestion generation failed", exc_info=True)` should yield a stack trace in uvicorn stdout — capture next); (2) `gpt-5.4-mini` reasoning-token consumption with even 800-token budget; consider 2000 or model swap; (3) JSON output parser miscount (response.choices[0].message.content empty due to function-call-style response wrapping that's not flowing to the structured-output path).
+  - **NR-deferred-row-067.2-11** Row 067.2-11 — OpenRouter Kimi 2.5 live timeout regression. Carry-forward from Phase 067.2; **`OPENROUTER_API_KEY` IS present** in `backend/.env`, but synthetic-timeout protocol was not exercised during 067.3 UAT (out of 067.3 plan-set scope per D-067.3-WAVE-03 multi-provider availability rule). Phase 067.4 must run synthetic-timeout protocol: set `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10`, restart uvicorn, submit a long-form prompt with model=kimi-k2.5 → confirm `runs.status='timed_out'` + `runs.error='timed_out: 10s per-call deadline exceeded at iteration N (model=moonshotai/kimi-k2.5)'`. Clean cancellation format (NOT `GeneratorExit`).
+  - **NR-deferred-row-067.2-12** Row 067.2-12 — OpenRouter MiniMax 2.7 live timeout regression. Same carry-forward situation as 067.2-11. Phase 067.4 must run synthetic-timeout protocol with model=`minimax/minimax-m2.7`.
 
-  - Row 5 (D-067.2-03b 90-min wait) blocked by R-2.
-  - Rows 11/12 (kimi/minimax live timeout) — Plan 05 smoke ✓; symmetric Track A evidence via Row 9 (sonnet timeout `runs.error='timed_out: 10s per-call deadline exceeded at iteration 4'`, clean cancellation, NOT `GeneratorExit at run_helpers.py:1680`).
-  - **N-02** (UX/cost concern, defer) Multi-step pipeline self-QA = 8 of 14 tool_calls on opus pptx run. Cap via SYSTEM_PROMPT or MAX_SELF_QA_ITERATIONS in a future UX phase.
+Phase 067.3 GREEN summary (closed in this phase, do not re-litigate):
+
+  - **R-1** (Plan 03 — per-thread message store via `messagesByThread` Map): cross-thread switch mid-stream now preserves the streamed-into thread's render. Verified via 2 concurrent multi-step streaming threads (run_ids `8cb9c8cd-…` + `7742ed37-…`); both rendered full content, no cross-talk, no token loss. Mirrors 067.2 Row 3 GREEN.
+  - **R-2** (Plan 02 — sandbox download via JS blob fetch+download helper in `frontend/src/lib/api.ts:downloadSandboxOutput`): pgvector docx download verified end-to-end (run_id `906fcf04-…`); 302 redirect to Supabase CDN → 200, zero 401s. Mirrors 067.2 Row 4 GREEN.
+  - **R-2-IDOR** (Plan 02 — D-067.3-R2-05 cross-user IDOR): existence-leak prevention at `backend/app/api/sandbox_outputs.py:48-67` returns 404 to foreign user_id paths. Verified via technical-equivalent (same JWT + foreign user_id). Frontend helper translates 404 → "File not found." toast.
+  - **R-2 long-TTL re-sign** (Plan 02 architecture): same pgvector docx URL re-signed twice ~12 min apart yielded distinct `iat` values (1778274062 / 1778274782); each click hits FastAPI re-sign endpoint and produces fresh ~60s signed URL. Mirrors 067.2 Row 5 GREEN (architecture-equivalent — slow-path 90-min wait unnecessary).
+  - **N-01** (Plan 01 — model→provider router): `claude-sonnet-4-6` request streamed end-to-end via Anthropic SDK (run_id `7682f8e2-…`, status `completed`). 4/4 unit tests in `backend/tests/test_provider_router.py` pass on merged tree.
+  - **No-regression check (067.3-NR):** 4 streaming threads (Bread, Physicists, pgvector, Photosynthesis) all completed cleanly; auto-title generation working on all 4; no regression detected.
+
+Deferred (other carry-forwards, NOT Phase 067.4 scope):
+
+  - **N-02** (UX/cost concern) Multi-step pipeline self-QA = 8 of 14 tool_calls on opus pptx run. Cap via SYSTEM_PROMPT or MAX_SELF_QA_ITERATIONS in a future UX phase. NOT in Phase 067.4 scope.
 
 Phase 067.2 GREEN summary (working, do not regress):
 
@@ -51,7 +58,7 @@ Phase 067.2 GREEN summary (working, do not regress):
   - Plan 05 multi-provider smoke ✓ for all 4 models; Plan 01 Track A helper symmetry confirmed via Row 9.
   - NR-1, NR-2 — Phase 067.1 / 066 contracts still hold.
 
-Next action: Plan Phase 067.3 (`/gsd:plan-phase 067.3`) — Plan 01 N-01 routing fix (HIGH) → Plan 02 R-2 sandbox-outputs auth (token-in-URL or JS blob) → Plan 03 R-3 suggestions render investigation → Plan 04 R-1 per-thread streaming cache. After 067.3 ships, re-run rows 3/4/5/6 + complete deferred 11/12 to close 067.2's UAT gate.
+Next action: Discuss + plan Phase 067.4 (`/gsd:discuss-phase 067.4` then `/gsd:plan-phase 067.4`). Scope: (a) **PRIMARY (gate-blocking)** R-3 suggestion-emit fix — investigate `backend/app/services/suggestion_service.py` and the emit path at `backend/app/api/threads.py:2466-2526`. Capture the Plan 04 instrumentation log (`logger.warning("suggestion generation failed", exc_info=True)`) from uvicorn stdout to disambiguate exception-swallow vs `questions=[]` vs reasoning-token-starvation. (b) **SECONDARY (carry-forward)** Run synthetic-timeout protocol for kimi-k2.5 (Row 067.2-11) and minimax-m2.7 (Row 067.2-12) on the OpenRouter branch. Closing UAT must mirror back into BOTH 067.2-HUMAN-UAT.md AND 067.3-HUMAN-UAT.md to close all three open phases (067.2, 067.3, 067.4) together.
 
 ## Recent Completed Phases
 
@@ -191,18 +198,29 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 067.3 context gathered
-Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:discuss-phase`) for the new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** to address Gap-006.
+Last session: 2026-05-09
+Stopped at: Phase 067.3 Plan 05 closed — UAT executed with gaps; escalating to Phase 067.4
+Next: `/gsd:discuss-phase 067.4` → `/gsd:plan-phase 067.4` for the follow-on phase covering (a) R-3 suggestion-emit fix [primary, gate-blocking] and (b) carry-forward 067.2-11 + 067.2-12 OpenRouter timeout regression checks [secondary]. After 067.4 ships, BOTH Phase 067.2 AND Phase 067.3 close alongside Phase 067.4 via the cross-phase D-067.3-WAVE-03 closure rule (now extended to 067.4).
+
+**Phases OPEN (cross-phase blocked):**
+
+- **Phase 067.2** (streaming-render-and-storage-fixes) — OPEN; strict 12/12 gate not met. Rows 3/4/5 resolved by 067.3 in practice but cannot tick GREEN until Row 6 closes via 067.4. Rows 11/12 deferred to 067.4. Audit trail in `067.2-HUMAN-UAT.md` preserved + new `## Phase 067.3 verdict — 9/12 GREEN (gate not met)` section appended.
+- **Phase 067.3** (streaming-render-and-storage-fixes-round-2) — OPEN; 5/5 plans landed but Plan 05 closing UAT showed 9 GREEN / 2 RED / 2 deferred. R-3 root cause unidentified during UAT (max_tokens hypothesis disconfirmed live). Full evidence in `067.3-HUMAN-UAT.md` + `067.3-05-SUMMARY.md`.
+
+**Phase 067.4 scope (next):**
+
+- Primary (gate-blocking): R-3 suggestion-emit fix — `backend/app/services/suggestion_service.py` + `backend/app/api/threads.py:2466-2526` emit path investigation + fix.
+- Secondary (carry-forward): OpenRouter kimi-k2.5 + minimax-m2.7 synthetic-timeout regression checks.
+- Closing UAT: mirror verdicts back into 067.2-HUMAN-UAT.md, 067.3-HUMAN-UAT.md, AND 067.4-HUMAN-UAT.md — close all three phases together when strict gate met.
 
 **Completed Phase:** 063.1 (frontend-stream-decoupling-gap-closure) — 5/5 plans — closed 2026-05-04 (UAT `partial`, project-level `approved`)
 
-**Carry-forward (non-blocking):**
+**Carry-forward (non-blocking, pre-067.4):**
 
 - SC#5 cross-tab Stop end-to-end (Phase 064 fixture harness)
 - SC#6 Resume button live test under `ENABLE_TEST_FIXTURES=1` (Phase 064)
 - SC#7 full Phase 063 SC#1–#6 manual regression (next manual UAT pass)
 
-**New phase queued (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness which is test infrastructure, not a fix). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`.
+**Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 067.3 (Streaming Render & Storage Fixes — Round 2) — 5 plans — 2026-05-08T19:52:03.820Z
+**Planned Phase:** 067.3 (Streaming Render & Storage Fixes — Round 2) — 5 plans — 2026-05-08T19:52:03.820Z (executed 2026-05-09, OPEN with gaps)
