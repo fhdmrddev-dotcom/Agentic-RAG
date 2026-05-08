@@ -187,6 +187,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
       justCreatedThreadRef.current = activeThread.id
+      // D-067.2-01: synchronously align activeThreadIdRef BEFORE sendMessage
+      // begins. sendMessage sets streamingThreadIdRef.current = threadId at
+      // useMessages.ts:513 and the first onDelta arrives ms later;
+      // guardedSetMessages at useMessages.ts:623-628 no-ops the delta unless
+      // streamingThreadIdRef === activeThreadIdRef. Without this line the
+      // useLayoutEffect at the top of this component does not fire until the
+      // parent re-renders with the new `thread` prop (50-500ms after
+      // onCreateThread resolves), and every delta in the gap is silently
+      // dropped — the empty-until-end-of-run user-observable failure.
+      setViewingThread(activeThread.id)
     }
     await sendMessage(
       activeThread.id,
