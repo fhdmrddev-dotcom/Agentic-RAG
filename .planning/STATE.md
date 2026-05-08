@@ -4,14 +4,14 @@ milestone: v2.5
 milestone_name: Deployment Strategy
 status: Phase OPEN — strict UAT gate not met (7 GREEN, 3 RED, 3 deferred + 2 new findings)
 stopped_at: Phase 067.3 context gathered
-last_updated: "2026-05-08T19:21:53.263Z"
+last_updated: "2026-05-08T19:52:03.836Z"
 last_activity: 2026-05-08 -- Plan 06 UAT outcome captured; Phase 067.3 queued
 progress:
   total_phases: 14
   completed_phases: 11
-  total_plans: 49
+  total_plans: 54
   completed_plans: 49
-  percent: 100
+  percent: 91
 ---
 
 # Project State
@@ -205,4 +205,4 @@ Next: (1) `/gsd:verify-work` on Phase 063.1. (2) `/gsd:plan-phase` (or `/gsd:dis
 
 **New phase queued (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness which is test infrastructure, not a fix). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`.
 
-**Planned Phase:** 067.2 (Streaming Render & Storage Fixes) — 6 plans — 2026-05-07T20:37:33.918Z
+**Planned Phase:** 067.3 (Streaming Render & Storage Fixes — Round 2) — 5 plans — 2026-05-08T19:52:03.820Z
