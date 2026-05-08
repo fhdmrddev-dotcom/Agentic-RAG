@@ -634,7 +634,8 @@ async def delete_thread(
             )
             file_rows = file_resp.data or []
             if file_rows:
-                from starlette.concurrency import run_in_threadpool
+                # Phase 067.4 (D-067.4-R3-03): module-local re-import deleted; the
+                # module-top import at threads.py:12 is now the single source.
                 paths = [f["storage_path"] for f in file_rows]
                 await run_in_threadpool(
                     supabase.storage.from_("sandbox-outputs").remove, paths
@@ -2477,48 +2478,62 @@ async def send_message(
               # cancelled run" (D-067.2-05a + D-067.2-05b). Deleted in plan
               # 067.2-02 so title cannot fire twice on success.
 
+              # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
+              # Phase 067.4 (D-067.4-R3-03): wrap sync call in run_in_threadpool per CLAUDE.md D-v2.5-01.
+              # Phase 067.4 (D-067.4-R3-02): always emit, even when empty — removes SSE-replay ambiguity.
+              # Phase 067.4 (Rule 3 deviation): the suggestion block moved BEFORE the 'done'
+              # emit. `done` is in TERMINAL_TYPES (threads.py:88) so the SSE replay consumer
+              # (runs.py replay_tail_consumer:170) returns immediately after yielding 'done',
+              # which previously made suggestion events emitted-after-done invisible to SSE
+              # consumers. Producer-side ordering is now suggestions → done → stream_end so
+              # the wire delivers suggestions to the SSE-replay reader.
+              try:
+                  from app.services.suggestion_service import generate_suggestions
+                  questions, sugg_fallback = await run_in_threadpool(
+                      generate_suggestions,
+                      body.content,         # user_message (positional, mirrors the title pattern at threads.py:1028)
+                      full_content,         # assistant_response
+                      user_settings,        # user_settings
+                  )
+                  if sugg_fallback:
+                      await _emit(redis, run_id, 'fallback_model', **sugg_fallback)
+                  # D-067.4-R3-02: unconditional emit (frontend gate at MessageItem.tsx:93-98 already
+                  # short-circuits empty arrays via `message.suggestions.length > 0` clause).
+                  await _emit(redis, run_id, 'suggestions', questions=questions[:3])
+                  if not questions:
+                      logger.info(
+                          "suggestions empty for run %s — generate_suggestions returned [] "
+                          "(emitted as empty list; not an error)",
+                          run_id,
+                      )
+              except (openai.APIError, openai.APIConnectionError, openai.APITimeoutError,
+                      openai.BadRequestError, openai.RateLimitError, openai.InternalServerError) as e:
+                  # D-067.4-R3-01 branch (a): narrowed catch for known OpenAI API
+                  # error classes. SUG-04 invariant preserved — no re-raise; the
+                  # producer continues to 'done' + 'stream_end'.
+                  logger.warning(
+                      "suggestion generation API error for run %s: %s",
+                      run_id, type(e).__name__,
+                      exc_info=True,
+                  )
+              except Exception:
+                  # Final safety net — unknown exception class. Logged at ERROR
+                  # severity so operator gets paged; SUG-04 invariant still
+                  # preserved (no re-raise).
+                  logger.error(
+                      "suggestion generation UNEXPECTED for run %s — investigate",
+                      run_id,
+                      exc_info=True,
+                  )
+
               # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
               # Phase 061: this 'done' event flows through the regular MAXLEN-bounded _emit path.
               # The EXPLICIT terminal sentinel in the producer's finally (via _emit_terminal) is the
               # safety net for paths that don't reach this line (TimeoutError, exceptions, cancellation)
               # — that one is exempt from MAXLEN trimming (Pitfall 5).
+              # Phase 067.4 (Rule 3 deviation): suggestion block now precedes this 'done' emit
+              # so SSE-replay readers see suggestions before the consumer's terminal break.
               await _emit(redis, run_id, 'done')
-
-              # Phase 32: Non-blocking suggestion generation (SUG-03, SUG-04)
-              try:
-                  from app.services.suggestion_service import generate_suggestions
-                  questions, sugg_fallback = generate_suggestions(
-                      user_message=body.content,       # the user's message
-                      assistant_response=full_content,  # accumulated full response text
-                      user_settings=user_settings,
-                  )
-                  if sugg_fallback:
-                      await _emit(redis, run_id, 'fallback_model', **sugg_fallback)
-                  if questions:
-                      await _emit(redis, run_id, 'suggestions', questions=questions[:3])
-                  else:
-                      # Phase 067.3 (D-067.3-R3-03 Task 1b): explicit log when
-                      # generate_suggestions returns []. Distinguishes the
-                      # empty-model-output path (this branch) from the
-                      # silent-swallow path (Task 1a logger.warning below).
-                      logger.info(
-                          "suggestions empty for run %s — generate_suggestions returned [] "
-                          "(no emit; not an error)",
-                          run_id,
-                      )
-              except Exception:
-                  # Phase 067.3 (D-067.3-R3-03 Task 1a): observability-first.
-                  # Swap the silent `pass` for logger.warning(exc_info=True).
-                  # SUG-04 invariant preserved — exception still does NOT affect
-                  # the main response (no re-raise; the producer continues to
-                  # stream_end). The log line disambiguates Task 2a (silent
-                  # backend path) from Task 2b (empty model output) when
-                  # correlated with the run_id.
-                  logger.warning(
-                      "suggestion generation failed for run %s — main response unaffected",
-                      run_id,
-                      exc_info=True,
-                  )
 
               # Phase 32: True stream end — frontend returns from streamMessage
               await _emit(redis, run_id, 'stream_end')
