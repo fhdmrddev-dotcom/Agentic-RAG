@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import type { Message, ToolCall, OutputFile, SourceReference, Citation } from "../types"
 // eslint-disable-next-line prettier/prettier
 import { getMessages, postMessage, subscribeToRun, getActiveRuns, cancelRun, type StreamCallbacks } from "../lib/api"
@@ -42,11 +42,24 @@ function makeTempId() {
  * (sendMessage / reconcile) wraps this to flip runStatus + handle Pitfall 8
  * buffer_expired fallback BEFORE calling our internal default (which is a no-op).
  */
+// Phase 067.3 (D-067.3-R1-04): callback-factory `setMessages` is now a
+// thread-bound writer. Callers (sendMessage, reconcile) construct it via
+// `(updater) => setMessagesForThread(threadId, updater)` so each delta routes
+// to its thread's bucket regardless of the user's current viewing thread.
+// Replaces the legacy single-array `React.Dispatch<React.SetStateAction<Message[]>>`
+// signature (which forced the now-removed `guardedSetMessages` race-fix at the
+// call sites — D-067.3-R1-04). The factory body is unchanged: every call site
+// inside this function is `setMessages((prev) => ...)` and that shape is
+// preserved exactly by the new signature.
+type ThreadBoundSetMessages = (
+  updater: Message[] | ((prev: Message[]) => Message[]),
+) => void
+
 function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
   onTitleUpdate?: (title: string) => void
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+  setMessages: ThreadBoundSetMessages
   setFallbackNotice: React.Dispatch<React.SetStateAction<string | null>>
 }): StreamCallbacks {
   const { assistantId, onTitleUpdate, setMessages, setFallbackNotice } = opts
@@ -340,7 +353,38 @@ function makeStreamCallbacks(opts: {
 }
 
 export function useMessages(): UseMessages {
-  const [messages, setMessages] = useState<Message[]>([])
+  // Phase 067.3 (D-067.3-R1-01/02): per-thread message store. Mirrors
+  // ChatGPT/Claude.ai client-side architecture; replaces the single
+  // `messages: Message[]` state. Map (not Record) for insertion-order
+  // semantics. Visible `messages` is derived via useMemo against
+  // viewedThreadId — a state slot mirroring activeThreadIdRef so React
+  // re-renders on view changes (useMemo cannot dep on a ref).
+  //
+  // Phase 067.3 (D-067.3-R1-08) cursor / dedup audit:
+  //   - lastSeenOffsetRef: Map<run_id, cursor>           (run-keyed; composes with bucket — NO CHANGE)
+  //   - subscriptionsRef:  Map<run_id, AbortController>  (run-keyed — NO CHANGE)
+  //   - reconcileInFlightRef: bool                       (single-bit — NO CHANGE)
+  //   - streamingThreadIdRef: string | null              (bucket key for incoming deltas — D-067.3-R1-05)
+  //   - activeThreadIdRef:    string | null              (D-060-01 sole writer = setViewingThread)
+  const [messagesByThread, setMessagesByThread] = useState<Map<string, Message[]>>(() => new Map())
+  const [viewedThreadId, setViewedThreadId] = useState<string | null>(null)
+  const messages = useMemo<Message[]>(
+    () => (viewedThreadId ? messagesByThread.get(viewedThreadId) ?? [] : []),
+    [messagesByThread, viewedThreadId],
+  )
+  // D-067.3-R1-03: LRU N=5 with streaming threads pinned. lastViewedAtRef
+  // updates on every setViewingThread call; eviction picks smallest
+  // timestamp among non-streaming non-active candidates when size > 5.
+  const lastViewedAtRef = useRef<Map<string, number>>(new Map())
+  // Phase 067.3 (D-067.3-R1-01 / WR-08 preserve): ref mirror of messagesByThread
+  // so reconcile (and any future stable-identity callback) can read the latest
+  // bucket without taking the state into its useCallback dep array — preserves
+  // reconcile's stable identity, which the visibility/focus/pageshow listener
+  // effect in ChatArea.tsx (WR-08) depends on.
+  const messagesByThreadRef = useRef<Map<string, Message[]>>(messagesByThread)
+  useEffect(() => {
+    messagesByThreadRef.current = messagesByThread
+  }, [messagesByThread])
   const [isStreaming, setIsStreaming] = useState(false)
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null)
   const isSendingRef = useRef(false)
@@ -388,10 +432,22 @@ export function useMessages(): UseMessages {
   // WR-03 fix: read latest messages from a ref instead of putting `messages`
   // in the dep array. Otherwise stopStreaming gets recreated on every token
   // delta and any closure that captured the previous reference goes stale.
-  const messagesRef = useRef(messages)
+  //
+  // Phase 067.3 (D-067.3-R1-04 / Pitfall 3): stopStreaming derives run_id from
+  // the STREAMING bucket (not the viewing bucket). Today these are usually the
+  // same; under cross-thread switch they diverge — stopStreaming must still
+  // find the streaming run. Read from streamingThreadIdRef's bucket if
+  // present; fall back to activeThreadIdRef's bucket (covers
+  // Stop-after-completion edge case where streamingThreadIdRef is null and
+  // we want to inspect what the user is currently viewing). Reconcile's
+  // runId-match dedup at D-063.1-04 still uses messagesRef.current the same
+  // way — it sees the latest snapshot of whichever bucket is most relevant.
+  const messagesRef = useRef<Message[]>([])
   useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
+    const stid = streamingThreadIdRef.current
+    const fallbackId = stid ?? activeThreadIdRef.current
+    messagesRef.current = fallbackId ? messagesByThread.get(fallbackId) ?? [] : []
+  }, [messagesByThread])
 
   const stopStreaming = useCallback(async () => {
     // Pitfall 3: derive run_id from message state (NOT a separate ref).
@@ -421,14 +477,87 @@ export function useMessages(): UseMessages {
   // ChatArea (Plan 060-02) calls this as the first action of its thread-selection useEffect,
   // before clearMessages/abortStream/loadMessages, so the post-await guard inside
   // loadMessages (D-060-02) sees the new thread id when comparing.
+  // Phase 067.3 (D-067.3-R1-01/03): also writes the viewedThreadId state slot
+  // (so useMemo-derived `messages` re-computes on view changes — useMemo cannot
+  // dep on a ref) AND stamps the LRU timestamp so a freshly-viewed thread is
+  // least likely to be evicted next.
   const setViewingThread = useCallback((threadId: string | null) => {
     activeThreadIdRef.current = threadId
+    setViewedThreadId(threadId)
+    if (threadId) lastViewedAtRef.current.set(threadId, Date.now())
   }, [])
 
+  // Phase 067.3 (D-067.3-R1-03): pin streaming + active + just-written buckets;
+  // evict LRU among the rest when over CAP. If all over-cap entries are
+  // protected, accept temporary overage (return store unchanged); will
+  // re-check on next write. Pure helper; reads streamingThreadIdRef /
+  // activeThreadIdRef which are declared above this point.
+  const evictIfOverCapacity = useCallback(
+    (
+      store: Map<string, Message[]>,
+      justWrittenThreadId: string,
+    ): Map<string, Message[]> => {
+      const CAP = 5
+      if (store.size <= CAP) return store
+      const protectedIds = new Set<string>()
+      protectedIds.add(justWrittenThreadId)
+      if (streamingThreadIdRef.current) protectedIds.add(streamingThreadIdRef.current)
+      if (activeThreadIdRef.current) protectedIds.add(activeThreadIdRef.current)
+      let lruId: string | null = null
+      let lruTs = Number.POSITIVE_INFINITY
+      for (const id of store.keys()) {
+        if (protectedIds.has(id)) continue
+        const ts = lastViewedAtRef.current.get(id) ?? 0
+        if (ts < lruTs) {
+          lruTs = ts
+          lruId = id
+        }
+      }
+      if (lruId) {
+        const next = new Map(store)
+        next.delete(lruId)
+        lastViewedAtRef.current.delete(lruId)
+        return next
+      }
+      return store
+    },
+    [],
+  )
+
+  // Phase 067.3 (D-067.3-R1-04): bucket-targeted setState. Replaces direct
+  // setMessages calls. ThreadId resolves at the CALL SITE — sendMessage and
+  // reconcile have `threadId` in scope; makeStreamCallbacks accepts threadId
+  // as a constructor arg and binds via a closure.
+  const setMessagesForThread = useCallback(
+    (threadId: string, updater: Message[] | ((prev: Message[]) => Message[])) => {
+      setMessagesByThread((store) => {
+        const prev = store.get(threadId) ?? []
+        const updated =
+          typeof updater === "function"
+            ? (updater as (p: Message[]) => Message[])(prev)
+            : updater
+        const next = new Map(store)
+        next.set(threadId, updated)
+        return evictIfOverCapacity(next, threadId)
+      })
+    },
+    [evictIfOverCapacity],
+  )
+
   const clearMessages = useCallback(() => {
-    // D-060-10: clearMessages is a pure state reset. The caller (ChatArea, plan 060-02)
-    // is responsible for calling abortStream() first when it intends to cancel a stream.
-    setMessages([])
+    // Phase 067.3 (D-067.3-R1-07): clear only the active thread's bucket, NOT
+    // the entire store. Caller (ChatArea, plan 060-02) is responsible for
+    // calling abortStream() first when it intends to cancel a stream.
+    const tid = activeThreadIdRef.current
+    if (tid) {
+      setMessagesByThread((store) => {
+        if (!store.has(tid)) return store
+        const next = new Map(store)
+        next.delete(tid)
+        return next
+      })
+      lastViewedAtRef.current.delete(tid)
+    }
     setIsStreaming(false)
     isSendingRef.current = false
   }, [])
@@ -478,7 +607,11 @@ export function useMessages(): UseMessages {
       // briefly; the next loadMessages after the consumer terminates (at
       // which point `subscriptionsRef.delete(runId)` has fired in onTerminal)
       // collapses back to one. Strictly better than swallowing terminals.
-      setMessages((prev) => {
+      // Phase 067.3 (D-067.3-R1-04): write into the threadId bucket via
+      // setMessagesForThread. The MERGE logic below is byte-identical to the
+      // pre-067.3 setMessages((prev) => {...}) shape — only the read source
+      // (prev) and write target (this thread's bucket) change.
+      setMessagesForThread(threadId, (prev) => {
         const dbRunIds = new Set(
           data.filter((m) => m.runId).map((m) => m.runId),
         )
@@ -497,7 +630,7 @@ export function useMessages(): UseMessages {
       if (err instanceof Error && err.name === "AbortError") return
       throw err
     }
-  }, [])
+  }, [setMessagesForThread])
 
   const sendMessage = useCallback(async (
     threadId: string,
@@ -522,7 +655,10 @@ export function useMessages(): UseMessages {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
-    setMessages((prev) => [...prev, userMsg])
+    // Phase 067.3 (D-067.3-R1-04): bucket-targeted write. ThreadId is the
+    // sendMessage parameter; the placeholder lands in this thread's bucket
+    // regardless of viewing thread.
+    setMessagesForThread(threadId, (prev) => [...prev, userMsg])
 
     // Optimistic assistant placeholder — extended with runId/runStatus per
     // RESEARCH Open Question 2. runId is filled in once postMessage returns.
@@ -538,7 +674,7 @@ export function useMessages(): UseMessages {
       tool_calls: [],
       runStatus: "streaming",
     }
-    setMessages((prev) => [...prev, assistantMsg])
+    setMessagesForThread(threadId, (prev) => [...prev, assistantMsg])
     setIsStreaming(true)
     isStreamingRef.current = true
 
@@ -591,7 +727,8 @@ export function useMessages(): UseMessages {
       // can side-by-side a duplicate persisted user message with the temp
       // placeholder. Also: stamp run_id onto the assistant placeholder so
       // Stop can find it via stopStreaming.
-      setMessages((prev) =>
+      // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+      setMessagesForThread(threadId, (prev) =>
         prev.map((m) => {
           if (m.id === userMsg.id) return { ...m, id: message_id }
           if (m.id === assistantId) return { ...m, runId: run_id }
@@ -604,34 +741,27 @@ export function useMessages(): UseMessages {
       // setMessages map-update shape, but we now ALSO handle terminal events
       // explicitly via onTerminal (NEW vs the previous one-call orchestrator).
       //
-      // Phase 063.1 (D-063.1-08 / Gap-003): gate sendMessage's per-event
-      // setMessages on the streaming thread still being the one in view.
-      // streamingThreadIdRef is set above (line 401) to threadId at send-start
-      // and reset to null in the finally block. activeThreadIdRef tracks the
-      // user's current viewing thread (D-060-01 sole writer). When they
-      // diverge (user navigated away mid-stream), per-event setMessages is a
-      // no-op; the in-flight SSE keeps writing through this still-live guard
-      // and updates resume the moment the user navigates back (because
-      // activeThreadIdRef === streamingThreadIdRef again). Mirrors reconcile's
-      // WR-05 guardedSetMessages pattern (line 681-686).
+      // Phase 067.3 (D-067.3-R1-01/04): the legacy `guardedSetMessages` race
+      // fix that lived here (D-063.1-08, removed) gated per-event setMessages
+      // on `streamingThreadIdRef === activeThreadIdRef` to suppress writes to
+      // a non-viewed thread. With the per-thread bucket store, that guard is
+      // structurally unnecessary: deltas write to THIS thread's bucket
+      // regardless of which thread the user is viewing; only the useMemo-
+      // derived visible `messages` follows the viewed thread. The user-visible
+      // failure mode the guard was patching (cross-thread switch loses streamed-
+      // into thread's render) is closed at the architecture level. See
+      // D-067.3-R1-01 in 067.3-CONTEXT.md.
       //
-      // Critical: terminal-status flip (callbacks.onTerminal override below)
-      // and the runId stamp (already executed line 457-463) use plain
-      // setMessages — those must run regardless of viewing thread (the run
-      // actually ended; the placeholder needs the correct runStatus when the
-      // user navigates back). PATTERNS.md note line 134.
-      const guardedSetMessages: typeof setMessages = ((
-        update: Parameters<typeof setMessages>[0],
-      ) => {
-        if (streamingThreadIdRef.current !== activeThreadIdRef.current) return
-        setMessages(update)
-      }) as typeof setMessages
-
+      // Critical (preserved invariant): terminal-status flip (callbacks.
+      // onTerminal override below) and the runId stamp (already executed
+      // above) write to threadId's bucket via setMessagesForThread — those
+      // must run regardless of viewing thread (the run actually ended; the
+      // placeholder needs the correct runStatus when the user navigates back).
       const callbacks: StreamCallbacks = makeStreamCallbacks({
         assistantId,
         threadId,
         onTitleUpdate,
-        setMessages: guardedSetMessages,
+        setMessages: (updater) => setMessagesForThread(threadId, updater),
         setFallbackNotice,
       })
 
@@ -651,7 +781,8 @@ export function useMessages(): UseMessages {
         // correct DB-row runStatus via Phase 063.1 D-063.1-13/15 LEFT JOIN.
         // Avoids the unguarded setMessages race documented in 067-RESEARCH.md
         // §"useMessages.ts state-machine cleanup".
-        setMessages((prev) => {
+        // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+        setMessagesForThread(threadId, (prev) => {
           if (!prev.some((m) => m.id === assistantId)) return prev
           return prev.map((m) => {
             if (m.id !== assistantId) return m
@@ -693,7 +824,8 @@ export function useMessages(): UseMessages {
         // Caller-initiated abort (rare in 063 — only for navigate-away timeouts).
       } else {
         console.error("sendMessage failed:", err)
-        setMessages((prev) =>
+        // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+        setMessagesForThread(threadId, (prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, runStatus: "failed" } : m,
           ),
@@ -720,7 +852,8 @@ export function useMessages(): UseMessages {
       }
 
       // Always clear planning flag on stream end
-      setMessages((prev) =>
+      // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+      setMessagesForThread(threadId, (prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
       )
 
@@ -728,7 +861,7 @@ export function useMessages(): UseMessages {
 
       // Mark running or preparing tool calls as "interrupted" if the user stopped the stream
       if (wasStoppedByUser) {
-        setMessages((prev) =>
+        setMessagesForThread(threadId, (prev) =>
           prev.map((m) => {
             if (m.id !== assistantId) return m
             const hasActiveTools = m.tool_calls?.some(
@@ -748,7 +881,7 @@ export function useMessages(): UseMessages {
       }
 
       // Apply stopped flag to the placeholder message (pure state update, no side effects)
-      setMessages((prev) => {
+      setMessagesForThread(threadId, (prev) => {
         const lastMsg = prev[prev.length - 1]
         if (lastMsg?.id === assistantId) {
           return prev.map((m) =>
@@ -765,7 +898,7 @@ export function useMessages(): UseMessages {
       // CRITICAL Phase 060 invariant (Bug 3 guard): do NOT call loadMessages here.
       // SSE-built content stays canonical; reconcile + onTerminal handle merge.
     }
-  }, [loadMessages])
+  }, [loadMessages, setMessagesForThread])
 
   // Phase 063 (Pattern 2 + CONTEXT.md "Reconciliation Hook Ordering"): on
   // every (re)connect (mount, focus, visibilitychange, pageshow), query
@@ -805,12 +938,19 @@ export function useMessages(): UseMessages {
       if (activeThreadIdRef.current !== threadId) return
 
       // Phase 063.1 (D-063.1-04 / Gap-001): runId-match dedup. If a message
-      // already in current state carries this run_id (e.g. post-F5 the LEFT
-      // JOIN runs delivered a persisted assistant row with runId from
+      // already in this thread's bucket carries this run_id (e.g. post-F5 the
+      // LEFT JOIN runs delivered a persisted assistant row with runId from
       // getMessages), reuse THAT message's id as the SSE callback target —
-      // no second bubble. messagesRef.current is the current state (declared
-      // at line 316-319 for stopStreaming's WR-03 fix; same pattern reused).
-      const existingByRunId = messagesRef.current.find((m) => m.runId === run.run_id)
+      // no second bubble.
+      // Phase 067.3 (D-067.3-R1-01): read from this thread's bucket via
+      // messagesByThreadRef.current (NOT messagesRef.current — that tracks
+      // the STREAMING bucket which may belong to a DIFFERENT thread under
+      // cross-thread switch mid-stream; reconcile is scoped to `threadId`).
+      // Using a ref-mirror of the state keeps reconcile's useCallback identity
+      // stable (WR-08 invariant in ChatArea.tsx — reconcile is depended on by
+      // the visibility/focus/pageshow listener effect via reconcileRef).
+      const threadMessages = messagesByThreadRef.current.get(threadId) ?? []
+      const existingByRunId = threadMessages.find((m) => m.runId === run.run_id)
       const targetId = existingByRunId?.id ?? `temp-${run.run_id}`
 
       // Idempotent placeholder insert ONLY when no existing row found.
@@ -829,7 +969,8 @@ export function useMessages(): UseMessages {
           runId: run.run_id,
           runStatus: "streaming",
         }
-        setMessages((prev) => {
+        // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+        setMessagesForThread(threadId, (prev) => {
           // Idempotent insert.
           if (prev.some((m) => m.id === targetId)) return prev
           return [...prev, placeholder]
@@ -855,28 +996,24 @@ export function useMessages(): UseMessages {
       const controller = new AbortController()
       subscriptionsRef.current.set(run.run_id, controller)
 
-      // WR-05 fix: gate live setMessages updates on the user still viewing
-      // this thread. The placeholder INSERT above is fine to write in either
-      // case (so it appears when the user navigates back), but per-event
-      // updates from the consumer should NOT mutate visible state on a
-      // different thread (Phase 060 D-060-01 invariant). State updates are
-      // resumed automatically when the user navigates back via reconcile()
-      // re-attaching to the same run (subscriptionsRef short-circuit
-      // continues to gate duplicate consumers).
-      const guardedSetMessages: typeof setMessages = ((
-        update: Parameters<typeof setMessages>[0],
-      ) => {
-        if (activeThreadIdRef.current !== threadId) return
-        setMessages(update)
-      }) as typeof setMessages
-
+      // Phase 067.3 (D-067.3-R1-01/04): the legacy `guardedSetMessages` race
+      // fix that lived here (D-063.1-08, removed) gated reconcile's per-event
+      // setMessages on `activeThreadIdRef.current === threadId` to suppress
+      // writes to a non-viewed thread. With the per-thread bucket store, that
+      // guard is structurally unnecessary: deltas write to THIS thread's
+      // bucket regardless of which thread the user is viewing; only the
+      // useMemo-derived visible `messages` follows the viewed thread. The
+      // user-visible failure mode (cross-thread switch loses streamed-into
+      // thread's render) is closed at the architecture level. See
+      // D-067.3-R1-01 in 067.3-CONTEXT.md.
+      //
       // Phase 063.1 (D-063.1-04): pass `targetId` (the dedup-resolved id) as
       // the assistantId so all event callbacks route SSE deltas to the
       // persisted DB row when one exists, not to a parallel temp placeholder.
       const callbacks: StreamCallbacks = makeStreamCallbacks({
         assistantId: targetId,
         threadId,
-        setMessages: guardedSetMessages,
+        setMessages: (updater) => setMessagesForThread(threadId, updater),
         setFallbackNotice,
       })
       const originalOnTerminal = callbacks.onTerminal
@@ -895,7 +1032,8 @@ export function useMessages(): UseMessages {
         // If loadMessages's MERGE-preserve filter (Phase 063.1 D-063.1-12) dropped
         // the placeholder because the DB row caught up, the flip is a no-op and
         // the next reconcile picks up the DB-row runStatus via D-063.1-13/15.
-        setMessages((prev) => {
+        // Phase 067.3 (D-067.3-R1-04): bucket-targeted via threadId.
+        setMessagesForThread(threadId, (prev) => {
           if (!prev.some((m) => m.id === targetId)) return prev
           return prev.map((m) => {
             if (m.id !== targetId) return m
@@ -965,7 +1103,7 @@ export function useMessages(): UseMessages {
       // because they're inside the outer try). T-063.1-13 mitigation.
       reconcileInFlightRef.current = false
     }
-  }, [loadMessages])
+  }, [loadMessages, setMessagesForThread])
 
   // D-063-04: Resume = re-POST the original user message. The backend POST
   // inserts a duplicate user-message row + spawns a fresh run; matches
@@ -1026,6 +1164,10 @@ export function useMessages(): UseMessages {
   //   unmount effect only fires on logout/route change.
   //   If a future surface adds a second consumer of this hook or keys
   //   ChatArea on thread.id, the cleanup semantics need re-review.
+  // D-067.3-R1-08: unmount cleanup audited — subscriptionsRef is run-keyed,
+  // no per-bucket teardown needed (the bucket store and lastViewedAtRef are
+  // hook-scoped state and ref; React + GC handle their teardown when the
+  // hook unmounts).
   useEffect(() => {
     return () => {
       for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
