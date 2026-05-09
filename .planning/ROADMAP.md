@@ -370,7 +370,10 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   2. All tests in `backend/tests/integration/test_skills_import_export.py` either PASS or are explicitly skipped with documented reason — the 3 currently-failing export tests are fixed or formally deferred.
   3. The combined skills test run (`pytest tests/integration/test_threads_skills.py tests/integration/test_skills_import_export.py -q`) reports 0 errors and 0 unexpected failures.
   4. No regression in 058 / 059 binding gates: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and the `test_059_disconnect.py` suite still pass.
-**Plans:** 5/5 plans complete
+**Plans:** 2 plans
+Plans:
+- [ ] 065-01-PLAN.md - Repair test_threads_skills.py: rename 13 patch targets to create_adaptive_streaming_chat + tuple-wrap fake returns + add CallingMode import
+- [ ] 065-02-PLAN.md - Triage 3 failing tests in test_skills_import_export.py: fix-or-skip-with-reason per SEED-002 scope guard
 **Risks / pitfalls:**
   - The `create_streaming_chat` patch target was likely removed in a refactor (current name is `create_adaptive_streaming_chat`). Some tests may have additional drift beyond just the name — they may also be testing call signatures, return shapes, or event emission patterns that have evolved. A pure mechanical rename is a starting point, not necessarily the finish line.
   - The 3 export-test failures may share a root cause with the known MIME fidelity gap (skill files stored as `application/octet-stream` on import) — fixing the test may require fixing the export to preserve original MIME, which is a real behavioral change. Decide upfront: scope this phase to test-only fixes (skip-with-reason if the underlying behavior is wrong), or expand to fix the export path.
