@@ -127,7 +127,7 @@ Full details: `.planning/milestones/v2.4-ROADMAP.md`
 - [ ] **Phase 061.1: Run-Backed Streaming Cleanup** — Diagnose `ERR_INCOMPLETE_CHUNKED_ENCODING` consumer drop surfaced during 061 manual UAT; fix the 5 integration test-pattern races (mocks inspected before background `_shielded_finalize` completes); close out code-review WR-01 (consumer cursor `$` race), WR-04/06/07 + IN-01..04. Can run in parallel with 062.
 - [ ] **Phase 062: Replay & Tail API** — `GET /threads/{id}/active-runs` returns active `run_id` + current offset; `GET /runs/{id}/stream?since={offset}` replays from offset + live-tails new tokens + emits termination event on completion
 - [ ] **Phase 063: Frontend Stream Decoupling** — POST returns `run_id` immediately; frontend opens separate replay-and-tail subscription; on every (re)connect (page load, focus, visibilitychange, pageshow) query active-runs and reattach if found; multi-tab sync falls out for free
-- [ ] **Phase 064: Validation Harness** — Reproducible chrome-in-browser MCP scripts for scenarios E (tab switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation during stream), and multi-tab sync — all proving the run-backed architecture from 061–063
+- [~] **Phase 064: Validation Harness — DEFERRED** — Originally scoped chrome MCP scripts for scenarios E/F/G/H + multi-tab sync. Deferred at v2.5 close 2026-05-09: scenarios E/F/H validated organically by Phases 067.3/067.4/067.5 user-driven UAT (5/5 GREEN cycles for empty-thread-until-refresh + cross-thread switch). G + multi-tab sync remain partially deferred to a future side-phase if ever needed. See ROADMAP entry below for full coverage table.
 - [ ] **Phase 065: Skills Test Infrastructure Repair** — Fix 13+ broken patches in `test_threads_skills.py` and 3 broken export tests in `test_skills_import_export.py` so the next milestone (Skill Studio) starts on a green test foundation
 - [ ] **Phase 066: Adaptive Run Timeouts & Lifecycle States** — Fix Gap-006 (LLM agent stops mid-iteration on complex tool-call prompts; surfaces as `GeneratorExit` in LangSmith). Replace the total-deadline `RUN_HARD_TIMEOUT_SECONDS=120` budget with a per-LLM-call timeout that resets on tool-call boundaries (matches ChatGPT/Claude's never-cap-the-agent-loop UX). Split overloaded `cancelled` terminal status into `cancelled` (user-Stop) vs `timed_out` (system limit). Capture stop-reason in `runs.error` so the UI can surface "Agent reached time limit" instead of silent stop. Restores parity with v2.4 long-tool-call behavior under the new run-backed architecture.
 - [x] **Phase 067: Frontend Streaming-UX Fix** — Restore real-time first-paint of streaming agent events (no manual refresh required) and close the five carry-forward UX issues (UX-067-01..05) surfaced by Phase 066's live UAT: empty-paint, "Saving response…" thrash, refresh-required first-paint, redis-consumer log noise on tab cycle, and tool-call iteration boundary surfacing. Re-runs Phase 066 Plan 05 Task 2 protocol to close out SC#6 live verification. *(Closed 2026-05-07 — UAT `partial` / project-level `approved`; 5/5 plans landed; UX-067-01..05 all green via Chrome MCP; SC#6 4-of-5 sub-criteria green, LangSmith trace hygiene red → Gap-007 escalated to **Phase 067.1**.)*
@@ -335,22 +335,30 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
 | 066. Adaptive Run Timeouts & Lifecycle States | v2.5 | 5/5 | Complete    | 2026-05-06 |
 
-### Phase 064: Validation Harness
+### Phase 064: Validation Harness — DEFERRED (covered organically by 067.x UAT scoreboards)
 
-**Goal**: Each scenario that the run-backed streaming architecture must satisfy is reproducible in browser MCP without writing new code per run, so regressions are caught before merge — including the new ChatGPT/Claude-class behaviors (refresh-mid-stream, multi-tab sync) introduced by 061–063.
-**Depends on**: Phase 063
-**Requirements**: TEST-01
-**Success Criteria** (what must be TRUE):
-  1. A developer can run any single scenario script and observe pass/fail without writing new code — scripts exist and are runnable end-to-end via chrome-in-browser MCP (or Playwright as a fallback runner).
-  2. The harness includes a fetch interceptor utility that logs each `getMessages`, `active-runs`, and `runs/{id}/stream` call with thread ID, run_id, offset, and timing — surfaced to console for debugging.
-  3. Scripts cover at minimum: Symptom E (tab switch mid-stream — frontend reattaches via visibilitychange), Symptom F (F5 mid-stream — frontend replays from offset), Symptom G (Stop button cancels producer cleanly), Symptom H (thread navigation during stream — STREAM-02a guard), multi-tab sync (two tabs see same stream), and refresh-mid-stream (the headline ChatGPT/Claude parity scenario).
-  4. Scripts assume only that the dev server (frontend + backend + Redis) is running on default ports — no other manual setup. Document the Redis prerequisite.
-  5. Each script returns a clear PASS / FAIL signal (assertions on DOM state, message content, network outcomes, or run-buffer state) — no manual screenshot interpretation required.
-**Plans**: TBD
-**Risks / pitfalls**:
-  - Don't conflate scenario scripts with general E2E tests — keep this harness narrowly focused on streaming + reconnect.
-  - Multi-tab tests are inherently flaky — use deterministic fixtures (slow-mock LLM with fixed token cadence) rather than real LLM calls for the harness.
-  - Original v2.5-dev failure was attributed partly to "no browser feedback loop while iterating" — the rescope is architectural, not iterative-debugging, so 064 lands AFTER 063 here. Adjust the playbook for next iterative work.
+**Status:** **DEFERRED at v2.5 milestone close (2026-05-09)** — Phase 064's intended scenarios were validated organically through the user-driven UAT scoreboards in Phases 067.x (and earlier, 063.1). The original goal was a reusable Chrome MCP regression harness; in practice the v2.5 stream of work pivoted to live UAT scoreboards driven by the user, which produced lived-experience evidence superior to a synthetic harness for the streaming-render edge cases that surfaced.
+
+**Coverage achieved without Phase 064:**
+
+| Original SC | Where it was actually validated in v2.5 |
+|---|---|
+| Symptom E (tab-switch mid-stream) | Phase 067.3 R-1 row + Phase 067.5 5-cycle UAT (cross-thread mid-stream nav, 5/5 GREEN) |
+| Symptom F (F5 mid-stream) | Phase 067.5 Row 11 protocol explicitly tests F5 repair behavior; vitest in `useMessages.test.ts` covers reconcile-on-switch-back |
+| Symptom G (Stop button) | Phase 063.1 UAT SC#5 — partial; cross-tab Stop end-to-end deferred (already documented as carry-forward in STATE.md) |
+| Symptom H (thread navigation during stream) | Phase 067.4 R-4 row + Phase 067.5 Branch D-3 fix (clearMessages streaming-bucket guard) |
+| Refresh-mid-stream parity | Phase 063.1 UAT SC#6 + Phase 067.5 Cycle protocol (4/4 threads render without F5 across 5 cycles) |
+| Multi-tab sync | Phase 063.1 UAT SC#5 — partially deferred (cross-tab Stop live test) |
+
+**Carry-forward items (already in STATE.md Carry-forward):**
+- SC#5 cross-tab Stop end-to-end (live multi-tab test)
+- SC#7 full Phase 063 SC#1–#6 manual regression
+
+**Original goal (re-open trigger):** if the project ever needs a reusable, scriptable Chrome MCP regression harness — e.g., to onboard a new contributor to the streaming codebase, or to gate a CI pipeline against the streaming scenarios — re-open Phase 064 as a side-phase. Until then, the 067.x UAT runbooks (`067.5-CLOSING-UAT.md`, `067.4-CLOSING-UAT-RUNBOOK.md`, `063.1-HUMAN-UAT.md`) serve as the canonical validation reference.
+
+**Decision rationale:** during the v2.5 streaming-fix escalation chain (067 → 067.1 → 067.2 → 067.3 → 067.4 → 067.5), the user-driven UAT scoreboards proved more effective at catching edge cases than a synthetic harness would have — they surfaced Row 11's empty-thread-until-refresh bug, which would have been hard to encode as a deterministic Chrome MCP script. The defer is a recognition that the actual validation pattern that emerged was different from (and arguably better than) the originally-planned harness.
+
+**Original Goal (preserved for reference):** Each scenario that the run-backed streaming architecture must satisfy is reproducible in browser MCP without writing new code per run, so regressions are caught before merge — including the new ChatGPT/Claude-class behaviors (refresh-mid-stream, multi-tab sync) introduced by 061–063.
 
 ### Phase 065: Skills Test Infrastructure Repair
 
