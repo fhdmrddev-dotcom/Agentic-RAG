@@ -264,6 +264,67 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.5 — Deployment Strategy
+
+**Shipped:** 2026-05-09
+**Phases:** 16 (Phases 058–067.5; 1 deferred — 064) | **Plans:** 64 | **Tasks:** 112
+**Timeline:** 2026-04-30 → 2026-05-09 (10 days)
+**Commits:** 445
+**LOC delta:** +107,682 / −3,715 across 531 files
+
+### What Was Built
+
+- Backend SSE concurrency unblocked: `aexec` async wrapper around supabase `.execute()` + AnyIO 200-token limiter; cross-tab GET dropped from ~30s queued to <1s during streaming (Phase 058, CONCUR-01)
+- Run-backed streaming architecture: `asyncio.Queue` + sse-starlette (059), Redis Streams `run:{run_id}` durable buffer (061), replay-and-tail HTTP API `GET /runs/{rid}/stream?since=N` (062), POST returns JSON `{message_id, run_id}` + frontend reattaches via separate subscription (063), gap closure round (063.1)
+- Adaptive run timeouts + lifecycle states: per-LLM-call budget that resets on tool-call boundaries; `cancelled` (user-Stop) vs `timed_out` (system limit) distinction; "Agent reached time limit" UI banner with Resume button (Phase 066, closes Gap-006)
+- Streaming UX polish: empty-paint, "Saving response…" thrash, refresh-required first-paint, redis-consumer log noise, tool-call iteration boundary (Phase 067) + context-aware in-flight copy + multi-step-intent system prompt + skill-load tool-card copy (Phase 067.1)
+- Streaming render & storage fixes (cross-phase chain 067.2 → 067.5): per-thread message store via `messagesByThread` Map, sandbox-output download via JS blob fetch, model→provider router, suggestions emit always-emit-empty + reordered before `done`, code-execution heartbeat events, empty-thread-until-refresh fix via `clearMessages` streaming-bucket guard
+- Skills test infrastructure repair: 11 patch sites renamed + 19 fakes tuple-wrapped (065-01); 3 export assertion drifts fixed (065-02); 11 tests migrated to canonical Phase 063 POST→GET-stream pattern (065-03); combined skills test run 26/26 pass (Phase 065)
+
+### What Worked
+
+- **Run-backed streaming as a single feature branch (D-v2.5-11)** — 061 + 062 + 063 shipped together as one merge commit; no feature flags, no dual code paths, no half-state on main. Made each phase's verification cleaner because there was no "with feature flag on" vs "off" surface to maintain.
+- **Cross-phase escalation chain** — When 067.2's user-driven UAT surfaced 3 RED rows, escalating to 067.3 (which closed R-1/R-2/N-01) → 067.4 (which closed R-3 + 067.4-discovered R-4/R-5) → 067.5 (which closed Row 11) preserved scope discipline at every step. Each phase had a clear gate-blocking row, no scope creep, and the chain closed cleanly.
+- **Strict 12/12 GREEN gate on user-driven UAT** — refusing partial-with-approval shortcuts on 067.2/067.3/067.4 forced real fixes instead of paper closures. Ultimately the chain shipped 100% of gate-blocking rows GREEN downstream; the strict gate kept signal honest.
+- **Worktree-isolated parallel execution** — Phases 065 / 066 / 067 wave executors ran in `.claude/worktrees/agent-*` directories with merge-back protection for STATE.md / ROADMAP.md (orchestrator-owned files always win). No corruption; no last-merge-wins races.
+- **Plan-checker iteration loop** — On 065-03, the plan-checker's first pass found 1 BLOCKER + 4 WARNINGS (TERMINAL_TYPES misdoc + scope/mock-fragility flags). Targeted revision passed iteration 2 cleanly. The loop caught real defects without forcing replanning.
+- **Test-only maintenance discipline (Phase 065)** — Plans 01/02/03 each touched exactly one test file, no production code, atomic commits. Made post-merge regression diagnosis trivial and gave the next milestone (Skill Studio) a clean foundation.
+
+### What Was Inefficient
+
+- **ROADMAP / STATE.md drift** — At v2.5 close, 5 phases were administratively `[ ]` despite shipping (065 just completed; 066 closed 2026-05-06; 067.2/067.3/067.4 closed via cross-phase chain; 067.5 missing from top-section entirely). `phase.complete` SDK reported `roadmap_updated: true` but didn't actually flip checkboxes. Required a manual reconciliation pass at milestone close that should have happened phase-by-phase.
+- **HUMAN-UAT.md status fields not updated** — All 10 UAT scoreboards showed legacy `blocked` / `gaps_blocking` / `partial` statuses even after their gate-blocking rows closed downstream. Required acknowledgement at milestone close. Future workflow: when a downstream phase closes a previous phase's gate-blocking row, the closing phase's executor should update the upstream HUMAN-UAT.md status field too (cross-phase-mirror discipline).
+- **First UAT row mis-verdict on 067.4** — Initial Row 1 (R-3) RED was logged due to a stale DOM probe taken between the `done` and `suggestions` SSE events landing in React state. User reviewer correctly flagged the false RED. Lesson: when verifying SSE-emitted UI, `wait_for` against the actual rendered text content, not a snapshot timestamp.
+- **Worktree wrong-cwd misstep on 065-03** — Executor's Bash commands ran against the main repo's working tree instead of the worktree (despite env block). Caught at commit time; recovered by copying file → worktree and reverting main. ~5 minutes of time lost. Lesson: in worktree mode, the executor should explicitly `cd` to the worktree on every shell command, not rely on env propagation.
+- **`max_tokens` 200→800 hypothesis on R-3** — Phase 067.3 spent UAT cycles testing a model-budget hypothesis that didn't fix the suggestion-pills issue; root cause was always-emit-empty + producer-wire-ordering. The disconfirming retest run_id `00dcf270-…` still showed no `suggestions` event in SSE. Lesson: when a hypothesis is tested live and disconfirmed, capture the disconfirmation evidence loudly so the next plan doesn't re-investigate the same path.
+
+### Patterns Established
+
+- **Run-backed streaming key conventions** — `run:{run_id}` (Redis Stream per-run buffer), `runs_by_thread:{tid}` (sorted set per-thread), `runs:active` (sorted set global). All three keyed off `run_id` from `_uuid_mod.uuid4()` at `threads.py:948`. Documented in CLAUDE.md.
+- **`_build_mock_supabase()` shared test fixture** — Per-table routing in `_run_helpers.py:179` with INSERT-id contract honored. Replaces per-test `mock_builder.execute.side_effect = [...]` arrays. Adopted by 065-03 + canonical analog `test_063_post_then_subscribe.py`.
+- **Per-thread message store via Map** — `messagesByThread: Map<string, Message[]>` (LRU N=5) replaces the v2.4 single-buffer pattern. Adopted in Phase 067.3 R-1 fix; preserved as architectural invariant by all subsequent 067.x phases.
+- **POST→GET-stream pattern** — POST returns `JSONResponse({message_id, run_id})` synchronously (HTTP 201); SSE consumed from `GET /runs/{run_id}/stream?since=N`. Replaces the v2.4 SSE-on-POST pattern. Adopted across `test_063_post_then_subscribe.py`, all 11 tests in `test_threads_skills.py` (post-065-03), and the production frontend.
+- **Cross-phase closure rule** — When phase A's gate-blocking row is fixed by downstream phase B, A closes via narrative pointing at B's evidence. ROADMAP closure annotations document the chain so future readers don't have to spelunk.
+- **`_reset_redis_singleton` autouse fixture** — Required for any test that hits the real `get_redis()` singleton because pytest-asyncio function-scope creates a fresh loop per test. Verbatim copy at `test_062_stream_replay.py:36-51` and `test_063_post_then_subscribe.py:45-62`.
+
+### Key Lessons
+
+- **Single feature branch beats incremental cutover for atomic architectural changes** — D-v2.5-11 (061 + 062 + 063 ship together) was the right call; would have been a bug magnet to ship 061 alone with the frontend still POSTing-and-streaming the legacy way.
+- **Strict UAT gates produce honest closure** — the cross-phase 067.2/067.3/067.4 chain repeatedly tested "am I being lazy?" and answered no by escalating to a fresh phase. Each escalation surfaced a real defect instead of papering over with project-level approval.
+- **Preserve `messagesByThread` invariants when extending the streaming surface** — every 067.x phase had to re-verify R-1 cross-thread protection. Plan 02 of 067.5 explicitly skipped the runtime R-1 retest because vitest covers it; that was the right call because the Branch D-3 fix was structurally additive.
+- **`gsd-tools.cjs audit-open` surfaces drift but doesn't itself flip stale status** — milestone close needs a manual reconciliation pass. The audit's job is signal, not action.
+- **When deferring an item, plant a seed with concrete `re_open_triggers`** — SEED-009/010/011 captured 3 carry-forwards from v2.5 with explicit re-open conditions. SEED-012/013/014 captured 3 forward-looking strategic ideas with cross-references to existing seeds. The "Capture every deferred idea" principle (memory `feedback_preserve_all_deferred_ideas.md`) paid off at close.
+- **Document the WHY of cross-phase chains in ROADMAP** — closure annotations like "Closed via 067.5 — Row 11 RED resolved (5/5 cycles GREEN, Branch D-3 fix at commit 3d040c7)" save the next planner from rediscovering the chain. Especially valuable when 067.2/067.3/067.4 all close on the same day via different downstream phases.
+- **Vibe-coder-friendly summaries belong in user-facing artifacts (ROADMAP, STATE)** — internal artifacts (CONTEXT.md, PLAN.md, commits) get the precise terminology. The two registers should not be confused.
+
+### Cost Observations
+
+- Model mix: ~95% claude-opus-4-7 (1M context) for orchestration, planning, executor work; ~5% claude-sonnet-4-6 for plan-checking and verification (faster turnaround on structured outputs)
+- Sessions: many across 10 days; the milestone close itself was a single multi-hour session covering audit + reconciliation + 3 forward-looking seeds + close-out
+- Notable: Phase 067.x cross-phase chain consumed disproportionate session count due to the strict 12/12 UAT gate forcing rework on 067.2 → 067.3 → 067.4 → 067.5. Single-shot cost of the strict gate was high; long-term value (no paper closures shipped) was higher.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
