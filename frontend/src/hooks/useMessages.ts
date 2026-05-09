@@ -573,8 +573,21 @@ export function useMessages(): UseMessages {
     // Phase 067.3 (D-067.3-R1-07): clear only the active thread's bucket, NOT
     // the entire store. Caller (ChatArea, plan 060-02) is responsible for
     // calling abortStream() first when it intends to cancel a stream.
+    //
+    // Phase 067.5 (Branch D-3-CLEAR-WIPES-STREAMING-BUCKET): refuse to wipe a
+    // bucket whose thread is currently being streamed into. ChatArea.tsx:89-126
+    // unconditionally calls clearMessages() on every thread.id change. Without
+    // this guard, switching BACK to a streaming thread (activeThreadIdRef ===
+    // streamingThreadIdRef) wipes the live placeholder; the immediately-following
+    // loadMessages(thread.id) early-returns at line 603 because isSendingRef is
+    // still true; the bucket stays empty; subsequent SSE onDelta/onTerminal
+    // callbacks no-op via the m.id === assistantId map (placeholder is gone);
+    // user stares at an empty thread until F5 reconciles. Gap source:
+    // 067.4-HUMAN-UAT.md Row 11 (lines 333-362). Diagnostic anchor:
+    // .planning/phases/067.5-frontend-reconcile-fix/067.5-01-REPRO-EVIDENCE.md
+    // (Branch D-3 — RED test in useMessages.test.ts proves the wipe).
     const tid = activeThreadIdRef.current
-    if (tid) {
+    if (tid && tid !== streamingThreadIdRef.current) {
       setMessagesByThread((store) => {
         if (!store.has(tid)) return store
         const next = new Map(store)
