@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: ready_to_complete_milestone
-stopped_at: Phase 065 closed; v2.5 milestone ready for /gsd:complete-milestone
-last_updated: "2026-05-09T19:30:00.000Z"
-last_activity: 2026-05-09 -- v2.5 milestone close-out reconciliation
+status: completed
+stopped_at: Phase 067.4 context gathered
+last_updated: "2026-05-09T18:13:24.000Z"
+last_activity: 2026-05-09
 progress:
   total_phases: 16
-  completed_phases: 16
-  total_plans: 67
-  completed_plans: 67
+  completed_phases: 14
+  total_plans: 59
+  completed_plans: 59
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-01)
 Phase: v2.5 milestone close
 Plan: All v2.5 phases closed (065, 066, 067, 067.1, 067.2, 067.3, 067.4, 067.5)
 Status: Ready to run `/gsd:complete-milestone v2.5`
-Last activity: 2026-05-09 — close-out reconciliation pass
+Last activity: 2026-05-09
 
 ## Outstanding before v2.5 close
 
