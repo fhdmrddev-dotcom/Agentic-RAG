@@ -1,240 +1,367 @@
+<!-- refreshed: 2026-05-09 -->
 # Architecture
-_Last updated: 2026-04-05_
 
-## High-Level System Design
+**Analysis Date:** 2026-05-09
 
-```
-Browser (React + Vite)
-        │
-        │  REST + SSE  (VITE_API_BASE_URL → http://localhost:8000)
-        ▼
-FastAPI Backend (Python, port 8000)
-        │                         │
-        │  supabase-py             │  openai SDK (OpenAI-compatible)
-        ▼                         ▼
-Supabase (Postgres +         LLM Provider
- pgvector + Auth +           (OpenAI / Anthropic /
- Storage + Realtime)         Google / OpenRouter / Ollama)
-```
+## System Overview
 
-All API calls from the frontend include a Supabase JWT in `Authorization: Bearer <token>`. The backend validates the token by calling `supabase.auth.get_user(token)` via the service-role client in `backend/app/dependencies.py`. The service-role key bypasses database RLS; RLS is enforced on direct client-side Supabase queries (Realtime, auth).
-
-## Module Breakdown
-
-The codebase was built through numbered modules. Current status is in `PROGRESS.md`.
-
-| Module | What it added |
-|--------|---------------|
-| 1 | App shell: FastAPI + Vite scaffold, Supabase auth, basic chat (OpenAI Assistants — since replaced) |
-| 2 | BYO Retrieval: document upload, pgvector embeddings, RAG tool-calling agent, SSE streaming, Supabase Realtime ingestion status |
-| 3 | Record Manager: SHA-256 dedup, stale-file replacement |
-| 4 | Metadata Extraction: LLM-structured JSON metadata per document, `metadata_filter` on search |
-| 5 | Multi-Format Support: PDF (pypdf), DOCX (python-docx), HTML, Markdown |
-| 6 | Hybrid Search + Reranking: `keyword_search_chunks` RPC + RRF fusion, optional Cohere/local reranker |
-| 6.1 | Settings UI (per-user provider overrides — later reverted) |
-| 6.2 | Settings Refactor: global `app_settings` table; settings page is read-only dashboard |
-| 7 | Additional Tools: Text-to-SQL (`query_documents`), web search (Tavily), multi-file upload |
-| 8 | Sub-Agents: `analyze_document` tool — isolated streaming LLM call on full document content |
-| KB v1.0 | Folder system, KB explorer tools (ls/tree/grep/glob/read_document), folder-scoped threads |
-| v2.0 | Agent Skills: skills catalog, `load_skill`/`save_skill`/`read_skill_file` tools, Docker sandbox code execution |
-
-## Key Subsystems
-
-### Authentication
-
-- **Provider:** Supabase Auth (email + password)
-- **Frontend:** `frontend/src/hooks/useAuth.ts` wraps `supabase.auth.*`. `App.tsx` gates all views behind `user !== null`.
-- **Backend:** `backend/app/dependencies.py` — `get_current_user()` FastAPI dependency validates the JWT on every request. Returns `{id, email}` dict injected via `Depends()`.
-- **Supabase client:** A single service-role client is created lazily in `get_supabase()` (singleton). Service role bypasses RLS so the backend can read/write on behalf of any user.
-
-### Row-Level Security (RLS)
-
-All tables have RLS enabled. General pattern: `auth.uid() = user_id`.
-
-**Exceptions with broader visibility:**
-- `folders`: `auth.uid() = user_id OR is_global = true`
-- `skills`: `auth.uid() = user_id OR is_global = true`
-- `skill_files`: own rows OR linked skill has `is_global = true`
-- `storage.objects` for `skill-files` bucket: own path prefix OR linked skill is global
-
-**Backend access pattern:** The backend uses the service-role client (bypasses RLS). User isolation is enforced by explicitly adding `.eq("user_id", current_user["id"])` to every query, or via the Python-level `fetch_visible_folders()` logic in `backend/app/utils/folder_utils.py` for global folder subtrees.
-
-**Realtime subscriptions:** Frontend subscribes without a `user_id` column filter. RLS policies on the Realtime publication ensure users only receive their own row events.
-
-### Document Ingestion Pipeline
-
-Upload → Text Extraction → Chunking → Embedding → Storage → Realtime Status Updates
-
-**Detailed steps (`backend/app/api/documents.py`):**
-
-1. `POST /documents/upload` (multipart form: `file`, optional `folder_id`)
-2. MIME type validation — allowed: `text/plain`, `text/markdown`, `text/html`, `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-3. Folder ownership validated if `folder_id` provided (only owner may upload into a folder)
-4. SHA-256 hash computed on raw bytes
-5. **Dedup check (folder-scoped):** if identical hash + `status=completed` in same folder → return HTTP 200 (skip re-ingestion)
-6. **Stale check:** if same filename with different hash → delete old doc + storage object, then proceed
-7. Text extracted synchronously: PDF via `pypdf.PdfReader`, DOCX via `python-docx`, others decoded as UTF-8
-8. Document row inserted (`status=pending`); file uploaded to Supabase Storage bucket `documents` at `{user_id}/{doc_id}/{filename}`
-9. FastAPI `BackgroundTasks` queues `ingest_document()` — returns HTTP 201 immediately
-10. **Background task (`ingest_document`):**
-    - `status → processing` (Realtime UPDATE fires → frontend shows "processing")
-    - `chunk_text()` → overlapping fixed-size chunks with sentence-boundary snapping
-    - `embed_chunks()` → calls embedding model via openai-compatible API
-    - Bulk insert into `document_chunks` table (content + vector embedding)
-    - `extract_metadata()` — LLM call for structured JSON (best-effort, never blocks)
-    - `status → completed`, stores `chunk_count`, `metadata`, `full_markdown`
-
-**Frontend awareness:** `useDocuments` (`frontend/src/hooks/useDocuments.ts`) subscribes to Supabase Realtime `postgres_changes` on the `documents` table. UPDATE events patch status in-place; INSERT events prepend new rows; DELETE events remove rows.
-
-### RAG / Chat Architecture
-
-**Stateless history:** No server-side session. Each `POST /threads/{id}/messages` loads full message history from `messages` table, reconstructs it into OpenAI-compatible multi-turn format, prepends the system prompt, then calls the LLM.
-
-**History reconstruction** (`_reconstruct_history()` in `backend/app/api/threads.py`): Messages with persisted `tool_calls` are expanded into three entries: (1) `assistant` + `tool_calls`, (2) `tool` result messages, (3) `assistant` text. This reconstructs the exact wire format OpenAI expects for multi-turn tool use.
-
-**Agentic loop** (`event_stream()` in `backend/app/api/threads.py`):
-
-```
-for iteration in range(max_iterations):   # default 12; explorer mode 8
-    stream = create_streaming_chat(messages, ...)
-    buffer tool_call deltas from stream
-    if finish_reason == "tool_calls":
-        execute tools, append results to messages
-        continue
-    else:
-        break   # natural stop
-# Final iteration forces tool_choice="none" to prevent infinite loops
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│                Browser (React 19 + Vite + Tailwind)                  │
+│                                                                      │
+│   ChatArea / ChatLayout    Pages (Auth/Settings/Skills/Health/       │
+│   `frontend/src/`            Ingestion)                              │
+│   components/chat/         `frontend/src/pages/`                     │
+│                                                                      │
+│   useMessages (per-thread bucket store, run subscriptions)           │
+│   `frontend/src/hooks/useMessages.ts`                                │
+└─────────┬──────────────────────────────────┬─────────────────────────┘
+          │ POST /threads/{id}/messages      │ GET /runs/{id}/stream
+          │ → JSON {message_id, run_id}      │ → SSE replay-and-tail
+          ▼                                  ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│              FastAPI Backend (single uvicorn worker)                 │
+│              `backend/app/main.py`                                   │
+│                                                                      │
+│   Routers          Services                  Utilities               │
+│   `backend/app/    `backend/app/             `backend/app/           │
+│    api/`            services/`                utils/db.py` (aexec)   │
+│                                                                      │
+│   Producer (agent_runner) ──► Redis Stream ◄── Consumer (SSE)        │
+│   `threads.py:1059`           `run:{run_id}`   `runs.py:80`          │
+└────┬───────────────────┬────────────────────────────┬────────────────┘
+     │ supabase-py       │ OpenAI / Anthropic SDK     │ redis.asyncio
+     │ (sync, wrapped    │ + LangSmith tracing        │
+     │  via aexec)       │                            │
+     ▼                   ▼                            ▼
+┌─────────────────────┐ ┌────────────────────┐ ┌──────────────────────┐
+│  Supabase Postgres  │ │   LLM Providers    │ │   Redis (run-buffer) │
+│  pgvector + RLS +   │ │   OpenAI / Anth.   │ │   Streams + sorted   │
+│  Storage + Realtime │ │   / Google /       │ │   sets + TTL         │
+│                     │ │   OpenRouter /     │ │                      │
+│  `supabase/         │ │   Ollama           │ │   `docker-compose.   │
+│   full-schema.sql`  │ │                    │ │    dev.yml`          │
+│                     │ │  + Docker          │ │                      │
+│                     │ │  `llm-sandbox`     │ │                      │
+│                     │ │  for execute_code  │ │                      │
+└─────────────────────┘ └────────────────────┘ └──────────────────────┘
 ```
 
-**Tool roster (13 tools in default mode):**
-- `ls`, `tree`, `grep`, `glob`, `read_document` — KB filesystem navigation (implemented in `backend/app/api/kb.py`)
-- `search_documents` — vector/hybrid semantic search with optional `metadata_filter`
-- `query_documents` — SQL SELECT via Supabase RPC (Text-to-SQL)
-- `analyze_document` — sub-agent: full-document analysis via isolated streaming LLM call
-- `web_search` — Tavily API (tool excluded entirely when `TAVILY_API_KEY` absent)
-- `load_skill`, `save_skill`, `read_skill_file` — skill catalog operations
-- `execute_code` — Docker sandbox Python execution (excluded when `SANDBOX_ENABLED=false`)
+All frontend API calls include a Supabase JWT in `Authorization: Bearer <token>`. The backend validates tokens via `supabase.auth.get_user(token)` in `backend/app/dependencies.py:47-58` using a service-role client (bypasses RLS — the backend enforces ownership via `.eq("user_id", current_user["id"])` filters on every query). RLS still protects direct client-side Supabase queries (Auth, Realtime, Storage) and is the canonical authorization layer for global-vs-private folders/skills.
 
-**Agent modes:** `default` (all 13 tools, 12 iterations) or `explorer` (KB navigation tools only, 8 iterations, `EXPLORER_SYSTEM_PROMPT`). Mode sent as `agent_mode` field in POST body.
+## Component Responsibilities
 
-**Folder-scoped threads:** A thread can have a `folder_id`. When set, the backend resolves the full subtree of that folder, injects a scope note into the system prompt, and restricts relevant tool results to that subtree.
+| Component | Responsibility | File |
+|-----------|----------------|------|
+| FastAPI app | Mounts routers, configures CORS, lifespan startup/shutdown (Redis ping, AnyIO thread tokens, sandbox cleanup, RUN_TASKS cancellation) | `backend/app/main.py` |
+| `threads` router | Thread CRUD + `POST /threads/{id}/messages` (spawns producer task, returns `{message_id, run_id}`) + `GET /threads/{id}/active-runs` | `backend/app/api/threads.py` |
+| `runs` router | `GET /runs/{run_id}/stream?since=N` (replay-and-tail consumer) and `DELETE /runs/{run_id}` (cancel verb — happy/zombie/terminal paths) | `backend/app/api/runs.py` |
+| `documents` router | Upload + ingestion pipeline + version management + reingest | `backend/app/api/documents.py` |
+| `kb` router | Knowledge-base tools (`ls`, `tree`, `grep`, `glob`, `read`) — also reused by the LLM tool-dispatch path inside threads.py | `backend/app/api/kb.py` |
+| `skills` router | Skill CRUD + ZIP import/export + skill_files | `backend/app/api/skills.py` |
+| `feedback` router | Thumbs up/down ratings (INSERT-only) + feedback stats | `backend/app/api/feedback.py` |
+| `audit` router | Audit log query + CSV export | `backend/app/api/audit.py` |
+| `knowledge_health` router | 4-signal library-health metrics (most-retrieved, never-retrieved, low-confidence, stale) | `backend/app/api/knowledge_health.py` |
+| `sandbox_outputs` router | Signed-URL download for sandbox-generated files (Phase 067.4) | `backend/app/api/sandbox_outputs.py` |
+| `settings` router | Settings persistence (`user_settings`, `app_settings`) | `backend/app/api/settings.py` |
+| `folders` router | Folder CRUD + global toggle | `backend/app/api/folders.py` |
+| `test_fixtures` router | E2E harness fixture endpoints (gated by `ENABLE_TEST_FIXTURES=1`) | `backend/app/api/test_fixtures.py` |
+| Producer (`agent_runner`) | Runs the LLM tool-dispatch loop and `XADD`s every SSE event to `run:{run_id}`. Lifetime decoupled from the SSE consumer. | `backend/app/api/threads.py:1059` |
+| Consumer (`replay_tail_consumer`) | Two-mode `XREAD` from `run:{run_id}` — replay backlog from `since`, then live-tail with `BLOCK 5000`. Wraps in `EventSourceResponse`. | `backend/app/api/runs.py:80` |
+| LLM service layer | OpenAI-compatible streaming, Anthropic native SDK, structured tool-call parser, sub-agent wrapper, retrieval, web search, SQL, embeddings, multimodal, reranking, suggestions | `backend/app/services/` |
+| Sandbox manager | Lazy `llm-sandbox` import, per-thread Docker session TTL, `harvest_output_files` to Storage, lifespan close-all | `backend/app/services/sandbox_service.py` |
+| `aexec` helper | `await aexec(query)` runs sync supabase-py `.execute()` off the event loop via `run_in_threadpool` (D-v2.5-01) | `backend/app/utils/db.py:32` |
+| `useMessages` hook | Per-thread `messagesByThread` Map, run subscriptions, `lastSeenOffsetRef` cursor, AbortController cancel of GET stream, `reconcile` on (re)connect, `resumeFromFailed` | `frontend/src/hooks/useMessages.ts` |
+| `ChatArea` | Wires thread switching → `setViewingThread` + `clearMessages` + reconcile-via-ref on visibilitychange/focus/pageshow/mount | `frontend/src/components/chat/ChatArea.tsx` |
+| `subscribeToRun` | SSE parser for `GET /runs/{id}/stream` — dispatches typed events to `StreamCallbacks`, exposes Redis Stream entry id via `onCursor` for cursor advancement | `frontend/src/lib/api.ts:274` |
 
-**Skills catalog injection:** On each chat request in default mode, enabled skills (own + global) are fetched and appended to the system prompt as a markdown catalog. LLM calls `load_skill(skill_name)` to get full instructions.
+## Pattern Overview
 
-**Context budget:** Tool results in the reconstructed `messages` array are capped to 3,000 chars (10,000 for `analyze_document`) to prevent unbounded context growth across many iterations.
+**Overall:** Layered FastAPI service + React SPA with **decoupled producer/consumer streaming** (Phase 061: D-v2.5-08). The HTTP request that posts a chat message returns immediately with `{message_id, run_id}`; a separate `GET /runs/{id}/stream?since=N` request consumes the SSE event buffer from Redis Streams. The producer task's lifetime is independent of any HTTP request — disconnect, refresh, or multi-tab access all attach/reattach to the same buffer.
 
-### SSE Streaming Architecture
+**Key Characteristics:**
+- **Run-backed streaming via Redis Streams** — every SSE event is `XADD`-ed to `run:{run_id}` (MAXLEN ~10000, ~10 min TTL). Multiple consumers can `XREAD` non-destructively from the same stream — the foundation for multi-tab sync, navigate-away, and refresh-mid-stream working without manual F5.
+- **Stateless chat completions** — no provider-side thread state. Full message history is reconstructed from `messages` table on every request and trimmed to fit per-provider context budgets in `services/context_window.py`.
+- **No LangChain / LangGraph** — raw provider SDK calls only. `services/openai_service.py` (OpenAI-compatible) and `services/anthropic_service.py` (native Anthropic SDK) implement parallel streaming paths, both feeding `_drain_stream_with_close_on_cancel` (`threads.py:158`) which decouples the sync provider stream from the async event loop.
+- **Per-LLM-call adaptive timeouts (Phase 066, D-066-01..03)** — no total-deadline cap on the agent loop. Each LLM call has its own `asyncio.timeout(per_call_budget)` wrapper inside the iteration loop; tool execution is OUTSIDE the timer (tools own their own discipline). Per-model budgets via `MODEL_CAPABILITIES[model]['llm_call_timeout_seconds']` in `config.py`.
+- **Single uvicorn worker (D-v2.5-02)** — concurrency comes from asyncio + threadpool, NOT process workers. `RUN_TASKS` registry, `_BACKGROUND_TASKS` set, and sandbox session manager are in-process state that would break under multi-worker.
+- **Async sync-wrapping discipline (D-v2.5-01)** — every supabase-py `.execute()` call goes through `aexec()` (`utils/db.py:32`); blocking sandbox / SDK / SQL paths use `run_in_threadpool`. AnyIO default thread tokens bumped to `settings.anyio_thread_tokens` at startup (`main.py:59`) so the SSE-path doesn't queue at the 40-token default.
+- **Row-Level Security as the durable boundary** — every user-facing table has an RLS policy in `supabase/full-schema.sql` keyed on `auth.uid() = user_id`, plus `runs_select_own` (line 1493) for the v2.5 runs table. Global folders/skills are the only shared scope, surfaced via `folder_is_globally_visible(uuid)` SECURITY DEFINER function and `is_global` flags.
+- **Realtime is best-effort hint, not source of truth (D-v2.5-03)** — frontend always reconciles via fetch on (re)connect. `useMessages.reconcile()` runs `getActiveRuns(threadId) || loadMessages(threadId)` in parallel on every mount/visibilitychange/focus/pageshow.
+- **Strict-mode-safe React state** — every per-event `setMessages` is bucket-targeted via `setMessagesForThread(threadId, updater)`; ChatArea's reconcile listener routes through `reconcileRef.current` to avoid effect-recreate-mid-stream tearing.
 
-**Backend:** `event_stream()` is an `AsyncGenerator[str, None]` returned as `StreamingResponse`. Emits newline-delimited `data: <json>\n\n` events.
+## Layers
 
-**SSE event types:**
+**Frontend — `frontend/src/`:**
+- Purpose: Browser UI for chat, ingestion, skills, knowledge-health, settings.
+- Location: `frontend/src/`
+- Contains: React 19 components, Vite build, Tailwind + shadcn/ui Aether Intelligence design system (Deep Midnight theme), TanStack Query for server-cache, custom hooks for stateful flows.
+- Depends on: Supabase JS SDK (auth + Realtime), `lib/api.ts` (REST + SSE wire), Lucide icons, `react-markdown`, `recharts`.
+- Used by: Browser. Talks to FastAPI over CORS-enabled HTTP/SSE.
 
-| Event type | Payload | Purpose |
-|---|---|---|
-| `delta` | `{content}` | LLM text token chunk |
-| `title` | `{content}` | Auto-generated thread title after first exchange |
-| `tool_start` | `{name, args}` | Tool call beginning |
-| `tool_end` | `{name, result}` | Tool call result |
-| `sub_agent_start` | `{filename, task}` | Analyze-document sub-agent starting |
-| `sub_agent_delta` | `{content}` | Sub-agent token stream |
-| `sub_agent_done` | — | Sub-agent finished |
-| `skill_activated` | `{skill_name}` | `load_skill` tool resolved a skill |
-| `code_execution_start` | `{code_preview}` | Sandbox execution starting |
-| `code_stdout` | `{content}` | Sandbox stdout line |
-| `code_stderr` | `{content}` | Sandbox stderr line |
-| `code_execution_complete` | `{exit_code, duration_ms, output_files, error}` | Sandbox finished |
-| `[DONE]` | — | Stream complete |
+**FastAPI Routers — `backend/app/api/`:**
+- Purpose: HTTP/SSE surface; authentication; per-route ownership enforcement.
+- Location: `backend/app/api/`
+- Contains: One module per resource family (`threads`, `runs`, `documents`, `kb`, `skills`, `audit`, `feedback`, `knowledge_health`, `folders`, `sandbox_outputs`, `settings`, `test_fixtures`).
+- Depends on: `services/`, `models/`, `utils/db.py`, `dependencies.py`.
+- Used by: FastAPI app in `main.py` (mounted in order at lines 138–148).
 
-**Frontend parsing:** `streamMessage()` in `frontend/src/lib/api.ts` reads the response body as a `ReadableStream`, buffers incomplete lines across chunks, and dispatches each event type to callback functions. Unknown types are silently ignored.
+**Service Layer — `backend/app/services/`:**
+- Purpose: LLM + tool integrations + retrieval + sandboxing + observability.
+- Location: `backend/app/services/`
+- Contains: Provider-specific SDK adapters (`openai_service.py`, `anthropic_service.py`), retrieval (`retrieval_service.py`), sub-agent (`sub_agent_service.py`), sandbox (`sandbox_service.py`), web search (`web_search_service.py`), SQL tool (`sql_service.py`), embedding (`embedding_service.py`), reranking (`rerank_service.py`), suggestions (`suggestion_service.py`), context window trimming (`context_window.py`), multimodal (`multimodal_service.py`), tool parser (`tool_parser.py`), audit (`audit_service.py`).
+- Depends on: External SDKs + supabase-py.
+- Used by: Routers (especially `threads.py`).
 
-### Supabase Realtime Usage
+**Models — `backend/app/models/`:**
+- Purpose: Pydantic types for request/response bodies and database row shapes.
+- Location: `backend/app/models/`
+- Contains: `document.py`, `folder.py`, `kb.py`, `message.py`, `run.py`, `skill.py`, `thread.py`, `user_settings.py`.
+- Depends on: Pydantic.
+- Used by: Routers (request/response models) + services where structured outputs are coerced.
 
-Three tables are added to the `supabase_realtime` publication:
+**Utils — `backend/app/utils/`:**
+- Purpose: Cross-cutting helpers.
+- Location: `backend/app/utils/`
+- Contains: `db.py` (the `aexec` async-exec wrapper around supabase-py — Phase 058 D-058-03), `folder_utils.py` (visible-folder fetch + subtree resolution).
+- Depends on: starlette.concurrency, supabase-py.
+- Used by: Routers + services.
 
-| Table | Subscribed by | Purpose |
-|---|---|---|
-| `documents` | `useDocuments` hook | Ingestion status updates (pending → processing → completed/failed) |
-| `folders` | `useFolders` hook | Folder create/rename/delete/global-toggle sync |
-| `messages` | Not subscribed (pulled on demand) | — |
+**Database / Storage — Supabase:**
+- Purpose: Authoritative storage. Postgres + pgvector for documents/chunks; Supabase Storage for files; Auth for JWT; Realtime for ingestion-status hints (best-effort only).
+- Location: `supabase/migrations/` (numbered SQL — currently 001 → 038), `supabase/full-schema.sql` (regenerated from live DB; deploy artifact).
+- Contains: 24 tables with RLS, ~10 RPC functions, partial indexes, generated columns, triggers.
+- Depends on: pgvector extension.
+- Used by: All backend modules (via `dependencies.get_supabase()`).
 
-Realtime channels use the `postgres_changes` API. No `user_id` filter is applied on the channel (avoids needing `REPLICA IDENTITY FULL`). RLS on the table enforces row isolation.
+**Run Buffer — Redis:**
+- Purpose: Ephemeral per-run SSE event buffer for the producer/consumer split. No schema, no migrations — keys created on first write.
+- Location: `docker-compose.dev.yml` at repo root (local), Upstash `rediss://` URL (cloud).
+- Contains: `run:{run_id}` (Redis Stream — events), `runs_by_thread:{thread_id}` (sorted set — active runs per thread), `runs:active` (sorted set — all currently-streaming run_ids), `run:{run_id}:cancel_lock` (SETNX cancel-lock for zombie-heal idempotency).
+- Depends on: redis-py async client.
+- Used by: `threads.py` (producer), `runs.py` (consumer + DELETE).
 
-### Hybrid Search & Retrieval
+**Sandbox — Docker / `llm-sandbox`:**
+- Purpose: Isolated Python execution for the `execute_code` tool. Per-thread session with TTL eviction.
+- Location: `backend/app/services/sandbox_service.py` (lazy import — module is gated by `SANDBOX_ENABLED=true`).
+- Contains: `sandbox_manager` (singleton), `harvest_output_files` (copies container output to `sandbox-outputs` Storage bucket, signs URLs).
+- Used by: `threads.py` `execute_code` tool dispatch + `sandbox_outputs.py` for signed-URL download (Phase 067.4).
 
-`backend/app/services/retrieval_service.py`
+## Data Flow
 
-**Vector search:** Embeds query text → calls `match_document_chunks` Supabase RPC (pgvector cosine similarity, HNSW index). Accepts optional `metadata_filter` (JSONB containment `@>`) and `folder_ids` scope list.
+### Run-Backed Streaming Flow (Phase 061 → 067.5 — the v2.5 architectural shift)
 
-**Keyword search:** Calls `keyword_search_chunks` RPC (Postgres `tsvector` GIN index, full-text `@@` operator).
+This is the most important flow in the codebase. The core decoupling pattern: **the HTTP request that initiates a run has nothing to do with the HTTP request that consumes the SSE events**.
 
-**RRF fusion:** `_rrf_fuse()` — `score(d) = Σ weight / (k + rank_i(d))`. `k=60` by default. Both vector and keyword weights configurable.
+**1. POST /threads/{thread_id}/messages — `threads.py:875` (`send_message`)**
 
-**Reranking (optional):** `backend/app/services/rerank_service.py` — API mode (Cohere via httpx) or local mode (sentence-transformers `CrossEncoder`, lazy-loaded). Graceful fallback if reranker unavailable.
+   a. Validate thread ownership (line 883) and INSERT user message row, capturing `_user_msg_id` (line 905).
+   b. Resolve provider via `body.provider` → `MODEL_CAPABILITIES[model]['provider']` → `active_provider` chain (line 957) — the model→provider router (D-067.3-N01).
+   c. Generate fresh `run_id = uuid4()` (line 948); INSERT `runs` row with `status='streaming'`, model, provider (line 974); `ZADD` to `runs_by_thread:{tid}` and `runs:active` sorted sets (line 990).
+   d. Auto-generate thread title from first user message if `title='New Chat'` (line 1020) — fires BEFORE producer spawn so title persists regardless of run outcome.
+   e. Spawn `agent_runner(run_id)` as `asyncio.create_task` (line 2698); register in `RUN_TASKS[run_id]` registry; attach done-callback to self-evict.
+   f. Return `JSONResponse(201, {"message_id": _user_msg_id, "run_id": run_id})` (line 2719). **The agent runs in the background.**
 
-Config: `HYBRID_SEARCH_ENABLED=true` (default), `RERANK_ENABLED=false` (default).
+**2. agent_runner producer — `threads.py:1059` (function defined inline inside `send_message`)**
 
-### Folder System
+   a. Outer `try`/`finally` — finally is shielded (Phase 061 Plan 03 Task 3) and runs the 5-step finalize: terminal sentinel → `runs` UPDATE → Redis `EXPIRE 60` → ZREM × 2 → RUN_TASKS.pop.
+   b. Per-iteration loop (max_iterations=15 in General mode, 8 in Explorer):
+      - Update `_last_iteration` / `_last_model_id` / `_last_per_call_budget` BEFORE the SDK call so the outer except can build a meaningful `timed_out` error string (D-066-07).
+      - Resolve `per_call_budget` from `MODEL_CAPABILITIES` (default 180s for unknown models).
+      - Anthropic native path (~line 1149) or OpenAI/Google/OpenRouter path (~line 1213): `async with asyncio.timeout(per_call_budget)` + `_drain_stream_with_close_on_cancel(stream, ...)` — drains the sync SDK stream from a thread executor, with explicit `close_fn` so timeout cancellation closes the SDK stream from the OUTSIDE (avoids `langsmith._TracedStream.__iter__` recording `error=GeneratorExit` — Phase 067.1 Track A).
+      - On every chunk, `await _emit(redis, run_id, type, **fields)` → `XADD run:{run_id} {data: json}` with MAXLEN ~10000.
+      - Tool calls dispatched via in-module handlers; results round-trip into the next iteration as `tool` role messages.
+      - `code_executing` heartbeat events (~every 1s during sandbox execution) emitted by sandbox dispatch (Phase 067.4 R-5).
+   c. On natural completion: persist assistant message to `messages` (with citations, source_refs, confidence, suggestions); emit `done`, then `suggestions`, then `stream_end` (terminal sentinel).
+   d. On `asyncio.CancelledError` (DELETE /runs/{rid} fired): set `_terminal_status='cancelled'`; finally writes terminal `cancelled` sentinel.
+   e. On per-call `asyncio.TimeoutError`: set `_terminal_status='timed_out'`; finally writes `timed_out` sentinel with iteration/model context (D-066-06/07).
+   f. On other exception: set `_terminal_status='failed'`; finally writes `error` sentinel.
+   g. The 5-step finalize translates `runs.status` → SSE TERMINAL_TYPES via `_RUN_STATUS_TO_TERMINAL_TYPE` (line 95) and writes the terminal sentinel through `_emit_terminal` (which is exempt from MAXLEN trimming — Pitfall 5).
 
-**Schema:** `folders` table — adjacency list with self-referencing `parent_id`, `is_global` boolean. Documents linked via nullable `folder_id` FK with `ON DELETE SET NULL`. Migrations: `014_folders.sql`, `015_global_folder_document_rls.sql`, `019_global_folder_subtree_visibility.sql`.
+**3. GET /runs/{run_id}/stream?since={offset} — `runs.py:331` (`stream_run`)**
 
-**Visibility logic** (`backend/app/utils/folder_utils.py`):
-- `fetch_visible_folders()` — returns all folders a user can see: owned folders + any folder that is itself global or has a global ancestor (recursive tree walk with memoization cache)
-- `get_globally_visible_folder_ids()` — returns IDs of foreign-owned folders in global subtrees (used by `list_documents` to include global folder contents)
-- `is_in_global_subtree()` — recursive ancestor check
+   a. Ownership SELECT on `runs` row via `aexec(...).maybe_single()` (line 342). 404 (NOT 403) on miss to avoid existence leak (T-062-01, D-062-12).
+   b. Bounded Redis health probe `await asyncio.wait_for(redis.exists(...), timeout=2.0)`. On `RedisError`/timeout: 503 + `Retry-After: 10`.
+   c. If buffer exists → return `EventSourceResponse(replay_tail_consumer(redis, run_id, since, settings))`.
+   d. If buffer TTL-expired → return `EventSourceResponse(_synthetic_terminal_generator(runs.status, runs.error))` — emits ONE terminal SSE event mapped from the durable `runs` row.
 
-**KB Explorer tools** (`backend/app/api/kb.py`): `ls_path`, `tree_path`, `grep_path`, `glob_path`, `read_path` are pure Python functions callable both as HTTP handlers (`GET /kb/ls` etc.) and directly from the agent tool loop in `threads.py`.
+**4. replay_tail_consumer — `runs.py:80`**
 
-### Skills System
+   a. Phase 1 (replay): `XREAD streams={key: since} count=100` in a loop until empty. For each entry, advance `last_id`, yield `{"data": data_field}`, parse JSON, break on `payload.type ∈ TERMINAL_TYPES`.
+   b. Phase 2 (live-tail): `XREAD ... block=5000`. Same dispatch. On empty result, probe `redis.exists(stream_key)` — if missing, emit synthetic `buffer_expired_during_tail` and return.
+   c. Deadline guard: `monotonic() + settings.consumer_timeout_seconds` (~610s, bumped from 130s in Phase 066 to outlast `max_iterations × per_call_budget`).
+   d. WR-01 invariant: never reset `last_id` to `$` between Phase 1 and Phase 2 — always carry forward, otherwise a fast producer can emit between phases and the entry is missed.
+   e. `finally: pass` (D-061-03) — consumer disconnect MUST NOT cancel producer.
+   f. Cancellation discipline: `asyncio.CancelledError` re-raises (cooperative); `RedisTimeoutError` (cancellation-equivalent at xread BLOCK) emits a clean SSE error and returns; other `RedisError` emits `redis_error`.
 
-**Schema:** `skills` table (name, description, instructions, `is_enabled`, `is_global`) + `skill_files` table for file attachments. RLS: own rows + global. Supabase Storage bucket `skill-files` at `{user_id}/{skill_id}/{filename}`. Migration `017_skills.sql`.
+**5. DELETE /runs/{run_id} — `runs.py:421` (`cancel_run`) — the Stop verb**
 
-**Skill catalog injection:** On each chat request in default mode, enabled skills (own + global) are fetched and appended to the system prompt as a markdown list.
+   a. Ownership SELECT (404 not 403).
+   b. Already-terminal (`completed`/`failed`/`cancelled`/`timed_out`) → 204 silent (idempotent, D-062-09).
+   c. **Happy path** — `RUN_TASKS[run_id]` alive → `task.cancel()` → 204 immediately. Producer's CancelledError handler runs the shielded finalize asynchronously.
+   d. **Zombie heal** (D-062-11) — RUN_TASKS missing but `runs.status='streaming'`: SETNX `run:{rid}:cancel_lock` (idempotency under concurrent DELETEs), UPDATE `runs.status='cancelled'`, emit synthetic `cancelled` sentinel via `_emit_terminal`, ZREM both sorted sets, EXPIRE 60. All Redis ops in independent try/except — Postgres UPDATE is the durable cancel record (T-062-03).
+   e. Cross-tab Stop falls out for free — the sentinel propagates to ALL attached consumers via the same Redis Stream.
 
-**YAML import/export:** `backend/app/api/skills.py` supports bulk import from ZIP archives containing `SKILL.md` files with YAML frontmatter + markdown body.
+**6. Frontend consumer — `useMessages.sendMessage` (`useMessages.ts:673`) and `useMessages.reconcile` (`useMessages.ts:948`)**
 
-### Code Execution Sandbox
+   a. `sendMessage`: optimistic user + assistant placeholders inserted into `messagesByThread` Map keyed by threadId; `streamingThreadIdRef.current = threadId`; `await postMessage()` returns `{message_id, run_id}`; reserve `subscriptionsRef.set(run_id, controller)` BEFORE the runId-stamping `setMessages` (D-067-01) to short-circuit racing reconcile triggers; swap user-temp-id for real `message_id`; stamp `run_id` on placeholder; `subscribeToRun(run_id, "0", callbacks, controller.signal)` opens `GET /runs/{run_id}/stream`.
+   b. `reconcile(threadId)` fires from ChatArea on mount/visibilitychange/focus/pageshow (`ChatArea.tsx:163-188` via `reconcileRef`). Body:
+      - `reconcileInFlightRef` lock (D-063.1-11) — multi-tab activation fires both visibilitychange + focus in <50ms; coalesces.
+      - `Promise.all([getActiveRuns(threadId), loadMessages(threadId)])` (CONTEXT.md ordering mandate).
+      - For each active run: runId-match dedup against the DB-loaded messages (D-063.1-04) → re-use the persisted message id as the SSE callback target if one exists, else insert idempotent `temp-${run_id}` placeholder.
+      - Skip subscribe if `subscriptionsRef.has(run_id)` (live consumer already attached); else reserve slot BEFORE `subscribeToRun` (WR-06) and pass `lastSeenOffsetRef.current.get(run_id) ?? "0"` as `since`.
+   c. `subscribeToRun` parser (`api.ts:274`) emits typed events through `StreamCallbacks` (`onDelta`, `onToolPreparing`, `onToolStart`, `onToolEnd`, `onCitations`, `onConfidence`, `onSuggestions`, `onCodeExecuting`, `onIterationStart`, `onTerminal`, etc.). After every successful event dispatch, fires `onCursor(redisStreamEntryId)` so `lastSeenOffsetRef` advances (D-063.1-01/02). On `stream_end` / `error` / `cancelled` / `timed_out`, calls `onTerminal(kind, errorPayload?)` and returns.
+   d. `onTerminal` → flips `runStatus` on the matching message id (existence-check guarded — D-067-02), deletes `subscriptionsRef.get(runId)`, falls back to `loadMessages(threadId)` if `errorPayload === 'buffer_expired'`.
+   e. **Critical clearMessages guard (Phase 067.5 Branch D-3, `useMessages.ts:572-590`)**: ChatArea calls `clearMessages()` on every thread switch. Without the guard, switching BACK to a thread whose run is still streaming wipes the live placeholder (because `tid === streamingThreadIdRef.current`). Fix: `if (tid && tid !== streamingThreadIdRef.current) { ... delete bucket ... }`. Loaded message buckets for non-streaming threads still clear; streaming bucket is preserved through the round-trip.
 
-`backend/app/services/sandbox_service.py` — `SandboxSessionManager` maintains `InteractiveSandboxSession` instances (from `llm-sandbox[docker]`) keyed by `thread_id`. Sessions persist within a thread (variables and installed packages survive between calls in the same thread). Sessions are evicted after `SANDBOX_TTL_MINUTES` idle time and closed on app shutdown. Entirely gated by `SANDBOX_ENABLED=false` default (Docker SDK not imported when disabled).
+**7. Stop button — `useMessages.stopStreaming` (`useMessages.ts:477`)**
 
-### Settings Architecture
+   a. Find the streaming assistant message via `messagesRef.current` (latest snapshot of streaming bucket, NOT viewing bucket — D-067.3-R1-04 / Pitfall 3).
+   b. `await cancelRun(runId)` → DELETE /runs/{rid} → producer cancelled server-side.
+   c. The terminal `cancelled` sentinel arrives via the still-open SSE; `subscribeToRun` parses it; `onTerminal('cancelled')` flips `runStatus='cancelled'` + `stopped: true` on the placeholder. **No client-side AbortController.abort()** — that would only close the consumer-side socket; the producer would keep running until natural completion.
 
-Settings resolution priority: `settings_override.json` > `.env` > pydantic defaults.
+### Document Ingestion Flow (manual file upload only — not automated)
 
-- `backend/app/config.py` — `Settings` (pydantic-settings) reads from `.env`. LLM provider resolution via `@model_validator`: `LLM_PROVIDER` env var selects provider; resolved to `llm_api_key` / `llm_base_url`. Supported: `openai`, `anthropic`, `google`, `openrouter`, `ollama`.
-- `backend/app/models/user_settings.py` — `load_user_settings()` merges env defaults with `settings_override.json`. `UserEffectiveSettings` is passed to all services per-request.
-- Settings page in UI is **read-only** — it displays current effective values. No writes to DB.
+1. User uploads file via `IngestionPage` / `DocumentUpload` (`frontend/src/components/ingestion/DocumentUpload.tsx`).
+2. `POST /documents/upload` (`backend/app/api/documents.py`) — multipart upload; Storage write to `documents` bucket; INSERT `documents` row with `status='pending'`, `ingestion_step='received'`.
+3. Background ingestion task: extract (pypdf / python-docx / pdfplumber / python-pptx / openpyxl / ebooklib), chunk via sentence-boundary, embed (`services/embedding_service.py`), tables via pdfplumber, images via vision-LLM (`services/multimodal_service.py`), persist to `document_chunks` / `document_tables` / `document_images`. Updates `documents.status` and `ingestion_step` at each stage; Realtime notifies the frontend (best-effort hint, frontend reconciles via fetch).
+4. SHA-256 dedup via `documents.content_hash`; new versions bump `version_number` and toggle `is_latest`.
 
-## Data Flow: Upload → Ingest → Chat
+## Key Abstractions
 
-```
-1. User drags file onto DocumentUpload (frontend)
-2. useDocuments.upload() → POST /documents/upload (multipart)
-3. Backend: dedup check → text extract → insert documents row (status=pending)
-4. Backend: file upload to Supabase Storage bucket
-5. BackgroundTask: ingest_document()
-   a. status → processing  →  Realtime UPDATE → frontend shows "processing"
-   b. chunk_text() → embed_chunks() → insert document_chunks rows
-   c. extract_metadata() (best-effort, never blocks)
-   d. status → completed   →  Realtime UPDATE → frontend shows "completed"
-6. User opens chat, types message
-7. POST /threads/{id}/messages (JSON body: content, model, agent_mode)
-8. Backend: insert user message → event_stream() yields SSE
-9. Backend: load history → reconstruct OpenAI messages → enter agentic loop
-10. LLM responds with tool_call: search_documents
-    a. embed query → match_document_chunks RPC → optional rerank
-    b. tool_start SSE → frontend shows ToolCallPanel
-    c. tool result appended to messages
-11. LLM generates final answer → delta SSE events stream token-by-token
-12. Loop ends → [DONE] SSE event
-13. Backend: persist assistant message (content + tool_calls) to messages table
-14. (First exchange only) generate_thread_title() → title SSE → sidebar updates
-```
+**Run** (Phase 061+):
+- Purpose: Server-side handle for one agent invocation, decoupled from the HTTP request that started it.
+- Examples: `supabase/migrations/035_runs_table.sql` (durable lifecycle), `supabase/migrations/038_runs_timed_out_status.sql` (status enum extension), `RUN_TASKS` registry at `threads.py:80`, `run:{run_id}` Redis Stream key.
+- Pattern: durable Postgres lifecycle row + ephemeral Redis Stream event buffer + in-process asyncio.Task registry. Status enum: `streaming` → `{completed, failed, cancelled, timed_out}` (terminal). SSE wire types map via `_RUN_STATUS_TO_TERMINAL_TYPE` at `threads.py:95`.
 
-## Error Handling Strategy
+**StreamCallbacks bag** (Phase 063):
+- Purpose: Typed event-dispatch interface from the SSE parser to `useMessages`. Replaces the legacy POST-stream closure.
+- Examples: `frontend/src/lib/api.ts` (StreamCallbacks type + `subscribeToRun` parser), `frontend/src/hooks/useMessages.ts` (`makeStreamCallbacks` factory at line 58).
+- Pattern: callback factory takes a `threadId` + `assistantId` + `setMessages: ThreadBoundSetMessages` and produces the bag. Caller wraps `onTerminal` to flip `runStatus` and clean up `subscriptionsRef`. `onCursor(msId)` advances the per-run replay offset.
 
-- **Ingestion failures:** Caught in background `ingest_document()`; `status → failed`, `error_message` persisted to DB.
-- **LLM API errors:** `openai.APIError` caught in `event_stream()`; error note emitted; stream closes.
-- **Tool execution errors:** Each tool wrapped in `try/except`; error string returned as tool result so LLM can handle gracefully.
-- **Response truncation:** `finish_reason == "length"` appends a `*[Response truncated]*` note and breaks the loop.
-- **Metadata extraction:** `extract_metadata()` returns `None` on any failure — never blocks ingestion.
-- **Null bytes:** `_strip_nul()` recursively removes PostgreSQL-illegal `\x00` bytes from all strings before DB writes.
+**Per-thread message bucket store** (Phase 067.3 D-067.3-R1-01..08):
+- Purpose: Isolate cross-thread message state so a streaming run into thread A doesn't lose its render when the user navigates to thread B and back.
+- Examples: `useMessages.ts:394` (`messagesByThread: Map<string, Message[]>`), `setMessagesForThread` (line 556), LRU N=5 eviction with streaming-thread pinning (`evictIfOverCapacity`, line 520).
+- Pattern: state is a Map; visible `messages` is a `useMemo` derived against `viewedThreadId`; every per-event `setMessages` is bucket-targeted via threadId. The legacy single-array `messages: Message[]` is gone.
+
+**Tool dispatch loop** (General mode = 16 tools; Explorer mode = 6 KB tools):
+- Purpose: Multi-iteration agent loop that lets the LLM emit tool calls, execute them, feed results back, until the model returns a content-only response or `max_iterations` is hit.
+- Examples: `threads.py` `agent_runner` (the inline closure inside `send_message`), `services/openai_service.py` (`get_tools()`, `get_explorer_tools()`, `EXPLORER_SYSTEM_PROMPT`), `services/tool_parser.py` (structured-mode JSON-in-prompt path).
+- Pattern: native tool-calling for proven providers (OpenAI, Anthropic, Google) gated by `MODEL_CAPABILITIES[model]['native_tools']`; structured tool-calling (JSON-in-prompt + parser) for everything else (D-53-01/02). One-shot deterministic — no retries.
+
+**Sub-agent (Explorer / Document analysis)**:
+- Purpose: Isolated LLM context for high-stakes single-shot tasks (full-document analysis, KB exploration with synthesis).
+- Examples: `backend/app/services/sub_agent_service.py`, `backend/app/api/threads.py` analyze_document tool dispatch.
+- Pattern: separate model resolution (`_SUB_AGENT_MODEL_DEFAULTS`), separate context budget, content cap (~600k chars), result returns as `tool` role message.
+
+**Skill** (Phase 10 — agentskills.io open standard):
+- Purpose: User-authored / shared persistent agent capability — `SKILL.md` + attached files.
+- Examples: `supabase/migrations/017_skills.sql`, `supabase/migrations/018_skill_creator_seed.sql`, `frontend/src/components/skills/SkillFormDialog.tsx`, `backend/app/api/skills.py`, `load_skill` / `save_skill` / `read_skill_file` tool dispatch in `threads.py`.
+- Pattern: SKILL.md frontmatter YAML; private bucket in Supabase Storage; ZIP import/export; global vs private via RLS.
+
+## Entry Points
+
+**FastAPI app**:
+- Location: `backend/app/main.py`
+- Triggers: `uvicorn app.main:app --reload` (dev) — single worker only (D-v2.5-02).
+- Responsibilities: postgrest 204-error patch (line 22), LangSmith env config (line 47), CORS, lifespan (Redis ping, AnyIO thread tokens, RUN_TASKS shutdown cancel, sandbox close-all), router mounting.
+
+**React app**:
+- Location: `frontend/src/main.tsx` → `frontend/src/App.tsx` → `frontend/src/components/layout/ChatLayout.tsx`.
+- Triggers: `npm run dev` (Vite at localhost:5173 by default).
+- Responsibilities: auth gate via `useAuth`, `TooltipProvider`, view routing between `chat` / `documents` / `skills` / `settings` / `library-health`.
+
+**Producer task entry**:
+- Location: `agent_runner` inline closure inside `send_message` at `backend/app/api/threads.py:1059`; spawned at `:2698`.
+- Triggers: `POST /threads/{thread_id}/messages`.
+- Responsibilities: agent loop, SSE event emission via XADD, terminal classification, shielded finalize.
+
+**Consumer entry**:
+- Location: `replay_tail_consumer` at `backend/app/api/runs.py:80`; mounted via `EventSourceResponse` in `stream_run` at `:331`.
+- Triggers: `GET /runs/{run_id}/stream?since={offset}`.
+- Responsibilities: replay backlog from `since`, live-tail with BLOCK 5000, terminate on TERMINAL_TYPES.
+
+## Architectural Constraints
+
+- **Threading:** Single-process, single-uvicorn-worker (D-v2.5-02). Concurrency comes from asyncio. Blocking I/O (supabase-py `.execute()`, sandbox Docker calls, sync provider streams, sync SQL) is offloaded via `run_in_threadpool` / `aexec` / `_drain_stream_with_close_on_cancel`. AnyIO default thread limiter is bumped to `settings.anyio_thread_tokens` at startup so the SSE-path `aexec` calls don't queue at the 40-token default (D-058-07).
+- **Global state (in-process):** `_supabase` singleton (`dependencies.py:10`); `_redis` singleton (`dependencies.py:20`); `RUN_TASKS: dict[UUID, Task]` (`threads.py:80`); `_BACKGROUND_TASKS: set[Task]` (`threads.py:60`); `sandbox_manager` (lazy import in `services/sandbox_service.py`); module-level `_TTL_CACHE` for settings file (5s) in `models/user_settings.py`. **All require single-worker discipline.**
+- **Stateless chat completions:** No provider-side thread state (CLAUDE.md). Full message history rebuilt from `messages` table per request and trimmed to fit per-provider context budget in `services/context_window.py`.
+- **Run history persistence (D-v2.5-11):** Run lifecycle metadata persists in `public.runs` Postgres table with full RLS; Redis Stream is the ephemeral event buffer (TTL ~10 min). Active-runs API reads from Postgres; replay-and-tail reads from Redis.
+- **Redis is best-effort except for the durable cancel:** Postgres `runs.status` is the source of truth; Redis ops in `cancel_run` zombie-heal each have their own try/except so DELETE returns 204 even if every Redis op fails (D-062-13).
+- **Schema discipline:** Migrations are append-only numbered SQL under `supabase/migrations/`. Apply via Supabase SQL editor only — never `db push` / `db reset`. Then run `bash scripts/regenerate-full-schema.sh` to refresh `supabase/full-schema.sql`.
+
+## Anti-Patterns
+
+### Calling supabase-py `.execute()` directly inside an async handler
+
+**What happens:** A `.execute()` call inside an `async def` handler blocks the asyncio event loop because supabase-py is sync (D-v2.5-01). Cross-tab GETs queue behind the streaming run.
+**Why it's wrong:** The CONCUR-01 binding pytest gate (`backend/tests/integration/test_058_concurrency.py`) measures cross-tab GET latency during streaming and fails if it exceeds 1s. Direct `.execute()` regresses this from ~15ms to ~30s.
+**Do this instead:** `await aexec(supabase.table(...).select(...).eq(...))` (`backend/app/utils/db.py:32`). Pass the query object (NOT a callable); `aexec` calls `.execute` on it inside the threadpool.
+
+### Running uvicorn with `--workers N`
+
+**What happens:** Multiple worker processes each have their own `RUN_TASKS` registry, `sandbox_manager`, `_BACKGROUND_TASKS`, settings TTL cache. A run started in worker 1 can't be cancelled by a DELETE that lands in worker 2.
+**Why it's wrong:** Masks concurrency bugs and breaks all in-process state (D-v2.5-02).
+**Do this instead:** Single uvicorn worker. Use asyncio + threadpool for concurrency; use Redis for cross-process coordination (the design choice for v2.5 scale).
+
+### Treating Supabase Realtime as the source of truth for streaming state
+
+**What happens:** Frontend listens to a Realtime INSERT on `messages` and assumes the assistant message will appear. Realtime delivery is unreliable for tab-switch and F5 mid-stream scenarios.
+**Why it's wrong:** D-v2.5-03 — Realtime is a best-effort hint, not a source of truth. Failure mode is "thread looks empty until F5".
+**Do this instead:** Always reconcile via fetch on (re)connect. `useMessages.reconcile()` runs `Promise.all([getActiveRuns, loadMessages])` on mount/visibilitychange/focus/pageshow.
+
+### Cancelling the producer by aborting the consumer-side fetch
+
+**What happens:** Frontend `controller.abort()` closes the SSE connection; the user thinks Stop worked; the LLM call keeps running on the backend until natural completion.
+**Why it's wrong:** D-061-03 / D-063-03 — consumer disconnect MUST NOT cancel producer (the whole point of run-backed streaming is decoupling). Producer continues burning paid tokens.
+**Do this instead:** Server-side cancel via `DELETE /runs/{run_id}` (`useMessages.stopStreaming` → `cancelRun(runId)`). The terminal `cancelled` sentinel arrives via the still-open SSE; the parser handles UI update.
+
+### Resetting `last_id` to `$` between replay and live-tail XREAD phases
+
+**What happens:** Phase 1 of `replay_tail_consumer` finishes; you set `last_id = "$"` to switch to live-tail; the producer XADDs an entry between Phase 1 exit and Phase 2 entry — entry is silently lost.
+**Why it's wrong:** WR-01 invariant in `runs.py:80`. Multi-consumer fan-out depends on every consumer seeing every event.
+**Do this instead:** Always carry `last_id` forward across phases (`runs.py:179`).
+
+### Calling `clearMessages()` on every thread switch without checking the streaming thread
+
+**What happens:** User starts a run on thread A, navigates to thread B, navigates back to thread A. ChatArea fires `clearMessages` on every thread.id change; without the guard, the live `temp-*` placeholder for thread A is wiped from `messagesByThread.get('A')`; the next loadMessages early-returns because `isSendingRef` is still true; subsequent SSE deltas no-op via the `m.id === assistantId` map (placeholder is gone). User stares at empty thread until F5.
+**Why it's wrong:** Phase 067.5 Branch D-3 reproduction (`useMessages.test.ts` RED test). The bucket store is per-thread, so the wipe must be per-thread AND must skip the streaming thread.
+**Do this instead:** `if (tid && tid !== streamingThreadIdRef.current) { ...delete bucket... }` at `useMessages.ts:572-590`.
+
+### Using `redis.exceptions.X` inside a route that has `redis: aioredis.Redis = Depends(get_redis)`
+
+**What happens:** Inside `stream_run` / `cancel_run` route bodies, the parameter `redis` shadows the `redis` MODULE. Writing `redis.exceptions.RedisError` dereferences `.exceptions` on the Redis INSTANCE → `AttributeError`.
+**Why it's wrong:** D-062-13 / `runs.py:24-30` documentation invariant.
+**Do this instead:** Import unqualified at module top: `from redis.exceptions import RedisError, TimeoutError as RedisTimeoutError`. Use bare names inside route bodies.
+
+### Putting reconcile (or its dep) into an effect's dep array if it's recreated mid-stream
+
+**What happens:** `useEffect(..., [reconcile])` tears down + re-adds visibility/focus/pageshow listeners every time `reconcile` changes identity (e.g. message-state changes via `useCallback([...messages])`); the new listener fires immediately on the next visibility hint and races into a duplicate consumer.
+**Why it's wrong:** WR-07 fix in `ChatArea.tsx:135-159`. Reconcile MUST have a stable identity for the listener effect to be mount-only.
+**Do this instead:** Route through `reconcileRef.current(tid)`; keep `reconcile`'s `useCallback` deps minimal (`[loadMessages, setMessagesForThread]`).
+
+## Error Handling
+
+**Strategy:** Defense-in-depth at the wire layer (terminal sentinel guarantee), explicit exception-to-status mapping at the route layer, fail-loudly at the producer (each iteration logs context), best-effort with logger.exception swallow at the cleanup layer.
+
+**Patterns:**
+- Producer's outer try/finally writes a terminal sentinel on EVERY exit path (completion / cancellation / timeout / exception). The shielded finalize is exempt from MAXLEN trimming (`_emit_terminal`).
+- 5 SSE TERMINAL_TYPES: `done`, `error`, `cancelled`, `timed_out`, plus `stream_end` as the closing marker after `done` + `suggestions`. Frontend's `subscribeToRun` parser routes each to `onTerminal(kind, errorPayload?)`.
+- Consumer surfaces structural errors as synthetic SSE events (`{type: 'error', error: 'consumer_timeout'}` / `'invalid_since'` / `'redis_timeout'` / `'redis_error'` / `'buffer_expired_during_tail'`) so the client always gets a clean SSE close, never a silent drop.
+- Route-level: 401 (invalid JWT, `dependencies.py:55`), 404 (ownership mismatch — never 403 to avoid existence leak, D-062-12), 503 + `Retry-After: 10` (Redis down on stream open, D-062-13), 500 (defensive — e.g. user-message INSERT didn't return id, `threads.py:926`).
+- Background tasks (audit log writes, memory writes, feedback) use `_spawn(coro)` (`threads.py:63`) — fire-and-forget but with strong reference retention so the event loop doesn't garbage-collect mid-execution (WR-05).
+- Sandbox: try/except + best-effort cleanup in `delete_thread` (`threads.py:620`) — pre-deletion cleanup of `sandbox_files` Storage paths, swallowed on failure.
+- LLM 404 fallback: sub-agent retries with provider default; emits `fallback_model` SSE event so frontend shows a 4s notice via `setFallbackNotice`.
+
+## Cross-Cutting Concerns
+
+**Logging:** Standard Python `logging.getLogger(__name__)` in every module. `asyncio` logger set to ERROR in `main.py:12` to suppress benign "socket.send() raised exception" warnings during disconnect. LangSmith tracing wired via env vars at `main.py:48-51`.
+**Validation:** Pydantic models in `backend/app/models/` for every request body and response shape. Structured LLM output via Pydantic-validated JSON parsing (no LangChain).
+**Authentication:** Supabase JWT in `Authorization: Bearer <token>` header → `dependencies.get_current_user` validates via `supabase.auth.get_user(token)` (line 47-58). RLS is the secondary defense layer (kicks in if the service-role bypass is ever lifted; also enforced on direct client-side queries from the browser).
+**Authorization:** Per-route `.eq("user_id", current_user["id"])` filter on every supabase-py query is the primary boundary (the service-role key bypasses RLS). RLS policies in `supabase/full-schema.sql` are the durable defense if a route forgets the filter — but treat them as belt-and-suspenders, not the canonical layer.
+**Observability:** LangSmith for LLM traces (`LANGSMITH_TRACING`, `LANGSMITH_PROJECT`, `LANGSMITH_API_KEY` env vars). Health check at `GET /health` reports Redis status.
+**Audit:** `services/audit_service.write_audit_entry` called via `BackgroundTasks` (non-SSE routes) or `_spawn` / `asyncio.create_task` (SSE producers). 8 action types: thread.create / thread.delete / message.send / document.upload / document.delete / version.restore / settings.update / web_search.toggle. INSERT-only RLS; CSV export endpoint.
+
+---
+
+*Architecture analysis: 2026-05-09*

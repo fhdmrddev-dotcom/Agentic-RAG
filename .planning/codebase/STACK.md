@@ -1,120 +1,151 @@
+<!-- refreshed: 2026-05-09 -->
 # Technology Stack
-_Last updated: 2026-04-05_
+
+**Analysis Date:** 2026-05-09
 
 ## Languages
 
 **Primary:**
-- TypeScript ~5.9.3 — Frontend (all `.ts` / `.tsx` source files in `frontend/src/`)
-- Python 3.12.6 — Backend (all files in `backend/app/`)
+- TypeScript ~5.9.3 — Frontend (`frontend/src/**/*.ts`, `frontend/src/**/*.tsx`)
+- Python 3.12 — Backend (`backend/app/**/*.py`); CI pins `python-version: "3.12"` (`.github/workflows/backend-tests.yml:28`)
 
 **Secondary:**
-- SQL — Supabase migrations in `supabase/migrations/` (19 migration files, pgvector functions, RLS policies)
+- SQL — Supabase migrations in `supabase/migrations/` (38 numbered files, latest `038_runs_timed_out_status.sql`); pgvector functions, RLS policies
+- Shell (Bash) — `scripts/regenerate-full-schema.sh` (run via Git-bash on Windows)
 
 ## Runtime
 
 **Environment:**
-- Node.js v22.14.0 — Frontend dev server and build toolchain
-- Python 3.12.6 — Backend runtime via virtual environment at `backend/venv/`
+- Node.js — Frontend dev server (Vite 8.0) and build toolchain
+- Python 3.12 — Backend runtime via venv at `backend/venv/` (mandated by `CLAUDE.md` rules section)
+- Single Uvicorn worker — `--workers N` is forbidden by decision D-v2.5-02 (in-memory state: `RUN_TASKS` registry, `_BACKGROUND_TASKS` set, sandbox session map)
 
 **Package Manager:**
-- npm — Frontend (`frontend/package.json`)
-- pip — Backend (`backend/requirements.txt`)
-- Lockfile: present for frontend; backend uses `requirements.txt` with pinned versions
+- npm — Frontend (`frontend/package.json`); separate workspace `e2e/package.json` for Playwright tests
+- pip — Backend (`backend/requirements.txt`, pinned versions for runtime deps, `>=` for SDK floors)
+- Lockfiles: `frontend/package-lock.json` (committed); `e2e/` has its own; backend has no lockfile (requirements.txt pins critical versions directly)
 
 ## Frameworks
 
-**Core:**
+**Core (Frontend):**
 - React 19.2.4 — UI framework (`frontend/src/`)
+- Vite 8.0 — Dev server and bundler (`frontend/vite.config.ts`)
+- TanStack React Query 5.90 — Server state (`frontend/src/hooks/`)
+- React Markdown 10.1 + remark-gfm 4.0 + react-syntax-highlighter 16.1 + DOMPurify 3.3 — Markdown rendering with syntax-highlighted code (`frontend/src/components/chat/MarkdownRenderer.tsx`)
+- Recharts 3.8 — Knowledge-health charts (`frontend/src/components/health/RetrievalTrendChart.tsx`)
+- Marked 17.0 — Secondary markdown parser (used alongside react-markdown)
+
+**Core (Backend):**
 - FastAPI 0.115.6 — REST API framework (`backend/app/main.py`)
-- Uvicorn 0.32.1 (standard extras) — ASGI server for FastAPI
+- Uvicorn 0.32.1 (`[standard]` extras for httptools/websockets) — ASGI server
+- sse-starlette 2.4.1 — `EventSourceResponse` for SSE streaming (`backend/app/api/runs.py:43`, `backend/app/api/threads.py`)
+- Pydantic + pydantic-settings 2.7 — Models, env loading, structured outputs (mandated, no LangChain)
+- Starlette concurrency primitives — `run_in_threadpool` wraps blocking supabase-py calls (decision D-v2.5-01; helper at `backend/app/utils/db.py`)
+- AnyIO — Default thread limiter bumped to 200 tokens at startup (`backend/app/main.py:59`, `Settings.anyio_thread_tokens`)
 
-**UI Component Library:**
-- shadcn/ui pattern — Radix UI primitives + Tailwind CSS (individual `@radix-ui/*` packages, no monolithic shadcn package)
-  - Radix UI packages: `@radix-ui/react-avatar`, `react-dialog`, `react-dropdown-menu`, `react-label`, `react-scroll-area`, `react-select`, `react-separator`, `react-slot`, `react-tooltip`
-- Tailwind CSS 3.4.19 — Utility-first CSS (`frontend/tailwind.config.js`)
-  - `tailwindcss-animate` 1.0.7 — animation utilities
-  - `@tailwindcss/typography` 0.5.19 — prose styling for markdown output
-- `class-variance-authority` 0.7.1 — variant-based component styles
-- `tailwind-merge` 3.5.0 — class merging utility
-- `lucide-react` 0.577.0 — icon library
-- Fonts: Inter (sans), Manrope (headline), JetBrains Mono (mono) — loaded via CSS
-
-**State Management:**
-- `@tanstack/react-query` 5.90.21 — server state and caching (no Redux / Zustand)
-- React built-in `useState` / `useEffect` — local component state
-- Custom hooks in `frontend/src/hooks/` — encapsulate shared stateful logic (auth, documents, threads, folders, skills, messages, theme)
-
-**Markdown / Content Rendering:**
-- `react-markdown` 10.1.0 with `remark-gfm` 4.0.1 — renders LLM responses
-- `marked` 17.0.4 — secondary markdown parser
-- `react-syntax-highlighter` 16.1.1 — code block highlighting in chat
-- `dompurify` 3.3.3 — sanitizes HTML before rendering
+**UI System:**
+- Tailwind CSS 3.4.19 + tailwindcss-animate 1.0.7 + @tailwindcss/typography 0.5.19 (`frontend/tailwind.config.js`, `frontend/postcss.config.js`)
+- shadcn/ui (slate base, default style, CSS variables) — configured in `frontend/components.json`; primitives under `frontend/src/components/ui/`
+- Radix UI primitives — `@radix-ui/react-{alert-dialog,avatar,collapsible,dialog,dropdown-menu,label,scroll-area,select,separator,slot,tabs,tooltip}` (12 packages)
+- Lucide React 0.577 — Icon library (`iconLibrary: "lucide"` in components.json)
+- class-variance-authority 0.7 + clsx 2.1 + tailwind-merge 3.5 — Class composition
 
 **Testing:**
-- Vitest 4.1.0 — frontend unit test runner (`frontend/vitest.config.ts`, jsdom environment)
-- `@testing-library/react` 16.3.2 + `@testing-library/user-event` 14.6.1 — component testing
-- `@testing-library/jest-dom` 6.9.1 — DOM assertion matchers
-- Playwright 1.49.0 — end-to-end browser tests (`e2e/package.json`)
-- pytest 8.0.0+ with `pytest-asyncio` 0.24.0+ — backend unit/integration tests (`backend/pytest.ini`)
-- `httpx` 0.27.0+ — async HTTP client used in backend tests
+- pytest 8.0+ + pytest-asyncio 0.24 + pytest-timeout 2.4 — Backend test runner (`backend/tests/`); `conftest.py` at `backend/tests/conftest.py`; CI runs `pytest tests -q`
+- Vitest 4.1 + @vitest/ui 4.1 + jsdom 29 — Frontend unit tests (`frontend/src/__tests__/`, `frontend/src/setupTests.ts`)
+- @testing-library/react 16.3 + @testing-library/jest-dom 6.9 + @testing-library/user-event 14.6 — Component testing
+- Playwright 1.49 — E2E browser tests (`e2e/playwright.config.ts`, `e2e/tests/*.spec.ts`); chromium-only
 
-**Build / Dev:**
-- Vite 8.0.0 — frontend bundler and dev server (`frontend/vite.config.ts`)
-  - `@vitejs/plugin-react` 6.0.0 — React Fast Refresh and JSX transform
-  - Path alias `@` → `./src` configured in both `vite.config.ts` and `vitest.config.ts`
-- PostCSS 8.5.8 + Autoprefixer 10.4.27 — CSS processing (`frontend/postcss.config.js`)
-- TypeScript compiler (`tsc -b`) — type-checking before production build
+**Build/Dev:**
+- TypeScript 5.9 with project references (`frontend/tsconfig.json` → `tsconfig.app.json` + `tsconfig.node.json`); `strict`, `noUnusedLocals`, `verbatimModuleSyntax`, `moduleResolution: bundler`
+- ESLint 9.39 (flat config, `frontend/eslint.config.js`) + typescript-eslint 8.56 + eslint-plugin-react-hooks 7.0 + eslint-plugin-react-refresh 0.5
+- @vitejs/plugin-react 6.0 — React Fast Refresh
+- autoprefixer 10.4 — PostCSS pipeline
 
 ## Key Dependencies
 
-**Critical:**
-- `@supabase/supabase-js` 2.99.2 — frontend client for auth, Realtime subscriptions (`frontend/src/lib/supabase.ts`)
-- `supabase` 2.10.0 (Python SDK) — backend client for database queries and storage (`backend/app/dependencies.py`)
-- `openai` ≥2.0.0 — ALL LLM inference and embeddings via OpenAI-compatible API (supports multiple providers via `base_url` swap); raw SDK calls only, no LangChain (`backend/app/services/openai_service.py`)
-- `pydantic-settings` 2.7.0 — type-safe config from env vars (`backend/app/config.py`)
-- `langsmith` 0.2.3 — tracing and observability via `@traceable` decorators on retrieval, reranking, web search, and sub-agent functions
+**Critical (Backend LLM/Agent):**
+- `openai>=2.0.0` — Default client for OpenAI, OpenRouter, Google (Gemini OpenAI-compat endpoint), Ollama (`backend/app/services/openai_service.py`); also used as Anthropic fallback ImportError shim (`backend/app/api/threads.py:18-20`)
+- `anthropic>=0.97.0` — Native Anthropic SDK (raw, not LangChain) for Claude tool_use streaming (`backend/app/services/anthropic_service.py:24`)
+- `tiktoken>=0.12.0` — Token counting via `cl100k_base` encoder for OpenAI models (`backend/app/services/context_window.py:16-37`); chars/4 fallback for non-OpenAI providers
+- `redis>=5.2,<6` — Async client `redis.asyncio.from_url` for run-backed streaming buffer (`backend/app/dependencies.py:1`, `decode_responses=True`); Streams API (`XADD`, `XREAD`, `EXPIRE`)
+- `supabase==2.10.0` — Sync Python client; **MUST** be wrapped in `run_in_threadpool`/`aexec` per D-v2.5-01
 
-**Document Processing:**
-- `pypdf` ≥5.0.0 — PDF text extraction
-- `python-docx` ≥1.0.0 — Word document text extraction
-- `python-multipart` 0.0.20 — multipart file upload support for FastAPI endpoints
+**Critical (Frontend):**
+- `@supabase/supabase-js ^2.99.2` — Auth + Postgres client + Realtime (`frontend/src/lib/supabase.ts`)
+- `@tanstack/react-query ^5.90.21` — Server-state cache for documents, folders, threads, skills
 
-**Retrieval / AI:**
-- `sentence-transformers` ≥3.0.0 — local cross-encoder reranking (`backend/app/services/rerank_service.py`); lazy-loaded only when `RERANK_PROVIDER=local`
-- `httpx` ≥0.27.0 — sync HTTP client for Tavily web search and Cohere reranking API calls
+**Document Ingestion (Python):**
+- `pypdf>=5.0.0` — PDF text extraction (`backend/app/api/documents.py:8`)
+- `python-docx>=1.0.0` — DOCX extraction
+- `pdfplumber>=0.11.0` — PDF table extraction (`backend/app/services/multimodal_service.py:42`)
+- `python-pptx>=1.0.0` — PowerPoint extraction
+- `openpyxl>=3.1.0` — XLSX extraction
+- `ebooklib>=0.18` — EPUB extraction
+- `python-multipart==0.0.20` — FastAPI multipart/form-data file upload
 
-**Code Execution Sandbox:**
-- `llm-sandbox[docker]` ≥0.3.37 — Docker-based Python code sandbox (`backend/app/services/sandbox_service.py`); lazy-loaded only when `SANDBOX_ENABLED=true`
+**Retrieval & Embedding:**
+- OpenAI `text-embedding-3-small` (default, 1536 dim) via `openai>=2.0.0`
+- `sentence-transformers>=3.0.0` — Optional local CrossEncoder reranker (`backend/app/services/rerank_service.py:34`); lazy-loaded
+- pgvector — Postgres extension (Supabase) for vector similarity search
+
+**Code Execution:**
+- `llm-sandbox[docker]>=0.3.37` — Containerised Python sandbox; `InteractiveSandboxSession(lang="python")` (`backend/app/services/sandbox_service.py:24`); lazy-imported only when `SANDBOX_ENABLED=true`
+
+**Observability:**
+- `langsmith==0.2.3` — Tracing decorator `@traceable` across `web_search_service`, `rerank_service`, `sub_agent_service`, `retrieval_service`; configured via `LANGSMITH_*` env vars set at module import time (`backend/app/main.py:48-51`)
+
+**HTTP/Misc:**
+- `httpx>=0.27.0` — Used directly for Tavily search (`backend/app/services/web_search_service.py:1`) and Cohere rerank API (`backend/app/services/rerank_service.py:17`); also FastAPI test client transport
+- `python-dotenv==1.0.1` — `.env` loading via `pydantic-settings`
+
+**Infrastructure:**
+- Docker — Required for `llm-sandbox`, Supabase CLI local stack, and Redis (`docker-compose.dev.yml`)
+- Redis 7-alpine — Run-buffer (`docker-compose.dev.yml:17`); ephemeral (`--save ""`, `--appendonly no`), 256MB cap, allkeys-lru eviction
 
 ## Configuration
 
 **Environment:**
-- Backend config loaded via `pydantic-settings` from `backend/.env` (`backend/app/config.py`)
-- Frontend config loaded via Vite's `import.meta.env` (vars must be prefixed `VITE_`)
-- Key backend vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LLM_PROVIDER`, `LLM_MODEL`, provider API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`), `LANGSMITH_API_KEY`, `TAVILY_API_KEY`, `SANDBOX_ENABLED`
-- Key frontend vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-- Per-user runtime overrides via `backend/settings_override.json`
+- Backend: `backend/.env` (gitignored); template at `backend/.env.example`; loaded via `pydantic_settings.BaseSettings` with `extra="ignore"` (`backend/app/config.py:245`)
+- Frontend: `frontend/.env.local` (gitignored); reads `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_API_BASE_URL` (`frontend/src/lib/supabase.ts`, `frontend/src/lib/api.ts:9`)
+- Override file: `backend/settings_override.json` (gitignored) — Settings UI writes here; takes precedence over `.env` for non-secret app settings (`backend/app/models/user_settings.py:27`)
+
+**Key configs required:**
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — Auth + DB access
+- `REDIS_URL` — `redis://localhost:6379` local; `rediss://...` cloud (Upstash TLS)
+- `LLM_PROVIDER` + per-provider key (`OPENAI_API_KEY` | `ANTHROPIC_API_KEY` | `GOOGLE_API_KEY` | `OPENROUTER_API_KEY` | `OLLAMA_BASE_URL`)
+- `EMBEDDING_MODEL` (`text-embedding-3-small`), `EMBEDDING_DIMENSIONS` (1536) — must match the pgvector column width
+- `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_TRACING` — Observability
+- `SANDBOX_ENABLED` — Gates Docker code execution
+- `TAVILY_API_KEY` — Enables web search tool (otherwise tool is hidden)
+- `RERANK_*` — Optional Cohere or local CrossEncoder
+- Phase 066: `LLM_CALL_TIMEOUT_OVERRIDES` (per-model override map), `CONSUMER_TIMEOUT_SECONDS` (default 610s)
+- Phase 058: `ANYIO_THREAD_TOKENS` (default 200)
+- Test-only: `ENABLE_TEST_FIXTURES=1` mounts `/__test__/inject-failed-run` (refuses to start if `ENVIRONMENT=production`; `backend/app/main.py:161-167`)
 
 **Build:**
-- Frontend: `frontend/tsconfig.json` (composite), `frontend/tsconfig.app.json`, `frontend/tsconfig.node.json`
-- Backend: no build step — Python runs directly from source in venv
-
-## Linting
-
-- ESLint 9.39.4 — frontend linting (`frontend/eslint.config.js`)
-  - `typescript-eslint` 8.56.1
-  - `eslint-plugin-react-hooks` 7.0.1
-  - `eslint-plugin-react-refresh` 0.5.2
-- No Prettier config detected — formatting not enforced by tooling
-- No backend linter config detected (no `ruff.toml`, `.flake8`, or `mypy.ini`)
+- Frontend: `vite.config.ts` with `@` → `./src` alias; `npm run build` runs `tsc -b && vite build`
+- Backend: no build step; `uvicorn app.main:app --reload --port 8000`
 
 ## Platform Requirements
 
 **Development:**
-- Python 3.12+ with venv at `backend/venv/`
-- Node.js 22+
-- Docker — required only when `SANDBOX_ENABLED=true` (llm-sandbox)
-- Supabase project (cloud or local via `start_supabase.bat`)
+- Docker Desktop (for Supabase CLI stack, Redis container, optional sandbox)
+- Supabase CLI (managed locally; `supabase start` boots Postgres on :54322 / API on :54321 / Studio on :54323 / Mailpit on :54324)
+- Python 3.12 + venv at `backend/venv/` (Windows: `.\venv\Scripts\Activate.ps1`)
+- Node.js 22+ (Vite 8 requires modern Node)
+- Git Bash (Windows) — for `scripts/regenerate-full-schema.sh`
 
 **Production:**
-- Deployment target not explicitly declared; FastAPI served by Uvicorn; frontend built as static assets via Vite
+- Cloud Supabase (project URL + service role key) — vector store, auth, storage, realtime
+- Cloud Redis (Upstash recommended, free tier; `rediss://` URL with TLS) — run-backed streaming buffer; or self-hosted Redis on the same VPS for SEED-003 (Hostinger) deploys
+- Single Uvicorn worker per process — D-v2.5-02 forbids `--workers N`
+- Docker host — only if `SANDBOX_ENABLED=true`
+- LLM provider keys + LangSmith key
+
+**CI:**
+- GitHub Actions: `.github/workflows/backend-tests.yml` — Ubuntu, Python 3.12, boots Redis from `docker-compose.dev.yml`, runs `pytest tests -q`. No frontend or e2e job currently wired in CI.
+
+---
+
+*Stack analysis: 2026-05-09*
