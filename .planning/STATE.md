@@ -3,18 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 067.5 closed (Row 11 RED → GREEN)
-last_updated: "2026-05-09T11:35:00.000Z"
-last_activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN
+stopped_at: Phase 067.4 context gathered
+last_updated: "2026-05-09T14:45:52.160Z"
+last_activity: 2026-05-09 -- Phase 065 execution started
 progress:
-  total_phases: 17
-  completed_phases: 15
-  total_plans: 63
-  completed_plans: 61
-  percent: 88
-  open_phases:
-    - "064-validation-harness (never scaffolded)"
-    - "065-skills-test-infrastructure-repair (only .gitkeep — needed before next milestone per SEED-002)"
+  total_phases: 16
+  completed_phases: 14
+  total_plans: 64
+  completed_plans: 63
+  percent: 98
 ---
 
 # Project State
@@ -24,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 067.5 closed; v2.5 milestone NOT yet ready to close — Phase 064 (Validation Harness) and Phase 065 (Skills Test Infrastructure Repair) still open. Plus 067.1–067.5 lack `*REVIEW*.md` artifacts.
+**Current focus:** Phase 065 — skills-test-infrastructure-repair
 
 ## Current Position
 
-Phase: 067.5 (frontend-reconcile-fix) — COMPLETE
-Plan: 2 of 2
-Status: Phase 067.5 closed. v2.5 milestone close BLOCKED on Phase 064 + Phase 065 + optional code reviews on 067 series.
-Last activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN; Row 11 mirrored to 067.4-HUMAN-UAT.md
+Phase: 065 (skills-test-infrastructure-repair) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 065
+Last activity: 2026-05-09 -- Phase 065 execution started
 
 ## Outstanding before v2.5 close
 
@@ -244,4 +241,4 @@ Next: `/gsd:discuss-phase 067.4` → `/gsd:plan-phase 067.4` for the follow-on p
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 067.5 (frontend-reconcile-fix) — 2 plans — 2026-05-09T06:43:21.636Z
+**Planned Phase:** 065 (skills-test-infrastructure-repair) — 3 plans — 2026-05-09T14:45:52.132Z
