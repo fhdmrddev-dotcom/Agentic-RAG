@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
-status: ready_to_plan
-stopped_at: Phase 067.4 context gathered
-last_updated: "2026-05-09T16:29:53.611Z"
-last_activity: 2026-05-09 -- Phase 065 execution started
+status: ready_to_complete_milestone
+stopped_at: Phase 065 closed; v2.5 milestone ready for /gsd:complete-milestone
+last_updated: "2026-05-09T19:30:00.000Z"
+last_activity: 2026-05-09 -- v2.5 milestone close-out reconciliation
 progress:
   total_phases: 16
-  completed_phases: 15
-  total_plans: 64
-  completed_plans: 63
-  percent: 94
+  completed_phases: 16
+  total_plans: 67
+  completed_plans: 67
+  percent: 100
 ---
 
 # Project State
@@ -21,55 +21,59 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 065 — skills-test-infrastructure-repair
+**Current focus:** v2.5 Deployment Strategy — milestone close-out reconciliation complete; ready for `/gsd:complete-milestone`
 
 ## Current Position
 
-Phase: 066
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-09
+Phase: v2.5 milestone close
+Plan: All v2.5 phases closed (065, 066, 067, 067.1, 067.2, 067.3, 067.4, 067.5)
+Status: Ready to run `/gsd:complete-milestone v2.5`
+Last activity: 2026-05-09 — close-out reconciliation pass
 
 ## Outstanding before v2.5 close
 
-- **Phase 064: Validation Harness** — never scaffolded. Was meant to ship reproducible Chrome MCP scripts for E (tab-switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation), and multi-tab sync. Largely substituted in practice by the user-driven UAT scoreboards in 067.x but the original `Phase 064` artifact never landed.
-- **Phase 065: Skills Test Infrastructure Repair** — directory has `.gitkeep` only. Needed before Skill Studio milestone per `.planning/seeds/SEED-002-skill-studio-milestone-prep.md`. 13+ broken patches in `test_threads_skills.py` + 3 broken export tests in `test_skills_import_export.py` must be repaired or formally skipped-with-reason before Skill Studio's "all agent tools covered by integration tests" gate.
-- **Code review (optional gate)**: 067.1, 067.2, 067.3, 067.4, 067.5 have no `*REVIEW*.md`. Older phases (058–063.1, 066) do. Could run `/gsd:code-review` per-phase or skip if confident.
-- **Milestone close decision**: `/gsd:complete-milestone` will run `audit-open` and either block or force `[A] Acknowledge` deferral. User can choose to defer 064/065 to a side-phase or to the next milestone, or to ship them now.
+All gate-blocking work is now closed. One administrative deferral remains, intentional and documented:
 
-Blockers (escalated to Phase 067.4):
+- **Phase 064: Validation Harness — DEFERRED (intentional).** Originally scoped Chrome MCP scripts for scenarios E (tab-switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation), and multi-tab sync. Scenarios E + F + H were validated organically by Phases 067.3 / 067.4 / 067.5 user-driven UAT (5/5 GREEN cycles for empty-thread-until-refresh + cross-thread switch). G + multi-tab sync remain partially deferred to a future side-phase if ever needed. See ROADMAP entry for full coverage table. NOT a v2.5 close blocker.
+- **Code review (optional gate, non-blocking):** 067.1, 067.2, 067.3, 067.4, 067.5 have no `*REVIEW*.md` (the orchestrator-driven UAT scoreboards substituted for code review on those tightly-scoped polish phases). Older phases (058–063.1, 065, 066) do have REVIEW.md. Acceptable per Phase 063 / 067 precedent — no action required for v2.5 close.
+- **Carry-forward seeds (NOT v2.5 scope):** (a) claude-haiku-4-5-20251001 `max_tokens=65536 > 64000` cap mismatch (surfaced during 067.5 cycle 5; Resume worked; worthy of a separate seed); (b) NR-067.2-11/12 OpenRouter Kimi 2.5 + MiniMax 2.7 synthetic-timeout protocol (user-deferred at 067.4 UAT; OpenRouter creds present, just exercise the protocol later).
 
-  - **R-3** Row R-3 + Row 067.2-6 (cross-phase mirror) — Suggestion pills not emitted to SSE for Fahed-Mrad search-only prompts. Two separate run_ids confirmed: `36b509e2-b281-4de2-af79-70d9df73334d` (initial) + `00dcf270-3773-44e2-8181-6ee36169dc03` (retest after `max_tokens` 200→800 hypothesis bump). SSE replay (`/runs/{id}/stream?since=0`) `uniqueKinds` shows: `[title, iteration_start, tool_preparing, tool_start, tool_end, planning, delta, sources, citations, confidence, done]` — NO `suggestions` event, NO `fallback_model` event. The emit at `backend/app/api/threads.py:2477` is never reached, OR is reached with `questions=[]`. Confidence indicator renders correctly across both runs ("Low confidence" / "Medium confidence"); only the suggestion-pills rendering is broken. **Hypothesis disconfirmed:** `max_tokens` budget bump 200→800 in `backend/app/services/suggestion_service.py:75/92` did NOT fix it. Retest run `00dcf270-3773-…` ALSO produced no `suggestions` event in SSE. Root cause is elsewhere. Phase 067.4 must investigate `backend/app/services/suggestion_service.py` + threads.py 2487-2526 emit-path. Likely candidate causes for 067.4: (1) `client.chat.completions.create(...)` raising a non-`NotFoundError` exception that the broad `except Exception:` at threads.py:2509 swallows (Plan 04 instrumentation `logger.warning("suggestion generation failed", exc_info=True)` should yield a stack trace in uvicorn stdout — capture next); (2) `gpt-5.4-mini` reasoning-token consumption with even 800-token budget; consider 2000 or model swap; (3) JSON output parser miscount (response.choices[0].message.content empty due to function-call-style response wrapping that's not flowing to the structured-output path).
-  - **NR-deferred-row-067.2-11** Row 067.2-11 — OpenRouter Kimi 2.5 live timeout regression. Carry-forward from Phase 067.2; **`OPENROUTER_API_KEY` IS present** in `backend/.env`, but synthetic-timeout protocol was not exercised during 067.3 UAT (out of 067.3 plan-set scope per D-067.3-WAVE-03 multi-provider availability rule). Phase 067.4 must run synthetic-timeout protocol: set `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10`, restart uvicorn, submit a long-form prompt with model=kimi-k2.5 → confirm `runs.status='timed_out'` + `runs.error='timed_out: 10s per-call deadline exceeded at iteration N (model=moonshotai/kimi-k2.5)'`. Clean cancellation format (NOT `GeneratorExit`).
-  - **NR-deferred-row-067.2-12** Row 067.2-12 — OpenRouter MiniMax 2.7 live timeout regression. Same carry-forward situation as 067.2-11. Phase 067.4 must run synthetic-timeout protocol with model=`minimax/minimax-m2.7`.
-  - **R-4** (UAT-discovered, NEW) Active-thread UI freezes at tool-execution stage; refetch on thread-switch repairs. Symptom during T2 (R-2 docx download UAT): `"Use the code execution tool..."` prompt produced `Executing code` spinner for ~9 min from operator POV, but the run actually completed server-side in 2.8s — visible after thread navigation away+back triggered `getMessages()` refetch. Sonnet T4 (no sandbox path) had no such issue, ruling out general streaming regression and isolating to the tool-execution branch. Likely a Plan 03 (R-1 per-thread store) regression: when `useMessages.ts` was refactored to `messagesByThread: Map<string, Message[]>`, one or more SSE handlers (`tool_end`, `tool_preparing`, post-`done` finalizer) likely missed the update to write to the per-thread bucket on the **active** thread. Tool-state transitions write to a stale buffer; UI does not re-render until refetch. Adjacent to but distinct from R-3 — R-3 is backend `suggestions` event genuinely missing; R-4 is SSE events present but frontend handlers don't update active bucket on tool boundaries. Phase 067.4 investigation start: diff `frontend/src/hooks/useMessages.ts` SSE handlers vs pre-Plan-03 baseline; verify these event types reach the active thread's bucket: `tool_preparing`, `tool_start`, `tool_end`, `done`, `stream_end`, `code_output_line`. Repro: send a sandbox-invoking prompt; observe whether spinner-to-result transition fires WITHOUT thread navigation.
-  - **R-5** (UAT-discovered, NEW — UX gap, not a bug) Code-execution progress shown only as spinner; no token-by-token feedback. Best practice: stream sandbox stdout line-by-line as `code_output_line` SSE events, parallel to how `delta` flows for text. Approach (additive — strict no-conflict with R-1/R-2/R-3/N-01 surfaces): backend hooks `llm-sandbox` stdout stream in `backend/app/api/threads.py` near existing `tool_start`/`tool_end` block to emit `code_output_line` SSE events; frontend adds handler in `useMessages.ts` that writes each line into `messagesByThread[threadId]` bucket (reuses Plan 03's append-to-bucket pattern, parallel to `delta`); `ExecuteCodeBlock.tsx` Output panel renders incrementally. NO changes to `OutputFileCard` (R-2), `messagesByThread` shape (R-1), `MODEL_CAPABILITIES` router (N-01), `suggestion_service` (R-3) — strictly additive.
-
-Phase 067.3 GREEN summary (closed in this phase, do not re-litigate):
-
-  - **R-1** (Plan 03 — per-thread message store via `messagesByThread` Map): cross-thread switch mid-stream now preserves the streamed-into thread's render. Verified via 2 concurrent multi-step streaming threads (run_ids `8cb9c8cd-…` + `7742ed37-…`); both rendered full content, no cross-talk, no token loss. Mirrors 067.2 Row 3 GREEN.
-  - **R-2** (Plan 02 — sandbox download via JS blob fetch+download helper in `frontend/src/lib/api.ts:downloadSandboxOutput`): pgvector docx download verified end-to-end (run_id `906fcf04-…`); 302 redirect to Supabase CDN → 200, zero 401s. Mirrors 067.2 Row 4 GREEN.
-  - **R-2-IDOR** (Plan 02 — D-067.3-R2-05 cross-user IDOR): existence-leak prevention at `backend/app/api/sandbox_outputs.py:48-67` returns 404 to foreign user_id paths. Verified via technical-equivalent (same JWT + foreign user_id). Frontend helper translates 404 → "File not found." toast.
-  - **R-2 long-TTL re-sign** (Plan 02 architecture): same pgvector docx URL re-signed twice ~12 min apart yielded distinct `iat` values (1778274062 / 1778274782); each click hits FastAPI re-sign endpoint and produces fresh ~60s signed URL. Mirrors 067.2 Row 5 GREEN (architecture-equivalent — slow-path 90-min wait unnecessary).
-  - **N-01** (Plan 01 — model→provider router): `claude-sonnet-4-6` request streamed end-to-end via Anthropic SDK (run_id `7682f8e2-…`, status `completed`). 4/4 unit tests in `backend/tests/test_provider_router.py` pass on merged tree.
-  - **No-regression check (067.3-NR):** 4 streaming threads (Bread, Physicists, pgvector, Photosynthesis) all completed cleanly; auto-title generation working on all 4; no regression detected.
-
-Deferred (other carry-forwards, NOT Phase 067.4 scope):
-
-  - **N-02** (UX/cost concern) Multi-step pipeline self-QA = 8 of 14 tool_calls on opus pptx run. Cap via SYSTEM_PROMPT or MAX_SELF_QA_ITERATIONS in a future UX phase. NOT in Phase 067.4 scope.
-
-Phase 067.2 GREEN summary (working, do not regress):
-
-  - Plan 01 streaming-render race fix (useLayoutEffect alignment) — Rows 1, 2 confirmed; new-thread + F5 mid-stream paths.
-  - Plan 02 auto-title hoist — Rows 7, 8 confirmed (Stop + synthetic timeout titles).
-  - Plan 03 sandbox-outputs endpoint LOGIC works (path-segment fence, sandbox_files lookup, 60s TTL re-sign, 302 redirect) — but the auth integration is broken for `<a href>` clicks (R-2).
-  - Plan 04 audit predicted no-op for confidence; confidence ✓, suggestions ✗ (R-3).
-  - Plan 05 multi-provider smoke ✓ for all 4 models; Plan 01 Track A helper symmetry confirmed via Row 9.
-  - NR-1, NR-2 — Phase 067.1 / 066 contracts still hold.
-
-Next action: Discuss + plan Phase 067.4 (`/gsd:discuss-phase 067.4` then `/gsd:plan-phase 067.4`). Scope: (a) **PRIMARY (gate-blocking)** R-3 suggestion-emit fix — investigate `backend/app/services/suggestion_service.py` and the emit path at `backend/app/api/threads.py:2466-2526`. Capture the Plan 04 instrumentation log (`logger.warning("suggestion generation failed", exc_info=True)`) from uvicorn stdout to disambiguate exception-swallow vs `questions=[]` vs reasoning-token-starvation. (b) **PRIMARY** R-4 active-thread tool-stage UI staleness — diff `useMessages.ts` SSE handlers vs pre-Plan-03 baseline; fix any tool-stage handlers that missed the per-thread bucket update (R-1 regression candidate). (c) **SECONDARY (UX additive)** R-5 code-execution stdout streaming — add `code_output_line` SSE event end-to-end, strictly additive (no conflict with shipped R-1/R-2/R-3/N-01 surfaces). (d) **SECONDARY (carry-forward)** Run synthetic-timeout protocol for kimi-k2.5 (Row 067.2-11) and minimax-m2.7 (Row 067.2-12) on the OpenRouter branch. Closing UAT must mirror back into BOTH 067.2-HUMAN-UAT.md AND 067.3-HUMAN-UAT.md to close all three open phases (067.2, 067.3, 067.4) together.
+Next action: `/gsd:complete-milestone v2.5` — all gate-blocking work closed. After milestone close, plant carry-forward seeds (claude-haiku max_tokens cap; OpenRouter Kimi/MiniMax synthetic-timeout protocol; deferred-items.md D-065-01-DEFER-2 test_059 fixture-cleanup) before starting next milestone.
 
 ## Recent Completed Phases
+
+### Phase 065: Skills Test Infrastructure Repair (Complete 2026-05-09)
+
+- VERIFICATION 4/4 must-haves verified (re-verified after Plan 065-03 gap closure); combined skills test run reports 26 passed / 0 failed / 0 skipped / 0 xfailed
+- 065-01 renamed `create_streaming_chat` → `create_adaptive_streaming_chat` patch targets across 11 sites + tuple-wrapped 19 fake returns + added `CallingMode` import; 065-02 fixed 3 export-side assertion drifts (slug-prefixed bundle layout) → 15/15 pass; 065-03 migrated 11 tests to canonical Phase 063 POST→GET-stream pattern using `_build_mock_supabase()` + per-test `thread_id` fixture (closes BL-01 INSERT-id mock + WR-01 SSE-on-POST staleness + WR-02 THREAD_ID singleton + IN-01 stale assertion strings)
+- 058 binding gate (`test_cross_tab_unblocked_during_sse`) green; 059 suite preserves pre-Plan-01 baseline (one pre-existing `test_normal_stream_unchanged: Event loop is closed` failure verified pre-existing on `fa1e327` base via git-stash round-trip — NOT a Phase 065 regression; deferred to a future test-infra phase per `deferred-items.md` D-065-01-DEFER-2)
+- No production code touched. Code review (post-execution, depth=quick) clean (0 blockers / 0 warnings / 0 info). Plan-checker passed on iteration 2 after one targeted revision (TERMINAL_TYPES doc fix + mid-task checkpoint + scope-reduction guard + helper hardening)
+- Skill Studio milestone (SEED-002) can now extend the green test foundation without inheriting broken patches
+
+### Phase 066: Adaptive Run Timeouts & Lifecycle States (Complete 2026-05-06)
+
+- VERIFICATION 7/7 must-haves verified; HUMAN-UAT `green` with `project_level_approval: approved` 2026-05-07
+- Per-call timeout machinery + cancelled/timed_out lifecycle split shipped across 5 plans; live UAT 9m02s multi-step run (run_id `95e3447c-…`) verified Gap-006 closed at runtime — agent loop has no hard total cap, only per-LLM-call budgets that reset on tool-call boundaries
+- SC#6 partial→green promotion delivered by Phase 067.1's Track A drain-into-queue fix in `backend/app/api/run_helpers.py`
+- Closes Gap-006: "LLM agent stops mid-iteration on complex tool-call prompts; surfaces as `GeneratorExit` in LangSmith"
+
+### Phase 067: Frontend Streaming-UX Fix (Complete 2026-05-07)
+
+- All 5 plans landed; UX-067-01..05 all green via Chrome MCP (empty-paint, "Saving response…" thrash, refresh-required first-paint, redis-consumer log noise on tab cycle, tool-call iteration boundary surfacing)
+- UAT `partial` / project-level `approved`; SC#6 4-of-5 sub-criteria green, LangSmith trace hygiene red → Gap-007 escalated to Phase 067.1
+
+### Phase 067.1: Agent Streaming & Behavior Polish (Complete 2026-05-07)
+
+- Track A drain-into-queue helper shipped in `run_helpers.py`; Phase 066 SC#6 promoted partial→green; SC#3 green-with-note (3/5 strict, 5/5 substantive)
+- Closes Gap-007 (D-066-11 `stream.close()` invariant violated under synthetic-timeout) plus 3 deep-UAT findings: context-aware in-flight copy, system-prompt redesign for multi-step pipelines, skill-load tool card copy clarity
+- 6 lived-experience gaps reported post-closure → escalated to Phase 067.2
+
+### Phase 067.2 / 067.3 / 067.4: Streaming Render & Storage Fixes (cross-phase chain, Complete 2026-05-09)
+
+- 067.2 closing UAT 7G/3R/3D (initial 2026-05-08) → escalated to 067.3 → 9G/2R/2D → escalated to 067.4 → 4G/1R/7D → Row 11 RED escalated to 067.5
+- All gate-blocking rows closed downstream: R-1 (cross-thread switch via `messagesByThread` Map), R-2 (sandbox-output JS blob fetch+download via `frontend/src/lib/api.ts:downloadSandboxOutput`), R-2-IDOR (path-segment fence at `backend/app/api/sandbox_outputs.py:48-67` returns 404 to foreign user_id), R-2 long-TTL re-sign (60s TTL), N-01 (model→provider router at `backend/app/api/threads.py:949` honors `MODEL_CAPABILITIES[model]["provider"]`), R-3 (suggestion pills emit at threads.py:2487-2526 — Row 1 GREEN run `aa92f90e`), R-4 (active-thread tool-stage), R-5 (code-execution heartbeat / `code_output_line` SSE event), Row 11 (empty-thread-until-refresh closed via Phase 067.5 Branch D-3)
+- User-deferred (non-blocking, NOT v2.5 scope): 067.2-11 + 067.2-12 OpenRouter Kimi 2.5 + MiniMax 2.7 synthetic-timeout protocol (creds present; carry-forward seed); 067.4 Rows 4–9, 12 user-retained ownership at UAT start (orchestrator delivered all UI-driveable rows)
+- Per cross-phase closure rule (ROADMAP line 137 narrative), 067.2 + 067.3 + 067.4 close together once Row 11 GREEN — satisfied by 067.5
 
 ### Phase 067.5: Frontend Reconcile Fix (Empty-Thread-Until-Refresh) (Complete 2026-05-09)
 
