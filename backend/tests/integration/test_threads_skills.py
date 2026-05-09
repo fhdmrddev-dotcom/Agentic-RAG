@@ -15,6 +15,8 @@ from uuid import uuid4
 
 import pytest
 
+from app.services.openai_service import CallingMode
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -124,9 +126,9 @@ class TestCatalogInjection:
 
         def fake_create_streaming_chat(messages, **kwargs):
             captured_messages.extend(messages)
-            return iter(stream_chunks)
+            return iter(stream_chunks), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -165,9 +167,9 @@ class TestCatalogInjection:
 
         def fake_create_streaming_chat(messages, **kwargs):
             captured_messages.extend(messages)
-            return iter(stream_chunks)
+            return iter(stream_chunks), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -216,9 +218,9 @@ class TestExplorerModeNoSkills:
 
         def fake_create_streaming_chat(messages, **kwargs):
             captured_kwargs.update(kwargs)
-            return iter(stream_chunks)
+            return iter(stream_chunks), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -289,10 +291,10 @@ class TestLoadSkill:
                 return iter([
                     _make_tool_call_chunk("tc-1", "load_skill", json.dumps({"skill_name": SKILL_NAME})),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Skill loaded!"), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Skill loaded!"), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -333,10 +335,10 @@ class TestLoadSkill:
                 return iter([
                     _make_tool_call_chunk("tc-1", "load_skill", json.dumps({"skill_name": "NonExistent"})),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Skill not found."), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Skill not found."), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -381,10 +383,10 @@ class TestSaveSkill:
                 return iter([
                     _make_tool_call_chunk("tc-1", "save_skill", json.dumps(save_args)),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Skill created!"), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Skill created!"), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -424,10 +426,10 @@ class TestSaveSkill:
                 return iter([
                     _make_tool_call_chunk("tc-1", "save_skill", json.dumps(save_args)),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Skill updated!"), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Skill updated!"), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -476,10 +478,10 @@ class TestReadSkillFile:
                 return iter([
                     _make_tool_call_chunk("tc-1", "read_skill_file", json.dumps(read_args)),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("File content loaded."), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("File content loaded."), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -520,10 +522,10 @@ class TestReadSkillFile:
                 return iter([
                     _make_tool_call_chunk("tc-1", "read_skill_file", json.dumps(read_args)),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Could not find skill."), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Could not find skill."), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -571,10 +573,10 @@ class TestSkillActivatedEvent:
                 return iter([
                     _make_tool_call_chunk("tc-1", "load_skill", json.dumps({"skill_name": SKILL_NAME})),
                     _make_tool_calls_done_chunk(),
-                ])
-            return iter([_make_sse_chunk("Done."), _make_done_chunk()])
+                ]), CallingMode.NATIVE
+            return iter([_make_sse_chunk("Done."), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
@@ -637,12 +639,12 @@ class TestLoadSkillFiles:
                 return iter([
                     _make_tool_call_chunk("tc-1", "load_skill", json.dumps({"skill_name": SKILL_NAME})),
                     _make_tool_calls_done_chunk(),
-                ])
+                ]), CallingMode.NATIVE
             # On second call, capture what was passed as tool result messages
             captured_tool_messages.extend([m for m in messages if m.get("role") == "tool"])
-            return iter([_make_sse_chunk("Done."), _make_done_chunk()])
+            return iter([_make_sse_chunk("Done."), _make_done_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_streaming_chat", side_effect=fake_create_streaming_chat):
+        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=fake_create_streaming_chat):
             with client.stream(
                 "POST",
                 f"/threads/{THREAD_ID}/messages",
