@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.5
 milestone_name: Deployment Strategy
 status: executing
-stopped_at: Phase 067.4 context gathered
-last_updated: "2026-05-09T06:43:21.650Z"
-last_activity: 2026-05-08 -- Phase 067.4 execution started
+stopped_at: Phase 067.5 closed (Row 11 RED → GREEN)
+last_updated: "2026-05-09T11:35:00.000Z"
+last_activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN
 progress:
   total_phases: 16
-  completed_phases: 13
-  total_plans: 61
-  completed_plans: 59
-  percent: 97
+  completed_phases: 14
+  total_plans: 63
+  completed_plans: 61
+  percent: 100
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 067.4 — streaming-suggestions-tool-stage-render-code-execution
+**Current focus:** v2.5 milestone close eligible — Phase 067.5 closed Row 11 RED via clearMessages streaming-bucket guard
 
 ## Current Position
 
-Phase: 067.4 (streaming-suggestions-tool-stage-render-code-execution) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 067.4
-Last activity: 2026-05-08 -- Phase 067.4 execution started
+Phase: 067.5 (frontend-reconcile-fix) — COMPLETE
+Plan: 2 of 2
+Status: Phase 067.5 closed; v2.5 milestone gate eligible to advance
+Last activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN; Row 11 mirrored to 067.4-HUMAN-UAT.md
 
 Blockers (escalated to Phase 067.4):
 
@@ -63,6 +63,15 @@ Phase 067.2 GREEN summary (working, do not regress):
 Next action: Discuss + plan Phase 067.4 (`/gsd:discuss-phase 067.4` then `/gsd:plan-phase 067.4`). Scope: (a) **PRIMARY (gate-blocking)** R-3 suggestion-emit fix — investigate `backend/app/services/suggestion_service.py` and the emit path at `backend/app/api/threads.py:2466-2526`. Capture the Plan 04 instrumentation log (`logger.warning("suggestion generation failed", exc_info=True)`) from uvicorn stdout to disambiguate exception-swallow vs `questions=[]` vs reasoning-token-starvation. (b) **PRIMARY** R-4 active-thread tool-stage UI staleness — diff `useMessages.ts` SSE handlers vs pre-Plan-03 baseline; fix any tool-stage handlers that missed the per-thread bucket update (R-1 regression candidate). (c) **SECONDARY (UX additive)** R-5 code-execution stdout streaming — add `code_output_line` SSE event end-to-end, strictly additive (no conflict with shipped R-1/R-2/R-3/N-01 surfaces). (d) **SECONDARY (carry-forward)** Run synthetic-timeout protocol for kimi-k2.5 (Row 067.2-11) and minimax-m2.7 (Row 067.2-12) on the OpenRouter branch. Closing UAT must mirror back into BOTH 067.2-HUMAN-UAT.md AND 067.3-HUMAN-UAT.md to close all three open phases (067.2, 067.3, 067.4) together.
 
 ## Recent Completed Phases
+
+### Phase 067.5: Frontend Reconcile Fix (Empty-Thread-Until-Refresh) (Complete 2026-05-09)
+
+- D-067.4-QUALITY-01 5/5 lived-experience cycles GREEN — Row 11 empty-thread-until-refresh repro closed (user-driven Plan 02 UAT, all 4 threads rendered without F5 across 5 consecutive cycles)
+- Branch D-3-CLEAR-WIPES-STREAMING-BUCKET fix in `frontend/src/hooks/useMessages.ts:572-590` — `clearMessages` now refuses to wipe a bucket whose thread is `streamingThreadIdRef.current`. Total diff: 14 insertions, 1 deletion (commit `3d040c7`). See `.planning/phases/067.5-frontend-reconcile-fix/067.5-01-SUMMARY.md` for the surface fixed and full RED→GREEN cycle.
+- Root cause: ChatArea.tsx:89-126 useEffect unconditionally called `clearMessages()` on every `thread.id` change. When user switched BACK to a still-streaming thread, the live placeholder was wiped; `loadMessages` early-returned at useMessages.ts:603 due to `isSendingRef=true`; subsequent SSE callbacks no-op'd; bucket stayed empty until F5. Initial D-2-EARLY-WINDOW hypothesis invalidated by RED test passing — corrected to D-3 after tracing `clearMessages` consumers in ChatArea.
+- R-1 cross-thread dual-pass + Phase 067.4 Plans 01/02/03 GREEN regression spot-check: vitest evidence stands (R-1 protection + R-4 active-thread + R-5 heartbeat tests all still pass post-fix; user opted to skip the runtime spot-checks at closure since the Branch D-3 fix is structurally additive to clearMessages and doesn't touch the SSE event dispatcher or per-thread bucket write contract).
+- STREAM-04-correctness-round3 residual gap closed; v2.5 milestone gate eligible to advance.
+- Carry-forward observation (separate from 067.5 scope): Cycle 5 surfaced a backend `BadRequestError` for `claude-haiku-4-5-20251001` `max_tokens=65536 > 64000` cap. Resume path D-063-04 worked cleanly. Worthy of a separate seed; does NOT invalidate 067.5 closure.
 
 ### Phase 56.1: Agent Feedback Gaps (Complete 2026-04-29)
 
