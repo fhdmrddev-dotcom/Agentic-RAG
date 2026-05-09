@@ -360,3 +360,246 @@ describe("useMessages — R-5 code-execution heartbeat (additive)", () => {
     void sendPromise
   })
 })
+
+// ── Phase 067.5 — Row 11 empty-thread-until-refresh regression ─────────────────
+/**
+ * Phase 067.5 closes Phase 067.4 Row 11 RED — the empty-thread-until-refresh
+ * symptom (1-of-4 streaming threads renders empty in UI even after waiting
+ * minutes; F5 repairs it; Postgres has the row; React in-memory state is stale).
+ *
+ * Branch decision (per .planning/phases/067.5-frontend-reconcile-fix/067.5-01-REPRO-EVIDENCE.md):
+ *   D-2-EARLY-WINDOW. loadMessages fires during postMessage in-flight window
+ *   when the assistant placeholder has no `runId` stamped yet (line 759 stamp
+ *   hasn't run). MERGE filter at lines 644-649 of useMessages.ts requires
+ *   `m.runId && ...`, so the unstamped placeholder is DROPPED. Subsequent SSE
+ *   `onDelta`/`onTerminal` callbacks targeting that placeholder's `assistantId`
+ *   no-op via the `m.id === assistantId` map (placeholder is gone). Bucket
+ *   stays empty until F5 → mount → reconcile → loadMessages with persisted DB
+ *   row repairs it.
+ *
+ * The fix narrows the MERGE predicate to preserve temp placeholders WITHOUT
+ * a stamped runId (they represent the postMessage-in-flight window — runId
+ * will be stamped soon by sendMessage line 759), while still dropping them
+ * when DB has caught up on a stamped runId (D-063.1-12 invariant preserved).
+ *
+ * Test 1 (REQUIRED): regression guard for reconcile-on-switch-back; passes
+ * against the unfixed code, must continue to pass after fix lands.
+ *
+ * Test 2 (BRANCH D-2-EARLY-WINDOW): RED test — fails against unfixed code,
+ * passes after fix lands. Drives the early-window MERGE-drops-unstamped-
+ * placeholder failure mode directly.
+ */
+describe("Phase 067.5 — Row 11 empty-thread-until-refresh regression", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetMessages.mockResolvedValue([])
+    mockGetActiveRuns.mockResolvedValue([])
+    mockCancelRun.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  /**
+   * Test 1 (REQUIRED — regression guard for all branches):
+   * reconcile-on-switch-back surfaces the post-`done` state in
+   * messagesByThread.get(threadA), not an empty placeholder.
+   *
+   * Sequence: thread A streams via reconcile → switch to B → fire
+   * onDone+onTerminal on Thread A's captured callbacks → DB now returns the
+   * populated row → switch back to A → reconcile fires → assert content
+   * surfaces.
+   */
+  it("reconcile on switch-back surfaces the post-done state, not an empty placeholder", async () => {
+    const recorder = makeSseRecorder()
+
+    // Thread A: getActiveRuns returns the in-flight run; getMessages starts empty.
+    mockGetActiveRuns.mockImplementation(async (threadId: string) => {
+      if (threadId === "thread-A") {
+        return [{ run_id: "run-A", started_at: "2026-05-09T10:00:00Z" }]
+      }
+      return []
+    })
+
+    const { result } = renderHook(() => useMessages())
+
+    // View Thread A and trigger reconcile (simulates ChatArea mount/visibility).
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+    await act(async () => {
+      await result.current.reconcile("thread-A")
+    })
+
+    // Reconcile inserts a temp-run-A placeholder + opens SSE consumer.
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cbA = recorder.forRun("run-A") as StreamCallbacks
+    expect(cbA).toBeTruthy()
+
+    // Stream content into Thread A.
+    act(() => {
+      cbA.onDelta("hello ")
+      cbA.onDelta("world")
+    })
+
+    // Switch to Thread B mid-stream.
+    act(() => {
+      result.current.setViewingThread("thread-B")
+    })
+    await act(async () => {
+      await result.current.reconcile("thread-B")
+    })
+
+    // Thread A's run completes while user views Thread B.
+    act(() => {
+      cbA.onDone()
+      cbA.onTerminal("done")
+    })
+
+    // DB has caught up — getMessages now returns the populated assistant row.
+    mockGetMessages.mockImplementation(async (threadId: string) => {
+      if (threadId === "thread-A") {
+        return [
+          {
+            id: "db-A",
+            thread_id: "thread-A",
+            user_id: "user-1",
+            role: "assistant",
+            content: "hello world",
+            created_at: "2026-05-09T10:00:00Z",
+            updated_at: "2026-05-09T10:01:00Z",
+            runId: "run-A",
+            runStatus: "completed",
+          },
+        ]
+      }
+      return []
+    })
+    // getActiveRuns now returns empty (run completed).
+    mockGetActiveRuns.mockResolvedValue([])
+
+    // Switch back to Thread A.
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+    await act(async () => {
+      await result.current.reconcile("thread-A")
+    })
+
+    // Assertion: messages must contain the populated content + completed status.
+    await waitFor(() => {
+      const assistant = result.current.messages.find((m) => m.role === "assistant")
+      expect(assistant?.content).toBe("hello world")
+      expect(assistant?.runStatus).toBe("completed")
+    })
+  })
+
+  /**
+   * Test 2 (BRANCH D-3-CLEAR-WIPES-STREAMING-BUCKET): clearMessages must NOT
+   * wipe the bucket of a thread that is currently being streamed into.
+   *
+   * Root cause (corrected from initial D-2 analysis — D-2 was invalidated by
+   * test passing against unfixed code due to isSendingRef guard at
+   * useMessages.ts:603):
+   *
+   *   1. User on Thread A, submits prompt. sendMessage(A) starts.
+   *      streamingThreadIdRef = A. isSendingRef = true. Placeholder inserted.
+   *   2. User switches view to Thread X. activeThreadIdRef = X.
+   *      ChatArea.tsx:89-126 useEffect fires: clearMessages() reads
+   *      activeThreadIdRef = X, clears bucket X. loadMessages(X) — early-
+   *      returns because isSendingRef = true. (Bucket A still intact.)
+   *   3. Thread A's run completes server-side. SSE done arrives. onTerminal
+   *      flips runStatus on bucket A's placeholder; subscriptionsRef.delete(A).
+   *      sendMessage's finally runs — isSendingRef = false. Bucket A remains
+   *      populated with the full streamed content.
+   *   4. User switches BACK to Thread A. activeThreadIdRef = A.
+   *      ChatArea.tsx:123 calls clearMessages() — reads activeThreadIdRef = A.
+   *      **Wipes bucket A.** loadMessages(A) refetches; if isSendingRef has
+   *      already been reset (step 3 finished) the MERGE restores from DB. ✓
+   *      But if the user switches back BEFORE step 3 fully completes (the
+   *      narrow window between SSE done arriving server-side and finally
+   *      running on the consumer), isSendingRef is still true → loadMessages
+   *      early-returns → bucket A stays EMPTY. Subsequent SSE callbacks
+   *      targeting the dropped placeholder's `assistantId` no-op via
+   *      `m.id === assistantId` map. Empty thread persists until F5.
+   *
+   * Fix surface: guard `clearMessages` (useMessages.ts:572-588) to refuse
+   * to wipe a bucket whose thread is `streamingThreadIdRef.current` —
+   * preserves the streaming bucket while loadMessages's MERGE handles
+   * post-stream reconciliation cleanly.
+   *
+   * RED behavior (current code): bucket A wiped on switch-back to streaming
+   * thread → empty render.
+   * GREEN behavior (after fix): bucket A preserved → content stays visible.
+   */
+  it("clearMessages does not wipe a bucket whose thread is currently streaming (Branch D-3)", async () => {
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValue({
+      run_id: "run-A",
+      message_id: "user-msg-A",
+    })
+
+    const { result } = renderHook(() => useMessages())
+
+    // User on Thread A, submits prompt.
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+
+    let sendPromise!: Promise<void>
+    act(() => {
+      sendPromise = result.current.sendMessage("thread-A", "hello")
+    })
+
+    // Wait for SSE consumer subscription (postMessage resolved, runId stamped).
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+    const cbA = recorder.forRun("run-A") as StreamCallbacks
+    expect(cbA).toBeTruthy()
+
+    // SSE deltas land in bucket A while user views A.
+    act(() => {
+      cbA.onDelta("partial content")
+    })
+
+    await waitFor(() => {
+      const assistant = result.current.messages.find((m) => m.role === "assistant")
+      expect(assistant?.content).toBe("partial content")
+    })
+
+    // User switches AWAY to Thread X (mid-stream).
+    act(() => {
+      result.current.setViewingThread("thread-X")
+    })
+
+    // SSE delta arrives while user views X. Bucket A's placeholder updates
+    // (per-thread bucket write — D-067.3-R1).
+    act(() => {
+      cbA.onDelta(" more content")
+    })
+
+    // User switches BACK to Thread A — STREAMING IS STILL IN FLIGHT
+    // (no onDone / onTerminal yet; isSendingRef is still true).
+    act(() => {
+      result.current.setViewingThread("thread-A")
+    })
+
+    // Simulate ChatArea.tsx:123 calling clearMessages() on the thread.id useEffect
+    // when the user switches back to Thread A.
+    act(() => {
+      result.current.clearMessages()
+    })
+
+    // Branch D-3 assertion: bucket A's content MUST be preserved because
+    // streamingThreadIdRef === activeThreadIdRef === "thread-A".
+    // Pre-fix (RED): clearMessages wipes bucket A unconditionally → bucket is
+    // empty → result.current.messages is [].
+    // Post-fix (GREEN): clearMessages refuses to wipe a streaming thread's
+    // bucket → assistant content remains visible.
+    const assistant = result.current.messages.find((m) => m.role === "assistant")
+    expect(assistant).toBeTruthy()
+    expect(assistant?.content).toBe("partial content more content")
+
+    void sendPromise
+  })
+})
