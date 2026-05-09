@@ -215,6 +215,8 @@ D. **Signoff.** Generate executive summary table: 6 PRDs × scope summary × est
 - [ ] **§10 (Surprise-feature) vs §11 (Lean) split honored** — §10 entries show "considered, then rejected" with re-trigger condition (process check); §11 entries show out-of-scope routing (deferred-to-which-milestone / rejected-entirely / awaiting-decision). No item appears in both with same framing.
 - [ ] **§4 Out-of-Scope rows ⊆ §11 Lean entries** — every Out-of-Scope row in any PRD's §4 has a matching §11 Lean entry with same wording, OR §11 explicitly cross-references §4 (no duplication).
 - [ ] **No migration number collisions** — `MIGRATION-RESERVATIONS.md` table consulted; every PRD's claimed migration numbers fall within its reserved range; no two PRDs claim the same number.
+- [ ] **§9 PARTIALLY-SUPERSEDES rows close cleanly** — for every §9 row marked PARTIALLY-SUPERSEDES, the un-superseded portion appears in §11 (deferred / rejected / awaiting) OR is marked carries-forward-unchanged with rationale. No partial-state row leaks unaddressed across PRDs.
+- [ ] **Q-ID upgrades route correctly** — every PRD's §13 questions either stay open (clear "decided by user before {milestone phase}") or, if upgraded mid-pass, route to `D-PRD-NN` for cross-milestone scope or `D-v{X.Y}-NN` for milestone-confined scope (per PRD-TEMPLATE §13 instruction).
 
 ## Scope bounding — what this meta-phase is NOT doing
 

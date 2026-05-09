@@ -108,7 +108,9 @@
 
 ## 5. Architecture & Data Model changes
 
-> **Filling instruction:** Concrete inventory of what the codebase will look different after this milestone ships. List: new tables, modified tables, new SDK / library deps, new env vars, new Redis key patterns, new SSE event types, new API routes, new background processes. End with a schema-migration-count estimate.
+> **Filling instruction:** Concrete inventory of what the codebase will look different after this milestone ships. List: new tables, modified tables, **modified hot paths** (call sites whose internals change but external contract stays — e.g., `_drain_stream_with_close_on_cancel` rewriting from sync to asyncpg, RLS predicates rewriting per-table for multi-tenancy, `run_sub_agent` extending for eval-mode), new SDK / library deps, new env vars, new Redis key patterns, new SSE event types, new API routes, new background processes. End with a schema-migration-count estimate.
+>
+> The "Modified hot paths" subsection is required for any milestone that rewrites internals without changing wire shape (multi-worker, multi-tenancy RLS shift, Skill Studio eval extension, API versioning). If your milestone is purely additive, write `Modified hot paths: none — additive only`.
 >
 > **MIGRATION NUMBERS — MANDATORY:** Read `MIGRATION-RESERVATIONS.md` BEFORE picking any migration number. Your milestone has a reserved range (e.g., v2.6 = `039-049`, v3.0 = `050-064`, etc.). Pick numbers ONLY from your reserved range. If you need more than your range, EXTEND the table in `MIGRATION-RESERVATIONS.md` and document the change in your PRD's §5. NEVER assume `039` is available — check the file. This prevents collision when parallel PRD-authoring agents in Plans 03-08 run concurrently.
 
@@ -147,6 +149,8 @@
 ## 6. Compatibility check (Gate 1)
 
 > **Filling instruction:** For every architectural change in §5, name (a) the current code path being touched (`file:line`), (b) the compatibility constraint it must satisfy (which D-v2.5-XX or D-PRD-XX rule applies), (c) what the integration point looks like, and (d) any conflict that needs resolution. Don't be exhaustive about untouched code — only the surfaces this milestone modifies.
+>
+> **Format:** Use a table with one row per change (mirror §5 inventory). When a single change crosses ≥4 `file:line` anchors (common for cross-cutting work like multi-tenancy RLS rewrite, run-pipeline plumbing, useMessages refactor), use a NESTED bulleted list inside the `Touches` cell rather than a comma-jammed string. Readability beats cell-width discipline.
 
 **Annotated example:**
 
@@ -357,6 +361,12 @@
 ## 13. Decisions to lock pre-execution
 
 > **Filling instruction:** Any one-way decisions surfaced during PRD authoring that must be added to DECISIONS.md before milestone execution starts. Per decision: **question / options / recommendation / who decides / by when**. If the milestone has no new locked decisions, write "None — all relevant decisions are pre-locked in DECISIONS.md." If you write that and there are 5+ obvious unknowns, the reviewer will kick this back.
+>
+> **Q-ID naming convention:** Use `Q-v{X.Y}-NN` for questions inside this milestone (e.g., `Q-v2.6-01`). When a question gets accepted as a binding decision, route the upgrade based on scope:
+> - Decision affects ONLY this milestone's internals → upgrade to `D-v{X.Y}-NN` (per-milestone ADR; same prefix style as `D-v2.5-01..10`)
+> - Decision affects DOWNSTREAM milestones (e.g., supersedes a prior architectural rule, sets a posture other PRDs must inherit) → upgrade to the next free `D-PRD-NN` ID and append to `DECISIONS.md`
+>
+> Example: lifting `D-v2.5-02` (single-worker rule) in v2.6 affects every downstream milestone → upgrade to `D-PRD-12`. A v2.6-internal asyncpg pool tuning decision stays as `D-v2.6-NN`.
 
 **Annotated example:**
 
