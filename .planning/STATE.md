@@ -40,6 +40,67 @@ All gate-blocking work is now closed. One administrative deferral remains, inten
 
 Next action: `/gsd:complete-milestone v2.5` — all gate-blocking work closed. After milestone close, plant carry-forward seeds (claude-haiku max_tokens cap; OpenRouter Kimi/MiniMax synthetic-timeout protocol; deferred-items.md D-065-01-DEFER-2 test_059 fixture-cleanup) before starting next milestone.
 
+## Deferred Items
+
+Items acknowledged and deferred at v2.5 milestone close on 2026-05-09. Each item was reviewed against the ROADMAP closure narratives; none contradict the closure annotations or block milestone completion. Surfaced by `gsd-tools.cjs audit-open` at close time (31 items total).
+
+### UAT status fields not flipped after cross-phase closure (10)
+
+These phases closed via the documented cross-phase chain (see ROADMAP top-section closure annotations + the cross-phase entry in this file's "Recent Completed Phases"). The HUMAN-UAT.md frontmatter `status` fields were not updated when downstream phases closed the gate-blocking rows. All 10 show `0 pending scenarios` — no actionable UAT work remaining.
+
+| Phase | UAT file | Recorded status | Reality |
+|-------|----------|-----------------|---------|
+| 062 | 062-HUMAN-UAT.md | partial | Closed; 062 verified passing during v2.5 chain |
+| 063.1 | 063.1-HUMAN-UAT.md | partial | Closed (project-level approval per Phase 063 precedent) |
+| 066 | 066-HUMAN-UAT.md | green | Closed; UAT was already green/approved at close |
+| 067 | 067-HUMAN-UAT.md | partial | Closed (project-level approval) |
+| 067.1 | 067.1-HUMAN-UAT.md | green-with-note | Closed (SC#3 substantive 5/5 / strict 3/5) |
+| 067.2 | 067.2-HUMAN-UAT.md | blocked | Closed via 067.3 / 067.4 / 067.5 cross-phase chain |
+| 067.3 | 067.3-HUMAN-UAT.md | gaps_blocking | Closed via 067.4 R-3 GREEN |
+| 067.4 | 067.4-CLOSING-UAT-RUNBOOK.md | unknown | Runbook artifact, not a UAT scoreboard |
+| 067.4 | 067.4-HUMAN-UAT.md | gaps_blocking | Closed via 067.5 Branch D-3 fix (Row 11 GREEN) |
+| 067.5 | 067.5-02-CLOSING-UAT.md | unknown | Closing UAT — gate met, 5/5 cycles GREEN |
+
+### Verification gaps (4)
+
+All four are `human_needed`-status verifications on phases that closed with project-level approval (Phase 063 precedent: project_level_approval `approved` is sufficient closure when human-driven verification is logistically gated). None blocked phase closure.
+
+| Phase | File | Note |
+|-------|------|------|
+| 061 | 061-VERIFICATION.md | Run-Backed Streaming backend; closed with project approval |
+| 063 | 063-VERIFICATION.md | Frontend Stream Decoupling; closed with project approval |
+| 063.1 | 063.1-VERIFICATION.md | Gap closure for 063; closed with project approval |
+| 067 | 067-VERIFICATION.md | Frontend Streaming-UX Fix; closed with project approval |
+
+### Quick tasks — historical micro-tickets predating GSD (11)
+
+These pre-date the GSD planning workflow. Most are `unknown` status (the tracker has no link back to whether they shipped). Several were almost certainly resolved during v2.2 / v2.3 / v2.4 milestones but the quick-task tracker was never reconciled. NOT in v2.5 scope; should be re-triaged at next milestone planning if any still reproduce.
+
+- 260322-26g — improve tool-call display for ls/tree/grep
+- 260328-v6n — investigate duplicate folder behavior
+- 260328-wqj — folder-scoped chat returning results bug
+- 260328-x6n — folder not created when pressing (`completed` per tracker)
+- 260404-vel — streaming cursor bug + meaningful indicator
+- 260405-rgy — folder public visibility files
+- 260405-s1e — hide toggle-global from non-owners
+- 260407-vqw — context window management review
+- 260411-wj5 — skill file upload bug
+- 260412-dqu — four issues in skills API
+- 260412-jnc — import skill 202 BackgroundTask
+
+### Dormant seeds — intentional future work (6)
+
+These are explicitly future-looking ideas, planted in earlier milestones and confirmed dormant by frontmatter. They surface when their `trigger_when` conditions fire, not before. NOT v2.5 scope by design.
+
+- SEED-002 — Skill Studio Milestone Preparation
+- SEED-003 — Deployment Flexibility & Install/Config UX
+- SEED-004 — Org / Department / Role Multi-Tenancy
+- SEED-005 — Document Management Capabilities (M-Files-aligned subset)
+- SEED-006 — Multimodal Extraction Quality (Phase 35/36 Follow-up)
+- SEED-007 — App-level Streams Provider
+
+(SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
+
 ## Recent Completed Phases
 
 ### Phase 065: Skills Test Infrastructure Repair (Complete 2026-05-09)
