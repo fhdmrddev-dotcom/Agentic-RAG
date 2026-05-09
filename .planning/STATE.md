@@ -7,11 +7,14 @@ stopped_at: Phase 067.5 closed (Row 11 RED → GREEN)
 last_updated: "2026-05-09T11:35:00.000Z"
 last_activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN
 progress:
-  total_phases: 16
-  completed_phases: 14
+  total_phases: 17
+  completed_phases: 15
   total_plans: 63
   completed_plans: 61
-  percent: 100
+  percent: 88
+  open_phases:
+    - "064-validation-harness (never scaffolded)"
+    - "065-skills-test-infrastructure-repair (only .gitkeep — needed before next milestone per SEED-002)"
 ---
 
 # Project State
@@ -21,14 +24,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.5 milestone close eligible — Phase 067.5 closed Row 11 RED via clearMessages streaming-bucket guard
+**Current focus:** Phase 067.5 closed; v2.5 milestone NOT yet ready to close — Phase 064 (Validation Harness) and Phase 065 (Skills Test Infrastructure Repair) still open. Plus 067.1–067.5 lack `*REVIEW*.md` artifacts.
 
 ## Current Position
 
 Phase: 067.5 (frontend-reconcile-fix) — COMPLETE
 Plan: 2 of 2
-Status: Phase 067.5 closed; v2.5 milestone gate eligible to advance
+Status: Phase 067.5 closed. v2.5 milestone close BLOCKED on Phase 064 + Phase 065 + optional code reviews on 067 series.
 Last activity: 2026-05-09 -- Phase 067.5 closing UAT 5/5 GREEN; Row 11 mirrored to 067.4-HUMAN-UAT.md
+
+## Outstanding before v2.5 close
+
+- **Phase 064: Validation Harness** — never scaffolded. Was meant to ship reproducible Chrome MCP scripts for E (tab-switch mid-stream), F (refresh mid-stream), G (Stop button), H (thread navigation), and multi-tab sync. Largely substituted in practice by the user-driven UAT scoreboards in 067.x but the original `Phase 064` artifact never landed.
+- **Phase 065: Skills Test Infrastructure Repair** — directory has `.gitkeep` only. Needed before Skill Studio milestone per `.planning/seeds/SEED-002-skill-studio-milestone-prep.md`. 13+ broken patches in `test_threads_skills.py` + 3 broken export tests in `test_skills_import_export.py` must be repaired or formally skipped-with-reason before Skill Studio's "all agent tools covered by integration tests" gate.
+- **Code review (optional gate)**: 067.1, 067.2, 067.3, 067.4, 067.5 have no `*REVIEW*.md`. Older phases (058–063.1, 066) do. Could run `/gsd:code-review` per-phase or skip if confident.
+- **Milestone close decision**: `/gsd:complete-milestone` will run `audit-open` and either block or force `[A] Acknowledge` deferral. User can choose to defer 064/065 to a side-phase or to the next milestone, or to ship them now.
 
 Blockers (escalated to Phase 067.4):
 
