@@ -332,7 +332,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
 | 063. Frontend Stream Decoupling | v2.5 | 5/5 | Complete (gap-closed by 063.1) | 2026-05-03 |
 | 063.1. Frontend Stream Decoupling — Gap Closure | v2.5 | 5/5 | Complete    | 2026-05-04 |
 | 064. Validation Harness | v2.5 | 0/0 | Not started | — |
-| 065. Skills Test Infrastructure Repair | v2.5 | 0/0 | Not started | — |
+| 065. Skills Test Infrastructure Repair | v2.5 | 3/3 | Complete    | 2026-05-09 |
 | 066. Adaptive Run Timeouts & Lifecycle States | v2.5 | 5/5 | Complete    | 2026-05-06 |
 
 ### Phase 064: Validation Harness — DEFERRED (covered organically by 067.x UAT scoreboards)
@@ -370,7 +370,7 @@ Rationale: 061 (backend writes to Redis), 062 (replay-and-tail API), and 063 (fr
   2. All tests in `backend/tests/integration/test_skills_import_export.py` either PASS or are explicitly skipped with documented reason — the 3 currently-failing export tests are fixed or formally deferred.
   3. The combined skills test run (`pytest tests/integration/test_threads_skills.py tests/integration/test_skills_import_export.py -q`) reports 0 errors and 0 unexpected failures.
   4. No regression in 058 / 059 binding gates: `test_058_concurrency.py::test_cross_tab_unblocked_during_sse` and the `test_059_disconnect.py` suite still pass.
-**Plans:** 2 plans
+**Plans:** 3/3 plans complete
 Plans:
 - [x] 065-01-PLAN.md - Repair test_threads_skills.py: rename 13 patch targets to create_adaptive_streaming_chat + tuple-wrap fake returns + add CallingMode import
 - [x] 065-02-PLAN.md - Triage 3 failing tests in test_skills_import_export.py: fix-or-skip-with-reason per SEED-002 scope guard
