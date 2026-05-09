@@ -8,29 +8,19 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-## Current Milestone: v2.5 SSE Concurrency & Reconnect Stability
-
-**Goal:** Resolve the Phase 057 deferral by fixing the dominant backend concurrency blocker (sync supabase calls in async event_stream) and shipping a correct frontend reconnect architecture (race fixes + visibilitychange + Resume button).
-
-**Target features:**
-- Backend SSE handler doesn't block other requests during long agent loops (cross-tab GET < 1s during streaming)
-- Long-running agent loops decoupled from request lifetime (background task + asyncio.Queue + sse-starlette)
-- Frontend race conditions eliminated (setViewingThread separation, AbortController-based cancellation, finally-block reload removed)
-- Tab-switch (Symptom E) and F5-mid-stream (Symptom F) recover reliably without breaking Stop (G) or thread navigation (H)
-- Reproducible browser-based test harness so future SSE work can be validated in isolation
-
-**Key context:** Two prior implementation attempts failed (`057-DEFERRAL.md`). Authoritative research saved at `.planning/research/058-sse-concurrency-research.md`: `run_in_threadpool` is the immediate fix; `--workers N` masks the bug; Supabase Realtime is best-effort, not at-least-once.
-
 ## Current State
 
-**Shipped:** v2.4 (Stability, Polish & UX Fixes) — 2026-04-30
-**Active:** v2.5 (SSE Concurrency & Reconnect Stability) — started 2026-05-01
-**Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage)
-**Codebase:** ~57,000 LOC (Python + TypeScript), 72 files changed in v2.4
-**Phases shipped:** 57 phases across 6 milestones (v1.0–v2.4), 80+ plans executed
+**Shipped:** v2.5 (Deployment Strategy) — 2026-05-09 (16 phases, 64 plans, 445 commits, ~104K LOC delta)
+**Active:** TBD — milestone planning starts via `/gsd:new-milestone` (likely candidates per planted seeds: Skill Studio milestone prep per SEED-002; admin/operator UI per SEED-012; external integrations + MCP per SEED-013; automations per SEED-014)
+**Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage) + Redis Streams (run-backed streaming)
+**Codebase:** ~160K LOC (Python + TypeScript) post-v2.5; 531 files touched across the v2.5 window
+**Phases shipped:** 73 phases across 7 milestones (v1.0–v2.5); 144+ plans executed
 **Design system:** Aether Intelligence — Deep Midnight theme, glassmorphic cards, gradient accents, mobile-responsive
-**Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`)
-**Known tech debt:** STREAM-02a closed by Phase 060 (frontend race fixes); STREAM-04 (run-backed streaming for Claude/ChatGPT-class refresh + multi-tab + navigate-away survival) scoped to v2.5 phases 061 (Run-Backed Streaming Backend with Redis Streams per D-v2.5-08 — closed 2026-05-02), 061.1 (residual cleanup — closed 2026-05-03; ERR_INCOMPLETE_CHUNKED_ENCODING root-caused as sse-starlette ping race and fixed via `ping=None`, live-validated through Chrome MCP), 062 (Replay & Tail API), 063 (Frontend Stream Decoupling — also delivers STREAM-02b); 064 validates the chain; 065 (Skills Test Infra Repair) parallel-able. SKILL-01/02 (catalog full-inject, deferred to Skills Studio); human UAT gaps for Phases 45, 46, 48
+**Docker:** `llm-sandbox` container for code execution (`SANDBOX_ENABLED=true`); Redis container for run-backed streaming buffer
+**Known tech debt going into next milestone:**
+- Phase 064 (Validation Harness) — DEFERRED (intentional; scenarios E/F/H validated organically by 067.x UAT, G + multi-tab sync remain partially deferred)
+- Carry-forward seeds: SEED-009 (claude-haiku max_tokens cap), SEED-010 (OpenRouter synthetic-timeout protocol), SEED-011 (test_059 fixture-teardown bug)
+- Forward-looking seeds for next-milestone selection: SEED-002, SEED-012, SEED-013, SEED-014
 
 ## Requirements
 
@@ -132,16 +122,31 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ TOOL-01: Cross-provider tool calling reliability (MODEL_CAPABILITIES, tool_parser.py) — v2.4 Phase 53
 - ✓ GEN-01/02/04/05: Anthropic native SDK, no token reduction, generation mode disambiguation — v2.4 Phase 54
 
-### Active (v2.5 in flight)
+*v2.5 milestone (Deployment Strategy):*
 
-- [ ] CONCUR-01: Backend SSE handler does not block concurrent requests during long agent loops *(v2.5 Phase 058)*
-- [ ] CONCUR-02: SSE architecture decouples handler lifetime from agent loop lifetime *(v2.5 Phase 059)*
-- [x] STREAM-02a: Frontend race conditions eliminated (setViewingThread, AbortController, finally-block reload removed) *(v2.5 Phase 060 — shipped 2026-05-02)*
-- [ ] STREAM-02b: Tab-switch (E) and F5 mid-stream (F) recover without breaking Stop (G) or navigation (H) *(v2.5 Phase 063 — subsumed by STREAM-04)*
-- [ ] STREAM-04: Stream survives navigation, refresh, and multi-tab access — generation lifetime decoupled from any single HTTP request via Redis Streams + replay-and-tail API + frontend reconcile-on-(re)connect (Claude/ChatGPT-class behavior) *(v2.5 Phases 061 + 062 + 063)*
-- [ ] TEST-01: Reproducible browser-based test harness for SSE/reconnect scenarios including run-backed streaming + multi-tab sync + refresh-mid-stream *(v2.5 Phase 064)*
-- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone)*
-- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone)*
+- ✓ CONCUR-01: Backend SSE handler does not block concurrent requests during long agent loops — v2.5 Phase 058 (shipped 2026-05-01; cross-tab GET <1s during streaming, measured ~15ms)
+- ✓ CONCUR-02: SSE architecture decouples handler lifetime from agent loop lifetime — v2.5 Phase 059 (shipped 2026-05-02; agent_runner producer + asyncio.Queue + sse-starlette)
+- ✓ STREAM-02a: Frontend race conditions eliminated — v2.5 Phase 060 (shipped 2026-05-02; setViewingThread separation + AbortController + finally-block reload removed)
+- ✓ STREAM-02b: Tab-switch / F5 mid-stream recover without breaking Stop or navigation — v2.5 (subsumed by STREAM-04; final reconcile fix landed in Phase 067.5)
+- ✓ STREAM-04: Stream survives navigation, refresh, multi-tab access — Redis Streams + replay-and-tail API + frontend reconcile — v2.5 Phases 061 + 062 + 063 (shipped 2026-05-04 as a single feature branch per D-v2.5-11)
+- ✓ STREAM-04-correctness: Run-backed streaming gap closures — v2.5 Phase 063.1 (shipped 2026-05-04; closed Gap-001..005)
+- ✓ Gap-006 closed: Per-LLM-call timeout machinery + cancelled vs timed_out lifecycle distinction — v2.5 Phase 066 (shipped 2026-05-06; HUMAN-UAT green/approved)
+- ✓ UX-067-01..05 closed: Empty-paint, "Saving response…" thrash, refresh-required first-paint, redis-consumer log noise, tool-call iteration boundary — v2.5 Phase 067 (shipped 2026-05-07)
+- ✓ Gap-007 closed + agent behavior polish — v2.5 Phase 067.1 (shipped 2026-05-07; Track A drain-into-queue, multi-step pipeline system prompt, context-aware in-flight copy)
+- ✓ STREAM-04-correctness-round2 closed: Per-thread message store + sandbox download via JS blob + model→provider router + suggestions emit + active-thread tool-stage + code-execution heartbeat — v2.5 Phases 067.2 / 067.3 / 067.4 (shipped 2026-05-09 via cross-phase chain)
+- ✓ STREAM-04-correctness-round3 closed: Empty-thread-until-refresh reconcile fix — v2.5 Phase 067.5 (shipped 2026-05-09; Branch D-3 `clearMessages` guard, 5/5 lived-experience cycles GREEN)
+- ✓ TEST-DEBT-059 closed: Skills test infrastructure repaired — v2.5 Phase 065 (shipped 2026-05-09; combined skills test run 26/26 pass)
+
+### Active (next milestone — TBD)
+
+The next milestone has not been scoped yet. Strong candidates per planted seeds:
+
+- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone — SEED-002)*
+- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone — SEED-002)*
+- [ ] Admin / operator UI completeness — control everything from UI; sane fallback when not *(SEED-012)*
+- [ ] External integrations: public API + MCP server + webhooks + service accounts *(SEED-013)*
+- [ ] Automations & routines: scheduled / triggered / reactive agent runs *(SEED-014)*
+- [ ] Org / Department / Role multi-tenancy *(SEED-004 — surfaces when first multi-tenant install need fires)*
 
 ### Out of Scope
 
@@ -265,4 +270,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-05 — Phase 063.1 shipped (Frontend Stream Decoupling Gap Closure): closed 5 gaps from Phase 063's live UAT — Gap-001 duplicate-bubble flicker (runId-match dedup against `messagesRef.current`), Gap-003 blank-window-on-thread-switch + duplicate Redis Stream replay (`abortStream()` removed from ChatArea, `guardedSetMessages` lifted to wrap sendMessage callbacks), Gap-004 hard-coded `since="0"` (`lastSeenOffsetRef` Map + `onCursor` parser threads `since={highest-seen-ms-id}` through reconcile's `subscribeToRun`), Gap-005 concurrent-reconcile race wiping placeholder (`reconcileInFlightRef` boolean guard + `loadMessages` REPLACE→MERGE preserving live temp- placeholders), Gap-002 Resume button data flow (backend `GET /threads/{tid}/messages` extended via two-query Python merge to surface `run_id`/`run_status` per assistant row + Pydantic `MessageResponse` extension + cross-user RLS guard test). 5 plans across 5 waves serialized (avoid useMessages.ts merge conflicts), 21/21 must-haves verified at code level, code review found 4 blockers + 9 warnings — 12/13 fixed; live-bundle Chrome MCP verification confirmed all Wave 2/3/4 fixes served at localhost:5173. New Gap-006 filed and escalated to a follow-on phase: `RUN_HARD_TIMEOUT_SECONDS=120` cancels complex tool-calling agents mid-iteration (clusters at 120-152s in supabase `runs` table; surfaces as `GeneratorExit` in LangSmith via `langsmith/run_helpers.py:1680` cleanup of cancelled LLM iterator)*
+*Last updated: 2026-05-09 — v2.5 (Deployment Strategy) shipped: 16 phases / 64 plans / ~104K LOC delta over 10 days. Closed Gap-006 (per-LLM-call timeout machinery + cancelled/timed_out lifecycle split, Phase 066), shipped run-backed streaming architecture (Redis Streams + replay-and-tail, Phases 061→063), and resolved STREAM-02 family via cross-phase chain through 067.5 Branch D-3 `clearMessages` guard fix. Three carry-forward seeds planted (SEED-009/010/011) and three forward-looking strategic seeds (SEED-012/013/014 — admin UI, integrations + MCP, automations). 31 deferred items acknowledged in STATE.md `## Deferred Items`; none contradict shipped work. Next milestone candidates: SEED-002 (Skill Studio), SEED-012 (admin/operator UI), SEED-013 (external integrations + MCP), SEED-014 (automations & routines).*
