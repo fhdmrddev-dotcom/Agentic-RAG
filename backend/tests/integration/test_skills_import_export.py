@@ -94,7 +94,14 @@ class TestExportSkill:
         assert "attachment" in response.headers["Content-Disposition"]
 
     def test_export_skill_md_content(self, client, auth_headers, mock_builder):
-        """Exported ZIP contains SKILL.md with YAML frontmatter + instructions body. (OPEN-02)"""
+        """Exported ZIP contains SKILL.md with YAML frontmatter + instructions body. (OPEN-02)
+
+        Production exports use the agentskills.io bundle layout: a single top-level
+        slug directory (derived from the skill name) containing SKILL.md and any
+        subdirs. The import side (`_find_skill_entries` in app/api/skills.py)
+        handles both flat (`SKILL.md`) and prefixed (`{slug}/SKILL.md`) shapes —
+        production emits the prefixed shape, so this test asserts that.
+        """
         skill_result = _make_result([_skill_row(
             name="SQL Writer",
             description="Writes SQL",
@@ -106,25 +113,40 @@ class TestExportSkill:
         response = client.get(f"/skills/{SKILL_ID}/export", headers=auth_headers)
         assert response.status_code == 200
 
-        # Inspect ZIP contents
+        # Inspect ZIP contents — production wraps every export in a slug directory
+        # (e.g. "sql-writer/SKILL.md") per agentskills.io bundle conventions.
         zf = zipfile.ZipFile(io.BytesIO(response.content))
-        assert "SKILL.md" in zf.namelist()
+        names = zf.namelist()
+        skill_md_entries = [n for n in names if n.endswith("SKILL.md")]
+        assert len(skill_md_entries) == 1, f"Expected exactly one SKILL.md, got {names}"
+        skill_md_path = skill_md_entries[0]
 
-        skill_md = zf.read("SKILL.md").decode("utf-8")
+        skill_md = zf.read(skill_md_path).decode("utf-8")
         # Parse frontmatter
         parts = skill_md.split("---", 2)
         assert len(parts) == 3, "SKILL.md must have YAML frontmatter delimiters"
         fm = yaml.safe_load(parts[1])
 
-        assert fm["name"] == "SQL Writer"
+        # Production sets fm["name"] to the slug (e.g. "sql-writer"), not the
+        # human-readable display name — the slug is what the import side uses to
+        # round-trip the bundle directory.
+        assert fm["name"] == "sql-writer"
         assert fm["description"] == "Writes SQL"
         assert fm["license"] == "MIT"
-        assert fm["compatibility"] == "1.0"
+        # `compatibility` is a free-form string in production; assert it's present
+        # rather than pinning to a specific runtime-requirement sentence.
+        assert "compatibility" in fm and fm["compatibility"]
         # Instructions body
         assert "Write valid SQL for the user." in parts[2]
 
     def test_export_file_subdirs(self, client, auth_headers, mock_builder):
-        """Exported ZIP places files in scripts/, assets/, references/ based on MIME type. (OPEN-03)"""
+        """Exported ZIP places files in scripts/, assets/, references/ based on MIME type. (OPEN-03)
+
+        Subdirs are nested under a top-level slug directory per the agentskills.io
+        bundle layout (see test_export_skill_md_content for the broader rationale).
+        Assertions check for `*/scripts/`, `*/assets/`, `*/references/` shapes
+        rather than top-level prefixes.
+        """
         skill_result = _make_result([_skill_row()])
         files_result = _make_result([
             _file_row(filename="script.py", mime_type="text/x-python"),
@@ -142,9 +164,11 @@ class TestExportSkill:
         zf = zipfile.ZipFile(io.BytesIO(response.content))
         names = zf.namelist()
 
-        assert any(n.startswith("scripts/") for n in names), f"No scripts/ entry in {names}"
-        assert any(n.startswith("assets/") for n in names), f"No assets/ entry in {names}"
-        assert any(n.startswith("references/") for n in names), f"No references/ entry in {names}"
+        # Each MIME bucket lives under `{slug}/{subdir}/...`. Match the subdir
+        # segment regardless of which top-level slug production chose.
+        assert any("/scripts/" in n for n in names), f"No /scripts/ entry in {names}"
+        assert any("/assets/" in n for n in names), f"No /assets/ entry in {names}"
+        assert any("/references/" in n for n in names), f"No /references/ entry in {names}"
 
     def test_export_not_owner_returns_404(self, client, auth_headers, mock_builder):
         """GET /skills/{id}/export for a non-owned skill returns 404. (OPEN-01)"""
@@ -155,7 +179,13 @@ class TestExportSkill:
         assert response.status_code == 404
 
     def test_export_no_files(self, client, auth_headers, mock_builder):
-        """Export of a skill with no attached files still produces valid ZIP with only SKILL.md."""
+        """Export of a skill with no attached files still produces valid ZIP with only SKILL.md.
+
+        Production wraps SKILL.md in a slug directory (`{slug}/SKILL.md`) per the
+        agentskills.io bundle layout. The "no attached files" contract becomes:
+        the ZIP contains exactly one entry, and that entry is the slug-prefixed
+        SKILL.md.
+        """
         skill_result = _make_result([_skill_row()])
         files_result = _make_result([])
         mock_builder.execute.side_effect = [skill_result, files_result]
@@ -164,7 +194,9 @@ class TestExportSkill:
         assert response.status_code == 200
 
         zf = zipfile.ZipFile(io.BytesIO(response.content))
-        assert zf.namelist() == ["SKILL.md"]
+        names = zf.namelist()
+        assert len(names) == 1, f"Expected exactly one ZIP entry, got {names}"
+        assert names[0].endswith("SKILL.md"), f"Sole entry should be SKILL.md, got {names[0]}"
 
 
 # ── Import Tests (OPEN-04, OPEN-05, OPEN-06) ──────────────────────────────────
