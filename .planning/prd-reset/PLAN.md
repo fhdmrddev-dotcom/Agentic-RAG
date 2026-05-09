@@ -211,6 +211,10 @@ D. **Signoff.** Generate executive summary table: 6 PRDs × scope summary × est
 - [ ] Lateral-thinking checklist (≥21 features) walked; each marked covered/deferred/rejected
 - [ ] ≥3 features surfaced beyond synthesis (proves Plan 09 wasn't a checkbox exercise)
 - [ ] User signoff captured
+- [ ] **§8 (Coverage) vs §9 (Document validity) split honored** — every PRD's §8 names theme **clusters** (forward-looking, from synthesis §4); §9 names input **docs** (backward-looking, from synthesis §7). No PRD has both sections naming the same orientation; no redundant content across the two.
+- [ ] **§10 (Surprise-feature) vs §11 (Lean) split honored** — §10 entries show "considered, then rejected" with re-trigger condition (process check); §11 entries show out-of-scope routing (deferred-to-which-milestone / rejected-entirely / awaiting-decision). No item appears in both with same framing.
+- [ ] **§4 Out-of-Scope rows ⊆ §11 Lean entries** — every Out-of-Scope row in any PRD's §4 has a matching §11 Lean entry with same wording, OR §11 explicitly cross-references §4 (no duplication).
+- [ ] **No migration number collisions** — `MIGRATION-RESERVATIONS.md` table consulted; every PRD's claimed migration numbers fall within its reserved range; no two PRDs claim the same number.
 
 ## Scope bounding — what this meta-phase is NOT doing
 
