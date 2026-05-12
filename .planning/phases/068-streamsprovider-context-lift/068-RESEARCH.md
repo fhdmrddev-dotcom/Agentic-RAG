@@ -983,22 +983,24 @@ export function useMessages() {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Playwright spec inventory location.**
+All three open questions resolved during the gsd-planner source-audit step. Resolutions captured below and reflected in PLAN.md frontmatter `truths` blocks where applicable.
+
+1. **Playwright spec inventory location — RESOLVED.**
    - What we know: Phase 063.1 plan 05 references three spec files. Phase 067.x cycles closed via Chrome MCP + manual UAT, not Playwright per se.
-   - What's unclear: are the 063.1 spec files committed and runnable on a fresh `npm install`? Or were they authored but never executed (vitest runtime issue on the dev machine, per STATE.md:264)?
-   - Recommendation: Plan 4 author runs `find frontend -name "*.spec.ts" -path "*e2e*"` (or equivalent) and confirms the inventory before claiming "re-run" as a gate. If specs are missing, treat the gate as Chrome MCP manual exercise + existing vitest suite — SC#3 phrasing supports this interpretation.
+   - What's unclear (was): are the 063.1 spec files committed and runnable on a fresh `npm install`? Or were they authored but never executed (vitest runtime issue on the dev machine, per STATE.md:264)?
+   - **RESOLVED:** Planner audit confirmed `frontend/e2e/` directory does NOT exist; no committed Playwright specs. SC#3 regression gate is therefore Vitest (`__tests__/providers/streamsProvider.test.tsx`) + Chrome MCP manual exercise per RESEARCH §Finding #10. Encoded in Plan 4 Task 1 frontmatter `truths` ("Spec inventory confirmed... NO Playwright e2e specs exist").
 
-2. **`useMessages` rename to `useChatMessages`.**
+2. **`useMessages` rename to `useChatMessages` — RESOLVED.**
    - What we know: CONTEXT lists rename as Claude's discretion; "keeping the name minimizes diff in callers (ChatArea, MessageList, etc.)".
-   - What's unclear: whether a rename falls out cleanly enough during Plan 2 to be worth doing now vs deferring.
-   - Recommendation: keep `useMessages` name unless rename costs <50 LOC diff. Most callers import `useMessages` from a single path; the cost is `grep -rln "useMessages" frontend/src | wc -l` LOC of renames. Plan 2 author can decide on the spot.
+   - What's unclear (was): whether a rename falls out cleanly enough during Plan 2 to be worth doing now vs deferring.
+   - **RESOLVED:** Keep `useMessages` name. Diff-minimization wins — rename would force `grep -rln "useMessages" frontend/src` worth of follow-on edits in ChatArea / MessageList / MessageItem / SkeletonMessage / etc. Plan 2 keeps the export name; only the implementation becomes a thin delegate.
 
-3. **Should the `surfaceId` parameter live on `subscribeToRun` at api.ts:274?**
+3. **`surfaceId` parameter placement (`subscribeToRun` at api.ts:274 vs store-action closure) — RESOLVED.**
    - What we know: CONTEXT canonical-refs says "adds optional surfaceId parameter". Finding #7 argues for cleaner placement in the STORE-ACTION layer instead.
-   - What's unclear: which placement gets through plan-checker without friction.
-   - Recommendation: bind `surfaceId` inside the store-action `makeStreamCallbacks` closure; leave `subscribeToRun` signature untouched. If plan-checker objects, add an unused `surfaceId?: SurfaceId` param to `subscribeToRun` with a comment "routing param — used only by callers binding callbacks; no effect inside this function." Either passes; choose the cleaner one.
+   - What's unclear (was): which placement gets through plan-checker without friction.
+   - **RESOLVED:** Bind `surfaceId` inside the store-action `makeStreamCallbacks` closure; `subscribeToRun` signature at `frontend/src/lib/api.ts:274` stays untouched. Surface concept never leaks into the SSE protocol layer. This is the planner's adopted choice and the source audit confirms `lib/api.ts` is NOT in any plan's `files_modified`.
 
 ---
 

@@ -228,6 +228,12 @@ Full details below in **Phase Details**.
   3. A mocked second stream surface (test-only) subscribes alongside chat and renders without colliding on the per-thread bucket invariant; existing 063 / 063.1 / 067.x Playwright e2e regression specs stay green.
   4. The `reconcileInFlightRef` D-063.1-11 single-bit lock semantics survive the lift — concurrent reconcile calls still bail at the top guard.
 
+**Plans:** 4 plans (authored 2026-05-12):
+- [ ] 068-01-PLAN.md — Store + provider scaffold (Wave 1; install zustand@^5.0.13; create streamsStore.ts + StreamsProvider.tsx + 4 named hooks; mount in App.tsx below auth gate; useMessages unchanged)
+- [ ] 068-02-PLAN.md — useMessages becomes thin reader + L-068-01..07 Vitest regression (Wave 2; binding gate SC#2 Branch D-3 per-surface; lift action bodies into provider; useMessages.ts < 100 LOC)
+- [ ] 068-03-PLAN.md — Reconcile listeners migration complete (Wave 3; delete ChatArea.tsx:157-187 listener block + reconcileRef indirection; provider is sole listener owner)
+- [ ] 068-04-PLAN.md — Mocked second surface + Chrome MCP exercise (Wave 4; SC#3 binding gate; DevTwoPaneMock dev-only component; re-render isolation test; manual checkpoint)
+
 ### Phase 069: `PdfExtractor` Abstraction Scaffold
 **Goal**: Document ingestion flows through a `PdfExtractor` abstract base class so swapping extractors becomes a 1-line config change, with zero observable behavior change in this phase.
 **Depends on**: Nothing (Wave 0)
