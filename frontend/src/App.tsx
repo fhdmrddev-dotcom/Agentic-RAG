@@ -4,6 +4,7 @@ import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { StreamsProvider } from "@/providers/StreamsProvider"
 
 export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health"
 
@@ -25,15 +26,17 @@ function App() {
   }
 
   return (
-    <TooltipProvider>
-      <ChatLayout
-        onSignOut={signOut}
-        activeView={activeView}
-        onNavigate={setActiveView}
-        prefillMessage={prefillMessage}
-        onSetPrefillMessage={setPrefillMessage}
-      />
-    </TooltipProvider>
+    <StreamsProvider>
+      <TooltipProvider>
+        <ChatLayout
+          onSignOut={signOut}
+          activeView={activeView}
+          onNavigate={setActiveView}
+          prefillMessage={prefillMessage}
+          onSetPrefillMessage={setPrefillMessage}
+        />
+      </TooltipProvider>
+    </StreamsProvider>
   )
 }
 
