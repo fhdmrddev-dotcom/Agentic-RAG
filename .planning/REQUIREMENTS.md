@@ -120,37 +120,43 @@ Six questions deferred to per-phase `/gsd:discuss-phase` — NOT blocking the ro
 
 ## Traceability
 
-Empty until ROADMAP.md is generated. Each requirement maps to exactly one phase.
+Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS section for the routing rationale (in particular F-1 for TOKEN-COL-01's attach point at Phase 073).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RAG-DOCLING-01 | TBD | Pending |
-| RAG-DOCLING-02 | TBD | Pending |
-| RAG-MM-LIFT-01 | TBD | Pending |
-| RAG-MM-LIFT-02 | TBD | Pending |
-| RAG-RECAL-01 | TBD | Pending |
-| WORKER-LIFT-01 | TBD | Pending |
-| WORKER-LIFT-02 | TBD | Pending |
-| WORKER-LIFT-03 | TBD | Pending |
-| WORKER-LIFT-04 | TBD | Pending |
-| STREAMS-PROVIDER-01 | TBD | Pending |
-| POLISH-SEED-008-01 | TBD | Pending |
-| POLISH-SEED-008-02 | TBD | Pending |
-| POLISH-SEED-009-01 | TBD | Pending |
-| POLISH-SEED-010-01 | TBD | Pending |
-| POLISH-SEED-011-01 | TBD | Pending |
-| POLISH-TOOL-PROG-01 | TBD | Pending |
-| CQ-SUPA-01 | TBD | Pending |
-| CQ-CTX-01 | TBD | Pending |
-| CQ-DEDUP-01 | TBD | Pending |
-| CQ-TITLE-01 | TBD | Pending |
-| TOKEN-COL-01 | TBD | Pending |
+| RAG-DOCLING-01 | 071 — Docling Primary Path | Pending |
+| RAG-DOCLING-02 | 070 — Docling httpx Spike | Pending |
+| RAG-MM-LIFT-01 | 072 — Multimodal Lift + DOCX Completeness | Pending |
+| RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Pending |
+| RAG-RECAL-01 | 076 — Confidence Recalibration | Pending |
+| WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Pending |
+| WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Pending |
+| WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Pending |
+| WORKER-LIFT-04 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| STREAMS-PROVIDER-01 | 068 — `<StreamsProvider>` Context Lift | Pending |
+| POLISH-SEED-008-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
+| POLISH-SEED-008-02 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
+| POLISH-SEED-009-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Pending |
+| POLISH-SEED-010-01 | 081 — SEED-010 OpenRouter UAT | Pending |
+| POLISH-SEED-011-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Pending |
+| POLISH-TOOL-PROG-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
+| CQ-SUPA-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| CQ-CTX-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| CQ-DEDUP-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Pending |
 
 **Coverage:**
 - v2.6 requirements: 21 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 21 ⚠️ (resolves when ROADMAP.md ships)
+- Mapped to phases: 21 / 21 ✓
+- Unmapped: 0
+- Orphaned phases (no REQ-ID owner): 0 — Phase 068 owns STREAMS-PROVIDER-01; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting milestone-close verification
+
+**Routing notes:**
+- **TOKEN-COL-01 → Phase 073** (per ROADMAP F-1): added at PRD signoff 2026-05-12; the PRD §12 outline pre-dates the addition. Attached to 073 as a forward-fill of `runs.input_tokens` / `runs.output_tokens` during the asyncpg-refactored `_drain_stream_with_close_on_cancel` finalize path — the natural code site for the two new column writes.
+- **WORKER-LIFT-01 spans two phases:** validated under synthetic load in Phase 077 (harness), final enablement (`--workers 2` lit up in dev + prod) in Phase 079. Traceability row attached to 077 since the validation is the verification gate.
+- **RAG-DOCLING-02 → Phase 070** (the spike phase). The CI gate (`pytest backend/tests/integration/test_pdf_extractor_*.py` green) is the spike output; Phase 071 consumes it but does not re-verify it.
 
 ---
 *Requirements defined: 2026-05-12 from `.planning/PRDs/v2.6.md` §4 (Active section)*
-*Last updated: 2026-05-12 — initial materialization*
+*Last updated: 2026-05-12 — traceability filled in by gsd-roadmapper after ROADMAP.md generation*

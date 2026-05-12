@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: "Foundation: RAG Quality + Multi-Worker + Polish"
 status: planning
-stopped_at: Milestone v2.6 started — defining requirements + roadmap
+stopped_at: v2.6 ROADMAP.md authored — awaiting /gsd:discuss-phase 068
 last_updated: "2026-05-12T00:00:00.000Z"
 last_activity: 2026-05-12
 progress:
-  total_phases: 0
+  total_phases: 15
   completed_phases: 0
-  total_plans: 0
+  total_plans: 38
   completed_plans: 0
   percent: 0
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.6 Foundation kicked off 2026-05-12 via `/gsd:new-milestone v2.6`. Scope brief at `.planning/PRDs/v2.6.md`. 21 Active REQ-IDs (RAG-DOCLING-*, RAG-MM-*, RAG-RECAL-*, WORKER-LIFT-*, STREAMS-PROVIDER-*, POLISH-SEED-*, POLISH-TOOL-PROG-*, CQ-*, TOKEN-COL-*). 15 phases proposed in PRD §12 (068–082). Pending: REQUIREMENTS.md materialization + ROADMAP.md from gsd-roadmapper.
+**Current focus:** v2.6 Foundation kicked off 2026-05-12 via `/gsd:new-milestone v2.6`. Scope brief at `.planning/PRDs/v2.6.md`. 21 Active REQ-IDs (RAG-DOCLING-*, RAG-MM-*, RAG-RECAL-*, WORKER-LIFT-*, STREAMS-PROVIDER-*, POLISH-SEED-*, POLISH-TOOL-PROG-*, CQ-*, TOKEN-COL-*). 15 phases proposed in PRD §12 (068–082). REQUIREMENTS.md materialized 2026-05-12; ROADMAP.md authored 2026-05-12 with all 21 REQ-IDs mapped + one routing FLAG (F-1: TOKEN-COL-01 → Phase 073).
 
 ## Current Position
 
-Phase: Not started (defining requirements + roadmap)
+Phase: Not started (roadmap complete, awaiting /gsd:discuss-phase 068)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-05-12 — Milestone v2.6 started (PRD-driven; research skipped — PRD-reset produced 7 milestone PRDs)
+Status: Planning (roadmap authored, no phases started)
+Last activity: 2026-05-12 — ROADMAP.md authored: 15 phases (068–082) across 4 waves, ~38 plans, all 21 v2.6 REQ-IDs mapped, TOKEN-COL-01 attached to Phase 073 (asyncpg finalize path) per FLAG F-1
 
 ## PRD-reset outputs (committed)
 
@@ -230,6 +230,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 - ROADMAP.md authored 2026-05-01: 5 phases, 5/5 v1 requirements mapped, dependencies form valid DAG (058→059→060→061; 062 parallel-able with 058)
 - Phase 063 added 2026-05-02: Skills Test Infrastructure Repair — close TEST-DEBT discovered during 059-02 verification (13+ broken patches in test_threads_skills.py + 3 broken export tests). Standalone, parallel-able with 060-062. Prep for upcoming Skill Studio milestone (see SEED-002).
 - Phase 067 added 2026-05-07: Frontend Streaming-UX Fix — close the 5-issue carry-forward dossier (UX-067-01..05) surfaced by Phase 066's live UAT (empty first-paint, "Saving response…" thrash, refresh-required first-paint, redis log noise on tab cycle, tool-call iteration boundary surfacing). Re-runs Phase 066 Plan 05 Task 2 protocol to close out SC#6 live verification deferred from 066.
+- v2.6 ROADMAP.md authored 2026-05-12: 15 phases (068–082) across 4 waves derived directly from PRD §12 outline. All 21 v2.6 REQ-IDs mapped; TOKEN-COL-01 (added at signoff post-§12) attached to Phase 073 (asyncpg finalize path) per FLAG F-1. Phases 068/069/070 form Wave 0 (foundational, no inter-wave dependencies); 071-075 form Wave 1 (parallel RAG + asyncpg + polish); 076-078 form Wave 2; 079-081 form Wave 3 (release-gating); 082 forms Wave 4 (cross-cutting verify). Headline path: 069→070→071→076 (Docling) + 073→077→078→079 (multi-worker) + 068 (Streams Provider parallel) → 082 (verify). Phased rollout per Q-v2.6-02 recommendation (NOT atomic like v2.5 D-v2.5-11).
 
 ### Decisions
 
@@ -312,8 +313,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: v2.6 milestone kicked off — PROJECT.md + STATE.md updated; REQUIREMENTS.md + ROADMAP.md pending
-Next: After REQUIREMENTS.md + ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss.
+Stopped at: v2.6 ROADMAP.md authored — 15 phases (068–082), all 21 REQ-IDs mapped (1 routing FLAG: F-1 TOKEN-COL-01 → Phase 073), STATE.md + REQUIREMENTS.md traceability updated. Awaiting user approval + commit.
+Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point; also Wave 0). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss per their owning-phase mapping in REQUIREMENTS.md.
 
 **Phases OPEN (cross-phase blocked):**
 
