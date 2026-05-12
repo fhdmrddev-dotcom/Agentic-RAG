@@ -1,34 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: prd-reset
-milestone_name: PRD-Reset Meta-Phase (pre-v2.6)
-status: completed
-stopped_at: PRD-reset Plan 09 signoff + DECISIONS.md ADRs locked
+milestone: v2.6
+milestone_name: "Foundation: RAG Quality + Multi-Worker + Polish"
+status: planning
+stopped_at: Milestone v2.6 started — defining requirements + roadmap
 last_updated: "2026-05-12T00:00:00.000Z"
 last_activity: 2026-05-12
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 9
-  completed_plans: 9
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-01) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked 2026-05-10..2026-05-12)
+See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.5 shipped + archived 2026-05-09. PRD-reset meta-phase complete 2026-05-12 — **7 milestone PRDs** authored (v2.6 → v2.7 → v3.0 → v3.4) and signed off. v2.7 (Agent Workspace + Harness + Plugin Contract) added 2026-05-12 between v2.6 and v3.0 per user signal on Episode 6 harness pattern. Ready to start v2.6 via `/gsd:new-milestone v2.6`.
+**Current focus:** v2.6 Foundation kicked off 2026-05-12 via `/gsd:new-milestone v2.6`. Scope brief at `.planning/PRDs/v2.6.md`. 22 Active REQ-IDs (RAG-DOCLING-*, RAG-MM-*, RAG-RECAL-*, WORKER-LIFT-*, STREAMS-PROVIDER-*, POLISH-SEED-*, POLISH-TOOL-PROG-*, CQ-*, TOKEN-COL-*). 15 phases proposed in PRD §12 (068–082). Pending: REQUIREMENTS.md materialization + ROADMAP.md from gsd-roadmapper.
 
 ## Current Position
 
-Phase: PRD-reset meta-phase complete
-Plan: All 9 plans closed (Wave 0 foundation, Wave 1 pilot v2.6, Wave 1B parallel v3.0-v3.4, Wave 2 consistency + signoff)
-Status: Ready to run `/gsd:new-milestone v2.6` — consumes `.planning/PRDs/v2.6.md` as scope brief
-Last activity: 2026-05-12
+Phase: Not started (defining requirements + roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-12 — Milestone v2.6 started (PRD-driven; research skipped — PRD-reset produced 7 milestone PRDs)
 
 ## PRD-reset outputs (committed)
 
@@ -312,8 +312,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 067.4 context gathered
-Next: `/gsd:discuss-phase 067.4` → `/gsd:plan-phase 067.4` for the follow-on phase covering (a) R-3 suggestion-emit fix [primary, gate-blocking] and (b) carry-forward 067.2-11 + 067.2-12 OpenRouter timeout regression checks [secondary]. After 067.4 ships, BOTH Phase 067.2 AND Phase 067.3 close alongside Phase 067.4 via the cross-phase D-067.3-WAVE-03 closure rule (now extended to 067.4).
+Stopped at: v2.6 milestone kicked off — PROJECT.md + STATE.md updated; REQUIREMENTS.md + ROADMAP.md pending
+Next: After REQUIREMENTS.md + ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss.
 
 **Phases OPEN (cross-phase blocked):**
 

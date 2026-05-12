@@ -8,10 +8,33 @@ A RAG-based AI agent platform where users organize documents into nested folders
 
 The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
+## Current Milestone: v2.6 Foundation — RAG Quality + Multi-Worker + Polish
+
+**Goal:** Build the production-ready substrate the next four milestones depend on — close the user-observed PDF↔DOCX extraction inconsistency, lift the single-worker concurrency ceiling, hoist the streams subscription surface out of `useMessages`, and absorb six carry-forward seeds before they compound.
+
+**Scope brief:** `.planning/PRDs/v2.6.md` (locked 2026-05-10, signoff 2026-05-12). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean). 22 Active REQ-IDs in PRD §4. 15 phases in PRD §12 (068–082).
+
+**Target features (6 themes):**
+
+- **Theme A — RAG Quality Lift:** Docling primary extractor (MIT) + PyMuPDF AGPL fallback (subprocess-fenced) behind a new `PdfExtractor` abstraction; multimodal ceiling lift to ≥80% figure coverage with empty-description rows persisted; DOCX `related_parts` walk; confidence threshold recalibration on Docling-extracted distributions.
+- **Theme B — Multi-Worker Readiness:** `asyncpg>=0.29` pool in hot paths; supersede `D-v2.5-02` via the new `D-PRD-12` ADR; `--workers N` uvicorn enable validated under 50-parallel-run synthetic load; `GET /admin/backpressure` JSON primitive (UI hookup deferred to v3.1).
+- **Theme C — Streams Provider Pre-emptive Lift (per D-PRD-06):** Hoist `subscriptionsRef` / `lastSeenOffsetRef` / `messagesByThread` Map out of `frontend/src/hooks/useMessages.ts` (1229 LOC) into a top-level `<StreamsProvider>` Context. **The Phase 067.5 Branch D-3 `clearMessages` guard at `useMessages.ts:572-590` MUST survive the lift verbatim.**
+- **Theme D — Polish & Quality Carry-forwards:** SEED-008 (`GET /threads/{id}/snapshot` + line-by-line `code_stdout`), SEED-009 (`MODEL_CAPABILITIES.max_output_tokens` extension), SEED-010 (OpenRouter Kimi/MiniMax UAT), SEED-011 (`_reset_redis_singleton` fixture), `tool_args_progress` SSE for non-execute_code tools.
+- **Theme E — Opportunistic Code-Quality (Cluster G):** Supabase singleton `aclose()` on lifespan, context-window protected-only overrun branch, concurrent-upload dedup race (partial unique index migration), title-gen silent-failure `WARNING` log.
+- **Theme F — Token Telemetry:** TOKEN-COL-01 — populate `runs.input_tokens` / `runs.output_tokens` from LLM `usage`. Pure observability, no caps, no enforcement. Used by v3.1 admin dashboards + v3.4 spend-cap pre-flight.
+
+**Key context:**
+
+- **Phase numbering:** continues from v2.5's last phase 067.5 → v2.6 starts at Phase **068**.
+- **Migration range reserved:** `039 – 049` (per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`). 039/040/041/042/043/044 used; 045 conditional on Q-v2.6-02; 046–049 buffer.
+- **Locked decisions inheritance (PRD §2):** D-PRD-01 (mid-large enterprise), D-PRD-03 (closed core + open peripherals → AGPL subprocess fence), D-PRD-04 (feature-complete timing), D-PRD-06 (Streams Provider lift pre-emptive), D-PRD-07 (Docling-first + PyMuPDF fallback; PyMuPDF Pro deferred), D-PRD-08 (multi-worker readiness in v2.6). Inherits v2.5: D-v2.5-01, D-v2.5-03, D-v2.5-08, D-v2.5-11, D-v2.5-12. **Supersedes** D-v2.5-02 via the new D-PRD-12 ADR authored in Phase 079.
+- **Pre-execution decisions (PRD §13):** Q-v2.6-01..06 route to `/gsd:discuss-phase` per their owning phase — not blocking the roadmap.
+- **Seeds consumed at milestone completion:** SEED-006, SEED-007, SEED-008, SEED-009, SEED-010, SEED-011 close; SEED-001 downgrades to partial (per-user SSE cap + sticky sessions remain planted).
+
 ## Current State
 
 **Shipped:** v2.5 (Deployment Strategy) — 2026-05-09 (16 phases, 64 plans, 445 commits, ~104K LOC delta)
-**Active:** TBD — milestone planning starts via `/gsd:new-milestone` (likely candidates per planted seeds: Skill Studio milestone prep per SEED-002; admin/operator UI per SEED-012; external integrations + MCP per SEED-013; automations per SEED-014)
+**Active:** v2.6 Foundation (RAG Quality + Multi-Worker + Polish) — kicked off 2026-05-12; phases 068–082 proposed in PRD §12; scope brief at `.planning/PRDs/v2.6.md`
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage) + Redis Streams (run-backed streaming)
 **Codebase:** ~160K LOC (Python + TypeScript) post-v2.5; 531 files touched across the v2.5 window
 **Phases shipped:** 73 phases across 7 milestones (v1.0–v2.5); 144+ plans executed
@@ -137,16 +160,42 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ STREAM-04-correctness-round3 closed: Empty-thread-until-refresh reconcile fix — v2.5 Phase 067.5 (shipped 2026-05-09; Branch D-3 `clearMessages` guard, 5/5 lived-experience cycles GREEN)
 - ✓ TEST-DEBT-059 closed: Skills test infrastructure repaired — v2.5 Phase 065 (shipped 2026-05-09; combined skills test run 26/26 pass)
 
-### Active (next milestone — TBD)
+### Active (v2.6 — Foundation: RAG Quality + Multi-Worker + Polish)
 
-The next milestone has not been scoped yet. Strong candidates per planted seeds:
+22 Active REQ-IDs scoped in `.planning/PRDs/v2.6.md` §4. Materialized in `.planning/REQUIREMENTS.md` and mapped to phases in `.planning/ROADMAP.md`.
 
-- [ ] SKILL-01: Skill catalog uses relevance-based filtering, not all enabled skills *(Skills Studio milestone — SEED-002)*
-- [ ] SKILL-02: Non-relevant skills never triggered even if in catalog *(Skills Studio milestone — SEED-002)*
-- [ ] Admin / operator UI completeness — control everything from UI; sane fallback when not *(SEED-012)*
-- [ ] External integrations: public API + MCP server + webhooks + service accounts *(SEED-013)*
-- [ ] Automations & routines: scheduled / triggered / reactive agent runs *(SEED-014)*
-- [ ] Org / Department / Role multi-tenancy *(SEED-004 — surfaces when first multi-tenant install need fires)*
+**Theme A — RAG Quality Lift**
+- [ ] RAG-DOCLING-01: Docling primary path produces comparable PDF↔DOCX table/image counts (≤20% delta on reference thesis)
+- [ ] RAG-DOCLING-02: httpx<0.28 vs supabase 2.10 conflict resolved per Q-v2.6-01; CI green
+- [ ] RAG-MM-LIFT-01: `_MAX_VISION_CALLS` / `_MAX_B64_BYTES` lifted to `app_settings`; ≥80% figure coverage on 4 MB reference PDF; empty-description rows persisted
+- [ ] RAG-MM-LIFT-02: DOCX extraction reaches floating shapes + headers/footers via `doc.part.related_parts` walk
+- [ ] RAG-RECAL-01: Confidence thresholds recalibrated per Q-v2.6-03; distributions documented in PROJECT.md
+
+**Theme B — Multi-Worker Readiness**
+- [ ] WORKER-LIFT-01: `uvicorn --workers 2` runs cleanly — run-tracking + sandbox stickiness + per-worker Redis singleton all verified
+- [ ] WORKER-LIFT-02: `asyncpg` pool replaces sync `supabase-py` in streaming endpoint + finalize path; CONCUR-01 stays green
+- [ ] WORKER-LIFT-03: D-PRD-12 ADR supersedes D-v2.5-02; `CLAUDE.md` rule updated
+- [ ] WORKER-LIFT-04: `GET /admin/backpressure` returns documented JSON shape, gated on env-var allow-list
+
+**Theme C — Streams Provider Lift**
+- [ ] STREAMS-PROVIDER-01: `<StreamsProvider>` Context owns all run-stream subscriptions; two-pane mock renders without state collision; Branch D-3 guard preserved; 067.5 regression specs green
+
+**Theme D — Polish Carry-forwards**
+- [ ] POLISH-SEED-008-01: Thread-switch perceived latency reduced ≥50% via new `GET /threads/{id}/snapshot`
+- [ ] POLISH-SEED-008-02: Sandbox stdout emits ≥3 distinct `code_stdout` SSE events over ≥1s for the `range(5)+sleep(1)` reference loop
+- [ ] POLISH-SEED-009-01: `claude-haiku-4-5-20251001` no longer 400s on `max_tokens > 64000`; `MODEL_CAPABILITIES.max_output_tokens` populated for all listed models
+- [ ] POLISH-SEED-010-01: OpenRouter Kimi-k2.5 + MiniMax-m2.7 produce clean `runs.status='timed_out'` under synthetic-timeout overrides
+- [ ] POLISH-SEED-011-01: `pytest test_059_disconnect.py -q` is 3/3 PASS — no "Event loop is closed"
+- [ ] POLISH-TOOL-PROG-01: Non-execute_code tools emit `tool_args_progress` SSE events when arg JSON exceeds 5 KB
+
+**Theme E — Code-Quality (Cluster G)**
+- [ ] CQ-SUPA-01: Supabase singleton `aclose()` on FastAPI shutdown — no RuntimeWarning
+- [ ] CQ-CTX-01: Protected-only overrun trims oldest-protected or raises `ConversationTooLongError` — no silent overrun
+- [ ] CQ-DEDUP-01: Concurrent same-file uploads produce exactly one `documents` row + one chunk set (partial unique index + atomic CAS)
+- [ ] CQ-TITLE-01: Title-generation failures emit `logger.warning`; fallback preserved
+
+**Theme F — Token Telemetry**
+- [ ] TOKEN-COL-01: `runs.input_tokens` / `runs.output_tokens` populated from LLM `usage` for every completed call; forward-fill only; NULL writes become dashboard warning
 
 ### Out of Scope
 
@@ -270,4 +319,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-09 — v2.5 (Deployment Strategy) shipped: 16 phases / 64 plans / ~104K LOC delta over 10 days. Closed Gap-006 (per-LLM-call timeout machinery + cancelled/timed_out lifecycle split, Phase 066), shipped run-backed streaming architecture (Redis Streams + replay-and-tail, Phases 061→063), and resolved STREAM-02 family via cross-phase chain through 067.5 Branch D-3 `clearMessages` guard fix. Three carry-forward seeds planted (SEED-009/010/011) and three forward-looking strategic seeds (SEED-012/013/014 — admin UI, integrations + MCP, automations). 31 deferred items acknowledged in STATE.md `## Deferred Items`; none contradict shipped work. Next milestone candidates: SEED-002 (Skill Studio), SEED-012 (admin/operator UI), SEED-013 (external integrations + MCP), SEED-014 (automations & routines).*
+*Last updated: 2026-05-12 — v2.6 (Foundation: RAG Quality + Multi-Worker + Polish) kicked off via `/gsd:new-milestone v2.6`. Scope consumed from `.planning/PRDs/v2.6.md` (locked 2026-05-10, signed off 2026-05-12 with TOKEN-COL-01 added at signoff). 22 Active REQ-IDs across 6 themes; phases 068–082 proposed in PRD §12 (~38 plans). Migration range 039–049 reserved. Continues phase numbering from v2.5's last phase 067.5. Six seeds (006/007/008/009/010/011) consumed at milestone completion; SEED-001 partial. Pre-execution decisions Q-v2.6-01..06 routed to `/gsd:discuss-phase` per phase. v2.5 (Deployment Strategy) shipped 2026-05-09 — 16 phases / 64 plans / ~104K LOC delta.*
