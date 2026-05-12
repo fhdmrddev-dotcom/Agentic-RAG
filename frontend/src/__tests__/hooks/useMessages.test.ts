@@ -18,7 +18,8 @@
  *   callback inside `act()` to simulate event arrival from the wire.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { renderHook, waitFor, act } from "@testing-library/react"
+import { renderHook as renderHookRaw, waitFor, act } from "@testing-library/react"
+import { createElement, type ReactNode } from "react"
 
 // ── Mock API module ───────────────────────────────────────────────────────────
 // vi.mock is hoisted; use vi.hoisted() for any closure-captured vars.
@@ -58,7 +59,29 @@ vi.mock("@/lib/supabase", () => ({
 }))
 
 import { useMessages } from "@/hooks/useMessages"
+import { StreamsProvider } from "@/providers/StreamsProvider"
+import { useStreamsStore } from "@/stores/streamsStore"
 import type { StreamCallbacks } from "@/lib/api"
+
+// ── Phase 068 (STREAMS-PROVIDER-01) wrapper shim ─────────────────────────────
+// useMessages is now a thin reader delegating to <StreamsProvider>'s named
+// hooks. The provider registers actions in mount-time useEffect with
+// closures over provider-scoped refs, so every renderHook in this file
+// MUST wrap the hook in <StreamsProvider>; without the wrapper,
+// useStreamActions() returns the module-level throwing-`notMounted` stubs
+// and the test asserts fail at the first action call.
+//
+// This wrapper is the ONLY change to this file — every assertion / mock
+// helper / SSE event sequence below is byte-identical to the pre-068 form
+// (3rd evidence layer per RESEARCH §Validation Architecture point 3 — the
+// test BODIES are unmodified; only the renderHook plumbing was patched
+// to mount the new provider boundary).
+const renderHook: typeof renderHookRaw = ((callback, options) =>
+  renderHookRaw(callback, {
+    ...options,
+    wrapper: ({ children }: { children: ReactNode }) =>
+      createElement(StreamsProvider, null, children),
+  })) as typeof renderHookRaw
 
 // ── SSE recorder helper ───────────────────────────────────────────────────────
 /**
@@ -89,6 +112,22 @@ function makeSseRecorder() {
     forRun: (runId: string) => callbacksByRunId.get(runId),
   }
 }
+
+// ── Phase 068 store reset (cross-test isolation) ──────────────────────────────
+// Pre-068 the hook owned per-mount React state that React unmounted between
+// renderHook calls, so cross-test state leakage was impossible. Post-068 the
+// Zustand store is a module-level singleton — bucketsBySurface and
+// subscriptionsByRunId survive across describes. Reset to baseline before
+// each test so the previous test's bucket cannot pollute the current one.
+beforeEach(() => {
+  useStreamsStore.setState({
+    bucketsBySurface: new Map(),
+    viewedThreadId: null,
+    isStreaming: false,
+    fallbackNotice: null,
+    subscriptionsByRunId: new Set<string>(),
+  })
+})
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 describe("useMessages — R-4 active-thread tool-stage", () => {
