@@ -317,8 +317,9 @@ describe("Phase 068 — L-068-01 Branch D-3 (clearThreadBucket guard, per-surfac
 describe("Phase 068 — L-068-02 concurrent reconcile lock (single-bit in-flight)", () => {
   it("two concurrent reconcile() calls deduplicate via the in-flight bit", async () => {
     // Slow-resolving active-runs so both reconciles overlap on the same tick.
-    let resolveFirst!: (v: { runs: { run_id: string; started_at: string }[] }) => void
-    let resolveSecond!: (v: { runs: { run_id: string; started_at: string }[] }) => void
+    // getActiveRuns returns ActiveRun[] directly per lib/api.ts:456-467.
+    let resolveFirst!: (v: { run_id: string; started_at: string }[]) => void
+    let resolveSecond!: (v: { run_id: string; started_at: string }[]) => void
     mockGetActiveRuns
       .mockImplementationOnce(
         () =>
@@ -349,7 +350,7 @@ describe("Phase 068 — L-068-02 concurrent reconcile lock (single-bit in-flight
 
     // Settle the first reconcile so the lock releases.
     await act(async () => {
-      resolveFirst({ runs: [] })
+      resolveFirst([])
       // Flush microtasks.
       await Promise.resolve()
     })
@@ -363,7 +364,7 @@ describe("Phase 068 — L-068-02 concurrent reconcile lock (single-bit in-flight
     expect(mockGetActiveRuns).toHaveBeenCalledTimes(2)
 
     // Cleanup — resolve the second to avoid leaving pending promises.
-    if (resolveSecond) resolveSecond({ runs: [] })
+    if (resolveSecond) resolveSecond([])
   })
 })
 
@@ -429,11 +430,18 @@ describe("Phase 068 — L-068-03 sole writer (mid-await navigation discards stal
 describe("Phase 068 — L-068-05 runId-match dedup (reconcile reuses placeholder id)", () => {
   it("reconcile reuses existing placeholder id when runId matches; no second bubble inserted", async () => {
     // Pre-seed bucket with a placeholder that already carries runId='run-A'.
+    // Use the `temp-existing` id (temp- prefix) so the MERGE 3-clause filter
+    // in loadMessages preserves it across the reconcile-fire from setViewingThread.
+    // (In production this row would either be a temp- placeholder from
+    // sendMessage's optimistic insert, or a DB-persisted row returned by
+    // getMessages — both survive the MERGE filter. An arbitrary non-temp id
+    // would not, hence the temp- prefix here.)
+    const existingPlaceholderId = "temp-existing"
     useStreamsStore.setState((s) => {
       const surfMap = new Map<string, import("@/types").Message[]>()
       surfMap.set("thread-A", [
         {
-          id: "existing-placeholder",
+          id: existingPlaceholderId,
           thread_id: "thread-A",
           user_id: "",
           role: "assistant",
@@ -450,8 +458,10 @@ describe("Phase 068 — L-068-05 runId-match dedup (reconcile reuses placeholder
       return { bucketsBySurface: next }
     })
 
-    mockGetMessages.mockResolvedValueOnce([])
-    mockGetActiveRuns.mockResolvedValueOnce([
+    // Persistent mocks so reconcile-fire-from-setViewingThread (Task 2c) and
+    // the explicit reconcile both observe the same active-runs payload.
+    mockGetMessages.mockResolvedValue([])
+    mockGetActiveRuns.mockResolvedValue([
       { run_id: "run-A", started_at: "2026-05-09T10:00:00Z" },
     ])
 
@@ -466,7 +476,7 @@ describe("Phase 068 — L-068-05 runId-match dedup (reconcile reuses placeholder
       await result.current.reconcile("thread-A")
     })
 
-    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
 
     // Bucket must still have exactly ONE assistant message (the existing
     // placeholder), NOT two (existing + a fresh `temp-run-A`).
@@ -474,7 +484,7 @@ describe("Phase 068 — L-068-05 runId-match dedup (reconcile reuses placeholder
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
     const assistants = bucket.filter((m) => m.role === "assistant")
     expect(assistants).toHaveLength(1)
-    expect(assistants[0].id).toBe("existing-placeholder")
+    expect(assistants[0].id).toBe(existingPlaceholderId)
 
     // Fire onDelta on the captured callbacks — it must target the existing
     // placeholder's id (via the closed-over assistantId), so the existing
@@ -487,7 +497,7 @@ describe("Phase 068 — L-068-05 runId-match dedup (reconcile reuses placeholder
     await waitFor(() => {
       const bucketAfter =
         useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-A") ?? []
-      const existing = bucketAfter.find((m) => m.id === "existing-placeholder")
+      const existing = bucketAfter.find((m) => m.id === existingPlaceholderId)
       expect(existing?.content).toBe("hello")
     })
   })
@@ -536,7 +546,10 @@ describe("Phase 068 — L-068-06 MERGE temp placeholders (3-clause filter)", () 
 
     // DB returns a row with runId='run-DB' — so 'temp-drop' should be filtered
     // out by the 3-clause filter; 'temp-keep' (runId='run-LIVE') survives.
-    mockGetMessages.mockResolvedValueOnce([
+    // Use mockResolvedValue (persistent) instead of mockResolvedValueOnce so
+    // the reconcile-fire-on-setViewingThread (Task 2c) doesn't consume the
+    // mock before the explicit loadMessages call lands.
+    mockGetMessages.mockResolvedValue([
       {
         id: "db-row",
         thread_id: "thread-A",

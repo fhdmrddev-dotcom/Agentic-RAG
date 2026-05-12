@@ -25,12 +25,22 @@
  *           bucket whose thread is currently being streamed into; lifted
  *           VERBATIM from useMessages.ts:589-598).
  * L-068-02: reconcile in-flight lock — top-of-function bail + try/finally.
- *           Real body lifts in Plan 2; Plan 1 ships a no-op shell so the
- *           ChatArea listener block + this provider's listener block can
- *           coexist safely until Plan 3 deletes ChatArea's listeners.
+ *           Plan 2 Task 2b ports the real body inside the try/finally; Plan 1
+ *           shipped a no-op shell so coexistence with ChatArea listeners is safe.
  * L-068-03: activeThreadIdRef has EXACTLY ONE writer (setViewingThread).
- *           This file should contain ONE assignment expression; grep verifies
- *           that (acceptance criterion in PLAN.md).
+ *           Plan 2 Task 2c extends setViewingThread to ALSO fire reconcile when
+ *           threadId is non-null — without adding a second assignment to the
+ *           ref. Sole-writer grep gate remains at exactly 1.
+ * L-068-04: makeStreamCallbacks factory captures surfaceId via closure
+ *           (RESEARCH §Finding #7). Deltas route to streamingThreadIdRef's
+ *           bucket regardless of viewing thread.
+ * L-068-05: reconcile's for-loop runId-match dedup (m.runId equals run.run_id)
+ *           reuses the existing placeholder's id as the assistantId.
+ * L-068-06: loadMessages MERGE 3-clause filter preserves live in-flight temp
+ *           placeholders (startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)).
+ * L-068-07: subscriptionsRef.current.delete(runId) fires inside onTerminal,
+ *           NOT inside the promise .finally() chain (safety-net finally still
+ *           allowed). subscriptionsByRunId Zustand mirror tracks add/remove.
  *
  * RESEARCH §Finding #1: EMPTY_ARRAY is module-level so atomic selectors get
  *                       a stable reference for empty buckets — no re-render.
@@ -44,7 +54,21 @@
  * RESEARCH §Pitfall 5: Throwing stubs surface pre-mount usage instantly.
  */
 import { useEffect, useRef, type PropsWithChildren } from "react"
-import type { Message } from "@/types"
+import type {
+  Message,
+  ToolCall,
+  OutputFile,
+  SourceReference,
+  Citation,
+} from "@/types"
+import {
+  getMessages,
+  postMessage,
+  subscribeToRun,
+  getActiveRuns,
+  cancelRun,
+  type StreamCallbacks,
+} from "@/lib/api"
 import {
   useStreamsStore,
   type SurfaceId,
@@ -56,26 +80,311 @@ import {
 // selector result is shallow-equal across stores.
 const EMPTY_ARRAY: Message[] = []
 
+function makeTempId() {
+  return `temp-${Date.now()}-${Math.random()}`
+}
+
+// Phase 068 (L-068-04): bucket-routing factory for SSE callbacks; surfaceId
+// captured by closure (RESEARCH §Finding #7). Source: useMessages.ts:35-378.
+// Body is byte-identical to the pre-lift implementation — only the
+// `setMessages` signature changes (thread-bound writer; the surfaceId binds at
+// the call site that constructs this factory, not in lib/api.ts).
+type ThreadBoundSetMessages = (
+  updater: Message[] | ((prev: Message[]) => Message[]),
+) => void
+
+function makeStreamCallbacks(opts: {
+  assistantId: string
+  threadId: string
+  onTitleUpdate?: (title: string) => void
+  setMessages: ThreadBoundSetMessages
+}): StreamCallbacks {
+  const { assistantId, onTitleUpdate, setMessages } = opts
+  // D-067-03: closure-tracked iteration counter, stamped onto each ToolCall
+  // created in onToolPreparing/onToolStart. Updated on every iteration_start
+  // SSE event BEFORE setMessages.
+  let currentIteration = 0
+  return {
+    onDelta: (delta) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId ? { ...m, isPlanning: false, content: m.content + delta } : m,
+        ),
+      )
+    },
+    onDone: () => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
+      )
+    },
+    onTerminal: () => {
+      // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
+    },
+    onTitleUpdate,
+    onToolPreparing: (name: string, index: number) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const preparingId = `preparing-${index}`
+          const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
+          if (alreadyPreparing) return m
+          const preparingEntry: ToolCall = {
+            id: preparingId,
+            name,
+            args: {},
+            status: "preparing",
+            startedAt: undefined,
+            iteration: currentIteration,
+          }
+          return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
+        }),
+      )
+    },
+    onToolStart: (name, args) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const existingCalls = m.tool_calls ?? []
+          const preparingIdx = existingCalls.findIndex(
+            (tc) => tc.name === name && tc.status === "preparing",
+          )
+          let updatedCalls: ToolCall[]
+          if (preparingIdx !== -1) {
+            updatedCalls = existingCalls.map((tc, i) =>
+              i === preparingIdx
+                ? {
+                    ...tc,
+                    args,
+                    status: "running" as const,
+                    startedAt: Date.now(),
+                    iteration: tc.iteration ?? currentIteration,
+                  }
+                : tc,
+            )
+          } else {
+            updatedCalls = [
+              ...existingCalls,
+              {
+                id: `running-${Date.now()}`,
+                name,
+                args,
+                status: "running" as const,
+                startedAt: Date.now(),
+                iteration: currentIteration,
+              },
+            ]
+          }
+          return { ...m, isPlanning: false, tool_calls: updatedCalls }
+        }),
+      )
+    },
+    onToolEnd: (name, result) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === name && tc.status === "running"
+              ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    onSubAgentStart: (filename, task) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
+            : m,
+        ),
+      )
+    },
+    onSubAgentDelta: (text) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId || !m.sub_agent) return m
+          return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
+        }),
+      )
+    },
+    onSubAgentDone: () => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId || !m.sub_agent) return m
+          return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
+        }),
+      )
+    },
+    onSkillActivated: (skillName) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const newActivation = {
+            type: "skill_activation" as const,
+            skillName,
+            occurredAt: Date.now(),
+          }
+          return {
+            ...m,
+            activatedSkill: skillName,
+            activatedSkills: [...(m.activatedSkills ?? []), newActivation],
+          }
+        }),
+      )
+    },
+    onSkillLoaded: (skillName, description) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const activations = m.activatedSkills
+          if (!activations || activations.length === 0) return m
+          let updated = false
+          const next = activations
+            .slice()
+            .reverse()
+            .map((act) => {
+              if (!updated && act.skillName === skillName) {
+                updated = true
+                return { ...act, description }
+              }
+              return act
+            })
+            .reverse()
+          if (!updated) return m
+          return { ...m, activatedSkills: next }
+        }),
+      )
+    },
+    onCodeExecutionStart: undefined,
+    onCodeExecuting: (toolIndex: number, elapsedSeconds: number) => {
+      void toolIndex
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, elapsedSeconds }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    onCodeStdout: (content: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stdout" as const, content }] }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    onCodeStderr: (content: string) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, outputLines: [...(tc.outputLines ?? []), { kind: "stderr" as const, content }] }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    onCodeExecutionComplete: (
+      exitCode: number,
+      durationMs: number,
+      outputFiles: OutputFile[],
+      error?: string,
+    ) => {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const updated = (m.tool_calls ?? []).map((tc) =>
+            tc.name === "execute_code" && tc.status === "running"
+              ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
+    onSources: (sources: SourceReference[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),
+      )
+    },
+    onCitations: (citations: Citation[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, citations } : m)),
+      )
+    },
+    onConfidence: (level, avgSimilarity, disclaimer) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, confidence: { level, avg_similarity: avgSimilarity, disclaimer } }
+            : m,
+        ),
+      )
+    },
+    onSuggestions: (questions: string[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, suggestions: questions } : m)),
+      )
+    },
+    onPlanning: () => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: true } : m)),
+      )
+    },
+    onIterationStart: (iteration: number) => {
+      currentIteration = iteration
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, iterationCount: iteration } : m)),
+      )
+    },
+    onFallbackModel: (original: string, fallback: string) => {
+      useStreamsStore.setState({
+        fallbackNotice: `Model ${original} unavailable — using ${fallback}.`,
+      })
+      setTimeout(() => useStreamsStore.setState({ fallbackNotice: null }), 4000)
+    },
+  }
+}
+
 export function StreamsProvider({ children }: PropsWithChildren) {
   // ---- Provider-scoped refs (D-068-01: handles, not display state) ----
   // Lifted VERBATIM from useMessages.ts:417-447 shape (single source of truth
-  // for in-flight handles). Plan 2 ports the real sendMessage/reconcile bodies
-  // that read/write these.
+  // for in-flight handles).
   const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
   const reconcileInFlightRef = useRef(false)
   const streamingThreadIdRef = useRef<string | null>(null)
   const activeThreadIdRef = useRef<string | null>(null)
+  // Phase 068 (Task 2a): additional refs lifted from useMessages.ts for sendMessage.
+  const isSendingRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const loadAbortRef = useRef<AbortController | null>(null)
+  const stoppedByUserRef = useRef(false)
+  const resumeInFlightRef = useRef(false)
 
   // ---- useEffect #1: register real action implementations (Pattern 4) ----
   // RESEARCH §Pitfall 3 + §Finding #2: actions are registered post-mount so
-  // they close over the refs above. Plan 1 ships:
-  //   - real setMessagesForBucket (immutable nested-Map replace per Pattern 3)
-  //   - real clearThreadBucket (verbatim L-068-01 Branch D-3 guard predicate)
-  //   - real setViewingThread (L-068-03 sole writer)
-  //   - real reconcile SHELL (L-068-02 in-flight lock + no-op body — Plan 2 fills it)
-  //   - LIFT-IN-PLAN-2 stubs for sendMessage/stopStream/resumeFromFailed/loadMessages
+  // they close over the refs above.
   useEffect(() => {
+    // Helper — surfaceId-bound writer for makeStreamCallbacks.
+    const setMessagesForBucketBound =
+      (surfaceId: SurfaceId, threadId: string): ThreadBoundSetMessages =>
+      (updater) =>
+        useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, updater)
+
     useStreamsStore.setState({
       actions: {
         // --- D-068-04 / RESEARCH §Pattern 3: immutable nested-Map replace ---
@@ -95,10 +404,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           })
         },
 
-        // --- L-068-01 Branch D-3 guard predicate (VERBATIM from
-        //     useMessages.ts:589-598) — refuse to wipe a bucket whose thread
-        //     is currently being streamed into. Predicate text matches the
-        //     acceptance-criterion grep regex exactly. ---
+        // Phase 068 (L-068-01): Branch D-3 guard predicate (VERBATIM from
+        // useMessages.ts:589-598) — refuse to wipe a bucket whose thread is
+        // currently being streamed into. Predicate text matches the
+        // acceptance-criterion grep exactly. Source: useMessages.ts:572-601.
         clearThreadBucket: (surface) => {
           const tid = activeThreadIdRef.current
           if (tid && tid !== streamingThreadIdRef.current) {
@@ -117,53 +426,444 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           }
         },
 
-        // --- L-068-03: SOLE WRITER of activeThreadIdRef ---
-        // This is the ONLY assignment expression to that ref in this file —
-        // verified by acceptance-criterion grep. Plan 2's runtime test hammers
-        // mid-await navigation against this contract.
+        // Phase 068 (L-068-03): SOLE WRITER of activeThreadIdRef.
+        // Plan 2 Task 2c extends this body to fire reconcile internally on
+        // non-null threadId (RESEARCH §Finding #8 point 2 — mount-time-
+        // reconcile-fire responsibility shifts here from ChatArea.tsx:165
+        // post-lift). The activeThreadIdRef assignment count remains 1.
         setViewingThread: (threadId) => {
           activeThreadIdRef.current = threadId
           useStreamsStore.setState({ viewedThreadId: threadId })
+          // Phase 068 Task 2c (L-068-03 + RESEARCH §Finding #8 point 2):
+          // mount-time-reconcile-fire responsibility lives here post-lift.
+          // ChatArea.tsx:165 useEffect([thread?.id]) deleted by Plan 3 Task 2.
+          // Sole writer of activeThreadIdRef.current preserved (assignment
+          // count == 1). setViewingThread(null) is a no-op for reconcile
+          // (D-068-08 listener-gate semantics extended to programmatic path).
+          if (threadId !== null) {
+            useStreamsStore
+              .getState()
+              .actions.reconcile(threadId)
+              .catch((err) => {
+                console.error("[StreamsProvider] reconcile from setViewingThread failed", err)
+              })
+          }
         },
 
-        // --- L-068-02: reconcile in-flight lock shell. Body is a no-op in
-        //     Plan 1; Plan 2 ports the real reconcile body inside the
-        //     try/finally. The lock must already work in Plan 1 so the
-        //     double-attach (ChatArea + this provider) coexists safely
-        //     pre-Plan-3 (RESEARCH §Pitfall 4). ---
-        reconcile: async (_threadId, _surfaceId = "chat") => {
+        // Phase 068 (L-068-02 + L-068-05): reconcile in-flight lock +
+        // runId-match dedup. Source: useMessages.ts:948-1144.
+        reconcile: async (threadId, surfaceId = "chat") => {
+          // Phase 063.1 (D-063.1-11 / Gap-005): top-of-function in-flight guard.
           if (reconcileInFlightRef.current) return
           reconcileInFlightRef.current = true
           try {
-            // LIFT-IN-PLAN-2: real reconcile body (active-runs fetch + per-run
-            // resubscribe via subscribeToRun) ports here. The surrounding
-            // try/finally and reconcileInFlightRef lock are the L-068-02 shape.
+            let activeRuns: Awaited<ReturnType<typeof getActiveRuns>>
+            try {
+              // CONTEXT.md "Reconciliation Hook Ordering": active-runs and messages
+              // MUST be fetched in parallel.
+              const [runs] = await Promise.all([
+                getActiveRuns(threadId),
+                useStreamsStore.getState().actions.loadMessages(threadId, surfaceId),
+              ])
+              activeRuns = runs
+            } catch (err) {
+              console.error("reconcile failed:", err)
+              return
+            }
+
+            for (const run of activeRuns) {
+              // Pitfall 3 cross-thread safety: only attach if this thread is still
+              // the viewing thread when reconcile started.
+              if (activeThreadIdRef.current !== threadId) return
+
+              // Phase 063.1 (D-063.1-04 / Gap-001) / Phase 068 L-068-05:
+              // runId-match dedup. RESEARCH §Pattern 5: read from current
+              // bucket via getState() (replaces the messagesByThreadRef
+              // mirror that pre-lift maintained).
+              const threadMessages =
+                useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
+              const existingByRunId = threadMessages.find((m) => m.runId === run.run_id)
+              const targetId = existingByRunId?.id ?? `temp-${run.run_id}`
+
+              if (!existingByRunId) {
+                const placeholder: Message = {
+                  id: targetId,
+                  thread_id: threadId,
+                  user_id: "",
+                  role: "assistant",
+                  content: "",
+                  created_at: run.started_at,
+                  updated_at: run.started_at,
+                  tool_calls: [],
+                  runId: run.run_id,
+                  runStatus: "streaming",
+                }
+                useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+                  if (prev.some((m) => m.id === targetId)) return prev
+                  return [...prev, placeholder]
+                })
+              }
+
+              // Phase 063.1 (D-063.1-09 / Gap-003): NARROWED short-circuit.
+              if (subscriptionsRef.current.has(run.run_id)) continue
+
+              // WR-06 fix: RESERVE the subscription slot BEFORE firing subscribeToRun.
+              const controller = new AbortController()
+              subscriptionsRef.current.set(run.run_id, controller)
+              useStreamsStore.setState((s) => ({
+                subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(run.run_id),
+              }))
+
+              const callbacks: StreamCallbacks = makeStreamCallbacks({
+                assistantId: targetId,
+                threadId,
+                setMessages: setMessagesForBucketBound(surfaceId, threadId),
+              })
+              const originalOnTerminal = callbacks.onTerminal
+              callbacks.onTerminal = (kind, errorPayload) => {
+                useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+                  if (!prev.some((m) => m.id === targetId)) return prev
+                  return prev.map((m) => {
+                    if (m.id !== targetId) return m
+                    if (kind === "done") return { ...m, runStatus: "completed" }
+                    if (kind === "error") return { ...m, runStatus: "failed" }
+                    if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
+                    // kind === "cancelled"
+                    return { ...m, runStatus: "cancelled" }
+                  })
+                })
+                // L-068-07: cleanup on onTerminal (BL-03 fix).
+                subscriptionsRef.current.delete(run.run_id)
+                useStreamsStore.setState((s) => {
+                  const next = new Set(s.subscriptionsByRunId)
+                  next.delete(run.run_id)
+                  return { subscriptionsByRunId: next }
+                })
+                if (errorPayload === "buffer_expired") {
+                  useStreamsStore
+                    .getState()
+                    .actions.loadMessages(threadId, surfaceId)
+                    .catch(console.error)
+                }
+                originalOnTerminal(kind, errorPayload)
+              }
+
+              // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
+              callbacks.onCursor = (msId: string) => {
+                lastSeenOffsetRef.current.set(run.run_id, msId)
+              }
+
+              subscribeToRun(
+                run.run_id,
+                lastSeenOffsetRef.current.get(run.run_id) ?? "0",
+                callbacks,
+                controller.signal,
+              )
+                .catch((err) => {
+                  if (!(err instanceof Error && err.name === "AbortError")) {
+                    console.error("reconcile subscribeToRun failed:", err)
+                  }
+                })
+                .finally(() => {
+                  // BL-03 safety net.
+                  if (subscriptionsRef.current.has(run.run_id)) {
+                    subscriptionsRef.current.delete(run.run_id)
+                    useStreamsStore.setState((s) => {
+                      const next = new Set(s.subscriptionsByRunId)
+                      next.delete(run.run_id)
+                      return { subscriptionsByRunId: next }
+                    })
+                  }
+                  // Pitfall 5 (terminal-time merge).
+                  useStreamsStore
+                    .getState()
+                    .actions.loadMessages(threadId, surfaceId)
+                    .catch(console.error)
+                })
+            }
           } finally {
+            // Phase 063.1 (D-063.1-11 / Gap-005): ALWAYS reset in finally.
             reconcileInFlightRef.current = false
           }
         },
 
-        // --- LIFT-IN-PLAN-2 stubs (keep throwing-notMounted shape) ---
-        // Plan 2 replaces these four with the real bodies lifted from
-        // useMessages.ts (sendMessage / stopStreaming / resumeFromFailed /
-        // loadMessages). Wiring subscriptionsByRunId mirror updates and
-        // subscriptionsRef AbortController storage happens inside those
-        // ports — Plan 1 leaves the mirror as the empty Set seeded by the store.
-        sendMessage: async () => {
-          // LIFT-IN-PLAN-2
-          throw new Error("sendMessage not yet wired (Plan 068-02 will port from useMessages.ts)")
+        // Phase 068 (L-068-04 + L-068-07): bucket-routing on streaming
+        // thread; cleanup on onTerminal. Source: useMessages.ts:673-939.
+        sendMessage: async (threadId, content, opts) => {
+          const surfaceId: SurfaceId = opts?.surfaceId ?? "chat"
+          if (isSendingRef.current) return
+          isSendingRef.current = true
+          streamingThreadIdRef.current = threadId
+
+          // Optimistic user message.
+          const userMsg: Message = {
+            id: makeTempId(),
+            thread_id: threadId,
+            user_id: "",
+            role: "user",
+            content,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
+            ...prev,
+            userMsg,
+          ])
+
+          // Optimistic assistant placeholder.
+          const assistantId = makeTempId()
+          const assistantMsg: Message = {
+            id: assistantId,
+            thread_id: threadId,
+            user_id: "",
+            role: "assistant",
+            content: "",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            tool_calls: [],
+            runStatus: "streaming",
+          }
+          useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
+            ...prev,
+            assistantMsg,
+          ])
+          useStreamsStore.setState({ isStreaming: true })
+
+          const controller = new AbortController()
+          abortControllerRef.current = controller
+
+          let registeredRunId: string | null = null
+
+          try {
+            // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
+            const { message_id, run_id } = await postMessage(threadId, content, {
+              model: opts?.model,
+              provider: opts?.provider,
+              agentMode: opts?.agentMode,
+            })
+            registeredRunId = run_id
+
+            // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages.
+            // L-068-07 (open side): track in subscriptionsByRunId mirror.
+            subscriptionsRef.current.set(run_id, controller)
+            useStreamsStore.setState((s) => ({
+              subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(run_id),
+            }))
+
+            // WR-04 fix: swap temp user id for real, stamp run_id on assistant placeholder.
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+              prev.map((m) => {
+                if (m.id === userMsg.id) return { ...m, id: message_id }
+                if (m.id === assistantId) return { ...m, runId: run_id }
+                return m
+              }),
+            )
+
+            // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
+            const callbacks: StreamCallbacks = makeStreamCallbacks({
+              assistantId,
+              threadId,
+              onTitleUpdate: opts?.onTitleUpdate,
+              setMessages: setMessagesForBucketBound(surfaceId, threadId),
+            })
+
+            const originalOnTerminal = callbacks.onTerminal
+            callbacks.onTerminal = (kind, errorPayload) => {
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+                if (!prev.some((m) => m.id === assistantId)) return prev
+                return prev.map((m) => {
+                  if (m.id !== assistantId) return m
+                  if (kind === "done") return { ...m, runStatus: "completed" }
+                  if (kind === "error") return { ...m, runStatus: "failed" }
+                  if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
+                  // kind === "cancelled"
+                  return { ...m, runStatus: "cancelled", stopped: true }
+                })
+              })
+              // L-068-07: BL-03 fix — subscriptionsRef cleanup belongs in
+              // onTerminal, NOT the finally chain. Mirror updates alongside.
+              if (registeredRunId) {
+                subscriptionsRef.current.delete(registeredRunId)
+                const runIdToRemove = registeredRunId
+                useStreamsStore.setState((s) => {
+                  const next = new Set(s.subscriptionsByRunId)
+                  next.delete(runIdToRemove)
+                  return { subscriptionsByRunId: next }
+                })
+              }
+              // Pitfall 8: TTL-expired buffer fallback.
+              if (errorPayload === "buffer_expired") {
+                useStreamsStore
+                  .getState()
+                  .actions.loadMessages(threadId, surfaceId)
+                  .catch(console.error)
+              }
+              originalOnTerminal(kind, errorPayload)
+            }
+
+            // Phase 063.1 (D-063.1-01/02 / Gap-004): cursor advancement.
+            callbacks.onCursor = (msId: string) => {
+              lastSeenOffsetRef.current.set(run_id, msId)
+            }
+
+            await subscribeToRun(run_id, "0", callbacks, controller.signal)
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") {
+              // Caller-initiated abort.
+            } else {
+              console.error("sendMessage failed:", err)
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, runStatus: "failed" } : m,
+                ),
+              )
+            }
+          } finally {
+            abortControllerRef.current = null
+            isSendingRef.current = false
+            streamingThreadIdRef.current = null
+            useStreamsStore.setState({ isStreaming: false })
+            // L-068-07 safety net: only delete if entry still present (catch
+            // paths where onTerminal didn't fire).
+            if (registeredRunId && subscriptionsRef.current.has(registeredRunId)) {
+              subscriptionsRef.current.delete(registeredRunId)
+              const runIdToRemove = registeredRunId
+              useStreamsStore.setState((s) => {
+                const next = new Set(s.subscriptionsByRunId)
+                next.delete(runIdToRemove)
+                return { subscriptionsByRunId: next }
+              })
+            }
+
+            // Always clear planning flag on stream end.
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),
+            )
+
+            const wasStoppedByUser = stoppedByUserRef.current
+
+            if (wasStoppedByUser) {
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.map((m) => {
+                  if (m.id !== assistantId) return m
+                  const hasActiveTools = m.tool_calls?.some(
+                    (tc) => tc.status === "running" || tc.status === "preparing",
+                  )
+                  if (!hasActiveTools) return m
+                  return {
+                    ...m,
+                    tool_calls: m.tool_calls!.map((tc) =>
+                      tc.status === "running" || tc.status === "preparing"
+                        ? { ...tc, status: "interrupted" as const }
+                        : tc,
+                    ),
+                  }
+                }),
+              )
+            }
+
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+              const lastMsg = prev[prev.length - 1]
+              if (lastMsg?.id === assistantId) {
+                return prev.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, ...(wasStoppedByUser ? { stopped: true } : {}) }
+                    : m,
+                )
+              }
+              return prev
+            })
+
+            stoppedByUserRef.current = false
+          }
         },
+
+        // Phase 068 (L-068-07 safety-net side): stopStream tears down
+        // subscription; mirror remove. Source: useMessages.ts:477-495.
         stopStream: async () => {
-          // LIFT-IN-PLAN-2
-          throw new Error("stopStream not yet wired (Plan 068-02 will port from useMessages.ts)")
+          // Pitfall 3: derive run_id from streaming bucket (or fall back to
+          // viewing bucket). RESEARCH §Pattern 5: read via getState().
+          const stid = streamingThreadIdRef.current ?? activeThreadIdRef.current
+          if (!stid) return
+          const bucket =
+            useStreamsStore.getState().bucketsBySurface.get("chat")?.get(stid) ?? []
+          const streamingMsg = [...bucket]
+            .reverse()
+            .find((m) => m.role === "assistant" && m.runStatus === "streaming")
+          const runId = streamingMsg?.runId
+          if (!runId) return
+          stoppedByUserRef.current = true
+          try {
+            await cancelRun(runId)
+          } catch (err) {
+            console.error("Stop failed:", err)
+          }
         },
-        resumeFromFailed: async () => {
-          // LIFT-IN-PLAN-2
-          throw new Error("resumeFromFailed not yet wired (Plan 068-02 will port from useMessages.ts)")
+
+        // Phase 068 (L-068-07): resume retries via sendMessage; mirror
+        // semantics inherited. Source: useMessages.ts:1158-1190.
+        resumeFromFailed: async (failedMessage) => {
+          if (resumeInFlightRef.current) return
+          resumeInFlightRef.current = true
+          try {
+            const surfaceId: SurfaceId = "chat"
+            const threadId = failedMessage.thread_id
+            const bucket =
+              useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
+            const idx = bucket.findIndex((m) => m.id === failedMessage.id)
+            if (idx < 0) return
+            let userMsg: Message | undefined
+            for (let i = idx - 1; i >= 0; i--) {
+              if (bucket[i].role === "user") {
+                userMsg = bucket[i]
+                break
+              }
+            }
+            if (!userMsg) {
+              console.warn("resumeFromFailed: no preceding user message for", failedMessage.id)
+              return
+            }
+            await useStreamsStore
+              .getState()
+              .actions.sendMessage(threadId, userMsg.content, { surfaceId })
+          } finally {
+            resumeInFlightRef.current = false
+          }
         },
-        loadMessages: async () => {
-          // LIFT-IN-PLAN-2
-          throw new Error("loadMessages not yet wired (Plan 068-02 will port from useMessages.ts)")
+
+        // Phase 068 (L-068-03 + L-068-06): post-await sole-writer guard +
+        // MERGE 3-clause filter. Source: useMessages.ts:603-671.
+        loadMessages: async (threadId, surfaceId = "chat") => {
+          // D-060-03: cancel the previous in-flight getMessages fetch.
+          loadAbortRef.current?.abort()
+          const controller = new AbortController()
+          loadAbortRef.current = controller
+          try {
+            const data = await getMessages(threadId, controller.signal)
+            // L-068-03 / D-060-02: read activeThreadIdRef ONLY after await —
+            // discards cross-thread responses.
+            if (activeThreadIdRef.current !== threadId) return
+            // Protect optimistic placeholders if a send is in flight on the same thread.
+            if (isSendingRef.current) return
+            // L-068-06: MERGE 3-clause filter preserves live in-flight temp
+            // placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
+            //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+              const dbRunIds = new Set(data.filter((m) => m.runId).map((m) => m.runId))
+              const liveTempPlaceholders = prev.filter(
+                (m) =>
+                  m.id.startsWith("temp-") &&
+                  m.runId &&
+                  // Keep when DB doesn't have this runId yet OR a live SSE
+                  // consumer is still bound via this runId (CR-01 fix).
+                  (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
+              )
+              return [...data, ...liveTempPlaceholders]
+            })
+          } catch (err) {
+            if (err instanceof Error && err.name === "AbortError") return
+            throw err
+          }
         },
       },
     })
@@ -174,12 +874,6 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   }, [])
 
   // ---- useEffect #2: reconcile listeners (D-068-07 / D-068-08) ----
-  // RESEARCH §Finding #8: attached ONCE on provider mount; no [thread?.id] dep
-  // (the listeners gate on activeThreadIdRef.current at fire time — not at
-  // attach time — so we never re-attach). Coexists with the legacy
-  // ChatArea.tsx:162-187 listener block during the Plan 1 → Plan 3 window;
-  // the L-068-02 in-flight lock above makes the double-attach safe
-  // (RESEARCH §Pitfall 4). Plan 3 deletes the ChatArea block.
   useEffect(() => {
     const tryReconcile = () => {
       const tid = activeThreadIdRef.current
@@ -237,11 +931,14 @@ export const useViewingThread = (): string | null =>
 export const useStreamActions = (): StreamsState["actions"] =>
   useStreamsStore((state) => state.actions)
 
+// Phase 068 Task 3: hoist isStreaming into Zustand state so chat UX
+// (MessageInput disabled, MessageList scroll, MessageItem spinner) reads via
+// this named hook. Plan 2 Task 3 audit confirmed live consumers across
+// ChatArea/MessageList/MessageItem — Branch A (hoist) required.
+export const useIsStreaming = (): boolean =>
+  useStreamsStore((state) => state.isStreaming)
+
 // useStreamSubscriptions reads from the Zustand-visible `subscriptionsByRunId`
-// mirror (declared in streamsStore.ts; initial value: empty Set). The
-// AbortController Map itself lives in provider-scoped `subscriptionsRef`
-// (RESEARCH §Finding #2 — AbortController must NOT be in Zustand state).
-// Plan 2 wires the mirror updates inside sendMessage/reconcile/stopStream
-// (subscribe → setState add; onTerminal → setState delete).
+// mirror.
 export const useStreamSubscriptions = (runId: string): boolean =>
   useStreamsStore((state) => state.subscriptionsByRunId.has(runId))
