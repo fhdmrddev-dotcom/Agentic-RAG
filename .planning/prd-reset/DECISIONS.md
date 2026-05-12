@@ -976,6 +976,172 @@ Specifically:
 
 ---
 
+## D-PRD-13 — Skill Versioning: semver + immutable-on-publish
+
+**Status:** ACCEPTED 2026-05-12 (locked by Plan 09 cross-PRD consistency pass)
+**Decision-makers:** User signoff post-Plan 09 + research subagent (Plan 09 SUMMARY.md §A.1)
+**Supersedes:** Q-v3.0-05 (lifted from milestone-internal to cross-milestone after v3.3 ZIP roundtrip and v3.4 routine pinning both surfaced dependencies on a single versioning shape)
+
+### Context
+
+The skills system shipped in v2.0 (RECOVERED_Episode4_PRD) has no concept of versions — a skill's instructions can be edited in place. v3.0 Skill Studio's iterative dev loop needs a way to compare ratings across versions so users can see whether their changes improved the skill. v3.3 Open Platform's ZIP roundtrip needs a stable per-version reference for export/import. v3.4 Automations needs to pin a routine to a specific version so in-flight runs aren't disrupted by edits.
+
+If each PRD picked its own versioning shape, the three milestones would produce three incompatible representations of "skill version" — an architectural collision Plan 09 caught before it shipped.
+
+### Decision
+
+Skills carry semver text versions on a new `skill_versions` table; published versions are IMMUTABLE; editing a published version creates a new draft row; explicit publish flips `published_at = now()`. Backfill: existing skills get synthetic `1.0.0`. Eval runs (v3.0) and routine runs (v3.4) link to `skill_version_id`. ZIP export (v3.3) writes per-version siblings under `versions/<semver>.md` in the bundle.
+
+### Consequences
+
+**Positive:**
+- v3.0 ships primary infrastructure (Theme E migrations 054-055) — once
+- v3.3 ZIP export gets a clean per-version surface — no extra schema work
+- v3.4 routine_definitions can pin to `skill_version_id` so in-flight runs survive author edits
+- Future skill marketplace (deferred to v3.5+) has a portable version-aware artifact
+
+**Negative / trade-offs accepted:**
+- Skill authors now have to think about publishing (vs the previous "edit in place" mental model). Mitigated by drafts being mutable.
+- Backfill migration must touch every existing skill row.
+
+**Architectural implications:**
+- `skills.current_version_id` FK column added (v3.0)
+- Migration ordering: v3.0 ships skill_versions; v3.3 builds export on top; v3.4 references at routine publish
+
+### Alternatives considered + why rejected
+
+- **Per-milestone versioning (let each PRD pick)** — rejected: three incompatible representations would collide; Plan 09 already caught this in PRD authoring
+- **Integer-only versions** — rejected: loses ability to communicate major/minor/patch intent; semver is the industry-standard skill-author mental model
+- **Mutable published versions with audit log** — rejected: breaks v3.4 routine pinning semantics (you can't pin to "version X" if X can be mutated)
+
+### Sources
+
+- `.planning/PRDs/v3.0.md` §3 Theme E + Q-v3.0-05
+- `.planning/PRDs/v3.3.md` §3 Theme A
+- `.planning/PRDs/v3.4.md` §3 Theme B + Q-v3.4-07
+- `.planning/prd-reset/SUMMARY.md` §A.1
+- Prior commit anchor: `29be513`
+
+---
+
+## D-PRD-14 — Operator Role Tier: SYSTEM-level vs ORG-level split
+
+**Status:** ACCEPTED 2026-05-12 (locked by Plan 09 cross-PRD consistency pass)
+**Decision-makers:** User signoff post-Plan 09 + research subagent (Plan 09 SUMMARY.md §A.1)
+**Supersedes:** Q-v3.1-06 (lifted from milestone-internal because v3.2 multi-tenancy, v3.3 service accounts, and v3.4 routine ownership all inherit the SYSTEM-vs-ORG boundary)
+
+### Context
+
+v3.1 ships an admin shell with a new role tier above ordinary users (operator / super-admin). v3.2 multi-tenancy adds an org-level role hierarchy (org_admin / dept_admin / member). v3.3 service accounts inherit org membership. v3.4 routines are org-scoped with owner/editor roles. Without a locked boundary between SYSTEM-level (cross-org) and ORG-level (intra-org) roles, the four milestones would each invent their own permission rules — a maintenance bomb at v3.4 close.
+
+### Decision
+
+Two-axis role hierarchy with a strict boundary:
+- **SYSTEM-level (cross-org):** `super_admin`, `operator` → `operator_users` table (v3.1)
+  - super_admin: full control over the whole deployment; can create orgs, impersonate any user, manage operators, edit MODEL_CAPABILITIES, run migrations
+  - operator: cross-org read/cancel/restart; can NOT create orgs or impersonate
+- **ORG-level (intra-org):** `org_admin`, `dept_admin`, `member` → `org_members.role_id` + `dept_members.role_id` (v3.2)
+  - org_admin: full control within their org
+  - dept_admin: full control within their department
+  - member: standard user permissions
+
+A user can hold roles on BOTH axes — e.g., a super_admin user is also implicitly an org_admin of any org they belong to (operators cannot edit user content; that's the boundary).
+
+### Consequences
+
+**Positive:**
+- v3.1 ships SYSTEM-level cleanly (operator_users + BOOTSTRAP_SUPER_ADMIN_EMAIL env var)
+- v3.2 ships ORG-level (4-tier with role_permissions table) layered on top, not retrofit
+- v3.3 service accounts inherit org_id from v3.2 membership AND respect SYSTEM-level operators for cross-org observability
+- v3.4 routine ownership maps cleanly to org-tier roles
+
+**Negative / trade-offs accepted:**
+- More permission rules to author and test than a flat model
+- Users moving between orgs need careful row-cleanup (mitigated by membership tables, not role columns on auth.users)
+
+**Architectural implications:**
+- `operator_users` table is SEPARATE from `org_members` — they are independent axes
+- RLS policies must check both axes for cross-org admin actions (super_admin can read all orgs; operator can read but not write)
+- Q-v3.2-03 (4-tier role hierarchy) folds into this ADR — same decision
+
+### Alternatives considered + why rejected
+
+- **Single flat role list** — rejected: SaaS operator (whose job is keeping the deployment healthy) is conceptually different from an org admin (whose job is managing their org's content); merging them produces leaky abstractions
+- **Org-only (no SYSTEM tier)** — rejected: in hybrid SaaS, there must be a role tier ABOVE any org (otherwise no one can manage the deployment in co-tenant mode)
+- **Three flat tiers (admin / mod / user)** — rejected: loses the cross-org vs intra-org distinction critical for hybrid SaaS
+
+### Sources
+
+- `.planning/PRDs/v3.1.md` §3 Theme A + Q-v3.1-06
+- `.planning/PRDs/v3.2.md` §3 Theme A + Q-v3.2-03
+- `.planning/PRDs/v3.3.md` §3 Theme B
+- `.planning/PRDs/v3.4.md` §3 Theme G
+- `.planning/prd-reset/SUMMARY.md` §A.1
+- Prior commit anchor: `29be513`
+
+---
+
+## D-PRD-15 — SecretsBackend Interface Contract
+
+**Status:** ACCEPTED 2026-05-12 (locked by Plan 09 cross-PRD consistency pass)
+**Decision-makers:** User signoff post-Plan 09 + research subagent (Plan 09 SUMMARY.md §A.1)
+**Supersedes:** Q-v3.1-07 (lifted from milestone-internal because v3.2 SSO `idp_metadata`, v3.3 webhook HMAC keys, and v3.1.5+ BYOK encryption all read/write through the same interface)
+
+### Context
+
+v3.1 introduces a secrets management surface to close `CONCERNS.md:81-83` (API keys stored as plain text on disk). v3.2 SSO needs to store `idp_metadata` securely. v3.3 webhooks need HMAC signing keys. Enterprise tier (v3.1.5+) needs customer-managed keys (BYOK) via KMS adapters.
+
+If each subsystem reaches into its own secrets storage, the security surface fragments and "where is this secret stored?" becomes unanswerable. Locking the interface at v3.1 ship lets every downstream subsystem use the same contract without app-code changes when adapters land.
+
+### Decision
+
+The `SecretsBackend` Python interface stabilizes at v3.1 ship:
+
+```python
+class SecretsBackend(Protocol):
+    async def get(self, key: str) -> bytes | None: ...
+    async def set(self, key: str, value: bytes) -> None: ...
+    async def rotate(self, key: str) -> RotationToken: ...
+    async def list_keys(self) -> list[KeyMetadata]: ...
+```
+
+v3.1 ships two implementations:
+- `EncryptedPostgresSecretsBackend` — default; secrets in a `secrets` table encrypted with `pgsodium`; key rotation via dual-write window
+- `EnvVarReadOnlySecretsBackend` — legacy compatibility; NEVER writes back to env vars
+
+Adapters (Vault, Doppler, 1Password Connect, Infisical, AWS KMS / Azure Key Vault / GCP KMS) ship in v3.1.5+ as enterprise-tier add-ons (per D-PRD-10). No app-code changes elsewhere.
+
+### Consequences
+
+**Positive:**
+- v3.1 ships the interface + 2 default implementations — closes the plain-text-on-disk finding immediately
+- v3.1.5+ adapters are config-only swaps; no code touch outside `backend/app/secrets/`
+- v3.2 SSO `idp_metadata` + v3.3 webhook secret HMAC keys read/write through one path — auditable single surface
+- BYOK encryption becomes a clean v3.1.5+ extension via `KmsBackedSecretsBackend` adapter
+
+**Negative / trade-offs accepted:**
+- Async-only interface forces every call site to be inside an async context (already true for most v3.x code, but blocks any future sync use case)
+- `pgsodium` adds a Postgres extension dependency for fresh installs
+
+**Architectural implications:**
+- `backend/app/secrets/` module owns the interface + implementations
+- Selection via env var `SECRETS_BACKEND=postgres|env|vault|...`
+- v3.1 admin UI for secrets rotation reads from `list_keys()`; never displays values; rotation goes through `rotate()`
+
+### Alternatives considered + why rejected
+
+- **Direct vault SDK use everywhere** — rejected: locks every install to one secrets provider; breaks self-host shape diversity (Solo / Team / Enterprise)
+- **Synchronous interface** — rejected: v3.x request paths are async; sync would force `run_in_threadpool` everywhere
+- **Sync interface with async wrapper** — rejected: extra indirection with no benefit; cleaner to require async at the bottom
+
+### Sources
+
+- `.planning/PRDs/v3.1.md` §3 Theme J + Q-v3.1-07
+- `.planning/prd-reset/SUMMARY.md` §A.1 + §C.2 surfaced feature #3 (BYOK)
+- Prior commit anchor: `29be513`
+
+---
+
 ## Decisions explicitly NOT made yet (open for future PRD authoring)
 
 This appendix lists decisions that are deliberately left open so that PRD

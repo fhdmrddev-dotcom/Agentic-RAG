@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.5
-milestone_name: Deployment Strategy
+milestone: prd-reset
+milestone_name: PRD-Reset Meta-Phase (pre-v2.6)
 status: completed
-stopped_at: Phase 067.4 context gathered
-last_updated: "2026-05-09T18:13:24.000Z"
-last_activity: 2026-05-09
+stopped_at: PRD-reset Plan 09 signoff + DECISIONS.md ADRs locked
+last_updated: "2026-05-12T00:00:00.000Z"
+last_activity: 2026-05-12
 progress:
-  total_phases: 16
-  completed_phases: 14
-  total_plans: 59
-  completed_plans: 59
+  total_phases: 1
+  completed_phases: 1
+  total_plans: 9
+  completed_plans: 9
   percent: 100
 ---
 
@@ -18,17 +18,46 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-01)
+See: .planning/PROJECT.md (updated 2026-05-01) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked 2026-05-10..2026-05-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.5 Deployment Strategy — milestone close-out reconciliation complete; ready for `/gsd:complete-milestone`
+**Current focus:** v2.5 shipped + archived 2026-05-09. PRD-reset meta-phase complete 2026-05-12 — 6 milestone PRDs authored (v2.6 → v3.4) and signed off. Ready to start v2.6 via `/gsd:new-milestone v2.6`.
 
 ## Current Position
 
-Phase: v2.5 milestone close
-Plan: All v2.5 phases closed (065, 066, 067, 067.1, 067.2, 067.3, 067.4, 067.5)
-Status: Ready to run `/gsd:complete-milestone v2.5`
-Last activity: 2026-05-09
+Phase: PRD-reset meta-phase complete
+Plan: All 9 plans closed (Wave 0 foundation, Wave 1 pilot v2.6, Wave 1B parallel v3.0-v3.4, Wave 2 consistency + signoff)
+Status: Ready to run `/gsd:new-milestone v2.6` — consumes `.planning/PRDs/v2.6.md` as scope brief
+Last activity: 2026-05-12
+
+## PRD-reset outputs (committed)
+
+- `.planning/research/milestone-shaping-2026-05-09.md` — 797-line synthesis (commit `d7af056`)
+- `.planning/research/recovered/` — 15 recovered strategy MDs copied into project tree (commit `d7af056`)
+- `.planning/prd-reset/PLAN.md` — meta-phase plan (commit `0f0153c`, fixes `29295a0`+`a226ab4`)
+- `.planning/prd-reset/DECISIONS.md` — 15 locked D-PRD-NN ADRs (commit `fa63434` v1.0; +D-PRD-13/14/15 at signoff 2026-05-12)
+- `.planning/prd-reset/PRD-TEMPLATE.md` — 16-section template v2 (commit `fa63434`+`29295a0`)
+- `.planning/prd-reset/MIGRATION-RESERVATIONS.md` — claimed migration ranges 039-124 (commit `fa63434`)
+- `.planning/prd-reset/SUMMARY.md` — Plan 09 consistency + signoff (commit `a226ab4`)
+- `.planning/PRDs/v2.6.md` (556 lines, commit `29295a0`) + TOKEN-COL-01 added at signoff
+- `.planning/PRDs/v3.0.md` (539 lines, commit `29be513`) + accessibility theme added at signoff
+- `.planning/PRDs/v3.1.md` (604 lines, commit `29be513`) + accessibility theme added at signoff + D-PRD-13/14 → D-PRD-14/15 renumbering
+- `.planning/PRDs/v3.2.md` (626 lines, commit `29be513`) + Q-v3.2 footer fix at signoff
+- `.planning/PRDs/v3.3.md` (584 lines, commit `29be513`) + D-v3.2-NN → D-PRD-02+D-PRD-14 + explicit POST /api/v1/skills/{id}/run route
+- `.planning/PRDs/v3.4.md` (552 lines, commit `29be513`) + Q-v3.4-09 D-PRD-13 claim retracted
+
+## Signoff decisions captured (2026-05-12)
+
+- (A) 6 PRDs approved as authored
+- (B) TOKEN-COL-01 added to v2.6 §3 Theme F + §4 Active row (pure observability, no caps)
+- (C) Accessibility WCAG 2.1 AA: small lift across v3.0 Theme I + v3.1 Theme L
+- (D) Compliance: customer-driven (SOC 2 / ISO 27001 / HIPAA only when funded by an Enterprise-tier contract per D-PRD-10); GDPR DPA pre-emptive at v3.2 close (cheap, contract + tech checklist)
+
+## v2.5 archive (historical)
+
+v2.5 Deployment Strategy shipped + archived 2026-05-09. Phases 058-067.5 closed. Archives at `.planning/milestones/v2.5-phases/`, `v2.5-REQUIREMENTS.md`, `v2.5-ROADMAP.md`.
+
+## Outstanding before v2.5 close (historical — superseded by archive)
 
 ## Outstanding before v2.5 close
 
