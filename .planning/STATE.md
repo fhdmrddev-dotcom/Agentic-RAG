@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-01) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked 2026-05-10..2026-05-12)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.5 shipped + archived 2026-05-09. PRD-reset meta-phase complete 2026-05-12 — 6 milestone PRDs authored (v2.6 → v3.4) and signed off. Ready to start v2.6 via `/gsd:new-milestone v2.6`.
+**Current focus:** v2.5 shipped + archived 2026-05-09. PRD-reset meta-phase complete 2026-05-12 — **7 milestone PRDs** authored (v2.6 → v2.7 → v3.0 → v3.4) and signed off. v2.7 (Agent Workspace + Harness + Plugin Contract) added 2026-05-12 between v2.6 and v3.0 per user signal on Episode 6 harness pattern. Ready to start v2.6 via `/gsd:new-milestone v2.6`.
 
 ## Current Position
 
@@ -39,8 +39,9 @@ Last activity: 2026-05-12
 - `.planning/prd-reset/PRD-TEMPLATE.md` — 16-section template v2 (commit `fa63434`+`29295a0`)
 - `.planning/prd-reset/MIGRATION-RESERVATIONS.md` — claimed migration ranges 039-124 (commit `fa63434`)
 - `.planning/prd-reset/SUMMARY.md` — Plan 09 consistency + signoff (commit `a226ab4`)
-- `.planning/PRDs/v2.6.md` (556 lines, commit `29295a0`) + TOKEN-COL-01 added at signoff
-- `.planning/PRDs/v3.0.md` (539 lines, commit `29be513`) + accessibility theme added at signoff
+- `.planning/PRDs/v2.6.md` (560 lines, commit `29295a0`) + TOKEN-COL-01 added at signoff
+- `.planning/PRDs/v2.7.md` (550 lines, post-signoff addition 2026-05-12) — Agent Workspace + Harness Engine + Plugin Contract; migrations 125-135 (reserved 125-139); 8 §13 Q-IDs surfaced including Q-v2.7-07 → D-PRD-16 candidate (Plugin Contract codification)
+- `.planning/PRDs/v3.0.md` (545 lines, commit `29be513`) + accessibility theme added at signoff
 - `.planning/PRDs/v3.1.md` (604 lines, commit `29be513`) + accessibility theme added at signoff + D-PRD-13/14 → D-PRD-14/15 renumbering
 - `.planning/PRDs/v3.2.md` (626 lines, commit `29be513`) + Q-v3.2 footer fix at signoff
 - `.planning/PRDs/v3.3.md` (584 lines, commit `29be513`) + D-v3.2-NN → D-PRD-02+D-PRD-14 + explicit POST /api/v1/skills/{id}/run route

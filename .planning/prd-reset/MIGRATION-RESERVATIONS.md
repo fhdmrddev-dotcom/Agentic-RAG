@@ -22,8 +22,11 @@
 | **v3.2** — Multi-Tenancy (Hybrid SaaS Foundation) | `075 – 094` | 20 | Largest range. Per SEED-004 + RECOVERED_PRD_Enterprise_RAG F-04 successor: orgs, departments, org_members, dept_members, roles, role_permissions. RLS rewrite TOUCHES EVERY EXISTING TABLE — each table needs a migration to switch RLS predicates from `user_id = auth.uid()` to membership-based (documents, folders, threads, messages, runs, skills, skill_files, document_chunks, eval_cases, eval_runs, etc.). SSO + audit. |
 | **v3.3** — Open Platform: API + MCP + Service Accounts | `095 – 109` | 15 | service_accounts, api_keys, api_key_scopes, webhooks, webhook_deliveries, rate_limits (Redis-only or hybrid Redis+Postgres), mcp_server_metadata, sdk_audit. Org-aware variants of each. |
 | **v3.4** — Automations + DM Tier B | `110 – 124` | 15 | schedules, scheduled_runs (history), event_subscriptions (event-bus consumers), routine_definitions, dm_retention_policies, dm_check_in_out_state, dm_approvals, dm_approval_steps, dm_lifecycle_audit. Per-org variants where multi-tenancy applies. |
+| **v2.7** — Agent Workspace + Harness Engine + Plugin Contract | `125 – 139` | 15 | workspace_files, workspace_file_versions, workflow_definitions, workflow_runs, workflow_phases, todos, plugin_registry, plugin_extension_points, harness_phase_types, deep_mode_thread_metadata, harness_audit. Per-org variants where multi-tenancy applies. |
 
-**Total reserved through v3.4:** `039 – 124` (86 slots across 6 milestones, expecting ~50-60 actual migrations).
+**Total reserved through v3.4 (including inserted v2.7):** `039 – 139` (101 slots across 7 milestones, expecting ~60-72 actual migrations).
+
+**Note on v2.7 numbering:** v2.7 ships BEFORE v3.0 in execution order, but claims migration numbers at the END of the contiguous range (`125 – 139`) rather than ripple-shifting all later milestones up. Rationale: v2.7's tables are independent of v3.0–v3.4 schemas (no inbound FKs from earlier-numbered migrations). Supabase applies migrations in numerical order from a fresh deploy regardless of when they were authored — so applying `125_workspace_files.sql` after `124_dm_lifecycle_audit.sql` (v3.4) is correct on a greenfield install. On an upgrade install where v3.4 already shipped, v2.7's migrations simply append. Avoids ripple-editing five PRDs' worth of migration claims for a non-functional change.
 
 ## Conflict resolution
 
