@@ -12,7 +12,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 **Goal:** Build the production-ready substrate the next four milestones depend on — close the user-observed PDF↔DOCX extraction inconsistency, lift the single-worker concurrency ceiling, hoist the streams subscription surface out of `useMessages`, and absorb six carry-forward seeds before they compound.
 
-**Scope brief:** `.planning/PRDs/v2.6.md` (locked 2026-05-10, signoff 2026-05-12). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean). 22 Active REQ-IDs in PRD §4. 15 phases in PRD §12 (068–082).
+**Scope brief:** `.planning/PRDs/v2.6.md` (locked 2026-05-10, signoff 2026-05-12). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean). 21 Active REQ-IDs in PRD §4. 15 phases in PRD §12 (068–082).
 
 **Target features (6 themes):**
 
@@ -162,7 +162,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 ### Active (v2.6 — Foundation: RAG Quality + Multi-Worker + Polish)
 
-22 Active REQ-IDs scoped in `.planning/PRDs/v2.6.md` §4. Materialized in `.planning/REQUIREMENTS.md` and mapped to phases in `.planning/ROADMAP.md`.
+21 Active REQ-IDs scoped in `.planning/PRDs/v2.6.md` §4. Materialized in `.planning/REQUIREMENTS.md` and mapped to phases in `.planning/ROADMAP.md`.
 
 **Theme A — RAG Quality Lift**
 - [ ] RAG-DOCLING-01: Docling primary path produces comparable PDF↔DOCX table/image counts (≤20% delta on reference thesis)
@@ -319,4 +319,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-12 — v2.6 (Foundation: RAG Quality + Multi-Worker + Polish) kicked off via `/gsd:new-milestone v2.6`. Scope consumed from `.planning/PRDs/v2.6.md` (locked 2026-05-10, signed off 2026-05-12 with TOKEN-COL-01 added at signoff). 22 Active REQ-IDs across 6 themes; phases 068–082 proposed in PRD §12 (~38 plans). Migration range 039–049 reserved. Continues phase numbering from v2.5's last phase 067.5. Six seeds (006/007/008/009/010/011) consumed at milestone completion; SEED-001 partial. Pre-execution decisions Q-v2.6-01..06 routed to `/gsd:discuss-phase` per phase. v2.5 (Deployment Strategy) shipped 2026-05-09 — 16 phases / 64 plans / ~104K LOC delta.*
+*Last updated: 2026-05-12 — v2.6 (Foundation: RAG Quality + Multi-Worker + Polish) kicked off via `/gsd:new-milestone v2.6`. Scope consumed from `.planning/PRDs/v2.6.md` (locked 2026-05-10, signed off 2026-05-12 with TOKEN-COL-01 added at signoff). 21 Active REQ-IDs across 6 themes; phases 068–082 proposed in PRD §12 (~38 plans). Migration range 039–049 reserved. Continues phase numbering from v2.5's last phase 067.5. Six seeds (006/007/008/009/010/011) consumed at milestone completion; SEED-001 partial. Pre-execution decisions Q-v2.6-01..06 routed to `/gsd:discuss-phase` per phase. v2.5 (Deployment Strategy) shipped 2026-05-09 — 16 phases / 64 plans / ~104K LOC delta.*
