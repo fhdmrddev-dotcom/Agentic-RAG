@@ -1046,7 +1046,10 @@ describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
     // bucket has a temp placeholder with runId "run-2" (live, no DB match yet).
     const recorder = makeSseRecorder()
     void recorder
-    mockGetMessages.mockResolvedValueOnce([
+    // Use mockResolvedValue (not Once) — setViewingThread auto-fires reconcile
+    // which calls loadMessages, then the explicit loadMessages call also hits
+    // this mock. Both calls resolve to the same canonical payload.
+    mockGetMessages.mockResolvedValue([
       {
         id: "db-msg-1",
         thread_id: "thread-A",
@@ -1058,13 +1061,30 @@ describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
         runId: "run-1",
       } as Message,
     ])
-    mockGetActiveRuns.mockResolvedValueOnce([])
+    mockGetActiveRuns.mockResolvedValue([])
 
     const { result } = renderProvider()
 
+    // setViewingThread BEFORE loadMessages — the post-await activeThreadIdRef
+    // gate at StreamsProvider.tsx:845 short-circuits if the ref is null.
+    // (setViewingThread also triggers reconcile internally; allow it to settle
+    // before we seed the live temp placeholder, so the seed survives the merge.)
+    await act(async () => {
+      result.current.setViewingThread("thread-A")
+    })
+    // Wait for the auto-reconcile's loadMessages to settle before seeding.
+    await waitFor(() => {
+      const bucket = useStreamsStore
+        .getState()
+        .bucketsBySurface.get("chat")
+        ?.get("thread-A")
+      expect(bucket?.map((m) => m.id)).toContain("db-msg-1")
+    })
+
     // Seed a live temp placeholder bound to run-2 (not in DB yet).
     act(() => {
-      result.current.setMessagesForBucket("chat", "thread-A", [
+      result.current.setMessagesForBucket("chat", "thread-A", (prev) => [
+        ...prev,
         {
           id: "temp-xyz",
           thread_id: "thread-A",
@@ -1078,6 +1098,8 @@ describe("Phase 068.5 — L-068.5-02 MERGE 3-clause filter survives", () => {
       ])
     })
 
+    // Trigger an explicit reconcile/loadMessages — the MERGE 3-clause filter
+    // must keep temp-xyz (runId=run-2 not in dbRunIds) and replace db-msg-1.
     await act(async () => {
       await result.current.loadMessages("thread-A")
     })
@@ -1117,8 +1139,11 @@ describe("Phase 068.5 — L-068.5-05 cross-state precedence (hydrate overwritten
     bucketsBySurface.set("chat", surfMap)
     useStreamsStore.setState({ bucketsBySurface })
 
-    // Server returns fresh content for the same runId.
-    mockGetMessages.mockResolvedValueOnce([
+    // Server returns fresh content for the same runId. Use mockResolvedValue
+    // (not mockResolvedValueOnce) because setViewingThread triggers reconcile
+    // which itself calls loadMessages — both the auto-reconcile and any explicit
+    // call resolve to the same fresh payload.
+    mockGetMessages.mockResolvedValue([
       {
         id: "db-msg-1",
         thread_id: "T1",
@@ -1132,8 +1157,10 @@ describe("Phase 068.5 — L-068.5-05 cross-state precedence (hydrate overwritten
     ])
 
     const { result } = renderProvider()
+    // setViewingThread triggers reconcile internally (StreamsProvider.tsx:443-450)
+    // which calls loadMessages; that's the canonical post-mount flow.
     await act(async () => {
-      await result.current.loadMessages("T1")
+      result.current.setViewingThread("T1")
     })
 
     await waitFor(() => {
