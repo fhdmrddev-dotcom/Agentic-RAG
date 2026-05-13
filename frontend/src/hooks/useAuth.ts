@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { supabase } from "../lib/supabase"
+import { clearCacheForUser } from "@/lib/streamsCache"
 
 interface UseAuth {
   user: User | null
@@ -42,6 +43,10 @@ export function useAuth(): UseAuth {
   }
 
   const signOut = async () => {
+    // Phase 068.5 B-01: drop the current user's cache BEFORE clearing the
+    // auth token so the next user on a shared origin starts clean. Use the
+    // locally-tracked user (avoids an extra network round-trip via getUser).
+    if (user?.id) clearCacheForUser(user.id)
     await supabase.auth.signOut()
   }
 

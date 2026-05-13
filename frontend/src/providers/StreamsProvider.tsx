@@ -906,8 +906,27 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               if (err instanceof Error && err.name === "AbortError") return
               if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") return
               if (attempt === 0) {
-                // D-068.5-09: silent single retry at 1s
-                await new Promise((resolve) => setTimeout(resolve, 1000))
+                // D-068.5-09 + W-03 fix: silent single retry at 1s, bound to
+                // the controller's AbortSignal so a thread switch / unmount /
+                // user-initiated abort cancels the pending retry instead of
+                // letting it fire stale into the new thread's fetch.
+                try {
+                  await new Promise<void>((resolve, reject) => {
+                    const t = setTimeout(resolve, 1000)
+                    const onAbort = () => {
+                      clearTimeout(t)
+                      reject(new DOMException("aborted", "AbortError"))
+                    }
+                    if (controller.signal.aborted) {
+                      onAbort()
+                      return
+                    }
+                    controller.signal.addEventListener("abort", onAbort, { once: true })
+                  })
+                } catch (waitErr) {
+                  if (waitErr instanceof DOMException && waitErr.name === "AbortError") return
+                  throw waitErr
+                }
                 return tryFetch(1)
               }
               // Second failure → banner (D-068.5-08 + D-068.5-09)
@@ -995,9 +1014,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
     const throttledWrite = makeThrottle(writeNow, 500)
     throttledWriteRef.current = throttledWrite
-    const unsubscribe = useStreamsStore.subscribe((state) => {
-      throttledWrite(state)
-    })
+    // B-02 fix: selector-bound subscription — only fires when bucketsBySurface
+    // reference changes, NOT on every reconcileError / isStreaming /
+    // subscriptionsByRunId / loadingThreadId / viewedThreadId / fallbackNotice
+    // setState. Avoids wasted serialization on bookkeeping state.
+    // Requires `subscribeWithSelector` middleware in the store factory.
+    const unsubscribe = useStreamsStore.subscribe(
+      (state) => state.bucketsBySurface,
+      () => {
+        throttledWrite(useStreamsStore.getState())
+      },
+    )
     return () => {
       throttledWrite.flush()
       unsubscribe()

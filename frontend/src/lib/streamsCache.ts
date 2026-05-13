@@ -26,6 +26,17 @@
 import type { Message } from "@/types"
 import type { SurfaceId } from "@/stores/streamsStore"
 
+/**
+ * Phase 068.5 B-01 fix (2026-05-14): the cache key is user-scoped so a shared
+ * origin (dev machine with multiple test logins, kiosk, family device) can't
+ * leak one user's chat content into another user's first paint. The legacy
+ * key `STREAMS_CACHE_KEY` is preserved as a tombstone target so any prior
+ * write under it is cleared on first read.
+ *
+ * Resolved key shape: `agentic-rag.streams.v1.<user_id>`.
+ */
+export const STREAMS_CACHE_KEY_PREFIX = "agentic-rag.streams.v1" as const
+/** @deprecated B-01: legacy non-partitioned key. Cleared at module load. */
 export const STREAMS_CACHE_KEY = "agentic-rag.streams.v1" as const
 export const STREAMS_CACHE_VERSION = 1 as const
 /**
@@ -35,6 +46,69 @@ export const STREAMS_CACHE_VERSION = 1 as const
  * churn for completed threads whose source-of-truth lives in the DB anyway.
  */
 export const STREAMS_CACHE_MAX_THREADS_PER_SURFACE = 3 as const
+
+/**
+ * B-01: Resolve the current Supabase user_id synchronously by scanning the
+ * Supabase auth token storage key (`sb-<project_ref>-auth-token`). Returns
+ * null if no session is present. Sync read is safe because Supabase's client
+ * loads its session from localStorage at `createClient()` time (module load),
+ * so by the time the streamsStore factory runs, the auth token is already on
+ * disk (if the user is signed in).
+ */
+export function getCurrentUserIdSync(): string | null {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith("sb-") || !key.endsWith("-auth-token")) continue
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const parsed = JSON.parse(raw) as { user?: { id?: string } }
+      const userId = parsed?.user?.id
+      if (typeof userId === "string" && userId.length > 0) return userId
+    }
+  } catch {
+    // Defensive — any localStorage read / JSON parse failure returns null.
+  }
+  return null
+}
+
+/**
+ * Build the user-scoped cache key. Callers MUST resolve user_id first and
+ * pass a non-empty string. Reads with no user_id should early-return empty
+ * Map (see readSnapshotSyncOrEmpty), so this function is never called with
+ * an empty user_id.
+ */
+export function streamsCacheKey(userId: string): string {
+  return `${STREAMS_CACHE_KEY_PREFIX}.${userId}`
+}
+
+/**
+ * B-01 tombstone clear: drops the legacy non-partitioned key if present.
+ * Called once at module load to migrate users away from the leaky shape.
+ * Idempotent + safe in all browser environments.
+ */
+function clearLegacyKey(): void {
+  try {
+    if (localStorage.getItem(STREAMS_CACHE_KEY) !== null) {
+      localStorage.removeItem(STREAMS_CACHE_KEY)
+    }
+  } catch {
+    /* localStorage unavailable — nothing to clear */
+  }
+}
+clearLegacyKey()
+
+/**
+ * Drop the cache for a specific user — called from auth signOut so the next
+ * user on a shared origin starts clean. Idempotent; no-op if the key doesn't
+ * exist or the user has no cache.
+ */
+export function clearCacheForUser(userId: string): void {
+  try {
+    localStorage.removeItem(streamsCacheKey(userId))
+  } catch {
+    /* localStorage unavailable */
+  }
+}
 
 interface SerializedThreadEntry {
   messages: Message[]
@@ -55,14 +129,20 @@ interface SerializedSnapshot {
  */
 export function readSnapshotSyncOrEmpty(): Map<SurfaceId, Map<string, Message[]>> {
   try {
-    const raw = localStorage.getItem(STREAMS_CACHE_KEY)
+    // B-01: user-scoped key. No session → no cache (return empty Map; a
+    // post-auth follow-up effect can re-hydrate once getSession resolves —
+    // acceptable for the rare deep-link-before-auth case).
+    const userId = getCurrentUserIdSync()
+    if (!userId) return new Map()
+    const key = streamsCacheKey(userId)
+    const raw = localStorage.getItem(key)
     if (!raw) return new Map()
     const parsed = JSON.parse(raw) as SerializedSnapshot
     if (!parsed || typeof parsed !== "object" || parsed.version !== STREAMS_CACHE_VERSION) {
       // Version drift — drop the key entirely so a future shape change cannot
       // poison the read path.
       try {
-        localStorage.removeItem(STREAMS_CACHE_KEY)
+        localStorage.removeItem(key)
       } catch {
         /* ignore — read path must never throw */
       }
@@ -104,6 +184,12 @@ export function writeSnapshotToLocalStorage(
   now: number = Date.now(),
   keepPredicate?: (surfaceId: SurfaceId, threadId: string) => boolean,
 ): void {
+  // B-01: user-scoped key. No session → skip the write entirely (the
+  // in-memory bucket still holds the data; cache hydrate on next mount only
+  // runs after auth resolves anyway).
+  const userId = getCurrentUserIdSync()
+  if (!userId) return
+  const key = streamsCacheKey(userId)
   // Pitfall 5 mitigation (v1 hybrid):
   //   - For threads ALREADY on disk: preserve their lastAccessedAt so threads
   //     that haven't been touched since their first cache entry age naturally
@@ -118,7 +204,7 @@ export function writeSnapshotToLocalStorage(
   // is a future refinement.
   const priorRaw = (() => {
     try {
-      return localStorage.getItem(STREAMS_CACHE_KEY)
+      return localStorage.getItem(key)
     } catch {
       return null
     }
@@ -169,14 +255,14 @@ export function writeSnapshotToLocalStorage(
   }
   evictPerSurfaceIfOver(snapshot, STREAMS_CACHE_MAX_THREADS_PER_SURFACE)
   try {
-    localStorage.setItem(STREAMS_CACHE_KEY, JSON.stringify(snapshot))
+    localStorage.setItem(key, JSON.stringify(snapshot))
   } catch (err) {
     if (err instanceof DOMException && err.name === "QuotaExceededError") {
       // Drop oldest half across all surfaces and retry once. If second throw,
       // give up — in-memory bucket still works; cache is disabled this session.
       evictOldestHalf(snapshot)
       try {
-        localStorage.setItem(STREAMS_CACHE_KEY, JSON.stringify(snapshot))
+        localStorage.setItem(key, JSON.stringify(snapshot))
       } catch {
         console.warn(
           "[streamsCache] quota exhausted after eviction; cache disabled this session",

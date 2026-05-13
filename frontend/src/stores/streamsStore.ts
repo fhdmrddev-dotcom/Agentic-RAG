@@ -34,6 +34,7 @@
  * from user events (post-mount, after useEffect has registered real bodies).
  */
 import { create } from "zustand"
+import { subscribeWithSelector } from "zustand/middleware"
 import type { Message } from "@/types"
 import { readSnapshotSyncOrEmpty } from "@/lib/streamsCache"
 
@@ -85,7 +86,7 @@ const notMounted = async (): Promise<never> => {
   )
 }
 
-export const useStreamsStore = create<StreamsState>()(() => ({
+export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() => ({
   // Phase 068.5 (D-068.5-01..04 + Pitfall 1/8): hydrate from localStorage
   // synchronously so the first render of any subscriber sees cached content,
   // not the empty Map. L-068.5-03 shape preserved:
@@ -107,4 +108,4 @@ export const useStreamsStore = create<StreamsState>()(() => ({
     resumeFromFailed: notMounted,
     loadMessages: notMounted,
   },
-}))
+})))

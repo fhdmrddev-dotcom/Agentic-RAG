@@ -18,12 +18,28 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import {
   readSnapshotSyncOrEmpty,
   writeSnapshotToLocalStorage,
-  STREAMS_CACHE_KEY,
   STREAMS_CACHE_VERSION,
+  streamsCacheKey,
 } from "@/lib/streamsCache"
 import type { Message } from "@/types"
 
 const NOW = "2026-05-13T00:00:00Z"
+
+// Phase 068.5 B-01: cache key is now user-scoped. Tests must seed a mock
+// Supabase auth token so `getCurrentUserIdSync` resolves and the cache reads/
+// writes hit the user-scoped key. Without this, every read/write becomes a
+// no-op and the assertions below fail.
+const TEST_USER_ID = "test-user-id"
+const TEST_AUTH_KEY = "sb-test-auth-token"
+function seedAuth(userId: string = TEST_USER_ID): void {
+  localStorage.setItem(TEST_AUTH_KEY, JSON.stringify({ user: { id: userId } }))
+}
+function testCacheKey(userId: string = TEST_USER_ID): string {
+  return streamsCacheKey(userId)
+}
+// Back-compat alias for tests that reference the old origin-wide key — they
+// should be reading the user-scoped key now.
+const STREAMS_CACHE_KEY = testCacheKey()
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
   return {
@@ -41,6 +57,7 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
 describe("Phase 068.5 — streamsCache: serialize round-trip", () => {
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   it("write + read returns a structurally-equal Map", () => {
@@ -61,6 +78,7 @@ describe("Phase 068.5 — streamsCache: serialize round-trip", () => {
 describe("Phase 068.5 — streamsCache: LRU eviction (per-surface cap)", () => {
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   it("evicts oldest threads by lastAccessedAt when surface exceeds cap (rescoped 10 → 3 in Option C)", () => {
@@ -116,6 +134,7 @@ describe("Phase 068.5 — streamsCache: LRU eviction (per-surface cap)", () => {
 describe("Phase 068.5 — streamsCache: L-068.5-03 shape invariant", () => {
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   it("deserialized snapshot is Map<SurfaceId, Map<string, Message[]>>, not plain object", () => {
@@ -136,6 +155,7 @@ describe("Phase 068.5 — streamsCache: L-068.5-03 shape invariant", () => {
 describe("Phase 068.5 — streamsCache: version drift recovery", () => {
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   it("returns empty Map AND removes the key when stored version mismatches", () => {
@@ -159,6 +179,7 @@ describe("Phase 068.5 — streamsCache: QuotaExceededError fallback", () => {
 
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   afterEach(() => {
@@ -191,9 +212,58 @@ describe("Phase 068.5 — streamsCache: QuotaExceededError fallback", () => {
   })
 })
 
+describe("Phase 068.5 B-01 — cache key is partitioned per user", () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it("write under user-A is invisible to user-B (cross-user isolation)", () => {
+    seedAuth("user-A")
+    const buckets = new Map<string, Map<string, Message[]>>()
+    const chatMap = new Map<string, Message[]>()
+    chatMap.set("thread-A1", [makeMessage({ id: "secret-msg-from-A" })])
+    buckets.set("chat", chatMap)
+    writeSnapshotToLocalStorage(buckets)
+
+    // Switch to user-B (simulate signOut + signIn into a different account).
+    localStorage.removeItem(TEST_AUTH_KEY)
+    seedAuth("user-B")
+
+    // user-B's read must see an empty Map — user-A's content is NOT visible.
+    const outB = readSnapshotSyncOrEmpty()
+    expect(outB.size).toBe(0)
+
+    // Switch back to user-A — content is still there for the correct user.
+    localStorage.removeItem(TEST_AUTH_KEY)
+    seedAuth("user-A")
+    const outA = readSnapshotSyncOrEmpty()
+    expect(outA.get("chat")?.get("thread-A1")?.[0].id).toBe("secret-msg-from-A")
+  })
+
+  it("read with no auth session returns empty Map (no leak via missing user_id fallback)", () => {
+    // No seedAuth() — no sb-*-auth-token in localStorage.
+    const out = readSnapshotSyncOrEmpty()
+    expect(out).toBeInstanceOf(Map)
+    expect(out.size).toBe(0)
+  })
+
+  it("write with no auth session is a no-op (does not persist to legacy key)", () => {
+    // No seedAuth(). Capture pre-existing keys; the write must NOT create any.
+    const keysBefore = Object.keys(localStorage)
+    const buckets = new Map<string, Map<string, Message[]>>()
+    const chatMap = new Map<string, Message[]>()
+    chatMap.set("t1", [makeMessage()])
+    buckets.set("chat", chatMap)
+    writeSnapshotToLocalStorage(buckets)
+    const keysAfter = Object.keys(localStorage)
+    expect(keysAfter).toEqual(keysBefore)
+  })
+})
+
 describe("Phase 068.5 — streamsCache: parse failure returns empty Map", () => {
   beforeEach(() => {
     localStorage.clear()
+    seedAuth()
   })
 
   it("returns new Map() and does NOT throw when localStorage payload is invalid JSON", () => {

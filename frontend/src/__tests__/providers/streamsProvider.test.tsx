@@ -937,10 +937,23 @@ describe("Phase 068 — multi-surface isolation (SC#3)", () => {
 // yet); GREEN after Tasks 2-5 land.
 // =============================================================================
 
-import { STREAMS_CACHE_KEY, STREAMS_CACHE_VERSION } from "@/lib/streamsCache" // RED — Task 3 creates
+import { STREAMS_CACHE_VERSION, streamsCacheKey } from "@/lib/streamsCache"
+
+// Phase 068.5 B-01: cache key is now user-scoped. Tests seed a mock Supabase
+// auth token so `getCurrentUserIdSync()` resolves and the cache reads/writes
+// hit the user-scoped key. The legacy `STREAMS_CACHE_KEY` symbol is rebound
+// to the user-scoped key here so the surrounding test bodies don't change.
+const TEST_USER_ID = "test-user-id"
+const TEST_AUTH_KEY = "sb-test-auth-token"
+function seedAuth(userId: string = TEST_USER_ID): void {
+  localStorage.setItem(TEST_AUTH_KEY, JSON.stringify({ user: { id: userId } }))
+}
+const STREAMS_CACHE_KEY = streamsCacheKey(TEST_USER_ID)
 
 describe("Phase 068.5 — hydrate from localStorage populates bucketsBySurface before first paint", () => {
   it("seeded cache is visible via useStreamsStore.getState() after a fresh module re-import", async () => {
+    // B-01: cache is user-scoped — seed auth so the hydrate path reads our key.
+    seedAuth()
     // Seed localStorage BEFORE the store factory re-runs.
     const seed = {
       version: STREAMS_CACHE_VERSION,
@@ -1183,6 +1196,8 @@ describe("Phase 068.5 — throttled-write fires after 500ms", () => {
   })
 
   it("localStorage is NOT written immediately on setMessagesForBucket; flushes after 500ms", async () => {
+    // B-01: cache is user-scoped — seed auth so the throttled write hits our key.
+    seedAuth()
     const { result } = renderProvider()
     expect(localStorage.getItem(STREAMS_CACHE_KEY)).toBeNull()
 
@@ -1222,6 +1237,8 @@ describe("Phase 068.5 — throttled-write fires after 500ms", () => {
 
 describe("Phase 068.5 — setViewingThread flushes pending write immediately", () => {
   it("calling setViewingThread('T2') after setMessagesForBucket(T1) writes localStorage WITHOUT advancing timers", () => {
+    // B-01: cache is user-scoped — seed auth so the flush writes hit our key.
+    seedAuth()
     const { result } = renderProvider()
     expect(localStorage.getItem(STREAMS_CACHE_KEY)).toBeNull()
 
