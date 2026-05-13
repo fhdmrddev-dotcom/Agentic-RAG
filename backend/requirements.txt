@@ -1,7 +1,7 @@
 fastapi==0.115.6
 sse-starlette==2.4.1
 uvicorn[standard]==0.32.1
-supabase==2.10.0
+supabase==2.29.0
 openai>=2.0.0
 anthropic>=0.97.0
 tiktoken>=0.12.0
@@ -20,7 +20,8 @@ redis>=5.2,<6
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
 pytest-timeout>=2.4.0
-httpx>=0.27.0
+httpx>=0.28.0,<0.29.0
 reportlab>=4.0.0  # Phase 069 test fixtures (PDF synth for golden-extraction tests)
 sentence-transformers>=3.0.0
 llm-sandbox[docker]>=0.3.37
+docling>=2.93.0,<3.0.0

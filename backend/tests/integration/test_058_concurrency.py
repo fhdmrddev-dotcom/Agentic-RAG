@@ -227,7 +227,7 @@ async def test_cross_tab_unblocked_during_sse():
             "app.api.threads.create_adaptive_streaming_chat",
             return_value=(iter(_fast_chunks()), CallingMode.NATIVE),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 # Start the SSE stream on Thread A — keeps the event loop busy
                 # awaiting the slow INSERT (which is parked on a threadpool
                 # worker). If aexec() wrapping is correct, the event loop is
