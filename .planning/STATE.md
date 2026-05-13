@@ -4,14 +4,14 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: executing
 stopped_at: Phase 070 context gathered
-last_updated: "2026-05-13T21:18:32.260Z"
+last_updated: "2026-05-13T21:36:03.489Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 7
-  percent: 88
+  completed_phases: 3
+  total_plans: 10
+  completed_plans: 8
+  percent: 80
 ---
 
 # Project State
@@ -337,4 +337,4 @@ Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Co
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 068.5 (Chat-Surface Persistent Rendering + In-Flight Pulse) — 2 plans — 2026-05-13T16:37:39.505Z
+**Planned Phase:** 070 (docling-httpx-spike) — 2 plans — 2026-05-13T21:36:03.479Z
