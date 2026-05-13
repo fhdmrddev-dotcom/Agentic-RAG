@@ -16,6 +16,10 @@
  * D-068-05: Surface-aware action signatures (surfaceId opt; default "chat").
  * D-068-06: Per-run keying explicitly NOT adopted in v2.6.
  *
+ * D-068.5-01..04 + Pitfall 1/8: bucketsBySurface synchronously hydrated from
+ *           localStorage in the factory; first paint sees cached content.
+ *           reconcileError slot added for Plan 02 retry banner.
+ *
  * RESEARCH §Finding #2: AbortController must NOT live in Zustand state (not
  * serializable, identity churn breaks selector memoization). The provider
  * holds the actual Map<runId, AbortController> in a ref; this Set is the
@@ -31,6 +35,7 @@
  */
 import { create } from "zustand"
 import type { Message } from "@/types"
+import { readSnapshotSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
 
@@ -39,6 +44,9 @@ export interface StreamsState {
   viewedThreadId: string | null
   isStreaming: boolean
   fallbackNotice: string | null
+  /** Phase 068.5 (D-068.5-08..10): consumed by Plan 02 retry banner to surface
+   *  loadMessages failures over cached content without blanking the list. */
+  reconcileError: { threadId: string; error: Error } | null
   subscriptionsByRunId: Set<string>
   actions: {
     setMessagesForBucket: (
@@ -73,10 +81,15 @@ const notMounted = async (): Promise<never> => {
 }
 
 export const useStreamsStore = create<StreamsState>()(() => ({
-  bucketsBySurface: new Map(),
+  // Phase 068.5 (D-068.5-01..04 + Pitfall 1/8): hydrate from localStorage
+  // synchronously so the first render of any subscriber sees cached content,
+  // not the empty Map. L-068.5-03 shape preserved:
+  //   bucketsBySurface: Map<SurfaceId, Map<string, Message[]>>
+  bucketsBySurface: readSnapshotSyncOrEmpty(),
   viewedThreadId: null,
   isStreaming: false,
   fallbackNotice: null,
+  reconcileError: null,
   subscriptionsByRunId: new Set<string>(),
   actions: {
     setMessagesForBucket: () => {},

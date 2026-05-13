@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageItem } from "./MessageItem"
+import { MessageSkeleton } from "./MessageSkeleton"
 import type { Message } from "@/types"
 
 interface Props {
@@ -85,19 +86,26 @@ export function MessageList({ messages, isStreaming, onSendMessage, showSuggesti
   return (
     <ScrollArea className="flex-1">
       <div ref={containerRef} className="space-y-1 px-6 py-6 max-w-4xl mx-auto">
-        {messages.map((msg, idx) => {
-          const isLastAssistant =
-            msg.role === "assistant" && idx === messages.length - 1
-          return (
-            <MessageItem
-              key={msg.id}
-              message={msg}
-              isStreaming={isStreaming && isLastAssistant}
-              onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
-              onResume={onResume}
-            />
-          )
-        })}
+        {/* Phase 068.5 (D-068.5-11 + D-068.5-12): cold-load skeleton placeholder
+            when the bucket is empty AND no localStorage entry hydrated. Clears
+            the instant the first message arrives (hydrate or reconcile). */}
+        {messages.length === 0 ? (
+          <MessageSkeleton />
+        ) : (
+          messages.map((msg, idx) => {
+            const isLastAssistant =
+              msg.role === "assistant" && idx === messages.length - 1
+            return (
+              <MessageItem
+                key={msg.id}
+                message={msg}
+                isStreaming={isStreaming && isLastAssistant}
+                onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
+                onResume={onResume}
+              />
+            )
+          })
+        )}
         <div ref={bottomRef} />
       </div>
     </ScrollArea>
