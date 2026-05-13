@@ -5,6 +5,7 @@ import { AuthPage } from "./pages/AuthPage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+import { DevTwoPaneMock } from "@/components/dev/DevTwoPaneMock"
 
 export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health"
 
@@ -35,6 +36,7 @@ function App() {
           prefillMessage={prefillMessage}
           onSetPrefillMessage={setPrefillMessage}
         />
+        <DevTwoPaneMock />
       </TooltipProvider>
     </StreamsProvider>
   )

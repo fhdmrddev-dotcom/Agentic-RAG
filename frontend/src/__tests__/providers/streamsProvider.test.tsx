@@ -25,8 +25,9 @@
  * readFileSync / fs imports here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { renderHook, waitFor, act } from "@testing-library/react"
+import { render, renderHook, waitFor, act } from "@testing-library/react"
 import type { ReactNode } from "react"
+import type { Message } from "@/types"
 
 // ── Mock API module ───────────────────────────────────────────────────────────
 // vi.mock is hoisted; use vi.hoisted() for any closure-captured vars.
@@ -65,7 +66,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }))
 
-import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
+import { StreamsProvider, useStreamActions, useThreadMessages } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import type { StreamCallbacks } from "@/lib/api"
 
@@ -788,5 +789,135 @@ describe("Phase 068 — listener migration (D-068-07 / D-068-08 / SC#1)", () => 
         })
       }
     }
+  })
+})
+
+// =============================================================================
+// Phase 068 Plan 4 (SC#3 binding gate) — multi-surface isolation.
+//
+// Two tests:
+//   1. Re-render isolation — render-counter ref pattern per RESEARCH §Finding #5
+//      / §Pattern 6. A write to `('mock-eval', T)` re-renders the eval consumer
+//      exactly +1 time and does NOT re-render the chat consumer.
+//   2. Cross-surface bucket isolation — state-level reference-equality check:
+//      `setMessagesForBucket('mock-eval', T, msgs)` does NOT mutate the chat
+//      bucket; the reference to `bucketsBySurface.get('chat')?.get(T)` is
+//      preserved. (RESEARCH §Pattern 3 — nested-Map immutable replace only
+//      touches the affected surface.)
+//
+// Test-only: direct store access permitted; production code MUST go through
+// named hooks (D-068-03).
+// =============================================================================
+describe("Phase 068 — multi-surface isolation (SC#3)", () => {
+  it("re-render isolation: write to mock-eval bucket does NOT re-render chat consumer", () => {
+    const renderCount = { chat: 0, mockEval: 0 }
+
+    function ChatConsumer({ threadId }: { threadId: string }) {
+      renderCount.chat++
+      const msgs = useThreadMessages(threadId, "chat")
+      return <div data-testid="chat">{msgs.length}</div>
+    }
+
+    function MockEvalConsumer({ threadId }: { threadId: string }) {
+      renderCount.mockEval++
+      const msgs = useThreadMessages(threadId, "mock-eval")
+      return <div data-testid="eval">{msgs.length}</div>
+    }
+
+    renderCount.chat = 0
+    renderCount.mockEval = 0
+
+    render(
+      <StreamsProvider>
+        <ChatConsumer threadId="thread-A" />
+        <MockEvalConsumer threadId="thread-A" />
+      </StreamsProvider>,
+    )
+
+    const baselineChat = renderCount.chat
+    const baselineEval = renderCount.mockEval
+
+    act(() => {
+      useStreamsStore
+        .getState()
+        .actions.setMessagesForBucket("mock-eval", "thread-A", [
+          {
+            id: "msg-1",
+            thread_id: "thread-A",
+            user_id: "",
+            role: "assistant",
+            content: "from eval",
+            created_at: "2026-05-13T00:00:00Z",
+            updated_at: "2026-05-13T00:00:00Z",
+            runId: "run-eval-1",
+          } as Message,
+        ])
+    })
+
+    // SC#3 binding assertion: chat consumer renders zero additional times
+    // after a mock-eval write.
+    expect(renderCount.chat).toBe(baselineChat)
+    // The eval consumer re-renders exactly +1 time (the write produced a new
+    // bucket reference and the atomic selector saw a new value).
+    expect(renderCount.mockEval).toBe(baselineEval + 1)
+  })
+
+  it("cross-surface bucket isolation: setMessagesForBucket('mock-eval', T, msgs) does not mutate bucketsBySurface.get('chat').get(T)", () => {
+    // Pre-seed the chat bucket with one message.
+    act(() => {
+      useStreamsStore
+        .getState()
+        .actions.setMessagesForBucket("chat", "thread-A", [
+          {
+            id: "chat-msg-1",
+            thread_id: "thread-A",
+            user_id: "user-1",
+            role: "user",
+            content: "from chat",
+            created_at: "2026-05-13T00:00:00Z",
+            updated_at: "2026-05-13T00:00:00Z",
+          } as Message,
+        ])
+    })
+
+    const chatBucketBefore = useStreamsStore
+      .getState()
+      .bucketsBySurface.get("chat")
+      ?.get("thread-A")
+
+    // Write to mock-eval / thread-A — must NOT touch the chat surface map.
+    act(() => {
+      useStreamsStore
+        .getState()
+        .actions.setMessagesForBucket("mock-eval", "thread-A", [
+          {
+            id: "eval-msg-1",
+            thread_id: "thread-A",
+            user_id: "",
+            role: "assistant",
+            content: "from eval",
+            created_at: "2026-05-13T00:00:00Z",
+            updated_at: "2026-05-13T00:00:00Z",
+          } as Message,
+        ])
+    })
+
+    const chatBucketAfter = useStreamsStore
+      .getState()
+      .bucketsBySurface.get("chat")
+      ?.get("thread-A")
+
+    // Reference equality — RESEARCH §Pattern 3: nested-Map immutable replace
+    // only touches the affected surface's inner Map; the chat surface's
+    // thread-A array reference is preserved.
+    expect(chatBucketAfter).toBe(chatBucketBefore)
+
+    // And the eval bucket has the new message.
+    const evalBucket = useStreamsStore
+      .getState()
+      .bucketsBySurface.get("mock-eval")
+      ?.get("thread-A")
+    expect(evalBucket?.length).toBe(1)
+    expect(evalBucket?.[0].id).toBe("eval-msg-1")
   })
 })
