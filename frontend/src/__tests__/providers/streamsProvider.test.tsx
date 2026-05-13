@@ -1274,16 +1274,28 @@ describe("Phase 068.5 — retry banner: silent retry at 1s, then surfaces banner
   })
 
   it("Test 1 — first fetch rejects, retry at 1s succeeds: NO banner state set; reconcileError stays null", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds with [].
     mockGetMessages.mockReset()
-    mockGetMessages.mockRejectedValueOnce(new Error("network"))
-    mockGetMessages.mockResolvedValueOnce([])
+    mockGetMessages.mockResolvedValue([])
 
     const { result } = renderProvider()
 
-    // Set viewing thread first so the post-await active-thread gate matches.
+    // Set viewing thread first — fires an auto-reconcile that consumes the baseline.
     await act(async () => {
       result.current.setViewingThread("T1")
     })
+    // Advance any pending timers from the auto-reconcile so we start clean.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Reset call history and queue the failing-then-succeeding sequence for the
+    // explicit loadMessages call. The default-resolve safety net catches any
+    // subsequent reconciles triggered by side-effects.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValueOnce(new Error("network"))
+    mockGetMessages.mockResolvedValueOnce([])
+    mockGetMessages.mockResolvedValue([])
 
     // Fire loadMessages — first attempt rejects.
     let loadPromise: Promise<void>
@@ -1304,14 +1316,22 @@ describe("Phase 068.5 — retry banner: silent retry at 1s, then surfaces banner
   })
 
   it("Test 2 — both attempts reject: reconcileError populated with threadId + error", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds.
     mockGetMessages.mockReset()
-    mockGetMessages.mockRejectedValue(new Error("network"))
+    mockGetMessages.mockResolvedValue([])
 
     const { result } = renderProvider()
 
     await act(async () => {
       result.current.setViewingThread("T1")
     })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Now make BOTH retry attempts reject.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValue(new Error("network"))
 
     let loadPromise: Promise<void>
     act(() => {
@@ -1359,16 +1379,25 @@ describe("Phase 068.5 — retry banner: AbortError is NOT a fetch failure (no re
   })
 
   it("AbortError early-returns without scheduling a retry; reconcileError stays null", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds.
     mockGetMessages.mockReset()
-    mockGetMessages.mockRejectedValueOnce(
-      Object.assign(new Error("aborted"), { name: "AbortError" }),
-    )
+    mockGetMessages.mockResolvedValue([])
 
     const { result } = renderProvider()
 
     await act(async () => {
       result.current.setViewingThread("T1")
     })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Reset and queue an AbortError for the explicit loadMessages call.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValueOnce(
+      Object.assign(new Error("aborted"), { name: "AbortError" }),
+    )
+    mockGetMessages.mockResolvedValue([]) // safety net
 
     let loadPromise: Promise<void>
     act(() => {

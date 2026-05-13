@@ -846,37 +846,65 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
         // Phase 068 (L-068-03 + L-068-06): post-await sole-writer guard +
         // MERGE 3-clause filter. Source: useMessages.ts:603-671.
+        //
+        // Phase 068.5 Plan 02 (D-068.5-08 + D-068.5-09): wraps the existing body
+        // (L-068.5-02 MERGE 3-clause filter byte-identical inside) with a
+        // silent-1s-then-banner retry shell. AbortError unchanged.
+        // Banner state lives in `useStreamsStore.reconcileError`; ChatArea renders
+        // the banner slot.
         loadMessages: async (threadId, surfaceId = "chat") => {
-          // D-060-03: cancel the previous in-flight getMessages fetch.
-          loadAbortRef.current?.abort()
-          const controller = new AbortController()
-          loadAbortRef.current = controller
-          try {
-            const data = await getMessages(threadId, controller.signal)
-            // L-068-03 / D-060-02: read activeThreadIdRef ONLY after await —
-            // discards cross-thread responses.
-            if (activeThreadIdRef.current !== threadId) return
-            // Protect optimistic placeholders if a send is in flight on the same thread.
-            if (isSendingRef.current) return
-            // L-068-06: MERGE 3-clause filter preserves live in-flight temp
-            // placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
-            //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
-            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
-              const dbRunIds = new Set(data.filter((m) => m.runId).map((m) => m.runId))
-              const liveTempPlaceholders = prev.filter(
-                (m) =>
-                  m.id.startsWith("temp-") &&
-                  m.runId &&
-                  // Keep when DB doesn't have this runId yet OR a live SSE
-                  // consumer is still bound via this runId (CR-01 fix).
-                  (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
-              )
-              return [...data, ...liveTempPlaceholders]
-            })
-          } catch (err) {
-            if (err instanceof Error && err.name === "AbortError") return
-            throw err
+          const tryFetch = async (attempt: number): Promise<void> => {
+            // D-060-03: cancel the previous in-flight getMessages fetch.
+            loadAbortRef.current?.abort()
+            const controller = new AbortController()
+            loadAbortRef.current = controller
+            try {
+              const data = await getMessages(threadId, controller.signal)
+              // L-068-03 / D-060-02: read activeThreadIdRef ONLY after await —
+              // discards cross-thread responses.
+              if (activeThreadIdRef.current !== threadId) return
+              // Protect optimistic placeholders if a send is in flight on the same thread.
+              if (isSendingRef.current) return
+              // L-068-06 / L-068.5-02: MERGE 3-clause filter preserves live in-flight
+              // temp placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
+              //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+                const dbRunIds = new Set(data.filter((m) => m.runId).map((m) => m.runId))
+                const liveTempPlaceholders = prev.filter(
+                  (m) =>
+                    m.id.startsWith("temp-") &&
+                    m.runId &&
+                    // Keep when DB doesn't have this runId yet OR a live SSE
+                    // consumer is still bound via this runId (CR-01 fix).
+                    (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
+                )
+                return [...data, ...liveTempPlaceholders]
+              })
+              // Phase 068.5: clear any prior banner state on success (handles
+              // transient outage recovery — first attempt fails, retry succeeds,
+              // or user clicks Retry and the fresh fetch succeeds).
+              if (useStreamsStore.getState().reconcileError?.threadId === threadId) {
+                useStreamsStore.setState({ reconcileError: null })
+              }
+            } catch (err) {
+              // Existing AbortError handling — early return, no retry, no banner.
+              if (err instanceof Error && err.name === "AbortError") return
+              if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError") return
+              if (attempt === 0) {
+                // D-068.5-09: silent single retry at 1s
+                await new Promise((resolve) => setTimeout(resolve, 1000))
+                return tryFetch(1)
+              }
+              // Second failure → banner (D-068.5-08 + D-068.5-09)
+              useStreamsStore.setState({
+                reconcileError: {
+                  threadId,
+                  error: err instanceof Error ? err : new Error(String(err)),
+                },
+              })
+            }
           }
+          await tryFetch(0)
         },
       },
     })

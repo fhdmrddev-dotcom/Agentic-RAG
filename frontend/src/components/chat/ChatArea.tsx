@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
+import { useStreamsStore } from "@/stores/streamsStore"
 import { getProviders } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
@@ -42,6 +43,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
+
+  // Phase 068.5 (D-068.5-08..10): retry banner state + manual retry + dismiss.
+  // The silent-1s-then-banner retry policy lives in StreamsProvider's
+  // loadMessages action body; this surface only reads reconcileError and
+  // exposes Retry / Dismiss affordances over cached content (banner never
+  // blanks the message list — L-068.5-01 / L-068.5-03 preserve cached data).
+  const reconcileError = useStreamsStore((s) => s.reconcileError)
+  const handleRetryReconcile = useCallback(() => {
+    useStreamsStore.setState({ reconcileError: null })
+    if (thread) {
+      loadMessages(thread.id).catch(console.error)
+    }
+  }, [thread, loadMessages])
+  const dismissReconcileError = useCallback(() => {
+    useStreamsStore.setState({ reconcileError: null })
+  }, [])
 
   useEffect(() => {
     setAgentMode("default")
@@ -277,6 +294,39 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       {fallbackNotice && (
         <div className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1">
           {fallbackNotice}
+        </div>
+      )}
+      {/* Phase 068.5 D-068.5-08..10: silent-1s-then-banner retry banner. Renders
+          over cached content when loadMessages fails twice in a row. Dismissable
+          (Retry re-fires reconcile; × clears state). Pattern S2 amber-400 chrome,
+          sibling of fallbackNotice slot. threadId predicate prevents stale banner
+          rendering on a thread different from the failing one. */}
+      {reconcileError && reconcileError.threadId === thread?.id && (
+        <div
+          className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1 flex items-center justify-between"
+          data-testid="reconcile-error-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <span>Couldn&apos;t load latest messages. Showing cached version.</span>
+          <span className="flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={handleRetryReconcile}
+              className="underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
+              aria-label="Retry loading messages"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={dismissReconcileError}
+              className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </span>
         </div>
       )}
       <MessageList
