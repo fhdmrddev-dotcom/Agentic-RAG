@@ -486,7 +486,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 068 — StreamsProvider Context Lift | 4/4 | Complete    | 2026-05-13 |
 | 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 2/2 | Complete    | 2026-05-14 |
 | 069 — PdfExtractor Abstraction Scaffold | 2/2 | Complete    | 2026-05-13 |
-| 070 — Docling httpx Spike | 0/2 | Not started | — |
+| 070 — Docling httpx Spike | 1/2 | In progress | — |
 | 071 — Docling Primary Path | 0/4 | Not started | — |
 | 072 — Multimodal Lift + DOCX Completeness | 0/3 | Not started | — |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |

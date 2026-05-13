@@ -4,8 +4,8 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: executing
 stopped_at: Phase 070 context gathered
-last_updated: "2026-05-13T21:36:03.489Z"
-last_activity: 2026-05-14
+last_updated: "2026-05-13T21:51:58.675Z"
+last_activity: 2026-05-13 -- Phase 070 execution started
 progress:
   total_phases: 4
   completed_phases: 3
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 068.5 — chat-surface-persistent-rendering-in-flight-pulse
+**Current focus:** Phase 070 — docling-httpx-spike
 
 ## Current Position
 
-Phase: 068.5
-Plan: 068.5-02 (pending — autonomous=false, requires Chrome MCP UAT + 5/5 lived-experience cycles)
-Status: Phase 068.5 in progress — Plan 01 complete (cache substrate + cold-render fix), Plan 02 pending
-Last activity: 2026-05-14
+Phase: 070 (docling-httpx-spike) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 070
+Last activity: 2026-05-13 -- Phase 070 execution started
 
 ## PRD-reset outputs (committed)
 
