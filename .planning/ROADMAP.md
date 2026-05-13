@@ -238,7 +238,10 @@ Full details below in **Phase Details**.
 ### Phase 068.5: Chat-Surface Persistent Rendering + In-Flight Pulse
 **Goal**: The chat surface never blanks during thread switches, page navigations, or refreshes — last-known-good content paints instantly, server data reconciles in the background without clobbering streaming buckets, and in-flight assistant turns show a visible pulse so users can tell "still working" from "broken / stuck".
 **Depends on**: Phase 068 (consumes the `<StreamsProvider>` Context surface; reads `streamsStore` bucket as the in-memory cache source)
-**Plans**: 2 (placeholder; refined at `/gsd:discuss-phase 068.5`)
+**Plans**: 2
+**Plans:**
+- [ ] 068.5-01-PLAN.md — Cache substrate + cold-render fix (localStorage snapshot + sync hydrate in Zustand factory; throttled-write + LRU eviction + quota-exceeded fallback; MessageSkeleton for cold-load; DELETE unconditional clearMessages() at ChatArea.tsx:134; Wave 0 RED tests for throttle/cache/hydrate/MERGE/cross-state/skeleton)
+- [ ] 068.5-02-PLAN.md — In-flight pulse + retry banner + Chrome MCP UAT (brandPulse keyframe in index.css + tailwind.config; MessageItem.tsx Bot icon gated on runStatus === 'streaming'; silent-1s-then-banner retry wrap on loadMessages with L-068.5-02 MERGE filter byte-identical; sticky retry banner in ChatArea; SC#5 Chrome MCP paint-timing UAT + SC#6 5/5 lived-experience cycles flipping BUG-260513-01 folded→closed)
 **Requirements**: CHAT-RESILIENCE-01
 **Mid-milestone amendment**: Added 2026-05-13 in response to BUG-260513-01 re-opening with expanded scope (page-nav + occasional load failure + Claude-style cached-render UX direction). Not in original PRD §12 outline — PRD amendment recommended.
 **Success Criteria** (what must be TRUE):
