@@ -228,7 +228,7 @@ Full details below in **Phase Details**.
   3. A mocked second stream surface (test-only) subscribes alongside chat and renders without colliding on the per-thread bucket invariant; existing 063 / 063.1 / 067.x Playwright e2e regression specs stay green.
   4. The `reconcileInFlightRef` D-063.1-11 single-bit lock semantics survive the lift — concurrent reconcile calls still bail at the top guard.
 
-**Plans:** 4 plans (authored 2026-05-12):
+**Plans:** 4/4 plans complete
 - [x] 068-01-PLAN.md — Store + provider scaffold (Wave 1; install zustand@^5.0.13; create streamsStore.ts + StreamsProvider.tsx + 4 named hooks; mount in App.tsx below auth gate; useMessages unchanged)
 - [x] 068-02-PLAN.md — useMessages becomes thin reader + L-068-01..07 Vitest regression (Wave 2; binding gate SC#2 Branch D-3 per-surface; lift action bodies into provider; useMessages.ts < 100 LOC)
 - [x] 068-03-PLAN.md — Reconcile listeners migration complete (Wave 3; delete ChatArea.tsx:157-187 listener block + reconcileRef indirection; provider is sole listener owner)
@@ -464,7 +464,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 068 — StreamsProvider Context Lift | 4/4 | Complete | 2026-05-13 |
+| 068 — StreamsProvider Context Lift | 4/4 | Complete    | 2026-05-13 |
 | 069 — PdfExtractor Abstraction Scaffold | 0/2 | Not started | — |
 | 070 — Docling httpx Spike | 0/2 | Not started | — |
 | 071 — Docling Primary Path | 0/4 | Not started | — |
