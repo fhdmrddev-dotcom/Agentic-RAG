@@ -249,7 +249,7 @@ Full details below in **Phase Details**.
   5. Chrome MCP UAT: cold-cache F5 → re-navigate to a thread with 38KB of messages → cached snapshot paints within 100ms of route-render; reconciled fresh data within 1s; no visible blank intermediate state.
   6. BUG-260513-01 status transitions `folded → closed` at milestone close after verify-work confirms 5/5 lived-experience UAT cycles green.
 
-
+### Phase 069: `PdfExtractor` Abstraction Scaffold
 **Goal**: Document ingestion flows through a `PdfExtractor` abstract base class so swapping extractors becomes a 1-line config change, with zero observable behavior change in this phase.
 **Depends on**: Nothing (Wave 0)
 **Plans**: 2

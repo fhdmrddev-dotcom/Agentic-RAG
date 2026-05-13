@@ -4,7 +4,7 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: completed
 stopped_at: Phase 068.5 context gathered
-last_updated: "2026-05-13T15:35:35.301Z"
+last_updated: "2026-05-13T15:38:34.229Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 3
@@ -337,4 +337,4 @@ Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Co
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 065 (skills-test-infrastructure-repair) — 3 plans — 2026-05-09T14:45:52.132Z
+**Planned Phase:** 069 (PdfExtractor Abstraction Scaffold) — 2 plans — 2026-05-13T15:38:34.221Z
