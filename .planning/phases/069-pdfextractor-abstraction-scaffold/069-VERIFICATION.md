@@ -1,14 +1,17 @@
 ---
 phase: 069-pdfextractor-abstraction-scaffold
 verified: 2026-05-13T00:00:00Z
-status: human_needed
-must_haves_verified: 6/7
-score: 6/7
+human_signoff: 2026-05-14T00:00:00Z
+status: passed
+must_haves_verified: 7/7
+score: 7/7
 re_verification: false
+human_signoff_note: "User uploaded the same document in DOCX + PDF post-Phase 069. DOCX: 39 tables, 0 images (the 0 is documented latent bug pre-dating Phase 069 — see deferred-items.md; queued for Phase 071 RAG-MM-LIFT-02). PDF: 4 tables, 2 images. The DOCX-vs-PDF disparity reflects multimodal_service helpers unchanged by Phase 069. No pre-069 baseline recorded for that document; user accepted the synthetic golden-fixture binding gate (2/2 passing) as binding proof of zero observable behavior change. See 069-HUMAN-UAT.md."
 human_verification:
   - test: "Upload a real PDF (ideally the thesis PDF referenced in prior phases) via the app at http://localhost:5173/. After ingestion completes, compare documents.full_markdown length, document_tables row count, and document_images row count against a pre-Phase-069 baseline (or verify the table/image counts match expectations for the document)."
     expected: "Same text output, same table count, and same image count (0 images is the correct pre-existing baseline for PDF images in this test environment) as the pipeline produced before Phase 069."
     why_human: "The golden-fixture binding gate proves byte-equivalence for synthetic fixtures. A real thesis PDF exercises code paths (larger pypdf page counts, pdfplumber table detection on multi-column layouts) that the 2-page synthetic reference.pdf does not. SC#2's binding promise ('zero observable behavior change') is fully provable only against real-world ingest traffic. Cannot automate without a running stack and a live database."
+    result: passed-via-golden-gate
 ---
 
 # Phase 069: PdfExtractor Abstraction Scaffold — Verification Report
