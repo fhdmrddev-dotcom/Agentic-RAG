@@ -4,9 +4,9 @@ title: 200-800ms blank chat surface on thread switch + occasional load failure o
 reported: 2026-05-13
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat-surface, frontend/streaming, frontend/navigation, UX/loading-states]
-folded_into: null
+folded_into: "068.5"
 related_seeds: [SEED-007]
 re_open_trigger: null
 reproduces_on:
@@ -123,6 +123,13 @@ User decision pending on routing. Default recommendation: Option A in v2.6 if th
 ### Updated re-open trigger
 
 Now superseded — status is `open`. When the chosen routing phase is picked, set `folded_into: NNN` and flip to `folded`. If the fix ships verifiably, flip to `closed` at `/gsd:complete-milestone`.
+
+### Routing decision 2026-05-13 (Option A)
+
+Folded into **Phase 068.5: Chat-Surface Persistent Rendering + In-Flight Pulse** (mid-milestone amendment to v2.6). REQ-ID `CHAT-RESILIENCE-01`. 2 plans (placeholder; refined at `/gsd:discuss-phase 068.5`). Phase added to `.planning/ROADMAP.md` Wave 0 between 068 and 069 (no dependency conflicts; runs parallel with 069+). `CHAT-RESILIENCE-01` added to `.planning/REQUIREMENTS.md` Theme C alongside `STREAMS-PROVIDER-01`. PRD v2.6 §4 amendment recommended (still says "21 Active REQs"); user discretion.
+
+**Lifecycle from here:**
+- `folded` (now) → `closed` at `/gsd:complete-milestone` after Phase 068.5 verify-work confirms all 6 SCs green via 5/5 lived-experience UAT cycles (mirroring Phase 067.5's lived-experience precedent that closes STREAM-04-correctness lineage).
 
 ### New affected area added
 

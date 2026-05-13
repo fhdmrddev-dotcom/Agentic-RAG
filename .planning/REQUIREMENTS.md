@@ -7,7 +7,9 @@
 
 ## v2.6 Requirements
 
-21 Active requirements grouped by theme. Each maps to exactly one roadmap phase (filled in §Traceability after roadmap generation).
+22 Active requirements grouped by theme. Each maps to exactly one roadmap phase (filled in §Traceability after roadmap generation).
+
+> **Mid-milestone amendment 2026-05-13:** CHAT-RESILIENCE-01 added in response to BUG-260513-01 re-opening with expanded scope (page-nav + occasional load failure). Owned by Phase 068.5 — direct frontend follow-up to Phase 068's StreamsProvider lift. PRD v2.6 §4 amendment recommended at user's discretion.
 
 ### Theme A — RAG Quality Lift
 
@@ -24,9 +26,10 @@
 - [ ] **WORKER-LIFT-03**: A new ADR (`D-PRD-12`) explicitly supersedes `D-v2.5-02`; `CLAUDE.md`'s "Single uvicorn worker" rule is updated to "Multi-worker — see D-PRD-12 for the audit checklist".
 - [ ] **WORKER-LIFT-04**: `GET /admin/backpressure` returns the documented JSON shape, gated on the existing operator role check (when none exists yet, scoped to a hard-coded admin user list via env var until v3.1 ships RBAC).
 
-### Theme C — Streams Provider Pre-emptive Lift
+### Theme C — Streams Provider Pre-emptive Lift + Chat-Surface Resilience
 
 - [ ] **STREAMS-PROVIDER-01**: A `<StreamsProvider>` Context owns all run-stream subscriptions; `useMessages` reads from it via `useStreamsContext()`; a second concurrent stream surface (mocked eval pane) renders without state collision. The Phase 067.5 Branch D-3 streaming-bucket guard at `frontend/src/hooks/useMessages.ts:572-590` is preserved verbatim; existing chat regression tests (063 / 063.1 / 067.x) stay green.
+- [ ] **CHAT-RESILIENCE-01**: The chat surface paints last-known-good messages immediately on thread switch / page navigation / page refresh (no blank window). `GET /threads/{id}/messages` reconciles in the background without clobbering streaming buckets (Phase 067.5 Branch D-3 guard respected). Assistant turns whose `runs.status` is `running` or `queued` render with a visible in-flight pulse / animated brand mark until terminal SSE arrives. Fetch failures surface an inline retry over cached content instead of blanking the message list. Closes BUG-260513-01.
 
 ### Theme D — Polish Carry-forwards
 
@@ -134,6 +137,7 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Pending |
 | WORKER-LIFT-04 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | STREAMS-PROVIDER-01 | 068 — `<StreamsProvider>` Context Lift | Pending |
+| CHAT-RESILIENCE-01 | 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | Pending |
 | POLISH-SEED-008-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
 | POLISH-SEED-008-02 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
 | POLISH-SEED-009-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Pending |
@@ -147,10 +151,10 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Pending |
 
 **Coverage:**
-- v2.6 requirements: 21 total
-- Mapped to phases: 21 / 21 ✓
+- v2.6 requirements: 22 total
+- Mapped to phases: 22 / 22 ✓
 - Unmapped: 0
-- Orphaned phases (no REQ-ID owner): 0 — Phase 068 owns STREAMS-PROVIDER-01; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting milestone-close verification
+- Orphaned phases (no REQ-ID owner): 0 — Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 (added 2026-05-13 to absorb BUG-260513-01); Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting milestone-close verification
 
 **Routing notes:**
 - **TOKEN-COL-01 → Phase 073** (per ROADMAP F-1): added at PRD signoff 2026-05-12; the PRD §12 outline pre-dates the addition. Attached to 073 as a forward-fill of `runs.input_tokens` / `runs.output_tokens` during the asyncpg-refactored `_drain_stream_with_close_on_cancel` finalize path — the natural code site for the two new column writes.

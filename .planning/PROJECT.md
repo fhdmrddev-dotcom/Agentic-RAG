@@ -12,7 +12,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 **Goal:** Build the production-ready substrate the next four milestones depend on — close the user-observed PDF↔DOCX extraction inconsistency, lift the single-worker concurrency ceiling, hoist the streams subscription surface out of `useMessages`, and absorb six carry-forward seeds before they compound.
 
-**Scope brief:** `.planning/PRDs/v2.6.md` (locked 2026-05-10, signoff 2026-05-12). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean). 21 Active REQ-IDs in PRD §4. 15 phases in PRD §12 (068–082).
+**Scope brief:** `.planning/PRDs/v2.6.md` (locked 2026-05-10, signoff 2026-05-12). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean). 21 Active REQ-IDs in PRD §4 + 1 mid-milestone amendment (CHAT-RESILIENCE-01 added 2026-05-13 to absorb BUG-260513-01, owned by Phase 068.5). 16 phases (068–082 in PRD §12 + Phase 068.5 amendment). PRD v2.6 §4 amendment recommended.
 
 **Target features (6 themes):**
 
@@ -34,7 +34,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 ## Current State
 
 **Shipped:** v2.5 (Deployment Strategy) — 2026-05-09 (16 phases, 64 plans, 445 commits, ~104K LOC delta)
-**Active:** v2.6 Foundation (RAG Quality + Multi-Worker + Polish) — kicked off 2026-05-12; phases 068–082 proposed in PRD §12; scope brief at `.planning/PRDs/v2.6.md`
+**Active:** v2.6 Foundation (RAG Quality + Multi-Worker + Polish) — kicked off 2026-05-12; phases 068–082 proposed in PRD §12 + Phase 068.5 amendment (added 2026-05-13); scope brief at `.planning/PRDs/v2.6.md`
 **Stack:** React/Vite + FastAPI + Supabase (Postgres + pgvector + Storage) + Redis Streams (run-backed streaming)
 **Codebase:** ~160K LOC (Python + TypeScript) post-v2.5; 531 files touched across the v2.5 window
 **Phases shipped:** 73 phases across 7 milestones (v1.0–v2.5); 144+ plans executed

@@ -19,7 +19,7 @@
 
 **Scope brief:** [`.planning/PRDs/v2.6.md`](PRDs/v2.6.md) (locked 2026-05-10, signoff 2026-05-12 with TOKEN-COL-01 addition). All 6 PRD gates passed (compatibility, scalability, coverage, doc-validity, surprise-feature, lean).
 
-**Phase numbering basis:** Continues from v2.5's last phase 067.5 → v2.6 starts at Phase **068** and runs through Phase **082** (15 phases, ~38 plans total). Matches PRD §12 phase outline verbatim.
+**Phase numbering basis:** Continues from v2.5's last phase 067.5 → v2.6 starts at Phase **068** and runs through Phase **082** (16 phases, ~40 plans total — includes mid-milestone amendment Phase 068.5). Matches PRD §12 phase outline verbatim except for Phase 068.5, added 2026-05-13 to absorb BUG-260513-01 (chat-surface persistent rendering); PRD v2.6 §4 amendment recommended at user's discretion.
 
 **Migration range reserved:** `039 – 049` (per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`).
 - Used: `039` (071), `040` (071), `041` (071), `042` (071), `043` (078), `044` (072)
@@ -168,6 +168,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 **Wave 0 — Foundational** (no inter-wave dependencies; can start in parallel)
 
 - [ ] **Phase 068: `<StreamsProvider>` Context Lift** — Hoist `subscriptionsRef`, `lastSeenOffsetRef`, `messagesByThread` Map, and the Phase 067.5 Branch D-3 `clearMessages` guard from `frontend/src/hooks/useMessages.ts` (1229 LOC) into a top-level `<StreamsProvider>` Context. `useMessages` becomes a thin reader. Frontend-only. (4 plans)
+- [ ] **Phase 068.5: Chat-Surface Persistent Rendering + In-Flight Pulse** — Render last-known-good messages immediately on thread switch / page nav / refresh; reconcile via `GET /threads/{id}/messages` in background; animated pulse on un-terminated assistant turns (`runs.status='running'`); inline retry on fetch failure. Closes BUG-260513-01. Frontend-only with backend touchpoint to expose `runs.status` per-message client-side. (2 plans)
 - [ ] **Phase 069: `PdfExtractor` Abstraction Scaffold** — Carve current pypdf + python-docx + pdfplumber pipeline behind a `PdfExtractor` ABC; no behavior change at the wire layer. (2 plans)
 - [ ] **Phase 070: Docling httpx Spike** — Validate Q-v2.6-01 resolution path: try (a) supabase-py 2.10 → 2.29, (b) docling pin-back, (c) subprocess isolation, in that order. Output: a chosen path + a working CI proof. (2 plans)
 
@@ -234,7 +235,21 @@ Full details below in **Phase Details**.
 - [x] 068-03-PLAN.md — Reconcile listeners migration complete (Wave 3; delete ChatArea.tsx:157-187 listener block + reconcileRef indirection; provider is sole listener owner)
 - [x] 068-04-PLAN.md — Mocked second surface + Chrome MCP exercise (Wave 4; SC#3 binding gate; DevTwoPaneMock dev-only component; re-render isolation test; manual checkpoint)
 
-### Phase 069: `PdfExtractor` Abstraction Scaffold
+### Phase 068.5: Chat-Surface Persistent Rendering + In-Flight Pulse
+**Goal**: The chat surface never blanks during thread switches, page navigations, or refreshes — last-known-good content paints instantly, server data reconciles in the background without clobbering streaming buckets, and in-flight assistant turns show a visible pulse so users can tell "still working" from "broken / stuck".
+**Depends on**: Phase 068 (consumes the `<StreamsProvider>` Context surface; reads `streamsStore` bucket as the in-memory cache source)
+**Plans**: 2 (placeholder; refined at `/gsd:discuss-phase 068.5`)
+**Requirements**: CHAT-RESILIENCE-01
+**Mid-milestone amendment**: Added 2026-05-13 in response to BUG-260513-01 re-opening with expanded scope (page-nav + occasional load failure + Claude-style cached-render UX direction). Not in original PRD §12 outline — PRD amendment recommended.
+**Success Criteria** (what must be TRUE):
+  1. Switching thread, navigating to a chat surface, or refreshing the page renders prior messages immediately (no blank message-list window). Cache source: `streamsStore` bucket if populated; localStorage snapshot if bucket cold post-F5; empty state with skeleton only as last resort.
+  2. `GET /threads/{id}/messages` reconciles in background without violating the Phase 067.5 Branch D-3 guard (`streamingThreadIdRef.current` buckets are never clobbered); existing Vitest regression test L-068-01 stays green.
+  3. Assistant messages whose `runs.status` is `running` or `queued` (and whose terminal SSE has not yet replayed) render with a visible pulse / animated brand mark; transition to static state when terminal arrives.
+  4. Fetch failures (network error, 5xx, timeout) surface an inline retry affordance over cached content rather than blanking the message list. Cached content remains visible during retry attempts.
+  5. Chrome MCP UAT: cold-cache F5 → re-navigate to a thread with 38KB of messages → cached snapshot paints within 100ms of route-render; reconciled fresh data within 1s; no visible blank intermediate state.
+  6. BUG-260513-01 status transitions `folded → closed` at milestone close after verify-work confirms 5/5 lived-experience UAT cycles green.
+
+
 **Goal**: Document ingestion flows through a `PdfExtractor` abstract base class so swapping extractors becomes a 1-line config change, with zero observable behavior change in this phase.
 **Depends on**: Nothing (Wave 0)
 **Plans**: 2
@@ -451,10 +466,11 @@ v2.6's outputs unblock downstream milestone PRDs as follows:
 
 ## Coverage Summary
 
-- **v2.6 Active requirements:** 21 (per PRD §4 Active + REQUIREMENTS.md)
-- **Mapped to phases:** 21 / 21 ✓
+- **v2.6 Active requirements:** 22 (per REQUIREMENTS.md; PRD §4 holds the original 21 — see note below)
+- **Mapped to phases:** 22 / 22 ✓
 - **Orphaned requirements:** 0
-- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all four are intentional non-REQ-bearing phases with explicit roles)
+- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 added 2026-05-13; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all four are intentional non-REQ-bearing phases with explicit roles)
+- **PRD amendment status:** `.planning/PRDs/v2.6.md` §4 still lists 21 Active REQs (matches signoff 2026-05-12). REQUIREMENTS.md and ROADMAP carry the 22nd REQ (CHAT-RESILIENCE-01) for Phase 068.5. User decision on whether to amend the locked PRD pending.
 
 See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 
@@ -465,6 +481,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 068 — StreamsProvider Context Lift | 4/4 | Complete    | 2026-05-13 |
+| 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 0/2 | Not started | — |
 | 069 — PdfExtractor Abstraction Scaffold | 0/2 | Not started | — |
 | 070 — Docling httpx Spike | 0/2 | Not started | — |
 | 071 — Docling Primary Path | 0/4 | Not started | — |
@@ -479,7 +496,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 080 — VPS Runbook + Deployment Guide Correction | 0/1 | Not started | — |
 | 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
-| **Total (v2.6)** | **0/38** | **Not started** | **—** |
+| **Total (v2.6)** | **4/40** | **In progress** | **—** |
 
 ---
 
