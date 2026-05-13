@@ -1,6 +1,10 @@
 fastapi==0.115.6
 sse-starlette==2.4.1
 uvicorn[standard]==0.32.1
+# Pinned by Phase 070 (Q-v2.6-01 resolution): supabase 2.10 → 2.29.x closes the
+# docling httpx<0.28 conflict. Bumping past supabase 2.29.x or relaxing the
+# httpx<0.29 cap re-introduces the conflict. Re-run
+# backend/tests/integration/test_pdf_extractor_docling_compat.py before changing.
 supabase==2.29.0
 openai>=2.0.0
 anthropic>=0.97.0
