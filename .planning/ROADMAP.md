@@ -241,7 +241,7 @@ Full details below in **Phase Details**.
 **Plans**: 2
 **Plans:**
 - [x] 068.5-01-PLAN.md — Cache substrate + cold-render fix (localStorage snapshot + sync hydrate in Zustand factory; throttled-write + LRU eviction + quota-exceeded fallback; MessageSkeleton for cold-load; DELETE unconditional clearMessages() at ChatArea.tsx:134; Wave 0 RED tests for throttle/cache/hydrate/MERGE/cross-state/skeleton) — 2026-05-14
-- [ ] 068.5-02-PLAN.md — In-flight pulse + retry banner + Chrome MCP UAT (brandPulse keyframe in index.css + tailwind.config; MessageItem.tsx Bot icon gated on runStatus === 'streaming'; silent-1s-then-banner retry wrap on loadMessages with L-068.5-02 MERGE filter byte-identical; sticky retry banner in ChatArea; SC#5 Chrome MCP paint-timing UAT + SC#6 5/5 lived-experience cycles flipping BUG-260513-01 folded→closed)
+- [x] 068.5-02-PLAN.md — In-flight pulse + retry banner + Chrome MCP UAT (brandPulse keyframe in index.css + tailwind.config; MessageItem.tsx Bot icon gated on runStatus === 'streaming'; silent-1s-then-banner retry wrap on loadMessages with L-068.5-02 MERGE filter byte-identical; sticky retry banner in ChatArea; SC#5 Chrome MCP paint-timing UAT + SC#6 5/5 lived-experience cycles flipping BUG-260513-01 folded→closed)
 **Requirements**: CHAT-RESILIENCE-01
 **Mid-milestone amendment**: Added 2026-05-13 in response to BUG-260513-01 re-opening with expanded scope (page-nav + occasional load failure + Claude-style cached-render UX direction). Not in original PRD §12 outline — PRD amendment recommended.
 **Success Criteria** (what must be TRUE):
@@ -484,7 +484,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 068 — StreamsProvider Context Lift | 4/4 | Complete    | 2026-05-13 |
-| 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 1/2 | In Progress | — |
+| 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 2/2 | Complete    | 2026-05-14 |
 | 069 — PdfExtractor Abstraction Scaffold | 2/2 | Complete    | 2026-05-13 |
 | 070 — Docling httpx Spike | 0/2 | Not started | — |
 | 071 — Docling Primary Path | 0/4 | Not started | — |
