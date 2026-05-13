@@ -1,0 +1,34 @@
+{
+  "image_extraction_error": null,
+  "images": [],
+  "table_extraction_error": null,
+  "tables": [
+    {
+      "headers": [
+        "Col1",
+        "Col2",
+        "Col3"
+      ],
+      "page": null,
+      "rows": [
+        [
+          "a1",
+          "b1",
+          "c1"
+        ],
+        [
+          "a2",
+          "b2",
+          "c2"
+        ],
+        [
+          "a3",
+          "b3",
+          "c3"
+        ]
+      ],
+      "table_index": 0
+    }
+  ],
+  "text": "Reference DOCX for Extraction Tests\n\nReference DOCX paragraph 1. Lorem ipsum dolor sit amet, consectetur adipiscing elit. This paragraph gives python-docx non-trivial content for the golden-output fixture.\n\nReference DOCX paragraph 2. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+}
