@@ -69,10 +69,19 @@ export default {
           "0%, 100%": { boxShadow: "0 0 0 0 hsl(239 84% 67% / 0.4)" },
           "50%": { boxShadow: "0 0 0 6px hsl(239 84% 67% / 0)" },
         },
+        // Phase 068.5 (D-068.5-05..07): brand-mark breathing pulse — sibling of
+        // pulseGlow. Keyframe body lives in index.css; this entry preserves the
+        // utility class name from Tailwind purge. camelCase matches existing
+        // convention (fadeSlideUp, pulseGlow).
+        brandPulse: {
+          "0%, 100%": { transform: "scale(1.0)", opacity: "0.85" },
+          "50%": { transform: "scale(1.05)", opacity: "1.0" },
+        },
       },
       animation: {
         fadeSlideUp: "fadeSlideUp 0.3s ease-out forwards",
         pulseGlow: "pulseGlow 2s ease-in-out infinite",
+        brandPulse: "brandPulse 1.5s ease-in-out infinite",
       },
     },
   },
