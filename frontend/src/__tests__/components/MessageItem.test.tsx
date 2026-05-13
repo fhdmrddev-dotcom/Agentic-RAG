@@ -129,3 +129,92 @@ describe("MessageItem – streaming state", () => {
     expect(cursor).not.toBeInTheDocument()
   })
 })
+
+// =============================================================================
+// Phase 068.5 — pulse class gating on runStatus (D-068.5-05..07 + L-068.5-04)
+//
+// RESEARCH §Finding #8: the codebase enum is the 5-value
+// 'streaming' | 'completed' | 'failed' | 'cancelled' | 'timed_out'.
+// The pulse fires ONLY on 'streaming' — NEVER on 'running' or 'queued'
+// (those values do not exist in this enum).
+//
+// data-testid="assistant-bot-icon" is the binding gate marker — the Vitest
+// assertion reads the className from this element. Pulse on 'streaming'
+// and Resume button on terminal failure states ('failed' || 'timed_out')
+// are mutually exclusive (enum is one value at a time).
+// =============================================================================
+describe("Phase 068.5 — pulse class gating on runStatus", () => {
+  it("Test 1 — runStatus === 'streaming' applies animate-brandPulse to the Bot icon", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Streaming reply…", runStatus: "streaming" })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).toContain("animate-brandPulse")
+  })
+
+  it("Test 2 — runStatus === 'completed' does NOT apply animate-brandPulse", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Done.", runStatus: "completed" })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+
+  it("Test 3 — runStatus === 'failed' does NOT apply animate-brandPulse", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Oops.", runStatus: "failed" })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+
+  it("Test 4 — runStatus === 'cancelled' does NOT apply animate-brandPulse", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Stopped.", runStatus: "cancelled" })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+
+  it("Test 5 — runStatus === 'timed_out' does NOT apply animate-brandPulse", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Timed out.", runStatus: "timed_out" })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+
+  it("Test 6 — runStatus === undefined (DB-loaded historical message) does NOT apply animate-brandPulse", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Old message." })}
+      />,
+    )
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+
+  it("Test 7 — mutual exclusivity: 'failed' shows Resume button AND no pulse (enum one-value-at-a-time)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Failed run.", runStatus: "failed" })}
+        onResume={() => {}}
+      />,
+    )
+    // Resume button is rendered for failed runs (L-068.5-04 / Phase 063/066 gate)
+    expect(screen.getByRole("button", { name: /resume/i })).toBeInTheDocument()
+    // Pulse class is NOT applied (mutual exclusivity is structural)
+    const botIcon = screen.getByTestId("assistant-bot-icon")
+    expect(botIcon.className).not.toContain("animate-brandPulse")
+  })
+})

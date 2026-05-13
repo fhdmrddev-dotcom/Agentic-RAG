@@ -61,7 +61,16 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
       data-testid="assistant-message"
       data-streaming={isStreaming ? "true" : "false"}
     >
-      <div className="flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20">
+      {/* Phase 068.5 (D-068.5-05..07 + L-068.5-04 + RESEARCH §Finding #8):
+          Pulse fires ONLY on runStatus === 'streaming' — the literal value
+          from the 5-value codebase enum (NOT 'running' or 'queued' which do
+          not exist). Resume button gate at lines 109-120 uses 'failed' ||
+          'timed_out'; mutual exclusivity is structural (enum is one value
+          at a time). Pattern S1 enum-conditional render. */}
+      <div
+        data-testid="assistant-bot-icon"
+        className={`flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20${message.runStatus === "streaming" ? " animate-brandPulse" : ""}`}
+      >
         <Bot className="w-4 h-4 text-white" />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">

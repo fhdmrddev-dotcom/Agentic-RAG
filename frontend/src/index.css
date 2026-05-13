@@ -199,6 +199,26 @@
   animation: pulseGlow 2s ease-in-out infinite;
 }
 
+/* Phase 068.5 (D-068.5-05..07): brand-mark breathing pulse for in-flight
+   assistant turns. Soft scale (1.0 → 1.05) + opacity (0.85 → 1.0) at 1.5s
+   ease-in-out. Sibling of pulseGlow above; Tailwind utility registered in
+   tailwind.config.js extend.animation. Applied to MessageItem Bot icon
+   when message.runStatus === 'streaming' (Pattern S1 + L-068.5-04). */
+@keyframes brandPulse {
+  0%, 100% {
+    transform: scale(1.0);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1.0;
+  }
+}
+
+.animate-brandPulse {
+  animation: brandPulse 1.5s ease-in-out infinite;
+}
+
 .animate-shimmer {
   background: linear-gradient(
     90deg,

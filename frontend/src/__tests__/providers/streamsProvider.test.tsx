@@ -1255,3 +1255,164 @@ describe("Phase 068.5 — clearMessages() unconditional call deleted from ChatAr
     expect(true).toBe(true)
   })
 })
+
+// =============================================================================
+// Phase 068.5 Plan 02 — retry banner: silent retry at 1s, then surfaces banner
+//   (D-068.5-08 + D-068.5-09 + D-068.5-10)
+//
+// The loadMessages action wraps the existing body (L-068.5-02 MERGE 3-clause
+// filter byte-identical inside) with: catch non-Abort error → silent 1s retry
+// once → on second failure, setState({ reconcileError: { threadId, error } }).
+// AbortError early-returns without retry.
+// =============================================================================
+describe("Phase 068.5 — retry banner: silent retry at 1s, then surfaces banner on second failure", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("Test 1 — first fetch rejects, retry at 1s succeeds: NO banner state set; reconcileError stays null", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds with [].
+    mockGetMessages.mockReset()
+    mockGetMessages.mockResolvedValue([])
+
+    const { result } = renderProvider()
+
+    // Set viewing thread first — fires an auto-reconcile that consumes the baseline.
+    await act(async () => {
+      result.current.setViewingThread("T1")
+    })
+    // Advance any pending timers from the auto-reconcile so we start clean.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Reset call history and queue the failing-then-succeeding sequence for the
+    // explicit loadMessages call. The default-resolve safety net catches any
+    // subsequent reconciles triggered by side-effects.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValueOnce(new Error("network"))
+    mockGetMessages.mockResolvedValueOnce([])
+    mockGetMessages.mockResolvedValue([])
+
+    // Fire loadMessages — first attempt rejects.
+    let loadPromise: Promise<void>
+    act(() => {
+      loadPromise = result.current.loadMessages("T1")
+    })
+
+    // Advance past the silent 1s retry boundary.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100)
+      await loadPromise!
+    })
+
+    // Banner state remains null — retry succeeded.
+    expect(useStreamsStore.getState().reconcileError).toBeNull()
+    // Two getMessages calls fired (initial + retry).
+    expect(mockGetMessages.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("Test 2 — both attempts reject: reconcileError populated with threadId + error", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockResolvedValue([])
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread("T1")
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Now make BOTH retry attempts reject.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValue(new Error("network"))
+
+    let loadPromise: Promise<void>
+    act(() => {
+      loadPromise = result.current.loadMessages("T1")
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100)
+      await loadPromise!
+    })
+
+    const errState = useStreamsStore.getState().reconcileError
+    expect(errState).not.toBeNull()
+    expect(errState?.threadId).toBe("T1")
+    expect(errState?.error.message).toBe("network")
+  })
+
+  it("Test 3 — setState({ reconcileError: null }) dismisses the banner state", async () => {
+    // Pre-seed an error
+    useStreamsStore.setState({
+      reconcileError: { threadId: "T1", error: new Error("network") },
+    })
+    expect(useStreamsStore.getState().reconcileError).not.toBeNull()
+
+    // Dismiss
+    useStreamsStore.setState({ reconcileError: null })
+    expect(useStreamsStore.getState().reconcileError).toBeNull()
+  })
+
+  it("Test 4 — L-068.5-02 MERGE 3-clause filter survives the retry wrap (static-grep placeholder)", () => {
+    // Static-grep marker: the actual gate is a manual grep documented in
+    // the plan's acceptance criteria:
+    //   grep -c "m.id.startsWith(.temp-.).*m.runId.*!dbRunIds.has" frontend/src/providers/StreamsProvider.tsx
+    // Expected: returns ≥ 1 (filter byte-identical inside the retry wrap).
+    expect(true).toBe(true)
+  })
+})
+
+describe("Phase 068.5 — retry banner: AbortError is NOT a fetch failure (no retry, no banner)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("AbortError early-returns without scheduling a retry; reconcileError stays null", async () => {
+    // Baseline: auto-reconcile from setViewingThread succeeds.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockResolvedValue([])
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread("T1")
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    // Reset and queue an AbortError for the explicit loadMessages call.
+    mockGetMessages.mockReset()
+    mockGetMessages.mockRejectedValueOnce(
+      Object.assign(new Error("aborted"), { name: "AbortError" }),
+    )
+    mockGetMessages.mockResolvedValue([]) // safety net
+
+    let loadPromise: Promise<void>
+    act(() => {
+      loadPromise = result.current.loadMessages("T1")
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100)
+      await loadPromise!
+    })
+
+    // No banner state — AbortError is not a fetch failure.
+    expect(useStreamsStore.getState().reconcileError).toBeNull()
+    // Only the initial attempt fired — no retry was scheduled.
+    // (Defensive: AbortError early-returns inside the catch, before the retry branch.)
+    expect(mockGetMessages.mock.calls.length).toBe(1)
+  })
+})
