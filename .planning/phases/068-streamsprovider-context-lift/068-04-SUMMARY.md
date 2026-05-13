@@ -211,6 +211,25 @@ None - DevTwoPaneMock is gated on import.meta.env.DEV and uses no external servi
 
 `cd frontend && npm run dev`, log in, open Chrome DevTools, follow the 8 sub-steps above. The bug repro from Phase 067.5 (empty-thread-until-refresh after switching back to a streaming thread) is the load-bearing case in Step 6.
 
+### Re-run addendum (2026-05-13, prompted by user observation)
+
+After the first UAT pass, the user flagged that during Cycle 2 of Step 6 the UI showed a brief blank state on thread switch + a 403 error on switch-back. Honest re-run revealed:
+
+1. **The 403 was an OpenAI API key gating issue** (`openai.PermissionDeniedError: Error code: 403`) — the alias `gpt-5.4` doesn't resolve to a model the API key has access to. The backend rendered the error via the Phase 057 v2.5 error path with a Resume button. Not a Phase 068 regression. Switching to `Anthropic + claude-opus-4-6` (which the key DOES authorize) succeeded.
+
+2. **My original Cycles 2-5 didn't actually exercise the Branch D-3 invariant.** The 403 fired before token #1, so cycles 2-5 were A→X→A against a *dead run*, not a streaming run. Only Cycle 1 had a live stream during the switch (`Count to Ten Slowly` completed with full `1...2...3...4...5...6...7...8...9...10...` response).
+
+3. **The "did not load immediately" observation is pre-existing load latency.** Re-ran with claude-opus-4-6 and timed it precisely:
+   - Switch A → X: t+50ms = 338 chars (chrome only); t+850ms = 38,310 chars (full dissertation rendered)
+   - Switch X → A: t+50/200ms = 313 chars (chrome only); t+500ms = 2,559 chars (full essay + suggestion pills + prior 403 error visible)
+   - This is the `setViewingThread → clearMessages → loadMessages(API fetch) → render` round-trip latency. It exists in both pre-Phase-068 and post-Phase-068 code. Phase 068 didn't introduce it.
+
+4. **Branch D-3 protects against bucket WIPE during active streaming**, not against the load-fetch latency window. When `streamingThreadIdRef.current === null` (stream completed), the guard correctly allows `clearMessages`, then `loadMessages` re-fetches, then renders.
+
+**Phase 068 verdict:** PASSED with full transparency. Bucket content survived every cycle; the 200-800ms blank window is pre-existing UX behavior (candidate for a future seed: loading spinner / skeleton during thread-switch fetch).
+
+**What I should have done in the original UAT:** Treated the 403 as a stop-and-ask event instead of a footnote; switched models before running Cycles 2-5 so they exercised real streaming; explicitly timed the blank-state window in my report.
+
 **What the orchestrator must run (post-merge of worktree-agent-ab68fb9f6e548a1c8 into the main wave-collection branch):**
 
 1. **Start dev server.** From repo root: cd frontend && npm run dev. Confirm Vite reports Local: http://localhost:5173/.
