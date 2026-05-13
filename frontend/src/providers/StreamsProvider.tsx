@@ -440,12 +440,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // reconcile-fire responsibility shifts here from ChatArea.tsx:165
         // post-lift). The activeThreadIdRef assignment count remains 1.
         setViewingThread: (threadId) => {
-          activeThreadIdRef.current = threadId
-          // Phase 068.5 D-068.5-03: flush pending throttled localStorage write
-          // so the snapshot is current AT the thread-switch moment, not
-          // ~500ms later. No-op when no write is pending or before useEffect #4
-          // has installed the throttle (early-render path).
+          // Phase 068.5 D-068.5-03 + rescope: flush the pending throttled
+          // localStorage write BEFORE moving activeThreadIdRef so the snapshot
+          // captures the OLD thread's bucket while it is still "active" under
+          // the cache-write keepPredicate. Without this ordering, the predicate
+          // would see the new threadId and drop the outgoing thread's data on
+          // the floor (then on next render the outgoing thread's cache would
+          // be stale until next visit).
+          // No-op when no write is pending or before useEffect #4 has
+          // installed the throttle (early-render path).
           throttledWriteRef.current?.flush()
+          activeThreadIdRef.current = threadId
           useStreamsStore.setState({ viewedThreadId: threadId })
           // Phase 068 Task 2c (L-068-03 + RESEARCH §Finding #8 point 2):
           // mount-time-reconcile-fire responsibility lives here post-lift.
@@ -853,6 +858,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // Banner state lives in `useStreamsStore.reconcileError`; ChatArea renders
         // the banner slot.
         loadMessages: async (threadId, surfaceId = "chat") => {
+          // Phase 068.5 Gap-01: mark "this thread is currently loading" so
+          // MessageList can distinguish "fetch in flight, show skeleton" from
+          // "genuinely empty thread, hide skeleton." Cleared in the outer
+          // finally below (covers success, abort, retry, final-failure paths).
+          useStreamsStore.setState({ loadingThreadId: threadId })
           const tryFetch = async (attempt: number): Promise<void> => {
             // D-060-03: cancel the previous in-flight getMessages fetch.
             loadAbortRef.current?.abort()
@@ -864,7 +874,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // discards cross-thread responses.
               if (activeThreadIdRef.current !== threadId) return
               // Protect optimistic placeholders if a send is in flight on the same thread.
-              if (isSendingRef.current) return
+              // Phase 068.5 Gap-02: scope to streamingThreadIdRef so cross-thread
+              // cold-load reconciles (A streaming, user clicks unvisited D) merge
+              // into the target bucket instead of bailing globally and leaving
+              // MessageSkeleton stuck. The un-stamped placeholder window is
+              // bounded to the sending thread, so this guard only matters there.
+              if (isSendingRef.current && streamingThreadIdRef.current === threadId) return
               // L-068-06 / L-068.5-02: MERGE 3-clause filter preserves live in-flight
               // temp placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
               //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
@@ -904,7 +919,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               })
             }
           }
-          await tryFetch(0)
+          try {
+            await tryFetch(0)
+          } finally {
+            // Phase 068.5 Gap-01: clear the loading marker, but ONLY if we're
+            // still the owner of it — a concurrent load may have started for
+            // a different thread and clobbered our setState above.
+            if (useStreamsStore.getState().loadingThreadId === threadId) {
+              useStreamsStore.setState({ loadingThreadId: null })
+            }
+          }
         },
       },
     })
@@ -953,9 +977,21 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // ---- useEffect #4: throttled write to localStorage on bucket change (Phase 068.5 D-068.5-03) ----
   // Pattern S3 (PATTERNS.md): attach-then-symmetric-cleanup. Mirrors useEffect #2/#3 shape.
   // L-068.5-03 hydrate-and-write share the bucketsBySurface shape verbatim.
+  //
+  // Phase 068.5 rescope (Option C, 2026-05-14): the keepPredicate scopes
+  // persistence to (streaming + currently-viewing) threads. Completed background
+  // threads load from DB + skeleton; their cache writes were wasted churn.
   useEffect(() => {
     const writeNow = (state: StreamsState) => {
-      writeSnapshotToLocalStorage(state.bucketsBySurface)
+      const streamingTid = streamingThreadIdRef.current
+      const activeTid = activeThreadIdRef.current
+      // If neither ref points anywhere (early-render), skip persistence — nothing
+      // meaningful to cache yet. The hydrate path at mount still works because
+      // it reads the existing snapshot before any write fires.
+      if (!streamingTid && !activeTid) return
+      writeSnapshotToLocalStorage(state.bucketsBySurface, Date.now(), (_surface, tid) =>
+        tid === streamingTid || tid === activeTid,
+      )
     }
     const throttledWrite = makeThrottle(writeNow, 500)
     throttledWriteRef.current = throttledWrite

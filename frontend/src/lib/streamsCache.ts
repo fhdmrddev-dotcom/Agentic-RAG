@@ -28,7 +28,13 @@ import type { SurfaceId } from "@/stores/streamsStore"
 
 export const STREAMS_CACHE_KEY = "agentic-rag.streams.v1" as const
 export const STREAMS_CACHE_VERSION = 1 as const
-export const STREAMS_CACHE_MAX_THREADS_PER_SURFACE = 10 as const
+/**
+ * Per-surface LRU cap. Rescoped 2026-05-14 (Phase 068.5 follow-up) from 10 → 3:
+ * the cache's load-bearing value is two threads (current-viewing + active-streaming)
+ * + brief overlap during a switch. Caching all recent threads created localStorage
+ * churn for completed threads whose source-of-truth lives in the DB anyway.
+ */
+export const STREAMS_CACHE_MAX_THREADS_PER_SURFACE = 3 as const
 
 interface SerializedThreadEntry {
   messages: Message[]
@@ -87,10 +93,16 @@ export function readSnapshotSyncOrEmpty(): Map<SurfaceId, Map<string, Message[]>
  * `now` is parameterized for test determinism (default Date.now()). Per Pitfall 5:
  * v1 uses snapshot-time uniformly for lastAccessedAt; per-thread access-time is
  * a future refinement.
+ *
+ * Phase 068.5 rescope (Option C, 2026-05-14): `keepPredicate` lets the provider
+ * scope persistence to (streaming + currently-viewing) threads only. Predicate
+ * returns true for threads worth persisting, false to skip. When omitted, all
+ * threads in the in-memory bucket are persisted (legacy behavior, used by tests).
  */
 export function writeSnapshotToLocalStorage(
   buckets: Map<SurfaceId, Map<string, Message[]>>,
   now: number = Date.now(),
+  keepPredicate?: (surfaceId: SurfaceId, threadId: string) => boolean,
 ): void {
   // Pitfall 5 mitigation (v1 hybrid):
   //   - For threads ALREADY on disk: preserve their lastAccessedAt so threads
@@ -142,6 +154,9 @@ export function writeSnapshotToLocalStorage(
     const surfaceEntry: Record<string, SerializedThreadEntry> = {}
     const priorSurf = priorTimes?.get(surface)
     for (const [tid, messages] of threads) {
+      // Phase 068.5 rescope: skip threads that aren't worth persisting (e.g.,
+      // completed background threads whose source-of-truth is the DB).
+      if (keepPredicate && !keepPredicate(surface, tid)) continue
       // If we have a prior entry for this surface+thread, keep its
       // lastAccessedAt so it ages naturally — only NEW threads get `now`.
       const prior = priorSurf?.get(tid)

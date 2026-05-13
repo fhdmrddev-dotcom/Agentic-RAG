@@ -58,31 +58,19 @@ describe("Phase 068.5 — streamsCache: serialize round-trip", () => {
   })
 })
 
-describe("Phase 068.5 — streamsCache: LRU eviction (per-surface 10 cap)", () => {
+describe("Phase 068.5 — streamsCache: LRU eviction (per-surface cap)", () => {
   beforeEach(() => {
     localStorage.clear()
   })
 
-  it("evicts oldest threads by lastAccessedAt when surface exceeds 10 threads", () => {
-    // Write 12 threads in order; lastAccessedAt is set to the `now` arg uniformly,
-    // so we write them in 12 separate `now` ticks to establish a clear ordering.
-    const buckets = new Map<string, Map<string, Message[]>>()
-    const chatMap = new Map<string, Message[]>()
-    for (let i = 0; i < 12; i++) {
-      chatMap.set(`thread-${i}`, [makeMessage({ id: `m-${i}` })])
-    }
-    buckets.set("chat", chatMap)
-
-    // Single write: per-surface eviction keeps the 10 most recently accessed.
-    // Since all share the same `now` arg, we expect the implementation to keep
-    // any 10; for a deterministic test we write threads incrementally with
-    // ascending `now` values so the "oldest 2" are well-defined.
+  it("evicts oldest threads by lastAccessedAt when surface exceeds cap (rescoped 10 → 3 in Option C)", () => {
+    // Phase 068.5 rescope 2026-05-14: cap dropped from 10 → 3 (only need
+    // streaming + currently-viewing + brief overlap during a switch). Write 5
+    // threads with ascending `now` values; expect only the 3 most-recent to
+    // survive.
     let now = 1_000
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 5; i++) {
       const single = new Map<string, Map<string, Message[]>>()
-      const surfMap = new Map<string, Message[]>()
-      surfMap.set(`thread-${i}`, [makeMessage({ id: `m-${i}` })])
-      // Merge with what's already on disk (read back first).
       const onDisk = readSnapshotSyncOrEmpty()
       const merged = onDisk.get("chat") ?? new Map<string, Message[]>()
       merged.set(`thread-${i}`, [makeMessage({ id: `m-${i}` })])
@@ -94,11 +82,34 @@ describe("Phase 068.5 — streamsCache: LRU eviction (per-surface 10 cap)", () =
     const out = readSnapshotSyncOrEmpty()
     const chatSurvivors = out.get("chat")
     expect(chatSurvivors).toBeDefined()
-    expect(chatSurvivors!.size).toBe(10)
-    // The two oldest (thread-0, thread-1) should be evicted.
+    expect(chatSurvivors!.size).toBe(3)
+    // Oldest 2 (thread-0, thread-1) evicted; most-recent 3 (thread-2/3/4) survive.
     expect(chatSurvivors!.has("thread-0")).toBe(false)
     expect(chatSurvivors!.has("thread-1")).toBe(false)
-    expect(chatSurvivors!.has("thread-11")).toBe(true)
+    expect(chatSurvivors!.has("thread-2")).toBe(true)
+    expect(chatSurvivors!.has("thread-3")).toBe(true)
+    expect(chatSurvivors!.has("thread-4")).toBe(true)
+  })
+
+  it("Phase 068.5 rescope — keepPredicate restricts what gets persisted to streaming + active threads", () => {
+    const buckets = new Map<string, Map<string, Message[]>>()
+    const chatMap = new Map<string, Message[]>()
+    chatMap.set("streaming", [makeMessage({ id: "m-stream" })])
+    chatMap.set("active", [makeMessage({ id: "m-active" })])
+    chatMap.set("background", [makeMessage({ id: "m-bg" })])
+    buckets.set("chat", chatMap)
+
+    writeSnapshotToLocalStorage(buckets, 1_000, (_surface, tid) =>
+      tid === "streaming" || tid === "active",
+    )
+
+    const out = readSnapshotSyncOrEmpty()
+    const chat = out.get("chat")
+    expect(chat).toBeDefined()
+    expect(chat!.size).toBe(2)
+    expect(chat!.has("streaming")).toBe(true)
+    expect(chat!.has("active")).toBe(true)
+    expect(chat!.has("background")).toBe(false)
   })
 })
 

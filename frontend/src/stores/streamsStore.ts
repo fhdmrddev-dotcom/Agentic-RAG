@@ -47,6 +47,11 @@ export interface StreamsState {
   /** Phase 068.5 (D-068.5-08..10): consumed by Plan 02 retry banner to surface
    *  loadMessages failures over cached content without blanking the list. */
   reconcileError: { threadId: string; error: Error } | null
+  /** Phase 068.5 Gap-01: thread whose loadMessages is currently in flight (null
+   *  when no fetch is pending). MessageList gates the cold-load skeleton on
+   *  `loadingThreadId === activeThreadId && messages.length === 0` so new chats
+   *  (or any thread without an active fetch) don't render misleading shimmer. */
+  loadingThreadId: string | null
   subscriptionsByRunId: Set<string>
   actions: {
     setMessagesForBucket: (
@@ -90,6 +95,7 @@ export const useStreamsStore = create<StreamsState>()(() => ({
   isStreaming: false,
   fallbackNotice: null,
   reconcileError: null,
+  loadingThreadId: null,
   subscriptionsByRunId: new Set<string>(),
   actions: {
     setMessagesForBucket: () => {},

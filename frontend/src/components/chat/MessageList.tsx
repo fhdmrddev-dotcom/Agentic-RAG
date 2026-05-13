@@ -7,13 +7,17 @@ import type { Message } from "@/types"
 interface Props {
   messages: Message[]
   isStreaming: boolean
+  /** Phase 068.5 Gap-01: true when loadMessages is in flight for the active
+   *  thread. Gates the cold-load skeleton so new/empty threads without a
+   *  pending fetch don't render misleading shimmer. */
+  isLoading?: boolean
   onSendMessage?: (content: string) => void
   showSuggestions?: boolean
   /** Phase 063 (Pattern 4 / D-063-04): forwarded to MessageItem; clicked from the Resume button on failed-run assistant bubbles. */
   onResume?: (message: Message) => void
 }
 
-export function MessageList({ messages, isStreaming, onSendMessage, showSuggestions, onResume }: Props) {
+export function MessageList({ messages, isStreaming, isLoading = false, onSendMessage, showSuggestions, onResume }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
   const isNearBottomRef = useRef(true)
@@ -87,9 +91,12 @@ export function MessageList({ messages, isStreaming, onSendMessage, showSuggesti
     <ScrollArea className="flex-1">
       <div ref={containerRef} className="space-y-1 px-6 py-6 max-w-4xl mx-auto">
         {/* Phase 068.5 (D-068.5-11 + D-068.5-12): cold-load skeleton placeholder
-            when the bucket is empty AND no localStorage entry hydrated. Clears
-            the instant the first message arrives (hydrate or reconcile). */}
-        {messages.length === 0 ? (
+            when the bucket is empty AND a reconcile fetch is in flight.
+            Gap-01 fix: gate on isLoading so new chats / empty threads without
+            a pending fetch don't render misleading shimmer (D-068.5-11 was
+            originally messages.length===0 only). Clears the instant the first
+            message arrives (hydrate or reconcile resolves). */}
+        {isLoading && messages.length === 0 ? (
           <MessageSkeleton />
         ) : (
           messages.map((msg, idx) => {

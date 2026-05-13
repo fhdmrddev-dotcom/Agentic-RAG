@@ -50,6 +50,11 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // exposes Retry / Dismiss affordances over cached content (banner never
   // blanks the message list — L-068.5-01 / L-068.5-03 preserve cached data).
   const reconcileError = useStreamsStore((s) => s.reconcileError)
+  // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
+  // flight. Passed to MessageList so the cold-load skeleton only renders when
+  // we're actually waiting on data (not on new/empty threads with no fetch).
+  const loadingThreadId = useStreamsStore((s) => s.loadingThreadId)
+  const isLoadingThisThread = !!thread && loadingThreadId === thread.id
   const handleRetryReconcile = useCallback(() => {
     useStreamsStore.setState({ reconcileError: null })
     if (thread) {
@@ -332,6 +337,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
+        isLoading={isLoadingThisThread}
         onSendMessage={handleSend}
         showSuggestions={agentMode !== "explorer"}
         onResume={resumeFromFailed}

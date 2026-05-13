@@ -37,13 +37,25 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
 }
 
 describe("Phase 068.5 — MessageList skeleton", () => {
-  it("renders <MessageSkeleton/> (data-testid='message-skeleton') when messages.length === 0", () => {
-    render(<MessageList messages={[]} isStreaming={false} />)
+  it("renders <MessageSkeleton/> (data-testid='message-skeleton') when isLoading AND messages.length === 0", () => {
+    // Phase 068.5 Gap-01: skeleton requires BOTH isLoading=true AND empty
+    // messages. Empty + not-loading = new chat → no skeleton.
+    render(<MessageList messages={[]} isStreaming={false} isLoading={true} />)
     expect(screen.getByTestId("message-skeleton")).toBeInTheDocument()
   })
 
   it("does NOT render the skeleton when at least one message is present", () => {
-    render(<MessageList messages={[makeMessage()]} isStreaming={false} />)
+    render(<MessageList messages={[makeMessage()]} isStreaming={false} isLoading={true} />)
+    expect(screen.queryByTestId("message-skeleton")).toBeNull()
+  })
+
+  it("Gap-01: does NOT render the skeleton on empty list when isLoading is false (new chat / no fetch in flight)", () => {
+    render(<MessageList messages={[]} isStreaming={false} isLoading={false} />)
+    expect(screen.queryByTestId("message-skeleton")).toBeNull()
+  })
+
+  it("Gap-01: defaults isLoading to false — empty list with no prop renders no skeleton", () => {
+    render(<MessageList messages={[]} isStreaming={false} />)
     expect(screen.queryByTestId("message-skeleton")).toBeNull()
   })
 })
