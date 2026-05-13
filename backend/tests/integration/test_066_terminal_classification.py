@@ -91,7 +91,7 @@ async def test_timeout_branch_writes_timed_out(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -149,7 +149,7 @@ async def test_failed_error_truncated_to_200_chars(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -210,7 +210,7 @@ async def test_delete_writes_cancelled_not_timed_out(redis_client):
 
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
-        async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
             r = await c.delete(
                 f"/runs/{run_id}",
                 headers={"Authorization": "Bearer test-token"},
@@ -272,7 +272,7 @@ async def test_delete_on_timed_out_row_short_circuits_silently(redis_client):
 
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
-        async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
             r = await c.delete(
                 f"/runs/{run_id}",
                 headers={"Authorization": "Bearer test-token"},

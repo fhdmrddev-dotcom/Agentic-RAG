@@ -57,7 +57,7 @@ async def test_consumer_receives_timed_out_sentinel(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -121,7 +121,7 @@ async def test_timed_out_sentinel_distinct_from_error_and_cancelled(redis_client
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",

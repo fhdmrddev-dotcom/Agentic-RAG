@@ -184,7 +184,7 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -267,7 +267,7 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",

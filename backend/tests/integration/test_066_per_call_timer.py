@@ -80,7 +80,7 @@ async def test_per_call_timer_fires_at_budget(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -137,7 +137,7 @@ async def test_quick_call_within_budget_completes(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -271,7 +271,7 @@ async def test_timer_resets_per_iteration(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
@@ -355,7 +355,7 @@ async def test_tool_exec_outside_timer(redis_client, monkeypatch):
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",

@@ -445,7 +445,7 @@ async def test_normal_stream_unchanged():
             "app.api.threads.generate_thread_title",
             return_value=("Test Title", None),
         ):
-            async with httpx.AsyncClient(app=app, base_url="http://test") as c:
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
                     "POST",
                     f"/threads/{THREAD_A}/messages",
