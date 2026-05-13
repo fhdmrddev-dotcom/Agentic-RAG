@@ -1,12 +1,23 @@
 ---
 phase: 069
 reviewed: 2026-05-13T00:00:00Z
+fixed: 2026-05-14T00:00:00Z
 status: issues
 findings:
-  blocking: 1
-  high: 2
+  blocking: 0
+  high: 0
   medium: 2
   low: 3
+fixes_applied:
+  - "BLOCKER — ExtractedDocument.tables/images switched to tuple[T, ...] (commit f305145)"
+  - "HIGH — Pillow>=10.0.0 declared in requirements.txt (commit 88a3113)"
+  - "HIGH — error-field tests migrated to patch.object on LegacyExtractor methods (commit f305145, bundled with BLOCKER fix)"
+deferred_to_phase_071:
+  - "MEDIUM — TODO(Phase 071) at documents.py discard site"
+  - "MEDIUM — golden-capture os.environ.setdefault prod-creds bleed (document clean-shell requirement)"
+  - "LOW — _LEGACY singleton Phase 071 stateful-engine hint"
+  - "LOW — _generate_fixtures.py missing `from __future__ import annotations`"
+  - "LOW — empty-PDF test builds real pypdf rather than stubbing"
 ---
 
 # Phase 069: Code Review — PdfExtractor Abstraction Scaffold
