@@ -596,6 +596,69 @@ Docling-first. Specifically:
 - Prior commit anchor: `d7af056`
 - Code references: `backend/app/services/multimodal_service.py:29-33` (`_MAX_VISION_CALLS=20`, `_MAX_B64_BYTES=512KB` — CONCERNS.md:289-291), CONCERNS.md:680-685 (Docling httpx conflict)
 
+### Appendix — Q-v2.6-06 closure: PyMuPDF AGPL fallback license posture (Phase 069)
+
+**Closes:** Q-v2.6-06 (PRD v2.6 §13, line 433)
+**Authored:** 2026-05-13 (Phase 069 — `PdfExtractor` Abstraction Scaffold)
+**Status:** APPENDED to D-PRD-07; documentation only.
+
+The `PdfExtractor` abstraction (Phase 069) creates the seam; Phase 071 will plug
+PyMuPDF as the AGPL fallback alongside Docling-primary. Before that wire-in
+happens, the license posture must be locked in writing.
+
+**Facts:**
+
+- **PyMuPDF (`pymupdf>=1.24`) is AGPL-3.0.** This is the upstream Artifex license.
+  AGPL's copyleft and network-use triggers fire when AGPL code is linked into a
+  distributed work.
+
+- **D-PRD-03 ("closed core + open peripherals") forbids linking AGPL code into the
+  open peripherals.** The MCP server, SDKs, and any future open-source client
+  components are MIT/Apache-licensed; an AGPL link would force the closed core's
+  source disclosure obligation onto code paths we do not want to publish.
+
+- **Subprocess fence is the mechanism.** PyMuPDF runs as a separate OS process
+  (its own Python interpreter, its own memory space) and communicates with the
+  closed core via stdio / IPC over bytes. AGPL's linking trigger does NOT fire
+  across a subprocess boundary — only across an in-process link (`import pymupdf`
+  or a shared-library load). The closed core consumes PyMuPDF's output as data,
+  not as a linked library.
+
+- **Dev / personal-use posture today: AGPL acceptance is fine.** No external
+  network users are served by the dev environment; no closed-core binary is
+  distributed; the closed-core `PdfExtractor` consumer can simply `import pymupdf`
+  in-process during dev without triggering the redistribution obligation. This
+  mirrors how the project ran pre-Phase 069 with no commercial pressure.
+
+- **Before any commercial redistribution that links PyMuPDF:** one of
+  (a) **keep the subprocess fence intact** — the closed core ships without
+      `import pymupdf` anywhere; the PyMuPDF subprocess is shipped as a separate
+      binary or invoked from a separate `pip install pymupdf` env on the host
+      (AGPL ships disclosed at the subprocess level only); OR
+  (b) **acquire PyMuPDF Pro (commercial license from Artifex)** — removes the
+      AGPL obligation entirely; deferred to first paying customer per D-PRD-07
+      ("PyMuPDF Pro is NOT purchased now. Re-trigger condition: first paying
+      customer signs").
+
+- **Phase 069 scope:** documentation only. No `pymupdf` in `requirements.txt`.
+  No subprocess fence implementation. No `PyMuPDFExtractor` skeleton in
+  `extraction_service.py`.
+
+- **Phase 071 scope:** wires `PyMuPDFExtractor` behind the `PdfExtractor` ABC,
+  implements the subprocess fence per (a) above, and treats Docling (MIT) as the
+  primary path. The `EXTRACTOR_PRIMARY` env var + per-document fallback (RAG-DOCLING-01)
+  surface the AGPL fallback choice operationally.
+
+**Re-trigger conditions for re-litigation:**
+
+- First paying customer signs → re-evaluate path (b) PyMuPDF Pro purchase.
+- Subprocess fence breaks for performance / latency reasons in Phase 071 → must
+  formally supersede this appendix (path (a) is the contract; can't be quietly
+  moved in-process).
+- Artifex changes PyMuPDF license terms → re-read the upstream license + revisit.
+- Closed-core distribution moves to a model that links PyMuPDF in-process before
+  a Pro license is acquired → blocked by this appendix; must be re-decided.
+
 ---
 
 ## D-PRD-08 — Multi-worker readiness: lift D-v2.5-02 in v2.6 (asyncpg + multi-worker discipline)
