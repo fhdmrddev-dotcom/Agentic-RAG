@@ -232,7 +232,7 @@ Full details below in **Phase Details**.
 - [x] 068-01-PLAN.md — Store + provider scaffold (Wave 1; install zustand@^5.0.13; create streamsStore.ts + StreamsProvider.tsx + 4 named hooks; mount in App.tsx below auth gate; useMessages unchanged)
 - [x] 068-02-PLAN.md — useMessages becomes thin reader + L-068-01..07 Vitest regression (Wave 2; binding gate SC#2 Branch D-3 per-surface; lift action bodies into provider; useMessages.ts < 100 LOC)
 - [x] 068-03-PLAN.md — Reconcile listeners migration complete (Wave 3; delete ChatArea.tsx:157-187 listener block + reconcileRef indirection; provider is sole listener owner)
-- [ ] 068-04-PLAN.md — Mocked second surface + Chrome MCP exercise (Wave 4; SC#3 binding gate; DevTwoPaneMock dev-only component; re-render isolation test; manual checkpoint)
+- [x] 068-04-PLAN.md — Mocked second surface + Chrome MCP exercise (Wave 4; SC#3 binding gate; DevTwoPaneMock dev-only component; re-render isolation test; manual checkpoint)
 
 ### Phase 069: `PdfExtractor` Abstraction Scaffold
 **Goal**: Document ingestion flows through a `PdfExtractor` abstract base class so swapping extractors becomes a 1-line config change, with zero observable behavior change in this phase.
@@ -464,7 +464,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 068 — StreamsProvider Context Lift | 3/4 | In Progress | — |
+| 068 — StreamsProvider Context Lift | 4/4 | Complete | 2026-05-13 |
 | 069 — PdfExtractor Abstraction Scaffold | 0/2 | Not started | — |
 | 070 — Docling httpx Spike | 0/2 | Not started | — |
 | 071 — Docling Primary Path | 0/4 | Not started | — |

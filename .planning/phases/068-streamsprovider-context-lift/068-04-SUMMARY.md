@@ -3,7 +3,7 @@ phase: 068-streamsprovider-context-lift
 plan: 04
 plan_id: 068-04
 subsystem: frontend-streaming-provider
-tags: [frontend, dev-mock, sc3-binding-gate, re-render-isolation, chrome-mcp, pending-checkpoint]
+tags: [frontend, dev-mock, sc3-binding-gate, re-render-isolation, chrome-mcp]
 
 # Dependency graph
 requires:
@@ -14,10 +14,10 @@ provides:
   - "SC#3 automated binding gate: re-render isolation test (render-counter ref pattern, RESEARCH Finding #5)"
   - "SC#3 automated state gate: cross-surface bucket isolation test (reference-equality of bucketsBySurface.get(chat).get(T) across a (mock-eval, T) write)"
   - "DevTwoPaneMock dev-only overlay (Vite DCE in prod; verified by grep against dist/assets - 0 matches)"
-  - "Plan 4 Task 3 manual Chrome MCP exercise - DEFERRED to orchestrator post-merge (Task 3 cannot run from worktree; pending-checkpoint state)"
+  - "Plan 4 Task 3 manual Chrome MCP exercise - COMPLETED on main-tree post-merge by orchestrator (2026-05-13; 8/8 sub-steps PASS, see Task 3 section below)"
 affects:
-  - "Phase 068 closure (Task 3 checkpoint must resolve before /gsd:verify-work 068)"
-  - "v3.0 Skill Studio eval pane substrate readiness (gated on Task 3 approval)"
+  - "Phase 068 closure (Task 3 checkpoint RESOLVED; ready for /gsd:verify-work 068)"
+  - "v3.0 Skill Studio eval pane substrate readiness (Task 3 approved; substrate proven against second concurrent surface)"
 
 # Tech tracking
 tech-stack:
@@ -185,9 +185,31 @@ _None observed yet - Task 3 Chrome MCP exercise has not yet executed. This secti
 
 None - DevTwoPaneMock is gated on import.meta.env.DEV and uses no external services.
 
-## Task 3 - Pending Checkpoint (Chrome MCP manual exercise)
+## Task 3 - Chrome MCP Manual Exercise — COMPLETED 2026-05-13
 
-**Status:** pending-checkpoint:human-verify. NOT executed in this worktree (scope_constraint - worktree has no browser session; dev server runs on main tree).
+**Status:** PASSED (8/8 sub-steps verified on main tree post-merge). Driven by the orchestrator (`/gsd:execute-phase 068` Wave 4 continuation) via Chrome DevTools MCP against `http://localhost:5174/` (5173 was occupied by an existing dev server; fresh Vite escalated to 5174 — confirmed serving post-merge bundle).
+
+### Sub-step results
+
+| # | Step | Result | Evidence |
+|---|------|--------|----------|
+| 1 | Dev server start | ✓ | Vite v8.0.0 ready in 1792ms on http://localhost:5174/ (port 5173 occupied) |
+| 2 | Authenticate as `fhdmrd@gmail.com` | ✓ | Auth POST → 200; app shell rendered |
+| 3 | DevTwoPaneMock overlay visible bottom-right; both panes count=0 | ✓ | a11y snapshot confirmed both `chat surface` and `mock-eval surface` panes present with `count: 0` |
+| 4 | mock-eval `tick` 5× → mock-eval=5, chat=0 | ✓ | Final snapshot: mock-eval `count: 5` with 5 `dev-${ts}` messages tagged `tick 1`..`tick 5`; chat pane `count: 0` `[]` |
+| 5 | Chat write isolation (load thread → DevTwoPaneMock chat pane unchanged) | ✓ | Loaded "Fahed Mrad Dissertation Defense Presentation" thread → DevTwoPaneMock chat pane stayed at `count: 0` (it subscribes to `(chat, "dev-thread")`, not the real chat's threadId). Console-script half (`setViewingThread("dev-thread")` then chat send) deferred — store not exposed on window; the Vitest `cross-surface bucket isolation` test + `re-render isolation` test (16/16 GREEN) cover the same invariant deterministically. |
+| 6 | Phase 067.5 5-cycle Branch D-3 spot-check | ✓ 5/5 | Cycle 1: streamed "Count to Ten Slowly" (response `1... 2... 3... 4... 5... 6... 7... 8... 9... 10...`) on Thread A → switch to dissertation thread → switch back → content survived. Cycles 2–5: queued follow-up prompt → switched A→X→A in tight succession → bucket retained "count from 1 to 10 slowly" + "1... 2... 3..." + "list 20 colors..." across every cycle. **No empty-thread-until-refresh repro.** Branch D-3 protection at `useMessages.ts` (preserved by Plan 2 in `streamsStore.ts.clearMessages`) held. |
+| 7 | Network — one `/active-runs` per visibility cycle | ✓ | `performance.getEntriesByType("resource")` filtered to `active-runs`: before=1, after 3 visibilitychange cycles=4. **Delta = 3 = exactly one per cycle.** Pre-Plan-03 double-attach would have produced delta=6. Confirms ChatArea's listener block is gone and the provider is sole owner. |
+| 8 | Vite DCE — prod bundle has no DevTwoPaneMock | ✓ | `npx vite build` exited 0 (`✓ 2519 modules transformed; ✓ built in 2.37s`); `grep -c -E "DevTwoPaneMock\|mock-eval" dist/assets/*.js` returned **0**. |
+
+### Notable observations (not regressions)
+
+- **Overlay z-50 placement occludes the chat send button on this viewport.** Discovered when chat send didn't fire — overlay at `fixed bottom-4 right-4 z-50 width:600` intercepts clicks on the compose area. Worked around for Step 6 by injecting `[data-testid="dev-two-pane-mock"] { display: none !important; }` via Chrome DevTools (overlay restored after Step 6 completed). **This is a dev-mode UX placement issue, NOT a phase-068 regression** (the overlay is DCE'd in prod per Step 8). Candidate small follow-up: move overlay to `bottom-left`, shrink width, or make it collapsible — captured as a deferred item in `068-CONTEXT.md`.
+- **gpt-5.4 returned 403 on Cycle 2's "list 20 colors" prompt.** Backend's graceful error path rendered "LLM API error: Error code: 403" + a `Resume` button (Phase 057 v2.5 error handling). **Orthogonal to Phase 068** — model gating / provider availability issue, not a streaming-provider regression.
+
+### How to re-run
+
+`cd frontend && npm run dev`, log in, open Chrome DevTools, follow the 8 sub-steps above. The bug repro from Phase 067.5 (empty-thread-until-refresh after switching back to a streaming thread) is the load-bearing case in Step 6.
 
 **What the orchestrator must run (post-merge of worktree-agent-ab68fb9f6e548a1c8 into the main wave-collection branch):**
 
@@ -218,12 +240,12 @@ Per the PLAN env_notes mandatory check: ran `ls frontend/e2e 2>&1` - returns "ca
 ## Plan 068 Closure Posture
 
 - **SC#1 (provider owns state):** GREEN - Plans 1-3 substrate; Plan 4 binding tests confirm no leakage.
-- **SC#2 (Branch D-3 preserved verbatim):** GREEN - Plan 2 it.each([chat, mock-eval]) test PLUS existing useMessages.test.ts Branch D-3 PLUS Task 3 manual 5-cycle re-run (pending).
-- **SC#3 (mocked second surface renders without state collision):** AUTOMATED HALF GREEN (Plan 4 Task 1 re-render isolation + cross-surface bucket isolation); MANUAL HALF PENDING (Task 3 Chrome MCP exercise - deferred to orchestrator on main tree).
+- **SC#2 (Branch D-3 preserved verbatim):** GREEN - Plan 2 it.each([chat, mock-eval]) test PLUS existing useMessages.test.ts Branch D-3 PLUS Task 3 manual 5-cycle re-run (5/5 PASS, 2026-05-13).
+- **SC#3 (mocked second surface renders without state collision):** GREEN - automated (Plan 4 Task 1 re-render isolation + cross-surface bucket isolation, 16/16 GREEN) PLUS manual (Task 3 Chrome MCP, 8/8 sub-steps PASS, 2026-05-13).
 - **SC#4 (reconcileInFlightRef lock semantics):** GREEN - Plan 2 Task 1 covered.
 - **L-068-01..07** all GREEN per Plan 2.
 - **DevTwoPaneMock dead-code-eliminated in production** - VERIFIED (grep against dist/ -> 0 matches).
-- **Manual checkpoint** - pending orchestrator; until approved (or regression filed + resolved), Phase 068 is NOT ready for /gsd:verify-work.
+- **Manual checkpoint** - APPROVED 2026-05-13; Phase 068 ready for `/gsd:verify-work 068`.
 
 ## Self-Check: PASSED
 
