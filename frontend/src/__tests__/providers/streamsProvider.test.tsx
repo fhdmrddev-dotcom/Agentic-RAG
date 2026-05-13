@@ -609,3 +609,184 @@ describe("Phase 068 — setViewingThread reconcile-fire contract (producer side 
     expect(mockGetActiveRuns).not.toHaveBeenCalled()
   })
 })
+
+// =============================================================================
+// Phase 068 Plan 3 — listener migration canary (D-068-07 / D-068-08 / SC#1).
+// Canary pattern (NOT RED-before-GREEN TDD): these four tests land GREEN
+// against the Plan 1 + Plan 2 state BEFORE Task 2 deletes the ChatArea
+// listener block. If Task 2 regresses anything, the canary trips RED.
+//   1. Provider attaches all 3 listeners on mount (D-068-07 sole-owner gate).
+//   2. Listeners no-op when activeThreadIdRef.current is null (D-068-08).
+//   3. Listeners fire reconcile when activeThreadIdRef.current is set.
+//   4. L-068-02 in-flight lock serializes rapid visibility+focus double-fire.
+// =============================================================================
+describe("Phase 068 — listener migration (D-068-07 / D-068-08 / SC#1)", () => {
+  it("provider attaches visibilitychange / focus / pageshow listeners on mount", async () => {
+    const docAddSpy = vi.spyOn(document, "addEventListener")
+    const winAddSpy = vi.spyOn(window, "addEventListener")
+
+    renderProvider()
+
+    // useEffect runs after first commit; the spy captures the attach calls.
+    const docEvents = docAddSpy.mock.calls.map((c) => c[0])
+    const winEvents = winAddSpy.mock.calls.map((c) => c[0])
+
+    expect(docEvents).toContain("visibilitychange")
+    expect(winEvents).toContain("focus")
+    expect(winEvents).toContain("pageshow")
+
+    docAddSpy.mockRestore()
+    winAddSpy.mockRestore()
+  })
+
+  it("listeners no-op when activeThreadIdRef.current is null (D-068-08 gate)", async () => {
+    // Force visibility=visible so the visibilitychange handler's inner gate passes.
+    const originalVisDescriptor = Object.getOwnPropertyDescriptor(
+      Document.prototype,
+      "visibilityState",
+    )
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    })
+
+    try {
+      renderProvider()
+      // Do NOT call setViewingThread — activeThreadIdRef.current stays null.
+
+      // Fire all three event types in the same tick.
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"))
+        window.dispatchEvent(new Event("focus"))
+        window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }))
+        await Promise.resolve()
+      })
+
+      // D-068-08 gate: tryReconcile() short-circuits on null activeThreadIdRef
+      // — getActiveRuns must NOT have been called.
+      expect(mockGetActiveRuns).not.toHaveBeenCalled()
+    } finally {
+      if (originalVisDescriptor) {
+        Object.defineProperty(document, "visibilityState", originalVisDescriptor)
+      } else {
+        // jsdom default — restore the prototype getter.
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "visible",
+        })
+      }
+    }
+  })
+
+  it("listeners fire reconcile when activeThreadIdRef.current is set (visibility entry point)", async () => {
+    const originalVisDescriptor = Object.getOwnPropertyDescriptor(
+      Document.prototype,
+      "visibilityState",
+    )
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    })
+
+    try {
+      mockGetActiveRuns.mockResolvedValue([])
+
+      const { result } = renderProvider()
+
+      // setViewingThread itself fires reconcile #1 (Plan 2 Task 2c — producer
+      // side of the Plan 3 pre-flight gate). Let it settle BEFORE we dispatch
+      // visibilitychange so the L-068-02 in-flight lock is released; only then
+      // can we attribute the second mockGetActiveRuns call to the listener path.
+      await act(async () => {
+        result.current.setViewingThread("thread-A")
+      })
+      await waitFor(() => {
+        expect(mockGetActiveRuns).toHaveBeenCalledWith("thread-A")
+      })
+
+      mockGetActiveRuns.mockClear()
+
+      // Now dispatch visibilitychange — listener must fire reconcile.
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"))
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(mockGetActiveRuns).toHaveBeenCalledWith("thread-A")
+      })
+    } finally {
+      if (originalVisDescriptor) {
+        Object.defineProperty(document, "visibilityState", originalVisDescriptor)
+      } else {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "visible",
+        })
+      }
+    }
+  })
+
+  it("L-068-02 lock serializes rapid visibility+focus double-fire (single getActiveRuns)", async () => {
+    const originalVisDescriptor = Object.getOwnPropertyDescriptor(
+      Document.prototype,
+      "visibilityState",
+    )
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    })
+
+    try {
+      // Slow-resolving active-runs so the in-flight lock holds across both
+      // event dispatches. getActiveRuns returns ActiveRun[] (see lib/api.ts:456-467).
+      let resolveActiveRuns!: (v: { run_id: string; started_at: string }[]) => void
+      mockGetActiveRuns.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveActiveRuns = resolve
+          }),
+      )
+
+      const { result } = renderProvider()
+
+      // setViewingThread fires reconcile #1 — this holds the lock (pending
+      // getActiveRuns promise). Don't await its settle — we want the lock held.
+      await act(async () => {
+        result.current.setViewingThread("thread-A")
+      })
+
+      await waitFor(() => {
+        expect(mockGetActiveRuns).toHaveBeenCalledTimes(1)
+      })
+
+      // Lock is held. Dispatch BOTH visibilitychange AND focus in the same
+      // act() tick — both listener paths attempt reconcile and BOTH should
+      // bail at the top guard `if (reconcileInFlightRef.current) return`.
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"))
+        window.dispatchEvent(new Event("focus"))
+        await Promise.resolve()
+      })
+
+      // Still only the original setViewingThread-fired reconcile is in flight.
+      expect(mockGetActiveRuns).toHaveBeenCalledTimes(1)
+
+      // Release the lock — verifies the test's setup was actually serialized
+      // (not just slow), and avoids leaving a hanging promise.
+      await act(async () => {
+        resolveActiveRuns([])
+        await Promise.resolve()
+      })
+    } finally {
+      if (originalVisDescriptor) {
+        Object.defineProperty(document, "visibilityState", originalVisDescriptor)
+      } else {
+        Object.defineProperty(document, "visibilityState", {
+          configurable: true,
+          get: () => "visible",
+        })
+      }
+    }
+  })
+})
