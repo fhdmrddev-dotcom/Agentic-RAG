@@ -4,9 +4,7 @@ import io
 import zipfile
 from uuid import uuid4
 
-from docx import Document as DocxDocument
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
-from pypdf import PdfReader
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -43,14 +41,12 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
 
 
 def extract_text(raw: bytes, mime_type: str) -> str:
-    if mime_type == "application/pdf":
-        reader = PdfReader(io.BytesIO(raw))
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+    """Extract text from non-PDF/non-DOCX MIME types.
 
-    if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        doc = DocxDocument(io.BytesIO(raw))
-        return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
-
+    Phase 069: PDF + DOCX flow through `app.services.extraction_service.get_extractor()`
+    instead of this function. The other 7 MIME types (PPTX, XLSX, CSV, EPUB, plain text,
+    markdown, HTML) remain here per D-069-02 (no engine swap planned for them).
+    """
     if mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
         from pptx import Presentation  # noqa: PLC0415
         prs = Presentation(io.BytesIO(raw))
@@ -227,8 +223,15 @@ async def upload_document(
     else:
         next_version = 1
 
+    # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
+    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+
     try:
-        text = extract_text(raw, mime_type)
+        extractor = get_extractor(mime_type)
+        if extractor is not None:
+            text = extractor.extract(raw, mime_type).text
+        else:
+            text = extract_text(raw, mime_type)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -450,8 +453,16 @@ async def reingest_document(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
+    # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
+    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+
+    mime_type = target["mime_type"]
     try:
-        text = extract_text(raw, target["mime_type"])
+        extractor = get_extractor(mime_type)
+        if extractor is not None:
+            text = extractor.extract(raw, mime_type).text
+        else:
+            text = extract_text(raw, mime_type)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not extract text: {e}")
 

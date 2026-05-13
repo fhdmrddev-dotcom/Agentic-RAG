@@ -1,0 +1,34 @@
+{
+  "image_extraction_error": null,
+  "images": [],
+  "table_extraction_error": null,
+  "tables": [
+    {
+      "headers": [
+        "Col1",
+        "Col2",
+        "Col3"
+      ],
+      "page": 1,
+      "rows": [
+        [
+          "a1",
+          "b1",
+          "c1"
+        ],
+        [
+          "a2",
+          "b2",
+          "c2"
+        ],
+        [
+          "a3",
+          "b3",
+          "c3"
+        ]
+      ],
+      "table_index": 0
+    }
+  ],
+  "text": "Reference PDF for Extraction Tests\nReference PDF for extraction tests. Page 1. Lorem ipsum dolor sit amet, consectetur adipiscing elit.\nThis paragraph exists to give pypdf text-extraction non-trivial content to work with, so that the\ngolden-output fixture is meaningful.\nSecond paragraph. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad\nminim veniam, quis nostrud exercitation ullamco laboris.\nCol1\nCol2\nCol3\na1\nb1\nc1\na2\nb2\nc2\na3\nb3\nc3\n\n\nReference PDF for Extraction Tests \u2014 Page 2\nPage 2. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla\npariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id\nest laborum.\n"
+}
