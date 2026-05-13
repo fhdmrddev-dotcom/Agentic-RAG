@@ -33,12 +33,17 @@ GOLDEN_DOCX = FIXTURES / "reference_docx_golden.json"
 
 
 def _normalize(obj):
-    """Round floats to 4 decimals + sort dict keys for deterministic compare (D-069-06)."""
+    """Round floats to 4 decimals + sort dict keys for deterministic compare (D-069-06).
+
+    Tuples and lists are normalized to the same list shape so the
+    `asdict(ExtractedDocument)` output (which preserves tuple-typed fields
+    as tuples) compares equal to the JSON golden (which round-trips as list).
+    """
     if isinstance(obj, float):
         return round(obj, 4)
     if isinstance(obj, dict):
         return {k: _normalize(obj[k]) for k in sorted(obj)}
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple)):
         return [_normalize(x) for x in obj]
     return obj
 
@@ -90,30 +95,40 @@ def test_legacy_extractor_text_failure_raises():
 
 
 def test_legacy_extractor_table_failure_populates_error_field():
-    """Tables failure → empty list + table_extraction_error str; no raise."""
-    with patch("app.services.multimodal_service.extract_pdf_tables",
-               side_effect=RuntimeError("pdfplumber exploded")):
+    """Tables failure → empty tuple + table_extraction_error str; no raise.
+
+    Patches `LegacyExtractor._extract_tables` directly (not the underlying
+    multimodal_service helper) so the test is load-order independent and
+    semantically precise about what's being validated: the error-field
+    translation in `LegacyExtractor.extract`, not the helper's behavior.
+    """
+    with patch.object(LegacyExtractor, "_extract_tables",
+                      side_effect=RuntimeError("pdfplumber exploded")):
         with patch.object(LegacyExtractor, "_extract_text", return_value="hello"):
             with patch.object(LegacyExtractor, "_extract_images", return_value=[]):
                 result = LegacyExtractor().extract(b"%PDF-1.4 fake", PDF_MIME)
     assert isinstance(result, ExtractedDocument)
     assert result.text == "hello"
-    assert result.tables == []
+    assert result.tables == ()
     assert result.table_extraction_error is not None
     assert "pdfplumber exploded" in result.table_extraction_error
     assert result.image_extraction_error is None
 
 
 def test_legacy_extractor_image_failure_populates_error_field():
-    """Images failure → empty list + image_extraction_error str; no raise."""
-    with patch("app.services.multimodal_service.extract_pdf_images",
-               side_effect=RuntimeError("pdfplumber image exploded")):
+    """Images failure → empty tuple + image_extraction_error str; no raise.
+
+    Patches `LegacyExtractor._extract_images` directly — see rationale on
+    `test_legacy_extractor_table_failure_populates_error_field`.
+    """
+    with patch.object(LegacyExtractor, "_extract_images",
+                      side_effect=RuntimeError("pdfplumber image exploded")):
         with patch.object(LegacyExtractor, "_extract_text", return_value="hello"):
             with patch.object(LegacyExtractor, "_extract_tables", return_value=[]):
                 result = LegacyExtractor().extract(b"%PDF-1.4 fake", PDF_MIME)
     assert isinstance(result, ExtractedDocument)
     assert result.text == "hello"
-    assert result.images == []
+    assert result.images == ()
     assert result.image_extraction_error is not None
     assert "pdfplumber image exploded" in result.image_extraction_error
     assert result.table_extraction_error is None
@@ -136,8 +151,8 @@ def test_legacy_extractor_empty_pdf_returns_empty_extracted_document():
     assert isinstance(result, ExtractedDocument)
     # A blank page's extract_text() yields "" → joined with "\n\n" the result is "".
     assert result.text == ""
-    assert result.tables == []
-    assert result.images == []
+    assert result.tables == ()
+    assert result.images == ()
     assert result.table_extraction_error is None
     assert result.image_extraction_error is None
 

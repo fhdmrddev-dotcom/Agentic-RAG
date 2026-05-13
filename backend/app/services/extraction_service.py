@@ -48,14 +48,19 @@ class ExtractedDocument:
     """Output of `PdfExtractor.extract` (D-069-01).
 
     text:                        Extracted plain text (joined pages/paragraphs).
-    tables:                      Tables (empty list on failure — see table_extraction_error).
-    images:                      Images (empty list on failure — see image_extraction_error).
+    tables:                      Tables (empty tuple on failure — see table_extraction_error).
+    images:                      Images (empty tuple on failure — see image_extraction_error).
     table_extraction_error:      str message if tables failed; None on success.
     image_extraction_error:      str message if images failed; None on success.
+
+    `tables` and `images` are tuples so that `frozen=True` actually prevents
+    container-level mutation. Inner `TableData.headers` / `TableData.rows` remain
+    lists — second-order mutation guarantee is intentionally not enforced; Phase
+    071 engine authors should treat the returned object as immutable.
     """
     text: str
-    tables: list[TableData]
-    images: list[ImageData]
+    tables: tuple[TableData, ...]
+    images: tuple[ImageData, ...]
     table_extraction_error: str | None = None
     image_extraction_error: str | None = None
 
@@ -117,8 +122,8 @@ class LegacyExtractor(PdfExtractor):
 
         return ExtractedDocument(
             text=text,
-            tables=tables,
-            images=images,
+            tables=tuple(tables),
+            images=tuple(images),
             table_extraction_error=table_error,
             image_extraction_error=image_error,
         )
