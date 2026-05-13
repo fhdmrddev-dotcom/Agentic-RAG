@@ -129,9 +129,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // streamingThreadIdRef bucket regardless of viewing thread; the visible
     // `messages` array derives via useMemo against viewedThreadId. The race
     // this comment used to flag (cross-thread switch loses streamed-into
-    // thread's render) is structurally closed. clearMessages() below now
-    // clears only the active thread's bucket (D-067.3-R1-07).
-    clearMessages()
+    // thread's render) is structurally closed.
+    //
+    // Phase 068.5 (RESEARCH §Finding #5): clearMessages() DELETED here.
+    // bucketsBySurface is per-thread keyed (Phase 067.3 D-067.3-R1-01) — the
+    // new viewing thread reads from its own bucket entry; the old viewing
+    // thread's bucket entry stays warm for switch-back. Branch D-3 guard at
+    // StreamsProvider.tsx:411-427 protects streaming buckets; reconcile-merge
+    // at the loadMessages call below (L-068.5-02 MERGE 3-clause filter)
+    // replaces stale non-streaming non-temp DB rows on the server response.
+    // The unconditional clearMessages() was the literal in-app cause of the
+    // BUG-260513-01 blank window. Deletion regression cost: zero — no
+    // existing test asserts the call (verified during Plan 01 authoring).
     loadMessages(thread.id).catch(console.error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id])

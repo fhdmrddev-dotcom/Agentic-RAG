@@ -74,6 +74,8 @@ import {
   type SurfaceId,
   type StreamsState,
 } from "@/stores/streamsStore"
+import { makeThrottle } from "@/lib/throttle"
+import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 
 // RESEARCH §Finding #1: module-level constant gives every empty-bucket subscriber
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
@@ -375,6 +377,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const stoppedByUserRef = useRef(false)
   const resumeInFlightRef = useRef(false)
 
+  // Phase 068.5 D-068.5-03: throttled localStorage writer; hoisted into a ref
+  // so the synchronous setViewingThread action body can call `.flush()` without
+  // re-creating the throttle on every render. The actual writer is installed by
+  // useEffect #4 below (Pattern S3: attach-then-symmetric-cleanup).
+  const throttledWriteRef = useRef<(ReturnType<typeof makeThrottle> & { flush: () => void }) | null>(null)
+
   // ---- useEffect #1: register real action implementations (Pattern 4) ----
   // RESEARCH §Pitfall 3 + §Finding #2: actions are registered post-mount so
   // they close over the refs above.
@@ -433,6 +441,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // post-lift). The activeThreadIdRef assignment count remains 1.
         setViewingThread: (threadId) => {
           activeThreadIdRef.current = threadId
+          // Phase 068.5 D-068.5-03: flush pending throttled localStorage write
+          // so the snapshot is current AT the thread-switch moment, not
+          // ~500ms later. No-op when no write is pending or before useEffect #4
+          // has installed the throttle (early-render path).
+          throttledWriteRef.current?.flush()
           useStreamsStore.setState({ viewedThreadId: threadId })
           // Phase 068 Task 2c (L-068-03 + RESEARCH §Finding #8 point 2):
           // mount-time-reconcile-fire responsibility lives here post-lift.
@@ -906,6 +919,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     return () => {
       for (const ctrl of subs.values()) ctrl.abort()
       subs.clear()
+    }
+  }, [])
+
+  // ---- useEffect #4: throttled write to localStorage on bucket change (Phase 068.5 D-068.5-03) ----
+  // Pattern S3 (PATTERNS.md): attach-then-symmetric-cleanup. Mirrors useEffect #2/#3 shape.
+  // L-068.5-03 hydrate-and-write share the bucketsBySurface shape verbatim.
+  useEffect(() => {
+    const writeNow = (state: StreamsState) => {
+      writeSnapshotToLocalStorage(state.bucketsBySurface)
+    }
+    const throttledWrite = makeThrottle(writeNow, 500)
+    throttledWriteRef.current = throttledWrite
+    const unsubscribe = useStreamsStore.subscribe((state) => {
+      throttledWrite(state)
+    })
+    return () => {
+      throttledWrite.flush()
+      unsubscribe()
+      throttledWriteRef.current = null
     }
   }, [])
 
