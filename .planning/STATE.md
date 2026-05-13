@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: milestone_complete
-stopped_at: Phase 068.5 context gathered
-last_updated: "2026-05-13T16:37:39.513Z"
-last_activity: 2026-05-13
+status: executing
+stopped_at: Phase 068.5 Plan 01 complete; Plan 02 pending (autonomous=false — Chrome MCP UAT + 5/5 lived-experience cycles)
+last_updated: "2026-05-14T00:00:00.000Z"
+last_activity: 2026-05-14 -- Phase 068.5 Plan 01 complete (cache substrate + cold-render fix)
 progress:
   total_phases: 3
-  completed_phases: 3
-  total_plans: 8
-  completed_plans: 6
-  percent: 100
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 7
+  percent: 70
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 068 — streamsprovider-context-lift
+**Current focus:** Phase 068.5 — chat-surface-persistent-rendering-in-flight-pulse
 
 ## Current Position
 
-Phase: 069
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-05-13
+Phase: 068.5
+Plan: 068.5-02 (pending — autonomous=false, requires Chrome MCP UAT + 5/5 lived-experience cycles)
+Status: Phase 068.5 in progress — Plan 01 complete (cache substrate + cold-render fix), Plan 02 pending
+Last activity: 2026-05-14
 
 ## PRD-reset outputs (committed)
 
