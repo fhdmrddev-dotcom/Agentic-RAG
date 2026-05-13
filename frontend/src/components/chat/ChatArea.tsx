@@ -33,7 +33,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     stopStreaming,
     clearMessages,
     setViewingThread,
-    reconcile,
     resumeFromFailed,
   } = useMessages()
   const [providers, setProviders] = useState<Provider[]>([])
@@ -76,12 +75,24 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     }
   }
 
-  // D-067.2-02: useLayoutEffect commits the activeThreadIdRef write SYNCHRONOUSLY
-  // after DOM mutation but BEFORE any sibling useEffect (including the
-  // reconcile-trigger useEffect at :163). Guarantees activeThreadIdRef.current === thread.id
-  // before reconcileRef.current(tid) fires, so guardedSetMessages at useMessages.ts:866-871
-  // does NOT no-op the replay-from-offset-0 events on F5 / mid-stream navigation.
-  // D-060-08: setViewingThread remains the SOLE writer of activeThreadIdRef per D-060-01.
+  // D-067.2-02 / Phase 068 D-068-07/D-068-08: useLayoutEffect commits the
+  // activeThreadIdRef write SYNCHRONOUSLY (inside <StreamsProvider>'s
+  // setViewingThread action) after DOM mutation but BEFORE any sibling
+  // useEffect runs. Two guarantees flow from that:
+  //   1. activeThreadIdRef.current === thread.id before the provider's
+  //      reconciliation listeners can fire — the D-068-08 null-gate never
+  //      spuriously short-circuits on a real thread switch.
+  //   2. setViewingThread's own reconciliation fire (Phase 068 Task 2c —
+  //      lives in StreamsProvider.tsx now, NOT in this component) sees the
+  //      freshly written ref, so guardedSetMessages at the provider's
+  //      bucket writer does NOT no-op the replay-from-offset-0 events on
+  //      F5 / mid-stream navigation.
+  // D-068-07 / D-068-08: reconciliation listeners + the per-thread-change
+  // reconciliation fire live inside <StreamsProvider>; this component owns
+  // only the setViewingThread call below (Phase 068 Plan 3 deleted
+  // ChatArea's listener block — D-068-07 single-owner gate).
+  // D-060-08: setViewingThread remains the SOLE writer of activeThreadIdRef
+  // per D-060-01 (assignment count == 1, enforced by Plan 1 Task 3 grep gate).
   useLayoutEffect(() => {
     setViewingThread(thread?.id ?? null)
   }, [thread?.id])
@@ -125,66 +136,17 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id])
 
-  // Phase 063 (Pattern 2 + CONTEXT.md "Reconciliation Hook Ordering"):
-  // Mount + visibility/focus/pageshow triggers → reconcile via active-runs.
-  // Pageshow MUST be additive to visibilitychange (Anti-Pattern: don't gate
-  // reconcile on pageshow alone — older browsers and some mobile contexts
-  // don't fire pageshow reliably). bfcache restore (event.persisted === true)
-  // ALWAYS reconciles regardless of local state per CONTEXT.md mandate.
-  //
-  // WR-07 fix: route reconcile through a ref so the effect's dep array
-  // does NOT include the function identity. Otherwise any future change
-  // that recreates reconcile mid-stream would tear down + re-add the
-  // visibility/focus/pageshow listeners and re-fire reconcile while the
-  // previous one is still resolving.
-  //
-  // WR-08 invariant (load-bearing — read before refactoring):
-  //   This ref-update effect is correct ONLY because `reconcile` is
-  //   currently stable across re-renders — its useCallback deps are
-  //   `[loadMessages]`, and loadMessages's deps are `[]`, so its
-  //   identity never changes after first mount. If a future change
-  //   adds a dep to either useCallback that mutates between renders,
-  //   `reconcile` will gain a new identity per render. React runs
-  //   effects in declaration order on each render, so the listener
-  //   effect below could fire `reconcileRef.current(...)` in response
-  //   to (e.g.) visibilitychange BEFORE this ref-update effect has
-  //   committed the latest `reconcile` — invoking the OLD captured
-  //   reconcile with stale closure-state. Fixes available if that
-  //   ever lands: either commit the ref synchronously via a direct
-  //   `reconcileRef.current = reconcile` at the top of render (no
-  //   effect), or accept the listener re-attach cost by making
-  //   `reconcile` a dep of the listener effect below.
-  const reconcileRef = useRef(reconcile)
-  useEffect(() => {
-    reconcileRef.current = reconcile
-  }, [reconcile])
-
-  useEffect(() => {
-    if (!thread?.id) return
-    const tid = thread.id
-    reconcileRef.current(tid).catch(console.error)
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") {
-        reconcileRef.current(tid).catch(console.error)
-      }
-    }
-    const onFocus = () => reconcileRef.current(tid).catch(console.error)
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) reconcileRef.current(tid).catch(console.error)
-    }
-
-    document.addEventListener("visibilitychange", onVisibility)
-    window.addEventListener("focus", onFocus)
-    window.addEventListener("pageshow", onPageShow)
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility)
-      window.removeEventListener("focus", onFocus)
-      window.removeEventListener("pageshow", onPageShow)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thread?.id])
+  // Phase 068 Plan 3 (D-068-07 / D-068-08): the reconciliation listeners and
+  // the per-thread-change reconciliation fire moved into <StreamsProvider>
+  // (see StreamsProvider.tsx — the listener useEffect near the bottom of the
+  // component, plus the setViewingThread action body). The provider is now
+  // the SOLE owner of those listeners (Phase 063 Pattern 2 + CONTEXT.md
+  // "Reconciliation Hook Ordering" mandate satisfied at the provider
+  // boundary). The old WR-07/WR-08 ref indirection ChatArea used to keep
+  // listener identities stable is obsolete: post-lift, `reconcile` is a
+  // Zustand action with stable identity, and the listener wiring no longer
+  // lives in this component anyway. The `reconcile` destructure was dropped
+  // from the useMessages() call above — no remaining consumer in this file.
 
   const handleSend = async (content: string) => {
     let activeThread = thread
