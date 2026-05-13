@@ -1,23 +1,17 @@
 ---
 id: BUG-260513-01
-title: 200-800ms blank chat surface on thread switch (no loading indicator)
+title: 200-800ms blank chat surface on thread switch + occasional load failure on page nav (no loading indicator, no cached-content fallback)
 reported: 2026-05-13
 surface: Agentic-RAG
-severity: minor
-status: deferred
-affected_areas: [frontend/chat-surface, frontend/streaming, UX/loading-states]
+severity: major
+status: open
+affected_areas: [frontend/chat-surface, frontend/streaming, frontend/navigation, UX/loading-states]
 folded_into: null
 related_seeds: [SEED-007]
-re_open_trigger: |
-  Re-open when any of the following fire:
-  (a) a v2.6+ phase touches `ChatArea.tsx` thread-id-change useEffect or `StreamsProvider.tsx` setViewingThread action — fold the loading-indicator fix in at that point;
-  (b) Phase 073 (asyncpg pool) lands and benchmarks show the GET /threads/{id}/messages round-trip becomes faster or slower — re-time the blank window and decide whether the indicator is still needed;
-  (c) any future v2.6/v2.7 chat-UX milestone (Skill Studio v3.0, Operator UX v3.1) — bundle the loading-state polish with related UX work;
-  (d) any further user complaint about thread-switch feeling "broken" or "blank";
-  (e) a regression: the blank window grows past 1.5s (suggests load-fetch path is no longer bounded by network latency).
+re_open_trigger: null
 reproduces_on:
   branch: v2.5-dev
-  commit: 1beded1
+  commit: bd6f68b
   date: 2026-05-13
 ---
 
@@ -69,15 +63,15 @@ Between steps 2 and 5 the bucket for thread X is empty. The message-list compone
 
 ## Suggested routing
 
-- **Fold into in-flight phase:** n/a — Phase 068 closed on 2026-05-13 without this fix because it's pre-existing (not a 068 regression) and would expand scope.
-- **Defer to future phase / milestone:** v2.6 polish or v3.0 Skill Studio (whichever phase next touches `ChatArea.tsx` or the thread-switch path). Natural fit: bundle with any future loading-state work or chat-surface UX refresh.
-- **Plant as seed:** Not needed — captured here as a bug report with concrete re-open trigger; surfaces at GSD touchpoints automatically.
+- **Fold into in-flight phase:** n/a — Phase 069 (PdfExtractor abstraction) is backend-only, no overlap.
+- **Defer to future phase / milestone:** **Candidate for active scoping in v2.6.** Natural homes: a new v2.6 frontend phase ("chat-surface persistent rendering"), or fold into Phase 081 (v2.6 polish phase if scoped) / a SEED-007 follow-up. v3.0 Skill Studio would be too late given user-reported impact.
+- **Plant as seed:** Not needed — this report is the seed equivalent and now status=open with active routing candidacy.
 - **External — note only:** no.
 
 ## Workarounds (prompt-side, code-side, or UI-side)
 
-- **User-side:** None. The blank state is brief enough that most users will just wait it out.
-- **Code-side fix (when triggered):** Add `isLoading` flag to `loadMessages` action in `StreamsProvider.tsx`. Render a skeleton or spinner in the message-list area while `isLoading === true`. Estimated diff: ~20 LOC + ~30 LOC test, single atomic commit. The skeleton component could reuse existing shadcn/ui patterns from the document list or library health pages.
+- **User-side:** None. Affects every thread switch + every navigation to a chat surface.
+- **Code-side fix (scope expanded after 2026-05-13 update — see below):** Was previously "add `isLoading` flag + skeleton" (~20 LOC + 30 LOC test). Updated scope per user feedback is larger: persist last-rendered message snapshot across navigation, render it immediately on mount, then reconcile with `GET /threads/{id}/messages` once it returns. Display a streaming pulse / animated brand mark for in-progress (`status='running'`) assistant turns whose terminal hasn't arrived yet. Estimated rough scope: ~100-200 LOC plus tests; Chrome MCP UAT for the visual states. Specifics belong in the phase that picks this up.
 
 ## Reference / evidence links
 
@@ -86,3 +80,50 @@ Between steps 2 and 5 the bucket for thread X is empty. The message-list compone
 - Phase 067.5 (related — fixed the worse F5-required variant): `.planning/milestones/v2.5-phases/067.5-frontend-reconcile-fix/067.5-01-SUMMARY.md`
 - SEED-007 (app-level streams provider — became Phase 068): `.planning/seeds/SEED-007-app-level-streams-provider.md`
 - Chrome MCP timing evidence captured in commit `e68dea3` (UAT re-run addendum)
+
+---
+
+## Update 2026-05-13 — user re-opened, scope expanded
+
+**Re-open trigger fired:** (d) any further user complaint about thread-switch feeling "broken" or "blank". User report verbatim:
+
+> "we have some issues with latency or sometimes failure until chat loads when switching to another page or thread, maybe we want to show what is already loaded or the iterations that already finished and maybe show animated logo while the ongoing iterations finishes when ever we switch chat or refresh. this mimics the behaviour of claude."
+
+### What this changes vs the original report
+
+| Aspect | Original (2026-05-13 morning) | Updated (2026-05-13 evening) |
+|---|---|---|
+| Symptom scope | Thread → thread switch only | Thread switch **and** page navigation **and** page refresh |
+| Failure mode | Always renders eventually after blank window | **Sometimes outright fails to load** until manual refresh |
+| Severity | minor (cosmetic) | **major** (every chat surface entry; sometimes blocking) |
+| Fix scope | Single skeleton/spinner | Two parts: (a) persistent cached render, (b) in-flight pulse for un-terminated turns |
+
+### Proposed UX direction (mimics Claude.ai)
+
+1. **Render last-known-good immediately on mount.** When user switches to a thread or navigates to a chat page, paint whatever is in the persisted client cache (the messages already in the StreamsProvider bucket, or a localStorage / session-scoped snapshot if the bucket is empty post-reload). No blank window — the user sees yesterday's conversation, then it updates as the fetch completes.
+2. **Reconcile in the background.** `GET /threads/{id}/messages` fires in parallel with the immediate render; results merge per the existing Phase 067.5 Branch D-3 guard (no clobbering streaming buckets). If the server returns fresh data, the cache reconciles silently.
+3. **Animated pulse / brand mark for un-terminated turns.** Any assistant message whose `runs.status` is `running` or `queued` (and whose terminal SSE event hasn't been replayed yet) renders with a soft pulse / breathing animation on the agent's brand mark — same pattern Claude.ai uses for "currently writing" turns. This is the visual cue that "the iteration is still in progress, not stuck."
+4. **Hard-failure surfacing.** If the fetch ultimately fails (network, 404, auth), show an inline retry affordance over the cached content rather than blanking out. The cached content keeps the user oriented; the retry button keeps them unblocked.
+
+### Why this is bigger than the original "add a spinner" fix
+
+- A spinner during the blank window solves the *blank* problem but not the *failure* problem. If `GET /threads/{id}/messages` returns 500 or hangs, a spinner spins forever.
+- Persistent rendering needs a cache strategy: in-memory (StreamsProvider bucket persists across navigations via the Phase 068 lift — partial win), localStorage (survives F5), or a service-worker (survives offline). User implied F5 / refresh resilience — localStorage feels like the minimum bar.
+- The pulse-for-in-flight UX needs `runs.status` to be readable client-side at message-render time. Today the run state lives in the SSE stream and the `runs` row; need to confirm the bucket's `Message` shape carries enough state to gate the pulse (likely yes via `runId` + a separate `useRunStatus(runId)` selector).
+
+### Candidate routing in v2.6
+
+- **Option A — new dedicated phase in v2.6** ("chat-surface persistent rendering + in-flight pulse"). 2-3 plans. Honest scope.
+- **Option B — fold into Phase 069 discuss/plan now.** Rejected — Phase 069 is backend PDF extraction, zero overlap, would dilute scope.
+- **Option C — wait for v3.0 Skill Studio.** Rejected — user-reported impact is current, not future.
+- **Option D — quick win first (skeleton + retry button, no caching).** ~30 LOC. Closes the cosmetic part of the bug without solving the "sometimes fails" or "show what's already loaded" parts. Could ship as a small-scope phase quickly, with the full caching/pulse work tracked separately.
+
+User decision pending on routing. Default recommendation: Option A in v2.6 if there's phase budget, else Option D as a stopgap with Option A planted as a SEED for v2.7+.
+
+### Updated re-open trigger
+
+Now superseded — status is `open`. When the chosen routing phase is picked, set `folded_into: NNN` and flip to `folded`. If the fix ships verifiably, flip to `closed` at `/gsd:complete-milestone`.
+
+### New affected area added
+
+`frontend/navigation` — page-route changes (sidebar nav clicks, deep-links, F5) also trigger the symptom, not just intra-chat thread switches.
