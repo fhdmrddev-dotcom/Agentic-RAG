@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_for_next_phase
-stopped_at: "Phase 071 (Docling Primary Path) closed partial 2026-05-14: 4 of 5 SCs green; SC#1 RED (Docling stalls on thesis-class PDF) carries forward to Phase 071.1. Phase 071.1 gap-closure scope captured in 071-VERIFICATION.md + 071-SUMMARY.md."
-last_updated: "2026-05-14T23:30:00.000Z"
-last_activity: 2026-05-14
+status: Ready for next phase (recommend inserting 071.1 before 072)
+stopped_at: "Phase 071.1 context gathered (D-071.1-01..06 locked: threadpool sweep on /reextract only, defense-in-depth Docling timeout, PyMuPDF auto-fallback on timeout only, friendly real fixture)"
+last_updated: "2026-05-14T20:35:53.748Z"
+last_activity: 2026-05-14 — Phase 071 close-out + Plan 04 Rule-1 inline fixes (commit 9116c2b)
 progress:
-  total_phases: 16
+  total_phases: 17
   completed_phases: 5
-  total_plans: 26
-  completed_plans: 14
-  percent: 54
+  total_plans: 14
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -234,6 +234,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 - Phase 063 added 2026-05-02: Skills Test Infrastructure Repair — close TEST-DEBT discovered during 059-02 verification (13+ broken patches in test_threads_skills.py + 3 broken export tests). Standalone, parallel-able with 060-062. Prep for upcoming Skill Studio milestone (see SEED-002).
 - Phase 067 added 2026-05-07: Frontend Streaming-UX Fix — close the 5-issue carry-forward dossier (UX-067-01..05) surfaced by Phase 066's live UAT (empty first-paint, "Saving response…" thrash, refresh-required first-paint, redis log noise on tab cycle, tool-call iteration boundary surfacing). Re-runs Phase 066 Plan 05 Task 2 protocol to close out SC#6 live verification deferred from 066.
 - v2.6 ROADMAP.md authored 2026-05-12: 15 phases (068–082) across 4 waves derived directly from PRD §12 outline. All 21 v2.6 REQ-IDs mapped; TOKEN-COL-01 (added at signoff post-§12) attached to Phase 073 (asyncpg finalize path) per FLAG F-1. Phases 068/069/070 form Wave 0 (foundational, no inter-wave dependencies); 071-075 form Wave 1 (parallel RAG + asyncpg + polish); 076-078 form Wave 2; 079-081 form Wave 3 (release-gating); 082 forms Wave 4 (cross-cutting verify). Headline path: 069→070→071→076 (Docling) + 073→077→078→079 (multi-worker) + 068 (Streams Provider parallel) → 082 (verify). Phased rollout per Q-v2.6-02 recommendation (NOT atomic like v2.5 D-v2.5-11).
+- Phase 071.1 inserted after Phase 071 on 2026-05-15: Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback (URGENT). Carry-forward from Phase 071 close-out (commit 270eaca): SC#1 live 20%-delta binding gate RED on user thesis pair due to Docling table/layout stall on pages 26-31. Scope per 071-VERIFICATION.md Finding 3: full run_in_threadpool wrap of remaining sync supabase-py calls in /reextract, per-call document_timeout enforcement, do_table_structure / images_scale env knobs, PyMuPDF subprocess fallback wired into the route, friendly-fixture validation, then SC#1 retry on thesis pair.
 
 ### Decisions
 
@@ -324,8 +325,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-14T20:00:00.000Z
-Stopped at: Phase 071 Plan 04 pre-UAT scaffolding (Tasks 1-4) shipped 2026-05-14; awaiting live SC#1 UAT (Task 5) on 551f03f9-... thesis pair before Task 6 close-out
+Last session: --stopped-at
+Stopped at: Phase 071.1 context gathered (D-071.1-01..06 locked: threadpool sweep on /reextract only, defense-in-depth Docling timeout, PyMuPDF auto-fallback on timeout only, friendly real fixture)
 Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase Studio against `551f03f9-...` PDF + DOCX siblings). User fills 12 TBD slots in `.planning/phases/071-docling-primary-path/071-VERIFICATION.md` and flips frontmatter `status: pending` → `green` or `red`. Then orchestrator authors `071-SUMMARY.md` (Task 6) — at which point Plan 04 closes and Phase 071 ships.
 
 **Phases OPEN (cross-phase blocked):**
