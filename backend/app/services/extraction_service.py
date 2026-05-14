@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -26,21 +27,32 @@ DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.docu
 
 @dataclass(frozen=True)
 class TableData:
-    """Normalized table from a single document page (D-069-01)."""
+    """Normalized table from a single document page (D-069-01).
+
+    Phase 071 D-071-08: `bbox` adds optional spatial coordinates populated by
+    layout-aware engines (Docling/PyMuPDF). LegacyExtractor leaves it None.
+    """
     page: int | None
     table_index: int
     headers: list[str]
     rows: list[list[str]]
+    # NEW per D-071-08:
+    bbox: dict | None = None
 
 
 @dataclass(frozen=True)
 class ImageData:
-    """Normalized image from a single document page (D-069-01)."""
+    """Normalized image from a single document page (D-069-01).
+
+    Phase 071 D-071-08: `bbox` adds optional spatial coordinates.
+    """
     page: int | None
     image_index: int
     b64_png: str
     width: int
     height: int
+    # NEW per D-071-08:
+    bbox: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +64,10 @@ class ExtractedDocument:
     images:                      Images (empty tuple on failure — see image_extraction_error).
     table_extraction_error:      str message if tables failed; None on success.
     image_extraction_error:      str message if images failed; None on success.
+    full_markdown:               Layout-preserving markdown (Phase 071 D-071-08).
+                                 Docling populates; Legacy/PyMuPDF leave None.
+    extractor_name:              Engine lineage tag (Phase 071 D-071-08) —
+                                 'docling' | 'pymupdf' | 'pypdf-legacy'.
 
     `tables` and `images` are tuples so that `frozen=True` actually prevents
     container-level mutation. Inner `TableData.headers` / `TableData.rows` remain
@@ -63,6 +79,9 @@ class ExtractedDocument:
     images: tuple[ImageData, ...]
     table_extraction_error: str | None = None
     image_extraction_error: str | None = None
+    # NEW per D-071-08:
+    full_markdown: str | None = None
+    extractor_name: str | None = None
 
 
 class PdfExtractor(ABC):
@@ -126,6 +145,9 @@ class LegacyExtractor(PdfExtractor):
             images=tuple(images),
             table_extraction_error=table_error,
             image_extraction_error=image_error,
+            # Phase 071 D-071-08: explicit lineage tag for telemetry clarity
+            # (per CONTEXT.md Discretion: "recommend explicit for clarity").
+            extractor_name="pypdf-legacy",
         )
 
     def _extract_text(self, raw: bytes, mime: str) -> str:
@@ -175,14 +197,60 @@ class LegacyExtractor(PdfExtractor):
 
 
 _LEGACY = LegacyExtractor()  # stateless — safe to share
+_DOCLING: "PdfExtractor | None" = None
+_PYMUPDF: "PdfExtractor | None" = None
+_PRIMARY_CACHED: str | None = None
 
 
-def get_extractor(mime: str) -> PdfExtractor | None:
-    """Return an extractor that supports `mime`, or None.
+def _read_primary() -> str:
+    """Read EXTRACTOR_PRIMARY env var (cached after first read).
 
-    Phase 069: always returns LegacyExtractor for PDF/DOCX, None otherwise.
-    Phase 071: will consult app_settings/env to pick between engines.
+    Phase 071 D-071-12: default 'docling'. Invalid values log a warning and
+    fall through to 'docling' (T-071-02-05 mitigation).
     """
+    global _PRIMARY_CACHED
+    if _PRIMARY_CACHED is None:
+        raw = os.getenv("EXTRACTOR_PRIMARY", "docling")
+        if raw not in ("docling", "pymupdf", "legacy"):
+            log.warning("Invalid EXTRACTOR_PRIMARY=%r; falling through to 'docling'", raw)
+            raw = "docling"
+        _PRIMARY_CACHED = raw
+    return _PRIMARY_CACHED
+
+
+def get_extractor(mime: str, engine_override: str | None = None) -> PdfExtractor | None:
+    """Resolve a PdfExtractor for `mime`, honoring engine_override or EXTRACTOR_PRIMARY env.
+
+    Phase 071 D-071-12: routes to Docling (default), PyMuPDF, or Legacy.
+    Lazy-imports engine modules so a missing PyMuPDF (Plan 03 not landed yet)
+    doesn't break the dispatcher — falls through to Legacy in that case.
+    """
+    global _DOCLING, _PYMUPDF
+    engine = engine_override or _read_primary()
+
+    if engine == "docling":
+        if _DOCLING is None:
+            try:
+                from app.services.extractors.docling import DoclingExtractor  # noqa: PLC0415
+                _DOCLING = DoclingExtractor()
+            except ImportError as e:
+                log.warning("DoclingExtractor import failed (%s); falling back to legacy", e)
+                _DOCLING = None
+        if _DOCLING is not None and _DOCLING.supports(mime):
+            return _DOCLING
+
+    if engine == "pymupdf":
+        if _PYMUPDF is None:
+            try:
+                from app.services.extractors.pymupdf import PyMuPDFExtractor  # noqa: PLC0415
+                _PYMUPDF = PyMuPDFExtractor()
+            except ImportError as e:
+                log.warning("PyMuPDFExtractor import failed (%s); falling back to legacy", e)
+                _PYMUPDF = None
+        if _PYMUPDF is not None and _PYMUPDF.supports(mime):
+            return _PYMUPDF
+
+    # engine == 'legacy' OR fall-through when chosen engine doesn't support mime / failed to import
     if _LEGACY.supports(mime):
         return _LEGACY
     return None

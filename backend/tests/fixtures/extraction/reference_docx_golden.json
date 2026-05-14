@@ -1,9 +1,12 @@
 {
+  "extractor_name": "pypdf-legacy",
+  "full_markdown": null,
   "image_extraction_error": null,
   "images": [],
   "table_extraction_error": null,
   "tables": [
     {
+      "bbox": null,
       "headers": [
         "Col1",
         "Col2",
