@@ -594,17 +594,22 @@ async def reextract_document(
         raise HTTPException(status_code=404, detail="Document not found after update")
 
     # 5. Extract text up-front via the chosen engine (mirrors /reingest pattern).
+    # Plan 04 Rule-1 inline fix: wrap blocking extract in run_in_threadpool per
+    # CLAUDE.md D-v2.5-01 — Docling extracts on real-world PDFs can run minutes;
+    # leaving them in the async path blocks the single uvicorn worker so even
+    # /healthz cannot return (observed during SC#1 UAT, 6+ min hang).
     from app.services.extraction_service import get_extractor  # noqa: PLC0415
+    from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
     mime_type = target["mime_type"]
     extract_start = time.perf_counter()
     extracted_doc: ExtractedDocument | None = None
     try:
         extractor = get_extractor(mime_type, engine_override=body.engine)
         if extractor is not None:
-            extracted_doc = extractor.extract(raw, mime_type)
+            extracted_doc = await run_in_threadpool(extractor.extract, raw, mime_type)
             text = extracted_doc.text
         else:
-            text = extract_text(raw, mime_type)
+            text = await run_in_threadpool(extract_text, raw, mime_type)
     except Exception as e:
         raise HTTPException(
             status_code=422,

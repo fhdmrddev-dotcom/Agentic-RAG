@@ -48,6 +48,12 @@ def _get_converter() -> "DocumentConverter":
                 opts.generate_picture_images = True   # required for p.get_image(doc) — RESEARCH Pitfall 3
                 opts.images_scale = 2.0
                 opts.document_timeout = 120.0         # T-071-02-03 mitigation
+                # Plan 04 Rule-1 inline fix: disable OCR by default — RapidOCR preprocess
+                # raised std::bad_alloc on the 551f03f9 thesis pair under Windows during
+                # SC#1 UAT (pages 26-31 OOM, crashed worker). Theses + most ingested PDFs
+                # have a text layer already; OCR is wasted work + the OOM source. Future
+                # work (Phase 072 / Skill Studio milestone): user-tunable do_ocr flag.
+                opts.do_ocr = False
                 log.info(
                     "DoclingExtractor: lazy-instantiating DocumentConverter "
                     "(first call downloads ~600MB; subsequent calls are fast)."
