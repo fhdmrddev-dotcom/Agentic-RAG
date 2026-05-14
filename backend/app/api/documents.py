@@ -5,9 +5,11 @@ import os
 import time
 import zipfile
 from datetime import datetime, timezone
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
+from pydantic import BaseModel
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -17,6 +19,17 @@ from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
+
+
+class ReextractRequest(BaseModel):
+    """POST /documents/{id}/reextract body schema (Phase 071 D-071-09).
+
+    `engine` is REQUIRED — distinct from /reingest which uses the global default.
+    Invalid values produce FastAPI auto-422 via Pydantic Literal validation
+    (T-071-04-02 mitigation — invalid engine cannot crash downstream get_extractor).
+    """
+
+    engine: Literal["docling", "pymupdf", "legacy"]
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -505,6 +518,113 @@ async def reingest_document(
         target["mime_type"],
         target["filename"],
         None,            # engine_override — None for /reingest (uses EXTRACTOR_PRIMARY default)
+        extracted_doc,
+        extract_duration_ms,
+    )
+    return result.data[0]
+
+
+@router.post("/{document_id}/reextract", response_model=DocumentResponse, status_code=202)
+async def reextract_document(
+    document_id: str,
+    body: ReextractRequest,
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Re-extract a single document with an explicit engine override (Phase 071 D-071-09..12).
+
+    Distinct from POST /reingest (which re-runs the global default extractor).
+    Body: {engine: 'docling' | 'pymupdf' | 'legacy'} REQUIRED.
+    Returns 202 Accepted + DocumentResponse.
+
+    Behavior (D-071-10):
+    1. Owner-only RLS check (eq user_id) — 404 (NOT 403) on miss to avoid leaking
+       existence (T-071-04-01 information-disclosure mitigation).
+    2. Fetch raw bytes from Storage.
+    3. Hard delete chunks + tables + images for this document_id.
+    4. UPDATE documents: status='pending', extractor=NULL, ingestion_step=NULL,
+       error_message=NULL. (version_number NOT bumped — engine swap is not a
+       source-bytes change; D-25 versioning contract preserved per D-071-10.)
+    5. Extract text up-front using the chosen engine override (matches /reingest
+       pattern so any extraction error surfaces synchronously as 422 rather than
+       silently failing in the background task).
+    6. Queue ingest_document with engine_override=body.engine.
+    """
+    # 1. Owner-only RLS check (T-071-04-01) — mirrors /reingest at documents.py:447-458
+    doc = (
+        supabase.table("documents")
+        .select("*")
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .eq("is_latest", True)
+        .maybe_single()
+        .execute()
+    )
+    if not doc.data:
+        # 404 (not 403) — avoid leaking existence to non-owners (T-071-04-01).
+        raise HTTPException(status_code=404, detail="Document not found")
+    target = doc.data
+
+    # 2. Fetch raw bytes from Storage (mirrors /reingest at documents.py:463-466)
+    try:
+        raw = supabase.storage.from_("documents").download(target["file_path"])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
+
+    # 3. Hard delete chunks + tables + images (D-071-10 cascade order — children before parent)
+    supabase.table("document_chunks").delete().eq("document_id", document_id).execute()
+    supabase.table("document_tables").delete().eq("document_id", document_id).execute()
+    supabase.table("document_images").delete().eq("document_id", document_id).execute()
+
+    # 4. Reset doc status (D-071-10 step 4). version_number NOT bumped (D-25 preserved).
+    result = (
+        supabase.table("documents")
+        .update({
+            "status": "pending",
+            "extractor": None,
+            "ingestion_step": None,
+            "error_message": None,
+        })
+        .eq("id", document_id)
+        .eq("user_id", current_user["id"])
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Document not found after update")
+
+    # 5. Extract text up-front via the chosen engine (mirrors /reingest pattern).
+    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+    mime_type = target["mime_type"]
+    extract_start = time.perf_counter()
+    extracted_doc: ExtractedDocument | None = None
+    try:
+        extractor = get_extractor(mime_type, engine_override=body.engine)
+        if extractor is not None:
+            extracted_doc = extractor.extract(raw, mime_type)
+            text = extracted_doc.text
+        else:
+            text = extract_text(raw, mime_type)
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not extract text via engine={body.engine}: {e}",
+        )
+    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
+
+    # 6. Schedule background ingestion with explicit engine_override (D-071-10 step 5).
+    # Matches the ingest_document signature wired up by Plan 02 (positional kwargs
+    # engine_override / extracted_doc / extract_duration_ms).
+    background_tasks.add_task(
+        ingest_document,
+        document_id,
+        text,
+        current_user["id"],
+        supabase,
+        raw,
+        mime_type,
+        target["filename"],
+        body.engine,        # engine_override — explicit per /reextract contract
         extracted_doc,
         extract_duration_ms,
     )

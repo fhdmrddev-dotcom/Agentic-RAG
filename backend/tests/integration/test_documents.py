@@ -391,6 +391,117 @@ class TestMoveDocument:
         assert "Folder not found" in response.json()["detail"]
 
 
+# ── POST /documents/{id}/reextract ─────────────────────────────────────────────
+
+class TestReextractDocument:
+    """Phase 071 Plan 04 — POST /documents/{id}/reextract integration tests (D-071-09..12).
+
+    Covers:
+    - happy_path_returns_202: owner reextract returns 202; chunks/tables/images deleted;
+      doc reset to status='pending' with extractor=NULL; ingest_document scheduled with
+      engine_override=body.engine.
+    - invalid_engine_returns_422: Pydantic Literal rejects unknown engine values
+      (T-071-04-02 mitigation).
+    - missing_engine_returns_422: required field omission produces FastAPI auto-422.
+    - owner_only_returns_404: cross-user IDOR attempt returns 404 (NOT 403) to avoid
+      leaking existence (T-071-04-01 mitigation).
+    """
+
+    def test_reextract_happy_path_returns_202(self, client, auth_headers, mock_builder):
+        """Owner reextract → 202; chunks/tables/images deleted; doc reset to pending;
+        ingest_document scheduled with engine_override='docling'."""
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        # Simulate the full happy path:
+        # 1. owner check returns the doc row.
+        # 2. delete chunks succeeds (empty data).
+        # 3. delete tables succeeds.
+        # 4. delete images succeeds.
+        # 5. UPDATE documents returns the updated row.
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),                                       # owner SELECT
+            _make_result([]),                                            # delete chunks
+            _make_result([]),                                            # delete tables
+            _make_result([]),                                            # delete images
+            _make_result([{**pdf_doc, "status": "pending"}]),            # UPDATE documents
+        ]
+
+        # Stub the in-route get_extractor (lazy-imported inside the route from
+        # app.services.extraction_service, so we patch at the source module) + ingest_document.
+        # The TestClient runs BackgroundTasks AFTER returning the response, so
+        # mock_ingest.called is observable post-response.
+        with patch("app.api.documents.ingest_document") as mock_ingest, \
+             patch("app.services.extraction_service.get_extractor") as mock_get_extractor:
+            mock_extractor_instance = MagicMock()
+            mock_extracted = MagicMock()
+            mock_extracted.text = "extracted text"
+            mock_extractor_instance.extract.return_value = mock_extracted
+            mock_get_extractor.return_value = mock_extractor_instance
+
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract",
+                headers=auth_headers,
+                json={"engine": "docling"},
+            )
+
+        assert response.status_code == 202, f"Expected 202, got {response.status_code}: {response.text}"
+        # get_extractor was called with engine_override='docling' (the body.engine value).
+        mock_get_extractor.assert_called_once()
+        _, kwargs = mock_get_extractor.call_args
+        assert kwargs.get("engine_override") == "docling"
+        # ingest_document scheduled with body.engine threaded through as the engine_override positional.
+        # BackgroundTasks invokes synchronously in TestClient — call observable post-response.
+        mock_ingest.assert_called_once()
+        ingest_args = mock_ingest.call_args.args
+        # Positional shape (matches Plan 02 wiring): (doc_id, text, user_id, supabase, raw, mime, filename, engine_override, extracted_doc, extract_duration_ms)
+        assert ingest_args[7] == "docling", f"Expected engine_override='docling' at positional index 7, got {ingest_args[7]!r}"
+
+    def test_reextract_invalid_engine_returns_422(self, client, auth_headers):
+        """Invalid engine value → FastAPI auto-422 (Pydantic Literal validation).
+
+        T-071-04-02 mitigation: invalid engine cannot reach the dispatcher.
+        """
+        response = client.post(
+            f"/documents/{DOC_ID}/reextract",
+            headers=auth_headers,
+            json={"engine": "rust-pdf"},
+        )
+        assert response.status_code == 422, f"Expected 422, got {response.status_code}: {response.text}"
+
+    def test_reextract_missing_engine_returns_422(self, client, auth_headers):
+        """Missing engine field in body → FastAPI auto-422 (engine is required, no default)."""
+        response = client.post(
+            f"/documents/{DOC_ID}/reextract",
+            headers=auth_headers,
+            json={},
+        )
+        assert response.status_code == 422, f"Expected 422, got {response.status_code}: {response.text}"
+
+    def test_reextract_owner_only_returns_404(self, client, auth_headers, mock_builder):
+        """Cross-user reextract → 404 (NOT 403) to avoid leaking existence.
+
+        T-071-04-01 mitigation: information-disclosure on IDOR attempt.
+        Simulates user A targeting a document owned by user B — the .eq('user_id', current_user_id)
+        filter returns no data, route raises 404.
+        """
+        mock_builder.execute.side_effect = [
+            _make_result(None),  # owner SELECT — no row for this user_id; maybe_single returns None
+        ]
+        response = client.post(
+            f"/documents/{DOC_ID}/reextract",
+            headers=auth_headers,
+            json={"engine": "docling"},
+        )
+        assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
+        assert "Document not found" in response.json().get("detail", ""), \
+            f"Expected 'Document not found' in detail, got: {response.json()}"
+
+
 # ── ingest_document full_markdown storage ──────────────────────────────────────
 
 class TestFullMarkdown:
