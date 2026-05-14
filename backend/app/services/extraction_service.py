@@ -21,6 +21,16 @@ from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
 
+
+class ExtractionError(Exception):
+    """Raised when an extractor pipeline fails in a way callers need to surface
+    (e.g. subprocess timeout, child non-zero exit, malformed payload).
+
+    Distinct from per-feature silent-swallow errors (D-069-04) which are stored
+    in ExtractedDocument.table_extraction_error / .image_extraction_error.
+    """
+
+
 PDF_MIME = "application/pdf"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
