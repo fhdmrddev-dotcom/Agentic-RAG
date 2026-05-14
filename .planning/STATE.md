@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 071-02-PLAN.md
-last_updated: "2026-05-14T17:43:23.771Z"
+stopped_at: Completed 071-03-PLAN.md
+last_updated: "2026-05-14T18:30:00.000Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 14
-  completed_plans: 13
+  total_plans: 15
+  completed_plans: 14
   percent: 93
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 071 (docling-primary-path) — EXECUTING
-Plan: 2 of 4
-Status: Ready to execute
+Plan: 3 of 4 (Plan 03 PyMuPDF AGPL fence shipped 2026-05-14)
+Status: Ready to execute Plan 04 (POST /reextract)
 Last activity: 2026-05-14
 
 ## PRD-reset outputs (committed)
@@ -221,6 +221,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 063.1 P04 | 4min | 1 tasks | 1 files |
 | Phase 063.1 P05 | ~70min total (across 2 sessions: spec authoring + close-out) | 3 tasks (2 e2e batches + UAT scoreboard fill) | 5 files (3 e2e specs + HUMAN-UAT.md + SUMMARY) |
 | Phase 071 P02 | 92min | 4 tasks | 12 files |
+| Phase 071 P03 | ~45min | 4 tasks | 7 files (4 created, 3 modified) |
 
 ## Accumulated Context
 
@@ -277,6 +278,12 @@ Recent decisions affecting v2.5 work:
 - Phase 071 Plan 02: LegacyExtractor returns explicit extractor_name='pypdf-legacy' (CONTEXT.md Discretion recommendation); Phase 069 goldens refreshed with the new key + null bbox/full_markdown entries.
 - Phase 071 Plan 02: Dispatcher uses ImportError-guarded lazy registration for PyMuPDF — lets Wave 2 (Plan 02) ship before Wave 2 sibling (Plan 03 PyMuPDF fence) lands.
 - Phase 071 Plan 02: ingest_document signature gained 3 kwargs (engine_override / extracted_doc / extract_duration_ms) — Phase 072 RAG-MM-LIFT-01 inherits TODO comment block above extract_and_store_tables/images call sites.
+- Phase 071 Plan 03: PyMuPDF AGPL subprocess fence shipped — `import fitz` lives ONLY in `backend/extractors/pymupdf_isolated.py` (child entrypoint OUTSIDE `backend/app/`); parent wrapper at `backend/app/services/extractors/pymupdf.py` spawns via subprocess.run with `cwd=BACKEND_DIR` (T-071-03-05) + `env={'PATH': ...}` (T-071-03-01 env scrubbing). Runtime invariant test `test_fitz_not_imported_by_parent` asserts `{'fitz','pymupdf','PyMuPDF'} & sys.modules == empty` after importing every parent-side module. Fence is enforced by 4 layers: file-tree separation, code review, runtime test, actual subprocess isolation.
+- Phase 071 Plan 03 (Rule 1 deviation): PyMuPDF 1.27's `page.find_tables()` prints `"Consider using the pymupdf_layout package…"` directly to sys.stdout, corrupting the JSON IPC contract. Fix: `_redirect_stdout_to_stderr()` context manager swaps `sys.stdout` to `sys.stderr` around the find_tables call. Python-level swap (not `os.dup2`) because the print goes through the TextIOWrapper buffer.
+- Phase 071 Plan 03: ExtractionError class added to `extraction_service.py` (not in the parent wrapper) — surfaces subprocess-timeout / malformed-JSON / non-zero-exit failures. Public discovery location for Plan 04 `/reextract` callers.
+- Phase 071 Plan 03: pymupdf>=1.24 pinned WITHOUT upper bound (`pymupdf>=1.24`) — D-070-14 comment block's "re-run binding test on pin change" is the lockdown contract, not version cap. Major-version backward-compat at the API level we use (`fitz.Document`, `page.find_tables`, `page.get_images`) has held historically.
+- Phase 071 Plan 03: PyMuPDFExtractor restricts `supports()` to PDF only (D-071 discretion) — DOCX continues to route through Docling/Legacy. Keeps the fence's surface minimal; PyMuPDF DOCX is rarely better than python-docx.
+- Phase 071 Plan 03: D-070-14 + D-v2.6-01 lines (Pinned by Phase 070 block + supabase==2.29.0 + httpx>=0.28.0,<0.29.0 + docling>=2.93.0,<3.0.0) byte-identical post-Plan-03 — confirmed via `git diff 97cff11:backend/requirements.txt requirements.txt`. New pymupdf>=1.24 pin inserted between pdfplumber and Pillow; Phase 070 binding gate stays GREEN.
 
 ### Pending Todos
 
@@ -316,8 +323,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-14T17:43:23.758Z
-Stopped at: Completed 071-02-PLAN.md
+Last session: 2026-05-14T18:30:00.000Z
+Stopped at: Completed 071-03-PLAN.md
 Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point; also Wave 0). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss per their owning-phase mapping in REQUIREMENTS.md.
 
 **Phases OPEN (cross-phase blocked):**
