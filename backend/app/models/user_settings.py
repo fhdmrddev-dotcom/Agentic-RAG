@@ -87,6 +87,10 @@ class UserEffectiveSettings(BaseModel):
     # Sandbox
     sandbox_enabled: bool
 
+    # Multimodal limits (Phase 071 migration 044; Phase 072 RAG-MM-LIFT-01 USES these)
+    multimodal_max_vision_calls: int = 100
+    multimodal_max_b64_bytes_kb: int = 4096
+
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -282,6 +286,10 @@ def load_app_settings() -> UserEffectiveSettings:
         web_search_enabled=_bool(override, "web_search_enabled", bool(env_settings.tavily_api_key)),
 
         sandbox_enabled=_bool(override, "sandbox_enabled", env_settings.sandbox_enabled),
+
+        multimodal_max_vision_calls=_int(override, "multimodal_max_vision_calls", 100),
+        multimodal_max_b64_bytes_kb=_int(override, "multimodal_max_b64_bytes_kb", 4096),
+
         context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
         sub_agent_max_output_tokens=_int(override, "sub_agent_max_output_tokens", env_settings.sub_agent_max_output_tokens),
         sub_agent_model=_str(override, "sub_agent_model", env_settings.sub_agent_model),
