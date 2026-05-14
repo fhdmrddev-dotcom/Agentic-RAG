@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dh3VO2YiP6GoHieadxxaclH2EtQ16oA2eNz5rvyqKHmVZ0k37g6dvSxkIqo6RLX
+\restrict R3RC6bTnwZUk0BkJI0XhlnCo8eHUsHgXqvBNWqTNHepLWBjrmmaaEcGVHtBYHBB
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -246,7 +246,9 @@ CREATE TABLE public.app_settings (
     vector_search_weight double precision,
     keyword_search_weight double precision,
     rrf_k integer,
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    multimodal_max_vision_calls integer DEFAULT 100,
+    multimodal_max_b64_bytes_kb integer DEFAULT 4096
 );
 
 
@@ -306,7 +308,8 @@ CREATE TABLE public.document_images (
     page integer,
     image_index integer NOT NULL,
     description text DEFAULT ''::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    bbox jsonb
 );
 
 
@@ -322,7 +325,9 @@ CREATE TABLE public.document_tables (
     table_index integer NOT NULL,
     headers jsonb DEFAULT '[]'::jsonb NOT NULL,
     rows jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    bbox jsonb,
+    extractor text
 );
 
 
@@ -349,6 +354,7 @@ CREATE TABLE public.documents (
     is_latest boolean DEFAULT true NOT NULL,
     full_markdown text,
     ingestion_step text,
+    extractor text,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -405,6 +411,24 @@ CREATE TABLE public.messages (
 );
 
 ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
+
+
+--
+-- Name: pdf_extraction_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pdf_extraction_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    document_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    engine text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    duration_ms integer,
+    table_count integer,
+    image_count integer,
+    error text
+);
 
 
 --
@@ -618,6 +642,14 @@ ALTER TABLE ONLY public.messages
 
 
 --
+-- Name: pdf_extraction_runs pdf_extraction_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pdf_extraction_runs
+    ADD CONSTRAINT pdf_extraction_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: profiles profiles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -732,6 +764,13 @@ CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USIN
 
 
 --
+-- Name: documents_dedup_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (user_id, content_hash, folder_id) WHERE (status <> 'failed'::text);
+
+
+--
 -- Name: documents_folder_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -778,6 +817,20 @@ CREATE INDEX folders_parent_id_idx ON public.folders USING btree (parent_id);
 --
 
 CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
+
+
+--
+-- Name: idx_pdf_extraction_runs_document_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pdf_extraction_runs_document_id ON public.pdf_extraction_runs USING btree (document_id);
+
+
+--
+-- Name: idx_pdf_extraction_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pdf_extraction_runs_user_id ON public.pdf_extraction_runs USING btree (user_id);
 
 
 --
@@ -1019,6 +1072,22 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.messages
     ADD CONSTRAINT messages_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: pdf_extraction_runs pdf_extraction_runs_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pdf_extraction_runs
+    ADD CONSTRAINT pdf_extraction_runs_document_id_fkey FOREIGN KEY (document_id) REFERENCES public.documents(id) ON DELETE CASCADE;
+
+
+--
+-- Name: pdf_extraction_runs pdf_extraction_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pdf_extraction_runs
+    ADD CONSTRAINT pdf_extraction_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -1475,6 +1544,19 @@ ALTER TABLE public.message_feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: pdf_extraction_runs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.pdf_extraction_runs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: pdf_extraction_runs pdf_extraction_runs_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR SELECT USING ((auth.uid() = user_id));
+
+
+--
 -- Name: profiles; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1527,5 +1609,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dh3VO2YiP6GoHieadxxaclH2EtQ16oA2eNz5rvyqKHmVZ0k37g6dvSxkIqo6RLX
+\unrestrict R3RC6bTnwZUk0BkJI0XhlnCo8eHUsHgXqvBNWqTNHepLWBjrmmaaEcGVHtBYHBB
 
