@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 071-03-PLAN.md
-last_updated: "2026-05-14T18:30:00.000Z"
+stopped_at: "Phase 071 Plan 04 pre-UAT scaffolding (Tasks 1-4) shipped 2026-05-14; awaiting live SC#1 UAT (Task 5) on 551f03f9-... thesis pair before Task 6 close-out"
+last_updated: "2026-05-14T20:00:00.000Z"
 last_activity: 2026-05-14
 progress:
   total_phases: 5
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 071 (docling-primary-path) — EXECUTING
-Plan: 3 of 4 (Plan 03 PyMuPDF AGPL fence shipped 2026-05-14)
-Status: Ready to execute Plan 04 (POST /reextract)
+Plan: 4 of 4 IN-PROGRESS — Tasks 1-4 of 6 complete (pre-UAT scaffolding shipped 2026-05-14, commits `8a75cd7` + `b2bfdfe`); Task 5 (human UAT against `551f03f9-...` thesis pair) and Task 6 (071-SUMMARY.md close-out) outstanding
+Status: Awaiting Task 5 live UAT — orchestrator coordinates with the user; Plan 04 NOT YET COMPLETE
 Last activity: 2026-05-14
 
 ## PRD-reset outputs (committed)
@@ -222,6 +222,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 063.1 P05 | ~70min total (across 2 sessions: spec authoring + close-out) | 3 tasks (2 e2e batches + UAT scoreboard fill) | 5 files (3 e2e specs + HUMAN-UAT.md + SUMMARY) |
 | Phase 071 P02 | 92min | 4 tasks | 12 files |
 | Phase 071 P03 | ~45min | 4 tasks | 7 files (4 created, 3 modified) |
+| Phase 071 P04 (Tasks 1-4 of 6) | ~50min | 4 tasks (Tasks 5+6 pending UAT) | 6 files (2 created, 3 modified, 1 deferred-items log) |
 
 ## Accumulated Context
 
@@ -323,9 +324,9 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-14T18:30:00.000Z
-Stopped at: Completed 071-03-PLAN.md
-Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point; also Wave 0). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss per their owning-phase mapping in REQUIREMENTS.md.
+Last session: 2026-05-14T20:00:00.000Z
+Stopped at: Phase 071 Plan 04 pre-UAT scaffolding (Tasks 1-4) shipped 2026-05-14; awaiting live SC#1 UAT (Task 5) on 551f03f9-... thesis pair before Task 6 close-out
+Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase Studio against `551f03f9-...` PDF + DOCX siblings). User fills 12 TBD slots in `.planning/phases/071-docling-primary-path/071-VERIFICATION.md` and flips frontmatter `status: pending` → `green` or `red`. Then orchestrator authors `071-SUMMARY.md` (Task 6) — at which point Plan 04 closes and Phase 071 ships.
 
 **Phases OPEN (cross-phase blocked):**
 
