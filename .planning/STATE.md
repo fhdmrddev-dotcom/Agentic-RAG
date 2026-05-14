@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
-stopped_at: "Phase 071 Plan 04 pre-UAT scaffolding (Tasks 1-4) shipped 2026-05-14; awaiting live SC#1 UAT (Task 5) on 551f03f9-... thesis pair before Task 6 close-out"
-last_updated: "2026-05-14T20:00:00.000Z"
+status: ready_for_next_phase
+stopped_at: "Phase 071 (Docling Primary Path) closed partial 2026-05-14: 4 of 5 SCs green; SC#1 RED (Docling stalls on thesis-class PDF) carries forward to Phase 071.1. Phase 071.1 gap-closure scope captured in 071-VERIFICATION.md + 071-SUMMARY.md."
+last_updated: "2026-05-14T23:30:00.000Z"
 last_activity: 2026-05-14
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 15
+  total_phases: 16
+  completed_phases: 5
+  total_plans: 26
   completed_plans: 14
-  percent: 93
+  percent: 54
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 071 — docling-primary-path
+**Current focus:** Phase 071 closed partial (SC#1 RED → carries to 071.1); next phase candidate 072 (Multimodal Lift) or insert 071.1 first.
 
 ## Current Position
 
-Phase: 071 (docling-primary-path) — EXECUTING
-Plan: 4 of 4 IN-PROGRESS — Tasks 1-4 of 6 complete (pre-UAT scaffolding shipped 2026-05-14, commits `8a75cd7` + `b2bfdfe`); Task 5 (human UAT against `551f03f9-...` thesis pair) and Task 6 (071-SUMMARY.md close-out) outstanding
-Status: Awaiting Task 5 live UAT — orchestrator coordinates with the user; Plan 04 NOT YET COMPLETE
-Last activity: 2026-05-14
+Phase: 071 — CLOSED PARTIAL (4/5 SCs green, SC#1 carry-forward → 071.1)
+Plan: All 4 plans complete + 071.1 scope captured in 071-VERIFICATION.md
+Status: Ready for next phase (recommend inserting 071.1 before 072)
+Last activity: 2026-05-14 — Phase 071 close-out + Plan 04 Rule-1 inline fixes (commit 9116c2b)
 
 ## PRD-reset outputs (committed)
 

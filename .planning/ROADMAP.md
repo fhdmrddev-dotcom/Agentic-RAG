@@ -286,11 +286,11 @@ Full details below in **Phase Details**.
   4. `pdf_extraction_runs` telemetry table records `engine`, `duration_ms`, `table_count`, `image_count`, `error` for every extraction run — visible per-document.
   5. Q-v2.6-04 (re-extraction migration policy: opt-in via `POST /documents/{id}/reextract`, NOT auto-run on deploy) is locked before this phase ships.
 
-**Plans:** 4 plans
-- [ ] 071-01-PLAN.md — Schema + migrations 039-044 + telemetry plumbing + user_settings reader hookup (Wave 1; autonomous: false; DRY-RUN dedup gate before migration 043 apply)
-- [ ] 071-02-PLAN.md — DoclingExtractor adapter + dispatcher rewire + ExtractedDocument extension + pdf_extraction_runs telemetry writes + academic_synth fixtures + test_docling_extractor.py (Wave 2; depends on Plan 01)
-- [ ] 071-03-PLAN.md — PyMuPDF subprocess fence (backend/extractors/ child + parent wrapper + requirements.txt pin + test_pymupdf_fence.py AGPL invariant) (Wave 2; depends on Plan 01; parallel with Plan 02)
-- [ ] 071-04-PLAN.md — POST /reextract endpoint + D-v2.6-04 lock + backend/README.md + live SC#1 UAT on 551f03f9-... + 071-SUMMARY.md (Wave 3; depends on Plans 01+02+03; autonomous: false for live UAT)
+**Plans:** 4/4 plans complete
+- [x] 071-01-PLAN.md — Schema + migrations 039-044 + telemetry plumbing + user_settings reader hookup (Wave 1; autonomous: false; DRY-RUN dedup gate before migration 043 apply)
+- [x] 071-02-PLAN.md — DoclingExtractor adapter + dispatcher rewire + ExtractedDocument extension + pdf_extraction_runs telemetry writes + academic_synth fixtures + test_docling_extractor.py (Wave 2; depends on Plan 01)
+- [x] 071-03-PLAN.md — PyMuPDF subprocess fence (backend/extractors/ child + parent wrapper + requirements.txt pin + test_pymupdf_fence.py AGPL invariant) (Wave 2; depends on Plan 01; parallel with Plan 02)
+- [x] 071-04-PLAN.md — POST /reextract endpoint + D-v2.6-04 lock + backend/README.md + live SC#1 UAT on 551f03f9-... + 071-SUMMARY.md (Wave 3; depends on Plans 01+02+03; autonomous: false for live UAT)
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
 **Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures, and a hand-crafted DOCX with floating shapes + header images surfaces both via the related-parts walk.
@@ -493,7 +493,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 2/2 | Complete    | 2026-05-14 |
 | 069 — PdfExtractor Abstraction Scaffold | 2/2 | Complete    | 2026-05-13 |
 | 070 — Docling httpx Spike | 2/2 | Complete    | 2026-05-14 |
-| 071 — Docling Primary Path | 0/4 | Not started | — |
+| 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
 | 072 — Multimodal Lift + DOCX Completeness | 0/3 | Not started | — |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
