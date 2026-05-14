@@ -1,7 +1,10 @@
 import csv
 import hashlib
 import io
+import os
+import time
 import zipfile
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
@@ -12,6 +15,7 @@ from app.models.document import DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
+from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -224,12 +228,16 @@ async def upload_document(
         next_version = 1
 
     # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
+    # Phase 071: capture full ExtractedDocument + duration for pdf_extraction_runs telemetry.
     from app.services.extraction_service import get_extractor  # noqa: PLC0415
 
+    extract_start = time.perf_counter()
+    extracted_doc: ExtractedDocument | None = None
     try:
         extractor = get_extractor(mime_type)
         if extractor is not None:
-            text = extractor.extract(raw, mime_type).text
+            extracted_doc = extractor.extract(raw, mime_type)
+            text = extracted_doc.text
         else:
             text = extract_text(raw, mime_type)
     except Exception as e:
@@ -237,6 +245,7 @@ async def upload_document(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Could not extract text from file: {e}",
         )
+    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
 
     document_id = str(uuid4())
     storage_path = f"{current_user['id']}/{document_id}/{file.filename}"
@@ -275,6 +284,9 @@ async def upload_document(
         raw,
         mime_type,
         file.filename,
+        None,            # engine_override — None for upload path (uses EXTRACTOR_PRIMARY default)
+        extracted_doc,
+        extract_duration_ms,
     )
     background_tasks.add_task(
         write_audit_entry,
@@ -454,17 +466,22 @@ async def reingest_document(
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
     # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
+    # Phase 071: capture full ExtractedDocument + duration for pdf_extraction_runs telemetry.
     from app.services.extraction_service import get_extractor  # noqa: PLC0415
 
     mime_type = target["mime_type"]
+    extract_start = time.perf_counter()
+    extracted_doc: ExtractedDocument | None = None
     try:
         extractor = get_extractor(mime_type)
         if extractor is not None:
-            text = extractor.extract(raw, mime_type).text
+            extracted_doc = extractor.extract(raw, mime_type)
+            text = extracted_doc.text
         else:
             text = extract_text(raw, mime_type)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Could not extract text: {e}")
+    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
 
     # 3. Reset status to pending
     result = (
@@ -487,6 +504,9 @@ async def reingest_document(
         raw,
         target["mime_type"],
         target["filename"],
+        None,            # engine_override — None for /reingest (uses EXTRACTOR_PRIMARY default)
+        extracted_doc,
+        extract_duration_ms,
     )
     return result.data[0]
 
@@ -639,9 +659,22 @@ def ingest_document(
     raw: bytes = b"",
     mime_type: str = "",
     filename: str = "",
+    engine_override: str | None = None,
+    extracted_doc: "ExtractedDocument | None" = None,
+    extract_duration_ms: int = 0,
 ) -> None:
     import logging, traceback
     log = logging.getLogger(__name__)
+
+    # Phase 071 D-071-08 — resolve engine lineage tag once, reused for both
+    # documents.extractor column and pdf_extraction_runs.engine telemetry.
+    engine_used = (
+        (extracted_doc.extractor_name if extracted_doc and extracted_doc.extractor_name else None)
+        or engine_override
+        or os.getenv("EXTRACTOR_PRIMARY", "docling")
+    )
+    started_at_iso = datetime.now(timezone.utc).isoformat()
+
     try:
         supabase.table("documents").update({"status": "processing"}).eq("id", document_id).execute()
         # D-10/D-11 (Phase 56): granular ingestion_step for Realtime-driven UI badge.
@@ -708,10 +741,45 @@ def ingest_document(
                 extract_and_store_images,
             )
             supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute()
+            # TODO Phase 072 (RAG-MM-LIFT-01/02): extract_and_store_tables and
+            # extract_and_store_images currently re-extract from raw bytes via the
+            # multimodal_service helpers (Phase 069 D-069-04 single-pass contract).
+            # This means document_tables.bbox + document_images.bbox columns (migrations
+            # 041/042) stay NULL for new ingests even when engine='docling' produced rich
+            # bbox data on ExtractedDocument.tables[i].bbox. Phase 072 will refactor these
+            # helpers to accept the pre-extracted lists, at which point bbox flows through.
             extract_and_store_tables(raw, mime_type, document_id, user_id, supabase)
 
             supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute()
+            # TODO Phase 072 (RAG-MM-LIFT-01/02): extract_and_store_tables and
+            # extract_and_store_images currently re-extract from raw bytes via the
+            # multimodal_service helpers (Phase 069 D-069-04 single-pass contract).
+            # This means document_tables.bbox + document_images.bbox columns (migrations
+            # 041/042) stay NULL for new ingests even when engine='docling' produced rich
+            # bbox data on ExtractedDocument.tables[i].bbox. Phase 072 will refactor these
+            # helpers to accept the pre-extracted lists, at which point bbox flows through.
             extract_and_store_images(raw, mime_type, document_id, user_id, supabase, app_settings)
+
+        # Phase 071 D-071-08 — telemetry write (happy path).
+        # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).
+        try:
+            table_count = len(extracted_doc.tables) if extracted_doc else 0
+            image_count = len(extracted_doc.images) if extracted_doc else 0
+            supabase.table("pdf_extraction_runs").insert({
+                "document_id": document_id,
+                "user_id": user_id,
+                "engine": engine_used,
+                "started_at": started_at_iso,
+                "duration_ms": extract_duration_ms,
+                "table_count": table_count,
+                "image_count": image_count,
+                "error": None,
+            }).execute()
+        except Exception as exc:
+            log.warning(
+                "pdf_extraction_runs INSERT failed (engine=%s, doc=%s): %s",
+                engine_used, document_id, exc,
+            )
 
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
         supabase.table("documents").update({
@@ -719,10 +787,28 @@ def ingest_document(
             "chunk_count": len(chunks),
             "metadata": metadata_dict,
             "full_markdown": text,
+            # Phase 071 D-071-08 — populate extractor lineage column for new ingests.
+            "extractor": engine_used,
         }).eq("id", document_id).execute()
 
     except Exception as e:
         log.error("ingest_document failed: %s\n%s", e, traceback.format_exc())
+        # Phase 071 D-071-08 — telemetry write on failure (D-071-11 fail-loud).
+        # Wrapped in its own try/except so a telemetry write failure cannot
+        # escalate into a double-fault on an already-failed ingest (T-071-02-02).
+        try:
+            supabase.table("pdf_extraction_runs").insert({
+                "document_id": document_id,
+                "user_id": user_id,
+                "engine": engine_used,
+                "started_at": started_at_iso,
+                "duration_ms": extract_duration_ms,
+                "table_count": 0,
+                "image_count": 0,
+                "error": str(e)[:1000],
+            }).execute()
+        except Exception:
+            pass  # telemetry never blocks status update
         supabase.table("documents").update({
             "status": "failed",
             "error_message": str(e)[:500],
