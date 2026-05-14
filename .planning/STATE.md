@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 071 context gathered
-last_updated: "2026-05-14T03:41:41.068Z"
-last_activity: 2026-05-13 -- Phase 070 execution started
+stopped_at: Completed 071-02-PLAN.md
+last_updated: "2026-05-14T17:43:23.771Z"
+last_activity: 2026-05-14
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 11
-  percent: 100
+  total_plans: 14
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 070 — docling-httpx-spike
+**Current focus:** Phase 071 — docling-primary-path
 
 ## Current Position
 
-Phase: 070 (docling-httpx-spike) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 070
-Last activity: 2026-05-13 -- Phase 070 execution started
+Phase: 071 (docling-primary-path) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-05-14
 
 ## PRD-reset outputs (committed)
 
@@ -220,6 +220,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 063.1 P03 | 18min | 2 tasks | 2 files |
 | Phase 063.1 P04 | 4min | 1 tasks | 1 files |
 | Phase 063.1 P05 | ~70min total (across 2 sessions: spec authoring + close-out) | 3 tasks (2 e2e batches + UAT scoreboard fill) | 5 files (3 e2e specs + HUMAN-UAT.md + SUMMARY) |
+| Phase 071 P02 | 92min | 4 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -273,6 +274,9 @@ Recent decisions affecting v2.5 work:
 - Phase 063.1 plan 04 (Rule 3 deferred-item carried forward from Plans 02/03): vitest runtime unavailable on this machine (npm optional-dep cascade — @rolldown/binding-win32-x64-msvc + @jridgewell/sourcemap-codec missing); TDD ceremony simplified to TypeScript-gated single commit with the six behavior cases (Tests 1-6) documented in commit body — matches plan's actual <verify> gate (tsc + grep). Plan 05 E2E specs (063.1-concurrent-reconcile.spec.ts, 063.1-refresh-no-duplicate-bubble.spec.ts) provide cross-stream regression coverage.
 - Phase 063.1 plan 05: HUMAN-UAT.md closed `status: partial` with project-level `approved` — splits the two concerns. Project-level approval reflects that Wave 2/3/4 fixes are live and load-bearing (verified via Chrome MCP — all four markers `lastSeenOffsetRef` / `m.runId === run.run_id` / no `abortStream` in ChatArea / `reconcileInFlightRef` + `temp-` filter served at localhost:5173); UAT-file `partial` reflects three SCs that need an end-to-end manual run depending on Phase 064's `ENABLE_TEST_FIXTURES=1` harness (SC#5 cross-tab Stop, SC#6 Resume live, SC#7 full 063 regression). Mirrors Phase 063's precedent where UAT shipped `partial` with similar carry-forwards.
 - Phase 063.1 plan 05: Gap-006 (LLM agent stops mid-iteration on complex tool-calling prompts) escalated to a new follow-on phase **"Adaptive Run Timeouts & Lifecycle States"** rather than patched in 063.1. Root cause: `RUN_HARD_TIMEOUT_SECONDS = 120s` (`backend/app/config.py:251`) wraps the entire agent loop via `asyncio.timeout` (`backend/app/api/threads.py:842`); when the timeout fires it cancels the producer task and the cancellation propagates through every nested await including the LangSmith-wrapped LLM stream iterator (surfaces in trace as `GeneratorExit`). Live `runs` table evidence (12-hour window, 24 runs): 5 of 11 cancellations clustered at 120–152s with `error: null`. Out-of-scope rationale: 063.1's scope is frontend gap closure; the timeout pipeline is untouched by 063.1. User-preferred fix paths: (path 2) per-iteration timeout budget that resets on each tool-call boundary + (path 3) split `cancelled` (user) vs `timed_out` (system) lifecycle states with `runs.error = "timed_out after Ns"` populated. Phase number TBD by orchestrator.
+- Phase 071 Plan 02: LegacyExtractor returns explicit extractor_name='pypdf-legacy' (CONTEXT.md Discretion recommendation); Phase 069 goldens refreshed with the new key + null bbox/full_markdown entries.
+- Phase 071 Plan 02: Dispatcher uses ImportError-guarded lazy registration for PyMuPDF — lets Wave 2 (Plan 02) ship before Wave 2 sibling (Plan 03 PyMuPDF fence) lands.
+- Phase 071 Plan 02: ingest_document signature gained 3 kwargs (engine_override / extracted_doc / extract_duration_ms) — Phase 072 RAG-MM-LIFT-01 inherits TODO comment block above extract_and_store_tables/images call sites.
 
 ### Pending Todos
 
@@ -312,8 +316,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 071 context gathered
+Last session: 2026-05-14T17:43:23.758Z
+Stopped at: Completed 071-02-PLAN.md
 Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Context Lift — frontend-only, no dependencies, parallel-able from start per PRD §12). Alternatively `/gsd:discuss-phase 069` (PdfExtractor Abstraction Scaffold — RAG quality entry point; also Wave 0). Six pre-execution questions (Q-v2.6-01..06) deferred to per-phase discuss per their owning-phase mapping in REQUIREMENTS.md.
 
 **Phases OPEN (cross-phase blocked):**
@@ -337,4 +341,4 @@ Next: After ROADMAP.md commit, run `/gsd:discuss-phase 068` (Streams Provider Co
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 070 (docling-httpx-spike) — 2 plans — 2026-05-13T21:36:03.479Z
+**Planned Phase:** 071 (docling-primary-path) — 4 plans — 2026-05-14T15:13:10.431Z
