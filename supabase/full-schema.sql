@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict R3RC6bTnwZUk0BkJI0XhlnCo8eHUsHgXqvBNWqTNHepLWBjrmmaaEcGVHtBYHBB
+\restrict RGqDqBSW5xBsK2nYbgimubqRSkwBftahAosWbOlZIzL5p5YiJBNuDUzUeeIeKG7
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -248,7 +248,14 @@ CREATE TABLE public.app_settings (
     rrf_k integer,
     updated_at timestamp with time zone DEFAULT now(),
     multimodal_max_vision_calls integer DEFAULT 100,
-    multimodal_max_b64_bytes_kb integer DEFAULT 4096
+    multimodal_max_b64_bytes_kb integer DEFAULT 4096,
+    extraction_text_engine_pdf text DEFAULT 'legacy'::text,
+    extraction_text_engine_docx text DEFAULT 'legacy'::text,
+    extraction_table_engine_pdf text DEFAULT 'docling_tf'::text,
+    extraction_image_engine_pdf text DEFAULT 'pymupdf_full'::text,
+    extraction_image_engine_docx text DEFAULT 'zip_xpath'::text,
+    extraction_equation_engine text DEFAULT 'docling_formula'::text,
+    extraction_per_call_hints_enabled boolean DEFAULT true
 );
 
 
@@ -1609,5 +1616,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict R3RC6bTnwZUk0BkJI0XhlnCo8eHUsHgXqvBNWqTNHepLWBjrmmaaEcGVHtBYHBB
+\unrestrict RGqDqBSW5xBsK2nYbgimubqRSkwBftahAosWbOlZIzL5p5YiJBNuDUzUeeIeKG7
 
