@@ -17,9 +17,12 @@ Adding a new engine:
      the new name to be settable via app_settings.
 
 Engines listed here MUST match the column defaults shipped by
-`supabase/migrations/045_app_settings_extraction_aspects.sql`:
+`supabase/migrations/045_app_settings_extraction_aspects.sql` and the
+Phase 071.3 winner registration:
   - text:         legacy (default), docling, pymupdf
-  - tables:       pdfplumber, docling_tf (default for PDF)
+  - tables:       pdfplumber, docling_tf (default for PDF), camelot
+                  (Phase 071.3 D-071.3-05 winner — migration 047 in Plan 03
+                  flips the default; Plan 04 deletes docling_tf)
   - images_pdf:   pdfplumber, pymupdf_full (default), docling_pictures
   - images_docx:  inline_shapes, zip_xpath (default)
   - equations:    none, docling_formula (default)
@@ -32,6 +35,7 @@ from app.services.extractors.aspects.text import (
     pymupdf_text,
 )
 from app.services.extractors.aspects.tables import (
+    camelot_tables,
     docling_tf_tables,
     pdfplumber_tables,
 )
@@ -61,6 +65,9 @@ TEXT_ENGINES: dict = {
 TABLE_ENGINES: dict = {
     "pdfplumber": pdfplumber_tables,
     "docling_tf": docling_tf_tables,
+    # Phase 071.3 D-071.3-05 winner; migration 047 (Plan 03) flips default
+    # to "camelot" and Plan 04 deletes docling_tf entirely.
+    "camelot": camelot_tables,
 }
 
 # PDF image adapters return list[ImageData]; called with (raw_bytes,)

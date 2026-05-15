@@ -142,6 +142,54 @@ class TestExtractionDispatcher:
         # because engines hint was non-empty.
         assert args[2].get("images") == "zip_xpath"
 
+    def test_camelot_engine_dispatched(
+        self, client, auth_headers, mock_builder, monkeypatch
+    ):
+        """Phase 071.3 Plan 02 — `?engines=tables:camelot` flows through to
+        extract_composable as engines_dict={'tables': 'camelot'} (D-071.3-05)."""
+        pdf_doc = _doc_row(
+            doc_id=DOC_ID, mime="application/pdf", filename="thesis.pdf"
+        )
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),                                       # owner SELECT
+            _make_result([]),                                            # delete chunks
+            _make_result([]),                                            # delete tables
+            _make_result([]),                                            # delete images
+            _make_result([{**pdf_doc, "status": "pending"}]),            # UPDATE documents
+        ]
+
+        # Ensure load_app_settings returns hints-enabled
+        fake_settings = MagicMock()
+        fake_settings.extraction_per_call_hints_enabled = True
+        from app.models import user_settings as us_mod
+        monkeypatch.setattr(us_mod, "load_app_settings", lambda: fake_settings)
+
+        mock_extracted = MagicMock()
+        mock_extracted.text = "x"
+        mock_extracted.tables = []
+        mock_extracted.images = []
+        mock_extracted.extractor_name = (
+            "composable[legacy/camelot/pymupdf_full/none]"
+        )
+
+        with patch("app.api.documents.ingest_document"), \
+             patch("app.services.extraction_service.extract_composable",
+                   return_value=mock_extracted) as mock_compose:
+            resp = client.post(
+                f"/documents/{DOC_ID}/reextract?engines=tables:camelot",
+                headers=auth_headers,
+                json={"engine": "docling"},
+            )
+
+        assert resp.status_code == 202, f"got {resp.status_code}: {resp.text}"
+        mock_compose.assert_called_once()
+        args = mock_compose.call_args.args
+        # Positional: (raw, mime, engines_dict)
+        assert args[2] is not None
+        # The hint set tables=camelot; body.engine='docling' did NOT alias
+        # because engines hint was non-empty.
+        assert args[2].get("tables") == "camelot"
+
     def test_per_call_hint_respects_admin_disable(
         self, client, auth_headers, mock_builder, monkeypatch
     ):
