@@ -587,6 +587,29 @@ class TestReextractDocument:
         assert "Document not found" in response.json().get("detail", ""), \
             f"Expected 'Document not found' in detail, got: {response.json()}"
 
+    def test_reextract_is_latest_false_returns_404(self, client, auth_headers, mock_builder):
+        """Phase 071.2 D-071.2-08 (companion to D-071.2-10) — when a prior failed
+        cascade leaves a document with is_latest=False, supabase-py's .maybe_single()
+        raises on the .eq('is_latest', True) eliminating filter rather than returning
+        .data=None. The /reextract route MUST wrap the owner SELECT in try/except and
+        re-raise as HTTPException 404 — NOT 500.
+
+        T-071.2-04-01 mitigation: bare raise (no `from e`) keeps the
+        PostgrestAPIError off the response surface.
+        """
+        # Simulate supabase-py raising on .maybe_single().execute() — the empty-
+        # eliminating-filter symptom from a prior failed cascade.
+        mock_builder.execute.side_effect = Exception("PostgrestAPIError: empty maybe_single")
+
+        response = client.post(
+            f"/documents/{DOC_ID}/reextract",
+            headers=auth_headers,
+            json={"engine": "docling"},
+        )
+        assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
+        assert response.json().get("detail") == "Document not found", \
+            f"Expected detail='Document not found', got: {response.json()}"
+
     # ── Phase 071.1 D-071.1-02 / D-071.1-04 ────────────────────────────────────
 
     def test_reextract_docling_timeout_falls_back_to_pymupdf(
