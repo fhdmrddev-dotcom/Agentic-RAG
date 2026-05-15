@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 071.2 Plan 02 Task 1 GREEN (DocumentStatusBadge.tsx extracting_tables + extracting_images labels); Task 2 checkpoint:human-verify parked for orchestrator/user — live Realtime-lifecycle UAT against thesis PDF (SC#1 201 latency + SC#2 /health under concurrent extract + SC#3 badge cycle without manual refresh, with the new labels rendering during the tables/images phase)
-last_updated: "2026-05-15T20:05:00.000Z"
-last_activity: 2026-05-15 -- Phase 071.2 Plan 02 Task 1 GREEN (frontend badge labels for extracting_tables + extracting_images)
+stopped_at: Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (per-aspect dispatcher GREEN + migration 045 written + composer wired into /upload+/reextract + SEEDs planted); Task 2 (migration apply + full-schema regen) AND Task 4 (live UAT — D-071.2-12 floor + RAG-MM-LIFT-02 closure + per-call hint smoke tests) parked together at checkpoint:human-action for orchestrator/user
+last_updated: "2026-05-15T22:30:00.000Z"
+last_activity: 2026-05-15 -- Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed; aspects package + extract_composable + migration 045 + SEED-017/018
 progress:
   total_phases: 18
   completed_phases: 6
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 071.2 (ingestion-plumbing-docling-quality-diagnostics) — EXECUTING
-Plan: 2 of 5 (Task 1 GREEN; Task 2 checkpoint:human-verify parked) — Wave 3 in progress; Plans 01/03/04 already GREEN, Plan 05 (per-aspect dispatcher) still pending
-Status: Wave 3 Plan 02 Task 1 complete (1 commit, e24ce04, +2 lines DocumentStatusBadge.tsx); Task 2 live Realtime-lifecycle UAT returned as checkpoint to orchestrator (Chrome MCP unavailable in this executor session + sandbox denies network probes — orchestrator must drive against http://localhost:5173/ with login fhdmrd@gmail.com / 123456)
-Last activity: 2026-05-15 -- Phase 071.2 Plan 02 Task 1 GREEN (frontend badge labels for extracting_tables + extracting_images)
+Plan: 5 of 5 (Tasks 1+2-code+3+5 committed; Task 2 migration apply + Task 4 live UAT parked at checkpoint) — Plans 01/03/04 already GREEN; Plan 02 Task 2 still parked; Plan 05 architectural anchor LANDED
+Status: Wave 3 Plan 05 Tasks 1+2(code)+3+5 complete (5 commits: a95c002 RED → 6e87df9 GREEN Task 1, fba262b Task 2 code, 8a57cab Task 3, 3b8f38e Task 5). Composer (extract_composable) + 6 aspect adapters + 5 registries + ExtractedDocument.equations field + migration 045 + UserEffectiveSettings extension + /upload + /reextract ?engines= plumbing + threadpool sweep gate + SEED-017/018. zip_xpath_docx is verbatim port of Docling MsWordDocumentBackend XPath algorithm (closes RAG-MM-LIFT-02 at unit level). Equations attribute verified clean (DoclingDocument.texts filtered by DocItemLabel.FORMULA — no fallback path active). Task 2 migration apply + Task 4 live UAT returned together as checkpoint:human-action — orchestrator drives migration paste in Supabase Studio SQL editor + full-schema regen + uvicorn restart + curl/SQL UAT against thesis PDF + DOCX.
+Last activity: 2026-05-15 -- Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (per-aspect dispatcher landed; D-071.2-01..04 architectural closure)
 
 ## PRD-reset outputs (committed)
 
@@ -224,6 +224,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 071 P03 | ~45min | 4 tasks | 7 files (4 created, 3 modified) |
 | Phase 071 P04 (Tasks 1-4 of 6) | ~50min | 4 tasks (Tasks 5+6 pending UAT) | 6 files (2 created, 3 modified, 1 deferred-items log) |
 | Phase 071.2 P02 (Task 1 of 2) | ~4min | 1 task (Task 2 checkpoint:human-verify parked) | 1 file (DocumentStatusBadge.tsx +2/-0) |
+| Phase 071.2 P05 (Tasks 1+2-code+3+5 of 5) | ~50min | 4 tasks (Task 2 SQL-apply + Task 4 live UAT parked at checkpoint:human-action) | 17 files (12 created — 6 adapters + 6 tests + 1 integration test + 2 seeds + 1 migration + 1 SUMMARY; 5 modified — extraction_service.py, user_settings.py, documents.py, test_documents.py, test_071_1_threadpool_sweep.py) |
 
 ## Accumulated Context
 
@@ -294,6 +295,12 @@ Recent decisions affecting v2.5 work:
 - Phase 071.2 Plan 04 (deferred — orchestrator): Task 3 `checkpoint:human-verify` parked. Requires live uvicorn + thesis-PDF `/reextract` + SQL UAT polling against `documents.status` drain + SC#5 parity (`pdf_extraction_runs.table_count == COUNT(document_tables)`) + SC#5 bbox flow (`jsonb_typeof(bbox) = 'object'`) + SC#6 curl test (`/reextract` on is_latest=false → 404 not 500). Pytest verification denied by sandbox in this executor; live tests remain for post-merge.
 - Phase 071.2 Plan 02: D-071.2-11 closure (label side) — `DocumentStatusBadge.tsx::ingestionStepLabel` widened from 4 to 6 cases. Added `if (step === "extracting_tables") return "Extracting tables"` and `if (step === "extracting_images") return "Extracting images"` AFTER the existing `extracting` case and BEFORE the `chunking` case (matches backend ingestion_step write order: extract → tables → images → chunk → embed → metadata). Diff: 2 inserted / 0 removed. TypeScript clean. `useDocuments.ts` Realtime wiring untouched per plan verify-only directive.
 - Phase 071.2 Plan 02 (deferred — orchestrator): Task 2 `checkpoint:human-verify` parked. Sequential executor lacks `mcp__chrome-devtools__*` tools in this session AND Bash sandbox denies network probes (curl / Invoke-WebRequest), so neither automation nor manual dev-stack probing reachable. Plan anticipates this fallback path. Orchestrator drives the live UAT against http://localhost:5173/ with test login fhdmrd@gmail.com / 123456: SC#1 (/upload 201 latency <1.5s) + SC#2 (concurrent /health <2s under in-flight extract) + SC#3 (Realtime-driven `pending → processing (Extracting → Extracting tables → Extracting images → Chunking → Embedding → Extracting metadata) → completed` cycle without manual refresh, both new labels rendering during the tables/images phase). Records results in `.planning/phases/071.2-ingestion-plumbing-docling-quality-diagnostics/071.2-HUMAN-UAT.md` (file to be created).
+- Phase 071.2 Plan 05: D-071.2-01..04 architectural closure — per-aspect dispatcher exists at `backend/app/services/extractors/aspects/`. Composer `extract_composable(raw, mime, engines=None)` in extraction_service.py routes each aspect through its independent registry. Defaults from migration 045 strict-wins (legacy text, docling_tf tables, pymupdf_full PDF images, zip_xpath DOCX images, docling_formula equations). Per-call hint `?engines=text:docling,tables:docling_tf,...` plumbed on /upload + /reextract; admin-disable via `app_settings.extraction_per_call_hints_enabled`.
+- Phase 071.2 Plan 05: zip_xpath_docx is verbatim port of Docling MsWordDocumentBackend XPath algorithm (lines 58-69 namespaces, 78-83 XPaths, 2122-2127 + 2181-2186 rel-ID dereference). Walks word/document.xml + word/header*.xml + word/footer*.xml. Dedups by media path. Hardened parser per T-071.2-05-03 (resolve_entities=False, no_network=True). Closes RAG-MM-LIFT-02 at unit level via programmatic anchor-only DOCX fixture (zipfile + raw XML strings — no binary checked in).
+- Phase 071.2 Plan 05: Equations attribute verification (PATTERNS.md MEDIUM-confidence flag) resolved clean — DoclingDocument.texts (docling_core/types/doc/document.py:2638) contains FormulaItem (line 1897) with `label == DocItemLabel.FORMULA`. Adapter walks `doc.texts` filtering by label. No fallback path active.
+- Phase 071.2 Plan 05: get_extractor backward-compat shim PRESERVED untouched. Plan 04 + 071.1 + Phase 069 tests stay green on the happy path; PyMuPDF fallback path in /reextract still uses get_extractor (composer raises asyncio.TimeoutError → route catches → get_extractor('pymupdf') fallback).
+- Phase 071.2 Plan 05: /reextract body.engine becomes TEXT engine alias when ?engines= absent — `engines_dict = {"text": body.engine}`. Preserves 071.1 API for all existing UAT scripts. Integration tests updated to patch extract_composable on happy path + get_extractor only on fallback path.
+- Phase 071.2 Plan 05 (deferred — orchestrator): Task 2 migration apply + Task 4 live UAT parked TOGETHER at `checkpoint:human-action` — CLAUDE.md prohibits `supabase db push` / `db reset` so executor cannot apply migration 045 directly. Orchestrator: (a) paste `supabase/migrations/045_app_settings_extraction_aspects.sql` into Supabase Studio SQL editor (http://127.0.0.1:54323/ → SQL Editor → Run), (b) `bash scripts/regenerate-full-schema.sh` (live-DB dump, no reset), (c) commit regenerated `supabase/full-schema.sql`, (d) restart uvicorn (Docling singleton cache), (e) drive Task 4 UAT (D-071.2-12 floor curl + SQL on thesis PDF/DOCX, RAG-MM-LIFT-02 closure, per-call hint smoke tests). Pytest verification by orchestrator: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`.
 
 ### Pending Todos
 
@@ -333,9 +340,14 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-15T20:05Z
-Stopped at: Phase 071.2 Plan 02 Task 1 GREEN (e24ce04, +2 lines DocumentStatusBadge.tsx labels for extracting_tables + extracting_images); Task 2 `checkpoint:human-verify` parked for orchestrator/user — live Realtime-lifecycle UAT against thesis PDF
-Next: Orchestrator drives Plan 02 Task 2 UAT against http://localhost:5173/ with login fhdmrd@gmail.com / 123456. Pass conditions: SC#1 /upload 201 latency <1.5s + SC#2 /health <2s under in-flight extract + SC#3 badge cycles through `pending → processing (Extracting → Extracting tables → Extracting images → Chunking → Embedding → Extracting metadata) → completed` WITHOUT manual page refresh. Record results in `.planning/phases/071.2-ingestion-plumbing-docling-quality-diagnostics/071.2-HUMAN-UAT.md`. After GREEN, flip ROADMAP checkbox `- [x] 071.2-02-PLAN.md` and proceed to Plan 05 (per-aspect dispatcher).
+Last session: 2026-05-15T22:30Z
+Stopped at: Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (5 commits ending at 3b8f38e); Task 2 (migration 045 apply + supabase/full-schema.sql regen) AND Task 4 (live UAT — D-071.2-12 floor + RAG-MM-LIFT-02 closure + per-call hint smoke tests) parked TOGETHER at checkpoint:human-action. Plan 02 Task 2 remains parked separately.
+Next: Orchestrator drives BOTH outstanding pieces:
+  (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
+  (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
+  (3) Plan 05 Task 4 live UAT — restart uvicorn (Docling singleton cache hold). Re-extract thesis PDF with no `?engines=` hint (uses new defaults — text=legacy, tables=docling_tf, images=pymupdf_full, equations=docling_formula). SQL: `SELECT count(*) FROM document_tables WHERE document_id='23cc112a-92c2-440f-83c9-13aa8bf3d53d';` etc. Pass: tables ≥ 20 AND figures ≥ 10 AND chunks ≥ 200 (D-071.2-12). Re-extract thesis DOCX sibling (DOCX images go through zip_xpath default). Pass: document_images count ≥ 1 (closes RAG-MM-LIFT-02). Per-call hint smoke: `?engines=images:inline_shapes` on DOCX drops count vs default; `?engines=images:pdfplumber` on PDF drops count vs pymupdf_full default.
+  (4) Plan 02 Task 2 live UAT (parked separately) — Realtime-lifecycle badge cycle on thesis PDF.
+After all GREEN, flip ROADMAP checkboxes `- [x] 071.2-02-PLAN.md` and `- [x] 071.2-05-PLAN.md`; Phase 071.2 closes.
 
 **Phases OPEN (cross-phase blocked):**
 
