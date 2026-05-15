@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (per-aspect dispatcher GREEN + migration 045 written + composer wired into /upload+/reextract + SEEDs planted); Task 2 (migration apply + full-schema regen) AND Task 4 (live UAT — D-071.2-12 floor + RAG-MM-LIFT-02 closure + per-call hint smoke tests) parked together at checkpoint:human-action for orchestrator/user
 last_updated: "2026-05-15T22:30:00.000Z"
 last_activity: 2026-05-15 -- Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed; aspects package + extract_composable + migration 045 + SEED-017/018
 progress:
   total_phases: 18
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 21
   completed_plans: 19
-  percent: 90
+  percent: 39
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 071.2 (ingestion-plumbing-docling-quality-diagnostics) — EXECUTING
-Plan: 5 of 5 (Tasks 1+2-code+3+5 committed; Task 2 migration apply + Task 4 live UAT parked at checkpoint) — Plans 01/03/04 already GREEN; Plan 02 Task 2 still parked; Plan 05 architectural anchor LANDED
-Status: Wave 3 Plan 05 Tasks 1+2(code)+3+5 complete (5 commits: a95c002 RED → 6e87df9 GREEN Task 1, fba262b Task 2 code, 8a57cab Task 3, 3b8f38e Task 5). Composer (extract_composable) + 6 aspect adapters + 5 registries + ExtractedDocument.equations field + migration 045 + UserEffectiveSettings extension + /upload + /reextract ?engines= plumbing + threadpool sweep gate + SEED-017/018. zip_xpath_docx is verbatim port of Docling MsWordDocumentBackend XPath algorithm (closes RAG-MM-LIFT-02 at unit level). Equations attribute verified clean (DoclingDocument.texts filtered by DocItemLabel.FORMULA — no fallback path active). Task 2 migration apply + Task 4 live UAT returned together as checkpoint:human-action — orchestrator drives migration paste in Supabase Studio SQL editor + full-schema regen + uvicorn restart + curl/SQL UAT against thesis PDF + DOCX.
-Last activity: 2026-05-15 -- Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (per-aspect dispatcher landed; D-071.2-01..04 architectural closure)
+Phase: 072
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-15
 
 ## PRD-reset outputs (committed)
 

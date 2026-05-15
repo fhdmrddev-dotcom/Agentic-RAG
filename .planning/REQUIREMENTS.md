@@ -15,9 +15,9 @@
 
 - [ ] **RAG-DOCLING-01
 **: A user-uploaded PDF and the same source's DOCX produce comparable table + image counts (within 20% delta) when re-ingested under the new extractor. Docling primary path used by default; `PdfExtractor` abstraction allows per-document fallback to PyMuPDF without flipping the global default. _(Plan 02 lands the extractor wire-in + telemetry writes; Plan 04 lands the binding live-UAT 20%-delta gate)_
-- [ ] **RAG-DOCLING-02**: The httpx<0.28 vs supabase 2.10 conflict has a chosen resolution path (per Q-v2.6-01) and is verified in CI: `pytest backend/tests/integration/test_pdf_extractor_*.py` green on the chosen resolution.
+- [x] **RAG-DOCLING-02**: The httpx<0.28 vs supabase 2.10 conflict has a chosen resolution path (per Q-v2.6-01) and is verified in CI: `pytest backend/tests/integration/test_pdf_extractor_*.py` green on the chosen resolution.
 - [ ] **RAG-MM-LIFT-01**: `multimodal_service._MAX_VISION_CALLS` and `_MAX_B64_BYTES` are admin-tunable via `app_settings`; default raised to a value that covers ≥80% of figures on a 4 MB academic PDF. Empty-vision-description rows persisted (with `description=''`) instead of dropped, so re-runs can fill in.
-- [ ] **RAG-MM-LIFT-02**: DOCX extraction reaches floating shapes and headers/footers via the full `doc.part.related_parts` walk (replaces `inline_shapes`-only).
+- [x] **RAG-MM-LIFT-02**: DOCX extraction reaches floating shapes and headers/footers via the full `doc.part.related_parts` walk (replaces `inline_shapes`-only).
 - [ ] **RAG-RECAL-01**: Confidence thresholds recalibrated after Docling lands — Q-v2.6-03 chosen path executed and the resulting score distributions documented in PROJECT.md.
 
 ### Theme B — Multi-Worker Readiness
@@ -128,10 +128,10 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RAG-DOCLING-01 | 071 — Docling Primary Path | Pending |
-| RAG-DOCLING-02 | 070 — Docling httpx Spike | Pending |
+| RAG-DOCLING-01 | 071 — Docling Primary Path | Complete |
+| RAG-DOCLING-02 | 070 — Docling httpx Spike | Complete |
 | RAG-MM-LIFT-01 | 072 — Multimodal Lift + DOCX Completeness | Pending |
-| RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Pending |
+| RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Complete |
 | RAG-RECAL-01 | 076 — Confidence Recalibration | Pending |
 | WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Pending |
 | WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Pending |

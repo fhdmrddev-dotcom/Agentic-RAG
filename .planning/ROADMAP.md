@@ -325,7 +325,7 @@ Plans:
   10. SEED-017 (PyMuPDF4LLM AGPL-fenced text engine) + SEED-018 (Marker GPL-fenced GPU-opt-in table engine) planted at phase close with concrete re-open triggers per D-071.2-15/16.
 
 **Plans:**
-- [x] 071.2-01-PLAN.md — `/upload` + `/reingest` `run_in_threadpool` sweep + instant-201 BackgroundTask refactor (Wave 1; backend-only; binding tests on instant-201 response time + handler responsiveness during in-flight extract)
+5/5 plans complete
 - [x] 071.2-02-PLAN.md — Frontend status-pulse + Realtime-driven `pending` → `processing` → `completed` badge UAT + optional `extracting_tables` / `extracting_images` ingestion_step labels (Wave 2; depends on 01) — code complete; Task 2 browser UAT parked in 071.2-HUMAN-UAT.md
 - [x] 071.2-03-PLAN.md — Diagnose + close the 95%-chunks-drop: extend `probe_docling_timeout.py` harness to compare `text` vs `full_markdown` chunk counts + Docling pipeline-flag effects + per-aspect image/table counts; swap `docling.py:198` to `text = full_markdown or doc.export_to_text()`; enable `do_formula_enrichment=True`. (Wave 1)
 - [x] 071.2-04-PLAN.md — Close the telemetry-vs-storage table-count mismatch: `multimodal_service.extract_and_store_tables/_images` accept `extracted_doc: ExtractedDocument | None` and use its data when present; legacy pdfplumber/python-docx path preserved for `None`. Includes `/reextract` `is_latest=False` 500 → 404 fix. (Wave 1)
@@ -542,7 +542,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 070 — Docling httpx Spike | 2/2 | Complete    | 2026-05-14 |
 | 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
 | 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
-| 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 0/4 | Not started | — |
+| 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
 | 072 — Multimodal Lift + DOCX Completeness | 0/3 | Not started | — |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
