@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (per-aspect dispatcher GREEN + migration 045 written + composer wired into /upload+/reextract + SEEDs planted); Task 2 (migration apply + full-schema regen) AND Task 4 (live UAT — D-071.2-12 floor + RAG-MM-LIFT-02 closure + per-call hint smoke tests) parked together at checkpoint:human-action for orchestrator/user
-last_updated: "2026-05-15T22:30:00.000Z"
-last_activity: 2026-05-15 -- Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed; aspects package + extract_composable + migration 045 + SEED-017/018
+status: planning
+stopped_at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
+last_updated: "2026-05-15T21:40:33.679Z"
+last_activity: 2026-05-15
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 7
   total_plans: 21
-  completed_plans: 19
-  percent: 39
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State
@@ -340,8 +340,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-15T22:30Z
-Stopped at: Phase 071.2 Plan 05 Tasks 1+2(code)+3+5 committed (5 commits ending at 3b8f38e); Task 2 (migration 045 apply + supabase/full-schema.sql regen) AND Task 4 (live UAT — D-071.2-12 floor + RAG-MM-LIFT-02 closure + per-call hint smoke tests) parked TOGETHER at checkpoint:human-action. Plan 02 Task 2 remains parked separately.
+Last session: --stopped-at
+Stopped at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
 Next: Orchestrator drives BOTH outstanding pieces:
   (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
   (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
