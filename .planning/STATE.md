@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: "Phase 071.1 Wave 1 shipped (Plan 01 code fixes complete); Wave 2 (Plan 02 live UAT) paused awaiting Claude Code/Antigravity restart to surface chrome-devtools MCP tools"
+status: ready_to_plan
 stopped_at: "Phase 071.1 Plan 01 merged (commits b7965b2..8626738 via merge 4d33412); 16/16 post-merge tests green; Plan 02 (autonomous: false) needs mcp__chrome-devtools__* tools which are registered globally + permissions-approved but not surfaced in this session"
 last_updated: "2026-05-15T10:00:00.000Z"
 last_activity: 2026-05-15 -- Phase 071.1 Wave 1 complete (Plan 01 shipped); Wave 2 paused for runtime restart
 progress:
   total_phases: 17
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
   completed_plans: 15
-  percent: 94
+  percent: 35
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 071.1 (docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 071.1
-Last activity: 2026-05-15 -- Phase 071.1 execution started
+Phase: 072
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-15
 
 ## PRD-reset outputs (committed)
 

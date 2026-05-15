@@ -202,7 +202,7 @@ Full details below in **Phase Details**.
 
 ---
 
-## v2.6 Deployment Strategy
+### v2.6 Deployment Strategy
 
 **Phased rollout per Q-v2.6-02 (recommended: phased, NOT atomic).** Unlike v2.5's atomic stream-architecture deployment (D-v2.5-11), v2.6's two independent workstreams ship sequentially:
 
@@ -291,6 +291,19 @@ Full details below in **Phase Details**.
 - [x] 071-02-PLAN.md — DoclingExtractor adapter + dispatcher rewire + ExtractedDocument extension + pdf_extraction_runs telemetry writes + academic_synth fixtures + test_docling_extractor.py (Wave 2; depends on Plan 01)
 - [x] 071-03-PLAN.md — PyMuPDF subprocess fence (backend/extractors/ child + parent wrapper + requirements.txt pin + test_pymupdf_fence.py AGPL invariant) (Wave 2; depends on Plan 01; parallel with Plan 02)
 - [x] 071-04-PLAN.md — POST /reextract endpoint + D-v2.6-04 lock + backend/README.md + live SC#1 UAT on 551f03f9-... + 071-SUMMARY.md (Wave 3; depends on Plans 01+02+03; autonomous: false for live UAT)
+
+### Phase 071.1: Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback (INSERTED, complete-partial 2026-05-15)
+
+**Goal:** Close the three live-UAT defects from Phase 071 Plan 04's SC#1 binding-gate run against the user's thesis PDF + DOCX siblings. Specifically: (a) comprehensive `run_in_threadpool` sweep of `/reextract`'s remaining sync supabase-py + storage calls, (b) per-call Docling timeout enforcement + wall-clock Layer 2 fail-safe at the route, (c) PyMuPDF auto-fallback on Docling timeout only (narrow override of D-071-11). Plus three operator-tunable env knobs (`EXTRACTOR_DOCLING_TIMEOUT_S` / `_DISABLE_TABLE_STRUCTURE` / `_IMAGES_SCALE`). Then retry the SC#1 20%-delta gate on the thesis pair.
+**Requirements**: RAG-DOCLING-01
+**Depends on:** Phase 071
+**Plans:** 2/2 complete (Plan 01 autonomous code fixes, Plan 02 live UAT close-out)
+
+Plans:
+- [x] 071.1-01-PLAN.md — Threadpool sweep + Layer 2 wall-clock timeout + PyMuPDF auto-fallback + 3 env knobs + 8 tests (autonomous, Wave 1) (completed 2026-05-15)
+- [x] 071.1-02-PLAN.md — Live UAT close-out: friendly fixture (arXiv 2605.15184v1 CC-BY 4.0) + thesis SC#1 retry + fill 071-VERIFICATION.md AFTER counts + author 071.1-SUMMARY.md (autonomous:false, Wave 2) (completed 2026-05-15, accept-degraded disposition)
+
+**Outcome:** Plan 01 fixes verified live — the 4-min Docling stall failure mode from Phase 071 is structurally ELIMINATED. Thesis PDF now completes in 125s (vs previously stalling indefinitely). Backend `/health` stays at 1-2s during in-flight extracts (vs frozen previously). The 20% binding-gate per D-071.1-06 stays RED at 89.7% / 100% — but the root cause has shifted from "Docling stalls" to "PDF and DOCX extraction quality differ structurally", which is NOT a Plan 01 regression. **Carry-forward:** Phase 071.2 (proposed) — PDF-side extraction quality (TableFormer A/B with DISABLE_TABLE_STRUCTURE=1, accounting reconciliation, SEED-006 promotion consideration). See 071-VERIFICATION.md and 071.1-SUMMARY.md for full close-out.
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
 **Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures, and a hand-crafted DOCX with floating shapes + header images surfaces both via the related-parts walk.
