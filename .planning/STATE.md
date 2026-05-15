@@ -4,14 +4,14 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: Ready for next phase (recommend inserting 071.1 before 072)
 stopped_at: "Phase 071.1 context gathered (D-071.1-01..06 locked: threadpool sweep on /reextract only, defense-in-depth Docling timeout, PyMuPDF auto-fallback on timeout only, friendly real fixture)"
-last_updated: "2026-05-14T20:35:53.748Z"
+last_updated: "2026-05-15T02:07:29.487Z"
 last_activity: 2026-05-14 — Phase 071 close-out + Plan 04 Rule-1 inline fixes (commit 9116c2b)
 progress:
   total_phases: 17
   completed_phases: 5
-  total_plans: 14
+  total_plans: 16
   completed_plans: 15
-  percent: 100
+  percent: 94
 ---
 
 # Project State
@@ -350,4 +350,4 @@ Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase 
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 071 (docling-primary-path) — 4 plans — 2026-05-14T15:13:10.431Z
+**Planned Phase:** 071.1 (docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback) — 2 plans — 2026-05-15T02:07:29.476Z
