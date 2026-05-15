@@ -2,8 +2,17 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import anyio
+from dotenv import load_dotenv
+
+# pydantic-settings reads backend/.env into the Settings object, but it does NOT
+# populate os.environ. Downstream os.getenv() consumers (extraction_service.py,
+# docling.py, etc.) therefore never saw EXTRACTOR_PRIMARY / EXTRACTOR_DOCLING_*.
+# load_dotenv() fills os.environ from backend/.env regardless of CWD. Must run
+# before any module reads os.getenv() at import time.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Suppress asyncio transport-level "socket.send() raised exception." warnings.
 # These fire from CPython's selector_events.py when a client disconnects while
