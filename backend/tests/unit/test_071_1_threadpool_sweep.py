@@ -103,3 +103,44 @@ def test_no_unwrapped_sync_calls_in_reextract():
         "Unwrapped sync supabase calls found in /reextract handler "
         "(D-071.1-01 violation):\n" + "\n".join(offenders)
     )
+
+
+def test_extract_composable_calls_wrapped_in_threadpool():
+    """Phase 071.2 Plan 05 — composer is sync; async route bodies MUST wrap
+    extract_composable calls in run_in_threadpool.
+
+    Static grep gate: every USE of `extract_composable` as a callable target
+    in documents.py — whether `extract_composable(...)` direct call OR
+    `run_in_threadpool(extract_composable, ...)` argument form — must have
+    `run_in_threadpool` within a small preceding window (same expression or
+    a few characters back). Import lines (e.g. `import extract_composable`)
+    are excluded by the `\b` check + skipping if it's part of an import path.
+    """
+    import re
+    repo_backend = Path(__file__).resolve().parents[2]
+    documents_py = repo_backend / "app" / "api" / "documents.py"
+    src = documents_py.read_text(encoding="utf-8")
+
+    # Match either `extract_composable(` (direct call) or `extract_composable,`
+    # (callable arg form). Both are USES; imports use `extract_composable\n` or
+    # `extract_composable, get_extractor` patterns we have to handle separately.
+    pattern = re.compile(r"\bextract_composable\s*[\(,]")
+
+    for match in pattern.finditer(src):
+        start = match.start()
+        # Skip if this is an `import ... extract_composable, ...` line
+        # (look back at the start of the line for `import`).
+        line_start = src.rfind("\n", 0, start) + 1
+        line_prefix = src[line_start:start]
+        # Imports look like:   "from ... import a, b, extract_composable, c"
+        # or "    from app.services.extraction_service import extract_composable"
+        if "import" in line_prefix and "(" not in line_prefix:
+            continue
+        # Walk back ~400 chars to find run_in_threadpool nearby.
+        window_start = max(0, start - 400)
+        window = src[window_start:start]
+        assert "run_in_threadpool" in window, (
+            f"extract_composable use at offset {start} not wrapped in "
+            f"run_in_threadpool within 400 chars preceding. Window tail: "
+            f"{window[-200:]!r}"
+        )

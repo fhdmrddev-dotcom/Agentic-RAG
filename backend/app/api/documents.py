@@ -23,6 +23,37 @@ from app.services.embedding_service import chunk_text, embed_chunks, extract_met
 from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
 
+
+def _parse_engines_hint(s: str | None) -> dict[str, str] | None:
+    """Phase 071.2 D-071.2-03 — parse `?engines=` query param into composer engines dict.
+
+    Format: 'text:docling,tables:docling_tf,images:pymupdf_full,equations:docling_formula'
+    (comma-separated key:value; key from {text, tables, images, equations}; value is
+    the engine name registered in the corresponding registry).
+
+    Returns None when:
+      - s is None or empty
+      - app_settings.extraction_per_call_hints_enabled is False (admin disable)
+
+    Unknown keys are silently dropped (defense in depth — composer raises
+    KeyError on unknown engine names, so we cleanly drop bad input rather
+    than leaking parser errors into the response).
+    """
+    if not s:
+        return None
+    from app.models.user_settings import load_app_settings  # noqa: PLC0415
+    if not load_app_settings().extraction_per_call_hints_enabled:
+        return None
+    out: dict[str, str] = {}
+    for pair in s.split(","):
+        if ":" not in pair:
+            continue
+        k, v = pair.split(":", 1)
+        k, v = k.strip(), v.strip()
+        if k in ("text", "tables", "images", "equations") and v:
+            out[k] = v
+    return out or None
+
 log = logging.getLogger(__name__)
 
 
@@ -107,6 +138,7 @@ def _upload_pipeline(
     user_id: str,
     storage_path: str,
     supabase: Client,
+    engines_dict: dict[str, str] | None = None,
 ) -> None:
     """Phase 071.2 D-071.2-05 — runs in BackgroundTask after /upload (or
     /reingest) returns 201/200.
@@ -116,8 +148,10 @@ def _upload_pipeline(
          not an async handler, so supabase-py runs on the BackgroundTask thread
          pool without blocking the event loop). Skipped if `storage_path` is
          empty / None (reingest path — file already in storage).
-      2. Layer 2 wall-clock-wrapped extract via _extract_with_fallback (the proven
-         071.1 pattern: Docling wall-clock timeout + PyMuPDF auto-fallback).
+      2. Layer 2 wall-clock-wrapped extract via the per-aspect composer
+         (`extract_composable`, Phase 071.2 D-071.2-01..04). When
+         `engines_dict` is None, the composer reads defaults from
+         `app_settings.extraction_*_engine_*`.
       3. Call existing ingest_document(document_id, text, user_id, supabase, raw,
          mime_type, filename, None, extracted_doc, extract_duration_ms) — keep
          signature byte-identical (Pitfall 2 — 071.1 tests stay green).
@@ -125,7 +159,7 @@ def _upload_pipeline(
          error_message=<short summary> (T-071.2-01-01 mitigation — don't echo
          supabase-py internals into error_message).
     """
-    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+    from app.services.extraction_service import extract_composable, get_extractor  # noqa: PLC0415
 
     # Step 1 — storage upload (only on the /upload path; /reingest path passes
     # an empty `storage_path` to signal "file already in storage, skip upload").
@@ -158,19 +192,24 @@ def _upload_pipeline(
     wall_clock_s = docling_timeout_s + 10  # +10s buffer over Docling's own check
 
     try:
-        extractor = get_extractor(mime_type)
-        if extractor is None:
-            # Non-PDF/non-DOCX MIMEs flow through the legacy extract_text helper.
+        # Phase 071.2 D-071.2-01..04 — route PDF/DOCX through the per-aspect
+        # composer. Non-PDF/non-DOCX MIMEs still flow through the legacy
+        # `extract_text` helper (composer is PDF/DOCX-only).
+        from app.services.extraction_service import PDF_MIME as _PDF, DOCX_MIME as _DOCX  # noqa: PLC0415
+        if mime_type not in (_PDF, _DOCX):
             text = extract_text(raw, mime_type)
         else:
             # We are inside a BackgroundTask thread (not an async handler), so
             # asyncio.wait_for is not directly usable. Use a small asyncio.run
             # bridge so the Layer 2 wall-clock pattern still applies. Mirrors
             # the /reextract Layer 2 shape (071.1 SP-2) but in sync context.
+            # NOTE: extract_composable is sync; running inside BackgroundTask
+            # thread, so no run_in_threadpool needed (test_071_1_threadpool_sweep
+            # exempts _upload_pipeline because it's a sync def).
             async def _run_with_timeout() -> ExtractedDocument:
                 from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
                 return await asyncio.wait_for(
-                    run_in_threadpool(extractor.extract, raw, mime_type),
+                    run_in_threadpool(extract_composable, raw, mime_type, engines_dict),
                     timeout=wall_clock_s,
                 )
 
@@ -337,6 +376,14 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     folder_id: str | None = Form(None),
+    engines: str | None = Query(
+        default=None,
+        description=(
+            "Phase 071.2 D-071.2-03 — per-call extraction engine override hint. "
+            "Format: 'text:docling,tables:docling_tf,images:pymupdf_full,equations:docling_formula'. "
+            "Subject to app_settings.extraction_per_call_hints_enabled flag."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -467,6 +514,8 @@ async def upload_document(
     # returns 201 within ~1s; _upload_pipeline does storage upload + Layer 2
     # wall-clock-wrapped extract + ingest_document inside the BackgroundTask
     # thread (not the async handler), so the event loop stays unblocked.
+    # Phase 071.2 D-071.2-03 — parse `?engines=` hint (admin-disable aware).
+    engines_dict = _parse_engines_hint(engines)
     background_tasks.add_task(
         _upload_pipeline,
         doc["id"],
@@ -476,6 +525,7 @@ async def upload_document(
         current_user["id"],
         storage_path,
         supabase,
+        engines_dict,
     )
     background_tasks.add_task(
         write_audit_entry,
@@ -707,6 +757,15 @@ async def reextract_document(
     document_id: str,
     body: ReextractRequest,
     background_tasks: BackgroundTasks,
+    engines: str | None = Query(
+        default=None,
+        description=(
+            "Phase 071.2 D-071.2-03 — per-call extraction engine override hint. "
+            "Format: 'text:docling,tables:docling_tf,images:zip_xpath,equations:docling_formula'. "
+            "When set, overrides body.engine (which becomes the text-engine alias). "
+            "Subject to app_settings.extraction_per_call_hints_enabled flag."
+        ),
+    ),
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
@@ -744,7 +803,7 @@ async def reextract_document(
     Docling attempt (engine='docling', error populated), one for PyMuPDF
     (engine='pymupdf-fallback').
     """
-    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+    from app.services.extraction_service import extract_composable, get_extractor  # noqa: PLC0415
 
     # 1. Owner-only RLS check (T-071-04-01) — mirrors /reingest at documents.py:447-458.
     # Phase 071.1 D-071.1-01: wrap in run_in_threadpool — sync supabase-py calls in async
@@ -829,18 +888,32 @@ async def reextract_document(
     engine_used: str = body.engine
     text: str = ""
 
+    # Phase 071.2 D-071.2-03 — `?engines=` hint takes precedence over body.engine.
+    # When hint is absent, body.engine (the legacy 071.1 API) becomes the
+    # TEXT engine — preserves all existing UAT scripts / clients.
+    engines_dict = _parse_engines_hint(engines)
+    if engines_dict is None and body.engine:
+        engines_dict = {"text": body.engine}
+
+    from app.services.extraction_service import (  # noqa: PLC0415
+        PDF_MIME as _PDF_MIME,
+        DOCX_MIME as _DOCX_MIME,
+    )
+
     try:
-        extractor = get_extractor(mime_type, engine_override=body.engine)
-        if extractor is None:
+        if mime_type not in (_PDF_MIME, _DOCX_MIME):
             # Non-PDF/non-DOCX MIMEs flow through the legacy `extract_text` helper.
             text = await run_in_threadpool(extract_text, raw, mime_type)
         else:
             try:
                 extracted_doc = await asyncio.wait_for(
-                    run_in_threadpool(extractor.extract, raw, mime_type),
+                    run_in_threadpool(
+                        extract_composable, raw, mime_type, engines_dict
+                    ),
                     timeout=wall_clock_s,
                 )
                 text = extracted_doc.text
+                engine_used = extracted_doc.extractor_name or body.engine
             except asyncio.TimeoutError:
                 # D-071.1-04 — fallback to PyMuPDF on Docling timeout ONLY.
                 if body.engine != "docling":
