@@ -1,6 +1,8 @@
+import asyncio
 import csv
 import hashlib
 import io
+import logging
 import os
 import time
 import zipfile
@@ -10,6 +12,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
@@ -19,6 +22,8 @@ from app.services.audit_service import write_audit_entry
 from app.services.embedding_service import chunk_text, embed_chunks, extract_metadata
 from app.services.extraction_service import ExtractedDocument
 from app.utils.folder_utils import get_globally_visible_folder_ids
+
+log = logging.getLogger(__name__)
 
 
 class ReextractRequest(BaseModel):
@@ -55,6 +60,43 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".epub": "application/epub+zip",
 }
+
+
+def _write_extraction_run_row(
+    supabase: Client,
+    document_id: str,
+    user_id: str,
+    engine: str,
+    duration_ms: int,
+    table_count: int,
+    image_count: int,
+    error: str | None,
+) -> None:
+    """Inline writer for `pdf_extraction_runs` from the /reextract fallback path
+    (Phase 071.1 D-071.1-04).
+
+    The happy-path writer lives inline in `ingest_document`; this helper is used
+    ONLY by the /reextract route's exception handler when fallback fires.
+
+    Telemetry-write failures are swallowed (T-071-02-07 pattern) — a telemetry
+    hiccup must NOT block the user's extraction outcome.
+    """
+    try:
+        supabase.table("pdf_extraction_runs").insert({
+            "document_id": document_id,
+            "user_id": user_id,
+            "engine": engine,
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "duration_ms": duration_ms,
+            "table_count": table_count,
+            "image_count": image_count,
+            "error": error[:1000] if error else None,
+        }).execute()
+    except Exception as exc:
+        log.warning(
+            "pdf_extraction_runs INSERT failed (engine=%s, doc=%s, from /reextract fallback): %s",
+            engine, document_id, exc,
+        )
 
 
 def extract_text(raw: bytes, mime_type: str) -> str:
@@ -550,10 +592,31 @@ async def reextract_document(
        pattern so any extraction error surfaces synchronously as 422 rather than
        silently failing in the background task).
     6. Queue ingest_document with engine_override=body.engine.
+
+    Layer 2 wall-clock fail-safe (D-071.1-02):
+      Docling extracts are wrapped with `asyncio.wait_for(timeout=
+      EXTRACTOR_DOCLING_TIMEOUT_S + 10)`. On wall-clock timeout, the underlying
+      thread leaks (Python cannot kill threads in native code — RESEARCH.md §2);
+      uvicorn restart heals leaks under D-v2.5-02 single-worker. The user-visible
+      response is clean: the route either succeeds via PyMuPDF fallback
+      (D-071.1-04) or returns 422 with both-engines-failed detail.
+
+    Auto-fallback to PyMuPDF on Docling timeout ONLY (D-071.1-04, narrow override
+    of D-071-11): Non-timeout Docling exceptions still fail loud (status='failed'
+    + error_message); D-071-11 quality-regression-visibility intent preserved. On
+    timeout, two `pdf_extraction_runs` rows are written: one for the failed
+    Docling attempt (engine='docling', error populated), one for PyMuPDF
+    (engine='pymupdf-fallback').
     """
-    # 1. Owner-only RLS check (T-071-04-01) — mirrors /reingest at documents.py:447-458
-    doc = (
-        supabase.table("documents")
+    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+
+    # 1. Owner-only RLS check (T-071-04-01) — mirrors /reingest at documents.py:447-458.
+    # Phase 071.1 D-071.1-01: wrap in run_in_threadpool — sync supabase-py calls in async
+    # handlers block the event loop and freeze the single uvicorn worker (CLAUDE.md /
+    # D-v2.5-01). Only `.execute()` is wrapped — auth predicates stay verbatim so
+    # T-071-04-01 (.eq user_id + 404-not-403) mitigation is preserved byte-identical.
+    doc = await run_in_threadpool(
+        lambda: supabase.table("documents")
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
@@ -568,18 +631,27 @@ async def reextract_document(
 
     # 2. Fetch raw bytes from Storage (mirrors /reingest at documents.py:463-466)
     try:
-        raw = supabase.storage.from_("documents").download(target["file_path"])
+        raw = await run_in_threadpool(
+            supabase.storage.from_("documents").download, target["file_path"]
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
-    # 3. Hard delete chunks + tables + images (D-071-10 cascade order — children before parent)
-    supabase.table("document_chunks").delete().eq("document_id", document_id).execute()
-    supabase.table("document_tables").delete().eq("document_id", document_id).execute()
-    supabase.table("document_images").delete().eq("document_id", document_id).execute()
+    # 3. Hard delete chunks + tables + images (D-071-10 cascade order — children before parent).
+    # D-071.1-01: each .execute() wrapped in run_in_threadpool.
+    await run_in_threadpool(
+        lambda: supabase.table("document_chunks").delete().eq("document_id", document_id).execute()
+    )
+    await run_in_threadpool(
+        lambda: supabase.table("document_tables").delete().eq("document_id", document_id).execute()
+    )
+    await run_in_threadpool(
+        lambda: supabase.table("document_images").delete().eq("document_id", document_id).execute()
+    )
 
     # 4. Reset doc status (D-071-10 step 4). version_number NOT bumped (D-25 preserved).
-    result = (
-        supabase.table("documents")
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
         .update({
             "status": "pending",
             "extractor": None,
@@ -594,22 +666,93 @@ async def reextract_document(
         raise HTTPException(status_code=404, detail="Document not found after update")
 
     # 5. Extract text up-front via the chosen engine (mirrors /reingest pattern).
-    # Plan 04 Rule-1 inline fix: wrap blocking extract in run_in_threadpool per
-    # CLAUDE.md D-v2.5-01 — Docling extracts on real-world PDFs can run minutes;
-    # leaving them in the async path blocks the single uvicorn worker so even
-    # /healthz cannot return (observed during SC#1 UAT, 6+ min hang).
-    from app.services.extraction_service import get_extractor  # noqa: PLC0415
-    from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
+    # Phase 071.1 Layer 2 (D-071.1-02) — wall-clock fail-safe for Docling stalls
+    # that wedge in native code (TableFormer/layout). Layer 1 in docling.py
+    # checks at batch boundaries only — insufficient for native wedges.
+    try:
+        docling_timeout_s = float(os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120"))
+    except ValueError:
+        log.warning(
+            "Invalid EXTRACTOR_DOCLING_TIMEOUT_S=%r; using default 120s",
+            os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S"),
+        )
+        docling_timeout_s = 120.0
+    wall_clock_s = docling_timeout_s + 10  # +10s buffer over Docling's own check
+
     mime_type = target["mime_type"]
     extract_start = time.perf_counter()
     extracted_doc: ExtractedDocument | None = None
+    engine_used: str = body.engine
+    text: str = ""
+
     try:
         extractor = get_extractor(mime_type, engine_override=body.engine)
-        if extractor is not None:
-            extracted_doc = await run_in_threadpool(extractor.extract, raw, mime_type)
-            text = extracted_doc.text
-        else:
+        if extractor is None:
+            # Non-PDF/non-DOCX MIMEs flow through the legacy `extract_text` helper.
             text = await run_in_threadpool(extract_text, raw, mime_type)
+        else:
+            try:
+                extracted_doc = await asyncio.wait_for(
+                    run_in_threadpool(extractor.extract, raw, mime_type),
+                    timeout=wall_clock_s,
+                )
+                text = extracted_doc.text
+            except asyncio.TimeoutError:
+                # D-071.1-04 — fallback to PyMuPDF on Docling timeout ONLY.
+                if body.engine != "docling":
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"engine={body.engine} timed out after {wall_clock_s}s",
+                    )
+
+                docling_duration_ms = int(
+                    (time.perf_counter() - extract_start) * 1000
+                )
+                docling_error = (
+                    f"docling timeout after {wall_clock_s}s (Layer 2 wall-clock)"
+                )
+
+                # First telemetry row (Docling failed): inline write via helper.
+                await run_in_threadpool(
+                    _write_extraction_run_row,
+                    supabase, document_id, current_user["id"],
+                    "docling", docling_duration_ms, 0, 0, docling_error,
+                )
+
+                # Attempt PyMuPDF — PYMUPDF_TIMEOUT_S enforced inside subprocess fence.
+                pymupdf_extractor = get_extractor(
+                    mime_type, engine_override="pymupdf"
+                )
+                if pymupdf_extractor is None:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Docling timed out and PyMuPDF unavailable for "
+                            f"{mime_type!r}"
+                        ),
+                    )
+
+                engine_used = "pymupdf-fallback"
+                try:
+                    extracted_doc = await run_in_threadpool(
+                        pymupdf_extractor.extract, raw, mime_type,
+                    )
+                    text = extracted_doc.text
+                except Exception as fallback_exc:
+                    await run_in_threadpool(
+                        _write_extraction_run_row,
+                        supabase, document_id, current_user["id"],
+                        "pymupdf-fallback", 0, 0, 0, str(fallback_exc)[:500],
+                    )
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Docling timed out; PyMuPDF fallback also failed: "
+                            f"{fallback_exc}"
+                        ),
+                    )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=422,
@@ -620,6 +763,9 @@ async def reextract_document(
     # 6. Schedule background ingestion with explicit engine_override (D-071-10 step 5).
     # Matches the ingest_document signature wired up by Plan 02 (positional kwargs
     # engine_override / extracted_doc / extract_duration_ms).
+    # D-071.1-04 Pitfall 3 — thread `engine_used` (not `body.engine`) so the
+    # happy-path telemetry row written by `ingest_document` records
+    # 'pymupdf-fallback' when fallback fired instead of misreporting 'docling'.
     background_tasks.add_task(
         ingest_document,
         document_id,
@@ -629,7 +775,7 @@ async def reextract_document(
         raw,
         mime_type,
         target["filename"],
-        body.engine,        # engine_override — explicit per /reextract contract
+        engine_used,        # was body.engine — Phase 071.1 D-071.1-04 Pitfall 3 fix
         extracted_doc,
         extract_duration_ms,
     )

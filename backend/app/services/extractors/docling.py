@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import os
 import threading
 from typing import TYPE_CHECKING
 
@@ -46,17 +47,48 @@ def _get_converter() -> "DocumentConverter":
 
                 opts = PdfPipelineOptions()
                 opts.generate_picture_images = True   # required for p.get_image(doc) — RESEARCH Pitfall 3
-                opts.images_scale = 2.0
-                opts.document_timeout = 120.0         # T-071-02-03 mitigation
                 # Plan 04 Rule-1 inline fix: disable OCR by default — RapidOCR preprocess
                 # raised std::bad_alloc on the 551f03f9 thesis pair under Windows during
                 # SC#1 UAT (pages 26-31 OOM, crashed worker). Theses + most ingested PDFs
                 # have a text layer already; OCR is wasted work + the OOM source. Future
                 # work (Phase 072 / Skill Studio milestone): user-tunable do_ocr flag.
                 opts.do_ocr = False
+
+                # Phase 071.1 D-071.1-03 — operator-tunable knobs (read once inside
+                # _CONVERTER_LOCK). Parse failures fall back to defaults to avoid
+                # worker-crash-on-typo (RESEARCH.md Pitfall 4).
+                try:
+                    opts.document_timeout = float(
+                        os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120")
+                    )
+                except ValueError:
+                    log.warning(
+                        "Invalid EXTRACTOR_DOCLING_TIMEOUT_S=%r; using default 120s",
+                        os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S"),
+                    )
+                    opts.document_timeout = 120.0
+                try:
+                    opts.images_scale = float(
+                        os.getenv("EXTRACTOR_DOCLING_IMAGES_SCALE", "2.0")
+                    )
+                except ValueError:
+                    log.warning(
+                        "Invalid EXTRACTOR_DOCLING_IMAGES_SCALE=%r; using default 2.0",
+                        os.getenv("EXTRACTOR_DOCLING_IMAGES_SCALE"),
+                    )
+                    opts.images_scale = 2.0
+                opts.do_table_structure = (
+                    os.getenv("EXTRACTOR_DOCLING_DISABLE_TABLE_STRUCTURE", "false").lower()
+                    not in ("1", "true", "yes")
+                )
+
                 log.info(
                     "DoclingExtractor: lazy-instantiating DocumentConverter "
-                    "(first call downloads ~600MB; subsequent calls are fast)."
+                    "(document_timeout=%.1fs, images_scale=%.1f, do_table_structure=%s; "
+                    "first call downloads ~600MB).",
+                    opts.document_timeout,
+                    opts.images_scale,
+                    opts.do_table_structure,
                 )
                 _CONVERTER = DocumentConverter(
                     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
@@ -148,6 +180,20 @@ class DoclingExtractor(PdfExtractor):
             converter = _get_converter()
             result = converter.convert(tmp_path)
             doc = result.document
+
+            # Phase 071.1 — surface Docling PARTIAL_SUCCESS (likely document_timeout
+            # tripped at a batch boundary) so operators can correlate truncated
+            # chunk/table/image counts with timeout events instead of silent loss.
+            try:
+                from docling.datamodel.base_models import ConversionStatus  # noqa: PLC0415
+                if result.status == ConversionStatus.PARTIAL_SUCCESS:
+                    log.warning(
+                        "Docling returned PARTIAL_SUCCESS for %s (likely "
+                        "document_timeout tripped at a batch boundary); "
+                        "chunk/table/image counts may be incomplete.", mime,
+                    )
+            except Exception:
+                pass  # never block extract on a status check
 
             text = doc.export_to_text()
             try:

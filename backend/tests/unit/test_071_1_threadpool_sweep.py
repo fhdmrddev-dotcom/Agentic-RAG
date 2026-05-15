@@ -28,13 +28,17 @@ def test_no_unwrapped_sync_calls_in_reextract():
     body = src[start:end]
 
     # Find every line containing supabase.table(...).execute() OR supabase.storage(...).execute()
+    lines = body.splitlines()
     offenders = []
-    for lineno, line in enumerate(body.splitlines(), start=1):
+    for idx, line in enumerate(lines):
         # Match .table(...).execute() or .storage(...).execute() chains
         if re.search(r"supabase\.(table|storage)\([^)]*\)[^#]*\.execute\(\)", line):
-            # Allow if `run_in_threadpool` appears on the same line (inline lambda form).
-            if "run_in_threadpool" not in line:
-                offenders.append(f"line {lineno}: {line.strip()}")
+            # Allow if `run_in_threadpool` appears on the same line (rare) OR on any
+            # of the few preceding non-blank lines — covers the multi-line
+            # `await run_in_threadpool(\n    lambda: supabase...execute()\n)` form.
+            window = "\n".join(lines[max(0, idx - 4): idx + 1])
+            if "run_in_threadpool" not in window:
+                offenders.append(f"line {idx + 1}: {line.strip()}")
 
     assert not offenders, (
         "Unwrapped sync supabase calls found in /reextract handler "
