@@ -1,4 +1,5 @@
 """Integration tests for /documents endpoints."""
+import asyncio
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
@@ -500,6 +501,176 @@ class TestReextractDocument:
         assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
         assert "Document not found" in response.json().get("detail", ""), \
             f"Expected 'Document not found' in detail, got: {response.json()}"
+
+    # ── Phase 071.1 D-071.1-02 / D-071.1-04 ────────────────────────────────────
+
+    def test_reextract_docling_timeout_falls_back_to_pymupdf(
+        self, client, auth_headers, mock_builder,
+    ):
+        """D-071.1-04 — Docling timeout triggers automatic PyMuPDF fallback (PDF body).
+
+        Asserts the route catches asyncio.TimeoutError, writes the docling-failed
+        telemetry row, re-dispatches via get_extractor(engine_override='pymupdf'),
+        threads engine_used (not body.engine) through to background_tasks.add_task,
+        and returns 202.
+        """
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),                                       # owner SELECT
+            _make_result([]),                                            # delete chunks
+            _make_result([]),                                            # delete tables
+            _make_result([]),                                            # delete images
+            _make_result([{**pdf_doc, "status": "pending"}]),            # UPDATE documents
+            _make_result([]),                                            # _write_extraction_run_row (docling failed)
+        ]
+
+        docling_mock = MagicMock()
+        docling_mock.extract.side_effect = asyncio.TimeoutError()
+        pymupdf_mock = MagicMock()
+        mock_extracted = MagicMock()
+        mock_extracted.text = "fallback text"
+        mock_extracted.tables = []
+        mock_extracted.images = []
+        pymupdf_mock.extract.return_value = mock_extracted
+
+        with patch("app.api.documents.ingest_document") as mock_ingest, \
+             patch("app.services.extraction_service.get_extractor",
+                   side_effect=[docling_mock, pymupdf_mock]) as mock_get_extractor:
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract",
+                headers=auth_headers,
+                json={"engine": "docling"},
+            )
+
+        assert response.status_code == 202, f"Expected 202, got {response.status_code}: {response.text}"
+        assert mock_get_extractor.call_count == 2
+        # First call asks for body.engine='docling'; second call asks for 'pymupdf'.
+        first_kwargs = mock_get_extractor.call_args_list[0].kwargs
+        second_kwargs = mock_get_extractor.call_args_list[1].kwargs
+        assert first_kwargs.get("engine_override") == "docling"
+        assert second_kwargs.get("engine_override") == "pymupdf"
+        # background_tasks.add_task receives engine_used='pymupdf-fallback' at positional index 7
+        mock_ingest.assert_called_once()
+        ingest_args = mock_ingest.call_args.args
+        assert ingest_args[7] == "pymupdf-fallback", (
+            f"Expected engine_override='pymupdf-fallback' at positional index 7, "
+            f"got {ingest_args[7]!r}"
+        )
+
+    def test_reextract_docling_layer2_timeout_triggers_pymupdf_fallback(
+        self, client, auth_headers, mock_builder,
+    ):
+        """D-071.1-02 — Layer 2 wall-clock fires; explicitly verify both get_extractor calls."""
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),
+            _make_result([]),
+            _make_result([]),
+            _make_result([]),
+            _make_result([{**pdf_doc, "status": "pending"}]),
+            _make_result([]),  # docling-failed telemetry row
+        ]
+        docling_mock = MagicMock()
+        docling_mock.extract.side_effect = asyncio.TimeoutError()
+        pymupdf_mock = MagicMock()
+        mock_extracted = MagicMock()
+        mock_extracted.text = "x"
+        mock_extracted.tables = []
+        mock_extracted.images = []
+        pymupdf_mock.extract.return_value = mock_extracted
+        with patch("app.api.documents.ingest_document"), \
+             patch("app.services.extraction_service.get_extractor",
+                   side_effect=[docling_mock, pymupdf_mock]) as mock_get_extractor:
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract",
+                headers=auth_headers,
+                json={"engine": "docling"},
+            )
+        assert response.status_code == 202
+        assert mock_get_extractor.call_count == 2
+        overrides = [c.kwargs.get("engine_override") for c in mock_get_extractor.call_args_list]
+        assert overrides == ["docling", "pymupdf"]
+
+    def test_reextract_docling_timeout_and_pymupdf_failure_returns_422(
+        self, client, auth_headers, mock_builder,
+    ):
+        """D-071.1-04 — Both engines fail → 422 + combined error detail + 2 telemetry rows."""
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),
+            _make_result([]),
+            _make_result([]),
+            _make_result([]),
+            _make_result([{**pdf_doc, "status": "pending"}]),
+            _make_result([]),  # docling-failed telemetry row
+            _make_result([]),  # pymupdf-fallback-failed telemetry row
+        ]
+        docling_mock = MagicMock()
+        docling_mock.extract.side_effect = asyncio.TimeoutError()
+        pymupdf_mock = MagicMock()
+        pymupdf_mock.extract.side_effect = RuntimeError("pymupdf subprocess died")
+        with patch("app.api.documents.ingest_document"), \
+             patch("app.services.extraction_service.get_extractor",
+                   side_effect=[docling_mock, pymupdf_mock]):
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract",
+                headers=auth_headers,
+                json={"engine": "docling"},
+            )
+        assert response.status_code == 422
+        detail = response.json()["detail"]
+        assert "Docling timed out" in detail
+        assert "PyMuPDF fallback also failed" in detail
+
+    def test_reextract_explicit_pymupdf_timeout_does_NOT_fallback(
+        self, client, auth_headers, mock_builder,
+    ):
+        """D-071.1-04 narrow guard — explicit non-Docling engine timeout fails loud, no fallback."""
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),
+            _make_result([]),
+            _make_result([]),
+            _make_result([]),
+            _make_result([{**pdf_doc, "status": "pending"}]),
+        ]
+        pymupdf_mock = MagicMock()
+        pymupdf_mock.extract.side_effect = asyncio.TimeoutError()
+        with patch("app.api.documents.ingest_document"), \
+             patch("app.services.extraction_service.get_extractor",
+                   return_value=pymupdf_mock) as mock_get_extractor:
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract",
+                headers=auth_headers,
+                json={"engine": "pymupdf"},
+            )
+        assert response.status_code == 422
+        assert "engine=pymupdf timed out after" in response.json()["detail"]
+        assert mock_get_extractor.call_count == 1  # no second dispatch
 
 
 # ── ingest_document full_markdown storage ──────────────────────────────────────

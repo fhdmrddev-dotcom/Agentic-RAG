@@ -119,3 +119,61 @@ class TestDoclingDispatch:
     def test_extract_unsupported_mime_raises(self, extractor, pdf_bytes):
         with pytest.raises(ValueError, match="does not support"):
             extractor.extract(pdf_bytes, "text/plain")
+
+
+# ── Phase 071.1 D-071.1-03 — env-tunable Docling knobs ────────────────────────
+
+from docling.datamodel.base_models import InputFormat  # noqa: E402
+
+
+def _pdf_opts(converter):
+    """Helper: navigate Docling 2.93's format options to the PdfPipelineOptions instance.
+
+    If `converter.format_to_options[InputFormat.PDF].pipeline_options` doesn't resolve
+    in the installed Docling version, adjust this single helper rather than every test.
+    """
+    return converter.format_to_options[InputFormat.PDF].pipeline_options
+
+
+class TestEnvKnobs:
+    """Phase 071.1 D-071.1-03 — env-tunable Docling knobs.
+
+    Verifies the three new env vars are read inside _get_converter() and applied
+    to PdfPipelineOptions. Singleton is reset between tests via the
+    reset_docling_singleton fixture (conftest.py).
+    """
+
+    def test_disable_table_structure_honored(
+        self, monkeypatch, reset_docling_singleton,
+    ):
+        from app.services.extractors import docling as docling_module
+        monkeypatch.setenv("EXTRACTOR_DOCLING_DISABLE_TABLE_STRUCTURE", "1")
+        converter = docling_module._get_converter()
+        pdf_opts = _pdf_opts(converter)
+        assert pdf_opts.do_table_structure is False
+
+    def test_images_scale_honored(self, monkeypatch, reset_docling_singleton):
+        from app.services.extractors import docling as docling_module
+        monkeypatch.setenv("EXTRACTOR_DOCLING_IMAGES_SCALE", "1.0")
+        converter = docling_module._get_converter()
+        pdf_opts = _pdf_opts(converter)
+        assert pdf_opts.images_scale == 1.0
+
+    def test_timeout_s_honored(self, monkeypatch, reset_docling_singleton):
+        from app.services.extractors import docling as docling_module
+        monkeypatch.setenv("EXTRACTOR_DOCLING_TIMEOUT_S", "60")
+        converter = docling_module._get_converter()
+        pdf_opts = _pdf_opts(converter)
+        assert pdf_opts.document_timeout == 60.0
+
+    def test_invalid_timeout_falls_back_to_default(
+        self, monkeypatch, reset_docling_singleton, caplog,
+    ):
+        """RESEARCH.md Pitfall 4 — garbage value doesn't crash the worker."""
+        from app.services.extractors import docling as docling_module
+        monkeypatch.setenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120s")
+        with caplog.at_level("WARNING"):
+            converter = docling_module._get_converter()
+        pdf_opts = _pdf_opts(converter)
+        assert pdf_opts.document_timeout == 120.0
+        assert "Invalid EXTRACTOR_DOCLING_TIMEOUT_S" in caplog.text

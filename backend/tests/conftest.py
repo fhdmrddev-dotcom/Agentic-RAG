@@ -199,6 +199,25 @@ async def redis_client():
         await client.aclose()
 
 
+@pytest.fixture
+def reset_docling_singleton():
+    """Reset the DoclingExtractor module-level converter singleton between tests.
+
+    Used by tests/integration/test_docling_extractor.py::TestEnvKnobs (Phase 071.1
+    D-071.1-03). The singleton in `app.services.extractors.docling` caches its env
+    reads at construction time and is frozen for process lifetime; tests that
+    monkeypatch env vars must reset it BEFORE the next _get_converter() call so
+    the new env values are picked up.
+
+    NOT autouse — only opt-in tests that mutate Docling env vars need this.
+    """
+    from app.services.extractors import docling as docling_module  # noqa: PLC0415
+    prev = docling_module._CONVERTER
+    docling_module._CONVERTER = None
+    yield
+    docling_module._CONVERTER = prev
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _flushdb_at_session_end():
     """FLUSHDB at session end (D-061-14, D-061-17).
