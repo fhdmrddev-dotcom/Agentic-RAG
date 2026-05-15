@@ -94,10 +94,10 @@ class UserEffectiveSettings(BaseModel):
     # Per-aspect extraction engines (Phase 071.2 D-071.2-02/03; migration 045)
     extraction_text_engine_pdf: str = "legacy"
     extraction_text_engine_docx: str = "legacy"
-    extraction_table_engine_pdf: str = "docling_tf"
+    extraction_table_engine_pdf: str = "pdfplumber"
     extraction_image_engine_pdf: str = "pymupdf_full"
     extraction_image_engine_docx: str = "zip_xpath"
-    extraction_equation_engine: str = "docling_formula"
+    extraction_equation_engine: str = "none"
     extraction_per_call_hints_enabled: bool = True
 
     # Context & Sub-agent
@@ -302,10 +302,10 @@ def load_app_settings() -> UserEffectiveSettings:
         # Phase 071.2 D-071.2-03 — per-aspect extraction engines (migration 045)
         extraction_text_engine_pdf=_str(override, "extraction_text_engine_pdf", "legacy"),
         extraction_text_engine_docx=_str(override, "extraction_text_engine_docx", "legacy"),
-        extraction_table_engine_pdf=_str(override, "extraction_table_engine_pdf", "docling_tf"),
+        extraction_table_engine_pdf=_str(override, "extraction_table_engine_pdf", "pdfplumber"),
         extraction_image_engine_pdf=_str(override, "extraction_image_engine_pdf", "pymupdf_full"),
         extraction_image_engine_docx=_str(override, "extraction_image_engine_docx", "zip_xpath"),
-        extraction_equation_engine=_str(override, "extraction_equation_engine", "docling_formula"),
+        extraction_equation_engine=_str(override, "extraction_equation_engine", "none"),
         extraction_per_call_hints_enabled=_bool(override, "extraction_per_call_hints_enabled", True),
 
         context_window_max_tokens=_int(override, "context_window_max_tokens", env_settings.context_window_max_tokens),
