@@ -1,0 +1,34 @@
+Source: https://arxiv.org/abs/2605.15184v1
+Title: Is Grep All You Need? How Agent Harnesses Reshape Agentic Search
+Authors: Sahil Sen, Akhil Kasturi, Elias Lumer, Anmol Gulati, Vamse Kumar Subbiah
+License: Creative Commons Attribution 4.0 International (CC-BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+
+Attribution per CC-BY 4.0:
+"Is Grep All You Need? How Agent Harnesses Reshape Agentic Search" by Sahil Sen,
+Akhil Kasturi, Elias Lumer, Anmol Gulati, and Vamse Kumar Subbiah is licensed
+under CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Available at
+arXiv: https://arxiv.org/abs/2605.15184v1.
+
+This fixture is committed to the agentic-rag repository for UAT purposes
+(Phase 071.1 D-071.1-05). It is not used by any binding pytest — see
+academic_synth.{pdf,docx} for the CI regression net.
+
+Modifications:
+  - friendly_real.pdf: byte-identical to the arXiv-distributed PDF (no changes).
+  - friendly_real.docx: NOT distributed by the authors. Generated for fixture
+    purposes by extracting text + tables from the PDF via Docling
+    (docling==2.93.0) and rendering into DOCX via python-docx. Contains the
+    same logical content (text + 4 tables) but figures and layout differ from
+    the original PDF. This sibling DOCX is for friendly-fixture UAT only and
+    is not represented as the authors' Word version.
+
+Date committed: 2026-05-15
+
+Fixture variance note:
+  - PDF: 9 pages, real text layer, 4 tables (Docling-detected), 1 image.
+    Within the 8-12 page window required by D-071.1-05.
+  - The "≥2 figures" criterion is not met (1 figure in the PDF, 0 embedded in
+    the generated DOCX). This is an informational gate for friendly UAT, not
+    binding. The thesis SC#1 retry on 23cc112a / 911225a6 remains the binding
+    gate per D-071.1-06.
