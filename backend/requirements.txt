@@ -37,3 +37,8 @@ reportlab>=4.0.0  # Phase 069 test fixtures (PDF synth for golden-extraction tes
 sentence-transformers>=3.0.0
 llm-sandbox[docker]>=0.3.37
 docling>=2.93.0,<3.0.0
+
+# Added by Phase 071.3 Plan 02 (D-071.3-05): Camelot 1.0 (MIT) — pdfium-backed
+# rule-based table extractor. ~80 MB install (opencv + pdfium + pdfminer.six).
+# Lazy-imported inside aspects/tables.py::camelot_tables (Pattern SP-4).
+camelot-py[base]>=1.0.0,<2.0.0
