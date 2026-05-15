@@ -215,6 +215,25 @@ restarts. Under the project's single-worker mode (D-v2.5-02), this means: if
 you see worker memory climb after multiple timeouts, restart the uvicorn
 process. Phase 077 multi-worker hardening will revisit thread-pool isolation.
 
+## SC#1 latency probe (manual UAT)
+
+Phase 071.2 D-071.2-05 — `/documents/upload` returns 201 within ~1.5s on any
+size PDF; extract + chunk + multimodal happen in a BackgroundTask. To verify
+against a running uvicorn (TestClient cannot measure async-defer latency —
+BackgroundTasks block the response in test mode per Pitfall 1):
+
+```bash
+time curl -X POST -F "file=@thesis.pdf" -H "Authorization: Bearer $JWT" http://localhost:8000/documents/upload
+# Expect: elapsed < 1.5s on a 4 MB PDF.
+```
+
+Concurrent /health probe during an in-flight thesis-PDF upload should also stay
+<2s per sample (validates the threadpool sweep didn't leave a sync call behind):
+
+```bash
+while true; do time curl -s http://localhost:8000/health > /dev/null; sleep 0.5; done
+```
+
 ---
 
 For deeper architectural context, see `../.planning/PROJECT.md`,

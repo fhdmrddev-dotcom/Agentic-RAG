@@ -99,6 +99,155 @@ def _write_extraction_run_row(
         )
 
 
+def _upload_pipeline(
+    document_id: str,
+    raw: bytes,
+    mime_type: str,
+    filename: str,
+    user_id: str,
+    storage_path: str,
+    supabase: Client,
+) -> None:
+    """Phase 071.2 D-071.2-05 — runs in BackgroundTask after /upload (or
+    /reingest) returns 201/200.
+
+    Steps:
+      1. Storage upload (sync supabase call; ok inside BackgroundTask task body —
+         not an async handler, so supabase-py runs on the BackgroundTask thread
+         pool without blocking the event loop). Skipped if `storage_path` is
+         empty / None (reingest path — file already in storage).
+      2. Layer 2 wall-clock-wrapped extract via _extract_with_fallback (the proven
+         071.1 pattern: Docling wall-clock timeout + PyMuPDF auto-fallback).
+      3. Call existing ingest_document(document_id, text, user_id, supabase, raw,
+         mime_type, filename, None, extracted_doc, extract_duration_ms) — keep
+         signature byte-identical (Pitfall 2 — 071.1 tests stay green).
+      4. On any unhandled exception: UPDATE documents SET status='failed',
+         error_message=<short summary> (T-071.2-01-01 mitigation — don't echo
+         supabase-py internals into error_message).
+    """
+    from app.services.extraction_service import get_extractor  # noqa: PLC0415
+
+    # Step 1 — storage upload (only on the /upload path; /reingest path passes
+    # an empty `storage_path` to signal "file already in storage, skip upload").
+    if storage_path:
+        try:
+            supabase.storage.from_("documents").upload(
+                path=storage_path,
+                file=raw,
+                file_options={"content-type": mime_type},
+            )
+        except Exception:
+            # Storage upload failure doesn't block ingestion — same swallow shape
+            # as the pre-071.2 inline call site at documents.py:330-331.
+            pass
+
+    # Step 2 — extract with Layer 2 wall-clock + PyMuPDF auto-fallback.
+    extract_start = time.perf_counter()
+    extracted_doc: ExtractedDocument | None = None
+    engine_used: str | None = None
+    text: str = ""
+
+    try:
+        docling_timeout_s = float(os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120"))
+    except ValueError:
+        log.warning(
+            "Invalid EXTRACTOR_DOCLING_TIMEOUT_S=%r; using default 120s",
+            os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S"),
+        )
+        docling_timeout_s = 120.0
+    wall_clock_s = docling_timeout_s + 10  # +10s buffer over Docling's own check
+
+    try:
+        extractor = get_extractor(mime_type)
+        if extractor is None:
+            # Non-PDF/non-DOCX MIMEs flow through the legacy extract_text helper.
+            text = extract_text(raw, mime_type)
+        else:
+            # We are inside a BackgroundTask thread (not an async handler), so
+            # asyncio.wait_for is not directly usable. Use a small asyncio.run
+            # bridge so the Layer 2 wall-clock pattern still applies. Mirrors
+            # the /reextract Layer 2 shape (071.1 SP-2) but in sync context.
+            async def _run_with_timeout() -> ExtractedDocument:
+                from starlette.concurrency import run_in_threadpool  # noqa: PLC0415
+                return await asyncio.wait_for(
+                    run_in_threadpool(extractor.extract, raw, mime_type),
+                    timeout=wall_clock_s,
+                )
+
+            try:
+                extracted_doc = asyncio.run(_run_with_timeout())
+                text = extracted_doc.text
+                engine_used = extracted_doc.extractor_name or None
+            except asyncio.TimeoutError:
+                # D-071.1-04 — fallback to PyMuPDF on Docling timeout only.
+                primary_name = (
+                    os.getenv("EXTRACTOR_PRIMARY", "docling") or "docling"
+                ).lower()
+                if primary_name != "docling":
+                    raise RuntimeError(
+                        f"engine={primary_name} timed out after {wall_clock_s}s"
+                    )
+
+                docling_duration_ms = int(
+                    (time.perf_counter() - extract_start) * 1000
+                )
+                docling_error = (
+                    f"docling timeout after {wall_clock_s}s (Layer 2 wall-clock)"
+                )
+                # First telemetry row (Docling failed) — best-effort.
+                try:
+                    _write_extraction_run_row(
+                        supabase, document_id, user_id, "docling",
+                        docling_duration_ms, 0, 0, docling_error,
+                    )
+                except Exception:
+                    pass
+
+                pymupdf_extractor = get_extractor(
+                    mime_type, engine_override="pymupdf"
+                )
+                if pymupdf_extractor is None:
+                    raise RuntimeError(
+                        f"Docling timed out and PyMuPDF unavailable for "
+                        f"{mime_type!r}"
+                    )
+                engine_used = "pymupdf-fallback"
+                extracted_doc = pymupdf_extractor.extract(raw, mime_type)
+                text = extracted_doc.text
+    except Exception as exc:
+        # Step 4 — surface a user-safe failure on the documents row + log full
+        # detail server-side (T-071.2-01-01 mitigation).
+        log.warning(
+            "upload_pipeline failed for %s: %s",
+            document_id,
+            exc,
+        )
+        try:
+            supabase.table("documents").update({
+                "status": "failed",
+                "error_message": str(exc)[:500],
+            }).eq("id", document_id).execute()
+        except Exception:
+            pass  # don't double-fault on telemetry write failure
+        return
+
+    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
+
+    # Step 3 — hand off to the existing ingest_document (signature byte-identical).
+    ingest_document(
+        document_id,
+        text,
+        user_id,
+        supabase,
+        raw,
+        mime_type,
+        filename,
+        engine_used,        # engine_override — None for default, 'pymupdf-fallback' on fallback
+        extracted_doc,
+        extract_duration_ms,
+    )
+
+
 def extract_text(raw: bytes, mime_type: str) -> str:
     """Extract text from non-PDF/non-DOCX MIME types.
 
@@ -219,10 +368,12 @@ async def upload_document(
             detail="File is empty",
         )
 
-    # Validate folder ownership: only the folder owner may upload into it
+    # Validate folder ownership: only the folder owner may upload into it.
+    # Phase 071.2 D-071.2-06: wrap sync supabase call in run_in_threadpool
+    # (mirrors /reextract 618-626 lambda-wrap shape).
     if folder_id:
-        folder_check = (
-            supabase.table("folders")
+        folder_check = await run_in_threadpool(
+            lambda: supabase.table("folders")
             .select("id, user_id")
             .eq("id", folder_id)
             .maybe_single()
@@ -253,15 +404,17 @@ async def upload_document(
         dedup_query = dedup_query.eq("folder_id", folder_id)
     else:
         dedup_query = dedup_query.is_("folder_id", "null")
-    existing = dedup_query.limit(1).execute()
+    # Phase 071.2 D-071.2-06: wrap dedup .execute() in run_in_threadpool.
+    existing = await run_in_threadpool(lambda: dedup_query.limit(1).execute())
     if existing.data:
         response.status_code = status.HTTP_200_OK
         return existing.data[0]
 
     # Case 2: same filename → create new version instead of deleting stale document.
     # Old files are retained in storage for future restore (Phase 29).
-    existing_versions = (
-        supabase.table("documents")
+    # Phase 071.2 D-071.2-06: wrap existing-versions SELECT in run_in_threadpool.
+    existing_versions = await run_in_threadpool(
+        lambda: supabase.table("documents")
         .select("id, version_number")
         .eq("user_id", current_user["id"])
         .eq("filename", file.filename)
@@ -271,9 +424,10 @@ async def upload_document(
     )
     if existing_versions.data:
         next_version = existing_versions.data[0]["version_number"] + 1
-        # Retire all previous versions from retrieval (user-scoped, not folder-scoped)
-        (
-            supabase.table("documents")
+        # Retire all previous versions from retrieval (user-scoped, not folder-scoped).
+        # Phase 071.2 D-071.2-06: wrap is_latest=False UPDATE cascade in run_in_threadpool.
+        await run_in_threadpool(
+            lambda: supabase.table("documents")
             .update({"is_latest": False})
             .eq("user_id", current_user["id"])
             .eq("filename", file.filename)
@@ -282,26 +436,11 @@ async def upload_document(
     else:
         next_version = 1
 
-    # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
-    # Phase 071: capture full ExtractedDocument + duration for pdf_extraction_runs telemetry.
-    from app.services.extraction_service import get_extractor  # noqa: PLC0415
-
-    extract_start = time.perf_counter()
-    extracted_doc: ExtractedDocument | None = None
-    try:
-        extractor = get_extractor(mime_type)
-        if extractor is not None:
-            extracted_doc = extractor.extract(raw, mime_type)
-            text = extracted_doc.text
-        else:
-            text = extract_text(raw, mime_type)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Could not extract text from file: {e}",
-        )
-    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
-
+    # Phase 071.2 D-071.2-05 — instant-201 BackgroundTask refactor.
+    # INSERT documents row with status='pending' FIRST so Supabase Realtime broadcasts
+    # the new row to the frontend immediately. Extract + chunk + multimodal moved into
+    # `_upload_pipeline` BackgroundTask (closes "/upload blocks 1-120s before 201" UX
+    # defect surfaced during Phase 072 discuss-phase setup).
     document_id = str(uuid4())
     storage_path = f"{current_user['id']}/{document_id}/{file.filename}"
 
@@ -318,30 +457,25 @@ async def upload_document(
         "version_number": next_version,
         "is_latest": True,
     }
-    result = supabase.table("documents").insert(doc_data).execute()
+    # Phase 071.2 D-071.2-06: wrap documents INSERT in run_in_threadpool.
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents").insert(doc_data).execute()
+    )
     doc = result.data[0]
 
-    try:
-        supabase.storage.from_("documents").upload(
-            path=storage_path,
-            file=raw,
-            file_options={"content-type": mime_type},
-        )
-    except Exception:
-        pass  # Storage upload failure doesn't block ingestion
-
+    # Phase 071.2 D-071.2-05 — schedule heavy work as BackgroundTask. The handler
+    # returns 201 within ~1s; _upload_pipeline does storage upload + Layer 2
+    # wall-clock-wrapped extract + ingest_document inside the BackgroundTask
+    # thread (not the async handler), so the event loop stays unblocked.
     background_tasks.add_task(
-        ingest_document,
-        document_id,
-        text,
-        current_user["id"],
-        supabase,
+        _upload_pipeline,
+        doc["id"],
         raw,
         mime_type,
         file.filename,
-        None,            # engine_override — None for upload path (uses EXTRACTOR_PRIMARY default)
-        extracted_doc,
-        extract_duration_ms,
+        current_user["id"],
+        storage_path,
+        supabase,
     )
     background_tasks.add_task(
         write_audit_entry,
@@ -498,10 +632,22 @@ async def reingest_document(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
 ):
-    """Re-queue a document for ingestion by fetching from storage and scheduling background task."""
-    # 1. Verify ownership and confirm document is the latest version
-    doc = (
-        supabase.table("documents")
+    """Re-queue a document for ingestion by fetching from storage and scheduling
+    background extraction.
+
+    Phase 071.2 D-071.2-06 — port of the 071.1 /reextract threadpool sweep:
+      1. Owner SELECT wrapped in run_in_threadpool.
+      2. Storage download wrapped in run_in_threadpool (bound-method form).
+      3. UPDATE status='pending' wrapped in run_in_threadpool.
+      4. Extract MOVED into _upload_pipeline BackgroundTask (storage_path=""
+         signals "skip storage upload — file already in storage"). Same Layer 2
+         wall-clock + PyMuPDF fallback as /upload.
+    """
+    # 1. Verify ownership and confirm document is the latest version.
+    # Phase 071.2 D-071.2-06: wrap owner SELECT in run_in_threadpool (port of
+    # /reextract 618-626 pattern verbatim).
+    doc = await run_in_threadpool(
+        lambda: supabase.table("documents")
         .select("*")
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
@@ -514,33 +660,21 @@ async def reingest_document(
 
     target = doc.data
 
-    # 2. Fetch raw bytes from storage so we can re-extract text
+    # 2. Fetch raw bytes from storage so we can re-extract text.
+    # Phase 071.2 D-071.2-06: wrap storage download in run_in_threadpool
+    # (bound-method form — matches /reextract 634-636).
     try:
-        raw = supabase.storage.from_("documents").download(target["file_path"])
+        raw = await run_in_threadpool(
+            supabase.storage.from_("documents").download, target["file_path"]
+        )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
-    # Phase 069: PDF/DOCX flow through PdfExtractor seam; other MIMEs use extract_text() fallback.
-    # Phase 071: capture full ExtractedDocument + duration for pdf_extraction_runs telemetry.
-    from app.services.extraction_service import get_extractor  # noqa: PLC0415
-
-    mime_type = target["mime_type"]
-    extract_start = time.perf_counter()
-    extracted_doc: ExtractedDocument | None = None
-    try:
-        extractor = get_extractor(mime_type)
-        if extractor is not None:
-            extracted_doc = extractor.extract(raw, mime_type)
-            text = extracted_doc.text
-        else:
-            text = extract_text(raw, mime_type)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Could not extract text: {e}")
-    extract_duration_ms = int((time.perf_counter() - extract_start) * 1000)
-
-    # 3. Reset status to pending
-    result = (
-        supabase.table("documents")
+    # 3. Reset status to pending. Phase 071.2 D-071.2-06: wrap UPDATE in
+    # run_in_threadpool. NB — version_number is NOT bumped; this is a
+    # re-ingest of the same source bytes (D-25 versioning contract preserved).
+    result = await run_in_threadpool(
+        lambda: supabase.table("documents")
         .update({"status": "pending"})
         .eq("id", document_id)
         .eq("user_id", current_user["id"])
@@ -549,19 +683,21 @@ async def reingest_document(
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found after update")
 
-    # 4. Schedule background ingestion
+    # 4. Schedule extract + ingest as BackgroundTask. Phase 071.2 D-071.2-06:
+    # extract moved out of the async handler so /reingest no longer blocks the
+    # event loop for the duration of Docling/PyMuPDF (closes D-v2.5-01 on the
+    # last foreground-extract route after 071.1 closed /reextract). We pass
+    # storage_path="" so _upload_pipeline skips the storage upload step — the
+    # file is already in storage.
     background_tasks.add_task(
-        ingest_document,
+        _upload_pipeline,
         document_id,
-        text,
-        current_user["id"],
-        supabase,
         raw,
         target["mime_type"],
         target["filename"],
-        None,            # engine_override — None for /reingest (uses EXTRACTOR_PRIMARY default)
-        extracted_doc,
-        extract_duration_ms,
+        current_user["id"],
+        "",                  # storage_path="" → skip storage upload (file already there)
+        supabase,
     )
     return result.data[0]
 
