@@ -164,6 +164,57 @@ grep -c "pdf_extraction_runs" ../supabase/full-schema.sql   # should be ≥ 1
 If the count is 0: the migration didn't run. Re-paste the SQL into the editor
 following the [Migrations](#migrations) protocol.
 
+### Docling timeout fallback to PyMuPDF
+
+Phase 071.1 ships defense-in-depth timeout handling for
+`POST /documents/{id}/reextract` when Docling is the engine. If Docling stalls
+in native code (TableFormer or layout-prediction model wedge — observed on
+large PDFs with complex layouts), the route's wall-clock fail-safe
+(`asyncio.wait_for(timeout=EXTRACTOR_DOCLING_TIMEOUT_S + 10)`) fires, the
+underlying thread leaks (Python cannot kill threads stuck in C code), and the
+route automatically retries the same document via PyMuPDF in the same request
+lifecycle.
+
+The user-visible response is 202 (success — the document IS being ingested,
+just on PyMuPDF). The audit trail in `pdf_extraction_runs` shows two rows for
+that one `/reextract` call:
+
+```sql
+SELECT engine, error, duration_ms, table_count, image_count
+FROM pdf_extraction_runs
+WHERE document_id = '<doc-id>'
+ORDER BY started_at DESC
+LIMIT 5;
+-- Expected on fallback:
+-- engine='pymupdf-fallback'  error=NULL  duration_ms=...  table_count=...  image_count=...
+-- engine='docling'           error='docling timeout after 130s (Layer 2 wall-clock)'  ...
+```
+
+To monitor how often auto-fallback is firing in production:
+
+```sql
+SELECT count(*) FROM pdf_extraction_runs WHERE engine = 'pymupdf-fallback';
+```
+
+**Operator knobs (env-only; uvicorn restart required to take effect):**
+
+- `EXTRACTOR_DOCLING_TIMEOUT_S` (default `120`): seconds Docling has before the
+  wall-clock layer fires (+10s buffer added internally). Lower for faster
+  fallback on big PDFs; higher if your typical document needs more time.
+- `EXTRACTOR_DOCLING_DISABLE_TABLE_STRUCTURE` (default `false`): set to
+  `1`/`true`/`yes` to disable Docling's TableFormer entirely. Falls back to
+  text-only table extraction. Useful when TableFormer is the consistent stall
+  point.
+- `EXTRACTOR_DOCLING_IMAGES_SCALE` (default `2.0`): rendered-image scale for
+  figure extraction. Lower (e.g., `1.0` or `0.5`) reduces memory pressure on
+  big PDFs.
+
+**Thread-leak operator note:** Python cannot kill a thread stuck in native
+code, so each Docling stall leaks ~250-500 MB of process memory until uvicorn
+restarts. Under the project's single-worker mode (D-v2.5-02), this means: if
+you see worker memory climb after multiple timeouts, restart the uvicorn
+process. Phase 077 multi-worker hardening will revisit thread-pool isolation.
+
 ---
 
 For deeper architectural context, see `../.planning/PROJECT.md`,
