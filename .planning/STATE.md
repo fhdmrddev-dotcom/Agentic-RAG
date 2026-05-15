@@ -4,14 +4,14 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 072 context gathered (D-072-01..09); Phase 071.2 inserted before 072; load_dotenv hot-fix committed 33860a7
-last_updated: "2026-05-15T14:08:29.668Z"
+last_updated: "2026-05-15T16:53:10.139Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 18
   completed_phases: 6
-  total_plans: 16
+  total_plans: 21
   completed_plans: 18
-  percent: 100
+  percent: 86
 ---
 
 # Project State
@@ -350,4 +350,4 @@ Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase 
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 071.1 (docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback) — 2 plans — 2026-05-15T02:07:29.476Z
+**Planned Phase:** 071.2 (Ingestion Plumbing + Per-Aspect Extraction Dispatcher) — 5 plans — 2026-05-15T16:53:10.130Z
