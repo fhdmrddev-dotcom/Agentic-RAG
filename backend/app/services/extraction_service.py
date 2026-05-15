@@ -92,6 +92,11 @@ class ExtractedDocument:
     # NEW per D-071-08:
     full_markdown: str | None = None
     extractor_name: str | None = None
+    # NEW per D-071.2-04 (Phase 071.2 Plan 05):
+    # tuple[EquationData, ...]; bare `tuple` annotation avoids a forward-ref
+    # cycle between extraction_service.py and aspects.equations. The composer
+    # constructs EquationData instances locally and stores them here.
+    equations: tuple = ()
 
 
 class PdfExtractor(ABC):
@@ -264,3 +269,124 @@ def get_extractor(mime: str, engine_override: str | None = None) -> PdfExtractor
     if _LEGACY.supports(mime):
         return _LEGACY
     return None
+
+
+# ---------------------------------------------------------------------------
+# Phase 071.2 Plan 05 — per-aspect dispatcher composer (D-071.2-01..04)
+# ---------------------------------------------------------------------------
+
+def load_app_settings():
+    """Indirection point so tests can monkey-patch this module's view of
+    `load_app_settings` without touching `app.models.user_settings` callers
+    that may have already bound the original symbol.
+    """
+    from app.models.user_settings import load_app_settings as _real  # noqa: PLC0415
+    return _real()
+
+
+def extract_composable(
+    raw: bytes,
+    mime: str,
+    engines: dict[str, str] | None = None,
+) -> ExtractedDocument:
+    """Per-aspect extraction composer (Phase 071.2 D-071.2-01..04).
+
+    Dispatches each aspect (text / tables / images / equations) through its
+    own independent registry in `app.services.extractors.aspects`. When
+    `engines` is None, defaults come from `app_settings.extraction_*_engine_*`
+    (migration 045).
+
+    Per-aspect try/except: a failure in one aspect populates the
+    corresponding `*_extraction_error` field on the result and leaves the
+    other aspects intact. Text failures still surface as exceptions (matches
+    D-069-04 semantics).
+
+    KeyError on unknown engine name (fail-fast). The route handler can
+    wrap this in HTTPException(400) if it wants client-visible 400 instead
+    of 500 — see Plan 05 Task 3 documents.py wiring.
+
+    extractor_name is set to `composable[{text}/{tables}/{images}/{equations}]`.
+    """
+    from app.services.extractors import aspects  # noqa: PLC0415
+
+    # Resolve engine names. Per-aspect override > app_settings default.
+    if engines is None:
+        engines = {}
+
+    settings = load_app_settings()
+
+    # Choose images registry based on mime — DOCX has its own engine list.
+    if mime == DOCX_MIME:
+        images_registry = aspects.IMAGE_ENGINES_DOCX
+        text_default = settings.extraction_text_engine_docx
+        images_default = settings.extraction_image_engine_docx
+    else:
+        images_registry = aspects.IMAGE_ENGINES_PDF
+        text_default = settings.extraction_text_engine_pdf
+        images_default = settings.extraction_image_engine_pdf
+
+    eng = {
+        "text": engines.get("text") or text_default,
+        "tables": engines.get("tables") or settings.extraction_table_engine_pdf,
+        "images": engines.get("images") or images_default,
+        "equations": engines.get("equations") or settings.extraction_equation_engine,
+    }
+
+    # Registry lookups — KeyError on unknown engine name (fail-fast).
+    text_fn = aspects.TEXT_ENGINES[eng["text"]]
+    table_fn = aspects.TABLE_ENGINES[eng["tables"]]
+    image_fn = images_registry[eng["images"]]
+    equation_fn = aspects.EQUATION_ENGINES[eng["equations"]]
+
+    # Text — failures raise (matches D-069-04 semantics for text).
+    text, full_markdown = text_fn(raw, mime)
+
+    # Tables — silent-swallow + error field (D-069-04).
+    tables: list = []
+    table_error: str | None = None
+    try:
+        tables = list(table_fn(raw, mime))
+    except Exception as exc:  # noqa: BLE001
+        table_error = str(exc)
+        log.warning(
+            "extract_composable: tables engine %r failed: %s", eng["tables"], exc
+        )
+
+    # Images — silent-swallow + error field. PDF image adapters take (raw,);
+    # DOCX image adapters also take (raw,). Both signatures match.
+    images: list = []
+    image_error: str | None = None
+    try:
+        images = list(image_fn(raw))
+    except Exception as exc:  # noqa: BLE001
+        image_error = str(exc)
+        log.warning(
+            "extract_composable: images engine %r failed: %s", eng["images"], exc
+        )
+
+    # Equations — silent-swallow (no dedicated error field; equations are
+    # nice-to-have, not gate-blocking per D-071.2-12).
+    equations: list = []
+    try:
+        equations = list(equation_fn(raw, mime))
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "extract_composable: equations engine %r failed: %s",
+            eng["equations"],
+            exc,
+        )
+
+    extractor_name = (
+        f"composable[{eng['text']}/{eng['tables']}/{eng['images']}/{eng['equations']}]"
+    )
+
+    return ExtractedDocument(
+        text=text,
+        tables=tuple(tables),
+        images=tuple(images),
+        table_extraction_error=table_error,
+        image_extraction_error=image_error,
+        full_markdown=full_markdown,
+        extractor_name=extractor_name,
+        equations=tuple(equations),
+    )
