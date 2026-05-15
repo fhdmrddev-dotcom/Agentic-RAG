@@ -238,12 +238,16 @@ def _recall_pct(count: int, gt: int) -> str:
     return f"{(count / gt) * 100:.0f}%" if gt > 0 else "N/A"
 
 
+def _sanitize_cell(s: str) -> str:
+    return (s or "").replace("|", "/").replace("\n", " ").replace("\r", " ")
+
+
 def _row(r: EngineResult) -> str:
     gt = THESIS_GROUND_TRUTH_TABLES if r.fixture == "thesis" else 0
     recall = _recall_pct(r.table_count, gt) if r.fixture == "thesis" else "N/A"
     wall_range = f"{r.wall_range_s[0]:.2f}-{r.wall_range_s[1]:.2f}" if r.runs_wall_s else "—"
-    status = r.status if r.status == "success" else f"failed: {r.error}"
-    notes = (r.notes or "").replace("|", "/").replace("\n", " ")
+    status = _sanitize_cell(r.status if r.status == "success" else f"failed: {r.error}")
+    notes = _sanitize_cell(r.notes)
     return (f"| {r.engine} | {r.fixture} | {r.table_count} | {recall} | "
             f"{r.median_wall_s:.2f} | {wall_range} | {r.peak_rss_mb} | {status} | {notes} |")
 
@@ -318,7 +322,14 @@ def main() -> None:
         ap.error(f"--thesis path does not exist: {thesis_path}")
     output_path = Path(args.output).resolve()
     results = bench_all(thesis_path, FRIENDLY_PDF, engines)
-    write_results(results, output_path, thesis_supplied=thesis_path is not None)
+    failures = [r for r in results if r.status != "success"]
+    install_notes_parts = []
+    for f in failures:
+        install_notes_parts.append(
+            f"- **{f.engine}** (fixture={f.fixture}): {_sanitize_cell(f.error or '')}"
+        )
+    install_notes = "\n".join(install_notes_parts)
+    write_results(results, output_path, thesis_supplied=thesis_path is not None, install_notes=install_notes)
     _log(f"wrote {len(results)} result rows to {output_path}")
     _log("done.")
 
