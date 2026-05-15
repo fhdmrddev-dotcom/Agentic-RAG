@@ -19,6 +19,7 @@ from app.utils.db import aexec
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
+    from app.services.extraction_service import ExtractedDocument
 
 log = logging.getLogger(__name__)
 
@@ -91,13 +92,31 @@ def extract_and_store_tables(
     document_id: str,
     user_id: str,
     supabase: Client,
+    extracted_doc: "ExtractedDocument | None" = None,   # Phase 071.2 D-071.2-08
 ) -> None:
     """Extract tables from raw bytes and INSERT rows into document_tables.
 
     Silently swallows all exceptions — never blocks ingestion.
+
+    Phase 071.2 D-071.2-08: when `extracted_doc` is provided AND contains
+    tables, those tables are used directly (Docling's bbox + structure
+    preserved into document_tables.bbox). When None/empty, falls back to
+    the legacy pdfplumber/python-docx pass over raw bytes — preserves
+    backward-compat for tests + Phase 069 LegacyExtractor callers.
     """
     try:
-        if mime_type == PDF_MIME:
+        if extracted_doc is not None and extracted_doc.tables:
+            table_dicts = [
+                {
+                    "page": t.page,
+                    "table_index": t.table_index,
+                    "headers": list(t.headers),
+                    "rows": [list(r) for r in t.rows],
+                    "bbox": t.bbox,
+                }
+                for t in extracted_doc.tables
+            ]
+        elif mime_type == PDF_MIME:
             table_dicts = extract_pdf_tables(raw)
         elif mime_type == DOCX_MIME:
             table_dicts = extract_docx_tables(raw)
@@ -115,6 +134,11 @@ def extract_and_store_tables(
                 "table_index": t["table_index"],
                 "headers": t["headers"],
                 "rows": t["rows"],
+                # Phase 071.2 D-071.2-08: conditional bbox spread — populate the
+                # migration 042 column only when the upstream extractor produced one.
+                # Skipping the key (rather than writing None) keeps the DB write clean
+                # and matches the column's jsonb nullable default.
+                **({"bbox": t["bbox"]} if t.get("bbox") is not None else {}),
             }
             for t in table_dicts
         ]
@@ -256,6 +280,7 @@ def extract_and_store_images(
     user_id: str,
     supabase: Client,
     app_settings: "UserEffectiveSettings",
+    extracted_doc: "ExtractedDocument | None" = None,   # Phase 071.2 D-071.2-08
 ) -> None:
     """Extract images from raw bytes, describe via vision LLM, INSERT to document_images.
 
@@ -263,9 +288,27 @@ def extract_and_store_images(
     Images below 50x50 px are skipped.
     Vision API failures store empty description rather than skipping the row.
     Capped at _MAX_VISION_CALLS per document.
+
+    Phase 071.2 D-071.2-08: when `extracted_doc` is provided AND contains
+    images, those images are used directly (Docling's bbox preserved into
+    document_images.bbox). The vision-LLM description loop still runs on
+    the b64_png. When None/empty, falls back to the legacy
+    pdfplumber/python-docx pass — preserves backward-compat.
     """
     try:
-        if mime_type == PDF_MIME:
+        if extracted_doc is not None and extracted_doc.images:
+            image_dicts = [
+                {
+                    "page": im.page,
+                    "image_index": im.image_index,
+                    "b64_png": im.b64_png,
+                    "width": im.width,
+                    "height": im.height,
+                    "bbox": im.bbox,
+                }
+                for im in extracted_doc.images
+            ]
+        elif mime_type == PDF_MIME:
             image_dicts = extract_pdf_images(raw)
         elif mime_type == DOCX_MIME:
             image_dicts = extract_docx_images(raw)
@@ -307,6 +350,9 @@ def extract_and_store_images(
                 "image_index": img["image_index"],
                 "description": description,
                 # b64_png intentionally NOT stored
+                # Phase 071.2 D-071.2-08: conditional bbox spread — populate the
+                # migration 042 column only when the upstream extractor produced one.
+                **({"bbox": img["bbox"]} if img.get("bbox") is not None else {}),
             })
 
         if not rows:
