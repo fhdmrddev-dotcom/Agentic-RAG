@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 072 context gathered (D-072-01..09); Phase 071.2 inserted before 072; load_dotenv hot-fix committed 33860a7
-last_updated: "2026-05-15T17:03:24.355Z"
-last_activity: 2026-05-15 -- Phase 071.2 execution started
+stopped_at: Phase 071.2 Plan 04 GREEN (Tasks 1+2 autonomous; Task 3 checkpoint:human-verify parked for orchestrator/user — live thesis-PDF /reextract + SC#5/SC#6 SQL UAT)
+last_updated: "2026-05-15T17:50:00.000Z"
+last_activity: 2026-05-15 -- Phase 071.2 Plan 04 GREEN (multimodal_service reads extracted_doc + /reextract 404 fix)
 progress:
   total_phases: 18
   completed_phases: 6
   total_plans: 21
-  completed_plans: 18
-  percent: 86
+  completed_plans: 19
+  percent: 90
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 071.2 (ingestion-plumbing-docling-quality-diagnostics) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 071.2
-Last activity: 2026-05-15 -- Phase 071.2 execution started
+Plan: 4 of 5 (Tasks 1+2 GREEN; Task 3 checkpoint parked)
+Status: Wave 2 Plan 04 implementation complete (4 commits); Plan 05 (per-aspect dispatcher) ready next
+Last activity: 2026-05-15 -- Phase 071.2 Plan 04 GREEN (multimodal_service reads extracted_doc + /reextract 404 fix)
 
 ## PRD-reset outputs (committed)
 
@@ -286,6 +286,11 @@ Recent decisions affecting v2.5 work:
 - Phase 071 Plan 03: pymupdf>=1.24 pinned WITHOUT upper bound (`pymupdf>=1.24`) — D-070-14 comment block's "re-run binding test on pin change" is the lockdown contract, not version cap. Major-version backward-compat at the API level we use (`fitz.Document`, `page.find_tables`, `page.get_images`) has held historically.
 - Phase 071 Plan 03: PyMuPDFExtractor restricts `supports()` to PDF only (D-071 discretion) — DOCX continues to route through Docling/Legacy. Keeps the fence's surface minimal; PyMuPDF DOCX is rarely better than python-docx.
 - Phase 071 Plan 03: D-070-14 + D-v2.6-01 lines (Pinned by Phase 070 block + supabase==2.29.0 + httpx>=0.28.0,<0.29.0 + docling>=2.93.0,<3.0.0) byte-identical post-Plan-03 — confirmed via `git diff 97cff11:backend/requirements.txt requirements.txt`. New pymupdf>=1.24 pin inserted between pdfplumber and Pillow; Phase 070 binding gate stays GREEN.
+- Phase 071.2 Plan 04: D-071.2-08 closure — `multimodal_service.extract_and_store_tables/_images` widened with optional `extracted_doc: "ExtractedDocument | None" = None` kwarg. Precedence: when `extracted_doc.tables/.images` is non-empty, use it (bbox flows into migration 042 columns); else fall back to legacy pdfplumber/python-docx pass (backward-compat preserved via default kwarg). Conditional bbox spread `**({"bbox": t["bbox"]} if t.get("bbox") is not None else {})` keeps DB writes clean.
+- Phase 071.2 Plan 04: D-071.2-10 closure — `/reextract` owner SELECT wrapped in try/except. supabase-py's `.maybe_single().execute()` raises on `is_latest=False` filter (prior failed cascade) rather than returning `.data=None`; now caught and re-raised as `HTTPException(404, "Document not found")`. Bare `raise` (no `from e`) per T-071.2-04-01 — avoids leaking PostgrestAPIError internals.
+- Phase 071.2 Plan 04: D-071.2-11 preservation — the two `ingestion_step` UPDATE writes at documents.py:1158 (`extracting_tables`) and :1169 (`extracting_images`) are byte-identical post-edit. They feed Plan 02's badge labels. Only the 7-line `TODO Phase 072 (RAG-MM-LIFT-01/02)` comment blocks above each call were deleted — the UPDATE statements themselves untouched.
+- Phase 071.2 Plan 04: TYPE_CHECKING import for `ExtractedDocument` reused the existing `TYPE_CHECKING` block at top of multimodal_service.py (no new guard introduced). Stringified forward-ref annotation `"ExtractedDocument | None"` — zero runtime import cost.
+- Phase 071.2 Plan 04 (deferred — orchestrator): Task 3 `checkpoint:human-verify` parked. Requires live uvicorn + thesis-PDF `/reextract` + SQL UAT polling against `documents.status` drain + SC#5 parity (`pdf_extraction_runs.table_count == COUNT(document_tables)`) + SC#5 bbox flow (`jsonb_typeof(bbox) = 'object'`) + SC#6 curl test (`/reextract` on is_latest=false → 404 not 500). Pytest verification denied by sandbox in this executor; live tests remain for post-merge.
 
 ### Pending Todos
 
