@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+# Phase 071.2 D-071.2-14: _CONVERTER is a process-lifetime cache (see _CONVERTER_LOCK below).
+# Pipeline-option changes (e.g., do_formula_enrichment) take effect only after uvicorn restart.
 _CONVERTER: "DocumentConverter | None" = None
 _CONVERTER_LOCK = threading.Lock()
 
@@ -81,14 +83,16 @@ def _get_converter() -> "DocumentConverter":
                     os.getenv("EXTRACTOR_DOCLING_DISABLE_TABLE_STRUCTURE", "false").lower()
                     not in ("1", "true", "yes")
                 )
+                opts.do_formula_enrichment = True   # Phase 071.2 D-071.2-14 — render math as LaTeX
 
                 log.info(
                     "DoclingExtractor: lazy-instantiating DocumentConverter "
-                    "(document_timeout=%.1fs, images_scale=%.1f, do_table_structure=%s; "
-                    "first call downloads ~600MB).",
+                    "(document_timeout=%.1fs, images_scale=%.1f, do_table_structure=%s, "
+                    "do_formula_enrichment=%s; first call downloads ~600MB).",
                     opts.document_timeout,
                     opts.images_scale,
                     opts.do_table_structure,
+                    opts.do_formula_enrichment,
                 )
                 _CONVERTER = DocumentConverter(
                     format_options={InputFormat.PDF: PdfFormatOption(pipeline_options=opts)}
@@ -195,12 +199,12 @@ class DoclingExtractor(PdfExtractor):
             except Exception:
                 pass  # never block extract on a status check
 
-            text = doc.export_to_text()
             try:
                 full_markdown = doc.export_to_markdown()
             except Exception as exc:  # noqa: BLE001
                 log.warning("Docling export_to_markdown failed: %s", exc)
                 full_markdown = None
+            text = full_markdown or doc.export_to_text()  # Phase 071.2 D-071.2-07
 
             tables: list[TableData] = []
             table_error: str | None = None
