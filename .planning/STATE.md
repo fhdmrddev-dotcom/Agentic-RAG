@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: Ready for next phase (recommend inserting 071.1 before 072)
-stopped_at: "Phase 071.1 context gathered (D-071.1-01..06 locked: threadpool sweep on /reextract only, defense-in-depth Docling timeout, PyMuPDF auto-fallback on timeout only, friendly real fixture)"
-last_updated: "2026-05-15T02:07:29.487Z"
-last_activity: 2026-05-14 — Phase 071 close-out + Plan 04 Rule-1 inline fixes (commit 9116c2b)
+status: "Phase 071.1 Wave 1 shipped (Plan 01 code fixes complete); Wave 2 (Plan 02 live UAT) paused awaiting Claude Code/Antigravity restart to surface chrome-devtools MCP tools"
+stopped_at: "Phase 071.1 Plan 01 merged (commits b7965b2..8626738 via merge 4d33412); 16/16 post-merge tests green; Plan 02 (autonomous: false) needs mcp__chrome-devtools__* tools which are registered globally + permissions-approved but not surfaced in this session"
+last_updated: "2026-05-15T10:00:00.000Z"
+last_activity: 2026-05-15 -- Phase 071.1 Wave 1 complete (Plan 01 shipped); Wave 2 paused for runtime restart
 progress:
   total_phases: 17
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 071 closed partial (SC#1 RED → carries to 071.1); next phase candidate 072 (Multimodal Lift) or insert 071.1 first.
+**Current focus:** Phase 071.1 — docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback
 
 ## Current Position
 
-Phase: 071 — CLOSED PARTIAL (4/5 SCs green, SC#1 carry-forward → 071.1)
-Plan: All 4 plans complete + 071.1 scope captured in 071-VERIFICATION.md
-Status: Ready for next phase (recommend inserting 071.1 before 072)
-Last activity: 2026-05-14 — Phase 071 close-out + Plan 04 Rule-1 inline fixes (commit 9116c2b)
+Phase: 071.1 (docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 071.1
+Last activity: 2026-05-15 -- Phase 071.1 execution started
 
 ## PRD-reset outputs (committed)
 
