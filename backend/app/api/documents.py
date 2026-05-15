@@ -751,15 +751,23 @@ async def reextract_document(
     # handlers block the event loop and freeze the single uvicorn worker (CLAUDE.md /
     # D-v2.5-01). Only `.execute()` is wrapped — auth predicates stay verbatim so
     # T-071-04-01 (.eq user_id + 404-not-403) mitigation is preserved byte-identical.
-    doc = await run_in_threadpool(
-        lambda: supabase.table("documents")
-        .select("*")
-        .eq("id", document_id)
-        .eq("user_id", current_user["id"])
-        .eq("is_latest", True)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        doc = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("*")
+            .eq("id", document_id)
+            .eq("user_id", current_user["id"])
+            .eq("is_latest", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception:
+        # Phase 071.2 D-071.2-10: is_latest=False from a prior failed cascade makes
+        # supabase-py raise on .maybe_single() rather than returning data=None.
+        # Treat empty-result-from-supabase-py as 404 — matches the `if not doc.data`
+        # branch below. Bare HTTPException (no `from e`) keeps supabase-py internals
+        # out of the response surface (T-071.2-04-01 information-disclosure constraint).
+        raise HTTPException(status_code=404, detail="Document not found")
     if not doc.data:
         # 404 (not 403) — avoid leaking existence to non-owners (T-071-04-01).
         raise HTTPException(status_code=404, detail="Document not found")
@@ -1148,24 +1156,24 @@ def ingest_document(
                 extract_and_store_images,
             )
             supabase.table("documents").update({"ingestion_step": "extracting_tables"}).eq("id", document_id).execute()
-            # TODO Phase 072 (RAG-MM-LIFT-01/02): extract_and_store_tables and
-            # extract_and_store_images currently re-extract from raw bytes via the
-            # multimodal_service helpers (Phase 069 D-069-04 single-pass contract).
-            # This means document_tables.bbox + document_images.bbox columns (migrations
-            # 041/042) stay NULL for new ingests even when engine='docling' produced rich
-            # bbox data on ExtractedDocument.tables[i].bbox. Phase 072 will refactor these
-            # helpers to accept the pre-extracted lists, at which point bbox flows through.
-            extract_and_store_tables(raw, mime_type, document_id, user_id, supabase)
+            # Phase 071.2 D-071.2-08: thread extracted_doc through so Docling's
+            # pre-extracted tables (with bbox per migration 042) flow into
+            # document_tables, replacing the silent pdfplumber re-extract.
+            # When extracted_doc is None (legacy path), multimodal_service falls
+            # back to the pdfplumber pass byte-identical to pre-071.2 behavior.
+            extract_and_store_tables(
+                raw, mime_type, document_id, user_id, supabase,
+                extracted_doc=extracted_doc,
+            )
 
             supabase.table("documents").update({"ingestion_step": "extracting_images"}).eq("id", document_id).execute()
-            # TODO Phase 072 (RAG-MM-LIFT-01/02): extract_and_store_tables and
-            # extract_and_store_images currently re-extract from raw bytes via the
-            # multimodal_service helpers (Phase 069 D-069-04 single-pass contract).
-            # This means document_tables.bbox + document_images.bbox columns (migrations
-            # 041/042) stay NULL for new ingests even when engine='docling' produced rich
-            # bbox data on ExtractedDocument.tables[i].bbox. Phase 072 will refactor these
-            # helpers to accept the pre-extracted lists, at which point bbox flows through.
-            extract_and_store_images(raw, mime_type, document_id, user_id, supabase, app_settings)
+            # Phase 071.2 D-071.2-08: thread extracted_doc through so Docling's
+            # pre-extracted images (with bbox per migration 042) flow into
+            # document_images. Vision-LLM description loop is preserved unchanged.
+            extract_and_store_images(
+                raw, mime_type, document_id, user_id, supabase, app_settings,
+                extracted_doc=extracted_doc,
+            )
 
         # Phase 071 D-071-08 — telemetry write (happy path).
         # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).
