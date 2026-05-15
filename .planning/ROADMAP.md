@@ -356,13 +356,13 @@ Plans:
   6. Live UAT on the user's reference thesis PDF: `/upload` (or `/reextract`) returns; SQL on `document_tables` returns count ≥ 15 (gmft target) OR ≥ 12 (PyMuPDF-only target if gmft underperforms). `document_images` count ≥ 30 (preserved from prior baseline post-migration 046). Chunks ≥ 200. Recorded in `071.3-HUMAN-UAT.md`.
   7. SEED-019 frontmatter status flipped from `planted` → `closed`. SEED-020 (embedding-model audit) planted with concrete re-open trigger per [[project-phase071-3-scope]] direction.
 
-**Plans:**
-0/5 plans complete (planning pending)
-- [ ] 071.3-01-PLAN.md — Spike + bench: run 3 table-engine candidates on thesis PDF, produce comparison numbers, pick winner. (Wave 1; autonomous: false — user observes numbers and confirms winner)
-- [ ] 071.3-02-PLAN.md — Winning engine adapter: add to `aspects/tables.py`, register in `TABLE_ENGINES`, lazy-import, unit tests. (Wave 1; autonomous: true)
-- [ ] 071.3-03-PLAN.md — Migration 047 + default flip: ship migration, update `user_settings.py` defaults, regen `full-schema.sql`. (Wave 2; depends on Plan 02; autonomous: true)
-- [ ] 071.3-04-PLAN.md — Docling rip + httpx unpin: delete adapters, delete `docling.py`, drop from requirements.txt, unpin httpx, delete `pymupdf_isolated.py` subprocess fence + parent wrapper IF in-process PyMuPDF smoke test passes, delete EXTRACTOR_DOCLING_* env knobs. (Wave 2; depends on Plan 03; autonomous: true)
-- [ ] 071.3-05-PLAN.md — Live UAT on thesis PDF + SEED-019 close + SEED-020 plant. Record results in `071.3-HUMAN-UAT.md`. (Wave 3; depends on Plan 04; autonomous: false — live UAT)
+**Plans:** 5 plans
+
+- [ ] 071.3-01-PLAN.md — Bench 3 table engines on 2 fixtures (user thesis + friendly_real.pdf); user picks winner via WINNER.md sentinel. (Wave 1; autonomous: false)
+- [ ] 071.3-02-PLAN.md — Wire winner adapter into aspects/tables.py + TABLE_ENGINES registry + unit + integration tests. (Wave 2 — depends on Plan 01 WINNER.md sentinel; autonomous: true)
+- [ ] 071.3-03-PLAN.md — Migration 047 + supabase/full-schema.sql regen + user_settings.py defaults flip. (Wave 3 — depends on Plan 02; autonomous: false — Task 2 paste-in-SQL-editor is a checkpoint:human-action)
+- [ ] 071.3-04-PLAN.md — Full Docling rip (8 phases A-H): delete adapters, source files, env knobs, EXTRACTOR_PRIMARY, drop docling from requirements, unpin httpx, conditional PyMuPDF in-process smoke + fence delete. (Wave 4 — depends on Plan 03; autonomous: true)
+- [ ] 071.3-05-PLAN.md — Live UAT on 3 fixtures (thesis + friendly_real + DOCX sibling); close SEED-019; plant SEED-020; conditional SEED-021 plant; PROJECT.md ADR + ROADMAP wording updates. (Wave 5 — depends on Plan 04; autonomous: false — live UAT requires user)
 
 **Notes:**
 - This phase is BEFORE Phase 072 because Phase 072's multimodal lift verification (SC#1 ≥80% of visible figures) re-extracts documents and would be tested under whichever table engine 071.3 ships. Doing 072 first would force a re-verification after 071.3.

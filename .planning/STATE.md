@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
+status: executing
 stopped_at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
-last_updated: "2026-05-15T22:32:07.119Z"
-last_activity: 2026-05-15
+last_updated: "2026-05-15T22:39:19.420Z"
+last_activity: 2026-05-15 -- Phase 071.3 execution started
 progress:
   total_phases: 19
   completed_phases: 7
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 071.2 — ingestion-plumbing-docling-quality-diagnostics
+**Current focus:** Phase 071.3 — docling-demotion-table-engine-full-rip
 
 ## Current Position
 
-Phase: 072
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-15
+Phase: 071.3 (docling-demotion-table-engine-full-rip) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 071.3
+Last activity: 2026-05-15 -- Phase 071.3 execution started
 
 ## PRD-reset outputs (committed)
 
