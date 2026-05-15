@@ -292,6 +292,91 @@ class TestUploadDocument:
         assert response.status_code == 404
         assert "Folder not found" in response.json()["detail"]
 
+    def test_upload_uses_background_task_for_extraction(self, client, auth_headers, mock_builder):
+        """Phase 071.2 D-071.2-05 — /upload schedules extraction via BackgroundTask,
+        NOT inline. After the INSERT (status='pending'), the route returns 201 and
+        the BackgroundTask runs `_upload_pipeline` which in turn invokes
+        `ingest_document`. TestClient drives BackgroundTasks synchronously per
+        Pitfall 1, so `mock_ingest.assert_called_once()` is observable post-response.
+        """
+        mock_builder.execute.side_effect = [
+            _make_result([]),                              # dedup: no existing
+            _make_result([]),                              # version: no stale
+            _make_result([_doc_row(status="pending")]),    # INSERT
+        ]
+
+        with patch("app.api.documents.ingest_document") as mock_ingest, \
+             patch("app.services.extraction_service.get_extractor") as mock_get_extractor:
+            mock_extractor = MagicMock()
+            mock_extracted = MagicMock()
+            mock_extracted.text = "extracted text"
+            mock_extracted.tables = []
+            mock_extracted.images = []
+            mock_extracted.extractor_name = "pypdf-legacy"
+            mock_extractor.extract.return_value = mock_extracted
+            mock_get_extractor.return_value = mock_extractor
+
+            response = client.post(
+                "/documents/upload",
+                headers=auth_headers,
+                files={"file": ("doc.pdf", b"%PDF-1.4 fake content", "application/pdf")},
+            )
+
+        assert response.status_code == 201, (
+            f"Expected 201, got {response.status_code}: {response.text}"
+        )
+        # BackgroundTasks invoked synchronously by TestClient (Pitfall 1) — call observable.
+        mock_ingest.assert_called_once()
+
+
+# ── POST /documents/{id}/reingest ──────────────────────────────────────────────
+
+class TestReingestDocument:
+    """Phase 071.2 Plan 01 — POST /documents/{id}/reingest integration tests.
+
+    Mirrors the proven /reextract pattern from Phase 071.1: extract moved into the
+    BackgroundTask, every sync supabase call wrapped in run_in_threadpool.
+    """
+
+    def test_reingest_wraps_extract_in_threadpool(self, client, auth_headers, mock_builder):
+        """SC#2 integration — /reingest doesn't block on extractor.extract; instead
+        it schedules ingest_document via BackgroundTask. Asserts 200 + ingest mock
+        invoked synchronously by TestClient (Pitfall 1)."""
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        # Side effects: 1=owner SELECT, 2=UPDATE status='pending' returning row
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),                              # owner SELECT
+            _make_result([{**pdf_doc, "status": "pending"}]),   # UPDATE
+        ]
+
+        with patch("app.api.documents.ingest_document") as mock_ingest, \
+             patch("app.services.extraction_service.get_extractor") as mock_get_extractor:
+            mock_extractor = MagicMock()
+            mock_extracted = MagicMock()
+            mock_extracted.text = "re-extracted text"
+            mock_extracted.tables = []
+            mock_extracted.images = []
+            mock_extracted.extractor_name = "pypdf-legacy"
+            mock_extractor.extract.return_value = mock_extracted
+            mock_get_extractor.return_value = mock_extractor
+
+            response = client.post(
+                f"/documents/{DOC_ID}/reingest",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
+        # BackgroundTasks invoked synchronously by TestClient (Pitfall 1).
+        mock_ingest.assert_called_once()
+
 
 # ── DELETE /documents/{id} ─────────────────────────────────────────────────────
 
