@@ -4,14 +4,14 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
-last_updated: "2026-05-15T21:40:33.679Z"
+last_updated: "2026-05-15T22:32:07.119Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 19
   completed_phases: 7
-  total_plans: 21
+  total_plans: 26
   completed_plans: 23
-  percent: 100
+  percent: 88
 ---
 
 # Project State
@@ -370,4 +370,4 @@ After all GREEN, flip ROADMAP checkboxes `- [x] 071.2-02-PLAN.md` and `- [x] 071
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 071.2 (Ingestion Plumbing + Per-Aspect Extraction Dispatcher) — 5 plans — 2026-05-15T16:53:10.130Z
+**Planned Phase:** 071.3 (Docling Demotion — Table Engine + Full Rip) — 5 plans — 2026-05-15T22:32:07.106Z
