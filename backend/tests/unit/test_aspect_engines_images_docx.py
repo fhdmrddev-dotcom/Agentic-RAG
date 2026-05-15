@@ -35,22 +35,14 @@ def _build_anchor_only_docx_bytes(*, duplicate_blip: bool = False) -> bytes:
       word/_rels/document.xml.rels (maps rId7 → media/image1.png)
       word/media/image1.png      (a tiny PNG)
     """
-    # Minimal 1x1 transparent PNG
-    png_1x1 = bytes.fromhex(
-        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-        "890000000d49444154789c63f80f000001010100"
-        "5a4d8a5a"  # CRC (approximate — minimal-fake; PIL is tolerant on size_filter path)
-        "0000000049454e44ae426082"
-    )
-    # Use a known-good 1x1 PNG instead — the bytes above are fragile.
-    png_1x1 = (
-        b"\x89PNG\r\n\x1a\n"
-        b"\x00\x00\x00\rIHDR"
-        b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00"
-        b"\x1f\x15\xc4\x89"
-        b"\x00\x00\x00\rIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x01\x00\x5a\x4d\x8a\x5a"
-        b"\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    # Use a real PIL-generated 60x60 PNG — must exceed the engine's
+    # min_px=50 size filter (see images_docx.py::zip_xpath_docx, default
+    # min_px=50). The earlier 1x1 fixture was filtered out, causing zip_xpath
+    # to return [] even though the XPath traversal correctly found the blip.
+    from PIL import Image as _PILImage
+    _png_buf = io.BytesIO()
+    _PILImage.new("RGB", (60, 60), (255, 255, 255)).save(_png_buf, format="PNG")
+    png_1x1 = _png_buf.getvalue()
 
     # Two anchor blips share rId7 if duplicate_blip=True
     second_blip_xml = ""
