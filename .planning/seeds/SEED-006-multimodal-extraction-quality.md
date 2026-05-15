@@ -140,6 +140,38 @@ These should be formalized in a `/gsd:spec-phase` invocation, but draft-quality 
 
 The diagnostic that produced the findings above is at `backend/scripts/probe_multimodal.py`. It's standalone, read-only, and can be re-run anytime against any document_id (Supabase) or local file (`--file`). When picking up this seed, re-run on multiple representative docs first to validate that the gap pattern holds beyond the original benchmark.
 
+## Retest 2026-05-15 — gap unchanged after Docling integration
+
+Same thesis PDF (different upload, `23cc112a-92c2-440f-83c9-13aa8bf3d53d`,
+same content as the original `551f03f9-...` benchmark) re-extracted via
+`/reextract` engine='docling' during Phase 071.1 UAT. Result:
+
+| Surface | Pre-Phase-071 (`pypdf-legacy`) | Post-071.1 (`docling`) | Visible in source PDF |
+|---|---|---|---|
+| `document_tables` rows | 4 | **4** | 50+ |
+| `document_images` rows | 2 | **2** | 60+ |
+| `pdf_extraction_runs` telemetry `table_count` | n/a | 1 (Docling foreground) | — |
+| `pdf_extraction_runs` telemetry `image_count` | n/a | 0 (Docling foreground) | — |
+
+**Confirms:** the bottleneck is in the persistence layer
+(`extract_and_store_tables` / `extract_and_store_images` in
+`multimodal_service.py`), not in the extractor. Swapping pypdf for Docling
+made **zero difference** to stored counts. The 4-vs-1 telemetry mismatch
+suggests `extract_and_store_tables` runs its own detection pass on the raw
+PDF bytes and ignores `extracted_doc.tables` — that's where the 3 extra
+"phantom" tables come from (pdfplumber's output, not Docling's).
+
+**Implication for SEED-006 promotion:** the seed remains valid. v2.6 Phase
+072 (Multimodal Lift + DOCX Completeness) is still the planned slot. Phase
+071.2 (proposed in `071.1-CARRY-FORWARDS.md`) may cover items #1 and #2 of
+SEED-006 (4-vs-1 wiring + PDF text-extraction regression) as quick
+diagnostic fixes before 072 takes on the bigger storage-layer rewrite.
+
+User-decision 2026-05-15: revert `EXTRACTOR_PRIMARY=legacy` — Docling
+remains opt-in via `/reextract` until either (a) the wiring bugs above are
+fixed so it actually delivers quality, or (b) Phase 072 / SEED-006 makes
+the persistence layer engine-agnostic and stops dropping Docling's output.
+
 ## Cross-References
 
 - Source phases: `.planning/milestones/v2.3-ROADMAP.md` Phase 35–36
@@ -147,3 +179,4 @@ The diagnostic that produced the findings above is at `backend/scripts/probe_mul
 - Current extraction: `backend/app/services/multimodal_service.py`
 - Schema baseline: `supabase/migrations/030_missing_tables.sql` (`document_tables`, `document_images`)
 - Decision context: D-04 (don't store b64_png), `_MAX_VISION_CALLS = 20`, `_MAX_B64_BYTES = 512KB` (all in Phase 35 history)
+- Retest evidence: `.planning/phases/071.1-docling-sc-1-retry-threadpool-timeouts-pymupdf-fallback/071.1-SUMMARY.md` (commit `905232d`) + `071.1-CARRY-FORWARDS.md` (commit pending) + `071-VERIFICATION.md` AFTER counts (commit `d5284b7`)

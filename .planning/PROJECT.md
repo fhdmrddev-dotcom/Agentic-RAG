@@ -46,6 +46,7 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - Phase 064 (Validation Harness) — DEFERRED (intentional; scenarios E/F/H validated organically by 067.x UAT, G + multi-tab sync remain partially deferred)
 - Carry-forward seeds: SEED-009 (claude-haiku max_tokens cap), SEED-010 (OpenRouter synthetic-timeout protocol), SEED-011 (test_059 fixture-teardown bug)
 - Forward-looking seeds for next-milestone selection: SEED-002, SEED-012, SEED-013, SEED-014
+- **Docling integration shipped stability, not quality (2026-05-15).** Phase 071.1 retry on the thesis pair confirmed Docling produces zero improvement in stored `document_tables` / `document_images` counts vs `pypdf-legacy` (same 4 tables / 2 images on PDF, same 39 / 0 on DOCX). PDF chunk count dropped 95% under Docling (~400 → 19) — suspected text-extraction regression. Docling is 25-100× slower on PDFs (~125s vs 1-5s legacy) and loads ~600 MB models + RapidOCR even when `do_ocr=False`. **`EXTRACTOR_PRIMARY=legacy` reverted in `backend/.env` 2026-05-15** for new uploads + `/reingest`; Docling/PyMuPDF remain opt-in per-doc via `/reextract`. 10 open investigations captured in `.planning/phases/071.1-.../071.1-CARRY-FORWARDS.md`; SEED-006 (multimodal extraction quality) retested + addendum added confirming the storage-layer bottleneck is unchanged since 2026-05-02. v2.6 PRD's "Docling-first" thesis is informally reversed pending Phase 071.2 wiring diagnostics + Phase 072 / SEED-006 multimodal lift.
 
 ## Requirements
 
