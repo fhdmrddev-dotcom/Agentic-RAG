@@ -15,6 +15,8 @@ const styles: Record<Props["status"], string> = {
 
 function ingestionStepLabel(step: string | null | undefined): string {
   if (step === "extracting") return "Extracting"
+  if (step === "extracting_tables") return "Extracting tables"
+  if (step === "extracting_images") return "Extracting images"
   if (step === "chunking") return "Chunking"
   if (step === "embedding") return "Embedding"
   if (step === "metadata") return "Extracting metadata"
