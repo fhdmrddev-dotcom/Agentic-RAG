@@ -175,6 +175,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 **Wave 1 — Parallelizable RAG + asyncpg + Polish**
 
 - [ ] **Phase 071: Docling Primary Path** — Make Docling the default extractor; PyMuPDF (AGPL, subprocess-fenced) + pypdfium2 fallbacks wired. Migrations 039 (`pdf_extraction_runs`), 040 (`documents.extractor`), 041 (`document_images.bbox`), 042 (`document_tables.bbox + extractor`). (4 plans)
+- [ ] **Phase 071.2: Ingestion Plumbing + Docling Quality Diagnostics** — `/upload` + `/reingest` `run_in_threadpool` sweep + instant-201 BackgroundTask refactor (document row INSERTed BEFORE extract so Realtime drives frontend status); diagnose + close the 95%-chunks-drop on Docling-extracted PDFs + the 4-vs-1 telemetry-vs-storage table-count mismatch. Inserted 2026-05-15 before Phase 072 so multimodal lift doesn't compound the foreground-extract latency bug. (4 plans)
 - [ ] **Phase 072: Multimodal Lift + DOCX Completeness** — Replace `_MAX_VISION_CALLS` / `_MAX_B64_BYTES` module constants with `app_settings` keys; persist empty-vision-description rows (`description=''`); DOCX `related_parts` walk catches floating shapes + headers/footers. Migration 044 (`app_settings_multimodal_limits`). (3 plans)
 - [ ] **Phase 073: asyncpg Pool Integration** — Replace sync `supabase-py` calls in streaming endpoint + ingestion task with asyncpg. New `_pg_pool` singleton at `dependencies.py`. Forward-fill `runs.input_tokens` / `runs.output_tokens` from LLM `usage` in the `_drain_stream_with_close_on_cancel` finalize path (TOKEN-COL-01 attaches here — see FLAGS below). (4 plans)
 - [ ] **Phase 074: SEED-009 + SEED-011 Polish Bundle** — `MODEL_CAPABILITIES.max_output_tokens` field + `_clamp_max_tokens` in `anthropic_service.py` + `_reset_redis_singleton` autouse fixture in `test_059_disconnect.py`. (2 plans)
@@ -304,6 +305,32 @@ Plans:
 - [x] 071.1-02-PLAN.md — Live UAT close-out: friendly fixture (arXiv 2605.15184v1 CC-BY 4.0) + thesis SC#1 retry + fill 071-VERIFICATION.md AFTER counts + author 071.1-SUMMARY.md (autonomous:false, Wave 2) (completed 2026-05-15, accept-degraded disposition)
 
 **Outcome:** Plan 01 fixes verified live — the 4-min Docling stall failure mode from Phase 071 is structurally ELIMINATED. Thesis PDF now completes in 125s (vs previously stalling indefinitely). Backend `/health` stays at 1-2s during in-flight extracts (vs frozen previously). The 20% binding-gate per D-071.1-06 stays RED at 89.7% / 100% — but the root cause has shifted from "Docling stalls" to "PDF and DOCX extraction quality differ structurally", which is NOT a Plan 01 regression. **Carry-forward:** Phase 071.2 (proposed) — PDF-side extraction quality (TableFormer A/B with DISABLE_TABLE_STRUCTURE=1, accounting reconciliation, SEED-006 promotion consideration). See 071-VERIFICATION.md and 071.1-SUMMARY.md for full close-out.
+
+### Phase 071.2: Ingestion Plumbing + Docling Quality Diagnostics (INSERTED 2026-05-15)
+
+**Goal**: Close the three ingestion-path defects that surfaced during Phase 072 discuss-phase setup (2026-05-15) BEFORE the multimodal lift in Phase 072 lands on top of them. Specifically: (a) `/upload` + `/reingest` no longer run `extractor.extract()` synchronously inside async handlers (D-v2.5-01 compliance — same bug class 071.1 closed for `/reextract`); (b) `/upload` returns 201 within ~1s with `status='pending'` instead of after a 1–120s foreground extract — the document row is INSERTed first, extract runs as a BackgroundTask so Realtime can drive frontend status feedback; (c) diagnose + close the two Docling-quality regressions documented in `071.1-CARRY-FORWARDS.md` (PDF chunks dropping ~95% under Docling, and the 4-vs-1 `pdf_extraction_runs.table_count` vs `document_tables` mismatch suggesting `extract_and_store_tables` ignores `extracted_doc.tables` and runs its own pdfplumber pass).
+**Depends on:** Phase 071.1
+**Plans**: 4
+**Requirements**: (operational gap-closure under RAG-DOCLING-01 + RAG-DOCLING-02 umbrellas; SC verification flows through 071-VERIFICATION.md SC#1 retest + new Docling-quality assertions)
+**Success Criteria** (what must be TRUE):
+  1. `/upload` POST returns 201 within ~1s on any size PDF (1 MB or 4 MB thesis). Document row INSERTed with `status='pending'` BEFORE extract starts; storage upload + extract + chunking happen in a BackgroundTask. Existing dedup, version, folder-routing semantics unchanged.
+  2. `/reingest` no longer blocks the async handler on `extractor.extract()` — same `run_in_threadpool` wrap as 071.1 applied to `/reextract`. Backend `/health` stays responsive (<2s) during in-flight extracts on either route.
+  3. Frontend documents list shows the new row immediately on upload completion (via Supabase Realtime INSERT trigger on `documents` table) with the `processing` badge; transitions to `ready` when the BackgroundTask finishes — no manual page refresh required to see status.
+  4. Thesis PDF re-ingested via `/reextract engine='docling'` produces `document_chunks` count within 20% of the legacy baseline (~400 chunks). Diagnostic plan identifies whether the gap is in Docling's text-extraction surface (`export_to_markdown()`) or in the chunker's handling of Docling markdown output; fix is applied in the same plan if root cause is narrow.
+  5. Telemetry-vs-storage table-count mismatch closed: `pdf_extraction_runs.table_count` (foreground Docling) equals the count of `document_tables` rows for the same `(document_id, extractor)` pair on the thesis PDF re-extract. If the cause is `extract_and_store_tables` running its own pdfplumber detection pass instead of reading `extracted_doc.tables`, that wiring bug is fixed in-plan.
+  6. Optional polish absorbed: `/reextract` no longer 500s on documents with `is_latest=False` — either pre-clears the flag in the reset cascade or returns a clean 404 (single-line fix per 071.1-CARRY-FORWARDS item #3).
+
+**Plans:**
+- [ ] 071.2-01-PLAN.md — `/upload` + `/reingest` `run_in_threadpool` sweep + instant-201 BackgroundTask refactor (Wave 1; ~1 plan; backend-only; binding tests on instant-201 response time + handler responsiveness during in-flight extract)
+- [ ] 071.2-02-PLAN.md — Frontend status-pulse + Realtime-driven 'pending' → 'processing' → 'ready' badge on the new immediate documents row (Wave 2; depends on 01; minimal — Realtime already wired post-068, just needs to honor the new lifecycle states)
+- [ ] 071.2-03-PLAN.md — Diagnose + close the 95%-chunks-drop on Docling-extracted PDFs (Wave 1; parallel with 01; produces a 1-pager finding + targeted fix if root cause is obvious; uses `backend/scripts/probe_docling_timeout.py` as the diagnostic harness)
+- [ ] 071.2-04-PLAN.md — Diagnose + close the 4-vs-1 telemetry-vs-storage table-count mismatch (Wave 1; parallel with 01+03; traces `ingest_document` → `extract_and_store_tables` to confirm whether `extracted_doc.tables` is ignored; ~1-2 line wiring fix expected)
+
+**Notes:**
+- This phase is BEFORE Phase 072 because 072's multimodal lift (raising `_MAX_VISION_CALLS` from 20 → 100) would compound the `/upload` latency problem if the foreground-extract bug stays — a 100-vision-call PDF on top of sync extract would extend uploads to several minutes.
+- The Docling-quality diagnostics (Plans 03+04) are operationally independent of the plumbing fixes (Plans 01+02). They could run in parallel, but the user's stated policy is `EXTRACTOR_PRIMARY=legacy` until Docling proves quality value — so the diagnostics are about UNBLOCKING the Docling-first thesis, not gating 072.
+- No new migrations.
+- Sibling carry-forward note: a `load_dotenv()` fix was applied as a hot-fix (commit `33860a7`, 2026-05-15) BEFORE this phase opened — pydantic-settings was reading `backend/.env` for `Settings` but NOT populating `os.environ`, so every `os.getenv()` consumer (including `EXTRACTOR_PRIMARY` in `extraction_service._read_primary`) was returning the hardcoded default `"docling"` regardless of `.env` content. The hot-fix unblocks the user's revert-to-legacy decision without waiting for this phase.
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
 **Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures, and a hand-crafted DOCX with floating shapes + header images surfaces both via the related-parts walk.
@@ -507,6 +534,8 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 069 — PdfExtractor Abstraction Scaffold | 2/2 | Complete    | 2026-05-13 |
 | 070 — Docling httpx Spike | 2/2 | Complete    | 2026-05-14 |
 | 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
+| 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
+| 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 0/4 | Not started | — |
 | 072 — Multimodal Lift + DOCX Completeness | 0/3 | Not started | — |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
