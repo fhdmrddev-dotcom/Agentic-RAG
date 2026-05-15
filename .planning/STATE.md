@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: "Phase 071.1 Plan 01 merged (commits b7965b2..8626738 via merge 4d33412); 16/16 post-merge tests green; Plan 02 (autonomous: false) needs mcp__chrome-devtools__* tools which are registered globally + permissions-approved but not surfaced in this session"
-last_updated: "2026-05-15T10:00:00.000Z"
-last_activity: 2026-05-15 -- Phase 071.1 Wave 1 complete (Plan 01 shipped); Wave 2 paused for runtime restart
+status: planning
+stopped_at: Phase 072 context gathered (D-072-01..09); Phase 071.2 inserted before 072; load_dotenv hot-fix committed 33860a7
+last_updated: "2026-05-15T14:08:29.668Z"
+last_activity: 2026-05-15
 progress:
-  total_phases: 17
+  total_phases: 18
   completed_phases: 6
   total_plans: 16
-  completed_plans: 15
-  percent: 35
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
@@ -326,7 +326,7 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 071.1 context gathered (D-071.1-01..06 locked: threadpool sweep on /reextract only, defense-in-depth Docling timeout, PyMuPDF auto-fallback on timeout only, friendly real fixture)
+Stopped at: Phase 072 context gathered (D-072-01..09); Phase 071.2 inserted before 072; load_dotenv hot-fix committed 33860a7
 Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase Studio against `551f03f9-...` PDF + DOCX siblings). User fills 12 TBD slots in `.planning/phases/071-docling-primary-path/071-VERIFICATION.md` and flips frontmatter `status: pending` → `green` or `red`. Then orchestrator authors `071-SUMMARY.md` (Task 6) — at which point Plan 04 closes and Phase 071 ships.
 
 **Phases OPEN (cross-phase blocked):**
