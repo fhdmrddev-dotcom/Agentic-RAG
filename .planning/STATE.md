@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 071.2 Plan 04 GREEN (Tasks 1+2 autonomous; Task 3 checkpoint:human-verify parked for orchestrator/user — live thesis-PDF /reextract + SC#5/SC#6 SQL UAT)
-last_updated: "2026-05-15T17:50:00.000Z"
-last_activity: 2026-05-15 -- Phase 071.2 Plan 04 GREEN (multimodal_service reads extracted_doc + /reextract 404 fix)
+stopped_at: Phase 071.2 Plan 02 Task 1 GREEN (DocumentStatusBadge.tsx extracting_tables + extracting_images labels); Task 2 checkpoint:human-verify parked for orchestrator/user — live Realtime-lifecycle UAT against thesis PDF (SC#1 201 latency + SC#2 /health under concurrent extract + SC#3 badge cycle without manual refresh, with the new labels rendering during the tables/images phase)
+last_updated: "2026-05-15T20:05:00.000Z"
+last_activity: 2026-05-15 -- Phase 071.2 Plan 02 Task 1 GREEN (frontend badge labels for extracting_tables + extracting_images)
 progress:
   total_phases: 18
   completed_phases: 6
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 071.2 (ingestion-plumbing-docling-quality-diagnostics) — EXECUTING
-Plan: 4 of 5 (Tasks 1+2 GREEN; Task 3 checkpoint parked)
-Status: Wave 2 Plan 04 implementation complete (4 commits); Plan 05 (per-aspect dispatcher) ready next
-Last activity: 2026-05-15 -- Phase 071.2 Plan 04 GREEN (multimodal_service reads extracted_doc + /reextract 404 fix)
+Plan: 2 of 5 (Task 1 GREEN; Task 2 checkpoint:human-verify parked) — Wave 3 in progress; Plans 01/03/04 already GREEN, Plan 05 (per-aspect dispatcher) still pending
+Status: Wave 3 Plan 02 Task 1 complete (1 commit, e24ce04, +2 lines DocumentStatusBadge.tsx); Task 2 live Realtime-lifecycle UAT returned as checkpoint to orchestrator (Chrome MCP unavailable in this executor session + sandbox denies network probes — orchestrator must drive against http://localhost:5173/ with login fhdmrd@gmail.com / 123456)
+Last activity: 2026-05-15 -- Phase 071.2 Plan 02 Task 1 GREEN (frontend badge labels for extracting_tables + extracting_images)
 
 ## PRD-reset outputs (committed)
 
@@ -223,6 +223,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 071 P02 | 92min | 4 tasks | 12 files |
 | Phase 071 P03 | ~45min | 4 tasks | 7 files (4 created, 3 modified) |
 | Phase 071 P04 (Tasks 1-4 of 6) | ~50min | 4 tasks (Tasks 5+6 pending UAT) | 6 files (2 created, 3 modified, 1 deferred-items log) |
+| Phase 071.2 P02 (Task 1 of 2) | ~4min | 1 task (Task 2 checkpoint:human-verify parked) | 1 file (DocumentStatusBadge.tsx +2/-0) |
 
 ## Accumulated Context
 
@@ -291,6 +292,8 @@ Recent decisions affecting v2.5 work:
 - Phase 071.2 Plan 04: D-071.2-11 preservation — the two `ingestion_step` UPDATE writes at documents.py:1158 (`extracting_tables`) and :1169 (`extracting_images`) are byte-identical post-edit. They feed Plan 02's badge labels. Only the 7-line `TODO Phase 072 (RAG-MM-LIFT-01/02)` comment blocks above each call were deleted — the UPDATE statements themselves untouched.
 - Phase 071.2 Plan 04: TYPE_CHECKING import for `ExtractedDocument` reused the existing `TYPE_CHECKING` block at top of multimodal_service.py (no new guard introduced). Stringified forward-ref annotation `"ExtractedDocument | None"` — zero runtime import cost.
 - Phase 071.2 Plan 04 (deferred — orchestrator): Task 3 `checkpoint:human-verify` parked. Requires live uvicorn + thesis-PDF `/reextract` + SQL UAT polling against `documents.status` drain + SC#5 parity (`pdf_extraction_runs.table_count == COUNT(document_tables)`) + SC#5 bbox flow (`jsonb_typeof(bbox) = 'object'`) + SC#6 curl test (`/reextract` on is_latest=false → 404 not 500). Pytest verification denied by sandbox in this executor; live tests remain for post-merge.
+- Phase 071.2 Plan 02: D-071.2-11 closure (label side) — `DocumentStatusBadge.tsx::ingestionStepLabel` widened from 4 to 6 cases. Added `if (step === "extracting_tables") return "Extracting tables"` and `if (step === "extracting_images") return "Extracting images"` AFTER the existing `extracting` case and BEFORE the `chunking` case (matches backend ingestion_step write order: extract → tables → images → chunk → embed → metadata). Diff: 2 inserted / 0 removed. TypeScript clean. `useDocuments.ts` Realtime wiring untouched per plan verify-only directive.
+- Phase 071.2 Plan 02 (deferred — orchestrator): Task 2 `checkpoint:human-verify` parked. Sequential executor lacks `mcp__chrome-devtools__*` tools in this session AND Bash sandbox denies network probes (curl / Invoke-WebRequest), so neither automation nor manual dev-stack probing reachable. Plan anticipates this fallback path. Orchestrator drives the live UAT against http://localhost:5173/ with test login fhdmrd@gmail.com / 123456: SC#1 (/upload 201 latency <1.5s) + SC#2 (concurrent /health <2s under in-flight extract) + SC#3 (Realtime-driven `pending → processing (Extracting → Extracting tables → Extracting images → Chunking → Embedding → Extracting metadata) → completed` cycle without manual refresh, both new labels rendering during the tables/images phase). Records results in `.planning/phases/071.2-ingestion-plumbing-docling-quality-diagnostics/071.2-HUMAN-UAT.md` (file to be created).
 
 ### Pending Todos
 
@@ -330,9 +333,9 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 072 context gathered (D-072-01..09); Phase 071.2 inserted before 072; load_dotenv hot-fix committed 33860a7
-Next: Orchestrator coordinates Task 5 live UAT with user (Chrome MCP + Supabase Studio against `551f03f9-...` PDF + DOCX siblings). User fills 12 TBD slots in `.planning/phases/071-docling-primary-path/071-VERIFICATION.md` and flips frontmatter `status: pending` → `green` or `red`. Then orchestrator authors `071-SUMMARY.md` (Task 6) — at which point Plan 04 closes and Phase 071 ships.
+Last session: 2026-05-15T20:05Z
+Stopped at: Phase 071.2 Plan 02 Task 1 GREEN (e24ce04, +2 lines DocumentStatusBadge.tsx labels for extracting_tables + extracting_images); Task 2 `checkpoint:human-verify` parked for orchestrator/user — live Realtime-lifecycle UAT against thesis PDF
+Next: Orchestrator drives Plan 02 Task 2 UAT against http://localhost:5173/ with login fhdmrd@gmail.com / 123456. Pass conditions: SC#1 /upload 201 latency <1.5s + SC#2 /health <2s under in-flight extract + SC#3 badge cycles through `pending → processing (Extracting → Extracting tables → Extracting images → Chunking → Embedding → Extracting metadata) → completed` WITHOUT manual page refresh. Record results in `.planning/phases/071.2-ingestion-plumbing-docling-quality-diagnostics/071.2-HUMAN-UAT.md`. After GREEN, flip ROADMAP checkbox `- [x] 071.2-02-PLAN.md` and proceed to Plan 05 (per-aspect dispatcher).
 
 **Phases OPEN (cross-phase blocked):**
 
