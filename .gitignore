@@ -57,3 +57,6 @@ logs/
 
 # Cloned repository folder (we've copied the files)
 claude-code-agentic-rag-masterclass/
+
+# Phase 071.3 UAT scratch (machine-readable per-fixture counts; consumed then deleted)
+.planning/phases/071.3-docling-demotion-table-engine-full-rip/uat_scratch.json
