@@ -63,9 +63,12 @@ class ReextractRequest(BaseModel):
     `engine` is REQUIRED — distinct from /reingest which uses the global default.
     Invalid values produce FastAPI auto-422 via Pydantic Literal validation
     (T-071-04-02 mitigation — invalid engine cannot crash downstream get_extractor).
+
+    Phase 071.3 Plan 04 (D-071.3-09): 'docling' removed from the Literal —
+    Docling adapters were hard-deleted; submitting 'docling' now returns 422.
     """
 
-    engine: Literal["docling", "pymupdf", "legacy"]
+    engine: Literal["pymupdf", "legacy"]
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -175,7 +178,10 @@ def _upload_pipeline(
             # as the pre-071.2 inline call site at documents.py:330-331.
             pass
 
-    # Step 2 — extract with Layer 2 wall-clock + PyMuPDF auto-fallback.
+    # Step 2 — extract via the per-aspect composer with a wall-clock fail-safe.
+    # Phase 071.3 Plan 04 (D-071.3-09): Docling auto-fallback path removed
+    # entirely — non-timeout exceptions fail loud (status='failed' +
+    # error_message); D-071-11 visibility intent preserved.
     extract_start = time.perf_counter()
     extracted_doc: ExtractedDocument | None = None
     engine_used: str | None = None
@@ -209,46 +215,9 @@ def _upload_pipeline(
                     timeout=wall_clock_s,
                 )
 
-            try:
-                extracted_doc = asyncio.run(_run_with_timeout())
-                text = extracted_doc.text
-                engine_used = extracted_doc.extractor_name or None
-            except asyncio.TimeoutError:
-                # D-071.1-04 — fallback to PyMuPDF on Docling timeout only.
-                primary_name = (
-                    os.getenv("EXTRACTOR_PRIMARY", "docling") or "docling"
-                ).lower()
-                if primary_name != "docling":
-                    raise RuntimeError(
-                        f"engine={primary_name} timed out after {wall_clock_s}s"
-                    )
-
-                docling_duration_ms = int(
-                    (time.perf_counter() - extract_start) * 1000
-                )
-                docling_error = (
-                    f"docling timeout after {wall_clock_s}s (Layer 2 wall-clock)"
-                )
-                # First telemetry row (Docling failed) — best-effort.
-                try:
-                    _write_extraction_run_row(
-                        supabase, document_id, user_id, "docling",
-                        docling_duration_ms, 0, 0, docling_error,
-                    )
-                except Exception:
-                    pass
-
-                pymupdf_extractor = get_extractor(
-                    mime_type, engine_override="pymupdf"
-                )
-                if pymupdf_extractor is None:
-                    raise RuntimeError(
-                        f"Docling timed out and PyMuPDF unavailable for "
-                        f"{mime_type!r}"
-                    )
-                engine_used = "pymupdf-fallback"
-                extracted_doc = pymupdf_extractor.extract(raw, mime_type)
-                text = extracted_doc.text
+            extracted_doc = asyncio.run(_run_with_timeout())
+            text = extracted_doc.text
+            engine_used = extracted_doc.extractor_name or None
     except Exception as exc:
         # Step 4 — surface a user-safe failure on the documents row + log full
         # detail server-side (T-071.2-01-01 mitigation).
@@ -277,7 +246,7 @@ def _upload_pipeline(
         raw,
         mime_type,
         filename,
-        engine_used,        # engine_override — None for default, 'pymupdf-fallback' on fallback
+        engine_used,        # engine_override — extractor_name from composer or None for default
         extracted_doc,
         extract_duration_ms,
     )
@@ -897,59 +866,14 @@ async def reextract_document(
                 text = extracted_doc.text
                 engine_used = extracted_doc.extractor_name or body.engine
             except asyncio.TimeoutError:
-                # D-071.1-04 — fallback to PyMuPDF on Docling timeout ONLY.
-                if body.engine != "docling":
-                    raise HTTPException(
-                        status_code=422,
-                        detail=f"engine={body.engine} timed out after {wall_clock_s}s",
-                    )
-
-                docling_duration_ms = int(
-                    (time.perf_counter() - extract_start) * 1000
+                # Phase 071.3 Plan 04 (D-071.3-09): Docling auto-fallback path
+                # deleted; non-Docling engines (camelot tables, pymupdf fence)
+                # fail loud on timeout. Operator recovers via /reextract with
+                # a different `?engines=` hint.
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"engine={body.engine} timed out after {wall_clock_s}s",
                 )
-                docling_error = (
-                    f"docling timeout after {wall_clock_s}s (Layer 2 wall-clock)"
-                )
-
-                # First telemetry row (Docling failed): inline write via helper.
-                await run_in_threadpool(
-                    _write_extraction_run_row,
-                    supabase, document_id, current_user["id"],
-                    "docling", docling_duration_ms, 0, 0, docling_error,
-                )
-
-                # Attempt PyMuPDF — PYMUPDF_TIMEOUT_S enforced inside subprocess fence.
-                pymupdf_extractor = get_extractor(
-                    mime_type, engine_override="pymupdf"
-                )
-                if pymupdf_extractor is None:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=(
-                            f"Docling timed out and PyMuPDF unavailable for "
-                            f"{mime_type!r}"
-                        ),
-                    )
-
-                engine_used = "pymupdf-fallback"
-                try:
-                    extracted_doc = await run_in_threadpool(
-                        pymupdf_extractor.extract, raw, mime_type,
-                    )
-                    text = extracted_doc.text
-                except Exception as fallback_exc:
-                    await run_in_threadpool(
-                        _write_extraction_run_row,
-                        supabase, document_id, current_user["id"],
-                        "pymupdf-fallback", 0, 0, 0, str(fallback_exc)[:500],
-                    )
-                    raise HTTPException(
-                        status_code=422,
-                        detail=(
-                            f"Docling timed out; PyMuPDF fallback also failed: "
-                            f"{fallback_exc}"
-                        ),
-                    )
     except HTTPException:
         raise
     except Exception as e:
@@ -961,10 +885,9 @@ async def reextract_document(
 
     # 6. Schedule background ingestion with explicit engine_override (D-071-10 step 5).
     # Matches the ingest_document signature wired up by Plan 02 (positional kwargs
-    # engine_override / extracted_doc / extract_duration_ms).
-    # D-071.1-04 Pitfall 3 — thread `engine_used` (not `body.engine`) so the
-    # happy-path telemetry row written by `ingest_document` records
-    # 'pymupdf-fallback' when fallback fired instead of misreporting 'docling'.
+    # engine_override / extracted_doc / extract_duration_ms). Thread `engine_used`
+    # (composer's extractor_name when available, else body.engine) so the
+    # telemetry row written by `ingest_document` reflects the actual engine used.
     background_tasks.add_task(
         ingest_document,
         document_id,
@@ -974,7 +897,7 @@ async def reextract_document(
         raw,
         mime_type,
         target["filename"],
-        engine_used,        # was body.engine — Phase 071.1 D-071.1-04 Pitfall 3 fix
+        engine_used,
         extracted_doc,
         extract_duration_ms,
     )
@@ -1138,10 +1061,12 @@ def ingest_document(
 
     # Phase 071 D-071-08 — resolve engine lineage tag once, reused for both
     # documents.extractor column and pdf_extraction_runs.engine telemetry.
+    # Phase 071.3 Plan 04 (D-071.3-09): EXTRACTOR_PRIMARY env fallback removed;
+    # default lineage tag is "legacy" when neither composer nor caller provides one.
     engine_used = (
         (extracted_doc.extractor_name if extracted_doc and extracted_doc.extractor_name else None)
         or engine_override
-        or os.getenv("EXTRACTOR_PRIMARY", "docling")
+        or "legacy"
     )
     started_at_iso = datetime.now(timezone.utc).isoformat()
 

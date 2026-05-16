@@ -212,47 +212,21 @@ class LegacyExtractor(PdfExtractor):
 
 
 _LEGACY = LegacyExtractor()  # stateless — safe to share
-_DOCLING: "PdfExtractor | None" = None
 _PYMUPDF: "PdfExtractor | None" = None
-_PRIMARY_CACHED: str | None = None
-
-
-def _read_primary() -> str:
-    """Read EXTRACTOR_PRIMARY env var (cached after first read).
-
-    Phase 071 D-071-12: default 'docling'. Invalid values log a warning and
-    fall through to 'docling' (T-071-02-05 mitigation).
-    """
-    global _PRIMARY_CACHED
-    if _PRIMARY_CACHED is None:
-        raw = os.getenv("EXTRACTOR_PRIMARY", "docling")
-        if raw not in ("docling", "pymupdf", "legacy"):
-            log.warning("Invalid EXTRACTOR_PRIMARY=%r; falling through to 'docling'", raw)
-            raw = "docling"
-        _PRIMARY_CACHED = raw
-    return _PRIMARY_CACHED
 
 
 def get_extractor(mime: str, engine_override: str | None = None) -> PdfExtractor | None:
-    """Resolve a PdfExtractor for `mime`, honoring engine_override or EXTRACTOR_PRIMARY env.
+    """Resolve a PdfExtractor for `mime`, honoring engine_override.
 
-    Phase 071 D-071-12: routes to Docling (default), PyMuPDF, or Legacy.
-    Lazy-imports engine modules so a missing PyMuPDF (Plan 03 not landed yet)
-    doesn't break the dispatcher — falls through to Legacy in that case.
+    Phase 071.3 Plan 04 (D-071.3-09, Option A — PATTERNS.md): EXTRACTOR_PRIMARY
+    deleted entirely. The per-aspect composer (`extract_composable`) is the
+    primary extraction path for PDF + DOCX mimes. `get_extractor` survives as a
+    thin seam for non-composer paths and route-level engine overrides; when
+    `engine_override` is None, defaults to LegacyExtractor (the cheapest engine
+    that supports every routable mime).
     """
-    global _DOCLING, _PYMUPDF
-    engine = engine_override or _read_primary()
-
-    if engine == "docling":
-        if _DOCLING is None:
-            try:
-                from app.services.extractors.docling import DoclingExtractor  # noqa: PLC0415
-                _DOCLING = DoclingExtractor()
-            except ImportError as e:
-                log.warning("DoclingExtractor import failed (%s); falling back to legacy", e)
-                _DOCLING = None
-        if _DOCLING is not None and _DOCLING.supports(mime):
-            return _DOCLING
+    global _PYMUPDF
+    engine = engine_override or "legacy"
 
     if engine == "pymupdf":
         if _PYMUPDF is None:

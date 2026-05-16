@@ -65,9 +65,9 @@ class TestParseEnginesHint:
         monkeypatch.setattr(us_mod, "load_app_settings", lambda: fake)
 
         out = _parse_engines_hint(
-            "text:docling,bogus:xxx,images:pymupdf_full,not_a_key:42"
+            "text:legacy,bogus:xxx,images:pymupdf_full,not_a_key:42"
         )
-        assert out == {"text": "docling", "images": "pymupdf_full"}
+        assert out == {"text": "legacy", "images": "pymupdf_full"}
 
     def test_returns_none_when_admin_disabled(self, monkeypatch):
         """When extraction_per_call_hints_enabled=False, parser returns None."""
@@ -78,7 +78,7 @@ class TestParseEnginesHint:
         fake.extraction_per_call_hints_enabled = False
         monkeypatch.setattr(us_mod, "load_app_settings", lambda: fake)
 
-        out = _parse_engines_hint("text:docling,images:pymupdf_full")
+        out = _parse_engines_hint("text:legacy,images:pymupdf_full")
         assert out is None
 
     def test_returns_none_for_empty(self, monkeypatch):
@@ -122,7 +122,7 @@ class TestExtractionDispatcher:
         mock_extracted.text = "x"
         mock_extracted.tables = []
         mock_extracted.images = []
-        mock_extracted.extractor_name = "composable[docling/docling_tf/zip_xpath/docling_formula]"
+        mock_extracted.extractor_name = "composable[legacy/camelot/zip_xpath/none]"
 
         with patch("app.api.documents.ingest_document"), \
              patch("app.services.extraction_service.extract_composable",
@@ -130,7 +130,7 @@ class TestExtractionDispatcher:
             resp = client.post(
                 f"/documents/{DOC_ID}/reextract?engines=images:zip_xpath",
                 headers=auth_headers,
-                json={"engine": "docling"},
+                json={"engine": "pymupdf"},
             )
 
         assert resp.status_code == 202, f"got {resp.status_code}: {resp.text}"
@@ -138,7 +138,7 @@ class TestExtractionDispatcher:
         args = mock_compose.call_args.args
         # Positional: (raw, mime, engines_dict)
         assert args[2] is not None
-        # The hint set images=zip_xpath; body.engine='docling' did NOT alias
+        # The hint set images=zip_xpath; body.engine='pymupdf' did NOT alias
         # because engines hint was non-empty.
         assert args[2].get("images") == "zip_xpath"
 
@@ -178,7 +178,7 @@ class TestExtractionDispatcher:
             resp = client.post(
                 f"/documents/{DOC_ID}/reextract?engines=tables:camelot",
                 headers=auth_headers,
-                json={"engine": "docling"},
+                json={"engine": "pymupdf"},
             )
 
         assert resp.status_code == 202, f"got {resp.status_code}: {resp.text}"
@@ -186,7 +186,7 @@ class TestExtractionDispatcher:
         args = mock_compose.call_args.args
         # Positional: (raw, mime, engines_dict)
         assert args[2] is not None
-        # The hint set tables=camelot; body.engine='docling' did NOT alias
+        # The hint set tables=camelot; body.engine='pymupdf' did NOT alias
         # because engines hint was non-empty.
         assert args[2].get("tables") == "camelot"
 
@@ -213,7 +213,7 @@ class TestExtractionDispatcher:
         mock_extracted.text = "x"
         mock_extracted.tables = []
         mock_extracted.images = []
-        mock_extracted.extractor_name = "composable[docling/docling_tf/pymupdf_full/docling_formula]"
+        mock_extracted.extractor_name = "composable[legacy/camelot/pymupdf_full/none]"
 
         with patch("app.api.documents.ingest_document"), \
              patch("app.services.extraction_service.extract_composable",
@@ -221,14 +221,14 @@ class TestExtractionDispatcher:
             resp = client.post(
                 f"/documents/{DOC_ID}/reextract?engines=images:zip_xpath",
                 headers=auth_headers,
-                json={"engine": "docling"},
+                json={"engine": "pymupdf"},
             )
 
         assert resp.status_code == 202
         mock_compose.assert_called_once()
         args = mock_compose.call_args.args
-        # admin disabled: the hint is None; body.engine='docling' became text alias.
-        assert args[2] == {"text": "docling"}, (
+        # admin disabled: the hint is None; body.engine='pymupdf' became text alias.
+        assert args[2] == {"text": "pymupdf"}, (
             f"Expected fallback to body.engine alias when admin-disabled, "
             f"got: {args[2]!r}"
         )

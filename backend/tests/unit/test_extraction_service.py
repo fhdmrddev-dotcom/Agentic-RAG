@@ -72,11 +72,9 @@ def test_extract_unsupported_mime_raises_valueerror():
 
 
 def test_get_extractor_returns_legacy_when_overridden(monkeypatch):
-    """Phase 071 D-071-12: explicit engine_override='legacy' forces LegacyExtractor.
-
-    Updated from Phase 069's "always returns Legacy" contract — Phase 071's
-    dispatcher reads EXTRACTOR_PRIMARY (default 'docling') so callers that
-    want the Legacy engine must pass engine_override='legacy'.
+    """Phase 071.3 Plan 04 (D-071.3-09, Option A): EXTRACTOR_PRIMARY removed;
+    get_extractor defaults to LegacyExtractor when engine_override is None or
+    explicitly 'legacy'.
     """
     e_pdf = get_extractor(PDF_MIME, engine_override="legacy")
     e_docx = get_extractor(DOCX_MIME, engine_override="legacy")
@@ -85,8 +83,8 @@ def test_get_extractor_returns_legacy_when_overridden(monkeypatch):
 
 
 def test_get_extractor_returns_none_for_unsupported_mime():
-    """Phase 071 D-071-12: even with default 'docling' engine, unsupported
-    mimes fall through to Legacy (which also doesn't support them) -> None.
+    """Phase 071.3 Plan 04 (D-071.3-09): with the default 'legacy' engine,
+    unsupported mimes fall through (Legacy doesn't support them) -> None.
     """
     assert get_extractor("text/plain") is None
     assert get_extractor("application/json") is None

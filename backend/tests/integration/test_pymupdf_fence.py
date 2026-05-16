@@ -39,7 +39,6 @@ def test_fitz_not_imported_by_parent():
     """
     # Force-load every parent-side module that could pull in fitz transitively.
     importlib.import_module("app.services.extraction_service")
-    importlib.import_module("app.services.extractors.docling")
     importlib.import_module("app.services.extractors.pymupdf")
     importlib.import_module("app.api.documents")
 
