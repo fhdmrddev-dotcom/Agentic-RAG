@@ -356,7 +356,7 @@ Plans:
   6. Live UAT on the user's reference thesis PDF: `/upload` (or `/reextract`) returns; SQL on `document_tables` returns count ≥ 15 (camelot target — gmft was excluded at Plan 01 PICK time due to upstream transformers strict-dataclass break) OR ≥ 12 (PyMuPDF-only fallback target — unused at ship). `document_images` count reflects `pymupdf_full` as the engine of record (≥ 20 on thesis confirmed at ship — the prior 30-image baseline was Docling's image extractor, which was retired with the rip). Image recall lift to be addressed by SEED-021. Chunks ≥ 200. Recorded in `071.3-HUMAN-UAT.md`. **Rewritten 2026-05-16 at phase close** to match what was actually shipped after Plan 04 retired Docling: ship floor is tables-only; image floor is preservation-not-lift; SEED-021 carries the lift work.
   7. SEED-019 frontmatter status flipped from `planted` → `closed`. SEED-020 (embedding-model audit) planted with concrete re-open trigger per [[project-phase071-3-scope]] direction.
 
-**Plans:** 5 plans
+**Plans:** 5/5 plans complete
 
 - [x] 071.3-01-PLAN.md — Bench 3 table engines on 2 fixtures (user thesis + friendly_real.pdf); user picks winner via WINNER.md sentinel. (Wave 1; autonomous: false) — **winner: camelot** (thesis 214 / friendly_real 15; gmft excluded — transformers strict-dataclass break)
 - [x] 071.3-02-PLAN.md — Wire winner adapter into aspects/tables.py + TABLE_ENGINES registry + unit + integration tests. (Wave 2 — depends on Plan 01 WINNER.md sentinel; autonomous: true) — camelot adapter shipped, 11/11 tests pass

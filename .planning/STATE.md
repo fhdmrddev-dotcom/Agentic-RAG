@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
 last_updated: "2026-05-15T22:39:19.420Z"
 last_activity: 2026-05-15 -- Phase 071.3 execution started
 progress:
   total_phases: 19
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 26
   completed_plans: 23
-  percent: 88
+  percent: 42
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 071.3 (docling-demotion-table-engine-full-rip) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 071.3
-Last activity: 2026-05-15 -- Phase 071.3 execution started
+Phase: 072
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-16
 
 ## PRD-reset outputs (committed)
 
