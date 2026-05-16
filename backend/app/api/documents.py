@@ -685,7 +685,19 @@ async def reingest_document(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
-    # 3. Reset status to pending. Phase 071.2 D-071.2-06: wrap UPDATE in
+    # 3. Hard delete prior tables + images so reingest doesn't accumulate
+    # (BUG-260516-04). /reextract already does this at lines 803-811; /reingest
+    # was missing the parity. Chunks are NOT deleted here because
+    # _upload_pipeline handles chunk cleanup downstream before re-insert.
+    # Order mirrors D-071-10 cascade (children before parent).
+    await run_in_threadpool(
+        lambda: supabase.table("document_tables").delete().eq("document_id", document_id).execute()
+    )
+    await run_in_threadpool(
+        lambda: supabase.table("document_images").delete().eq("document_id", document_id).execute()
+    )
+
+    # 4. Reset status to pending. Phase 071.2 D-071.2-06: wrap UPDATE in
     # run_in_threadpool. NB — version_number is NOT bumped; this is a
     # re-ingest of the same source bytes (D-25 versioning contract preserved).
     result = await run_in_threadpool(
@@ -698,7 +710,7 @@ async def reingest_document(
     if not result.data:
         raise HTTPException(status_code=404, detail="Document not found after update")
 
-    # 4. Schedule extract + ingest as BackgroundTask. Phase 071.2 D-071.2-06:
+    # 5. Schedule extract + ingest as BackgroundTask. Phase 071.2 D-071.2-06:
     # extract moved out of the async handler so /reingest no longer blocks the
     # event loop for the duration of Docling/PyMuPDF (closes D-v2.5-01 on the
     # last foreground-extract route after 071.1 closed /reextract). We pass
