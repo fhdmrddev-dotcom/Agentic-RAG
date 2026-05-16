@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
-last_updated: "2026-05-16T19:39:41.408Z"
-last_activity: 2026-05-16 -- Phase 072 execution started
+stopped_at: Completed 072-02-PLAN.md
+last_updated: "2026-05-16T20:12:46.092Z"
+last_activity: 2026-05-16
 progress:
   total_phases: 20
   completed_phases: 9
   total_plans: 33
-  completed_plans: 32
-  percent: 97
+  completed_plans: 34
+  percent: 100
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 072 (multimodal-lift-docx-completeness) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 072
-Last activity: 2026-05-16 -- Phase 072 execution started
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-05-16
 
 ## PRD-reset outputs (committed)
 
@@ -225,6 +225,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 071 P04 (Tasks 1-4 of 6) | ~50min | 4 tasks (Tasks 5+6 pending UAT) | 6 files (2 created, 3 modified, 1 deferred-items log) |
 | Phase 071.2 P02 (Task 1 of 2) | ~4min | 1 task (Task 2 checkpoint:human-verify parked) | 1 file (DocumentStatusBadge.tsx +2/-0) |
 | Phase 071.2 P05 (Tasks 1+2-code+3+5 of 5) | ~50min | 4 tasks (Task 2 SQL-apply + Task 4 live UAT parked at checkpoint:human-action) | 17 files (12 created — 6 adapters + 6 tests + 1 integration test + 2 seeds + 1 migration + 1 SUMMARY; 5 modified — extraction_service.py, user_settings.py, documents.py, test_documents.py, test_071_1_threadpool_sweep.py) |
+| Phase 072 P02 | ~7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -301,6 +302,9 @@ Recent decisions affecting v2.5 work:
 - Phase 071.2 Plan 05: get_extractor backward-compat shim PRESERVED untouched. Plan 04 + 071.1 + Phase 069 tests stay green on the happy path; PyMuPDF fallback path in /reextract still uses get_extractor (composer raises asyncio.TimeoutError → route catches → get_extractor('pymupdf') fallback).
 - Phase 071.2 Plan 05: /reextract body.engine becomes TEXT engine alias when ?engines= absent — `engines_dict = {"text": body.engine}`. Preserves 071.1 API for all existing UAT scripts. Integration tests updated to patch extract_composable on happy path + get_extractor only on fallback path.
 - Phase 071.2 Plan 05 (deferred — orchestrator): Task 2 migration apply + Task 4 live UAT parked TOGETHER at `checkpoint:human-action` — CLAUDE.md prohibits `supabase db push` / `db reset` so executor cannot apply migration 045 directly. Orchestrator: (a) paste `supabase/migrations/045_app_settings_extraction_aspects.sql` into Supabase Studio SQL editor (http://127.0.0.1:54323/ → SQL Editor → Run), (b) `bash scripts/regenerate-full-schema.sh` (live-DB dump, no reset), (c) commit regenerated `supabase/full-schema.sql`, (d) restart uvicorn (Docling singleton cache), (e) drive Task 4 UAT (D-071.2-12 floor curl + SQL on thesis PDF/DOCX, RAG-MM-LIFT-02 closure, per-call hint smoke tests). Pytest verification by orchestrator: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`.
+- Phase 072 Plan 02: ImageData frozen-dataclass mutation uses dataclasses.replace exclusively — no attribute-set, no try/except, no isinstance branching (D-072-06)
+- Phase 072 Plan 02: _dedup_images_by_hash is a module-scope helper composable by independent engines via lazy import — applied to pymupdf_full_images_pdf + zip_xpath_docx + inline_shapes_docx (WARNING 5 — safe across both extraction_image_engine_docx defaults)
+- Phase 072 Plan 02 deviation (Rule 1): test_pymupdf_full_returns_more_than_pdfplumber Rule-1 fix — switched fake_doc.extract_image.return_value (singleton, identical bytes collapse 5→1 under new SHA1 dedup) to .side_effect with 5 distinct PIL-generated PNG payloads
 
 ### Pending Todos
 
@@ -340,8 +344,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 071.3 context gathered (17 decisions D-071.3-01..17 locked); 5 plans scoped
+Last session: 2026-05-16T20:12:46.081Z
+Stopped at: Completed 072-02-PLAN.md
 Next: Orchestrator drives BOTH outstanding pieces:
   (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
   (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
