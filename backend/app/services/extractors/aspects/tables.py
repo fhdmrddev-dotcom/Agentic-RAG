@@ -68,8 +68,16 @@ def camelot_tables(raw: bytes, mime: str) -> list[TableData]:
     try:
         tables = camelot.read_pdf(tmp_path, flavor="stream", pages="all")
         out: list[TableData] = []
+        rejected = 0
         for ti, t in enumerate(tables):
             df = t.df
+            # Precision floor (SEED-022): camelot flavor=stream over-detects
+            # single-row formula blocks and single-col reference lists as
+            # tables. Require >=2 rows AND >=2 cols. Damage control before
+            # the full precision audit Phase 076 prereq.
+            if len(df) < 2 or len(df.columns) < 2:
+                rejected += 1
+                continue
             # Stream-mode treats the first detected row as the header band.
             if len(df) > 0:
                 headers = [str(c) for c in df.iloc[0].tolist()]
@@ -109,6 +117,12 @@ def camelot_tables(raw: bytes, mime: str) -> list[TableData]:
                     rows=rows,
                     bbox=bbox,
                 )
+            )
+        if rejected:
+            log.info(
+                "camelot_tables: precision floor rejected %d of %d candidate regions (<2 rows or <2 cols)",
+                rejected,
+                len(tables),
             )
         return out
     finally:
