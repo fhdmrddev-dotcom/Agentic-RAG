@@ -565,6 +565,110 @@ def test_extract_and_store_images_uses_extracted_doc():
     assert "b64_png" not in row
 
 
+def test_dedup_images_by_hash_drops_duplicates():
+    """Phase 072 D-072-06 EXTENDED: _dedup_images_by_hash drops duplicates
+    by SHA1 of b64. First-occurrence wins (preserves image_index ordering).
+    Works for both dict and ImageData shape.
+    """
+    from app.services.multimodal_service import _dedup_images_by_hash
+
+    # Dict shape (legacy).
+    items = [
+        {"b64_png": "PAYLOAD-A", "image_index": 0},
+        {"b64_png": "PAYLOAD-B", "image_index": 1},
+        {"b64_png": "PAYLOAD-A", "image_index": 2},  # duplicate of item 0
+        {"b64_png": "PAYLOAD-C", "image_index": 3},
+    ]
+    out = _dedup_images_by_hash(items)
+    assert len(out) == 3, f"Expected 3 unique, got {len(out)}"
+    # First-occurrence wins — item 0 stays, item 2 (dup) drops.
+    indexes = [r["image_index"] for r in out]
+    assert indexes == [0, 1, 3], f"Expected ordering [0,1,3], got {indexes}"
+
+    # ImageData (frozen dataclass) shape.
+    from app.services.extraction_service import ImageData
+    img_items = [
+        ImageData(page=1, image_index=0, b64_png="X", width=10, height=10, bbox=None),
+        ImageData(page=2, image_index=1, b64_png="Y", width=10, height=10, bbox=None),
+        ImageData(page=3, image_index=2, b64_png="X", width=10, height=10, bbox=None),  # dup
+    ]
+    out2 = _dedup_images_by_hash(img_items)
+    assert len(out2) == 2, f"Expected 2 unique, got {len(out2)}"
+    assert [im.image_index for im in out2] == [0, 1]
+
+
+def test_docx_image_label_prefix_in_chunk_content():
+    """Phase 072 D-072-06: when document_images.bbox has a 'location' key
+    (DOCX path; page=None), the chunk-embedding loop uses that for the
+    description prefix instead of the bare '[Image]:'.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+    from app.services.extraction_service import ExtractedDocument, ImageData
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
+
+    mock_settings = MagicMock()
+    mock_settings.llm_model = "openai/gpt-4o"
+    mock_settings.llm_api_key = "test-key"
+    mock_settings.llm_base_url = ""
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 4096
+    mock_settings.embedding_model = "openai/text-embedding-3-small"
+
+    # ExtractedDocument with two DOCX ImageData entries (page=None, bbox has location).
+    # ImageData is frozen — must construct with all fields at instantiation time.
+    ed = ExtractedDocument(
+        text="",
+        tables=(),
+        images=(
+            ImageData(page=None, image_index=0, b64_png="HEADERBYTES",
+                      width=200, height=200, bbox={"location": "header"}),
+            ImageData(page=None, image_index=1, b64_png="FLOATBYTES",
+                      width=200, height=200, bbox={"location": "floating"}),
+        ),
+        table_extraction_error=None,
+        image_extraction_error=None,
+        full_markdown=None,
+        extractor_name="composable[legacy/camelot/zip_xpath/none]",
+    )
+
+    with patch("app.services.multimodal_service.describe_image") as mock_desc, \
+         patch("app.services.multimodal_service.embed_texts") as mock_embed:
+        mock_desc.side_effect = ["The company logo.", "A flowchart figure."]
+        mock_embed.return_value = [[0.1] * 1536, [0.2] * 1536]
+        extract_and_store_images(
+            raw=b"PK",
+            mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            document_id="doc-072-02-t2",
+            user_id="user-072-02-t2",
+            supabase=mock_supabase,
+            app_settings=mock_settings,
+            extracted_doc=ed,
+        )
+
+    # Collect document_chunks INSERT payload (look for content field on rows).
+    chunk_inserts = []
+    for call in mock_builder.insert.call_args_list:
+        if call.args and isinstance(call.args[0], list) and call.args[0]:
+            first = call.args[0][0]
+            if isinstance(first, dict) and "content" in first and "embedding" in first:
+                chunk_inserts.extend(call.args[0])
+    assert len(chunk_inserts) == 2, (
+        f"Expected 2 chunk rows; got {len(chunk_inserts)}: {chunk_inserts!r}"
+    )
+    contents = sorted(r["content"] for r in chunk_inserts)
+    assert contents[0].startswith("[Image floating]:"), (
+        f"Expected '[Image floating]:' prefix; got {contents[0]!r}"
+    )
+    assert contents[1].startswith("[Image header]:"), (
+        f"Expected '[Image header]:' prefix; got {contents[1]!r}"
+    )
+
+
 def test_extract_and_store_tables_fallback_when_extracted_doc_none():
     """When extracted_doc is None (or omitted), the legacy pdfplumber pass
     MUST run — backward-compat for tests + call sites that don't supply

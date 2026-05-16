@@ -20,8 +20,34 @@ def test_pymupdf_full_returns_more_than_pdfplumber():
     pdfplumber mocked to return 2, the assertion
     `pymupdf_full > pdfplumber` holds — wiring proves the dispatch
     differentiates the two engines.
+
+    Phase 072 D-072-06 EXTENDED: `pymupdf_full_images_pdf` now invokes
+    `_dedup_images_by_hash` on its return value. To preserve THIS test's
+    "5 unique images" semantics under the new dedup wrapper, each fake
+    extract_image() return must produce DISTINCT bytes — otherwise the
+    SHA1 dedup correctly collapses identical-bytes duplicates to 1, and
+    the wiring assertion masks an actually-working production path.
     """
+    import io  # noqa: PLC0415
+
+    from PIL import Image as PILImage  # noqa: PLC0415
+
     from app.services.extractors.aspects import images_pdf
+
+    # Build 5 DISTINCT 1x1 PNG byte payloads by varying the pixel color.
+    # Identical PNG bytes would be SHA1-collapsed by Phase 072's dedup helper.
+    def _png_bytes_for(r: int, g: int, b: int) -> bytes:
+        buf = io.BytesIO()
+        PILImage.new("RGB", (1, 1), color=(r, g, b)).save(buf, format="PNG")
+        return buf.getvalue()
+
+    distinct_payloads = [
+        _png_bytes_for(0, 0, 0),
+        _png_bytes_for(255, 0, 0),
+        _png_bytes_for(0, 255, 0),
+        _png_bytes_for(0, 0, 255),
+        _png_bytes_for(128, 128, 128),
+    ]
 
     # Fake fitz.Document iterator: 3 pages with image lists summing to 5
     page1 = MagicMock()
@@ -32,17 +58,10 @@ def test_pymupdf_full_returns_more_than_pdfplumber():
     page3.get_images.return_value = [(301, 0)]
     fake_doc = MagicMock()
     fake_doc.__iter__.return_value = iter([page1, page2, page3])
-    fake_doc.extract_image.return_value = {
-        # 1x1 PNG bytes — Pillow can decode this minimal payload
-        "image": (
-            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00"
-            b"\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc"
-            b"```\x00\x00\x00\x04\x00\x01]\xcc\xdb\xe0\x00\x00\x00\x00IEND"
-            b"\xaeB`\x82"
-        ),
-        "width": 1,
-        "height": 1,
-    }
+    fake_doc.extract_image.side_effect = [
+        {"image": payload, "width": 1, "height": 1}
+        for payload in distinct_payloads
+    ]
 
     plumber_imgs = [
         ImageData(
