@@ -1,18 +1,20 @@
 ---
 seed_id: SEED-019
 title: PyMuPDF subprocess OOM diagnostic + non-Docling engine evaluation
-status: planted
+status: closed
 planted: 2026-05-15
+closed: 2026-05-16
+closed_by: 071.3-docling-demotion-table-engine-full-rip
 phase_origin: 071.2-ingestion-plumbing-docling-quality-diagnostics
-related_seeds: [SEED-006, SEED-017, SEED-018]
+related_seeds: [SEED-006, SEED-017, SEED-018, SEED-020, SEED-021]
 re_open_trigger: |
-  When the user is ready to make non-Docling extraction reliable + competitive on
-  table/image recall (the goal that motivated Docling in the first place).
-  Concretely: when the next user-driven /reextract on the thesis PDF crashes
-  with the same Docling timeout + PyMuPDF subprocess OOM signature, or when
-  the user wants to flip migration 045 defaults away from `docling_tf` (tables)
-  and `docling_formula` (equations) but lacks a tested replacement.
-suggested_phase: 071.3 or v2.7 depending on milestone framing
+  CLOSED — superseded by Phase 071.3 outcomes. Re-open is no longer applicable;
+  the table-engine evaluation (Plan 01 bench), Docling rip (Plan 04), and the
+  PyMuPDF subprocess fence retirement (Plan 04 Phase G PASS) all landed.
+  Residual concerns are now tracked by:
+  - SEED-020 (retrieval-quality audit — embedding-model + re-ranker + hybrid retrieval)
+  - SEED-021 (table/image recall lift — image recall stayed at 20/59 on the thesis)
+suggested_phase: closed
 ---
 
 ## Why this seed exists
@@ -115,3 +117,52 @@ optionality. The phase deliverable is:
 - [[project_seed006_multimodal_quality]] — original SEED-006 multimodal storage gap
 - [[feedback-extraction-root-cause-not-plumbing]] — investigation discipline
 - [[feedback-preserve-engine-optionality]] — keep the dispatcher; flip defaults, don't rip the architecture
+
+## Closing Note (2026-05-16)
+
+**Closed by Phase 071.3 (`071.3-docling-demotion-table-engine-full-rip`).**
+
+Outcomes:
+
+- **Q1 (PyMuPDF subprocess OOM root cause):** Sidestepped, not diagnosed.
+  Phase 071.3 Plan 04 Phase G ran D-071.3-11 smoke test
+  (`backend/tests/integration/test_pymupdf_in_process.py`) which confirmed
+  in-process `import fitz` works after the httpx unpin landed. Subprocess fence
+  deleted (commit `1482f46`). The OOM was specific to the subprocess plumbing,
+  not in-process PyMuPDF.
+
+- **Q2 (lightest reliable replacement for `docling_tf` tables):** **camelot**
+  won the Plan 01 bench (`.planning/research/071.3-bench-results.md`). 214
+  raw tables on the user's thesis vs pdfplumber's 4 (53.5x); 15 tables on
+  `friendly_real.pdf` vs pymupdf's 9 (1.67x). gmft excluded (transformers
+  strict-dataclass break on TATR config). Migration 047 sealed the default.
+
+- **Q3 (lightest reliable replacement for `pymupdf_full` PDF images):** Kept
+  `pymupdf_full` (now in-process, no fence). Plan 05 UAT confirmed it works
+  post-rip but image recall stayed at 20/59 on the thesis — SEED-021 owns
+  the lift.
+
+- **Q4 (eliminate the httpx conflict):** Done. `httpx<0.29` upper bound
+  removed in Plan 04 Phase F (commit `5317d4b`). Effective resolved version is
+  still 0.28.1 (transitive cap from supabase-py's `postgrest==2.29.0`), but
+  our requirements.txt no longer carries the policy constraint.
+
+- **Q5 (keep Docling for any aspect):** No. Full hard delete per D-071.3-09.
+  Equation engine reduced to `none` (placeholder); no equation extraction is
+  shipped in v2.6 — future-phase concern.
+
+Plan 05 UAT (this seed's closing evidence):
+
+| Fixture | Tables | Images | Chunks | Status |
+|---|---|---|---|---|
+| User thesis PDF | 214 | 20 | 461 | completed |
+| friendly_real.pdf | 15 | 1 | 65 | completed |
+| reference.docx | 1 | 1 | 2 | completed |
+
+SC#6 ship floor (>=15 tables on thesis for camelot): cleared by 14.3x.
+D-071.3-02 engine acceptance floor (>=20 tables on thesis): cleared by 10.7x.
+
+Residual concerns split into:
+- **SEED-020** (retrieval-quality audit) — planted at this seed's close
+- **SEED-021** (table/image recall lift) — planted at this seed's close
+  (image axis trigger: 20 < 45 on the thesis per D-071.3-16)
