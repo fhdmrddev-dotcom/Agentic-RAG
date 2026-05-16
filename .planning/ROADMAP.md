@@ -398,15 +398,22 @@ Plans:
 - SEED-022 stays planted after 071.4 ships — Plan 01 here is the row/col floor mitigation (drops magnitude of inflation), NOT the full precision audit (which Phase 076 inherits as a prerequisite).
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
-**Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures, and a hand-crafted DOCX with floating shapes + header images surfaces both via the related-parts walk.
+**Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures via the opt-in `vision_sweep` engine (per-page rasterize + vision-LLM "list figures + bboxes" prompt) or ≥35% via the default `pymupdf_full` engine; DOCX images carry location-prefix labels (header / inline / floating / footer) and content-hash dedup applied across BOTH PDF and DOCX paths; empty-description rows persist with retry-only refill via `/reextract`.
 **Depends on**: Phase 069
-**Plans**: 3
+**Plans**: 4 (widened 2026-05-16 to add vision_sweep engine + migration 048 + retry-empty-only branch)
 **Requirements**: RAG-MM-LIFT-01, RAG-MM-LIFT-02
 **Success Criteria** (what must be TRUE):
-  1. `multimodal_max_vision_calls` and `multimodal_max_b64_bytes_kb` are admin-tunable via `app_settings` (migration 044); defaults raised from current 20 / 512 KB to 100 / 4 MB (covers ≥80% of figures on the reference 4 MB academic PDF).
-  2. Empty-vision-description rows persist with `description=''` instead of being dropped (so retries can fill them in cheaply); count of stored vs visible figures on reference PDF assertable via SQL.
-  3. DOCX extraction walks `doc.part.related_parts` + detects `wp:anchor` floating shapes; a hand-crafted DOCX with a floating shape + a header image produces both `document_images` rows.
-  4. `app_settings` reader at `models/user_settings.py` is wired to consult the new keys (closing the `app_settings` table dead-code state per `CONCERNS.md:520-524` for these two specific keys).
+  1. `multimodal_service` reads `multimodal_max_vision_calls` + `multimodal_max_b64_bytes_kb` from `app_settings` (migration 044 already shipped); module constants `_MAX_VISION_CALLS` + `_MAX_B64_BYTES` deleted; new constant `MULTIMODAL_THUMBNAIL_MAX_EDGE = 1024` drives a PIL.thumbnail downscale before every vision-LLM call.
+  2. Empty-vision-description rows persist with `description=''` instead of being dropped. `/reextract?retry_empty_descriptions_only=true` ships as the lazy retry path (D-072-04 Shape B): skips delete-cascade + re-extract; loops over empty rows and refills via describe_image.
+  3. Content-hash dedup helper `_dedup_images_by_hash` invoked by BOTH DOCX (`zip_xpath_docx`) and PDF (`pymupdf_full_images_pdf`) image engines. DOCX images annotated with location label (`bbox.location` = header / footer / inline / floating); chunk-embedding prefix renders `[Image header]: ...`, `[Image floating]: ...`, etc.
+  4. New opt-in `vision_sweep` PDF image engine added to `IMAGE_ENGINES_PDF` registry. Guardrails: `vision_sweep_max_pages` page cap + caption-regex pre-filter + cost-warn log line. Migration 048 widens `extraction_image_engine_pdf` CHECK to allow `'vision_sweep'` and adds 2 guardrail columns.
+  5. Live UAT on thesis PDF: Mode A (`pymupdf_full`) total ≥ 21 (≥35% of ~59 figures); Mode B (`vision_sweep`) total ≥ 47 (≥80% of ~59 figures). Operator-confirmed Mode B cost within $3-10 range.
+
+**Plans:**
+- [ ] 072-01-PLAN.md — app_settings wiring + 1024px downscale + persist-empty-rows (Wave 1; autonomous)
+- [ ] 072-02-PLAN.md — Content-hash dedup helper (PDF + DOCX) + DOCX location-prefix labels (Wave 2; autonomous)
+- [ ] 072-03-PLAN.md — vision_sweep engine + migration 048 + guardrails (Wave 3; checkpoint:human-action for SQL editor paste)
+- [ ] 072-04-PLAN.md — /reextract retry-empty-only branch + dual-mode live UAT (Wave 4; checkpoint:human-action for live UAT)
 
 ### Phase 073: asyncpg Pool Integration
 **Goal**: The streaming endpoint's Postgres reads/writes go through an `asyncpg>=0.29` connection pool instead of sync `supabase-py` calls, CONCUR-01 stays green, and every completed run finalizes with `runs.input_tokens` + `runs.output_tokens` populated from the LLM `usage` field.
