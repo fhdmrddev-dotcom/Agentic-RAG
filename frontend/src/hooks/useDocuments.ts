@@ -45,9 +45,21 @@ export function useDocuments(): UseDocuments {
           },
           (payload) => {
             if (payload.eventType === "UPDATE") {
+              const newDoc = payload.new as Document
+              // Realtime payload reflects ONLY the documents table — but
+              // table_count + image_count + chunk_count are server-side
+              // aggregates from joined tables (see backend/app/api/documents.py
+              // D-09). They are NOT in payload.new. Spread-merge so the prior
+              // fetch's aggregates aren't blown away mid-transition; then on
+              // terminal-state transitions refetch the list to surface fresh
+              // counts (BUG-260516-01 follow-up: user reported "counts don't
+              // reflect real-time" after status badge started updating).
               setDocuments((prev) =>
-                prev.map((d) => (d.id === (payload.new as Document).id ? (payload.new as Document) : d)),
+                prev.map((d) => (d.id === newDoc.id ? { ...d, ...newDoc } : d)),
               )
+              if (newDoc.status === "completed" || newDoc.status === "failed") {
+                loadDocuments().catch(console.error)
+              }
             } else if (payload.eventType === "INSERT") {
               const newDoc = payload.new as Document
               setDocuments((prev) => {

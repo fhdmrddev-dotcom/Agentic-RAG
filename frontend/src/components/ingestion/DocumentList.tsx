@@ -8,9 +8,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
-import { ChevronDown, ChevronRight, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Trash2, Loader2, RefreshCw } from "lucide-react"
 import { DocumentStatusBadge } from "./DocumentStatusBadge"
-import { fetchDocumentVersions, restoreDocumentVersion } from "@/lib/api"
+import { fetchDocumentVersions, restoreDocumentVersion, reingestDocument } from "@/lib/api"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { getFileIcon } from "@/lib/fileIcons"
 import type { Document, DocumentMetadata } from "@/types"
 
@@ -231,6 +232,25 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeScope, setActiveScope] = useState<"version" | "all" | null>(null)
+  const [reingestingId, setReingestingId] = useState<string | null>(null)
+
+  // BUG-260516-03: surface the reingest action that previously only existed
+  // on the Library Health page. Same /documents/{id}/reingest endpoint
+  // /reextract+chunks behind the scenes (BUG-260516-04 fixed the underlying
+  // accumulation issue, so this is safe to expose).
+  async function handleReingest(id: string) {
+    setReingestingId(id)
+    try {
+      await reingestDocument(id)
+      // No need to manually refresh — the Realtime UPDATE on status change
+      // will trigger a refetch via useDocuments.ts (loadDocuments on terminal
+      // state transition). The button just kicks the backend.
+    } catch (e) {
+      console.error("Reingest failed:", e)
+    } finally {
+      setReingestingId(null)
+    }
+  }
 
   // Filter by selected folder:
   // - folderId === undefined: no folder context — show all (backward compat)
@@ -350,14 +370,39 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                     <DocumentStatusBadge status={doc.status} ingestionStep={doc.ingestion_step} />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeleteTarget(doc)}
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReingest(doc.id)}
+                            disabled={reingestingId === doc.id || doc.status === "pending" || doc.status === "processing"}
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                          >
+                            {reingestingId === doc.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Re-ingest document</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeleteTarget(doc)}
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete document</TooltipContent>
+                      </Tooltip>
+                    </div>
                   </td>
                 </tr>
                 {hasMetadata(doc) && expanded.has(doc.id) && (
