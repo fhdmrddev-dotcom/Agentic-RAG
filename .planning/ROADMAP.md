@@ -184,7 +184,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 2 — Depends on Wave 1**
 
-- [ ] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on Docling-extracted chunks (or reuse, per Q-v2.6-03). Score distributions documented in PROJECT.md. (2 plans)
+- [ ] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. (2 plans)
 - [ ] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; consistent-hashing-on-thread_id sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans)
 - [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
 
@@ -196,7 +196,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 4 — Verify**
 
-- [ ] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — Validate Docling output against the user's reference 5/4 vs 50+/0 PDF/DOCX baseline. Verify `--workers 2` doesn't regress the CONCUR-01 binding gate (`backend/tests/integration/test_058_concurrency.py`). Verify SEED-007 lift didn't regress 067.5 cycles (Chrome MCP + Playwright e2e against 063 / 063.1 / 067.x specs). (2 plans)
+- [ ] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — Validate final default-set output (post-071.3: camelot + pymupdf_full + legacy + `none` equations) against the user's reference PDF + DOCX baseline (ground truth: 35 tables / 59 figures on user thesis). Verify `--workers 2` doesn't regress the CONCUR-01 binding gate (`backend/tests/integration/test_058_concurrency.py`). Verify SEED-007 lift didn't regress 067.5 cycles (Chrome MCP + Playwright e2e against 063 / 063.1 / 067.x specs). (2 plans)
 
 Full details below in **Phase Details**.
 
@@ -367,7 +367,7 @@ Plans:
 **Notes:**
 - This phase is BEFORE Phase 072 because Phase 072's multimodal lift verification (SC#1 ≥80% of visible figures) re-extracts documents and would be tested under whichever table engine 071.3 ships. Doing 072 first would force a re-verification after 071.3.
 - **Phase 076** (Confidence Recalibration): rescopes to the new default engine's chunk distribution. Q-v2.6-03 "re-run vs reuse" answer flips to "re-run on new defaults" definitively.
-- **Phase 082** (Cross-cutting Verification): SC#1 rephrases away from "Validate Docling output against 5/4 vs 50+/0 baseline" to "Validate final default-set output against baseline."
+- **Phase 082** (Cross-cutting Verification): SC#1 rephrased at 071.3 close from the Docling-era wording to "Validate final default-set output against baseline" (camelot tables + pymupdf_full images + legacy text + `none` equations).
 - Sibling commit: `315f307` (2026-05-16) already flipped `app_settings` defaults for tables (`docling_tf` → `pdfplumber`) and equations (`docling_formula` → `none`) via migration 046. 071.3 supersedes the interim defaults.
 - Per `feedback_preserve_engine_optionality`: the per-aspect dispatcher pattern stays — just different engines in the registries. Docling adapters get deleted because Docling is genuinely uninstalled, not because we're abandoning optionality.
 - Per `feedback_dont_hedge_to_no_new_infra`: the "keep Docling as opt-in fallback" hedge was explicitly rejected at scope-lock; deleting Docling reclaims the httpx pin + subprocess fence (~150 LOC).
@@ -419,15 +419,15 @@ Plans:
   4. Existing `code_executing` heartbeat (Phase 067.4 Plan 03) is preserved — `code_stdout` re-wire is additive.
 
 ### Phase 076: Confidence Recalibration
-**Goal**: Confidence thresholds match the chunk score distribution under Docling primary path, so `messages.confidence_*` reads stay accurate after the extractor swap.
-**Depends on**: Phase 071
+**Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
+**Depends on**: Phase 071.3
 **Plans**: 2
 **Requirements**: RAG-RECAL-01
 **Success Criteria** (what must be TRUE):
-  1. Q-v2.6-03 is locked (recommended: re-run full Phase 32.5 calibration over Docling-extracted historical corpus); chosen path is documented and executed.
-  2. New thresholds for `_compute_confidence` at `backend/app/api/threads.py:133-139` are derived from the new score distribution; PROJECT.md gets a "Confidence calibration v2 (Docling-era)" appendix entry with before/after histograms.
+  1. Q-v2.6-03 LOCKED at 071.3 close: re-run full Phase 32.5 calibration over post-071.3 default-set extracted historical corpus (the "reuse" option is rejected — the new chunk distribution differs materially from the Docling-era distribution).
+  2. New thresholds for `_compute_confidence` at `backend/app/api/threads.py:133-139` are derived from the new score distribution; PROJECT.md gets a "Confidence calibration v2 (post-071.3 default-set)" appendix entry with before/after histograms.
   3. Existing `messages.confidence_*` schema (per `D-v2.5-12`) is unchanged — column reads/writes preserve the v2.5 contract; only threshold constants change.
-  4. The `pdf_extraction_runs` telemetry makes the per-extractor lineage observable so this calibration is re-litigable if Docling output drifts.
+  4. The `pdf_extraction_runs` telemetry makes the per-extractor lineage observable (camelot vs pdfplumber vs future engines) so this calibration is re-litigable if the default-set output drifts.
 
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
@@ -487,15 +487,15 @@ Plans:
   4. No code change required — pure UAT exercise; verifies the v2.5 Phase 067.1 Track A drain helper handles OpenRouter-routed providers under synthetic timeout.
 
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
-**Goal**: All three v2.6 workstreams are proven not to regress each other — Docling baseline matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
+**Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
 **Depends on**: Phase 076, Phase 080, Phase 081
 **Plans**: 2
 **Requirements**: (cross-cutting verification — all 21 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
 **Success Criteria** (what must be TRUE):
-  1. Docling re-extraction against the user's reference PDF + DOCX pair produces table + image counts within 20% delta (re-running the RAG-DOCLING-01 acceptance under the full v2.6 stack with multi-worker + StreamsProvider live).
+  1. Re-extraction with the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations) against the user's reference PDF + DOCX pair holds table + image counts within 20% delta of the 071.3 Plan 05 UAT baseline (re-running the RAG-DOCLING-01 acceptance under the full v2.6 stack with multi-worker + StreamsProvider live).
   2. `pytest backend/tests/integration/test_058_concurrency.py` (CONCUR-01 binding gate) green under `--workers 2`; no regression vs single-worker baseline.
   3. Phase 067.5 Branch D-3 `clearMessages` guard regression test green; 5/5 lived-experience cycles on Chrome MCP show no empty-thread-until-refresh repro post-StreamsProvider lift.
-  4. `pdf_extraction_runs` telemetry table populated for every document re-ingested during the verification pass; admin can query per-document extractor lineage + durations.
+  4. `pdf_extraction_runs` telemetry table populated for every document re-ingested during the verification pass; admin can query per-document extractor lineage + durations (per-aspect composer signature `composable[<text>/<tables>/<images>/<equations>]` per 071.3).
   5. Milestone-close audit confirms all 21 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
 
 ---
