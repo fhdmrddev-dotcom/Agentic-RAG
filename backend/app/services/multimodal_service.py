@@ -26,12 +26,59 @@ log = logging.getLogger(__name__)
 PDF_MIME = "application/pdf"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-# Maximum vision API calls per document (Pitfall 6: large PDFs)
-_MAX_VISION_CALLS = 20
+# Max edge length (px) for PIL.thumbnail() before vision-LLM call (D-072-02).
+# OpenAI detail=low downsamples to 512px internally → no quality gain above 1024px.
+# Anthropic caps base64 images at 5 MB; uniformly-small thumbnails (~50-200 KB)
+# prevent provider rejections + reduce bandwidth. Hardcoded constant per
+# CONTEXT.md (third app_setting deferred to v3.1 admin shell).
+MULTIMODAL_THUMBNAIL_MAX_EDGE = 1024
 
-# Maximum base64 payload size per image — prevents uncapped vision API calls
-# 512 KB is sufficient for any low-detail vision call
-_MAX_B64_BYTES = 512 * 1024
+
+def _downscale_b64_for_vision(
+    b64_png: str,
+    max_edge: int = MULTIMODAL_THUMBNAIL_MAX_EDGE,
+) -> str:
+    """Downscale b64-encoded PNG to max edge `max_edge` before vision-LLM call.
+
+    D-072-02 invariant — shared between `extract_and_store_images` (Plan 01)
+    and `_reextract_refill_empty_descriptions` (Plan 03) so both call sites
+    honor the downscale from a single source. Per WARNING 3 of the Phase
+    072 checker pass — avoids the regression where the retry path would
+    silently bypass the downscale.
+
+    Behavior:
+      - PIL.thumbnail preserves aspect ratio; only shrinks (no-op when
+        already <= max_edge on the longest edge).
+      - Re-encodes to PNG and returns the base64-encoded result.
+      - Best-effort: on any PIL decode failure (corrupted bytes, unsupported
+        format), returns the input b64 UNCHANGED. Degrades, never raises.
+
+    Args:
+        b64_png: base64-encoded PNG (or any PIL-decodable image format).
+        max_edge: pixel cap on the longest edge (default
+            MULTIMODAL_THUMBNAIL_MAX_EDGE = 1024).
+
+    Returns:
+        base64-encoded PNG (possibly downscaled). Same encoding scheme as
+        input.
+    """
+    try:
+        from PIL import Image as PILImage  # noqa: PLC0415
+        raw_img = base64.b64decode(b64_png)
+        pil_img = PILImage.open(io.BytesIO(raw_img))
+        if max(pil_img.width, pil_img.height) <= max_edge:
+            return b64_png  # no-op
+        pil_img.thumbnail((max_edge, max_edge))
+        out_buf = io.BytesIO()
+        fmt = pil_img.format or "PNG"
+        pil_img.save(out_buf, format=fmt)
+        return base64.b64encode(out_buf.getvalue()).decode("ascii")
+    except Exception as exc:  # noqa: BLE001
+        # Degrade to original on decode failure — never raise.
+        log.debug(
+            "_downscale_b64_for_vision: decode/encode failed: %s — using original", exc
+        )
+        return b64_png
 
 
 # ---------------------------------------------------------------------------
@@ -286,8 +333,9 @@ def extract_and_store_images(
 
     Silently swallows all exceptions — never blocks ingestion.
     Images below 50x50 px are skipped.
-    Vision API failures store empty description rather than skipping the row.
-    Capped at _MAX_VISION_CALLS per document.
+    Vision API failures store empty description rather than skipping the row
+    (D-072-03 — persisted empty rows are eligible for lazy /reextract refill).
+    Capped at `app_settings.multimodal_max_vision_calls` per document (D-072-08).
 
     Phase 071.2 D-071.2-08: when `extracted_doc` is provided AND contains
     images, those images are used directly (Docling's bbox preserved into
@@ -325,24 +373,25 @@ def extract_and_store_images(
         )
 
         rows: list[dict] = []
-        for img in image_dicts[:_MAX_VISION_CALLS]:
+        for img in image_dicts[:app_settings.multimodal_max_vision_calls]:
             # Secondary size guard — extraction helpers filter too, but mocks bypass them in tests
             if img.get("width", 0) < 50 or img.get("height", 0) < 50:
                 continue
             b64 = img["b64_png"]
-            if len(b64) > _MAX_B64_BYTES:
+            if len(b64) > app_settings.multimodal_max_b64_bytes_kb * 1024:
                 log.debug(
                     "Skipping oversized image in %s (%d bytes b64)", document_id, len(b64)
                 )
                 continue
+            # D-072-02: downscale to MULTIMODAL_THUMBNAIL_MAX_EDGE before vision LLM
+            # call via the shared helper. Plan 03's retry path uses the SAME helper
+            # so both call sites honor the invariant from a single source (WARNING 3).
+            b64 = _downscale_b64_for_vision(b64)
             try:
                 description = describe_image(b64, app_settings, client=openai_client)
             except Exception as exc:
                 log.debug("Vision description failed for image in %s: %s", document_id, exc)
                 description = ""
-            if not description:
-                log.debug("Skipping image with no description in %s", document_id)
-                continue
             rows.append({
                 "document_id": document_id,
                 "user_id": user_id,

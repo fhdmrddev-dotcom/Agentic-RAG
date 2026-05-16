@@ -115,6 +115,11 @@ def test_pdf_images_stored():
     mock_settings.llm_model = "openai/gpt-4o"
     mock_settings.llm_api_key = "test-key"
     mock_settings.llm_base_url = ""
+    # Phase 072 D-072-08: production code now reads cap + size from app_settings.
+    # Set the attrs explicitly so MagicMock doesn't auto-magic them into
+    # un-comparable Mock objects.
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 4096
 
     with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
          patch("app.services.multimodal_service.describe_image") as mock_desc:
@@ -169,16 +174,25 @@ def test_small_images_skipped():
 
 
 def test_image_description_failure_continues():
-    """If describe_image raises (e.g. vision model unsupported), ingestion continues with empty description."""
+    """Vision API failure → describe_image raises → ingestion continues, and the
+    row persists with description='' (Phase 072 D-072-03 — INVERTS the
+    pre-072 contract that dropped the row on failure). A future /reextract
+    can refill the empty description cheaply (Plan 03 lazy retry).
+    """
     from app.services.multimodal_service import extract_and_store_images
 
     mock_supabase = MagicMock()
     mock_builder = MagicMock()
     mock_supabase.table.return_value = mock_builder
     mock_builder.insert.return_value = mock_builder
-    mock_builder.execute.return_value = MagicMock(data=[])
+    mock_builder.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
 
     mock_settings = MagicMock()
+    mock_settings.llm_model = "openai/gpt-4o"
+    mock_settings.llm_api_key = "test-key"
+    mock_settings.llm_base_url = ""
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 4096
 
     with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
          patch("app.services.multimodal_service.describe_image") as mock_desc:
@@ -196,8 +210,187 @@ def test_image_description_failure_continues():
             app_settings=mock_settings,
         )
 
-    # When all image descriptions fail, no rows are inserted (images skipped)
-    mock_builder.insert.assert_not_called()
+    # D-072-03 inversion: row persists with description=''. The pre-072 code
+    # dropped the row (asserted insert.assert_not_called); Phase 072 inverts.
+    assert mock_builder.insert.called, "Expected document_images INSERT for empty-description row"
+
+
+# ---------------------------------------------------------------------------
+# Phase 072 Plan 01 — D-072-02 / D-072-03 / D-072-08
+# Tests for: app_settings cap read + shared downscale helper + persist empty rows.
+# ---------------------------------------------------------------------------
+
+def test_app_settings_max_vision_calls_read():
+    """Phase 072 D-072-08: extract_and_store_images reads the cap from
+    app_settings.multimodal_max_vision_calls (NOT the deleted _MAX_VISION_CALLS
+    module constant; NOT the default 100). Setting cap=3 with 10 stubbed images
+    results in exactly 3 describe_image calls.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
+
+    mock_settings = MagicMock()
+    mock_settings.llm_model = "openai/gpt-4o"
+    mock_settings.llm_api_key = "test-key"
+    mock_settings.llm_base_url = ""
+    mock_settings.multimodal_max_vision_calls = 3
+    mock_settings.multimodal_max_b64_bytes_kb = 4096  # 4 MB — won't trip
+    mock_settings.embedding_model = "openai/text-embedding-3-small"
+
+    ten_images = [
+        {"page": 1, "image_index": i, "b64_png": "a" * 16, "width": 100, "height": 100}
+        for i in range(10)
+    ]
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = ten_images
+        mock_desc.return_value = "fake description"
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-072-01-t1",
+            user_id="user-072-01-t1",
+            supabase=mock_supabase,
+            app_settings=mock_settings,
+        )
+
+    # CAP HONORED: exactly 3 describe_image calls (NOT 10, NOT 20, NOT 100).
+    assert mock_desc.call_count == 3, (
+        f"Expected 3 describe_image calls (cap from app_settings); got {mock_desc.call_count}"
+    )
+
+
+def test_downscale_before_vision_call():
+    """Phase 072 D-072-02: every image larger than MULTIMODAL_THUMBNAIL_MAX_EDGE
+    (1024px on the longest edge) is downscaled in-place via PIL.thumbnail BEFORE
+    the vision-LLM call. Assert by intercepting the b64 string passed into
+    describe_image and decoding it.
+
+    Internally exercises the shared `_downscale_b64_for_vision` helper which
+    Plan 03 also calls from the retry path (WARNING 3 — single-source invariant).
+    """
+    import base64
+    import io
+    from PIL import Image as PILImage
+    from app.services.multimodal_service import extract_and_store_images
+
+    # Build a 2048x2048 PNG to test downscale.
+    big_buf = io.BytesIO()
+    PILImage.new("RGB", (2048, 2048), color=(128, 128, 128)).save(big_buf, format="PNG")
+    big_b64 = base64.b64encode(big_buf.getvalue()).decode("ascii")
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
+
+    mock_settings = MagicMock()
+    mock_settings.llm_model = "openai/gpt-4o"
+    mock_settings.llm_api_key = "test-key"
+    mock_settings.llm_base_url = ""
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 999999  # don't trip size guard
+    mock_settings.embedding_model = "openai/text-embedding-3-small"
+
+    captured_b64: list[str] = []
+
+    def fake_describe(b64_arg, settings_arg, client=None):
+        captured_b64.append(b64_arg)
+        return "stubbed description"
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image", side_effect=fake_describe):
+        mock_imgs.return_value = [
+            {"page": 1, "image_index": 0, "b64_png": big_b64, "width": 2048, "height": 2048}
+        ]
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-072-01-t2",
+            user_id="user-072-01-t2",
+            supabase=mock_supabase,
+            app_settings=mock_settings,
+        )
+
+    assert len(captured_b64) == 1, f"Expected 1 describe_image call, got {len(captured_b64)}"
+    sent_bytes = base64.b64decode(captured_b64[0])
+    sent_img = PILImage.open(io.BytesIO(sent_bytes))
+    assert max(sent_img.width, sent_img.height) <= 1024, (
+        f"Image not downscaled: sent {sent_img.width}x{sent_img.height}, expected <=1024 on longest edge"
+    )
+
+
+def test_persist_empty_description_row():
+    """Phase 072 D-072-03: when describe_image returns '' (or raises), the
+    document_images INSERT still fires with description=''. The pre-072 code
+    used an early-continue to drop the row entirely (mock_builder.insert
+    asserted NOT called). Phase 072 inverts: row persists; chunk embedding
+    still skipped (no content to embed) but the image entry survives for a
+    later /reextract retry.
+    """
+    from app.services.multimodal_service import extract_and_store_images
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[{"chunk_index": 0}])
+
+    mock_settings = MagicMock()
+    mock_settings.llm_model = "openai/gpt-4o"
+    mock_settings.llm_api_key = "test-key"
+    mock_settings.llm_base_url = ""
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 4096
+    mock_settings.embedding_model = "openai/text-embedding-3-small"
+
+    with patch("app.services.multimodal_service.extract_pdf_images") as mock_imgs, \
+         patch("app.services.multimodal_service.describe_image") as mock_desc:
+        mock_imgs.return_value = [
+            {"page": 5, "image_index": 0, "b64_png": "a" * 16, "width": 200, "height": 200}
+        ]
+        mock_desc.return_value = ""  # vision returns empty — must NOT drop the row
+        extract_and_store_images(
+            raw=b"%PDF",
+            mime_type="application/pdf",
+            document_id="doc-072-01-t3",
+            user_id="user-072-01-t3",
+            supabase=mock_supabase,
+            app_settings=mock_settings,
+        )
+
+    # Find the document_images INSERT (table_call sequence is table().insert().execute()).
+    # The chunk-embedding pass is also bypassed (empty desc → no chunk rows), so only
+    # one document_images insert call is expected.
+    image_table_calls = [
+        c for c in mock_supabase.table.call_args_list if c.args and c.args[0] == "document_images"
+    ]
+    assert len(image_table_calls) >= 1, "document_images table().insert() never invoked"
+
+    # The insert payload must contain exactly one row with description=''.
+    insert_payloads = [
+        call.args[0]
+        for call in mock_builder.insert.call_args_list
+        if call.args and isinstance(call.args[0], list)
+    ]
+    # Find the payload that contains a row with our document_id (filters out chunk_rows).
+    image_payload = None
+    for p in insert_payloads:
+        if p and isinstance(p[0], dict) and p[0].get("document_id") == "doc-072-01-t3" and "description" in p[0]:
+            image_payload = p
+            break
+    assert image_payload is not None, f"Could not find document_images payload in inserts: {insert_payloads!r}"
+    assert len(image_payload) == 1, f"Expected exactly 1 image row, got {len(image_payload)}"
+    assert image_payload[0]["description"] == "", (
+        f"Expected description='', got {image_payload[0].get('description')!r}"
+    )
 
 
 def test_extract_pdf_images_reads_stream_bytes(tmp_path):
@@ -317,6 +510,9 @@ def test_extract_and_store_images_uses_extracted_doc():
     mock_settings.llm_model = "openai/gpt-4o"
     mock_settings.llm_api_key = "test-key"
     mock_settings.llm_base_url = ""
+    # Phase 072 D-072-08: production code now reads cap + size from app_settings.
+    mock_settings.multimodal_max_vision_calls = 100
+    mock_settings.multimodal_max_b64_bytes_kb = 4096
 
     ed = ExtractedDocument(
         text="",
