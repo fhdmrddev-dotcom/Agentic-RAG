@@ -728,6 +728,160 @@ class TestReextractDocument:
         assert response.status_code == 422
         assert "engine=pymupdf timed out after" in response.json()["detail"]
 
+    # ── Phase 072 Plan 03 — retry_empty_descriptions_only branch ────────────
+
+    def test_reextract_retry_empty_descriptions_only_branch(self, client, auth_headers, mock_builder):
+        """Phase 072 D-072-04: ?retry_empty_descriptions_only=true SKIPS the
+        delete cascade + extract_composable + ingest_document; ONLY loops
+        over document_images.description='' rows and refills via describe_image.
+
+        Assertions cover:
+          - 202 response status (existing /reextract contract preserved).
+          - extract_composable NOT called (retry bypasses the composer entirely).
+          - ingest_document NOT scheduled (no background task).
+          - load_app_settings called EXACTLY ONCE — by the ROUTE's retry-branch
+            fork (BLOCKER 3). The HELPER itself never calls it; app_settings is
+            INJECTED into the helper. The route-level call is wrapped in
+            run_in_threadpool per D-v2.5-01.
+          - Composite (image_index, page) matching key (WARNING 4) — rows match
+            via the tuple, not bare image_index.
+          - `_downscale_b64_for_vision` called before every describe_image
+            (WARNING 3 — D-072-02 invariant shared with extract_and_store_images).
+          - describe_image signature shape (b64, app_settings, client) honored
+            in call_args; the app_settings positional is the SAME object the
+            route loaded (proves injection, not re-load).
+        """
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        # Mock sequence — BLOCKER 3: NO load_app_settings supabase calls happen
+        # inside the HELPER (app_settings is injected). The ROUTE's retry-branch
+        # fork calls load_app_settings ONCE (patched below; the patched mock
+        # returns a stub UserEffectiveSettings, so this does NOT consume a
+        # mock_builder.execute slot).
+        # Retry helper supabase sequence:
+        #   1. owner SELECT returns the doc row.
+        #   2. SELECT empty-description rows returns 2 rows ((image_index=0, page=1) and (image_index=2, page=3)).
+        #   3. UPDATE row.id=img-1 (describe returned non-empty).
+        #   4. UPDATE row.id=img-2 (describe returned non-empty).
+        #   5. SELECT documents for the DocumentResponse shape.
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),  # owner SELECT
+            _make_result([
+                {"id": "img-1", "image_index": 0, "page": 1},
+                {"id": "img-2", "image_index": 2, "page": 3},
+            ]),  # SELECT empty rows (created_at < 5min ago — handled by .lt())
+            _make_result([{"id": "img-1"}]),  # UPDATE img-1
+            _make_result([{"id": "img-2"}]),  # UPDATE img-2
+            _make_result(pdf_doc),  # SELECT documents for DocumentResponse
+        ]
+
+        # Patch the helper's collaborators. BLOCKER 3: load_app_settings is
+        # patched at the route's import path (documents.py imports it at
+        # module scope per line 20). The route calls it ONCE inside the
+        # retry-branch fork; the helper NEVER calls it.
+        with patch("app.api.documents.ingest_document") as mock_ingest, \
+             patch("app.services.extraction_service.extract_composable") as mock_compose, \
+             patch("app.services.multimodal_service.extract_pdf_images") as mock_extract_imgs, \
+             patch("app.services.multimodal_service.describe_image") as mock_desc, \
+             patch("app.services.multimodal_service._downscale_b64_for_vision") as mock_downscale, \
+             patch("app.api.documents.load_app_settings") as mock_load_settings:
+            # Stub the route-level load_app_settings call. Return a sentinel
+            # object — describe_image is also patched, so the actual
+            # UserEffectiveSettings shape doesn't matter; we only need
+            # something non-None to satisfy the injection.
+            app_settings_sentinel = MagicMock(name="app_settings_stub")
+            mock_load_settings.return_value = app_settings_sentinel
+            # Fresh image extraction returns 3 images keyed by (image_index, page).
+            # Composite-key matching: (0,1) and (2,3) match the empty rows; (1,2) is extra.
+            mock_extract_imgs.return_value = [
+                {"page": 1, "image_index": 0, "b64_png": "B64FOR0", "width": 200, "height": 200},
+                {"page": 2, "image_index": 1, "b64_png": "B64FOR1", "width": 200, "height": 200},
+                {"page": 3, "image_index": 2, "b64_png": "B64FOR2", "width": 200, "height": 200},
+            ]
+            # Downscale is a no-op for the test — returns the input unchanged
+            # so we can verify both the call AND the b64 plumbing downstream.
+            mock_downscale.side_effect = lambda b64: b64
+            mock_desc.side_effect = ["A figure of charts.", "A flowchart diagram."]
+
+            response = client.post(
+                f"/documents/{DOC_ID}/reextract?retry_empty_descriptions_only=true",
+                headers=auth_headers,
+                json={"engine": "pymupdf"},
+            )
+
+        assert response.status_code == 202, (
+            f"Expected 202, got {response.status_code}: {response.text}"
+        )
+        # 1. extract_composable was NOT called (retry branch bypasses it).
+        assert mock_compose.call_count == 0, (
+            f"Expected 0 extract_composable calls in retry branch; got {mock_compose.call_count}"
+        )
+        # 2. ingest_document was NOT scheduled.
+        assert mock_ingest.call_count == 0, (
+            f"Expected 0 ingest_document schedule calls; got {mock_ingest.call_count}"
+        )
+        # 3. BLOCKER 3: route calls load_app_settings EXACTLY ONCE with NO ARGS
+        # inside the retry-branch fork (D-v2.5-01 threadpool-wrapped). The HELPER
+        # does NOT call it — app_settings is INJECTED. Verify both invariants
+        # AND lock the no-args signature so future drift is caught:
+        mock_load_settings.assert_called_once_with()
+        assert mock_load_settings.call_count == 1, (
+            f"Expected route to load_app_settings once for retry branch; "
+            f"got {mock_load_settings.call_count}. Helper must NOT call load_app_settings."
+        )
+        # 4. WARNING 3: downscale helper called twice (once per matched row).
+        assert mock_downscale.call_count == 2, (
+            f"Expected 2 _downscale_b64_for_vision calls (one per matched row); "
+            f"got {mock_downscale.call_count}"
+        )
+        # 5. describe_image was called twice (once per empty row matched by composite key).
+        assert mock_desc.call_count == 2, (
+            f"Expected 2 describe_image calls (one per matched empty row); got {mock_desc.call_count}"
+        )
+        # 6. WARNING 4: composite-key matching — describe_image got B64FOR0
+        #    (matches (0,1)) and B64FOR2 (matches (2,3)); B64FOR1 (image_index=1)
+        #    is NOT used because the empty rows are (0,1) and (2,3), not (1,2).
+        first_call_args = mock_desc.call_args_list[0].args
+        second_call_args = mock_desc.call_args_list[1].args
+        # describe_image signature: (b64_png, app_settings, client=None)
+        # Assert shape: args has at least 2 positional (b64 + app_settings).
+        assert len(first_call_args) >= 2, (
+            f"Expected describe_image call args to have shape (b64, app_settings, client); "
+            f"got {first_call_args!r}"
+        )
+        # BLOCKER 3 follow-on: the app_settings positional passed to
+        # describe_image is the SAME sentinel object the route loaded.
+        # Proves injection (not a fresh load inside the helper).
+        assert first_call_args[1] is app_settings_sentinel, (
+            "describe_image's app_settings arg must be the route-loaded "
+            "sentinel — proves injection (BLOCKER 3). Helper did not call "
+            "load_app_settings itself."
+        )
+        assert second_call_args[1] is app_settings_sentinel, (
+            "describe_image's app_settings arg must be the route-loaded "
+            "sentinel on the SECOND call too — proves single-injection (BLOCKER 3)."
+        )
+        # B64 plumbing: assert both calls received one of the expected b64s.
+        first_b64 = first_call_args[0]
+        second_b64 = second_call_args[0]
+        assert {first_b64, second_b64} == {"B64FOR0", "B64FOR2"}, (
+            f"Expected describe_image to be called with B64FOR0 and B64FOR2 "
+            f"(composite-key matches for (0,1) and (2,3)); "
+            f"got {first_b64!r} and {second_b64!r}. "
+            f"B64FOR1 (image_index=1) MUST NOT appear — (1,2) is not in the empty-rows list."
+        )
+        # 7. WARNING 3: downscale was called with the fresh b64 BEFORE describe_image.
+        downscale_b64s = {c.args[0] for c in mock_downscale.call_args_list}
+        assert downscale_b64s == {"B64FOR0", "B64FOR2"}, (
+            f"Expected downscale to be called with the same b64s as describe_image; "
+            f"got downscale={downscale_b64s!r}"
+        )
+
 
 # ── ingest_document full_markdown storage ──────────────────────────────────────
 
