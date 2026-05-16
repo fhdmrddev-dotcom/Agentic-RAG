@@ -361,7 +361,7 @@ Plans:
 - [x] 071.3-01-PLAN.md — Bench 3 table engines on 2 fixtures (user thesis + friendly_real.pdf); user picks winner via WINNER.md sentinel. (Wave 1; autonomous: false) — **winner: camelot** (thesis 214 / friendly_real 15; gmft excluded — transformers strict-dataclass break)
 - [x] 071.3-02-PLAN.md — Wire winner adapter into aspects/tables.py + TABLE_ENGINES registry + unit + integration tests. (Wave 2 — depends on Plan 01 WINNER.md sentinel; autonomous: true) — camelot adapter shipped, 11/11 tests pass
 - [x] 071.3-03-PLAN.md — Migration 047 + supabase/full-schema.sql regen + user_settings.py defaults flip. (Wave 3 — depends on Plan 02; autonomous: false — Task 2 paste-in-SQL-editor is a checkpoint:human-action) — migration applied, constraint sealed to (camelot, pdfplumber), default flipped to camelot; verified live
-- [ ] 071.3-04-PLAN.md — Full Docling rip (8 phases A-H): delete adapters, source files, env knobs, EXTRACTOR_PRIMARY, drop docling from requirements, unpin httpx, conditional PyMuPDF in-process smoke + fence delete. (Wave 4 — depends on Plan 03; autonomous: true)
+- [x] 071.3-04-PLAN.md — Full Docling rip (8 phases A-H): delete adapters, source files, env knobs, EXTRACTOR_PRIMARY, drop docling from requirements, unpin httpx, conditional PyMuPDF in-process smoke + fence delete. (Wave 4 — depends on Plan 03; autonomous: true) — Docling fully purged; httpx unpinned (Phase F PASS); fence deleted, in-process PyMuPDF (Phase G PASS); no seeds needed
 - [ ] 071.3-05-PLAN.md — Live UAT on 3 fixtures (thesis + friendly_real + DOCX sibling); close SEED-019; plant SEED-020; conditional SEED-021 plant; PROJECT.md ADR + ROADMAP wording updates. (Wave 5 — depends on Plan 04; autonomous: false — live UAT requires user)
 
 **Notes:**
