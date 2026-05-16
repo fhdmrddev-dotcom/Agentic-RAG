@@ -1,0 +1,8 @@
+# Spike-local large artifacts — never commit
+_fixtures/
+*.pdf
+*.docx
+out/
+__pycache__/
+*.pyc
+.venv*/
