@@ -181,15 +181,11 @@ def _upload_pipeline(
     engine_used: str | None = None
     text: str = ""
 
-    try:
-        docling_timeout_s = float(os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120"))
-    except ValueError:
-        log.warning(
-            "Invalid EXTRACTOR_DOCLING_TIMEOUT_S=%r; using default 120s",
-            os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S"),
-        )
-        docling_timeout_s = 120.0
-    wall_clock_s = docling_timeout_s + 10  # +10s buffer over Docling's own check
+    # Wall-clock fail-safe for the per-aspect composer. Post-Docling-rip
+    # (Phase 071.3 Plan 04 D-071.3-09), the only remaining heavy engines are
+    # camelot tables + pymupdf fence subprocess; 130s upper bound matches the
+    # legacy Layer 2 ceiling so behavior is unchanged for non-Docling stalls.
+    wall_clock_s = 130.0
 
     try:
         # Phase 071.2 D-071.2-01..04 — route PDF/DOCX through the per-aspect
@@ -772,7 +768,7 @@ async def reextract_document(
     """Re-extract a single document with an explicit engine override (Phase 071 D-071-09..12).
 
     Distinct from POST /reingest (which re-runs the global default extractor).
-    Body: {engine: 'docling' | 'pymupdf' | 'legacy'} REQUIRED.
+    Body: {engine: 'pymupdf' | 'legacy'} REQUIRED.
     Returns 202 Accepted + DocumentResponse.
 
     Behavior (D-071-10):
@@ -788,20 +784,13 @@ async def reextract_document(
        silently failing in the background task).
     6. Queue ingest_document with engine_override=body.engine.
 
-    Layer 2 wall-clock fail-safe (D-071.1-02):
-      Docling extracts are wrapped with `asyncio.wait_for(timeout=
-      EXTRACTOR_DOCLING_TIMEOUT_S + 10)`. On wall-clock timeout, the underlying
-      thread leaks (Python cannot kill threads in native code — RESEARCH.md §2);
-      uvicorn restart heals leaks under D-v2.5-02 single-worker. The user-visible
-      response is clean: the route either succeeds via PyMuPDF fallback
-      (D-071.1-04) or returns 422 with both-engines-failed detail.
-
-    Auto-fallback to PyMuPDF on Docling timeout ONLY (D-071.1-04, narrow override
-    of D-071-11): Non-timeout Docling exceptions still fail loud (status='failed'
-    + error_message); D-071-11 quality-regression-visibility intent preserved. On
-    timeout, two `pdf_extraction_runs` rows are written: one for the failed
-    Docling attempt (engine='docling', error populated), one for PyMuPDF
-    (engine='pymupdf-fallback').
+    Wall-clock fail-safe (D-071.1-02): the per-aspect composer call is wrapped
+    with `asyncio.wait_for(timeout=130s)`. On timeout, the underlying thread
+    may leak (Python cannot kill threads stuck in native code — camelot/
+    pymupdf C extensions); uvicorn restart heals leaks under D-v2.5-02
+    single-worker. Post-Docling-rip (Phase 071.3 Plan 04 D-071.3-09), the
+    auto-fallback path is no longer needed — non-timeout exceptions fail loud
+    (status='failed' + error_message); D-071-11 visibility intent preserved.
     """
     from app.services.extraction_service import extract_composable, get_extractor  # noqa: PLC0415
 
@@ -869,18 +858,11 @@ async def reextract_document(
         raise HTTPException(status_code=404, detail="Document not found after update")
 
     # 5. Extract text up-front via the chosen engine (mirrors /reingest pattern).
-    # Phase 071.1 Layer 2 (D-071.1-02) — wall-clock fail-safe for Docling stalls
-    # that wedge in native code (TableFormer/layout). Layer 1 in docling.py
-    # checks at batch boundaries only — insufficient for native wedges.
-    try:
-        docling_timeout_s = float(os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S", "120"))
-    except ValueError:
-        log.warning(
-            "Invalid EXTRACTOR_DOCLING_TIMEOUT_S=%r; using default 120s",
-            os.getenv("EXTRACTOR_DOCLING_TIMEOUT_S"),
-        )
-        docling_timeout_s = 120.0
-    wall_clock_s = docling_timeout_s + 10  # +10s buffer over Docling's own check
+    # Wall-clock fail-safe for the per-aspect composer. Post-Docling-rip
+    # (Phase 071.3 Plan 04 D-071.3-09), the only remaining heavy engines are
+    # camelot tables + pymupdf fence subprocess; 130s upper bound matches the
+    # legacy Layer 2 ceiling so behavior is unchanged for non-Docling stalls.
+    wall_clock_s = 130.0
 
     mime_type = target["mime_type"]
     extract_start = time.perf_counter()

@@ -8,8 +8,8 @@ import anyio
 from dotenv import load_dotenv
 
 # pydantic-settings reads backend/.env into the Settings object, but it does NOT
-# populate os.environ. Downstream os.getenv() consumers (extraction_service.py,
-# docling.py, etc.) therefore never saw EXTRACTOR_PRIMARY / EXTRACTOR_DOCLING_*.
+# populate os.environ. Downstream os.getenv() consumers (e.g. PYMUPDF_TIMEOUT_S
+# in the AGPL fence) would otherwise never see env-only knobs.
 # load_dotenv() fills os.environ from backend/.env regardless of CWD. Must run
 # before any module reads os.getenv() at import time.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")

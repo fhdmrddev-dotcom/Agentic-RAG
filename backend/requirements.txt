@@ -1,11 +1,10 @@
 fastapi==0.115.6
 sse-starlette==2.4.1
 uvicorn[standard]==0.32.1
-# Pinned by Phase 070 (Q-v2.6-01 resolution): supabase 2.10 → 2.29.x closes the
-# docling httpx<0.28 conflict. Bumping past supabase 2.29.x or relaxing the
-# httpx<0.29 cap re-introduces the conflict. Re-run
-# backend/tests/integration/test_pdf_extractor_docling_compat.py before changing.
-supabase==2.29.0
+# supabase: lower bound only — upper bound removed after Docling rip
+# (D-071.3-10). Bumping to a major version must re-verify integration
+# tests (backend/tests/integration/test_supabase_*.py).
+supabase>=2.29.0
 openai>=2.0.0
 anthropic>=0.97.0
 tiktoken>=0.12.0
@@ -36,7 +35,6 @@ httpx>=0.28.0,<0.29.0
 reportlab>=4.0.0  # Phase 069 test fixtures (PDF synth for golden-extraction tests)
 sentence-transformers>=3.0.0
 llm-sandbox[docker]>=0.3.37
-docling>=2.93.0,<3.0.0
 
 # Added by Phase 071.3 Plan 02 (D-071.3-05): Camelot 1.0 (MIT) — pdfium-backed
 # rule-based table extractor. ~80 MB install (opencv + pdfium + pdfminer.six).
