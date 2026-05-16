@@ -4,15 +4,35 @@ title: Library Health → Stale/Low-confidence page infinite-fetches /knowledge-
 reported: 2026-05-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
+closed: 2026-05-16
+closed_by: 071.4-02 (commit 4078e11)
 affected_areas: [frontend/library-health, frontend/data-fetching-hooks, backend/knowledge-health-endpoint]
-folded_into: null
+folded_into: 071.4
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
   branch: v2.5-dev
   commit: 40c2bf5
   date: 2026-05-16
+verified_fixed:
+  date: 2026-05-16
+  branch: v2.5-dev
+  evidence: |
+    Live verification via Chrome DevTools MCP on http://localhost:5173/:
+    - Navigate to Library Health page → click Low Confidence tab → click
+      By Query sub-tab in sequence.
+    - DevTools Network panel: exactly 1 request per tab activation
+      (most-retrieved, never-retrieved, stale, low-confidence/documents,
+      low-confidence/queries — 5 total knowledge-health tab requests).
+    - 5 seconds of idle produced zero follow-up fetches. UI did not shake.
+    - Pre-fix this same path produced dozens of identical requests per
+      second to /knowledge-health/low-confidence/documents.
+
+    Root cause was tabData in the useEffect deps with an items.length === 0
+    guard — empty backend response → guard stays true → setTabData fires
+    new object ref → deps see change → effect re-fires → tight loop.
+    Fix replaced with useRef<Set<TabKey>> tracking initialized tabs.
 ---
 
 # BUG-260516-02: Library Health → Stale/Low-confidence — infinite fetch loop + UI shake
