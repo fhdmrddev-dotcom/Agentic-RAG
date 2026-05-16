@@ -4,7 +4,9 @@ title: POST /documents/{id}/reingest does not delete prior document_tables or do
 reported: 2026-05-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
+closed: 2026-05-16
+closed_by: 071.4-04 (commits 7c0d189 + 4ac8378)
 affected_areas: [backend/api/documents, backend/ingestion, data-integrity, RAG/retrieval-quality]
 folded_into: 071.4
 related_seeds: [SEED-022]
@@ -13,6 +15,16 @@ reproduces_on:
   branch: v2.5-dev
   commit: 2907dbf
   date: 2026-05-16
+verified_fixed:
+  date: 2026-05-16
+  branch: v2.5-dev
+  evidence: |
+    Operator ran clean SQL cleanup + single reingest on thesis PDF + DOCX
+    after backend restart with the fix loaded. Counts landed exactly at the
+    predicted fresh-extract steady state:
+      PDF: 48 tables / 20 images / 441 chunks (predicted ~48 / ~20 / ~441)
+      DOCX: 39 tables / 20 images / 402 chunks (predicted ~39 / ~20 / ~402)
+    All within ±0% of predictions. No accumulation across reingests.
 ---
 
 # BUG-260516-04: /reingest does not delete prior tables/images → accumulation

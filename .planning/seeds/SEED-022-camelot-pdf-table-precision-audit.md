@@ -33,7 +33,7 @@ in `document_tables` via the camelot path. The same thesis content, extracted vi
 the DOCX path (`inline_shapes_tables` walking `<w:tbl>` elements), returned
 **39 tables** — which the operator identified as the true count.
 
-**Camelot is overcounting tables by ~5.5x on academic PDFs.**
+**Camelot was overcounting tables by ~5.5x on academic PDFs.**
 
 The DOCX path has perfect precision because it reads structural XML markup
 (`<w:tbl>` is a table by definition). The PDF path uses camelot at
@@ -46,6 +46,29 @@ with column-aligned content as a "table." False-positive candidates include:
 - Figure captions with numerical data
 - Bulleted lists with column-like spacing
 - Section header + body combinations that happen to align
+
+## Plan 071.4-01 mitigation — much better than predicted
+
+**Row/col precision floor landed in commit `46987c4`** (071.4-01): reject any
+camelot Table where `len(df) < 2 OR len(df.columns) < 2`. After the
+[[reingest-endpoint-does-not-delete-prior-tables-and-images]] BUG-260516-04
+fix unmasked the real per-extract count, the mitigated thesis PDF count is:
+
+| | Pre-floor (214) | Post-floor | Reduction |
+|---|---|---|---|
+| Thesis PDF tables | 214 | **48** | **4.4x** (78%) |
+| Ground truth (DOCX) | 39 | 39 | reference |
+| Remaining overcount | 175 | **9** | 95% closed |
+
+**This is much better than the predicted 80-120 range** — most of camelot's
+false positives ARE single-row or single-column shapes (header bands without
+data, aligned bulleted lists). Only ~9 false positives remain that have a
+≥2×2 shape — likely formula blocks or multi-row aligned text paragraphs.
+
+The remaining 9 require the content-density / figure-bbox-overlap audit
+originally scoped for the Phase 076 prerequisite. Whether that audit is
+still worth running before 076 is now an open question (down from "must
+address" to "nice-to-have") — surface to operator at /gsd:discuss-phase 076.
 
 ## Why it matters
 
