@@ -177,6 +177,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [ ] **Phase 071: Docling Primary Path** — Make Docling the default extractor; PyMuPDF (AGPL, subprocess-fenced) + pypdfium2 fallbacks wired. Migrations 039 (`pdf_extraction_runs`), 040 (`documents.extractor`), 041 (`document_images.bbox`), 042 (`document_tables.bbox + extractor`). (4 plans)
 - [ ] **Phase 071.2: Ingestion Plumbing + Docling Quality Diagnostics** — `/upload` + `/reingest` `run_in_threadpool` sweep + instant-201 BackgroundTask refactor (document row INSERTed BEFORE extract so Realtime drives frontend status); diagnose + close the 95%-chunks-drop on Docling-extracted PDFs + the 4-vs-1 telemetry-vs-storage table-count mismatch. Inserted 2026-05-15 before Phase 072 so multimodal lift doesn't compound the foreground-extract latency bug. (4 plans)
 - [ ] **Phase 071.3: Docling Demotion — Table Engine Pick + Full Rip** — Promote SEED-019. Bench PyMuPDF `find_tables(strategy="text")` + gmft (MIT, TATR-backed) + Camelot 1.0 Stream on the user's thesis; pick a non-Docling table engine that beats `pdfplumber`'s 4-of-20+ ceiling. Ship migration 047 flipping `extraction_table_engine_pdf` default. Full Docling cleanup: delete `docling` from `requirements.txt`, delete `docling.py` + 4 Docling adapters, unpin `httpx<0.29`, delete `pymupdf_isolated.py` subprocess fence if PyMuPDF runs clean in-process post-unpin. Plant SEED-020 (embedding-model audit) at close. Inserted 2026-05-16 after migration 046 demoted Docling defaults (commit `315f307`) but `pdfplumber` interim still misses 16+ tables. (5 plans)
+- [ ] **Phase 071.4: Post-071.3 Polish Bundle** — Camelot precision row/col floor (SEED-022 partial close — drops thesis from 214 → ~80-120 stored tables); BUG-260516-02 fix (Library Health infinite-fetch loop); BUG-260516-01 fix (documents-list realtime status). Inserted 2026-05-16 after Phase 071.3 testing surfaced 3 small but visible friction points on surfaces Phase 072 will build on. (3 plans)
 - [ ] **Phase 072: Multimodal Lift + DOCX Completeness** — Replace `_MAX_VISION_CALLS` / `_MAX_B64_BYTES` module constants with `app_settings` keys; persist empty-vision-description rows (`description=''`); DOCX `related_parts` walk catches floating shapes + headers/footers. Migration 044 (`app_settings_multimodal_limits`). (3 plans)
 - [ ] **Phase 073: asyncpg Pool Integration** — Replace sync `supabase-py` calls in streaming endpoint + ingestion task with asyncpg. New `_pg_pool` singleton at `dependencies.py`. Forward-fill `runs.input_tokens` / `runs.output_tokens` from LLM `usage` in the `_drain_stream_with_close_on_cancel` finalize path (TOKEN-COL-01 attaches here — see FLAGS below). (4 plans)
 - [ ] **Phase 074: SEED-009 + SEED-011 Polish Bundle** — `MODEL_CAPABILITIES.max_output_tokens` field + `_clamp_max_tokens` in `anthropic_service.py` + `_reset_redis_singleton` autouse fixture in `test_059_disconnect.py`. (2 plans)
@@ -372,6 +373,27 @@ Plans:
 - Per `feedback_preserve_engine_optionality`: the per-aspect dispatcher pattern stays — just different engines in the registries. Docling adapters get deleted because Docling is genuinely uninstalled, not because we're abandoning optionality.
 - Per `feedback_dont_hedge_to_no_new_infra`: the "keep Docling as opt-in fallback" hedge was explicitly rejected at scope-lock; deleting Docling reclaims the httpx pin + subprocess fence (~150 LOC).
 - Research brief: `.planning/research/071.3-table-engine-comparison.md` (2026-05-16, arXiv 2410.09871-backed). gmft expected winner; PyMuPDF text-strategy expected fallback.
+
+### Phase 071.4: Post-071.3 Polish Bundle
+**Inserted:** 2026-05-16 (post-071.3 session friction)
+**Goal**: Resolve three small but visible issues observed during Phase 071.3 testing — camelot table precision overcount (5.5x inflation on PDFs), Library Health infinite-fetch loop, and documents-list status-not-realtime. Each is small (1-2 LOC to 1-file scope), but together they accumulate friction and pollute the surfaces Phase 072 will build on.
+**Depends on**: Phase 071.3
+**Plans**: 3
+**Requirements**: none new — closes BUG-260516-01, BUG-260516-02, and partial-mitigates SEED-022.
+**Success Criteria** (what must be TRUE):
+  1. Camelot precision mitigation: `aspects/tables.py::camelot_tables` rejects Table objects where `len(rows) < 2 OR len(cols) < 2` before yielding. Drops the user's thesis from 214 → ~80-120 stored tables (closer to ground truth 39) without losing real tables. Unit test added for the floor. Full SEED-022 audit deferred to Phase 076 prerequisite.
+  2. Library Health infinite-fetch loop fixed: `/knowledge-health/low-confidence/documents` no longer fires endlessly when the Library Health → Stale/Low-confidence page is open. UI no longer "shakes." Verified via Chrome MCP — single fetch on mount, additional fetches only on user-driven pagination.
+  3. Documents-list realtime status: uploaded documents transition from `pending` → `processing` → `completed` without manual refresh / route change. Implemented via either (a) properly-wired Supabase Realtime subscription with fetch-on-event reconcile per D-v2.5-03, or (b) polling shim (`setInterval(refetch, 3000)` while any row is `pending`/`processing`) if Realtime investigation reveals deeper plumbing issues. Decision logged in plan/SUMMARY.
+
+**Plans**:
+- [ ] 071.4-01-PLAN.md — Camelot precision quick mitigation (SEED-022 partial close): row/col floor in `aspects/tables.py` + unit test + re-run UAT count on thesis to confirm drop. (~30 min; autonomous: true)
+- [ ] 071.4-02-PLAN.md — BUG-260516-02 fix: identify the unstable useEffect dep in the Library Health Low-Confidence hook, memoize or flatten to primitive deps, verify via Chrome MCP. (~30 min; autonomous: false — Chrome MCP verification)
+- [ ] 071.4-03-PLAN.md — BUG-260516-01 fix: investigate documents-list Realtime; ship the smallest viable fix (proper subscription OR polling shim); update bug status. (~30-60 min; autonomous: false — live upload verification)
+
+**Notes:**
+- Per [[document-status-not-realtime-on-upload]] BUG-260516-01 + [[knowledge-health-low-confidence-infinite-fetch-loop]] BUG-260516-02 + [[SEED-022-camelot-pdf-table-precision-audit]] SEED-022.
+- This is a polish phase, not a feature phase. Cross-AI review is not required; standard execute-phase flow is sufficient.
+- SEED-022 stays planted after 071.4 ships — Plan 01 here is the row/col floor mitigation (drops magnitude of inflation), NOT the full precision audit (which Phase 076 inherits as a prerequisite).
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
 **Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures, and a hand-crafted DOCX with floating shapes + header images surfaces both via the related-parts walk.
