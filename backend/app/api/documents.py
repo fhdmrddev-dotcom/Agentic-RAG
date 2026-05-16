@@ -729,6 +729,178 @@ async def reingest_document(
     return result.data[0]
 
 
+async def _reextract_refill_empty_descriptions(
+    *,
+    supabase: Client,
+    document_id: str,
+    user_id: str,
+    app_settings: "UserEffectiveSettings",
+    raw: bytes,
+    mime_type: str,
+) -> DocumentResponse:
+    """Phase 072 D-072-04 — refill document_images.description='' rows WITHOUT
+    running the full /reextract delete-cascade.
+
+    Steps:
+      1. SELECT empty-description rows older than 5 minutes (column = `created_at`
+         per the live schema; see BLOCKER 1 below for the schema-confirmation
+         provenance).
+      2. Re-run the PDF/DOCX image extraction pass on the storage raw bytes
+         (we need b64_png to call describe_image; D-04 from Phase 36 means b64_png
+         is NOT stored in document_images, so re-extracting is unavoidable).
+      3. Match each empty row's `(image_index, page)` composite key to the
+         freshly-extracted b64 (WARNING 4 — bare image_index can misalign across
+         engines; composite key is robust). Rows that don't match stay empty.
+      4. Downscale the fresh b64 via `_downscale_b64_for_vision` (shared D-072-02
+         invariant — Plan 01's `extract_and_store_images` and this retry path
+         share the SAME helper per WARNING 3).
+      5. Call `describe_image`; if non-empty, UPDATE the row.
+      6. Return DocumentResponse with the current doc state.
+
+    app_settings is INJECTED (BLOCKER 3) — the caller (route handler) loads it
+    ONCE in the retry-branch fork via `run_in_threadpool(load_app_settings, ...)`
+    per D-v2.5-01. This helper does NOT call `load_app_settings()` itself —
+    fewer threadpool boundaries inside the loop, cleaner test mocking, and it
+    aligns with how `extract_and_store_images` already accepts `app_settings`
+    as a parameter.
+
+    Every `.execute()` is wrapped in `run_in_threadpool` per D-v2.5-01 (sync
+    supabase-py calls inside an async handler would otherwise block the single
+    uvicorn worker's event loop).
+
+    Failure modes:
+      - No empty rows: return current doc state (no-op).
+      - Image re-extract raises: log warning, return current state (no UPDATE).
+      - Row's `(image_index, page)` doesn't match any fresh image: skip
+        (best-effort retry; operator can fall back to full /reextract).
+      - `describe_image` returns '' again: skip UPDATE for that row.
+    """
+    from app.services.multimodal_service import (  # noqa: PLC0415
+        _downscale_b64_for_vision,
+        describe_image,
+        extract_docx_images,
+        extract_pdf_images,
+    )
+
+    # 1. Fetch empty-description rows older than 5 minutes (threadpool-wrapped per D-v2.5-01).
+    # BLOCKER 1: the live schema column is `created_at` (NOT the prose-stage name
+    # used in CONTEXT.md). The 5-minute window prevents thrashing —
+    # empty rows just-INSERTed are not retry candidates
+    # (T-072-04-02 mitigation). Owner-only `.eq("user_id", user_id)` predicate
+    # is preserved (T-072-04-01 — RLS still gates the retry branch).
+    empties_resp = await run_in_threadpool(
+        lambda: supabase.table("document_images")
+        .select("id, image_index, page")
+        .eq("document_id", document_id)
+        .eq("user_id", user_id)
+        .eq("description", "")
+        .lt("created_at", "now() - interval '5 minutes'")
+        .execute()
+    )
+    empty_rows = empties_resp.data or []
+    if not empty_rows:
+        log.info(
+            "retry_empty_descriptions_only: no empty rows for document %s",
+            document_id,
+        )
+        doc_resp = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("*")
+            .eq("id", document_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        return DocumentResponse(**doc_resp.data)
+
+    # 2. Re-extract images from storage bytes. Wrapped in run_in_threadpool so
+    # the PDF/DOCX parsing (sync, CPU-bound) doesn't block the event loop.
+    try:
+        if mime_type == "application/pdf":
+            fresh_images = await run_in_threadpool(extract_pdf_images, raw)
+        elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            fresh_images = await run_in_threadpool(extract_docx_images, raw)
+        else:
+            fresh_images = []
+    except Exception as exc:  # noqa: BLE001 — silent-swallow + log per D-069-04
+        log.warning(
+            "retry_empty_descriptions_only: image re-extract failed for %s: %s",
+            document_id, exc,
+        )
+        fresh_images = []
+
+    if not fresh_images:
+        log.info(
+            "retry_empty_descriptions_only: no images re-extracted for %s; "
+            "%d empty rows left untouched",
+            document_id, len(empty_rows),
+        )
+        doc_resp = await run_in_threadpool(
+            lambda: supabase.table("documents")
+            .select("*")
+            .eq("id", document_id)
+            .eq("user_id", user_id)
+            .single()
+            .execute()
+        )
+        return DocumentResponse(**doc_resp.data)
+
+    # WARNING 4 — composite (image_index, page) key to avoid cross-engine
+    # misalignment. Rows whose (idx, page) tuple doesn't match a freshly-
+    # extracted image stay empty (best-effort retry).
+    fresh_by_loc = {(img["image_index"], img.get("page")): img for img in fresh_images}
+    refilled = 0
+
+    # 3 + 4 + 5. For each empty row, find matching fresh b64 by composite key,
+    # downscale via the shared D-072-02 helper, then describe.
+    for row in empty_rows:
+        key = (row["image_index"], row.get("page"))
+        fresh = fresh_by_loc.get(key)
+        if fresh is None:
+            # Row stays empty (best-effort retry — WARNING 4).
+            continue
+        b64 = fresh.get("b64_png")
+        if not b64:
+            continue
+        # WARNING 3 — shared D-072-02 downscale invariant. Plan 01's
+        # extract_and_store_images and this retry path call the SAME helper
+        # so both call sites honor the invariant from a single source.
+        b64_downscaled = _downscale_b64_for_vision(b64)
+        try:
+            desc = describe_image(b64_downscaled, app_settings)
+        except Exception as exc:  # noqa: BLE001 — silent-swallow per D-069-04
+            log.debug(
+                "retry_empty_descriptions_only: describe_image failed on row %s: %s",
+                row.get("id"), exc,
+            )
+            continue
+        if not desc:
+            continue
+        # UPDATE this row (threadpool-wrapped per D-v2.5-01).
+        await run_in_threadpool(
+            lambda r=row, d=desc: supabase.table("document_images")
+            .update({"description": d})
+            .eq("id", r["id"])
+            .execute()
+        )
+        refilled += 1
+
+    log.info(
+        "retry_empty_descriptions_only: refilled %d of %d empty rows for %s",
+        refilled, len(empty_rows), document_id,
+    )
+
+    doc_resp = await run_in_threadpool(
+        lambda: supabase.table("documents")
+        .select("*")
+        .eq("id", document_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+    return DocumentResponse(**doc_resp.data)
+
+
 @router.post("/{document_id}/reextract", response_model=DocumentResponse, status_code=202)
 async def reextract_document(
     document_id: str,
@@ -741,6 +913,21 @@ async def reextract_document(
             "Format: 'text:docling,tables:docling_tf,images:zip_xpath,equations:docling_formula'. "
             "When set, overrides body.engine (which becomes the text-engine alias). "
             "Subject to app_settings.extraction_per_call_hints_enabled flag."
+        ),
+    ),
+    retry_empty_descriptions_only: bool = Query(
+        default=False,
+        description=(
+            "Phase 072 D-072-04 — when true, ONLY refill document_images rows "
+            "where description='' AND created_at < now() - 5min. Skips the "
+            "delete-cascade + re-extract entirely. Leaves text/tables and "
+            "non-empty image rows untouched. Cost: re-runs PDF/DOCX image "
+            "extraction and one vision-LLM call per empty row. When false "
+            "(default), the legacy delete-cascade + re-extract path runs. "
+            "NOTE: BLOCKER 1 — the live schema column is `created_at` (per "
+            "supabase/migrations/030_missing_tables.sql:108-116 and "
+            "supabase/full-schema.sql:312-321), even though the CONTEXT.md "
+            "D-072-04 prose-stage name differs."
         ),
     ),
     current_user: dict = Depends(get_current_user),
@@ -809,6 +996,31 @@ async def reextract_document(
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
+
+    # Phase 072 D-072-04 — short-circuit retry path: SKIP the delete-cascade +
+    # re-extract; ONLY refill `document_images` rows with description=''.
+    # NOTE (BLOCKER 1): the live schema column is `created_at`. The route loads
+    # `app_settings` ONCE here (scoped to the retry branch — non-retry callers
+    # see no extra DB I/O) and injects it into the helper so the helper itself
+    # never calls `load_app_settings()` (BLOCKER 3 + D-v2.5-01).
+    # `load_app_settings` is already imported at line 20; `run_in_threadpool` at
+    # line 15. No new imports needed.
+    if retry_empty_descriptions_only:
+        # D-v2.5-01: `load_app_settings` is sync supabase-py I/O — wrap in
+        # `run_in_threadpool` inside this async handler.
+        # Signature: `def load_app_settings() -> UserEffectiveSettings` (NO args
+        # — loads global app_settings row). Verified at
+        # backend/app/models/user_settings.py:261 and matches the existing
+        # call site at documents.py:45 (the `_parse_engines_hint` helper).
+        app_settings = await run_in_threadpool(load_app_settings)
+        return await _reextract_refill_empty_descriptions(
+            supabase=supabase,
+            document_id=document_id,
+            user_id=current_user["id"],
+            app_settings=app_settings,
+            raw=raw,
+            mime_type=target["mime_type"],
+        )
 
     # 3. Hard delete chunks + tables + images (D-071-10 cascade order — children before parent).
     # D-071.1-01: each .execute() wrapped in run_in_threadpool.
