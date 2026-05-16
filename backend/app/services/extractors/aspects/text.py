@@ -3,8 +3,12 @@
 
 Each function takes (raw_bytes, mime) and returns (text, full_markdown_or_None).
 None markdown signals legacy engines (no layout-preserving export). Lazy imports
-inside function bodies keep module-import cost minimal (Pattern SP-4) and
-preserve the Phase 071 AGPL fence (no `import fitz` at module top).
+inside function bodies keep module-import cost minimal (Pattern SP-4).
+
+Phase 071.3 Plan 04 Phase G (D-071.3-11): the PyMuPDF subprocess fence was
+retired after the in-process smoke test verified `import fitz` works
+post-httpx-unpin. PyMuPDF AGPL-3.0 in-process imports are permitted per
+D-PRD-07.
 """
 from __future__ import annotations
 
@@ -36,14 +40,24 @@ def legacy_text(raw: bytes, mime: str) -> tuple[str, str | None]:
 
 
 def pymupdf_text(raw: bytes, mime: str) -> tuple[str, str | None]:
-    """PyMuPDF-backed text extraction via the AGPL-fenced subprocess child.
+    """PyMuPDF-backed text extraction via in-process `import fitz`.
 
-    Calls `_run_pymupdf_subprocess` (parent wrapper at
-    `backend/app/services/extractors/pymupdf.py`) which spawns
-    `python -m extractors.pymupdf_isolated`. No `import fitz` happens in
-    this process — AGPL fence preserved (Phase 071 D-PRD-07 Appendix).
+    Returns (text, None) — PyMuPDF does not produce a separate
+    layout-preserving markdown export (that was Docling's role; gone after
+    the rip). Callers that need markdown should use a markdown-capable
+    engine in the text aspect (currently only `legacy` is shipped and it
+    also returns None markdown).
+
+    AGPL: PyMuPDF is AGPL-3.0; in-process import is permitted per D-PRD-07 +
+    D-071.3-11.
     """
-    from app.services.extractors.pymupdf import _run_pymupdf_subprocess  # noqa: PLC0415
+    import fitz  # noqa: PLC0415 — AGPL in-process per D-PRD-07
 
-    ed = _run_pymupdf_subprocess(raw, mime)
-    return (ed.text, ed.full_markdown)
+    filetype = "pdf" if mime == PDF_MIME else "docx"
+    doc = fitz.Document(stream=raw, filetype=filetype)
+    try:
+        text_parts = [page.get_text() for page in doc]
+        text = "\n\n".join(text_parts)
+        return (text, None)
+    finally:
+        doc.close()

@@ -22,10 +22,12 @@ source venv/bin/activate            # POSIX
 pip install -r requirements.txt
 ```
 
-PyMuPDF (`pymupdf>=1.24`) is AGPL-3.0 and license-fenced behind the subprocess
-isolation pattern in `backend/extractors/pymupdf_isolated.py` (D-PRD-07 Appendix);
-the parent process MUST NOT `import fitz` directly — enforced by
-`tests/integration/test_pymupdf_fence.py::test_fitz_not_imported_by_parent`.
+PyMuPDF (`pymupdf>=1.24`) is AGPL-3.0. In-process import is permitted per
+D-PRD-07 + D-071.3-11 (Phase 071.3 Plan 04 Phase G smoke test verified
+compatibility post-Docling-rip). The earlier subprocess fence has been
+retired; `import fitz` now lives inline in
+`backend/app/services/extractors/aspects/text.py` +
+`backend/app/services/extractors/aspects/images_pdf.py`.
 
 Copy `.env.example` to `.env` and fill in the secrets (Supabase service-role key,
 LLM provider keys, etc.). See [`../REDIS-SETUP.md`](../REDIS-SETUP.md) and
@@ -93,21 +95,6 @@ Per-call overrides via `?engines=text:legacy,tables:pdfplumber` on `/upload`
 and `/reextract` (admin-gated via `app_settings.extraction_per_call_hints_enabled`).
 
 ## Troubleshooting
-
-### `import fitz` fails or the AGPL fence test trips
-
-PyMuPDF (`fitz`) lives ONLY in `backend/extractors/pymupdf_isolated.py` — the
-top-level package OUTSIDE `backend/app/`. Anything under `backend/app/` importing
-`fitz` violates the AGPL fence per D-PRD-07 Appendix. Run the binding invariant
-test:
-
-```bash
-cd backend && source venv/bin/activate
-pytest tests/integration/test_pymupdf_fence.py::test_fitz_not_imported_by_parent -x
-```
-
-If it fails: a parent-side module just added an `import fitz` that needs to move
-into the subprocess child entrypoint.
 
 ### Re-extracting a single document with an explicit engine override
 

@@ -16,12 +16,11 @@ pypdf>=5.0.0
 python-docx>=1.0.0
 pdfplumber>=0.11.0
 
-# Added by Phase 071 (D-071-04, D-PRD-07 Appendix): PyMuPDF (AGPL-3.0).
-# IMPORTANT — AGPL FENCE: `import fitz` is allowed ONLY in
-# backend/extractors/pymupdf_isolated.py (child subprocess). Parent FastAPI
-# process MUST NOT import fitz; enforced by
-# backend/tests/integration/test_pymupdf_fence.py::test_fitz_not_imported_by_parent.
-# Bumping or removing this pin requires re-verifying that test.
+# PyMuPDF (AGPL-3.0). In-process import permitted per D-PRD-07 +
+# D-071.3-11 (in-process smoke test verified compatibility with
+# unpinned httpx). The subprocess fence shipped in Phase 071 has
+# been retired; `import fitz` now lives inline in
+# backend/app/services/extractors/aspects/text.py + images_pdf.py.
 pymupdf>=1.24
 Pillow>=10.0.0
 python-pptx>=1.0.0

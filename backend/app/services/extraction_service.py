@@ -1,15 +1,14 @@
 """
-PDF + DOCX extraction service for Phase 069.
+PDF + DOCX extraction service.
 
 Defines the `PdfExtractor` ABC seam (D-069-03) over today's pypdf +
-pdfplumber + python-docx pipeline. `LegacyExtractor` is the only engine
-in Phase 069; Phase 071 will add DoclingExtractor / PyMuPDFExtractor /
-Pypdfium2Extractor behind the same dispatcher.
+pdfplumber + python-docx pipeline. `LegacyExtractor` is the only shipped
+engine after the Phase 071.3 Plan 04 Docling rip (D-071.3-09); PyMuPDF
+lives on as in-process aspect adapters (`pymupdf_text`,
+`pymupdf_full_images_pdf`) rather than a separate top-level extractor.
 
-Zero observable behavior change vs the pre-069 inline extraction in
-`app.api.documents.extract_text` + `app.services.multimodal_service`
-table/image helpers. Per D-069-04: text failures raise; table/image
-failures populate `*_extraction_error` fields and return empty lists.
+Per D-069-04: text failures raise; table/image failures populate
+`*_extraction_error` fields and return empty lists.
 """
 from __future__ import annotations
 
@@ -212,7 +211,6 @@ class LegacyExtractor(PdfExtractor):
 
 
 _LEGACY = LegacyExtractor()  # stateless — safe to share
-_PYMUPDF: "PdfExtractor | None" = None
 
 
 def get_extractor(mime: str, engine_override: str | None = None) -> PdfExtractor | None:
@@ -221,25 +219,15 @@ def get_extractor(mime: str, engine_override: str | None = None) -> PdfExtractor
     Phase 071.3 Plan 04 (D-071.3-09, Option A — PATTERNS.md): EXTRACTOR_PRIMARY
     deleted entirely. The per-aspect composer (`extract_composable`) is the
     primary extraction path for PDF + DOCX mimes. `get_extractor` survives as a
-    thin seam for non-composer paths and route-level engine overrides; when
-    `engine_override` is None, defaults to LegacyExtractor (the cheapest engine
-    that supports every routable mime).
+    thin seam for non-composer paths (legacy-engine lineage tag for non-PDF/
+    non-DOCX mimes that don't have per-aspect adapters).
+
+    Post-Phase-G (D-071.3-11) — the PyMuPDF subprocess fence was retired; the
+    `pymupdf` engine name is now consumed by the per-aspect composer's
+    `pymupdf` text adapter and `pymupdf_full` image adapter, both of which
+    `import fitz` in-process. `get_extractor` returns LegacyExtractor for any
+    supported mime regardless of engine_override.
     """
-    global _PYMUPDF
-    engine = engine_override or "legacy"
-
-    if engine == "pymupdf":
-        if _PYMUPDF is None:
-            try:
-                from app.services.extractors.pymupdf import PyMuPDFExtractor  # noqa: PLC0415
-                _PYMUPDF = PyMuPDFExtractor()
-            except ImportError as e:
-                log.warning("PyMuPDFExtractor import failed (%s); falling back to legacy", e)
-                _PYMUPDF = None
-        if _PYMUPDF is not None and _PYMUPDF.supports(mime):
-            return _PYMUPDF
-
-    # engine == 'legacy' OR fall-through when chosen engine doesn't support mime / failed to import
     if _LEGACY.supports(mime):
         return _LEGACY
     return None

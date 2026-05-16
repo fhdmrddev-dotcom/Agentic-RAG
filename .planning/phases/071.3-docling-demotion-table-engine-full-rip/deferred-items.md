@@ -39,6 +39,29 @@ Plan 03 baseline (commit `9b6fabb` minus Plan 04 changes).
      patch points stale.
    - Verified pre-existing 2026-05-16 via stash baseline.
 
+7. **Pre-existing async/sync test failures (~40 tests across multiple modules)**
+   - `tests/unit/test_retrieval_service.py` — 14 failures
+     (RuntimeWarning: coroutine `search_documents` was never awaited;
+      tests are synchronous but the function is async)
+   - `tests/unit/test_sql_service.py` — 10 failures (`query_documents` coroutine
+     never awaited)
+   - `tests/unit/test_sandbox_service.py::TestHarvestOutputFiles` — 2 failures
+   - `tests/unit/test_streaming_reliability.py::TestAsyncioShield` — 1 failure
+   - `tests/unit/test_multimodal_query.py` — 4 failures (TypeError)
+   - `tests/unit/test_explorer_agent.py::TestSendMessageAgentModeBranching` — 6 failures
+   - `tests/integration/test_059_disconnect.py` — 1 failure
+   - `tests/integration/test_061_producer_survives_disconnect.py` — 1 failure
+   - `tests/unit/test_061_consumer.py` — 1 ImportError
+   - `tests/unit/test_phase56_iteration_start.py` — 1 failure
+   - `tests/test_knowledge_health.py::test_never_retrieved_excludes_retrieved_docs` — 1
+   - `tests/test_mdl_verification.py::TestMDL02ProviderAwareModelResolution` — 2 failures
+   - Verified pre-existing 2026-05-16 via stash baseline (30 failures land
+     even without Plan 04 changes on the retrieval/sql/sandbox/streaming
+     modules tested in isolation).
+   - Plan 04-touched modules (test_aspect_engines_*, test_extract_composable,
+     test_extraction_dispatcher, test_documents, test_pymupdf_in_process)
+     are clean — no Plan 04-introduced failures.
+
 These belong in a separate hygiene phase (e.g. a "test fixture refresh"
 follow-on after Plan 05). Plan 04 leaves them untouched.
 
