@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -230,13 +230,21 @@ export function KnowledgeHealthPage() {
     loadOverviewAndTrend()
   }, [loadOverviewAndTrend])
 
+  // BUG-260516-02: track which tabs we've already initialized via a ref so an
+  // empty API response doesn't trigger an infinite re-fetch loop. Prior code
+  // had `tabData` in the deps + an `items.length === 0` guard — when the
+  // backend legitimately returned [] (e.g., zero low-confidence docs), the
+  // guard stayed true forever, deps saw a fresh tabData reference every fetch,
+  // and the effect re-fired endlessly. The ref doesn't trigger re-renders.
+  const initializedTabsRef = useRef<Set<TabKey>>(new Set())
+
   useEffect(() => {
     const key = getTabKey(activeTab, subTab)
-    const data = tabData[key]
-    if (data.items.length === 0 && !data.loading && !data.error) {
+    if (!initializedTabsRef.current.has(key)) {
+      initializedTabsRef.current.add(key)
       fetchTab(key, 0)
     }
-  }, [activeTab, subTab, fetchTab, tabData])
+  }, [activeTab, subTab, fetchTab])
 
   function removeFromPanel(key: TabKey, id: string) {
     setTabData((prev) => {
@@ -370,7 +378,13 @@ export function KnowledgeHealthPage() {
             variant="ghost"
             size="sm"
             className="h-8 gap-1.5 text-xs text-muted-foreground"
-            onClick={() => loadOverviewAndTrend(true)}
+            onClick={() => {
+              // BUG-260516-02 follow-up: clearing the ref lets the active
+              // tab refetch on the next render. Without this, the only way
+              // to retry an empty/failed tab fetch was a full page reload.
+              initializedTabsRef.current.clear()
+              loadOverviewAndTrend(true)
+            }}
             disabled={refreshing}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
