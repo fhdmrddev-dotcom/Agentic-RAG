@@ -30,6 +30,15 @@ Plan 03 baseline (commit `9b6fabb` minus Plan 04 changes).
 5. **`tests/unit/test_extraction_service.py::test_legacy_extractor_docx_matches_golden`**
    - Same root cause as #4 (golden fixture pre-dates `equations` field).
 
+6. **`tests/integration/test_threads.py::TestGetMessages::test_returns_message_list`**
+   **`tests/integration/test_threads.py::TestSendMessage::test_sse_stream_contains_delta_events`**
+   **`tests/integration/test_threads.py::TestSendMessage::test_sse_stream_delta_events_are_valid_json`**
+   - Error: `AttributeError: <module 'app.api.threads'> does not have the attribute 'create_streaming_chat'`
+   - Root cause: tests reference a function `create_streaming_chat` that was
+     renamed/removed in the Phase 061+ run-backed streaming refactor; mock
+     patch points stale.
+   - Verified pre-existing 2026-05-16 via stash baseline.
+
 These belong in a separate hygiene phase (e.g. a "test fixture refresh"
 follow-on after Plan 05). Plan 04 leaves them untouched.
 
