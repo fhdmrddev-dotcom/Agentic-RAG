@@ -62,6 +62,21 @@ Plan 03 baseline (commit `9b6fabb` minus Plan 04 changes).
      test_extraction_dispatcher, test_documents, test_pymupdf_in_process)
      are clean — no Plan 04-introduced failures.
 
+## Frontend build (pre-existing TS errors)
+
+`npm run build` fails with ~20 pre-existing TypeScript errors across
+test files, hooks, components, and stores. Verified zero references to
+`docling` or `extractor` in `frontend/src/`, so these errors are
+unrelated to Plan 04's backend changes. Logged for a future frontend
+hygiene phase. Errors include:
+- FolderTreeProps missing properties in tests
+- `beforeEach` not imported in IngestionPage.test.tsx
+- Various TS6133 unused-variable warnings
+- streamsStore.ts StateCreator type incompatibility
+- SettingsPage.tsx web_search_enabled / tooltip property mismatches
+- SkillFormDialog.tsx RefObject HTMLInputElement type
+- MessageSkeleton.tsx 'Cannot find namespace JSX'
+
 These belong in a separate hygiene phase (e.g. a "test fixture refresh"
 follow-on after Plan 05). Plan 04 leaves them untouched.
 
