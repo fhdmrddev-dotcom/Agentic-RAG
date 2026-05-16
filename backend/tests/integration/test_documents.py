@@ -350,9 +350,13 @@ class TestReingestDocument:
             "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
             "is_latest": True,
         }
-        # Side effects: 1=owner SELECT, 2=UPDATE status='pending' returning row
+        # Side effects (order matches reingest_document after BUG-260516-04 fix):
+        # 1=owner SELECT, 2=DELETE document_tables, 3=DELETE document_images,
+        # 4=UPDATE status='pending' returning row.
         mock_builder.execute.side_effect = [
             _make_result(pdf_doc),                              # owner SELECT
+            _make_result([]),                                    # DELETE tables (071.4-04)
+            _make_result([]),                                    # DELETE images (071.4-04)
             _make_result([{**pdf_doc, "status": "pending"}]),   # UPDATE
         ]
 
@@ -378,6 +382,77 @@ class TestReingestDocument:
         )
         # BackgroundTasks invoked synchronously by TestClient (Pitfall 1).
         mock_ingest.assert_called_once()
+
+    def test_reingest_deletes_prior_tables_and_images(self, client, auth_headers, mock_builder):
+        """BUG-260516-04 regression — /reingest must delete prior document_tables
+        AND document_images BEFORE queueing the BackgroundTask, mirroring
+        /reextract's lines 803-811 cascade. Without this, every Reingest click
+        accumulates rows on top of the existing set.
+
+        Pre-fix behavior: 0 .delete() calls during the synchronous endpoint
+        body. Post-fix behavior: 2 .delete() calls (one for document_tables,
+        one for document_images).
+        """
+        from tests.conftest import _supabase as supabase_mock  # noqa: PLC0415
+
+        pdf_doc = {
+            **_doc_row(doc_id=DOC_ID, status="completed"),
+            "mime_type": "application/pdf",
+            "filename": "thesis.pdf",
+            "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
+            "is_latest": True,
+        }
+        mock_builder.execute.side_effect = [
+            _make_result(pdf_doc),                              # owner SELECT
+            _make_result([]),                                    # DELETE tables
+            _make_result([]),                                    # DELETE images
+            _make_result([{**pdf_doc, "status": "pending"}]),   # UPDATE
+        ]
+
+        mock_extracted = MagicMock()
+        mock_extracted.text = "re-extracted text"
+        mock_extracted.tables = []
+        mock_extracted.images = []
+        mock_extracted.extractor_name = "composable[legacy/camelot/pymupdf_full/none]"
+
+        # Capture delete call count BEFORE the call (resets-fixture starts at 0)
+        delete_calls_before = mock_builder.delete.call_count
+
+        with patch("app.api.documents.ingest_document"), \
+             patch("app.services.extraction_service.extract_composable",
+                   return_value=mock_extracted):
+
+            response = client.post(
+                f"/documents/{DOC_ID}/reingest",
+                headers=auth_headers,
+            )
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.text}"
+        )
+
+        # Verify .delete() was invoked at least twice (once for tables, once
+        # for images). Pre-fix this would have been zero.
+        delete_calls_after = mock_builder.delete.call_count
+        new_deletes = delete_calls_after - delete_calls_before
+        assert new_deletes >= 2, (
+            f"Regression (BUG-260516-04): /reingest must call .delete() at "
+            f"least twice (once for document_tables, once for document_images). "
+            f"Observed: {new_deletes} delete calls. Pre-fix, this was 0."
+        )
+
+        # Verify the two delete targets via supabase.table(...) call history.
+        # supabase.table('document_tables') and supabase.table('document_images')
+        # must both appear in the call args.
+        table_args = [c.args[0] for c in supabase_mock.table.call_args_list]
+        assert "document_tables" in table_args, (
+            f"Regression: supabase.table('document_tables') never called. "
+            f"table() args were: {table_args}"
+        )
+        assert "document_images" in table_args, (
+            f"Regression: supabase.table('document_images') never called. "
+            f"table() args were: {table_args}"
+        )
 
 
 # ── DELETE /documents/{id} ─────────────────────────────────────────────────────
