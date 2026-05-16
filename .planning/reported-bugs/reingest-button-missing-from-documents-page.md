@@ -4,7 +4,9 @@ title: Reingest action exists on Library Health page but is missing from the Doc
 reported: 2026-05-16
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
+closed: 2026-05-16
+closed_by: 071.4-03 (commit 4d859de)
 affected_areas: [frontend/documents-list, frontend/library-health, ux/consistency]
 folded_into: 071.4
 related_seeds: []
@@ -13,6 +15,15 @@ reproduces_on:
   branch: v2.5-dev
   commit: 4931443
   date: 2026-05-16
+verified_fixed:
+  date: 2026-05-16
+  branch: v2.5-dev
+  evidence: |
+    Per-row Reingest button shipped on Documents page DocumentList. Verified
+    via Chrome MCP: button visible on every row (RefreshCw icon, ghost
+    variant, tooltip "Re-ingest document"), disabled when status is pending
+    or processing, click triggers POST /documents/{id}/reingest which
+    completes the round-trip with status transitions visible in real-time.
 ---
 
 # BUG-260516-03: Reingest button missing from Documents page

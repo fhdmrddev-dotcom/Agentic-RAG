@@ -4,15 +4,42 @@ title: Document status stays on "pending" after upload until manual refresh or r
 reported: 2026-05-16
 surface: Agentic-RAG
 severity: minor
-status: open
+status: closed
+closed: 2026-05-16
+closed_by: 071.4-03 (commit 4d859de)
 affected_areas: [frontend/documents-list, frontend/realtime, backend/realtime]
-folded_into: null
+folded_into: 071.4
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
   branch: v2.5-dev
   commit: f2cff11
   date: 2026-05-16
+verified_fixed:
+  date: 2026-05-16
+  branch: v2.5-dev
+  evidence: |
+    Operator clarified mid-investigation that status WAS updating via
+    Realtime — the actual gap was "counts (tables/images) don't reflect
+    real-time." Root cause was the Realtime UPDATE handler replacing the
+    entire local row with payload.new, which dropped server-side aggregates
+    (table_count / image_count / chunk_count are derived from joins in
+    listDocuments, NOT stored in the documents table — so payload.new
+    doesn't have them).
+
+    Fix: spread-merge {...d, ...newDoc} on each UPDATE event (preserves
+    prior aggregates mid-transition); on terminal-state transitions
+    (status=completed | failed) call loadDocuments() to refetch the list
+    with fresh aggregates.
+
+    Chrome MCP verification (commit 4d859de):
+    - Clicked Reingest on thesis DOCX from Documents page.
+    - Status badge transitioned "Extracting images" → "completed" over
+      ~39s via Realtime (no manual refresh).
+    - Counts stayed 39 tables / 20 imgs / 402 chunks throughout the
+      transition (didn't zero-out mid-flight, didn't accumulate
+      post-completion — that's the BUG-260516-04 fix combined).
+    - No console errors.
 ---
 
 # BUG-260516-01: Document status stays on "pending" after upload until manual refresh or route change
