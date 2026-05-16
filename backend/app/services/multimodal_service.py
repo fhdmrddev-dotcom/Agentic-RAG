@@ -82,6 +82,51 @@ def _downscale_b64_for_vision(
 
 
 # ---------------------------------------------------------------------------
+# Content-hash dedup helper (D-072-06 EXTENDED — applies to PDF + DOCX paths)
+# ---------------------------------------------------------------------------
+
+def _dedup_images_by_hash(images: list) -> list:
+    """Drop duplicate images by SHA1 of b64-encoded bytes (D-072-06 EXTENDED).
+
+    Use cases:
+      - DOCX templates embed the same logo in header + body + footer; the
+        existing `zip_xpath_docx` media-path dedup misses the case where
+        the same bytes live under DIFFERENT media paths.
+      - PDF documents with repeating headers/footers (logos on every page)
+        or figures spanning page boundaries can over-detect when the
+        in-process PyMuPDF extractor (or the future `vision_sweep` engine)
+        iterates pages independently.
+
+    Hashing the b64-encoded string directly is equivalent to hashing the
+    decoded bytes (b64 is a deterministic encoding) and saves a decode
+    step. First occurrence wins — preserves the original `image_index`
+    ordering downstream extraction relies on.
+
+    Accepts any sequence of objects with a `b64_png` attribute (ImageData)
+    OR `["b64_png"]` key (legacy dict). Returns the same type.
+    """
+    import hashlib  # noqa: PLC0415
+
+    seen: set[str] = set()
+    out: list = []
+    for im in images:
+        # Support both ImageData (attr) and legacy dict shape.
+        b64 = getattr(im, "b64_png", None)
+        if b64 is None and isinstance(im, dict):
+            b64 = im.get("b64_png", "")
+        if not b64:
+            # Defensive: empty b64 = unique-by-definition; keep it.
+            out.append(im)
+            continue
+        h = hashlib.sha1(b64.encode("ascii")).hexdigest()
+        if h in seen:
+            continue
+        seen.add(h)
+        out.append(im)
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Table extraction helpers (module-level so tests can patch them)
 # ---------------------------------------------------------------------------
 
@@ -435,11 +480,16 @@ def extract_and_store_images(
                 desc = (row.get("description") or "").strip()
                 if not desc:
                     continue
-                content = (
-                    f"[Image p.{page}]: {desc}"
-                    if page is not None
-                    else f"[Image]: {desc}"
-                )
+                # D-072-06: derive location prefix for DOCX images (page is None);
+                # PDF images keep the page-number prefix.
+                bbox = row.get("bbox") or {}
+                location = bbox.get("location") if isinstance(bbox, dict) else None
+                if page is not None:
+                    content = f"[Image p.{page}]: {desc}"
+                elif location:
+                    content = f"[Image {location}]: {desc}"
+                else:
+                    content = f"[Image]: {desc}"
                 descriptions.append((i, content))
             if descriptions:
                 texts = [d[1] for d in descriptions]

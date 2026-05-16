@@ -113,11 +113,19 @@ def inline_shapes_docx(raw: bytes) -> list[ImageData]:
 
     LIMITATION: only finds `<wp:inline>` shapes; misses floating
     `<wp:anchor>` pictures (the very thing RAG-MM-LIFT-02 closes).
+
+    Phase 072 D-072-06 EXTENDED: dedup-by-content-hash applied before
+    return per WARNING 5 — `extraction_image_engine_docx` defaults to
+    `'zip_xpath'` but users can flip to `'inline_shapes'`; safe across
+    both engines.
     """
-    from app.services.multimodal_service import extract_docx_images  # noqa: PLC0415
+    from app.services.multimodal_service import (  # noqa: PLC0415
+        _dedup_images_by_hash,
+        extract_docx_images,
+    )
 
     dicts = extract_docx_images(raw)
-    return [ImageData(**d) for d in dicts]
+    return _dedup_images_by_hash([ImageData(**d) for d in dicts])
 
 
 def zip_xpath_docx(raw: bytes, min_px: int = 50) -> list[ImageData]:
@@ -192,6 +200,13 @@ def zip_xpath_docx(raw: bytes, min_px: int = 50) -> list[ImageData]:
                     zf, media_path, image_index=len(results), min_px=min_px
                 )
                 if im is not None:
+                    location = _derive_docx_image_location(part, blip)
+                    # ImageData is @dataclass(frozen=True); `replace` is the ONLY mutation path.
+                    # bbox is JSONB in document_images (migration 042); piggyback the
+                    # location label onto the existing slot. Downstream chunk-embedding
+                    # reads bbox.get("location") to build the description prefix.
+                    from dataclasses import replace  # noqa: PLC0415
+                    im = replace(im, bbox={"location": location})
                     results.append(im)
 
             for vml_img in vml:
@@ -208,9 +223,13 @@ def zip_xpath_docx(raw: bytes, min_px: int = 50) -> list[ImageData]:
                     zf, media_path, image_index=len(results), min_px=min_px
                 )
                 if im is not None:
+                    location = _derive_docx_image_location(part, vml_img)
+                    from dataclasses import replace  # noqa: PLC0415
+                    im = replace(im, bbox={"location": location})
                     results.append(im)
 
-        return results
+        from app.services.multimodal_service import _dedup_images_by_hash  # noqa: PLC0415
+        return _dedup_images_by_hash(results)
     finally:
         zf.close()
 
@@ -262,3 +281,30 @@ def _load_media_as_image_data(
         height=pil_img.height,
         bbox=None,            # Renderer-dependent — out of scope
     )
+
+
+def _derive_docx_image_location(part: str, element) -> str:
+    """Classify a DOCX image's location based on its containing part + ancestor.
+
+    - `word/header*.xml` part → "header"
+    - `word/footer*.xml` part → "footer"
+    - `word/document.xml` part: walk ancestors looking for a `wp:anchor`
+      element (lxml localname == "anchor"); if found → "floating", else
+      → "inline".
+    """
+    if part.startswith("word/header"):
+        return "header"
+    if part.startswith("word/footer"):
+        return "footer"
+    # word/document.xml — distinguish inline vs floating by ancestor chain.
+    try:
+        from lxml import etree  # noqa: PLC0415
+        anc = element.getparent()
+        while anc is not None:
+            # localname strips the namespace prefix
+            if etree.QName(anc.tag).localname == "anchor":
+                return "floating"
+            anc = anc.getparent()
+    except Exception:
+        return "inline"
+    return "inline"

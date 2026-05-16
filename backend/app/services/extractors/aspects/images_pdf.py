@@ -46,6 +46,10 @@ def pymupdf_full_images_pdf(raw: bytes) -> list[ImageData]:
     Per-image failure mode (matches the deleted child entrypoint): a single
     image that fails to extract is logged + skipped; the rest of the document
     proceeds. Errors above page-iteration level bubble to extract_composable.
+
+    Phase 072 D-072-06 EXTENDED: dedup-by-content-hash is applied before
+    return. Catches cross-page duplicate logos and figures that span page
+    breaks (rendered to the same xref/bytes on multiple pages).
     """
     import fitz  # noqa: PLC0415 — AGPL in-process per D-PRD-07
 
@@ -79,6 +83,7 @@ def pymupdf_full_images_pdf(raw: bytes) -> list[ImageData]:
                         "(xref=%s, page=%s): %s",
                         xref, page_num, e,
                     )
-        return images
+        from app.services.multimodal_service import _dedup_images_by_hash  # noqa: PLC0415
+        return _dedup_images_by_hash(images)
     finally:
         doc.close()
