@@ -775,6 +775,8 @@ async def _reextract_refill_empty_descriptions(
         (best-effort retry; operator can fall back to full /reextract).
       - `describe_image` returns '' again: skip UPDATE for that row.
     """
+    from datetime import timedelta  # noqa: PLC0415
+
     from app.services.multimodal_service import (  # noqa: PLC0415
         _downscale_b64_for_vision,
         describe_image,
@@ -788,13 +790,18 @@ async def _reextract_refill_empty_descriptions(
     # empty rows just-INSERTed are not retry candidates
     # (T-072-04-02 mitigation). Owner-only `.eq("user_id", user_id)` predicate
     # is preserved (T-072-04-01 — RLS still gates the retry branch).
+    # PostgREST filter literals are NOT evaluated as SQL — the cutoff timestamp
+    # must be computed client-side and passed as an ISO 8601 string. Surfaced
+    # during Phase 072 Plan 03 UAT (the integration test mocked supabase-py
+    # and never exercised the live PostgREST layer).
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
     empties_resp = await run_in_threadpool(
         lambda: supabase.table("document_images")
         .select("id, image_index, page")
         .eq("document_id", document_id)
         .eq("user_id", user_id)
         .eq("description", "")
-        .lt("created_at", "now() - interval '5 minutes'")
+        .lt("created_at", cutoff_iso)
         .execute()
     )
     empty_rows = empties_resp.data or []
