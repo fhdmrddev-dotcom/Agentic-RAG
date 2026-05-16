@@ -35,39 +35,6 @@ def legacy_text(raw: bytes, mime: str) -> tuple[str, str | None]:
     raise ValueError(f"legacy_text: unsupported mime {mime!r}")
 
 
-def docling_text(raw: bytes, mime: str) -> tuple[str, str | None]:
-    """Docling-backed text extraction with full_markdown export.
-
-    Reuses the module-level `_get_converter` singleton from
-    `app.services.extractors.docling` (Pattern SP-6 — no second
-    DocumentConverter instance is constructed).
-    """
-    import tempfile  # noqa: PLC0415
-    import os  # noqa: PLC0415
-    from app.services.extractors.docling import _get_converter  # noqa: PLC0415
-
-    suffix = ".pdf" if mime == PDF_MIME else ".docx"
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
-        tf.write(raw)
-        tmp_path = tf.name
-    try:
-        converter = _get_converter()
-        result = converter.convert(tmp_path)
-        doc = result.document
-        try:
-            full_markdown = doc.export_to_markdown()
-        except Exception as exc:  # noqa: BLE001
-            log.warning("docling_text: export_to_markdown failed: %s", exc)
-            full_markdown = None
-        text = full_markdown or doc.export_to_text()
-        return (text, full_markdown)
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
-
-
 def pymupdf_text(raw: bytes, mime: str) -> tuple[str, str | None]:
     """PyMuPDF-backed text extraction via the AGPL-fenced subprocess child.
 

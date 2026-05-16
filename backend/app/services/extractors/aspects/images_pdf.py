@@ -44,36 +44,3 @@ def pymupdf_full_images_pdf(raw: bytes) -> list[ImageData]:
 
     ed = _run_pymupdf_subprocess(raw, PDF_MIME)
     return list(ed.images)
-
-
-def docling_pictures_pdf(raw: bytes) -> list[ImageData]:
-    """Docling pictures-array PDF image extraction.
-
-    Reuses the existing `_get_converter` singleton (Pattern SP-6) — no
-    second DocumentConverter instance is constructed.
-    """
-    import tempfile  # noqa: PLC0415
-    import os  # noqa: PLC0415
-    from app.services.extractors.docling import (  # noqa: PLC0415
-        _get_converter,
-        _to_image_data,
-    )
-
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tf:
-        tf.write(raw)
-        tmp_path = tf.name
-    try:
-        converter = _get_converter()
-        result = converter.convert(tmp_path)
-        doc = result.document
-        images: list[ImageData] = []
-        for pi, p in enumerate(doc.pictures):
-            im = _to_image_data(p, pi, doc)
-            if im is not None:
-                images.append(im)
-        return images
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass

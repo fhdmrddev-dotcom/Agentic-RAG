@@ -6,6 +6,10 @@ Tests prove:
   2. When engines=None, defaults come from app_settings.extraction_*_engine_*.
   3. Unknown engine names raise KeyError (defensive — fail fast at composer entry).
   4. ExtractedDocument.equations field exists + is populated by EQUATION_ENGINES.
+
+Phase 071.3 Plan 04: `docling_tf` and `docling_formula` engines removed from
+the registries. Tests use `camelot` (winner) for tables and inject a fake
+equation engine name via monkeypatch for the populated-equations case.
 """
 from __future__ import annotations
 
@@ -45,7 +49,7 @@ def test_extract_composable_dispatches_to_text_engine(monkeypatch):
         return []
 
     monkeypatch.setitem(aspects.TEXT_ENGINES, "legacy", fake_text)
-    monkeypatch.setitem(aspects.TABLE_ENGINES, "docling_tf", fake_tables)
+    monkeypatch.setitem(aspects.TABLE_ENGINES, "camelot", fake_tables)
     monkeypatch.setitem(aspects.IMAGE_ENGINES_PDF, "pymupdf_full", fake_images_pdf)
     monkeypatch.setitem(aspects.EQUATION_ENGINES, "none", fake_equations)
 
@@ -54,7 +58,7 @@ def test_extract_composable_dispatches_to_text_engine(monkeypatch):
         PDF_MIME,
         engines={
             "text": "legacy",
-            "tables": "docling_tf",
+            "tables": "camelot",
             "images": "pymupdf_full",
             "equations": "none",
         },
@@ -81,7 +85,7 @@ def test_extract_composable_falls_back_to_app_settings(monkeypatch):
         return ("FROM DEFAULT", None)
 
     monkeypatch.setitem(aspects.TEXT_ENGINES, "legacy", fake_text)
-    monkeypatch.setitem(aspects.TABLE_ENGINES, "docling_tf", lambda r, m: [])
+    monkeypatch.setitem(aspects.TABLE_ENGINES, "camelot", lambda r, m: [])
     monkeypatch.setitem(aspects.IMAGE_ENGINES_PDF, "pymupdf_full", lambda r: [])
     monkeypatch.setitem(aspects.EQUATION_ENGINES, "none", lambda r, m: [])
 
@@ -89,7 +93,7 @@ def test_extract_composable_falls_back_to_app_settings(monkeypatch):
     fake_settings = MagicMock()
     fake_settings.extraction_text_engine_pdf = "legacy"
     fake_settings.extraction_text_engine_docx = "legacy"
-    fake_settings.extraction_table_engine_pdf = "docling_tf"
+    fake_settings.extraction_table_engine_pdf = "camelot"
     fake_settings.extraction_image_engine_pdf = "pymupdf_full"
     fake_settings.extraction_image_engine_docx = "zip_xpath"
     fake_settings.extraction_equation_engine = "none"
@@ -117,7 +121,7 @@ def test_extract_composable_unknown_engine_raises_keyerror():
             PDF_MIME,
             engines={
                 "text": "bogus_engine_name_that_does_not_exist",
-                "tables": "docling_tf",
+                "tables": "camelot",
                 "images": "pymupdf_full",
                 "equations": "none",
             },
@@ -136,7 +140,7 @@ def test_extract_composable_populates_equations_field(monkeypatch):
     from app.services.extractors.aspects.equations import EquationData
 
     monkeypatch.setitem(aspects.TEXT_ENGINES, "legacy", lambda r, m: ("", None))
-    monkeypatch.setitem(aspects.TABLE_ENGINES, "docling_tf", lambda r, m: [])
+    monkeypatch.setitem(aspects.TABLE_ENGINES, "camelot", lambda r, m: [])
     monkeypatch.setitem(aspects.IMAGE_ENGINES_PDF, "pymupdf_full", lambda r: [])
 
     # Case A: equations=none → empty tuple
@@ -146,7 +150,7 @@ def test_extract_composable_populates_equations_field(monkeypatch):
         PDF_MIME,
         engines={
             "text": "legacy",
-            "tables": "docling_tf",
+            "tables": "camelot",
             "images": "pymupdf_full",
             "equations": "none",
         },
@@ -154,22 +158,25 @@ def test_extract_composable_populates_equations_field(monkeypatch):
     assert hasattr(out_a, "equations")
     assert out_a.equations == ()
 
-    # Case B: equations engine returns 2 EquationData → tuple length 2
+    # Case B: a stub equation engine returns 2 EquationData → tuple length 2.
+    # Inject a synthetic engine name (`stub_formula`) into the registry —
+    # post-Plan-04 there is no shipped engine that produces equations, so the
+    # populated case is exercised via monkeypatch only.
     fake_eqs = [
         EquationData(page=1, equation_index=0, latex="a^2", text="a^2", bbox=None),
         EquationData(page=1, equation_index=1, latex="b^2", text="b^2", bbox=None),
     ]
     monkeypatch.setitem(
-        aspects.EQUATION_ENGINES, "docling_formula", lambda r, m: list(fake_eqs)
+        aspects.EQUATION_ENGINES, "stub_formula", lambda r, m: list(fake_eqs)
     )
     out_b = extract_composable(
         b"%PDF",
         PDF_MIME,
         engines={
             "text": "legacy",
-            "tables": "docling_tf",
+            "tables": "camelot",
             "images": "pymupdf_full",
-            "equations": "docling_formula",
+            "equations": "stub_formula",
         },
     )
     assert len(out_b.equations) == 2
