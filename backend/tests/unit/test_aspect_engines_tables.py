@@ -92,10 +92,10 @@ def test_camelot_tables_invalid_mime_returns_empty():
 def test_camelot_tables_empty_pdf_returns_empty():
     """A valid PDF with no tabular content does not crash camelot_tables.
 
-    Per D-071.3-06, the adapter does not swallow internal failures — but a
-    legitimately structured PDF with only a line of text must complete
-    successfully and return a list (camelot's stream-mode treats stray text
-    as a 1x1 'table'; we assert the call doesn't raise and returns a list).
+    Per D-071.3-06, the adapter does not swallow internal failures. With the
+    071.4-01 precision floor (SEED-022 mitigation), any 1x1 degenerate "table"
+    that camelot synthesizes from a stray line of text is now rejected at the
+    floor — so this PDF must return an EMPTY list.
     """
     from app.services.extractors.aspects.tables import camelot_tables
 
@@ -111,6 +111,109 @@ def test_camelot_tables_empty_pdf_returns_empty():
 
     out = camelot_tables(buf.getvalue(), PDF_MIME)
     assert isinstance(out, list)
-    # Either empty OR a degenerate single-cell 'table' — both shapes acceptable.
-    for t in out:
-        assert isinstance(t, TableData)
+    # After 071.4-01 precision floor: degenerate 1x1 "tables" are rejected.
+    assert out == [], (
+        f"Expected empty list after precision floor; got {len(out)} tables: {out}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 071.4 Plan 01 — camelot precision floor (SEED-022 partial mitigation)
+# ---------------------------------------------------------------------------
+
+
+def _fake_camelot_table(df_rows: int, df_cols: int, page: int = 1):
+    """Build a Mock that quacks like a camelot Table for floor-rejection tests.
+
+    Only needs the attributes camelot_tables actually reads: .df (with .index,
+    .columns, .iloc), ._bbox, .page.
+    """
+    import pandas as pd  # noqa: PLC0415
+
+    data = [["c"] * df_cols for _ in range(df_rows)]
+    df = pd.DataFrame(data)
+
+    class _FakeTable:
+        pass
+
+    t = _FakeTable()
+    t.df = df
+    t._bbox = (10.0, 20.0, 100.0, 200.0)
+    t.page = page
+    return t
+
+
+def test_camelot_tables_precision_floor_rejects_single_row():
+    """A camelot region with only 1 row (header alone, no data) is not a real
+    table — reject at the floor per SEED-022 / 071.4-01.
+    """
+    from app.services.extractors.aspects import tables as aspect_tables
+
+    fakes = [_fake_camelot_table(df_rows=1, df_cols=3)]
+
+    with patch(
+        "camelot.read_pdf", return_value=fakes
+    ):
+        # Reuse the same minimal PDF — content doesn't matter, camelot is mocked.
+        from reportlab.pdfgen import canvas  # noqa: PLC0415
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf)
+        c.drawString(100, 750, "x")
+        c.showPage()
+        c.save()
+        out = aspect_tables.camelot_tables(buf.getvalue(), PDF_MIME)
+
+    assert out == [], (
+        f"Single-row region must be rejected by the floor; got {len(out)} tables"
+    )
+
+
+def test_camelot_tables_precision_floor_rejects_single_col():
+    """A camelot region with only 1 column (a list, not a table) is rejected."""
+    from app.services.extractors.aspects import tables as aspect_tables
+
+    fakes = [_fake_camelot_table(df_rows=8, df_cols=1)]
+
+    with patch(
+        "camelot.read_pdf", return_value=fakes
+    ):
+        from reportlab.pdfgen import canvas  # noqa: PLC0415
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf)
+        c.drawString(100, 750, "x")
+        c.showPage()
+        c.save()
+        out = aspect_tables.camelot_tables(buf.getvalue(), PDF_MIME)
+
+    assert out == [], (
+        f"Single-column region must be rejected by the floor; got {len(out)} tables"
+    )
+
+
+def test_camelot_tables_precision_floor_accepts_2x2_minimum():
+    """A 2x2 region (smallest real table) is NOT rejected — the floor is a
+    strict minimum, not a recommendation. 2 rows + 2 cols passes.
+    """
+    from app.services.extractors.aspects import tables as aspect_tables
+
+    fakes = [_fake_camelot_table(df_rows=2, df_cols=2)]
+
+    with patch(
+        "camelot.read_pdf", return_value=fakes
+    ):
+        from reportlab.pdfgen import canvas  # noqa: PLC0415
+
+        buf = io.BytesIO()
+        c = canvas.Canvas(buf)
+        c.drawString(100, 750, "x")
+        c.showPage()
+        c.save()
+        out = aspect_tables.camelot_tables(buf.getvalue(), PDF_MIME)
+
+    assert len(out) == 1, f"2x2 must pass the floor; got {len(out)} tables"
+    assert isinstance(out[0], TableData)
+    # First row becomes header, remaining rows become data.
+    assert len(out[0].headers) == 2
+    assert len(out[0].rows) == 1  # 2 df rows - 1 header = 1 data row
