@@ -4,7 +4,7 @@ title: Table + Image Recall Lift — GPU-fenced or alternative engines
 status: planted
 planted: 2026-05-16
 phase_origin: 071.3-docling-demotion-table-engine-full-rip
-related_seeds: [SEED-006, SEED-018, SEED-019, SEED-020]
+related_seeds: [SEED-006, SEED-018, SEED-019, SEED-020, SEED-022]
 re_open_trigger: |
   Either fires (whichever first) per D-071.3-16:
   1. Next academic-PDF upload misses tables/figures observed by user
