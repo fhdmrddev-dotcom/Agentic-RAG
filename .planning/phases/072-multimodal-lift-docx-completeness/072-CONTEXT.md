@@ -2,7 +2,32 @@
 
 **Gathered:** 2026-05-15
 **Revised:** 2026-05-16 (post-Phase 071.4 — Docling fully retired, in-process PyMuPDF, vision_sweep engine added to scope)
-**Status:** Ready for planning
+**Revised:** 2026-05-16 (post-planning — vision_sweep engine + migration 048 + ≥80% recall target DEFERRED per user cost-vs-value concern; see "2026-05-16 second update" below + `<deferred>` block + SEED-021)
+**Status:** Ready for planning (3-plan shape; vision_sweep deferred)
+
+## 2026-05-16 (second update) — vision_sweep deferral retraction
+
+After the 3-iteration plan-checker loop converged on 4 plans (Plans 01-04 with vision_sweep + migration 048 in Plan 03), the user raised a cost/value concern: vision-LLM-per-page on the operator's thesis runs ~$3-5 per re-extract, and the marginal RAG retrieval value of going from 34% → 80% image recall was never measured against the existing strong pipeline (hybrid search + reranker + 15+ tools + good table extraction). The user accepted recommendations A → B from the cost-feasibility discussion:
+
+- **Drop vision_sweep from Phase 072.** Plan budget shrinks 4 → 3 plans. Plan 03 (vision_sweep + migration 048 + guardrails) deleted. Plan 04 (lazy retry + UAT) renamed to Plan 03 with dual-mode UAT collapsed to default-mode-only.
+- **Defer the ≥80% recall target.** Phase 072 SC#1 target now keys off the default `pymupdf_full` baseline (≥34% recall preserved + empty-share ≤10% from Plan 01's persist-empty-rows policy + DOCX completeness from Plan 02).
+- **Spike before re-opening.** SEED-021 ("Table + Image Recall Lift") is the home for a throwaway figure-extractor OSS spike. Survey candidates: `pdfplumber.figures`, Marker (marker-pdf), PDFFigures2 (CMU), and PyMuPDF's `page.get_drawings()` for vector-figure clustering. None require vision-LLM calls; all are $0 per extraction. After the spike measures actual retrieval improvement on a representative query set, the project decides whether to ship a non-vision engine in v3.x.
+
+**Decisions retracted from the 2026-05-16 (first update):**
+- **D-072-01 SCOPE NARROWED** — vision_sweep engine removed; the decision now reads as documentation of the `pymupdf_full` engine status only.
+- **D-072-10 DELETED** — migration 048 (widening `extraction_image_engine_pdf` CHECK to include `'vision_sweep'`) NOT shipped.
+- **D-072-11 DELETED** — vision_sweep cost guardrails (page cap + caption pre-filter + cost-warn threshold) NOT shipped.
+- **D-072-06 NARROWED** — content-hash dedup STILL applies to BOTH PDF and DOCX (opportunistic catch — cheap), but the original motivation ("vision_sweep over-detection") is now historical.
+- **Plan budget 4 → 3.** Plan 04 (lazy retry + live UAT) becomes Plan 03 with default-engine-only UAT.
+- **SC#1 single-target.** ≥34% baseline preserved on default engine; ≥80% target deferred to SEED-021 spike + future phase.
+
+**Why this is the right call (per memories):** `[[feedback_dont_hedge_to_no_new_infra]]` — recommend technically best clearly. Per `[[feedback_extraction_root_cause_not_plumbing]]` + `[[feedback_research_landscape_completeness]]` — we hadn't surveyed the OSS landscape (Marker, PDFFigures2, pdfplumber.figures) before picking vision-LLM-per-page. Per `[[feedback_docling_skepticism]]` — user has lost patience with expensive engines whose value isn't proven. The spike-first path validates value before paying engineering tax.
+
+---
+
+## 2026-05-16 Update (first — historical, partially superseded by the deferral above)
+
+The content below is preserved for traceability. Items now retracted (vision_sweep, D-072-10, D-072-11) are still in the text but the `<deferred>` block + this header are the authoritative state.
 
 ## 2026-05-16 Update — what changed and why
 
@@ -296,6 +321,8 @@ Four open `surface: Agentic-RAG` bugs as of 2026-05-15:
 
 <deferred>
 ## Deferred Ideas
+
+- **vision_sweep engine + ≥80% recall target + migration 048 + cost guardrails (D-072-01 REVISED / D-072-10 / D-072-11)** — DEFERRED 2026-05-16 (post-planning, per user cost/value concern). The 4-plan version of Phase 072 included a `vision_sweep` PDF image engine (per-page rasterize + vision-LLM "list figures with bboxes" prompt → crops) that would have lifted recall from ~34% to ~80% on the thesis at ~$3-5 per re-extract. After the plan-checker converged, the user surfaced two concerns: (a) the cost was never compared against measured retrieval improvement; (b) the OSS landscape (Marker, PDFFigures2, pdfplumber.figures, PyMuPDF `page.get_drawings()`) was never surveyed as a $0 alternative. Phase 072 ships the cheap-and-correct fixes (`app_settings` wiring + downscale + persist empties + DOCX completeness + lazy retry) but NOT the recall-ceiling lift. **Re-open trigger:** SEED-021 spike completes with concrete data on (i) which OSS engine produces the best figure recall on the thesis at $0 cost, and (ii) whether ≥80% image recall actually improves retrieval on a representative query set. If both check out, fold the winning engine into a v3.x phase (NOT v2.6 follow-on — wait for the spike evidence). See SEED-021 + memories `[[feedback-extraction-root-cause-not-plumbing]]` + `[[feedback-research-landscape-completeness]]` for the methodological frame.
 
 - **PDF table extraction swap to PyMuPDF / Docling** — SEED-006 evidence shows pdfplumber emits false-positive 1×1 tables on the thesis. Out of 072 scope (072 is multimodal lift + DOCX completeness; tables-on-PDF is Phase 071 SC#3 which lives at 89.7%/100%). **Re-open trigger:** if Phase 071.2 Plan 04 wiring fix surfaces that `extract_and_store_tables` reading `extracted_doc.tables` STILL produces noisy 1×1 results under Legacy, fold the table-engine swap into a follow-on.
 

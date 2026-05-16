@@ -366,7 +366,7 @@ Plans:
 - [x] 071.3-05-PLAN.md — Live UAT on 3 fixtures (thesis + friendly_real + DOCX sibling); close SEED-019; plant SEED-020; conditional SEED-021 plant; PROJECT.md ADR + ROADMAP wording updates. (Wave 5 — depends on Plan 04; autonomous: false — live UAT requires user) — UAT green (thesis 214 tables / 20 images / 461 chunks; SC#6 ≥15 cleared 14.3x); SEED-019 closed; SEED-020 + SEED-021 (image-axis) planted; PROJECT.md D-v2.6-05 ADR added
 
 **Notes:**
-- This phase is BEFORE Phase 072 because Phase 072's multimodal lift verification (SC#1 ≥80% of visible figures) re-extracts documents and would be tested under whichever table engine 071.3 ships. Doing 072 first would force a re-verification after 071.3.
+- This phase is BEFORE Phase 072 because Phase 072 re-extracts documents and would be tested under whichever table engine 071.3 ships. Doing 072 first would force a re-verification after 071.3. (Note: the original "≥80% of visible figures" target this phase was sequenced around has since been deferred from Phase 072 — see Phase 072 CONTEXT.md `<deferred>` ▸ vision_sweep / SEED-021. The sequencing rationale still holds for table-engine continuity.)
 - **Phase 076** (Confidence Recalibration): rescopes to the new default engine's chunk distribution. Q-v2.6-03 "re-run vs reuse" answer flips to "re-run on new defaults" definitively.
 - **Phase 082** (Cross-cutting Verification): SC#1 rephrased at 071.3 close from the Docling-era wording to "Validate final default-set output against baseline" (camelot tables + pymupdf_full images + legacy text + `none` equations).
 - Sibling commit: `315f307` (2026-05-16) already flipped `app_settings` defaults for tables (`docling_tf` → `pdfplumber`) and equations (`docling_formula` → `none`) via migration 046. 071.3 supersedes the interim defaults.
@@ -398,22 +398,20 @@ Plans:
 - SEED-022 stays planted after 071.4 ships — Plan 01 here is the row/col floor mitigation (drops magnitude of inflation), NOT the full precision audit (which Phase 076 inherits as a prerequisite).
 
 ### Phase 072: Multimodal Lift + DOCX Completeness
-**Goal**: A 4 MB academic PDF re-ingested under v2.6 stores ≥80% of its visible figures via the opt-in `vision_sweep` engine (per-page rasterize + vision-LLM "list figures + bboxes" prompt) or ≥35% via the default `pymupdf_full` engine; DOCX images carry location-prefix labels (header / inline / floating / footer) and content-hash dedup applied across BOTH PDF and DOCX paths; empty-description rows persist with retry-only refill via `/reextract`.
+**Goal**: Close the `app_settings` dead-code seam for `multimodal_max_*` (migration 044 already shipped — wiring follows); persist empty-description rows so retry surfaces them cheaply; ship the DOCX location-aware completeness via the already-shipped `zip_xpath_docx` engine + content-hash dedup across BOTH PDF and DOCX paths; ship the `/reextract?retry_empty_descriptions_only=true` lazy-retry path. The ≥80% PDF figure-recall lift is OUT of Phase 072 scope (deferred to a SEED-021 spike — see Phase 072 CONTEXT.md `<deferred>`); default `pymupdf_full` baseline (~34% on thesis) is preserved.
 **Depends on**: Phase 069
-**Plans**: 4 (widened 2026-05-16 to add vision_sweep engine + migration 048 + retry-empty-only branch)
+**Plans**: 3 (narrowed 2026-05-16 from 4 — vision_sweep + migration 048 deferred to SEED-021 spike)
 **Requirements**: RAG-MM-LIFT-01, RAG-MM-LIFT-02
 **Success Criteria** (what must be TRUE):
   1. `multimodal_service` reads `multimodal_max_vision_calls` + `multimodal_max_b64_bytes_kb` from `app_settings` (migration 044 already shipped); module constants `_MAX_VISION_CALLS` + `_MAX_B64_BYTES` deleted; new constant `MULTIMODAL_THUMBNAIL_MAX_EDGE = 1024` drives a PIL.thumbnail downscale before every vision-LLM call.
   2. Empty-vision-description rows persist with `description=''` instead of being dropped. `/reextract?retry_empty_descriptions_only=true` ships as the lazy retry path (D-072-04 Shape B): skips delete-cascade + re-extract; loops over empty rows and refills via describe_image.
   3. Content-hash dedup helper `_dedup_images_by_hash` invoked by BOTH DOCX (`zip_xpath_docx`) and PDF (`pymupdf_full_images_pdf`) image engines. DOCX images annotated with location label (`bbox.location` = header / footer / inline / floating); chunk-embedding prefix renders `[Image header]: ...`, `[Image floating]: ...`, etc.
-  4. New opt-in `vision_sweep` PDF image engine added to `IMAGE_ENGINES_PDF` registry. Guardrails: `vision_sweep_max_pages` page cap + caption-regex pre-filter + cost-warn log line. Migration 048 widens `extraction_image_engine_pdf` CHECK to allow `'vision_sweep'` and adds 2 guardrail columns.
-  5. Live UAT on thesis PDF: Mode A (`pymupdf_full`) total ≥ 21 (≥35% of ~59 figures); Mode B (`vision_sweep`) total ≥ 47 (≥80% of ~59 figures). Operator-confirmed Mode B cost within $3-10 range.
+  4. Live UAT on thesis PDF under default `pymupdf_full`: `total >= 20` images stored + `empty / total <= 0.10`. DOCX micro-UAT on a hand-crafted floating-shape document returns exactly 3 deduped rows with location prefixes. (The ≥80% recall target is deferred — see SEED-021.)
 
 **Plans:**
 - [ ] 072-01-PLAN.md — app_settings wiring + 1024px downscale + persist-empty-rows (Wave 1; autonomous)
 - [ ] 072-02-PLAN.md — Content-hash dedup helper (PDF + DOCX) + DOCX location-prefix labels (Wave 2; autonomous)
-- [ ] 072-03-PLAN.md — vision_sweep engine + migration 048 + guardrails (Wave 3; checkpoint:human-action for SQL editor paste)
-- [ ] 072-04-PLAN.md — /reextract retry-empty-only branch + dual-mode live UAT (Wave 4; checkpoint:human-action for live UAT)
+- [ ] 072-03-PLAN.md — /reextract retry-empty-only branch + default-engine live UAT + DOCX micro-UAT (Wave 3; checkpoint:human-action for live UAT)
 
 ### Phase 073: asyncpg Pool Integration
 **Goal**: The streaming endpoint's Postgres reads/writes go through an `asyncpg>=0.29` connection pool instead of sync `supabase-py` calls, CONCUR-01 stays green, and every completed run finalizes with `runs.input_tokens` + `runs.output_tokens` populated from the LLM `usage` field.
@@ -608,7 +606,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
 | 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
 | 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
-| 072 — Multimodal Lift + DOCX Completeness | 0/3 | Not started | — |
+| 072 — Multimodal Lift + DOCX Completeness | 0/3 | Planned (vision_sweep deferred to SEED-021) | — |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
