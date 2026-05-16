@@ -2,7 +2,7 @@
 spike: 005
 name: retrieval-value-smoke
 validates: "Given the winning engine combo (pymupdf_full WITH the cap raised from 20→100), when 5-10 figure-grounded queries are run against the live pipeline, then answer quality observably exceeds the cap=20 baseline. This is the (b) leg of the SEED-021 re-open trigger."
-verdict: PENDING (needs operator hand-evaluation)
+verdict: NOT RUN — user opted to close SEED-021 on (a) findings alone (2026-05-16). Procedure preserved for optional future use or as the basis for Phase 072 Plan 03 UAT extension.
 related: [001-pymupdf-full-baseline, 002-get-drawings-vector-cluster, 003-pdfplumber-figures]
 tags: [seed-021, retrieval, leg-b, human-judgment, hand-evaluation]
 ---
@@ -53,9 +53,17 @@ Plan 03's live UAT measures **storage**: does total stored figure count rise, do
 
 Plan 03's UAT can pass with high stored figure count but zero retrieval improvement (the bad outcome where Plan 01 ships but doesn't move the needle). Spike 005 catches that case BEFORE shipping.
 
-## Results
+## Results (2026-05-16)
 
-PENDING — needs operator to run the manual procedure documented by `run.py prep`.
+**NOT RUN.** After Spikes 001-004 returned a conclusive (a)-leg finding ("extraction was never the bottleneck — storage cap was"), the operator opted to close SEED-021 on the (a) evidence alone and skip the (b) retrieval-value evaluation as a blocking gate.
+
+Rationale:
+- The (a) finding is mechanically unambiguous (the DB physically shows 20 stored figures with `empty=0` on a doc where the extractor finds 67 — the LLM successfully described every figure it tried).
+- Phase 072 Plan 01 ships the actual fix regardless (replaces the hardcode with the `app_settings` read — closes the dead-code seam).
+- The retrieval-quality observation can be made post-Plan-01 in real use without setting it up as a blocking spike.
+- The full procedure (~30 min of manual hand-evaluation) was disproportionate to the marginal information gain given the conclusive (a) leg.
+
+The manual procedure in `run.py prep` remains runnable if the question resurfaces. It is also a useful template for an optional extension to Phase 072 Plan 03's live UAT.
 
 ### Result template (fill in after run)
 

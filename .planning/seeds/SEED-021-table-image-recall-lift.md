@@ -1,10 +1,13 @@
 ---
 seed_id: SEED-021
 title: Table + Image Recall Lift — GPU-fenced or alternative engines
-status: planted
+status: partially-resolved
 planted: 2026-05-16
+image_axis_resolved: 2026-05-16 (via .planning/spikes/001-005 — storage cap, not extraction)
+table_axis_status: open (trigger #1 — user-observed missed tables — still active)
 phase_origin: 071.3-docling-demotion-table-engine-full-rip
 related_seeds: [SEED-006, SEED-018, SEED-019, SEED-020, SEED-022]
+related_spikes: [001-pymupdf-full-baseline, 002-get-drawings-vector-cluster, 003-pdfplumber-figures, 004-marker-cpu-smoke, 005-retrieval-value-smoke]
 re_open_trigger: |
   Either fires (whichever first):
   1. Next academic-PDF upload misses tables/figures observed by user
@@ -29,6 +32,21 @@ suggested_phase: post-v2.6 spike via `/gsd:spike` first; ship phase
   the OSS landscape closes enough of the gap without vision-LLM-per-page
   costs; see SEED-018 for GPU candidates if a GPU path is needed)
 ---
+
+## 2026-05-16 update — image-axis RESOLVED via spike series
+
+The spike-first re-open trigger fired and resolved the image-axis question in a single afternoon. See `.planning/spikes/MANIFEST.md` for the full series, but the headline:
+
+- **The "20 figures = 34% recall" baseline was a STORAGE-LAYER ARTIFACT**, not an extraction problem. Spike 001 ran `pymupdf_full` on the operator's thesis and found 67 unique figures. The DB confirmed: `app_settings.multimodal_max_vision_calls = 100` is already correct (per migration 044), but `backend/app/services/multimodal_service.py:_MAX_VISION_CALLS = 20` hardcodes the consumer side, dropping 47 of 67 figures before any vision-LLM call.
+- **Vector clustering (`page.get_drawings()`) is invalidated on this thesis** — only 68 vector primitives across 200 pages. Would still help on architecture-diagram-heavy docs but not academic prose+raster theses.
+- **pdfplumber.images (61 figures) is comparable to pymupdf_full (67)** — both walk the same xref graph. No drop-in advantage.
+- **Marker SKIPPED** — the conditional gate ("union <40") never triggered. Avoided the GPL/CPU-slow install entirely.
+- **Phase 072 Plan 01** (replace the hardcode with the `app_settings` read) is the SOLE load-bearing change for the recall lift. The deferred `vision_sweep` engine was solving a non-existent problem.
+- **Retrieval-value (b)-leg** intentionally skipped — operator closed on (a) alone given how mechanically conclusive the finding was. The DB physically demonstrates the diagnosis. The (b) observation can be made post-Plan-01 in real use without a blocking gate.
+
+The image-axis re-open trigger is **RESOLVED**. No engine swap needed; no GPU budget needed; no vision-LLM cost needed. Phase 072 Plan 01 alone is the fix.
+
+The table-axis trigger (#1 in the original frontmatter — "next academic-PDF upload misses tables observed by user") **stays open** as a separate concern. This spike series did NOT measure table recall.
 
 ## Why this seed exists
 

@@ -18,7 +18,7 @@ Both must come back positive to justify a future v3.x phase. Either negative clo
 | 002 | get-drawings-vector-cluster | vector clustering adds ≥15 figures (target union 20 → 35+) | INVALIDATED (but harmless) — thesis only has 68 vector primitives total; +2 figures | seed-021, pymupdf, vector-clustering, thesis-is-raster-heavy |
 | 003 | pdfplumber-figures | pdfplumber.images is a viable drop-in (target ≥30) | VALIDATED — 61 figures, comparable to pymupdf_full (engines walk same xref graph) | seed-021, pdfplumber, drop-in-alternative |
 | 004 | marker-cpu-smoke | Marker recall on CPU (conditional on 002+003 union <40) | SKIPPED — conditional gate not triggered (union = 69) | seed-021, marker, gpl, skipped |
-| 005 | retrieval-value-smoke | 5-10 figure-grounded queries: cap=20 baseline vs cap=100 lifted | PENDING (needs operator hand-evaluation) | seed-021, retrieval, leg-b, human-judgment |
+| 005 | retrieval-value-smoke | 5-10 figure-grounded queries: cap=20 baseline vs cap=100 lifted | NOT RUN — operator closed SEED-021 on (a) alone (2026-05-16) | seed-021, retrieval, leg-b, human-judgment, not-run |
 
 ## Topline finding (2026-05-16)
 
@@ -26,7 +26,11 @@ Both must come back positive to justify a future v3.x phase. Either negative clo
 
 **Implication for Phase 072:** Plan 01 (D-072-08 — replace the hardcode with the `app_settings` read) becomes the **sole load-bearing change** for the recall lift, not the entire vision_sweep engine that was deferred. The deferral was even more correct than originally argued.
 
-**Open question:** does going from 20 → 67 stored figures actually improve answers on figure-grounded queries against the live pipeline? Spike 005 is set up to measure this; needs operator hand-evaluation. Can be deferred to Phase 072 Plan 03's existing live-UAT step instead of running here.
+**Open question:** does going from 20 → 67 stored figures actually improve answers on figure-grounded queries against the live pipeline? Spike 005 was set up to measure this. **Operator opted not to run it (2026-05-16)** — the (a)-leg finding (storage cap, not extraction) is conclusive on its own; the (b)-leg question can be observed post-Plan-01 in real use without a blocking gate. The Spike 005 manual procedure remains runnable if the question resurfaces.
+
+## Status: COMPLETE (2026-05-16)
+
+SEED-021's image-axis re-open trigger is RESOLVED via the (a) findings alone. The seed's table-axis trigger (#1 in its frontmatter — "user uploads a new academic PDF + reports specific tables/figures that didn't surface") stays open as a separate concern; this spike series doesn't address tables.
 
 ## Related artifacts
 
