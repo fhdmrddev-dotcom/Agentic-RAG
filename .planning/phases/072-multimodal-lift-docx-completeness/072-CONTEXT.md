@@ -1,7 +1,29 @@
 # Phase 072: Multimodal Lift + DOCX Completeness - Context
 
 **Gathered:** 2026-05-15
-**Status:** Ready for planning (BLOCKED on Phase 071.2 Plan 04 — Layer 2 wiring fix)
+**Revised:** 2026-05-16 (post-Phase 071.4 — Docling fully retired, in-process PyMuPDF, vision_sweep engine added to scope)
+**Status:** Ready for planning
+
+## 2026-05-16 Update — what changed and why
+
+Phase 071.3 (Docling demotion) + Phase 071.4 (polish bundle) shipped between 2026-05-15 and 2026-05-16. They invalidated parts of the original CONTEXT.md:
+
+- **PyMuPDF subprocess fence retired** (Phase 071.4-04 Plan G PASS). The original D-072-01 — "swap to AGPL-fenced PyMuPDF subprocess" — is moot. PyMuPDF runs in-process and is already wired into the per-aspect dispatcher at `aspects/images_pdf.py::pymupdf_full_images_pdf`.
+- **EXTRACTOR_PRIMARY env var deleted** (Phase 071.4-04 Phase E). All extractor selection now goes through `app_settings.extraction_*_engine_*` per the per-aspect dispatcher.
+- **Docling adapters fully deleted** (Phase 071.4-04 Phase A/B). The per-aspect registries now contain: `TABLE_ENGINES = {camelot, pdfplumber}`, `IMAGE_ENGINES_PDF = {pymupdf_full}`, etc.
+- **Live image baseline measured** (Phase 071.4 verification): the user's thesis PDF (3.9 MB, ~59 visible figures) stores **20 of 59 = 34% recall** post-rip. This is the actual starting point for Phase 072 — not the original CONTEXT.md's "~2 of 60+ visible figures" estimate.
+- **Strategic realization:** Raising `_MAX_VISION_CALLS` from 20 → 100 alone CANNOT lift PDF recall, because `pymupdf_full` only **finds** 20 embedded raster images on this thesis. The bottleneck is extraction, not description.
+
+**Outcome of the 2026-05-16 update discussion:**
+
+- **G1 LOCKED:** Phase 072 **widens scope** to include a new opt-in `vision_sweep` engine (per-page rasterize + vision-LLM "list figures + bboxes" prompt). Preserves engine optionality per `[[feedback-preserve-engine-optionality]]`. Cost is bounded — user opts in via `app_settings.extraction_image_engine_pdf`.
+- **D-072-01 REVISED** to reflect the post-rip architecture + new vision_sweep engine.
+- **D-072-06 EXTENDED** to cover PDF image dedup (was DOCX-only) — important once vision_sweep can over-detect across rasterized pages.
+- **D-072-09 DELETED** (Layer 2 wiring was folded into 071.2 Plan 04 — long shipped, no live coupling).
+- **D-072-10 NEW** — Ship migration 048 widening `app_settings.extraction_image_engine_pdf` CHECK to include `'vision_sweep'`.
+- **D-072-11 NEW** — Vision_sweep cost guardrails (per-extraction page cap + caption pre-filter heuristic; planner picks final shape).
+- **Plan budget grew 3 → 4 plans** (vision_sweep engine + migration 048 = new Plan 03; UAT becomes new Plan 04).
+- **SC#1 dual-target:** Default (`pymupdf_full`) target is "≥35% (DOCX walk + downscale clarity baseline)"; opt-in (`vision_sweep`) target is the original "≥80% of visible figures". Binding gate keys off the operator's chosen engine.
 
 <domain>
 ## Phase Boundary
@@ -10,19 +32,22 @@ Lift the multimodal extraction ceiling so a 4 MB academic PDF stores ≥80% of i
 
 **Already shipped (do NOT re-do):**
 
-1. **Migration 044** (`supabase/migrations/044_app_settings_multimodal_limits.sql`) added `multimodal_max_vision_calls` + `multimodal_max_b64_bytes_kb` columns to `app_settings` — Phase 071 contract; defaults 100 / 4096.
-2. **`UserEffectiveSettings` fields** at `backend/app/models/user_settings.py:91-92` (Phase 071 wiring contract — Phase 072 USES these in the service).
-3. **`load_app_settings()` reads them** at `backend/app/models/user_settings.py:290-291` with the right defaults.
-4. **PyMuPDF subprocess fence** shipped Phase 071 Plan 03 (`backend/app/services/extractors/pymupdf.py` parent wrapper + `backend/extractors/pymupdf_isolated.py` child). Phase 072 consumes this for D-072-01 without modifying the fence.
-5. **`.env` → `os.environ` hot-fix** committed 2026-05-15 (commit `33860a7`) — `load_dotenv()` in `main.py` so the legacy revert + the three Docling env knobs from 071.1 actually take effect.
+1. **Migration 044** (`supabase/migrations/044_app_settings_multimodal_limits.sql`) added `multimodal_max_vision_calls` + `multimodal_max_b64_bytes_kb` columns to `app_settings` — defaults 100 / 4096.
+2. **`UserEffectiveSettings` fields** at `backend/app/models/user_settings.py` — Phase 072 USES these.
+3. **`load_app_settings()` reads them** at `backend/app/models/user_settings.py` with the right defaults.
+4. **In-process PyMuPDF + per-aspect dispatcher** (Phase 071.2 Plan 05 + Phase 071.4 Plan 04 Phase G). `aspects/images_pdf.py::pymupdf_full_images_pdf` is the current PDF image engine. **Subprocess fence + parent wrapper retired** — Phase 072 does NOT reintroduce the fence.
+5. **Camelot table engine + precision floor** (Phase 071.3 + 071.4 Plan 01). NOT in Phase 072 scope; mentioned as adjacent context — Phase 072 doesn't touch `aspects/tables.py`.
+6. **`/reingest` delete cascade fix** (Phase 071.4 Plan 04). Phase 072's binding tests can rely on `/reingest` correctly clearing prior tables + images.
 
 **Phase 072 owns:**
 
-- Swap `multimodal_service.py` module constants (`_MAX_VISION_CALLS=20` / `_MAX_B64_BYTES=512KB`) for `app_settings` reads via `UserEffectiveSettings` (D-072-09).
-- Swap `LegacyExtractor`'s PDF image extraction to use the AGPL-fenced PyMuPDF subprocess under the hood (D-072-01). Tables stay on pdfplumber (unchanged).
+- Swap `multimodal_service.py` module constants (`_MAX_VISION_CALLS=20` / `_MAX_B64_BYTES=512KB`) for `app_settings` reads via `UserEffectiveSettings` (D-072-08).
+- Add a new `vision_sweep` engine to `IMAGE_ENGINES_PDF` registry in `aspects/images_pdf.py` (D-072-01 REVISED). Per-page rasterize via in-process PyMuPDF → vision-LLM call per page with "list figures + bboxes" prompt → produce ImageData records. Opt-in via `app_settings.extraction_image_engine_pdf = 'vision_sweep'`. Default stays `pymupdf_full`. Tables stay on camelot (unchanged).
+- Ship **migration 048** widening `app_settings.extraction_image_engine_pdf` CHECK constraint to include `'vision_sweep'` (D-072-10).
+- Vision_sweep cost guardrails: per-extraction page cap + caption pre-filter heuristic (D-072-11). Planner picks final shape.
 - Downscale-before-vision: PIL.thumbnail(1024px max edge) on every image before vision API call (D-072-02). `_MAX_B64_BYTES` becomes a safety-net constant.
 - Persist `description=''` rows instead of dropping them (D-072-03). Lazy retry via `/reextract` only — no background worker (D-072-04).
-- DOCX completeness: walk `doc.part.related_parts` + `wp:anchor` floating shapes via lxml on `doc.element` (D-072-07). Page numbers stay null (D-072-05). De-duplicate by image-bytes content hash (D-072-06).
+- DOCX completeness: walk `doc.part.related_parts` + `wp:anchor` floating shapes via lxml on `doc.element` (D-072-07). Page numbers stay null (D-072-05). De-duplicate by image-bytes content hash (D-072-06 — now applies to BOTH PDF and DOCX paths).
 
 **What this phase does NOT do:**
 
@@ -42,10 +67,31 @@ Lift the multimodal extraction ceiling so a 4 MB academic PDF stores ≥80% of i
 
 ### Image extraction engine (the SC#1 anchor)
 
-- **D-072-01:** **Swap `LegacyExtractor._extract_images` (PDF path only) to use the AGPL-fenced PyMuPDF subprocess** shipped by Phase 071 Plan 03. The DOCX image path stays on python-docx (D-072-07 governs the walk). Tables stay on pdfplumber. Rationale: SEED-006 evidence (2026-05-02) shows pdfplumber drops 59 of 61 candidate images at the decode step (silent `try/except continue` on CMYK/JPEG2000/JBIG2 encodings); PyMuPDF's `doc.extract_image(xref)` returns properly-decoded bytes. EXTRACTOR_PRIMARY=legacy is the user's stated default until Docling earns its keep — swapping the image-engine within Legacy means the lift works for the user's actual deployment without changing the primary extractor decision.
-  - **Code site:** `backend/app/services/extraction_service.py:192-206` (`LegacyExtractor._extract_images`) plus a new `multimodal_service.extract_pdf_images_pymupdf` helper, OR delegate directly through the existing `PyMuPDFExtractor` parent wrapper at `backend/app/services/extractors/pymupdf.py`. Planner picks the cleanest shape.
-  - **Performance trade-off:** Each PDF extract now spawns the PyMuPDF subprocess in addition to running pypdf for text + pdfplumber for tables. Subprocess startup ~50ms; total legacy-extract time grows ~10-30%. Acceptable per D-v2.5-02 single-worker context — the gain (59 images recovered) dwarfs the overhead. Phase 077 multi-worker can revisit if perf shows up as a bottleneck.
-  - **AGPL fence invariant:** `import fitz` must remain only in `backend/extractors/pymupdf_isolated.py` (Phase 071 Plan 03 test `test_fitz_not_imported_by_parent` enforces). This decision adds NO new fitz imports anywhere — the legacy path subprocess-invokes the existing child entrypoint.
+- **D-072-01 (REVISED 2026-05-16):** **Add a new `vision_sweep` engine to the `IMAGE_ENGINES_PDF` registry in `backend/app/services/extractors/aspects/images_pdf.py`.** The default `pymupdf_full_images_pdf` engine stays — it's the cheap-fast in-process path. `vision_sweep` is an opt-in alternative for documents where pymupdf_full's embedded-raster ceiling is too low (operator's thesis: 20 of ~59 figures).
+
+  **vision_sweep behavior:**
+  - Rasterize each page of the PDF via in-process PyMuPDF (`fitz.Page.get_pixmap()` at ~150 DPI). Subprocess fence retired in Phase 071.4 Plan 04 Phase G; `import fitz` is now permitted in-process per D-PRD-07.
+  - For each page (subject to guardrails in D-072-11), send the rasterized image to the project's vision-LLM client (`describe_image` helper at `multimodal_service.py:210` already wraps the OpenAI/Anthropic SDKs) with a structured prompt:
+    > "List every figure, chart, table, or distinct visual element in this page. For each, return a JSON object with `bbox` (x1, y1, x2, y2 in page-relative 0–1 coords), `kind` (figure/chart/table/diagram), and a one-line caption. Return `[]` if no visual elements."
+  - Parse the LLM response (Pydantic per CLAUDE.md), crop the page raster to each bbox (`PIL.Image.crop`), encode as PNG, and produce one `ImageData` record per detected figure.
+  - Apply D-072-02 (downscale-before-vision) to each cropped figure before the description-fill pass (which happens at the existing `extract_and_store_images` layer downstream).
+
+  **Why this shape (and not a simpler one):**
+  - Preserves the per-aspect dispatcher pattern per `[[feedback-preserve-engine-optionality]]` — the engine slots in `IMAGE_ENGINES_PDF` stay swappable. Users can fall back to `pymupdf_full` if cost is a concern.
+  - No new heavy deps. Uses the existing PyMuPDF + PIL + vision-LLM stack. No GPU required.
+  - SEED-021 stays planted — full layout-aware ML detection (Marker, TATR-figures, LayoutLMv3) is still v3.x scope, but vision_sweep bridges to ~75–80% recall today.
+
+  **Code site:**
+  - New function in `aspects/images_pdf.py`: `def vision_sweep_images_pdf(raw: bytes, mime: str, *, vision_client, app_settings, ...) -> list[ImageData]`. Mirrors the existing `pymupdf_full_images_pdf` signature but takes the vision client as an injected dep.
+  - Register in `IMAGE_ENGINES_PDF` dict in `aspects/__init__.py`.
+  - The route layer (`/upload` / `/reingest` BackgroundTask in `documents.py`) reads `app_settings.extraction_image_engine_pdf` and dispatches accordingly via the existing `extract_composable` plumbing. No new function signatures at the route layer.
+
+  **AGPL invariant (relaxed but not removed):** PyMuPDF is now AGPL-in-process per D-PRD-07. The `requirements.txt` AGPL comment block stays. Phase 077 (multi-worker) may revisit if commercial-license concerns surface for distributed deploys, but for v2.6 (single-worker, self-hosted) the in-process posture is correct.
+
+  **Performance trade-off:**
+  - vision_sweep at default settings (page cap = 20 per D-072-11) on the operator's 75-page thesis: ~$3-5 per re-extract at OpenAI gpt-5.4 vision rates, ~30-60s wall time (vision-LLM bound; rasterization is fast).
+  - vs `pymupdf_full` (default): ~$0, ~2-5s wall time.
+  - User pays the cost only when they opt in via `app_settings.extraction_image_engine_pdf = 'vision_sweep'`. Default deployment cost-profile is unchanged.
 
 ### Downscale-before-vision strategy
 
@@ -69,7 +115,10 @@ Lift the multimodal extraction ceiling so a 4 MB academic PDF stores ≥80% of i
 
 - **D-072-05:** **DOCX images keep `page=null`.** python-docx genuinely cannot determine page boundaries — it has no rendered-layout concept. Heuristic page inference via section/paragraph index is noise-prone and brittle. Matches existing DOCX table behavior (`extract_docx_tables` sets `page=None`). The `query_tables` tool already handles `page=null` correctly.
 
-- **D-072-06:** **De-duplicate DOCX images by content hash** (SHA1 or MD5 of image bytes). Branded Word templates commonly embed the same logo in header + inline body + footer — storing 3 copies wastes 3× vision API calls and creates duplicate `document_chunks` for the same image. Implementation: build a `seen_hashes: set[str]` during the related_parts walk; skip on collision. Note the location in the description prefix (`[Image header]: ...` vs `[Image inline]: ...`) so the user can still trace where it appeared.
+- **D-072-06 (EXTENDED 2026-05-16):** **De-duplicate images by content hash (SHA1 of image bytes) — applies to BOTH DOCX and PDF paths.**
+  - **DOCX:** Branded Word templates commonly embed the same logo in header + inline body + footer — storing 3 copies wastes 3× vision API calls. Build a `seen_hashes: set[str]` during the `related_parts` + `wp:anchor` walk; skip on collision. Note the location in description prefix (`[Image header]: ...` vs `[Image inline]: ...`).
+  - **PDF (new):** With `vision_sweep` engine in play (D-072-01), a figure that spans a page break can be detected on TWO rasterized pages as separate visual elements. Content-hash on the cropped PNG bytes deduplicates these. Also catches the common case of a logo in every page header/footer rendering to the same crop. Implementation: same `seen_hashes` pattern in `vision_sweep_images_pdf` AND in `pymupdf_full_images_pdf` (for symmetry — the cost is trivial and matches the DOCX path's invariant).
+  - **Shared helper:** Move the dedup-by-hash logic into a small helper at `multimodal_service.py` or `aspects/__init__.py` so both PDF + DOCX engines call the same code (one `_dedup_images_by_hash(images)` function).
 
 - **D-072-07:** **Walk floating shapes via lxml on `doc.element`.** python-docx exposes `inline_shapes` natively but not floating ones (`<wp:anchor>` lives in a different XML namespace). Use python-docx's underlying lxml tree:
   ```python
@@ -88,23 +137,35 @@ Lift the multimodal extraction ceiling so a 4 MB academic PDF stores ≥80% of i
   - **No new function signatures:** `extract_and_store_images` already receives `app_settings`. The constants migrate to attribute reads inline. ~10 LOC diff.
   - **Closes CONCERNS.md:520-524 (per PRD SC#4)** — the `app_settings` dead-code state for these two specific keys gets closed.
 
-### Layer 2 wiring (cross-phase coupling — folded into 071.2)
+### Vision_sweep migration + cost guardrails (new 2026-05-16)
 
-- **D-072-09:** **The `extract_and_store_images` ignoring-`extracted_doc.images` wiring bug is folded into Phase 071.2 Plan 04** (originally scoped for tables only; extended to also cover images). By the time Phase 072 starts, Plan 04 has fixed Layer 2 so `extract_and_store_images` reads from `extracted_doc.images` instead of re-running `extract_pdf_images(raw)`. This means D-072-01's swap takes effect at Layer 1 only — `LegacyExtractor._extract_images` now returns PyMuPDF output, which `extracted_doc.images` carries through to the storage layer cleanly.
-  - **Why split across phases:** the wiring bug is the same bug class as the tables 4-vs-1 mismatch (071.1-CARRY-FORWARDS item #2). Fixing both in 071.2 Plan 04 keeps related changes atomic; 072 inherits a clean wire and focuses on the multimodal lift itself.
-  - **Risk if 071.2 Plan 04 slips:** Phase 072 either (a) waits for 071.2, OR (b) does its own Layer 2 fix inline in 072 plan. Planner picks at 072 plan time based on 071.2 status.
+- **D-072-10:** **Ship migration 048** at `supabase/migrations/048_app_settings_image_engine_pdf_vision_sweep.sql`. Widen the `app_settings.extraction_image_engine_pdf` CHECK constraint to include `'vision_sweep'` (currently allows `'pymupdf_full'` and other slots from migration 045). Default stays `'pymupdf_full'` — vision_sweep is opt-in by operator action. Follow CLAUDE.md migration discipline: paste in Supabase SQL editor (NOT `supabase db push`), then regen `supabase/full-schema.sql`. Commit migration + regenerated full-schema together.
+  - **Idempotency guards:** Use `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` pattern matching migration 047. Pre-migration UPDATE not required (no rows currently use `'vision_sweep'`).
 
-### Plan-budget split (advisory; gsd-planner finalizes)
+- **D-072-11:** **Vision_sweep cost guardrails — planner-discretion shape but mandatory guardrails exist.** The naive shape (vision-LLM call per page) would cost ~$3-5 per thesis re-extract; without bounds it's open-ended. Required guardrails:
+  - **Per-extraction page cap:** new `app_settings.vision_sweep_max_pages` integer (default 20). vision_sweep stops after this many vision-LLM calls per extraction. Surplus pages fall through to `pymupdf_full` baseline for the remaining pages (so the result is the union of LLM-detected figures on the first N pages + embedded rasters from all pages).
+  - **Caption pre-filter heuristic (recommended):** before calling the LLM on a page, do a cheap text scan for figure/table caption regex patterns (`Figure \d+`, `Fig\. \d+`, `Table \d+`, `Chart \d+`). If NO caption-pattern matches on a page, skip the LLM call for that page (assume no figures). Skip-the-LLM-call reduces cost on text-heavy pages without losing precision.
+  - **Cost-cap UI surface:** a new `app_settings.vision_sweep_estimated_cost_warn_usd` threshold (default 5.0 USD) → log a warning per extraction when projected cost exceeds. NOT a hard cap (operator decides). Planner discretion on the exact migration shape — could fold into migration 048 or split.
+  - **Planner picks the final shape** at plan-phase time. The MUST-HAVE invariants: (a) a page-cap setting reads from `app_settings`, (b) a per-extraction cost is observable in logs at INFO level for forensics. Everything else (caption filter, warn threshold, env var fallback) is planner-shaped.
 
-ROADMAP allocates 3 plans. Suggested split:
+### Plan-budget split (advisory; gsd-planner finalizes) — REVISED 2026-05-16 (3 → 4 plans)
 
-1. **Plan 01 — `app_settings` wiring + image-engine swap (PDF).** Replace module constants with `app_settings` reads (D-072-08). Swap `LegacyExtractor._extract_images` to PyMuPDF subprocess (D-072-01). Add 1024px PIL.thumbnail downscale before every vision call (D-072-02). Persist `description=''` rows (D-072-03). Binding test: ingest a thesis-class PDF, assert `document_images` count ≥ 30 + ≥90% non-empty descriptions on a 4 MB academic fixture. Autonomous: true.
+ROADMAP originally allocated 3 plans; the G1 widening to include vision_sweep adds one more. Suggested split:
 
-2. **Plan 02 — DOCX completeness (related_parts walk + lxml floating shapes + dedup).** Implement D-072-05/06/07. Replace `extract_docx_images` body with the new walk. Binding test: hand-craft a DOCX with (a) inline image, (b) header logo, (c) floating shape, (d) duplicate logo in footer — assert exactly 3 `document_images` rows (the duplicate dropped via hash dedup), each with the right `description` prefix. Autonomous: true.
+1. **Plan 01 — `app_settings` wiring + downscale + persist empty rows.** Replace module constants with `app_settings` reads (D-072-08). Add 1024px PIL.thumbnail downscale before every vision call (D-072-02). Persist `description=''` rows (D-072-03). Binding test: assert vision_max_calls reads from `app_settings`; assert downscale fires before vision API call; assert empty-description rows persist. Autonomous: true. ~150 LOC.
 
-3. **Plan 03 — Lazy retry path + live UAT.** Implement `/reextract?retry_empty_descriptions_only=true` (or accept Shape A and document it) per D-072-04. Live UAT on the thesis PDF + a branded DOCX fixture. Re-fill an SC#1 verification table showing ≥80% of visible figures stored (vs SEED-006's documented 2 of 60+). Autonomous: false (live UAT).
+2. **Plan 02 — DOCX completeness (related_parts walk + lxml floating shapes + dedup).** Implement D-072-05/06/07. Replace `extract_docx_images` body with the new walk. Add the shared `_dedup_images_by_hash` helper (D-072-06 extended to PDF + DOCX). Binding test: hand-craft a DOCX with (a) inline image, (b) header logo, (c) floating shape, (d) duplicate logo in footer — assert exactly 3 `document_images` rows (the duplicate dropped via hash dedup). Autonomous: true. ~200 LOC.
 
-Planner can collapse Plan 03 into Plan 02 if the retry path is sufficiently small AND the lazy-retry shape ends up being Shape A (incidental via full /reextract). Recommend keeping the live UAT split out — same lesson from Phase 071 (mixed autonomous + non-autonomous tasks slow the verifier).
+3. **Plan 03 — Vision_sweep engine + migration 048 + cost guardrails.** Implement `vision_sweep_images_pdf` in `aspects/images_pdf.py` (D-072-01). Register in `IMAGE_ENGINES_PDF`. Ship migration 048 (D-072-10) — paste-in-SQL-editor checkpoint per CLAUDE.md migration discipline. Implement the page-cap + caption pre-filter guardrails per D-072-11 (planner shapes final knobs). Wire `app_settings.extraction_image_engine_pdf = 'vision_sweep'` dispatch. Binding test: mock the vision-LLM client; ingest a hand-crafted multi-page PDF with synthetic captions; assert vision_sweep returns the expected ImageData records; assert the page-cap respects `app_settings.vision_sweep_max_pages`. Autonomous: false (migration paste checkpoint).
+
+4. **Plan 04 — Lazy retry path + live UAT (both engines).** Implement `/reextract?retry_empty_descriptions_only=true` (or accept Shape A and document it) per D-072-04. Live UAT on the thesis PDF in BOTH engine modes:
+   - Default mode (`pymupdf_full`): document_images ≥ 20 (current baseline preserved), DOCX walk extension adds ~5-10 images.
+   - Opt-in mode (`vision_sweep`, with `vision_sweep_max_pages = 75` for the thesis): document_images ≥ 47 (= 80% of 59 visible figures). Operator confirms cost is within the projected ~$3-5 range.
+   - Both modes record in `072-HUMAN-UAT.md` with separate sections + status.
+   - **Dual-target SC#1 keying:** UAT status = green iff (a) default mode hits ≥35% (≥21 of 59 figures), AND (b) opt-in mode hits ≥80% (≥47 of 59). Either failing = UAT red.
+   Autonomous: false (live UAT + operator-driven cost confirmation).
+
+Planner can collapse Plan 04 into Plan 03 if the retry path is sufficiently small AND lazy-retry shape ends up being Shape A. Recommend keeping live UAT split out — same lesson from Phase 071/071.3 (mixed autonomous + non-autonomous tasks slow the verifier; and the operator gate on cost is real).
 
 ### Claude's Discretion
 

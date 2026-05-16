@@ -130,3 +130,69 @@ The four areas below were discussed AFTER the hot-fix + roadmap update.
 - OCR for scanned PDFs — out of 072 scope; needs RapidOCR re-enablement strategy
 - Frontend admin UI for `multimodal_max_*` — v3.1
 - Per-document "X figures stored, Y attempted" badge — v3.1 admin shell polish
+
+---
+
+## 2026-05-16 Update Discussion
+
+**Trigger:** Phase 071.3 + 071.4 shipped between 2026-05-15 and 2026-05-16. Architectural assumptions in the original CONTEXT.md (D-072-01 references retired subprocess fence + deleted `LegacyExtractor._extract_images`; D-072-09 references long-shipped 071.2 Plan 04) became stale.
+
+**Areas re-discussed:**
+
+### G1 — Phase 072 scope direction for image recall (STRATEGIC)
+
+**Realization:** Current PDF image baseline is 20 of ~59 = 34% recall via `pymupdf_full_images_pdf`. Phase 072 as originally scoped (raise `_MAX_VISION_CALLS` 20 → 100 + DOCX walk extension) CANNOT meet SC#1 (≥80%) because extraction finds 20 images on the thesis — vision-LLM cap is not the bottleneck.
+
+**Options weighed:**
+
+| Path | What it ships | Recall estimate | Cost | New deps |
+|---|---|---|---|---|
+| A — Narrow + rewrite SC#1 | Original scope, target rewritten to ~35% | ~25-35 | $0 | none |
+| B — Widen with caption-based figure detection | Original + per-page rasterize + "Figure N" regex + snap bbox | ~35-45 | $0 ingest | PyMuPDF rasterize (already in deps) |
+| **C — Widen with vision-LLM page sweep as opt-in engine** | Original + new `vision_sweep` engine in per-aspect dispatcher; opt-in via `app_settings.extraction_image_engine_pdf` | **~45-50** | ~$3-5 per thesis (capped) | none |
+| D — Pilot Marker / GPU-backed figure detector | Original + GPU-required figure detector | ~50-55 | GPU infra | Marker / TATR-figures |
+
+**Decision: C (locked).**
+
+**Rationale:** Preserves engine optionality per `feedback_preserve_engine_optionality`. Cost is bounded (operator opts in). No GPU. No new heavy deps. Hits the goal IF user enables. SEED-021 stays planted for v3.x (Path D when GPU becomes available).
+
+### G2 — D-072-01 architecture revision
+
+Old D-072-01 ("swap LegacyExtractor._extract_images to AGPL-fenced PyMuPDF subprocess") was wholesale revised to reflect post-071.4 architecture: PyMuPDF is in-process, the per-aspect dispatcher is the path. D-072-01 now describes the new `vision_sweep` engine (rasterize + LLM page sweep) and how it slots into `IMAGE_ENGINES_PDF` alongside `pymupdf_full`.
+
+### G2 sub-decision — Migration for vision_sweep engine slot
+
+Options weighed:
+- (a) Ship migration 048 in Phase 072 widening the CHECK constraint — operator can enable from running app.
+- (b) Defer migration; register in Python only — operator cannot enable from running app.
+- (c) Boolean `enable_experimental_vision_sweep` flag bypassing the engine slot system.
+
+**Decision: (a) — Ship migration 048 in Phase 072 (locked as D-072-10).** Cleanest; the engine is shipped + enableable in one phase.
+
+### G3 — D-072-09 status (moot)
+
+Original D-072-09 ("fold Layer 2 wiring fix into Phase 071.2 Plan 04") references work that shipped long ago. **Decision: delete D-072-09**, replace with a one-line note in canonical refs that 071.2 Plan 04 closed the wiring concern. Avoids archaeological noise in CONTEXT.md.
+
+### G4 — PDF image dedup scope
+
+Options weighed:
+- (a) Extend D-072-06 to apply content-hash dedup to BOTH PDF and DOCX paths.
+- (b) Keep DOCX-only; defer PDF dedup.
+
+**Decision: (a) — Extend to both paths (D-072-06 extended).** Especially important once `vision_sweep` can over-detect figures across page-spanning rasterizations. Shared `_dedup_images_by_hash` helper.
+
+### New decisions locked
+
+- **D-072-10:** Ship migration 048 widening `app_settings.extraction_image_engine_pdf` CHECK to include `'vision_sweep'`. Default unchanged (`'pymupdf_full'`).
+- **D-072-11:** Vision_sweep cost guardrails — required page cap + caption pre-filter heuristic; planner picks final shape.
+
+### Plan budget revision
+
+Originally 3 plans; new vision_sweep engine + migration 048 + dual-mode UAT brings to **4 plans**. ROADMAP entry should be updated to reflect.
+
+### SC#1 target dual-keyed
+
+Default-engine target: **≥35%** (DOCX walk + downscale clarity baseline).
+Opt-in-engine (`vision_sweep`) target: **≥80%** of visible figures.
+Binding gate keys off the operator's chosen engine.
+
