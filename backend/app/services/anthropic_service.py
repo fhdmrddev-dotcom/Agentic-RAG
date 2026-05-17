@@ -170,7 +170,21 @@ def stream_anthropic(
         for event in stream:
             event_type = event.type
 
-            if event_type == "content_block_start":
+            if event_type == "message_start":
+                # Phase 073 TOKEN-COL-01 (D-073-08): yield a normalized usage event
+                # immediately on stream open. input_tokens is known here;
+                # output_tokens typically starts at 0 and ramps up via the
+                # later message_delta usage.output_tokens (Pitfall 9: that's
+                # FINAL CUMULATIVE per Message, not a delta-since-last-event).
+                m = event.message
+                _usage = getattr(m, "usage", None)
+                yield {
+                    "type": "usage",
+                    "input_tokens": getattr(_usage, "input_tokens", 0) or 0,
+                    "output_tokens": getattr(_usage, "output_tokens", 0) or 0,
+                }
+
+            elif event_type == "content_block_start":
                 block = event.content_block
                 if block.type == "tool_use":
                     tool_blocks[event.index] = {
@@ -214,6 +228,18 @@ def stream_anthropic(
                 # stop_reason is ONLY available here (not in content_block events)
                 stop_reason = event.delta.stop_reason
                 finish_reason = _STOP_REASON_MAP.get(stop_reason or "", "stop")
+                # Phase 073 TOKEN-COL-01 (D-073-08 + Pitfall 9): event.usage.output_tokens
+                # is the FINAL CUMULATIVE output_tokens for THIS Message
+                # (NOT a per-event delta — naive accumulation double-counts).
+                # Yield once per message_delta when usage is surfaced. Consumer
+                # (threads.py _on_chunk_anthropic in Plan 04) treats this as a
+                # single SUM contribution from the just-completed Message.
+                _usage = getattr(event, "usage", None)
+                if _usage is not None:
+                    yield {
+                        "type": "usage_delta",
+                        "output_tokens": getattr(_usage, "output_tokens", 0) or 0,
+                    }
 
     yield {
         "type": "finish",
