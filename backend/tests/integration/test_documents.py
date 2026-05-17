@@ -786,7 +786,6 @@ class TestReextractDocument:
         # retry-branch fork; the helper NEVER calls it.
         with patch("app.api.documents.ingest_document") as mock_ingest, \
              patch("app.services.extraction_service.extract_composable") as mock_compose, \
-             patch("app.services.multimodal_service.extract_pdf_images") as mock_extract_imgs, \
              patch("app.services.multimodal_service.describe_image") as mock_desc, \
              patch("app.services.multimodal_service._downscale_b64_for_vision") as mock_downscale, \
              patch("app.api.documents.load_app_settings") as mock_load_settings:
@@ -796,13 +795,21 @@ class TestReextractDocument:
             # something non-None to satisfy the injection.
             app_settings_sentinel = MagicMock(name="app_settings_stub")
             mock_load_settings.return_value = app_settings_sentinel
-            # Fresh image extraction returns 3 images keyed by (image_index, page).
-            # Composite-key matching: (0,1) and (2,3) match the empty rows; (1,2) is extra.
-            mock_extract_imgs.return_value = [
-                {"page": 1, "image_index": 0, "b64_png": "B64FOR0", "width": 200, "height": 200},
-                {"page": 2, "image_index": 1, "b64_png": "B64FOR1", "width": 200, "height": 200},
-                {"page": 3, "image_index": 2, "b64_png": "B64FOR2", "width": 200, "height": 200},
-            ]
+            # Phase 072.1 Gap 2 fix: helper now consumes ExtractedDocument from
+            # extract_composable (not a list of dicts from the legacy extractor).
+            # Same 3-image shape; same composite-key matching: (0,1) and (2,3)
+            # match the empty rows, (1,2) is extra.
+            from app.services.extraction_service import ExtractedDocument, ImageData
+            mock_compose.return_value = ExtractedDocument(
+                text="",
+                tables=(),
+                images=(
+                    ImageData(page=1, image_index=0, b64_png="B64FOR0", width=200, height=200, bbox=None),
+                    ImageData(page=2, image_index=1, b64_png="B64FOR1", width=200, height=200, bbox=None),
+                    ImageData(page=3, image_index=2, b64_png="B64FOR2", width=200, height=200, bbox=None),
+                ),
+                image_extraction_error=None,
+            )
             # Downscale is a no-op for the test — returns the input unchanged
             # so we can verify both the call AND the b64 plumbing downstream.
             mock_downscale.side_effect = lambda b64: b64
@@ -817,9 +824,20 @@ class TestReextractDocument:
         assert response.status_code == 202, (
             f"Expected 202, got {response.status_code}: {response.text}"
         )
-        # 1. extract_composable was NOT called (retry branch bypasses it).
-        assert mock_compose.call_count == 0, (
-            f"Expected 0 extract_composable calls in retry branch; got {mock_compose.call_count}"
+        # 1. extract_composable IS called exactly once by the retry helper
+        # (Phase 072.1 Gap 2 fix). Verify it was called with the engines
+        # hint that scopes to the IMAGES aspect only (not the full
+        # composer call shape that /reextract default uses).
+        assert mock_compose.call_count == 1, (
+            f"Expected 1 extract_composable call by retry helper "
+            f"(Phase 072.1 Gap 2 fix); got {mock_compose.call_count}"
+        )
+        # Composer was called with engines hint scoped to images aspect.
+        # Positional args: (raw, mime, engines_dict)
+        compose_args = mock_compose.call_args.args
+        assert "images" in compose_args[2], (
+            f"Expected engines dict to contain 'images' key; "
+            f"got engines={compose_args[2]!r}"
         )
         # 2. ingest_document was NOT scheduled.
         assert mock_ingest.call_count == 0, (
