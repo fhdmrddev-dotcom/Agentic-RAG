@@ -359,14 +359,67 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-17T15:51:02.764Z
-Stopped at: Completed 073-04-PLAN.md (Phase 073 ships end-to-end)
-Next: Orchestrator drives BOTH outstanding pieces:
-  (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
-  (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
-  (3) Plan 05 Task 4 live UAT — restart uvicorn (Docling singleton cache hold). Re-extract thesis PDF with no `?engines=` hint (uses new defaults — text=legacy, tables=docling_tf, images=pymupdf_full, equations=docling_formula). SQL: `SELECT count(*) FROM document_tables WHERE document_id='23cc112a-92c2-440f-83c9-13aa8bf3d53d';` etc. Pass: tables ≥ 20 AND figures ≥ 10 AND chunks ≥ 200 (D-071.2-12). Re-extract thesis DOCX sibling (DOCX images go through zip_xpath default). Pass: document_images count ≥ 1 (closes RAG-MM-LIFT-02). Per-call hint smoke: `?engines=images:inline_shapes` on DOCX drops count vs default; `?engines=images:pdfplumber` on PDF drops count vs pymupdf_full default.
-  (4) Plan 02 Task 2 live UAT (parked separately) — Realtime-lifecycle badge cycle on thesis PDF.
-After all GREEN, flip ROADMAP checkboxes `- [x] 071.2-02-PLAN.md` and `- [x] 071.2-05-PLAN.md`; Phase 071.2 closes.
+Last session: 2026-05-17 (Phase 073 close-out + diagnostic + seed-planting cycle)
+Stopped at: Phase 073 (asyncpg pool integration) shipped end-to-end (5/5 SCs verified, 4/4 plans complete). Session expanded to security cleanup of `.mcp.json`, LangSmith MCP setup, and three planted seeds (SEED-023, SEED-024, SEED-025).
+
+### Next session: pending USER actions before any code work
+
+These three actions are blocking the LangSmith MCP from loading and the Supabase MCP from working in any future session — must be done by the user before the next session starts:
+
+1. **ROTATE Supabase service role key** (security — was leaked in `.mcp.json` plaintext + committed to git history before this cleanup):
+   - Open Supabase Studio at http://127.0.0.1:54323/ → Project Settings → API
+   - Click "Reset service role key"
+   - Copy the new key (do NOT paste it back into any file in the repo)
+
+2. **Set User-level environment variables in Windows** (these are referenced by the new `.mcp.json` as `${VAR}`):
+   - `SUPABASE_MCP_SERVICE_KEY=<the rotated key from step 1>`
+   - `LANGSMITH_API_KEY=<the same value already in backend/.env>`
+   - `LANGSMITH_PROJECT=agentic-rag-module2` (or whichever project from backend/.env)
+   - Path: Windows Start → "Environment Variables" → User variables → New
+   - Per memory `reference_antigravity_env_inheritance`: User-scope env vars need full Antigravity restart, not just Claude reload
+
+3. **Verify the LangSmith MCP package name** (best-effort guess in `.mcp.json` — `@langchain/langsmith-mcp` may not be the real npm package). Sources to check, in order:
+   - https://github.com/langchain-ai/langsmith-mcp (likely repo)
+   - https://www.npmjs.com/search?q=langsmith-mcp
+   - LangSmith docs "MCP integration" section
+   - If the real package is different (e.g., `langsmith-mcp-server` or `@langchain-ai/langsmith-mcp`), update `.mcp.json` `args` accordingly before restarting Antigravity
+
+4. **Full Antigravity restart** (closes all Claude sessions; new ones inherit the User env vars and load the langsmith MCP server). Verify success in the next session by asking Claude to ToolSearch for `langsmith` — should return tools.
+
+### Optional: git history cleanup for the leaked key
+
+The leaked Supabase service key is in `.mcp.json` history (commits before this session). Even after rotation, scrubbing history is good practice if the repo is ever pushed to a non-private remote:
+```bash
+git filter-repo --invert-paths --path .mcp.json
+```
+Skip this if the repo stays private and the key is rotated — the rotation alone closes the exploit window.
+
+### State of the v2.6 milestone
+
+- Phase 073 (asyncpg pool integration) **complete 2026-05-17** — see `.planning/phases/073-asyncpg-pool-integration/073-VERIFICATION.md`
+- Next phase: **Phase 074** (SEED-009 + SEED-011 polish bundle — `claude-haiku-4-5` max_tokens registry + `test_059` fixture cleanup)
+- Phase **081.1** newly inserted (Settings Architecture Unification) — see ROADMAP.md L527; eliminates `settings_override.json` before v3.0 starts; depends on Phase 073; closes SEED-024
+- Phase 082 (cross-cutting verify) now depends on 081.1
+
+### Three seeds planted this session
+
+- **SEED-023** (adaptive per-call timeouts + duration telemetry) — addresses MiniMax m2.5:free timeout problem; should ship in v2.6 polish range (Phase 077-079) OR v3.1 admin shell
+- **SEED-024** (settings architecture unification) — **status: scheduled**, locked to Phase 081.1
+- **SEED-025** (sandbox execution telemetry) — fills the observability gap user identified via the pptx skill code-exec failure that self-corrected but was invisible in `runs` table + LangSmith failed-runs view; primary owner v3.0 Skill Studio, could pre-stage in Phase 077
+
+### Diagnostic utilities added
+
+- `scripts/langsmith_recent_failures.py` — reusable Python script that queries LangSmith API for failed/timed_out runs in the last 24h. Reads `LANGSMITH_API_KEY` + `LANGSMITH_PROJECT` from `backend/.env` via python-dotenv (key never echoed). Run from project root: `backend/venv/Scripts/python.exe scripts/langsmith_recent_failures.py`. Used 2026-05-17 to triage 3 recent failures (1 context overflow, 1 OpenRouter peer disconnect, 1 Anthropic credit balance).
+
+### Failure patterns observed during testing (informs SEED-023/024/025)
+
+| Pattern | Example | Where it's fixed |
+|---|---|---|
+| OpenRouter free-tier peer disconnect mid-stream | `minimax/minimax-m2.5:free` `RemoteProtocolError` 2026-05-17 18:38 UTC | SEED-023 stall detector |
+| Context overflow on smaller-context models | `minimax/minimax-m2.7:exacto` requested 207985 tokens / cap 204800 | SEED-024 per-model max_output_tokens admin override |
+| Anthropic billing | `claude-haiku-4-5` HTTP 400 credit-balance | User action (top up at https://console.anthropic.com/settings/billing) |
+| Code execution `ValueError` self-corrected via retry | pptx skill `add_chart(XL_CHART_TYPE.PIE, ...)` 2026-05-17 | SEED-025 sandbox execution telemetry |
+| Secondary-call model mismatch (title/suggestion/sub-agent uses different model than main agent) | UI shows kimi but LangSmith trace shows gpt-5.4 on title-gen calls | SEED-024 (settings unification eliminates the dual-storage drift) — short-term workaround: set `SUB_AGENT_MODEL=<your-model>` in `backend/.env` |
 
 **Phases OPEN (cross-phase blocked):**
 
