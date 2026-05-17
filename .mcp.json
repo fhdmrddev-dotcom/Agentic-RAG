@@ -6,7 +6,16 @@
       "args": ["supabase-mcp-proxy.js"],
       "env": {
         "SUPABASE_MCP_URL": "http://127.0.0.1:54321/mcp",
-        "SUPABASE_SERVICE_KEY": "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz"
+        "SUPABASE_SERVICE_KEY": "${SUPABASE_MCP_SERVICE_KEY}"
+      }
+    },
+    "langsmith": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@langchain/langsmith-mcp"],
+      "env": {
+        "LANGSMITH_API_KEY": "${LANGSMITH_API_KEY}",
+        "LANGSMITH_PROJECT": "${LANGSMITH_PROJECT}"
       }
     }
   }
