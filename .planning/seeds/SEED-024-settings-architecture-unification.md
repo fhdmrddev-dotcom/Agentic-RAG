@@ -1,8 +1,11 @@
 ---
 seed_id: SEED-024
 title: Settings & runtime-config architecture unification — eliminate settings_override.json, fold non-secret values into app_settings + user_settings + model_capabilities_overrides, expand admin scope to include title drafting, sub-agents, context window
-status: planted
+status: scheduled
 planted: 2026-05-17
+scheduled: 2026-05-17
+scheduled_phase: 081.1 (proposed — Settings Architecture Unification, inserted between Phase 081 OpenRouter UAT and Phase 082 cross-cutting verify)
+option_locked: B (small v2.6 polish phase before v3.0 starts; user lock-in 2026-05-17 — "we need to be consistent to establish a correct and solid ground to future milestones and plans")
 phase_origin: 073-asyncpg-pool-integration (user-raised concern post-073 close)
 related_seeds: [SEED-009, SEED-012, SEED-023]
 relates_to:

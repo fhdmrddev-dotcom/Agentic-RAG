@@ -524,9 +524,27 @@ Plans:
   3. UAT scoreboard rows ported from Phase 067.2 Rows 11-12 are all GREEN.
   4. No code change required — pure UAT exercise; verifies the v2.5 Phase 067.1 Track A drain helper handles OpenRouter-routed providers under synthetic timeout.
 
+### Phase 081.1: Settings Architecture Unification
+**Goal**: `backend/settings_override.json` is eliminated; every non-secret value it holds today lives in `app_settings` (global) or `user_settings` (per-user) tables, read through a single hot-reload cache. Secrets stay in `.env`. CLAUDE.md's stated principle ("Settings live in `user_settings` / `app_settings`; env vars are for secrets and infra only") finally holds in code. Foundation for v3.1 admin shell + v3.2 multi-tenancy — eliminates the JSON-file drift before downstream milestones inherit it.
+**Depends on**: Phase 073 (asyncpg pool — all new settings reads use it)
+**Plans**: 4
+**Requirements**: SETTINGS-UNIFY-01, SETTINGS-UNIFY-02 (new; carry SEED-024)
+**Success Criteria** (what must be TRUE):
+  1. `backend/settings_override.json` is deleted from the repo; its 30+ keys migrated to `app_settings` (global ops/feature toggles, model lists, retrieval params) and `user_settings` (per-user prefs). One-shot migration job runs on first startup post-deploy: reads any existing JSON, writes into the DB tables, renames file to `settings_override.json.migrated` for operator rollback artifact.
+  2. New columns on `app_settings` cover the user-named admin knobs that v3.1 PRD doesn't enumerate yet: `title_drafting_config` (model + prompt template, JSONB), `sub_agent_config` (model + max_output_tokens + system prompt, JSONB), `openrouter_tool_strategy`, `token_capture_enabled` (default true).
+  3. Per-model knobs (`context_window_tokens`, `llm_call_timeout_seconds`, `max_output_tokens`) move from `MODEL_CAPABILITIES` static dict + env CSV overrides to a new `model_capabilities_overrides` table (foundation that v3.1 admin shell will then add UI on top of). Hot-reload cache pattern mirrors `_TTL_CACHE` at `backend/app/models/user_settings.py:27` (30s TTL, per-key invalidation on write).
+  4. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV path stays as a fallback (deployment bootstrap) but DB row takes precedence when both exist. Documented in `backend/.env.example` as "operator bootstrap only; prefer admin UI in v3.1+."
+  5. Verifier integration test asserts: (a) no code path reads from `settings_override.json` after migration, (b) all values previously in the JSON resolve cleanly from DB through the new cache, (c) hot-reload observed — write to `app_settings`, next read within 30s reflects change.
+
+**Plans:**
+- 01 — `app_settings` schema delta + migration 048 (new JSONB columns: `title_drafting_config`, `sub_agent_config`; new columns for the per-aspect ops knobs); `model_capabilities_overrides` table scaffold (v3.1 will add UI later); hot-reload TTL cache extended to cover new keys.
+- 02 — One-shot migration runner: detect `settings_override.json`, parse, write to `app_settings` rows, rename file to `.migrated`. Idempotent on re-run (no-op if no JSON file present).
+- 03 — Code-side consumer migration: every `_OVERRIDE_FILE` reader in `backend/app/` rewired to read from the new DB-backed cache; `MODEL_CAPABILITIES` registry merged with `model_capabilities_overrides` at resolution time; `get_per_call_timeout` precedence updated (DB > env CSV > static dict).
+- 04 — Integration tests + verifier: (a) clean-install path (no JSON file) reads defaults from DB, (b) upgrade path (with JSON file) migrates cleanly, (c) hot-reload contract (write → read within 30s), (d) no code references `_OVERRIDE_FILE` or `settings_override.json` after migration.
+
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
 **Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
-**Depends on**: Phase 076, Phase 080, Phase 081
+**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1
 **Plans**: 2
 **Requirements**: (cross-cutting verification — all 21 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
 **Success Criteria** (what must be TRUE):
@@ -549,9 +567,10 @@ Plans:
 | 043_documents_dedup_unique_index.sql | 078 | Partial unique index closing concurrent-upload race |
 | 044_app_settings_multimodal_limits.sql | 072 | Admin-tunable multimodal ceilings |
 | 045_runs_worker_id.sql | 079 (conditional) | `runs.spawned_by_worker` debug column |
-| 046–049 | (buffer) | Reserved for unanticipated phase-level discoveries |
+| 048_app_settings_admin_knobs_unification.sql | 081.1 | `app_settings` JSONB columns (`title_drafting_config`, `sub_agent_config`) + `model_capabilities_overrides` table scaffold — eliminates `settings_override.json` (SEED-024) |
+| 046, 047, 049 | (buffer) | Reserved for unanticipated phase-level discoveries (047 already in use by 071.3; see actual on-disk files) |
 
-Six migrations committed unconditionally; one conditional (per Q-v2.6-02 outcome); four reserved as buffer. Total 11 slots claimed against the `039–049` reservation per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`.
+Six migrations committed unconditionally; one conditional (per Q-v2.6-02 outcome); one claimed for SEED-024 settings unification (081.1); three reserved as buffer. Total 11 slots claimed against the `039–049` reservation per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`. **Note:** the on-disk migration filenames at slots 045/046/047 are extraction-aspect work from Phase 071.2/071.3 (not the `runs_worker_id` originally reserved at 045) — pre-existing claims-table drift; reconcile at milestone close.
 
 ---
 
