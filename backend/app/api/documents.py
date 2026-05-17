@@ -745,9 +745,14 @@ async def _reextract_refill_empty_descriptions(
       1. SELECT empty-description rows older than 5 minutes (column = `created_at`
          per the live schema; see BLOCKER 1 below for the schema-confirmation
          provenance).
-      2. Re-run the PDF/DOCX image extraction pass on the storage raw bytes
-         (we need b64_png to call describe_image; D-04 from Phase 36 means b64_png
-         is NOT stored in document_images, so re-extracting is unavoidable).
+      2. Re-run the configured per-aspect image engine
+         (`extract_composable(raw, mime_type, engines={"images": app_settings.extraction_image_engine_*})`).
+         Phase 072.1 Gap 2 fix — the helper MUST use the same engine that
+         originally populated the rows (legacy `extract_pdf_images` /
+         `extract_docx_images` mismatch the dispatcher era; see Phase 072
+         VERIFICATION.md Anti-Patterns). We need b64_png to call describe_image;
+         D-04 from Phase 36 means b64_png is NOT stored in document_images,
+         so re-extracting through the dispatcher is unavoidable.
       3. Match each empty row's `(image_index, page)` composite key to the
          freshly-extracted b64 (WARNING 4 — bare image_index can misalign across
          engines; composite key is robust). Rows that don't match stay empty.
@@ -777,11 +782,15 @@ async def _reextract_refill_empty_descriptions(
     """
     from datetime import timedelta  # noqa: PLC0415
 
+    from app.services.extraction_service import (  # noqa: PLC0415
+        DOCX_MIME,
+        PDF_MIME,
+        ImageData,
+        extract_composable,
+    )
     from app.services.multimodal_service import (  # noqa: PLC0415
         _downscale_b64_for_vision,
         describe_image,
-        extract_docx_images,
-        extract_pdf_images,
     )
 
     # 1. Fetch empty-description rows older than 5 minutes (threadpool-wrapped per D-v2.5-01).
@@ -820,21 +829,44 @@ async def _reextract_refill_empty_descriptions(
         )
         return DocumentResponse(**doc_resp.data)
 
-    # 2. Re-extract images from storage bytes. Wrapped in run_in_threadpool so
-    # the PDF/DOCX parsing (sync, CPU-bound) doesn't block the event loop.
-    try:
-        if mime_type == "application/pdf":
-            fresh_images = await run_in_threadpool(extract_pdf_images, raw)
-        elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            fresh_images = await run_in_threadpool(extract_docx_images, raw)
-        else:
+    # 2. Re-extract images via the per-aspect dispatcher (Phase 072.1 Gap 2 fix).
+    # The retry helper MUST use the same engine that originally populated
+    # `document_images` rows; otherwise the (image_index, page) composite key
+    # cannot align (e.g., legacy `extract_docx_images` returns [] on docs
+    # where all images are floating/header/footer caught only by
+    # `zip_xpath_docx`). Resolve the engine name from `app_settings` and
+    # call `extract_composable(engines={"images": ...})` so only the images
+    # aspect runs through the configured engine.
+    if mime_type == PDF_MIME:
+        image_engine = app_settings.extraction_image_engine_pdf
+    elif mime_type == DOCX_MIME:
+        image_engine = app_settings.extraction_image_engine_docx
+    else:
+        image_engine = None
+
+    fresh_images: list[ImageData] = []
+    if image_engine is not None:
+        try:
+            extracted = await run_in_threadpool(
+                extract_composable,
+                raw,
+                mime_type,
+                {"images": image_engine},
+            )
+            if extracted.image_extraction_error:
+                log.warning(
+                    "retry_empty_descriptions_only: images engine %r reported "
+                    "error for %s: %s",
+                    image_engine, document_id, extracted.image_extraction_error,
+                )
+            fresh_images = list(extracted.images)
+        except Exception as exc:  # noqa: BLE001 — silent-swallow + log per D-069-04
+            log.warning(
+                "retry_empty_descriptions_only: image re-extract via engine %r "
+                "failed for %s: %s",
+                image_engine, document_id, exc,
+            )
             fresh_images = []
-    except Exception as exc:  # noqa: BLE001 — silent-swallow + log per D-069-04
-        log.warning(
-            "retry_empty_descriptions_only: image re-extract failed for %s: %s",
-            document_id, exc,
-        )
-        fresh_images = []
 
     if not fresh_images:
         log.info(
@@ -854,8 +886,10 @@ async def _reextract_refill_empty_descriptions(
 
     # WARNING 4 — composite (image_index, page) key to avoid cross-engine
     # misalignment. Rows whose (idx, page) tuple doesn't match a freshly-
-    # extracted image stay empty (best-effort retry).
-    fresh_by_loc = {(img["image_index"], img.get("page")): img for img in fresh_images}
+    # extracted ImageData stay empty (best-effort retry). Phase 072.1 Gap 2
+    # fix: matcher now consumes ImageData attribute access (was dict access
+    # under legacy extractors).
+    fresh_by_loc = {(img.image_index, img.page): img for img in fresh_images}
     refilled = 0
 
     # 3 + 4 + 5. For each empty row, find matching fresh b64 by composite key,
@@ -866,7 +900,7 @@ async def _reextract_refill_empty_descriptions(
         if fresh is None:
             # Row stays empty (best-effort retry — WARNING 4).
             continue
-        b64 = fresh.get("b64_png")
+        b64 = fresh.b64_png
         if not b64:
             continue
         # WARNING 3 — shared D-072-02 downscale invariant. Plan 01's
