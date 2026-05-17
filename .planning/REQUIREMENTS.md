@@ -23,7 +23,8 @@
 ### Theme B — Multi-Worker Readiness
 
 - [ ] **WORKER-LIFT-01**: `uvicorn --workers 2` runs cleanly: run-tracking survives across workers (cancelled run started in W1 cancellable from W2), sandbox sessions are sticky to the originating worker via consistent hashing on `thread_id`, Redis singleton initializes per worker without cross-talk.
-- [ ] **WORKER-LIFT-02**: `asyncpg` connection pool replaces sync `supabase-py` calls inside the streaming endpoint (`agent_runner` Postgres reads/writes in `threads.py`) and inside `_drain_stream_with_close_on_cancel`'s persistence finalize path. CONCUR-01 binding pytest gate (`backend/tests/integration/test_058_concurrency.py`) stays green.
+- [x] **WORKER-LIFT-02
+**: `asyncpg` connection pool replaces sync `supabase-py` calls inside the streaming endpoint (`agent_runner` Postgres reads/writes in `threads.py`) and inside `_drain_stream_with_close_on_cancel`'s persistence finalize path. CONCUR-01 binding pytest gate (`backend/tests/integration/test_058_concurrency.py`) stays green.
 - [ ] **WORKER-LIFT-03**: A new ADR (`D-PRD-12`) explicitly supersedes `D-v2.5-02`; `CLAUDE.md`'s "Single uvicorn worker" rule is updated to "Multi-worker — see D-PRD-12 for the audit checklist".
 - [ ] **WORKER-LIFT-04**: `GET /admin/backpressure` returns the documented JSON shape, gated on the existing operator role check (when none exists yet, scoped to a hard-coded admin user list via env var until v3.1 ships RBAC).
 

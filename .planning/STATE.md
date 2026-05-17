@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 073 context gathered
-last_updated: "2026-05-17T09:43:50.543Z"
+status: executing
+stopped_at: Completed 073-01-PLAN.md
+last_updated: "2026-05-17T15:23:02.887Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 20
   completed_phases: 10
-  total_plans: 35
-  completed_plans: 37
-  percent: 100
+  total_plans: 39
+  completed_plans: 38
+  percent: 97
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 072 — multimodal-lift-docx-completeness
+**Current focus:** Phase 073 — asyncpg-pool-integration
 
 ## Current Position
 
-Phase: 073
-Plan: Not started
-Status: Ready to plan
+Phase: 073 (asyncpg-pool-integration) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-05-17
 
 ## PRD-reset outputs (committed)
@@ -226,6 +226,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 071.2 P02 (Task 1 of 2) | ~4min | 1 task (Task 2 checkpoint:human-verify parked) | 1 file (DocumentStatusBadge.tsx +2/-0) |
 | Phase 071.2 P05 (Tasks 1+2-code+3+5 of 5) | ~50min | 4 tasks (Task 2 SQL-apply + Task 4 live UAT parked at checkpoint:human-action) | 17 files (12 created — 6 adapters + 6 tests + 1 integration test + 2 seeds + 1 migration + 1 SUMMARY; 5 modified — extraction_service.py, user_settings.py, documents.py, test_documents.py, test_071_1_threadpool_sweep.py) |
 | Phase 072 P02 | ~7min | 2 tasks | 4 files |
+| Phase 073 P01 | 5min | 5 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -305,6 +306,9 @@ Recent decisions affecting v2.5 work:
 - Phase 072 Plan 02: ImageData frozen-dataclass mutation uses dataclasses.replace exclusively — no attribute-set, no try/except, no isinstance branching (D-072-06)
 - Phase 072 Plan 02: _dedup_images_by_hash is a module-scope helper composable by independent engines via lazy import — applied to pymupdf_full_images_pdf + zip_xpath_docx + inline_shapes_docx (WARNING 5 — safe across both extraction_image_engine_docx defaults)
 - Phase 072 Plan 02 deviation (Rule 1): test_pymupdf_full_returns_more_than_pdfplumber Rule-1 fix — switched fake_doc.extract_image.return_value (singleton, identical bytes collapse 5→1 under new SHA1 dedup) to .side_effect with 5 distinct PIL-generated PNG payloads
+- Phase 073 Plan 01: JSONB codec registers via init=_init_pg_connection callback at asyncpg.create_pool time, NOT pool.set_type_codec (which doesn't exist on asyncpg.Pool — Pitfall 5). Codec calls conn.set_type_codec('jsonb', encoder=json.dumps, decoder=json.loads, schema='pg_catalog') per Connection at pool init.
+- Phase 073 Plan 01: _reset_pg_pool_singleton autouse fixture promoted suite-wide via tests/conftest.py (D-073-12) — must be @pytest_asyncio.fixture (not @pytest.fixture) so teardown can await pool.close(). Mandatory because asyncpg pools are event-loop-bound and pytest-asyncio creates a fresh loop per test (Pitfall 1).
+- Phase 073 Plan 01: FastAPI lifespan close-order is Redis aclose → asyncpg pool.close (with 5s wait_for + pool.terminate fallback) → sandbox close. Phase 078 (CQ-SUPA-01) will add _supabase.aclose() AFTER the pg pool close.
 
 ### Pending Todos
 
@@ -344,8 +348,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 073 context gathered
+Last session: 2026-05-17T15:22:50.121Z
+Stopped at: Completed 073-01-PLAN.md
 Next: Orchestrator drives BOTH outstanding pieces:
   (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
   (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
@@ -374,4 +378,4 @@ After all GREEN, flip ROADMAP checkboxes `- [x] 071.2-02-PLAN.md` and `- [x] 071
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 072 (multimodal-lift-docx-completeness) — 3 plans — 2026-05-16T18:34:22.043Z
+**Planned Phase:** 073 (asyncpg-pool-integration) — 4 plans — 2026-05-17T14:36:28.279Z

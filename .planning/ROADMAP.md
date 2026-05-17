@@ -428,8 +428,8 @@ Plans:
   5. Q-v2.6-02 (multi-worker rollout: phased vs atomic) is locked to phased before this phase starts.
 
 **Plans:**
-0/4 plans complete
-- [ ] 073-01-PLAN.md — Pool plumbing: asyncpg install + env vars + get_pg_pool() singleton with JSONB codec + lifespan close + autouse fixture + mock factory + singleton/lifespan unit tests (Wave 0; autonomous)
+1/4 plans complete
+- [x] 073-01-PLAN.md — Pool plumbing: asyncpg install + env vars + get_pg_pool() singleton with JSONB codec + lifespan close + autouse fixture + mock factory + singleton/lifespan unit tests (Wave 0; autonomous)
 - [ ] 073-02-PLAN.md — Typed helper module backend/app/db/runs.py + AsyncMock-pool unit tests for insert_run / finalize_run / insert_assistant_message (Wave 1; autonomous; depends on 01)
 - [ ] 073-03-PLAN.md — Token accumulator wiring: openai_service stream_options=include_usage + anthropic_service usage event yields + 4 token-accumulator unit tests (Wave 1; autonomous; depends on 01)
 - [ ] 073-04-PLAN.md — Three hot-path flips in threads.py (runs INSERT / runs UPDATE finalize / messages INSERT) + real-Postgres binding gate test_073_concurrency.py (Wave 2; autonomous; depends on 01+02+03)
@@ -616,7 +616,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
 | 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
 | 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
-| 073 — asyncpg Pool Integration | 0/4 | Not started | — |
+| 073 — asyncpg Pool Integration | 1/4 | In progress (Plan 01 shipped) | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
 | 076 — Confidence Recalibration | 0/2 | Not started | — |
