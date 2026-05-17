@@ -809,6 +809,15 @@ def create_adaptive_streaming_chat(
         "model": effective_model,
         "messages": messages,
         "stream": True,
+        # Phase 073 D-073-08 (TOKEN-COL-01): enable usage on every streaming call
+        # globally. OpenAI: emits one extra final chunk with chunk.usage populated
+        # and empty choices=[] (Pitfall 2 — _drain_stream_with_close_on_cancel
+        # runs the iterator to natural StopIteration, so the trailing chunk WILL
+        # be delivered). OpenRouter: officially deprecated as of 2026 (always
+        # returns usage now per Pitfall 8) — flag is a forward-compatible no-op.
+        # ONE flip covers BOTH providers (config.py:_PROVIDER_BASE_URLS routes
+        # openrouter through the same client.chat.completions.create call).
+        "stream_options": {"include_usage": True},
         token_param: effective_tokens,
     }
     
