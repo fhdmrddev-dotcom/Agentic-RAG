@@ -1,12 +1,13 @@
 ---
 phase: 072-multimodal-lift-docx-completeness
-plan: 03
+plan: 03+04+05
 type: human-uat
 status: partial
 target_doc: "3bf355d6-d4e1-416b-b067-9a63dd821945 (Fahed Mrad Chapters 1 to 4.docx)"
 last_updated: "2026-05-17"
 operator: fhdmrd@gmail.com
 driven_by: orchestrator (curl + settings_override.json toggle, no .env edit, no uvicorn restart)
+pending_operator_items: 2
 ---
 
 # Phase 072 — Human UAT Scoreboard
@@ -143,10 +144,11 @@ green after the cutoff_iso hotfix (mock contract unchanged).
 
 - [x] **Default engine UAT GREEN** — both DOCX (58/58) and PDF (67/67) cleanly exceed the cap-lift target
 - [x] **DOCX micro-UAT GREEN-with-caveat** — bbox.location labels confirmed in production data; mixed-location synthetic coverage deferred to unit tests
-- [ ] **Retry-empty smoke PARTIAL** — endpoint contract GREEN; refill effectiveness RED (Gap 2 blocks it for the modern dispatcher era)
-- [x] **All unit + integration tests green** — 29/29 passed post-hotfix
+- [ ] **Retry-empty smoke PARTIAL** — endpoint contract GREEN; refill effectiveness RED in original UAT (Gap 2). **Structurally CLOSED by Plan 04** — pending operator re-run (see "Gap closure UAT" section below)
+- [x] **All unit + integration tests green** — 29/29 passed post-hotfix; combined gap-closure gate 31 passed / 2 skipped (live-Supabase) after Plans 04 + 05
+- [x] **Gap 3 (orphan chunks / BUG-260517-01)** — **Structurally CLOSED by Plan 05** — pending operator re-run
 
-**Overall verdict:** **PARTIAL — ship Plans 01+02 surface, route Plan 03's refill effectiveness to gap closure.**
+**Overall verdict:** **PARTIAL — Plans 01+02+03+04+05 ship; 2 operator UAT items pending for production-data confirmation.**
 
 ## Gaps (to be folded into Phase 072.1)
 
@@ -172,6 +174,31 @@ green after the cutoff_iso hotfix (mock contract unchanged).
 - **PDF is consistent** (false alarm on the PDF side — `documents.chunk_count` appears to be text-only, image chunks are separate; PDF total 508 = 441 text + 67 image, no orphans).
 - **Fix shape:** trace the cascade-delete path on `/reingest` to confirm coverage, OR add an explicit cleanup step to `/reextract` so it leaves no orphans, OR fix `documents.chunk_count` to reflect total (text + image) chunks so UI doesn't lie.
 - **Estimated scope:** ~30-50 LOC + 1 integration test exercising the `/reextract → /reingest` sequence.
+
+## Gap closure UAT — Plans 04 + 05 (PENDING operator run, 2026-05-17)
+
+Both gaps from Plan 03's UAT are structurally closed and covered by non-mocked integration tests
+(`test_reextract_dispatcher.py` 385 lines for Gap 2; `test_reingest_reextract_orphans.py` 428 lines for Gap 3).
+Production-data confirmation on the operator's thesis DOCX is the final gate before flipping RAG-MM-LIFT-01 to Complete.
+
+### Test 1 — Gap 2 closure: retry-empty refills floating-shape DOCX
+**expected:** After repeating the Plan 03 retry-empty smoke flow (inject empty `openai_api_key` override, `/reextract`, restore key, `/reextract?retry_empty_descriptions_only=true`), the second snapshot shows `with_desc >= 52` on the operator's DOCX (≥90% refill of the 58 floating images). Pre-fix was 0/58 because `extract_docx_images` returned `[]` on this DOCX (no python-docx inline_shapes). Post-fix uses `extract_composable` with the configured `zip_xpath_docx` engine, which catches floating + header/footer images.
+**result:** [pending]
+
+### Test 2 — Gap 3 closure: `/reextract → /reingest` leaves no orphan chunks
+**expected:** On the operator's thesis DOCX (which currently has 462 orphan chunks from the original 2026-05-16 bug exposure — these existing orphans are NOT auto-cleaned, the fix is forward-only), trigger `/reextract` then `/reingest`. The post-`/reingest` `documents.chunk_count` must match `SELECT COUNT(*) FROM document_chunks WHERE document_id = ...`. Triggering `/reingest` a second time must leave the count stable (idempotency). The cascade widening in `reingest_document` now deletes `document_chunks` + `document_tables` + `document_images` doc-id-scoped before re-extraction.
+**result:** [pending]
+
+## Summary
+
+total: 2
+passed: 0
+issues: 0
+pending: 2
+skipped: 0
+blocked: 0
+
+---
 
 ## Carry-forwards / known limitations
 
