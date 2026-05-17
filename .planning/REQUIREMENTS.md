@@ -136,7 +136,7 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Complete |
 | RAG-RECAL-01 | 076 — Confidence Recalibration | Pending |
 | WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Pending |
-| WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Pending |
+| WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Complete |
 | WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Pending |
 | WORKER-LIFT-04 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | STREAMS-PROVIDER-01 | 068 — `<StreamsProvider>` Context Lift | Pending |
@@ -151,7 +151,7 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | CQ-CTX-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | CQ-DEDUP-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
-| TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Pending |
+| TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Complete |
 
 **Coverage:**
 - v2.6 requirements: 22 total

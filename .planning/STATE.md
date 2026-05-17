@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: verifying
+status: ready_to_plan
 stopped_at: Completed 073-04-PLAN.md (Phase 073 ships end-to-end)
 last_updated: "2026-05-17T15:51:02.771Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 20
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 39
   completed_plans: 41
-  percent: 100
+  percent: 60
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 073 (asyncpg-pool-integration) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 074
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-05-17
 
 ## PRD-reset outputs (committed)

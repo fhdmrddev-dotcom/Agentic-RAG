@@ -616,7 +616,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
 | 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
 | 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
-| 073 — asyncpg Pool Integration | 1/4 | In progress (Plan 01 shipped) | — |
+| 073 — asyncpg Pool Integration | 4/4 | Complete    | 2026-05-17 |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
 | 076 — Confidence Recalibration | 0/2 | Not started | — |
