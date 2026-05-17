@@ -641,6 +641,12 @@ async def restore_document_version(
 
 
 @router.post("/{document_id}/reingest", response_model=DocumentResponse)
+# Phase 072.1 Gap 3 / BUG-260517-01 — TODO Task 2: add document_chunks delete cascade
+# mirroring /reextract's pattern at lines 1034-1036. Confirmed via code read:
+# /reingest deletes tables + images (Phase 071.4 Plan 04) but NOT chunks; the
+# downstream `_upload_pipeline -> ingest_document` chain only INSERTs new chunks,
+# never deleting prior ones. The orphan accumulation in BUG-260517-01 is the
+# direct consequence.
 async def reingest_document(
     document_id: str,
     background_tasks: BackgroundTasks,
