@@ -428,10 +428,10 @@ Plans:
   5. Q-v2.6-02 (multi-worker rollout: phased vs atomic) is locked to phased before this phase starts.
 
 **Plans:**
-2/4 plans complete
+3/4 plans complete
 - [x] 073-01-PLAN.md — Pool plumbing: asyncpg install + env vars + get_pg_pool() singleton with JSONB codec + lifespan close + autouse fixture + mock factory + singleton/lifespan unit tests (Wave 0; autonomous)
 - [x] 073-02-PLAN.md — Typed helper module backend/app/db/runs.py + AsyncMock-pool unit tests for insert_run / finalize_run / insert_assistant_message (Wave 1; autonomous; depends on 01)
-- [ ] 073-03-PLAN.md — Token accumulator wiring: openai_service stream_options=include_usage + anthropic_service usage event yields + 4 token-accumulator unit tests (Wave 1; autonomous; depends on 01)
+- [x] 073-03-PLAN.md — Token accumulator wiring: openai_service stream_options=include_usage + anthropic_service usage event yields + 4 token-accumulator unit tests (Wave 1; autonomous; depends on 01)
 - [ ] 073-04-PLAN.md — Three hot-path flips in threads.py (runs INSERT / runs UPDATE finalize / messages INSERT) + real-Postgres binding gate test_073_concurrency.py (Wave 2; autonomous; depends on 01+02+03)
 
 ### Phase 074: SEED-009 + SEED-011 Polish Bundle

@@ -51,7 +51,7 @@
 
 ### Theme F — Token Telemetry
 
-- [ ] **TOKEN-COL-01**: `runs.input_tokens` and `runs.output_tokens` are populated for every completed LLM call (read from response `usage`). Backfill: existing NULL rows stay NULL — forward-fill only. NULL writes after this ship become a dashboard warning. No caps or limits introduced. Used by v3.1 admin observability + v3.4 spend-cap pre-flight.
+- [ ] **TOKEN-COL-01**: `runs.input_tokens` and `runs.output_tokens` are populated for every completed LLM call (read from response `usage`). Backfill: existing NULL rows stay NULL — forward-fill only. NULL writes after this ship become a dashboard warning. No caps or limits introduced. Used by v3.1 admin observability + v3.4 spend-cap pre-flight. *(Plan 03 ships the SDK-capture surface — `stream_options=include_usage` + Anthropic usage event yields + 4 accumulator unit tests; Plan 04 wires the finalize-path writes.)*
 
 ## Future Requirements (deferred)
 
