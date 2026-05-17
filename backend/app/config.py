@@ -359,6 +359,17 @@ class Settings(BaseSettings):
     # REDIS-SETUP.md for cloud setup.
     redis_url: str = "redis://localhost:6379"
 
+    # asyncpg pool (Phase 073 — D-073-01/02/03)
+    # Direct Postgres connection for the hot-path Postgres writes (runs INSERT
+    # / runs UPDATE finalize / messages INSERT). Connects to :5432 direct
+    # (local Supabase CLI: :54322), NOT the pgbouncer pooler on :6543 (D-073-01).
+    # Pool sized 2/10 by default — leaves headroom for Phase 079 `--workers 2`
+    # at an effective ceiling of 20 connections. Override in .env via
+    # POSTGRES_DSN / POSTGRES_POOL_MIN / POSTGRES_POOL_MAX.
+    postgres_dsn: str = "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+    postgres_pool_min: int = 2
+    postgres_pool_max: int = 10
+
     # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout
     # wrapper at threads.py:855 has been DELETED. The agent loop now has no
     # hard total cap (matches Claude/ChatGPT UX where complex tool-calling
