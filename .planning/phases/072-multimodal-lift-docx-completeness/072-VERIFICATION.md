@@ -1,8 +1,8 @@
 ---
 phase: 072-multimodal-lift-docx-completeness
 verified: 2026-05-17T03:30:00Z
-status: human_needed
-score: 7/7 must-haves verified (structural); 1 of 2 operator UAT items still pending
+status: passed
+score: 7/7 must-haves verified including operator UAT on production data 2026-05-17 (100%/58 refill rate, orphan-free invariant)
 verifier: gsd-verifier (re-verification after Plans 04 + 05 merged)
 re_verification:
   previous_status: gaps_found
