@@ -4,11 +4,11 @@ title: Anthropic-routed cycles end with tool-call narration instead of a synthes
 reported: 2026-05-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [backend/agent-loop, backend/system-prompts, frontend/chat-surface, provider/anthropic-native-sdk]
 folded_into: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Phase 075 polish bundle planning OR any system-prompt redesign touching anthropic_service.py / threads.py agent loop terminal frame OR v2.7 Agent Workspace milestone planning. Reviewed during /gsd:discuss-phase 074 (2026-05-17) — not folded because root cause is system-prompt/terminal-frame OR frontend block-ordering, not the max_tokens clamp surface Phase 074 covers."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7
