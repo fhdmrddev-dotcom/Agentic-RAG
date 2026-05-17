@@ -685,11 +685,20 @@ async def reingest_document(
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Could not retrieve stored file: {e}")
 
-    # 3. Hard delete prior tables + images so reingest doesn't accumulate
-    # (BUG-260516-04). /reextract already does this at lines 803-811; /reingest
-    # was missing the parity. Chunks are NOT deleted here because
-    # _upload_pipeline handles chunk cleanup downstream before re-insert.
-    # Order mirrors D-071-10 cascade (children before parent).
+    # 3. Hard delete prior chunks + tables + images so reingest doesn't
+    # accumulate (BUG-260516-04 closed /reingest -> /reingest on tables+images;
+    # BUG-260517-01 closes /reextract -> /reingest on chunks AND adds chunks
+    # to the steady-state cascade). /reextract does this at lines 1034-1042;
+    # /reingest now has parity. The prior assumption — "_upload_pipeline
+    # handles chunk cleanup downstream" — was wrong: ingest_document only
+    # INSERTs chunks (line ~1361), never deletes prior ones, so any chunks
+    # left over from a prior /reextract (or prior /reingest) survived.
+    # Doc_id-scoped — catches ALL orphan chunks for this doc regardless of
+    # which prior op created them. Order mirrors D-071-10 cascade (children
+    # before parent).
+    await run_in_threadpool(
+        lambda: supabase.table("document_chunks").delete().eq("document_id", document_id).execute()
+    )
     await run_in_threadpool(
         lambda: supabase.table("document_tables").delete().eq("document_id", document_id).execute()
     )
@@ -1444,6 +1453,14 @@ def ingest_document(
         supabase.table("documents").update({"ingestion_step": "metadata"}).eq("id", document_id).execute()
         supabase.table("documents").update({
             "status": "completed",
+            # Phase 072.1 Gap 3 closure documentation — chunk_count is TEXT-chunks-only.
+            # Image-description chunks (inserted by multimodal_service.extract_and_store_images
+            # at line ~507) are NOT counted here. This is intentional: the UI's
+            # documents-list "chunk count" represents the document's text density,
+            # not its total searchable-row count. Operators wanting the total can
+            # SELECT count(*) FROM document_chunks WHERE document_id=? directly.
+            # Consistent across /upload, /reingest, /reextract (all paths hit this
+            # ingest_document write site).
             "chunk_count": len(chunks),
             "metadata": metadata_dict,
             "full_markdown": text,
