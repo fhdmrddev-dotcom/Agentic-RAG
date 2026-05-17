@@ -409,11 +409,11 @@ Plans:
   4. Live UAT on thesis PDF under default `pymupdf_full`: `total >= 20` images stored + `empty / total <= 0.10`. DOCX micro-UAT on a hand-crafted floating-shape document returns exactly 3 deduped rows with location prefixes. (The ≥80% recall target is deferred — see SEED-021.)
 
 **Plans:**
-- [x] 072-01-PLAN.md — app_settings wiring + 1024px downscale + persist-empty-rows (Wave 1; autonomous) — SHIPPED
+5/5 plans complete
 - [x] 072-02-PLAN.md — Content-hash dedup helper (PDF + DOCX) + DOCX location-prefix labels (Wave 2; autonomous) — SHIPPED
 - [x] 072-03-PLAN.md — /reextract retry-empty-only branch + default-engine live UAT + DOCX micro-UAT (Wave 3; checkpoint:human-action for live UAT) — SHIPPED PARTIAL (endpoint contract green; refill effectiveness blocked by Gap 2 → Plan 04)
-- [ ] 072-04-PLAN.md — gap-closure: retry-helper dispatcher rewrite + non-mocked integration test (Wave 1; autonomous) — closes Gap 2 from 072-VERIFICATION.md
-- [ ] 072-05-PLAN.md — gap-closure: reingest chunks cascade-delete + orphan-free regression test (Wave 2; autonomous; depends on 072-04 — both touch documents.py) — closes BUG-260517-01
+- [x] 072-04-PLAN.md — gap-closure: retry-helper dispatcher rewrite + non-mocked integration test (Wave 1; autonomous) — closes Gap 2 from 072-VERIFICATION.md
+- [x] 072-05-PLAN.md — gap-closure: reingest chunks cascade-delete + orphan-free regression test (Wave 2; autonomous; depends on 072-04 — both touch documents.py) — closes BUG-260517-01
 
 ### Phase 073: asyncpg Pool Integration
 **Goal**: The streaming endpoint's Postgres reads/writes go through an `asyncpg>=0.29` connection pool instead of sync `supabase-py` calls, CONCUR-01 stays green, and every completed run finalizes with `runs.input_tokens` + `runs.output_tokens` populated from the LLM `usage` field.
@@ -608,7 +608,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
 | 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
 | 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
-| 072 — Multimodal Lift + DOCX Completeness | 0/3 | Planned (vision_sweep deferred to SEED-021) | — |
+| 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
 | 073 — asyncpg Pool Integration | 0/4 | Not started | — |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
