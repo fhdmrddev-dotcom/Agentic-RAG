@@ -400,7 +400,7 @@ Plans:
 ### Phase 072: Multimodal Lift + DOCX Completeness
 **Goal**: Close the `app_settings` dead-code seam for `multimodal_max_*` (migration 044 already shipped — wiring follows); persist empty-description rows so retry surfaces them cheaply; ship the DOCX location-aware completeness via the already-shipped `zip_xpath_docx` engine + content-hash dedup across BOTH PDF and DOCX paths; ship the `/reextract?retry_empty_descriptions_only=true` lazy-retry path. The ≥80% PDF figure-recall lift is OUT of Phase 072 scope (deferred to a SEED-021 spike — see Phase 072 CONTEXT.md `<deferred>`); default `pymupdf_full` baseline (~34% on thesis) is preserved.
 **Depends on**: Phase 069
-**Plans**: 3 (narrowed 2026-05-16 from 4 — vision_sweep + migration 048 deferred to SEED-021 spike)
+**Plans**: 5 (3 original 2026-05-16; +2 gap-closure 2026-05-17 — Plan 04 retry-helper dispatcher rewrite + Plan 05 orphan-chunks cleanup, both spawned from 072-VERIFICATION.md + BUG-260517-01)
 **Requirements**: RAG-MM-LIFT-01, RAG-MM-LIFT-02
 **Success Criteria** (what must be TRUE):
   1. `multimodal_service` reads `multimodal_max_vision_calls` + `multimodal_max_b64_bytes_kb` from `app_settings` (migration 044 already shipped); module constants `_MAX_VISION_CALLS` + `_MAX_B64_BYTES` deleted; new constant `MULTIMODAL_THUMBNAIL_MAX_EDGE = 1024` drives a PIL.thumbnail downscale before every vision-LLM call.
@@ -409,9 +409,11 @@ Plans:
   4. Live UAT on thesis PDF under default `pymupdf_full`: `total >= 20` images stored + `empty / total <= 0.10`. DOCX micro-UAT on a hand-crafted floating-shape document returns exactly 3 deduped rows with location prefixes. (The ≥80% recall target is deferred — see SEED-021.)
 
 **Plans:**
-- [ ] 072-01-PLAN.md — app_settings wiring + 1024px downscale + persist-empty-rows (Wave 1; autonomous)
-- [ ] 072-02-PLAN.md — Content-hash dedup helper (PDF + DOCX) + DOCX location-prefix labels (Wave 2; autonomous)
-- [ ] 072-03-PLAN.md — /reextract retry-empty-only branch + default-engine live UAT + DOCX micro-UAT (Wave 3; checkpoint:human-action for live UAT)
+- [x] 072-01-PLAN.md — app_settings wiring + 1024px downscale + persist-empty-rows (Wave 1; autonomous) — SHIPPED
+- [x] 072-02-PLAN.md — Content-hash dedup helper (PDF + DOCX) + DOCX location-prefix labels (Wave 2; autonomous) — SHIPPED
+- [x] 072-03-PLAN.md — /reextract retry-empty-only branch + default-engine live UAT + DOCX micro-UAT (Wave 3; checkpoint:human-action for live UAT) — SHIPPED PARTIAL (endpoint contract green; refill effectiveness blocked by Gap 2 → Plan 04)
+- [ ] 072-04-PLAN.md — gap-closure: retry-helper dispatcher rewrite + non-mocked integration test (Wave 1; autonomous) — closes Gap 2 from 072-VERIFICATION.md
+- [ ] 072-05-PLAN.md — gap-closure: reingest chunks cascade-delete + orphan-free regression test (Wave 2; autonomous; depends on 072-04 — both touch documents.py) — closes BUG-260517-01
 
 ### Phase 073: asyncpg Pool Integration
 **Goal**: The streaming endpoint's Postgres reads/writes go through an `asyncpg>=0.29` connection pool instead of sync `supabase-py` calls, CONCUR-01 stays green, and every completed run finalizes with `runs.input_tokens` + `runs.output_tokens` populated from the LLM `usage` field.
