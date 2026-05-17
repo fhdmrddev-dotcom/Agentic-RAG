@@ -166,9 +166,36 @@ def mock_builder():
 # Phase 061 Redis fixtures (D-061-14, D-061-17, Pitfall 6)
 # ═══════════════════════════════════════════════════════════════════════
 import os as _os  # noqa: E402
-import pytest_asyncio as _pytest_asyncio  # noqa: E402
+import pytest_asyncio  # noqa: E402
+import pytest_asyncio as _pytest_asyncio  # noqa: E402  # back-compat alias for existing fixtures
 
 _REDIS_TEST_URL = _os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_pg_pool_singleton():
+    """Phase 073 D-073-12 — reset app.dependencies._pg_pool between tests.
+
+    asyncpg pools are event-loop-bound (Pitfall 1). pytest-asyncio creates a
+    fresh loop per test (asyncio_mode=auto). A singleton created in test N's
+    loop, reused by test N+1, raises RuntimeError("Event loop is closed").
+
+    Mirrors the per-file _reset_redis_singleton fixture in test_062_stream_replay
+    (Phase 062 introduced; Phase 074 SEED-011 formalizes suite-wide). Promoted
+    to top-level conftest so any test importing get_pg_pool() inherits the reset.
+
+    Must be pytest_asyncio.fixture (NOT pytest.fixture) — teardown awaits
+    pool.close().
+    """
+    import app.dependencies as _deps
+    _deps._pg_pool = None
+    yield
+    if _deps._pg_pool is not None:
+        try:
+            await _deps._pg_pool.close()
+        except Exception:
+            pass
+        _deps._pg_pool = None
 
 
 @_pytest_asyncio.fixture

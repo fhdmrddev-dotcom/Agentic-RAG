@@ -31,7 +31,7 @@ History:
 import asyncio
 import time
 from typing import Any, Callable
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -412,3 +412,41 @@ async def setup_zombie_state(
         },
         "count": None,
     })()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 073 helpers — asyncpg mock pool factory (D-073-10 unit-tier scaffolding)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _build_mock_pg_pool():
+    """Build a mock asyncpg.Pool for unit tests against app/db/runs.py (Phase 073).
+
+    Sibling of _build_mock_supabase() — same factory-fixture style, but for the
+    asyncpg pool surface instead of supabase-py. Unit tests against insert_run /
+    finalize_run / insert_assistant_message consume this via:
+
+        from tests.integration._run_helpers import _build_mock_pg_pool
+        pool = _build_mock_pg_pool()
+        await insert_run(pool, run_id=..., ...)
+        sql, *args = pool.execute.call_args[0]
+        assert "INSERT INTO runs" in sql
+
+    Patches .execute / .fetchval / .fetchrow as AsyncMock (asyncpg pool methods
+    are coroutines). NO per-SQL-string routing here — unlike supabase-py's per-
+    table builder, asyncpg is raw SQL strings; tests inspect call_args directly.
+
+    Default return values:
+      - pool.execute: returns None (asyncpg pool.execute returns the cmd status,
+        but call sites in app.db.runs ignore it)
+      - pool.fetchval: returns a freshly-generated UUID (mirrors RETURNING id
+        behavior of insert_assistant_message)
+      - pool.fetchrow: returns None (override per-test via pool.fetchrow.return_value)
+    """
+    from uuid import uuid4
+
+    pool = MagicMock()
+    pool.execute = AsyncMock(return_value=None)
+    pool.fetchval = AsyncMock(return_value=uuid4())
+    pool.fetchrow = AsyncMock(return_value=None)
+    return pool
