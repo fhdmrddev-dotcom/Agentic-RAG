@@ -27,6 +27,8 @@ from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
+from app.dependencies import get_pg_pool
+from app.db.runs import insert_run, finalize_run, insert_assistant_message
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
@@ -1255,6 +1257,12 @@ async def send_message(
 
             full_content = ""
             persisted_tool_calls: list[dict] = []
+            # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
+            # Both default to None — D-073-09 NULL sentinel if NO iteration produced
+            # a usage payload. First successful usage event flips None to int; subsequent
+            # ones add on top (multi-iteration SUM). Read by _shielded_finalize step 3.
+            input_tokens_total: int | None = None
+            output_tokens_total: int | None = None
             source_refs: list[dict] = []  # {"document_id": str, "filename": str}
             unique_sources: list[dict] = []
             retrieved_citations: list[dict] = []    # Full citation objects per D-04
