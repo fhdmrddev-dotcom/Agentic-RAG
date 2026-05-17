@@ -350,11 +350,13 @@ class TestReingestDocument:
             "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
             "is_latest": True,
         }
-        # Side effects (order matches reingest_document after BUG-260516-04 fix):
-        # 1=owner SELECT, 2=DELETE document_tables, 3=DELETE document_images,
-        # 4=UPDATE status='pending' returning row.
+        # Side effects (order matches reingest_document after BUG-260517-01 fix):
+        # 1=owner SELECT, 2=DELETE document_chunks, 3=DELETE document_tables,
+        # 4=DELETE document_images, 5=UPDATE status='pending' returning row.
+        # Phase 072.1 Plan 05 widened cascade from 2 deletes to 3 (added chunks).
         mock_builder.execute.side_effect = [
             _make_result(pdf_doc),                              # owner SELECT
+            _make_result([]),                                    # DELETE chunks (072.1-05)
             _make_result([]),                                    # DELETE tables (071.4-04)
             _make_result([]),                                    # DELETE images (071.4-04)
             _make_result([{**pdf_doc, "status": "pending"}]),   # UPDATE
@@ -402,10 +404,13 @@ class TestReingestDocument:
             "file_path": f"{USER_ID}/{DOC_ID}/thesis.pdf",
             "is_latest": True,
         }
+        # Phase 072.1 Plan 05 widened cascade — added DELETE chunks BEFORE
+        # tables+images. Side effect chain now has 5 entries (was 4).
         mock_builder.execute.side_effect = [
             _make_result(pdf_doc),                              # owner SELECT
-            _make_result([]),                                    # DELETE tables
-            _make_result([]),                                    # DELETE images
+            _make_result([]),                                    # DELETE chunks (072.1-05)
+            _make_result([]),                                    # DELETE tables (071.4-04)
+            _make_result([]),                                    # DELETE images (071.4-04)
             _make_result([{**pdf_doc, "status": "pending"}]),   # UPDATE
         ]
 
@@ -431,20 +436,25 @@ class TestReingestDocument:
             f"Expected 200, got {response.status_code}: {response.text}"
         )
 
-        # Verify .delete() was invoked at least twice (once for tables, once
-        # for images). Pre-fix this would have been zero.
+        # Verify .delete() was invoked at least three times (chunks + tables +
+        # images). Pre-072.1-05 this was 2 (only tables + images); Phase 072.1
+        # Plan 05 added document_chunks delete to close BUG-260517-01.
         delete_calls_after = mock_builder.delete.call_count
         new_deletes = delete_calls_after - delete_calls_before
-        assert new_deletes >= 2, (
-            f"Regression (BUG-260516-04): /reingest must call .delete() at "
-            f"least twice (once for document_tables, once for document_images). "
-            f"Observed: {new_deletes} delete calls. Pre-fix, this was 0."
+        assert new_deletes >= 3, (
+            f"Regression (BUG-260517-01): /reingest must call .delete() at "
+            f"least three times (chunks + tables + images). Observed: "
+            f"{new_deletes} delete calls. Pre-072.1-05 was 2; pre-071.4-04 was 0."
         )
 
-        # Verify the two delete targets via supabase.table(...) call history.
-        # supabase.table('document_tables') and supabase.table('document_images')
-        # must both appear in the call args.
+        # Verify the three delete targets via supabase.table(...) call history.
+        # supabase.table('document_chunks'), 'document_tables', and 'document_images'
+        # must all appear in the call args.
         table_args = [c.args[0] for c in supabase_mock.table.call_args_list]
+        assert "document_chunks" in table_args, (
+            f"Regression (BUG-260517-01): supabase.table('document_chunks') never "
+            f"called. table() args were: {table_args}"
+        )
         assert "document_tables" in table_args, (
             f"Regression: supabase.table('document_tables') never called. "
             f"table() args were: {table_args}"

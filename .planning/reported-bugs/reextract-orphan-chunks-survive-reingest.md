@@ -4,11 +4,11 @@ title: /reextract orphan chunks survive subsequent /reingest (regression of BUG-
 reported: 2026-05-17
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/ingestion, backend/api/documents, RAG/retrieval, frontend/documents-list]
-folded_into: null
+folded_into: 072.1
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Operator observes orphan chunks after a /reextract -> /reingest sequence on the v2.5-dev or later branch; OR Phase 071.4 / 072.1 / 072 cascade-delete regression test fails."
 reproduces_on:
   branch: v2.5-dev
   commit: d29f068
@@ -122,3 +122,39 @@ Cross-checked at `/gsd:plan-phase` for Phase 072.1; will be cross-checked at
 - Plan 03 VERIFICATION: `.planning/phases/072-multimodal-lift-docx-completeness/072-VERIFICATION.md` § Anti-Patterns + Gap 3
 - Related closed bug: `.planning/reported-bugs/reingest-endpoint-does-not-delete-prior-tables-and-images.md` (BUG-260516-04 — closed in Phase 071.4 for the `/reingest → /reingest` repro)
 - Forensic timestamps from operator's DOCX captured in UAT scoreboard
+
+## Resolution (Phase 072.1 Plan 05 — 2026-05-17)
+
+**Root cause confirmed** via code reading (Plan 05 Task 1 diagnosis): `/reingest`
+deleted `document_tables` + `document_images` (Phase 071.4 Plan 04 fix) but
+NOT `document_chunks`. The downstream `_upload_pipeline -> ingest_document`
+chain only INSERTs chunks — never deletes prior ones — so any chunks left
+over from a prior `/reextract` (or prior failed `/reingest`) survived.
+
+**Fix** (Plan 05 Task 2): added a single `document_chunks` delete to
+`reingest_document` at the same cascade location as the existing tables+images
+deletes (`backend/app/api/documents.py:~693`, mirroring `/reextract`'s pattern
+at lines 1034-1042). Doc_id-scoped, threadpool-wrapped per D-v2.5-01.
+
+**Verification** (Plan 05 Task 3): non-mocked integration test
+`tests/integration/test_reingest_reextract_orphans.py` exercises the
+`/reextract -> /reingest -> /reingest` sequence against real supabase-py +
+real BackgroundTask + real cascade-delete and asserts (a) orphan-free invariant
+(`documents.chunk_count == text-chunks count`), (b) no-accumulation bound
+(`chunks_after_reingest < 2 * chunks_after_reextract + 10`), and (c) idempotency
+(`/reingest x 2` leaves count stable). Test passes 1/1 against local Supabase
+(8.54s). Combined Phase 072 + Plan 04 + Plan 05 pytest gate: 33 passed.
+
+**`documents.chunk_count` semantics clarified** (Plan 05 Task 2 inline comment
+at `ingest_document` line ~1413): chunk_count is TEXT-CHUNKS-ONLY (image-
+description chunks not counted). Consistent across all writers. The PDF in
+the original bug report (`441 = 441 text only`) was always correct; only
+the DOCX had the orphan accumulation visible because that doc happened to
+go through `/reextract -> /reingest`. No behavior change to chunk_count —
+only documentation of intent.
+
+**Backwards-compat note:** the fix is forward-only — existing documents with
+orphan rows (e.g., operator's thesis DOCX from the 2026-05-16 UAT) are NOT
+auto-cleaned. Operator can run the manual SQL from the "Workarounds" section
+above to clean their existing rows, or simply re-trigger `/reingest` (which
+will now correctly delete + re-insert).
