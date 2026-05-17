@@ -973,15 +973,17 @@ async def send_message(
             _resolved_provider = _user_settings.active_provider
 
     try:
-        await aexec(
-            supabase.table("runs").insert({
-                "run_id": str(run_id),
-                "thread_id": thread_id,
-                "user_id": current_user["id"],
-                "status": "streaming",
-                "model": _resolved_model,
-                "provider": _resolved_provider,
-            })
+        # Phase 073 D-073-04 SITE #1 — runs INSERT flips to asyncpg.
+        # _resolved_provider is guaranteed non-None at this line by the
+        # if/else chain above (Pitfall 6 — provider column is NOT NULL).
+        await insert_run(
+            await get_pg_pool(),
+            run_id=run_id,
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
+            status="streaming",
+            model=_resolved_model,
+            provider=_resolved_provider,
         )
 
         # ZADD sorted-set indexes (REDIS-SETUP.md key conventions). Score is
@@ -1315,9 +1317,24 @@ async def send_message(
                     row["confidence_disclaimer"] = c["disclaimer"]
                 _cached_id: str | None = None
                 try:
-                    _resp = await aexec(supabase.table("messages").insert(row))
-                    if _resp and getattr(_resp, "data", None):
-                        _cached_id = _resp.data[0].get("id")
+                    # Phase 073 D-073-04 SITE #3 — messages INSERT flips to asyncpg.
+                    # JSONB codec on the pool (Plan 01 _init_pg_connection) means
+                    # tool_calls / source_refs flow as plain Python lists — no
+                    # per-call json.dumps. Reads field values out of the already-
+                    # constructed `row` dict via .get() so conditional-set semantics
+                    # (lines above) carry over without rebuilding kwargs.
+                    _inserted_id = await insert_assistant_message(
+                        await get_pg_pool(),
+                        thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+                        user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
+                        content=_strip_nul(full_content),
+                        tool_calls=row.get("tool_calls"),
+                        source_refs=row.get("source_refs"),
+                        confidence_level=row.get("confidence_level"),
+                        confidence_avg_similarity=row.get("confidence_avg_similarity"),
+                        confidence_disclaimer=row.get("confidence_disclaimer"),
+                    )
+                    _cached_id = str(_inserted_id) if _inserted_id else None
                 except Exception as e:
                     logger.error("Failed to persist assistant message: %s", e)
                 _persist_assistant_message._cached_id = _cached_id  # type: ignore[attr-defined]
@@ -1444,8 +1461,31 @@ async def send_message(
                                 # _terminal_status='timed_out' (Phase 066
                                 # D-066-06/07).
                                 async def _on_chunk_anthropic(_ant_event):
-                                    nonlocal full_content, finish_reason
+                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
                                     _etype = _ant_event.get("type")
+                                    # Phase 073 TOKEN-COL-01 (D-073-08): usage events from Plan 03's
+                                    # anthropic_service.stream_anthropic yields. message_start to "usage";
+                                    # message_delta to "usage_delta" (Pitfall 9: usage_delta.output_tokens
+                                    # is FINAL CUMULATIVE for THAT Message; accumulator adds it ONCE per
+                                    # Message, which is what stream_anthropic guarantees).
+                                    if _etype == "usage":
+                                        _i = _ant_event.get("input_tokens", 0) or 0
+                                        _o = _ant_event.get("output_tokens", 0) or 0
+                                        if input_tokens_total is None:
+                                            input_tokens_total = _i
+                                            output_tokens_total = _o
+                                        else:
+                                            input_tokens_total += _i
+                                            output_tokens_total += _o
+                                        return
+                                    elif _etype == "usage_delta":
+                                        _o = _ant_event.get("output_tokens", 0) or 0
+                                        if output_tokens_total is None:
+                                            # rare: usage_delta without prior message_start (partial stream)
+                                            output_tokens_total = _o
+                                        else:
+                                            output_tokens_total += _o
+                                        return
                                     if _etype == "delta":
                                         _text = _ant_event.get("content", "")
                                         if _text:
@@ -1530,7 +1570,22 @@ async def send_message(
                                 # consumed by the outer agent_runner's
                                 # `except asyncio.TimeoutError` formatter.
                                 async def _on_chunk_openai(chunk):
-                                    nonlocal full_content, finish_reason
+                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
+                                    # Phase 073 TOKEN-COL-01 (D-073-08): final usage chunk has empty choices=[]
+                                    # and populated chunk.usage. Other chunks have chunk.usage=None. Pitfall 2:
+                                    # _drain_stream_with_close_on_cancel iterates the stream to natural
+                                    # StopIteration so the trailing chunk WILL be delivered.
+                                    if getattr(chunk, "usage", None) is not None:
+                                        u = chunk.usage
+                                        _i = getattr(u, "prompt_tokens", 0) or 0
+                                        _o = getattr(u, "completion_tokens", 0) or 0
+                                        if input_tokens_total is None:
+                                            input_tokens_total = _i
+                                            output_tokens_total = _o
+                                        else:
+                                            input_tokens_total += _i
+                                            output_tokens_total += _o
+                                        return  # usage chunk has empty choices=[]; no delta/tool work
                                     if not chunk.choices:
                                         return
                                     choice = chunk.choices[0]
