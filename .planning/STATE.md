@@ -362,37 +362,40 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 Last session: 2026-05-17 (Phase 073 close-out + diagnostic + seed-planting cycle)
 Stopped at: Phase 073 (asyncpg pool integration) shipped end-to-end (5/5 SCs verified, 4/4 plans complete). Session expanded to security cleanup of `.mcp.json`, LangSmith MCP setup, and three planted seeds (SEED-023, SEED-024, SEED-025).
 
-### Next session: pending USER actions before any code work
+### Next session: pending USER actions
 
-These three actions are blocking the LangSmith MCP from loading and the Supabase MCP from working in any future session — must be done by the user before the next session starts:
+`.mcp.json` is now PROJECT-SCOPED — no global Windows env vars needed. The LangSmith MCP reads its credentials from `backend/.env` via `scripts/launch-langsmith-mcp.py` (a small wrapper). Supabase MCP intentionally removed (user prefers Supabase CLI + direct Studio access; the prior Supabase MCP setup attempts failed multiple times locally — no value in re-attempting).
 
-1. **ROTATE Supabase service role key** (security — was leaked in `.mcp.json` plaintext + committed to git history before this cleanup):
+Three actions remain — security cleanup + one-time MCP install:
+
+1. **ROTATE Supabase service role key** (security — the OLD key was committed plaintext in `.mcp.json` before commit `890daf2`. Even though `.mcp.json` no longer references it, the OLD key value still exists in git history and is still valid until rotated):
    - Open Supabase Studio at http://127.0.0.1:54323/ → Project Settings → API
    - Click "Reset service role key"
-   - Copy the new key (do NOT paste it back into any file in the repo)
+   - Update the NEW key in `backend/.env` as `SUPABASE_SERVICE_ROLE_KEY` (already the existing var name there)
+   - Restart backend uvicorn so the new key takes effect
 
-2. **Set User-level environment variables in Windows** (these are referenced by the new `.mcp.json` as `${VAR}`):
-   - `SUPABASE_MCP_SERVICE_KEY=<the rotated key from step 1>`
-   - `LANGSMITH_API_KEY=<the same value already in backend/.env>`
-   - `LANGSMITH_PROJECT=agentic-rag-module2` (or whichever project from backend/.env)
-   - Path: Windows Start → "Environment Variables" → User variables → New
-   - Per memory `reference_antigravity_env_inheritance`: User-scope env vars need full Antigravity restart, not just Claude reload
+2. **Install the LangSmith MCP server into the project venv** (one-time):
+   ```powershell
+   backend\venv\Scripts\pip install langsmith-mcp-server
+   ```
+   Confirm install: `backend\venv\Scripts\langsmith-mcp-server.exe --help` should print usage. If the package name has changed upstream, set `LANGSMITH_MCP_CMD=<actual-name>` in `backend/.env` and the launcher will use it.
 
-3. **Verify the LangSmith MCP package name** (best-effort guess in `.mcp.json` — `@langchain/langsmith-mcp` may not be the real npm package). Sources to check, in order:
-   - https://github.com/langchain-ai/langsmith-mcp (likely repo)
-   - https://www.npmjs.com/search?q=langsmith-mcp
-   - LangSmith docs "MCP integration" section
-   - If the real package is different (e.g., `langsmith-mcp-server` or `@langchain-ai/langsmith-mcp`), update `.mcp.json` `args` accordingly before restarting Antigravity
+3. **Full Antigravity restart** (closes existing Claude sessions; new ones load the new `.mcp.json` with the LangSmith launcher).
+   In the next session, verify success by asking Claude to ToolSearch for `langsmith` — tools should appear and be loadable.
 
-4. **Full Antigravity restart** (closes all Claude sessions; new ones inherit the User env vars and load the langsmith MCP server). Verify success in the next session by asking Claude to ToolSearch for `langsmith` — should return tools.
+### Why no global env vars
+
+`scripts/launch-langsmith-mcp.py` reads `backend/.env` at MCP startup and injects its values into the spawned MCP server's env. Result: `LANGSMITH_API_KEY` lives only in `backend/.env` (gitignored), only this project's `.mcp.json` references the launcher, and other projects on the same machine see nothing of this configuration. Strictly project-local.
+
+If the launcher fails (package not installed, wrong CLI name, etc.), it prints a clear ERROR line to stderr that the MCP runner surfaces — easy to diagnose without env-var detective work.
 
 ### Optional: git history cleanup for the leaked key
 
-The leaked Supabase service key is in `.mcp.json` history (commits before this session). Even after rotation, scrubbing history is good practice if the repo is ever pushed to a non-private remote:
+The leaked Supabase service key is in `.mcp.json` history (commits before `890daf2`). Even after rotation, scrubbing history is good practice if the repo is ever pushed to a non-private remote:
 ```bash
 git filter-repo --invert-paths --path .mcp.json
 ```
-Skip this if the repo stays private and the key is rotated — the rotation alone closes the exploit window.
+Skip this if the repo stays private and the key is rotated — rotation alone closes the exploit window.
 
 ### State of the v2.6 milestone
 
