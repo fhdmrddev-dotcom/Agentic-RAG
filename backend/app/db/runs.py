@@ -13,8 +13,8 @@ app.dependencies._init_pg_connection — call sites here pass plain Python
 dicts/lists for tool_calls / source_refs. No per-call serialization here.
 
 SECURITY (T-073-02): ALL value substitutions use $N positional placeholders.
-No f-strings or .format() on SQL strings ever. asyncpg's native parameter
-binding makes SQL injection impossible at this layer.
+No f-strings or string-interpolation methods on SQL strings, ever. asyncpg's
+native parameter binding makes SQL injection impossible at this layer.
 """
 
 from datetime import datetime
