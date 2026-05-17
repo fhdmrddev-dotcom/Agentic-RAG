@@ -2703,21 +2703,33 @@ async def send_message(
                     except BaseException:
                         logger.exception("Terminal sentinel XADD failed for run %s", run_id)
 
-                    # 3. UPDATE runs row — status/error/completed_at/message_id/tokens
-                    # WR-01 fix: Python-side ISO-8601 timestamp instead of the literal string
-                    # "now()". PostgREST sends update payloads as JSON over the wire; "now()"
-                    # arrives as a JSON string and timestamptz only treats the bare token 'now'
-                    # (no parens) as a special literal. The "now()" form may store a literal
-                    # string, return NULL, or error depending on column/version — silently
-                    # corrupting the canonical run completion timestamp.
+                    # 3. UPDATE runs row — status/error/completed_at/message_id/tokens.
+                    # Phase 073 D-073-04 SITE #2 — flips to asyncpg finalize_run helper.
+                    # Phase 073 TOKEN-COL-01 (D-073-09): NULL + warn when SDK never
+                    # surfaced usage on any iteration (interrupted stream / provider
+                    # gap). Both slots stay None until the on-chunk callback fires.
+                    # Warning format string contains run/provider/model identifiers
+                    # only — NO token VALUES (T-073-04 mitigation; locked by Plan 03's
+                    # test_missing_usage_format_string_has_no_token_values negative gate).
+                    # WR-01 historical note: PostgREST required ISO-8601-string timestamps
+                    # due to JSON-over-the-wire encoding. asyncpg uses the Postgres binary
+                    # protocol — pass datetime objects directly.
                     try:
-                        await aexec(supabase.table("runs").update({
-                            "status": _terminal_status,
-                            "error": _terminal_error,
-                            "completed_at": datetime.now(timezone.utc).isoformat(),
-                            "message_id": _msg_id_for_runs,
-                            # input_tokens/output_tokens: filled if SDK surfaced usage; NULL otherwise (RESEARCH.md Q1)
-                        }).eq("run_id", str(run_id)))
+                        if input_tokens_total is None and output_tokens_total is None:
+                            logger.warning(
+                                "runs.usage missing for run=%s provider=%s model=%s",
+                                run_id, _resolved_provider, _resolved_model,
+                            )
+                        await finalize_run(
+                            await get_pg_pool(),
+                            run_id=run_id,
+                            status=_terminal_status,
+                            error=_terminal_error,
+                            completed_at=datetime.now(timezone.utc),
+                            message_id=UUID(_msg_id_for_runs) if _msg_id_for_runs else None,
+                            input_tokens=input_tokens_total,
+                            output_tokens=output_tokens_total,
+                        )
                     except BaseException:
                         logger.exception("runs row UPDATE failed for run %s", run_id)
 
