@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: Completed 073-04-PLAN.md (Phase 073 ships end-to-end)
-last_updated: "2026-05-17T15:51:02.771Z"
+status: planning
+stopped_at: Phase 074 context gathered
+last_updated: "2026-05-17T19:59:36.039Z"
 last_activity: 2026-05-17
 progress:
-  total_phases: 20
-  completed_phases: 12
+  total_phases: 21
+  completed_phases: 11
   total_plans: 39
   completed_plans: 41
-  percent: 60
+  percent: 100
 ---
 
 # Project State
@@ -359,8 +359,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-17 (Phase 073 close-out + diagnostic + seed-planting cycle)
-Stopped at: Phase 073 (asyncpg pool integration) shipped end-to-end (5/5 SCs verified, 4/4 plans complete). Session expanded to security cleanup of `.mcp.json`, LangSmith MCP setup, and three planted seeds (SEED-023, SEED-024, SEED-025).
+Last session: --stopped-at
+Stopped at: Phase 074 context gathered
 
 ### Next session: pending USER actions
 
@@ -392,9 +392,11 @@ If the launcher fails (package not installed, wrong CLI name, etc.), it prints a
 ### Optional: git history cleanup for the leaked key
 
 The leaked Supabase service key is in `.mcp.json` history (commits before `890daf2`). Even after rotation, scrubbing history is good practice if the repo is ever pushed to a non-private remote:
+
 ```bash
 git filter-repo --invert-paths --path .mcp.json
 ```
+
 Skip this if the repo stays private and the key is rotated — rotation alone closes the exploit window.
 
 ### State of the v2.6 milestone
