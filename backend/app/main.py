@@ -104,6 +104,21 @@ async def lifespan(app_instance):
     except Exception:
         logger.exception("Redis aclose failed at shutdown")
 
+    # Phase 073 — close the asyncpg pool BEFORE Supabase (matches Redis-then-Supabase
+    # order). pool.close() waits for in-flight queries; wrap in wait_for so a stuck
+    # query can't wedge shutdown (Pitfall 4). Falls back to pool.terminate() on
+    # timeout (fire-and-forget; kills sockets immediately).
+    try:
+        from app.dependencies import _pg_pool
+        if _pg_pool is not None:
+            try:
+                await asyncio.wait_for(_pg_pool.close(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.warning("pg pool close timed out — terminating")
+                _pg_pool.terminate()
+    except Exception:
+        logger.exception("pg pool close failed at shutdown")
+
     # Shutdown: close all open sandbox sessions to free Docker containers
     if settings.sandbox_enabled:
         from app.services.sandbox_service import sandbox_manager
