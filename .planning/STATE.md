@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
-stopped_at: Completed 073-03-PLAN.md
-last_updated: "2026-05-17T15:39:06.241Z"
+status: verifying
+stopped_at: Completed 073-04-PLAN.md (Phase 073 ships end-to-end)
+last_updated: "2026-05-17T15:51:02.771Z"
 last_activity: 2026-05-17
 progress:
   total_phases: 20
-  completed_phases: 10
+  completed_phases: 11
   total_plans: 39
-  completed_plans: 40
+  completed_plans: 41
   percent: 100
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 Phase: 073 (asyncpg-pool-integration) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-17
 
 ## PRD-reset outputs (committed)
@@ -229,6 +229,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 073 P01 | 5min | 5 tasks | 9 files |
 | Phase 073 P02 | 4min | 2 tasks | 3 files |
 | Phase 073 P03 | 4min | 4 tasks | 6 files |
+| Phase 073 P04 | 6min | 4 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -315,6 +316,10 @@ Recent decisions affecting v2.5 work:
 - Phase 073 Plan 03: stream_options={'include_usage': True} added GLOBALLY to openai_service.py kwargs dict (D-073-08 mandate) — single flip covers BOTH OpenAI direct AND OpenRouter because both route through the same client.chat.completions.create call per config.py:_PROVIDER_BASE_URLS.
 - Phase 073 Plan 03: anthropic_service.stream_anthropic yields normalized usage events on message_start ({'type':'usage','input_tokens':N,'output_tokens':M}) and message_delta ({'type':'usage_delta','output_tokens':N}). Pitfall 9 doc'd in code: event.usage.output_tokens on message_delta is FINAL CUMULATIVE for THAT Message, not a per-event delta — consumer adds it once per Message.
 - Phase 073 Plan 03: accumulator function shape locked as (chunk_or_event, input_total, output_total) -> (input_total, output_total) — pure tuple return so Plan 04 can inline the body verbatim into threads.py closures with one-line nonlocal tuple-assignment. _MISSING_USAGE_FORMAT = 'runs.usage missing for run=%s provider=%s model=%s' is the canonical warning literal Plan 04 will inline into _shielded_finalize step 3 (T-073-04 negative-assertion gate locks out tokens=/value=/usage_dict/%d).
+- Phase 073 Plan 04: All 3 hot-path call sites flipped from aexec to asyncpg helpers (runs INSERT at threads.py:974, messages INSERT at :1310, runs UPDATE finalize at :2651). Spawn-failure runs UPDATE at ~:997 STAYS on aexec per D-073-04 SC-minimum. T-073-03 final scope verified: exactly 3 helper calls in exactly 1 file (threads.py). aexec import preserved for cold-path consumers.
+- Phase 073 Plan 04: Run-level token accumulators (input_tokens_total / output_tokens_total) live in send_message's closure adjacent to full_content / persisted_tool_calls; both default to None (D-073-09 NULL sentinel). _on_chunk_openai and _on_chunk_anthropic both extend nonlocal with the two slot names and accumulate per Plan 03's locked handler shapes. _shielded_finalize step 3 emits logger.warning('runs.usage missing for run=%s provider=%s model=%s', ...) BEFORE finalize_run when both slots are None — T-073-04 mitigation locked (format string has identifiers only, 0 token-value leaks per audit grep).
+- Phase 073 Plan 04: test_073_concurrency.py (real-Postgres binding gate, 4 tests, 306 lines) ships alongside the preserved test_058_concurrency.py (mock-Supabase gate) per D-073-11 two-gate strategy. test_058 confirmed byte-identical post-Plan-04. test_073 covers singleton-reset autouse contract + JSONB codec round-trip + TOKEN-COL-01 non-NULL persistence + CONCUR-01 under asyncpg. 4/4 green locally against postgres:postgres@127.0.0.1:54322.
+- Phase 073 Plan 04 Rule-1 deviation: test_thread_user fixture initially used bare try/except: pass around threads INSERT, but local Supabase has threads.user_id -> auth.users.id FK constraint that mock-Supabase test_058 fixture never exercises. Fix: seed auth.users row first (only id is strictly NOT NULL); FK-safe cleanup order (runs/messages -> threads -> auth.users); pytest.skip on schema mismatch with actual exception surface.
 
 ### Pending Todos
 
@@ -354,8 +359,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-17T15:39:06.233Z
-Stopped at: Completed 073-03-PLAN.md
+Last session: 2026-05-17T15:51:02.764Z
+Stopped at: Completed 073-04-PLAN.md (Phase 073 ships end-to-end)
 Next: Orchestrator drives BOTH outstanding pieces:
   (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
   (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
