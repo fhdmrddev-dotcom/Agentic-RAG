@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: Completed 072-02-PLAN.md
-last_updated: "2026-05-17T06:37:52.691Z"
-last_activity: 2026-05-17 -- Phase 072 execution started
+status: planning
+stopped_at: Phase 073 context gathered
+last_updated: "2026-05-17T09:43:50.543Z"
+last_activity: 2026-05-17
 progress:
   total_phases: 20
   completed_phases: 10
   total_plans: 35
-  completed_plans: 35
-  percent: 50
+  completed_plans: 37
+  percent: 100
 ---
 
 # Project State
@@ -344,8 +344,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-16T20:12:46.081Z
-Stopped at: Completed 072-02-PLAN.md
+Last session: --stopped-at
+Stopped at: Phase 073 context gathered
 Next: Orchestrator drives BOTH outstanding pieces:
   (1) Plan 05 Task 2 migration apply — open Supabase Studio (http://127.0.0.1:54323/ → SQL Editor), paste contents of `supabase/migrations/045_app_settings_extraction_aspects.sql`, Run. Sanity SELECT: `SELECT extraction_text_engine_pdf, extraction_image_engine_docx, extraction_equation_engine, extraction_per_call_hints_enabled FROM app_settings LIMIT 1;` → expect `('legacy', 'zip_xpath', 'docling_formula', true)`. Run `bash scripts/regenerate-full-schema.sh`. Commit regenerated `supabase/full-schema.sql`.
   (2) Pytest verification: `cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_extract_composable.py tests/unit/test_aspect_engines_*.py tests/unit/test_extraction_service.py tests/unit/test_multimodal_extraction.py tests/unit/test_071_1_threadpool_sweep.py tests/integration/test_documents.py tests/integration/test_extraction_dispatcher.py -x -q`. Expect 0 failures (sandbox in this session denied pytest invocation — runtime gate runs post-merge).
