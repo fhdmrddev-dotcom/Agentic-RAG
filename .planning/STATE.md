@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 075 planned (3-plan split, plan-check passed with 2 metadata-only warnings now resolved)
-last_updated: "2026-05-18T18:41:03.275Z"
+status: executing
+stopped_at: Completed 075-01-PLAN.md
+last_updated: "2026-05-18T18:57:39.664Z"
 last_activity: 2026-05-18
 progress:
   total_phases: 22
   completed_phases: 12
   total_plans: 44
-  completed_plans: 43
-  percent: 98
+  completed_plans: 44
+  percent: 100
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 074 — seed-009-seed-011-polish-bundle
+**Current focus:** Phase 075 — seed-008-tool-args-progress-polish-bundle
 
 ## Current Position
 
-Phase: 075
-Plan: Not started
-Status: Ready to plan
+Phase: 075 (seed-008-tool-args-progress-polish-bundle) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-05-18
 
 ## PRD-reset outputs (committed)
@@ -230,6 +230,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 073 P02 | 4min | 2 tasks | 3 files |
 | Phase 073 P03 | 4min | 4 tasks | 6 files |
 | Phase 073 P04 | 6min | 4 tasks | 2 files |
+| Phase 075 P01 | 11min | 8 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -320,6 +321,7 @@ Recent decisions affecting v2.5 work:
 - Phase 073 Plan 04: Run-level token accumulators (input_tokens_total / output_tokens_total) live in send_message's closure adjacent to full_content / persisted_tool_calls; both default to None (D-073-09 NULL sentinel). _on_chunk_openai and _on_chunk_anthropic both extend nonlocal with the two slot names and accumulate per Plan 03's locked handler shapes. _shielded_finalize step 3 emits logger.warning('runs.usage missing for run=%s provider=%s model=%s', ...) BEFORE finalize_run when both slots are None — T-073-04 mitigation locked (format string has identifiers only, 0 token-value leaks per audit grep).
 - Phase 073 Plan 04: test_073_concurrency.py (real-Postgres binding gate, 4 tests, 306 lines) ships alongside the preserved test_058_concurrency.py (mock-Supabase gate) per D-073-11 two-gate strategy. test_058 confirmed byte-identical post-Plan-04. test_073 covers singleton-reset autouse contract + JSONB codec round-trip + TOKEN-COL-01 non-NULL persistence + CONCUR-01 under asyncpg. 4/4 green locally against postgres:postgres@127.0.0.1:54322.
 - Phase 073 Plan 04 Rule-1 deviation: test_thread_user fixture initially used bare try/except: pass around threads INSERT, but local Supabase has threads.user_id -> auth.users.id FK constraint that mock-Supabase test_058 fixture never exercises. Fix: seed auth.users row first (only id is strictly NOT NULL); FK-safe cleanup order (runs/messages -> threads -> auth.users); pytest.skip on schema mismatch with actual exception surface.
+- D-075-13 (BUG-260518-01 fix): inline payload extension on buffer_expired_during_tail with recently_active + runs_status discriminator; consumer-side layering in StreamsProvider routes transient vs terminal
 
 ### Pending Todos
 
@@ -359,8 +361,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 075 planned (3-plan split, plan-check passed with 2 metadata-only warnings now resolved)
+Last session: 2026-05-18T18:57:39.655Z
+Stopped at: Completed 075-01-PLAN.md
 
 ### Next session: pending USER actions
 

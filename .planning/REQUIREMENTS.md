@@ -35,7 +35,8 @@
 
 ### Theme D — Polish Carry-forwards
 
-- [ ] **POLISH-SEED-008-01**: Thread switch latency reduced ≥50% on cold-cache (post-F5) thread switch. New `GET /threads/{id}/snapshot` endpoint replaces the 3-call sequential chain.
+- [x] **POLISH-SEED-008-01
+**: Thread switch latency reduced ≥50% on cold-cache (post-F5) thread switch. New `GET /threads/{id}/snapshot` endpoint replaces the 3-call sequential chain.
 - [ ] **POLISH-SEED-008-02**: Sandbox `for i in range(5): print(i); time.sleep(1)` produces ≥3 distinct `code_stdout` SSE events across ≥1 second elapsed.
 - [x] **POLISH-SEED-009-01**: `claude-haiku-4-5-20251001` runs no longer 400 with `max_tokens > 64000`. `MODEL_CAPABILITIES.max_output_tokens` populated for all currently-listed Anthropic models.
 - [ ] **POLISH-SEED-010-01**: `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10` produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter-routed models.
