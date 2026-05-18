@@ -1,163 +1,191 @@
-# Phase 075 — Cross-Provider End-to-End UAT
+# Phase 075 — Cross-Provider End-to-End UAT (v2, with user-provided transcripts)
 
 **Date:** 2026-05-19 (started 2026-05-18 UTC)
-**Tester:** Chrome DevTools MCP + LangSmith REST API + Supabase REST API
-**Status:** ALL THREE ROUNDS HIT BUGS — three distinct failure modes documented
+**Tester:** Chrome DevTools MCP + LangSmith REST API + Supabase REST API + user-supplied transcripts
+**Status:** ALL THREE ROUNDS HIT BUGS — 10 distinct issues catalogued
 **Prompt:** *"search for Fahed Mrad dissertation, make a professional pptx for defence session and include comprehensive charts and visuals"*
+
+---
+
+## Universal Confirmed Finding (the headline)
+
+**Code execution is stuck on "Running code…" until the user manually refreshes the page** — reproduced across all three providers (OpenAI gpt-5.4, Anthropic claude-sonnet-4-6, OpenRouter kimi-k2.6). Backend completes correctly; frontend never receives the terminal frame. **POLISH-SEED-008-02 (live line-by-line code streaming) does not work in production for any provider.** This is the same SSE-break regression all 3 debug agents pinpointed:
+
+- **Backend:** `harvest_output_files` at `sandbox_service.py:67-149` runs synchronous blocking I/O directly on the async event loop after the cell completes (D-v2.5-01 violation), starving the SSE keepalive and tearing down the stream before the terminal frame ships.
+- **Frontend:** `_isTransientBufferExpired` at `StreamsProvider.tsx:111` only matches the literal `buffer_expired*` prefix, so plain `reader.done` stream-ends bypass the snapshot-probe recovery entirely.
+- **Tests:** `test_075_code_stdout_progressive.py:54-57` skipif gates all 4 binding tests on `SANDBOX_ENABLED=1`. Under `asyncio_mode=auto` the tests collect but skip silently when Docker isn't bound. The "11/11 GREEN" claim from Plan 02 exercised the OLD Phase 062 non-sandbox path. New path has zero CI coverage.
 
 ---
 
 ## Summary Table
 
-| Round | Provider | Model (UI) | Model (LangSmith) | Backend Status | Frontend Status | UX Verdict |
-|-------|----------|-----------|-------------------|----------------|-----------------|------------|
-| 1 | OpenAI | `gpt-5.4` | `gpt-5.4` + `gpt-5.4-mini` (sub-agent) | ✓ Completed (5 tool calls, 414s) | ✗ Stuck on "Executing code" forever, **no Resume button** | **Silent freeze** — worst UX |
-| 2 | Anthropic | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` (sub-agent) | ✓ Completed (13 tool calls, ~5min) | ✗ **Completely blank** UI — no user msg, no steps, no streaming text for the entire run | **Total black box** |
-| 3 | OpenRouter | `moonshotai/kimi-k2.6` | `moonshotai/kimi-k2.6:exacto` | 🔄 Still streaming at observation time | ⚠ Renders all tool steps correctly, then **Resume button DOES appear** mid-stream when backend is still alive | **False-positive recovery** — BUG-260518-01 still reproduces |
+| Round | Provider | Model (UI) | Model (LangSmith) | Backend Result | Live UX | PPTX produced? |
+|-------|----------|-----------|-------------------|----------------|---------|----------------|
+| 1 | OpenAI | `gpt-5.4` | `gpt-5.4` + `gpt-5.4-mini` (sub-agent) | ✓ completed (5 tools, 414s) | ✗ stuck on "Running code", no Resume | ✗ failed — model didn't try `pip install` after ModuleNotFoundError |
+| 2 | Anthropic | `claude-sonnet-4-6` | `claude-haiku-4-5-20251001` (sub-agent) | ✓ completed (13 tools, ~5min) | ✗ blank during run; **populates after F5** | ✓ 16-slide deck (634 KB) + 8 chart PNGs |
+| 3 | OpenRouter | `moonshotai/kimi-k2.6` | `moonshotai/kimi-k2.6:exacto` | ✗ erred with Resume button (path issue at step 7) | ✗ Resume button mid-stream | ✗ failed — model wrote to wrong path; harvest missed the file |
+
+**Note on Round 2 success:** Anthropic actually produced the most complete, well-designed presentation of the three (16 slides, 8 charts, professional layout). The agent installed `python-pptx`, generated all charts, built slides part 1, built slides part 2, ran a QA check on shape counts. The Phase 075 streaming-layer regression hides this success from the user during the run — they only see it after F5 reload.
 
 ---
 
-## Bug Inventory (NEW, found during this UAT)
+## Bug Inventory (10 distinct issues)
 
-### B-260519-01 — Anthropic provider produces zero frontend rendering
+### B-260519-01 — Anthropic: streaming doesn't render in real-time (reframed)
 **Severity:** blocker
-**Trigger:** Submit any prompt with `Anthropic / claude-sonnet-4-6` as the active provider/model.
-**Symptoms:** Backend agent loop runs perfectly (13 tool calls completed, runStatus=completed in DB), but the **frontend never renders the user message, never renders any Step indicator, never renders any streamed text** for the entire run lifecycle. Just the empty thread heading + a disabled composer. F5 reload + click thread still shows nothing because the rendering logic itself is broken for Anthropic responses.
-**Evidence:**
-- Thread `117a5ad2-a9ed-4172-99d0-9eaa9e3ca1ca`, run `7d7c2b19-86f3-4e03-8f69-b39ffd89ca87`
-- Snapshot returns 2 messages with the assistant message fully populated (13 tool_calls, content present)
-- Frontend `main.innerText.length = 167` chars (just UI chrome) during the entire run AND after completion
-- Console: NO errors logged
-**Suspected cause:** Anthropic's SSE event order/format diverges from the OpenAI shape that StreamsProvider's reducer expects. Likely related to D-075-15's deferred BUG-260514-02 root cause — Anthropic mixed text + tool_use block ordering breaks the message-content reducer. Plan 03's new `tool_args_progress` event on `anthropic_service.py:204-236` may have aggravated this if the new event isn't consumed correctly.
-**Fix surface:** `frontend/src/providers/StreamsProvider.tsx` SSE event reducer + `frontend/src/components/chat/MessageItem.tsx` content-block rendering. Likely needs explicit Anthropic content-block handling.
+**Trigger:** Submit any prompt with `Anthropic` as the active provider.
+**Symptoms:** During the entire run lifecycle (text streaming, tool calls, code execution), the frontend main panel renders **nothing** — no user message, no step indicators, no streaming text. Backend agent loop completes successfully and saves messages + tool_calls to DB. After F5 reload, the full conversation is visible (and looks great in the Anthropic case — full 16-slide deck was generated). So this is a streaming bug, not a rendering bug per se: the SSE consumer can't process Anthropic's event order/format, but the post-completion snapshot fetch works fine.
+**Suspected cause:** Anthropic's mixed text + tool_use content-block ordering breaks the StreamsProvider reducer mid-stream (the BUG-260514-02 root cause that D-075-15 deferred). Plan 03's new `tool_args_progress` emit on `anthropic_service.py:204-236` may also produce events in an order the frontend doesn't expect.
+**Fix surface:** `frontend/src/providers/StreamsProvider.tsx` SSE reducer + `frontend/src/components/chat/MessageItem.tsx` content-block rendering. Needs Anthropic-specific content-block handling.
 
 ### B-260519-02 — Snapshot endpoint returns 503 on brand-new empty threads
 **Severity:** major
-**Trigger:** Create a brand-new thread (POST /threads), then immediately GET /threads/{tid}/snapshot before any message is sent (which the frontend does automatically on mount).
-**Symptoms:** Endpoint returns `503 {"detail":"Streaming infrastructure unavailable"}` with `Retry-After: 10` (the D-062-13 Redis-down posture).
-**Evidence:**
-- Round 1, reqid=728: `GET /threads/e00649c9-99a5-44ae-98cb-a3f4842a29d6/snapshot → 503` immediately after POST /threads (response time was within milliseconds — Redis is not actually down).
-- Round 2 + Round 3 returned 200 — so it's flaky, not deterministic. Possibly a race between thread-create commit and the first /snapshot request hitting the Redis probe before the thread is visible.
-**Suspected cause:** D-075-04 has the Redis probe gated on Redis availability, but the probe runs unconditionally even when `active_runs` is empty (no run_ids to probe). For a brand-new empty thread there's nothing in Redis to probe; the endpoint should short-circuit `since_cursors: {}` without touching Redis.
-**Fix surface:** `backend/app/api/threads.py:510-552` snapshot endpoint — skip the Redis probe when `active_runs == []`. The probe should only fire per active run.
+**Trigger:** Create a brand-new thread (POST /threads), then immediately GET /threads/{tid}/snapshot before any message is sent (which the frontend does on mount).
+**Symptoms:** Endpoint returns `503 {"detail":"Streaming infrastructure unavailable"}` with `Retry-After: 10`. Race-flaky — Round 1 hit it, Rounds 2 + 3 didn't.
+**Suspected cause:** D-075-04's Redis probe runs unconditionally even when `active_runs` is empty. For a brand-new empty thread there's nothing to probe; the endpoint should short-circuit `since_cursors: {}` without touching Redis.
+**Fix surface:** `backend/app/api/threads.py:510-552` — skip the Redis probe when `active_runs == []`. The probe should only fire per active run id.
 
 ### B-260519-03 — Plan 01 BUG-260518-01 fix incomplete for OpenRouter stream-end
 **Severity:** major
-**Trigger:** Submit any prompt that triggers `execute_code` with an `OpenRouter / moonshotai/kimi-k2.6` model.
-**Symptoms:** During the execute_code step (Step 3 in the OpenRouter test), the SSE stream's stream-end pattern flips `runStatus → "failed"` and surfaces the "Resume run" button — even though `/snapshot` would confirm `active_runs` still contains the streaming run.
-**Evidence:**
-- Round 3, thread `f795def5-1572-43a0-8689-ed7f6f6f7cb0`, run `90a5abe5-015b-4f19-91a2-ef26c59d5283`
-- Backend snapshot at T+255s: `active_runs: [{run_id: 90a5abe5..., status: "streaming"}]` — run alive.
-- Frontend: `resumeBtnVisible: true`, `inputDisabled: false` — Resume button shown, composer enabled.
-- This is BUG-260518-01 STILL REPRODUCING despite Plan 01's `_isTransientBufferExpired` wiring at `StreamsProvider.tsx:111`.
-**Suspected cause:** `_isTransientBufferExpired` only matches the literal prefix `buffer_expired*`. OpenRouter's stream-end emits a different error message (likely something like `openrouter_disconnected` or `provider_disconnect`) that doesn't match the filter, so the transient → snapshot-probe fallback never fires.
-**Fix surface:** `frontend/src/providers/StreamsProvider.tsx:104-117` — widen `_isTransientBufferExpired` (rename to `_isTransientStreamEnd`) to ALSO probe `/snapshot` on (a) `kind === "done"` when any tool_call.status is still `running`/`preparing`, and (b) any error payload regardless of prefix when the run started recently AND no terminal frame was emitted yet. This pairs naturally with the SSE-DEBUG agent's Layer A fix.
+**Trigger:** Any `execute_code` step with OpenRouter (kimi-k2.6 observed; likely all OpenRouter models).
+**Symptoms:** During the execute_code step, the SSE stream's stream-end pattern surfaces the "Resume run" button **while backend is still alive**. Plan 01's `_isTransientBufferExpired` filter doesn't match OpenRouter's stream-end format.
+**Fix surface:** `frontend/src/providers/StreamsProvider.tsx:104-117` — widen the transient filter to probe `/snapshot` on (a) `kind === "done"` when any tool_call.status is `running`/`preparing`, AND (b) any error payload when the run started recently AND no terminal frame was emitted yet. Pairs naturally with SSE-DEBUG agent's Layer A fix.
 
-### B-260519-04 — LangSmith provider mislabeling for non-OpenAI calls
-**Severity:** info (observability bug, not user-facing)
+### B-260519-04 — LangSmith provider mislabeling (observability)
+**Severity:** info
 **Trigger:** Any LLM call using Anthropic or OpenRouter as the provider.
-**Symptoms:** All LangSmith traces are labeled `name: ChatOpenAI` and `extra.metadata.ls_provider: openai` regardless of actual provider. The model name (`ls_model_name`) is correct, but the `name` and `ls_provider` fields are wrong.
-**Evidence:** LangSmith API trace breakdown for the last 40 runs after all 3 rounds:
+**Symptoms:** All LangSmith traces are labeled `name: ChatOpenAI` and `extra.metadata.ls_provider: openai` regardless of actual provider. The `ls_model_name` field IS correct (so cost analysis still works), but the `name` and `ls_provider` fields make provider-specific debugging confusing.
+**Evidence:** Trace breakdown across all 3 rounds:
 ```
-  9  openai/gpt-5.4-mini/ChatOpenAI
-  8  openai/gpt-4.1/ChatOpenAI
-  6  openai/gpt-5.4/ChatOpenAI
-  5  openai/moonshotai/kimi-k2.6:exacto/ChatOpenAI   ← OpenRouter call mis-tagged as OpenAI
-  3  openai/claude-haiku-4-5-20251001/ChatOpenAI     ← Anthropic call mis-tagged as OpenAI
+9  openai/gpt-5.4-mini/ChatOpenAI
+8  openai/gpt-4.1/ChatOpenAI
+6  openai/gpt-5.4/ChatOpenAI
+5  openai/moonshotai/kimi-k2.6:exacto/ChatOpenAI    ← OpenRouter mis-tagged
+3  openai/claude-haiku-4-5-20251001/ChatOpenAI      ← Anthropic mis-tagged
 ```
-**Fix surface:** Wherever LangSmith tracing is initialized in the backend (likely `backend/app/services/anthropic_service.py` for the Anthropic path + the OpenRouter routing layer). The `ls_provider` metadata and the trace name should be set per-provider, not hardcoded to "openai".
+**Fix surface:** Wherever LangSmith tracing is initialized in the backend (likely `anthropic_service.py` for Anthropic + the OpenRouter routing layer). Set `ls_provider` and trace `name` per-provider.
 
-### B-260519-05 — User-selected model isn't propagated; sub-agents always use Haiku
+### B-260519-05 — User-selected model not propagated; sub-agents force cheaper model invisibly
 **Severity:** major (cost + behavior surprise)
-**Trigger:** Select `claude-sonnet-4-6` in the UI model picker; observe LangSmith traces.
-**Symptoms:** LangSmith shows ALL the LLM calls in the run are using `claude-haiku-4-5-20251001`, not the user's selected `claude-sonnet-4-6`. The main agent loop AND the sub-agent for `analyze_document` are both Haiku. Same pattern in OpenAI Round 1: user selected `gpt-5.4` but several sub-calls used `gpt-5.4-mini`.
-**Evidence:** Anthropic Round 2 traces (3 LLM calls), 100% are `claude-haiku-4-5-20251001`. OpenAI Round 1 traces (~22 LLM calls), main loop is `gpt-5.4` (correct) but sub-agent calls are `gpt-5.4-mini`. The OpenRouter Round 3 traces show `moonshotai/kimi-k2.6:exacto` (the `:exacto` suffix is curious — OpenRouter routing tag).
-**Suspected cause:** Two separate issues:
-- (a) The sub-agent infrastructure unilaterally downgrades to a cheaper model (Haiku for Anthropic, Mini for OpenAI) for tool sub-calls like `analyze_document` — this may be an intentional cost optimization but is undocumented in the UI and the user has no way to know or override it.
-- (b) For Anthropic specifically, even the MAIN agent loop is using Haiku, not the selected Sonnet. Either the model-routing config in the backend has a stale default for Anthropic, or the UI's model selection isn't persisting through to the agent-runner.
-**Fix surface:** `backend/app/api/threads.py` agent-runner — surface the user-selected model into the main loop and a clear "sub-agent model" override into the UI/config. At minimum, log a one-line "user requested {sonnet-4-6}, downgrading sub-agent to {haiku} for cost" so behavior is auditable.
+**Trigger:** Select `claude-sonnet-4-6` or `gpt-5.4` in the UI; observe LangSmith.
+**Symptoms:**
+- Anthropic Round 2: user selected `claude-sonnet-4-6`, ALL LangSmith traces are `claude-haiku-4-5-20251001`. Sonnet was NEVER called.
+- OpenAI Round 1: user selected `gpt-5.4`, main loop is `gpt-5.4` (correct), but sub-agents for `analyze_document` are silently `gpt-5.4-mini`.
+**Suspected cause:** Two issues:
+- (a) Sub-agent infrastructure unilaterally downgrades to the cheaper sibling for tool sub-calls — undocumented in UI, no override.
+- (b) For Anthropic, the MAIN loop is also downgrading. Either the model-routing config has a stale default for Anthropic, or the UI's selection isn't reaching the agent-runner.
+**Fix surface:** `backend/app/api/threads.py` agent-runner — surface user-selected model to main loop; expose sub-agent model as a separate config; log "user requested {sonnet-4-6}, downgrading sub-agent to {haiku}" so behavior is auditable.
 
-### B-260519-06 — Anthropic Round 2 frontend state diverged from backend (Run 2 still streaming but composer enabled)
+### B-260519-06 — Frontend isStreaming state diverges from backend active_runs over long runs
 **Severity:** major
-**Trigger:** Anthropic Round 2 specifically — interacts with B-260519-01 + Test 2 dual-`/messages` bug.
-**Symptoms:** After ~4-5 minutes of the Anthropic run, the frontend's textbox became NOT disabled (so the user could type a new message), but backend `active_runs` still showed the run as `status: streaming`. If the user typed a new prompt now, the backend would race or reject; either way the UX state diverged from truth.
-**Evidence:** Anthropic Round 2 at T+~5min: `active_runs: [{run_id: 7d7c2b19..., status: "streaming"}]`, frontend `textbox.disabled = false`.
-**Fix surface:** This is downstream of B-260519-01 and the duplicate-`/messages` bug from Test 2 — the frontend's source-of-truth for isStreaming should reconcile against `/snapshot.active_runs` periodically, not just rely on the SSE event stream.
+**Trigger:** Long-running prompts (>~3 min). Observed on Anthropic Round 2.
+**Symptoms:** After ~4-5 minutes, the frontend's textbox became NOT disabled (user could type a new message), but backend `active_runs` still showed `status: streaming`. If the user typed a new prompt now, race condition or rejection.
+**Fix surface:** Frontend isStreaming should reconcile against `/snapshot.active_runs` periodically, not rely solely on the SSE event stream. Downstream of B-260519-01 + the duplicate-`/messages` bug from Test 2.
+
+### B-260519-07 — Successful stdout shown in red (stderr styling)
+**Severity:** minor (cosmetic but misleading)
+**Trigger:** Any successful code-execution output (per user observation on Anthropic Round 2 + others).
+**Symptoms:** User reports "some of outputs of code execution are appearing in red." Tracebacks are correctly red (stderr). But Anthropic Round 2's success outputs — `Chart 1 saved`, `Slide 1 ✓ … Slide 7 ✓ Part 1 saved`, `Total slides: 16 Slide 01: 13 shapes…` — should be neutral/green, not red.
+**Suspected cause:** Either (a) Plan 02's new line-buffer accumulator may be writing successful stdout into the stderr branch, OR (b) the frontend `code_stdout` event renderer is applying the stderr-red class regardless of channel.
+**Fix surface:** Two-step audit: grep `backend/app/api/threads.py` sandbox branch for stdout/stderr stream-tagging in the new exec_run callback; grep `frontend/src/components/chat/` for `code_stdout` / `code_stderr` event styling.
+
+### B-260519-08 — OpenAI gpt-5.4 gives up after ModuleNotFoundError without trying `pip install`
+**Severity:** major (capability regression)
+**Trigger:** Any prompt where the cell needs a missing package (Round 1 hit `python-pptx`).
+**Symptoms:** Anthropic + OpenRouter both retried after `ModuleNotFoundError` by running `pip install python-pptx matplotlib …` and recovered cleanly. OpenAI gpt-5.4 ran the same code twice (both `ModuleNotFoundError`), wrote a user-facing apology, and stopped. The user got a text explanation and no .pptx file.
+**Fix surface:** System prompt (in the agent-runner) needs an explicit "if you hit ImportError, try `pip install <pkg>` first" hint. Model-side capability gap, but the system prompt should compensate. Bonus: pre-install common packages (`python-pptx`, `matplotlib`, `numpy`, `pandas`) in the sandbox Docker image so this doesn't happen at all.
+
+### B-260519-09 — OpenRouter sandbox path inconsistency + error UX
+**Severity:** major
+**Trigger:** OpenRouter Round 3 multi-step code execution.
+**Symptoms:** Step 6 reported `Slides 1-4 created.` but the `.pptx` file wasn't in the output-files panel (only the chart PNGs harvested). Step 7 tried `Presentation('/sandbox/output/Fahed_Mrad_Defense.pptx')` → `PackageNotFoundError: Package not found`. The model wrote the .pptx to a path that `harvest_output_files` doesn't sweep (likely `/tmp/` or `cwd`).
+**Suspected cause:** Two parts:
+- (a) Model-side: kimi-k2.6 isn't following the convention of writing to `/sandbox/output/`. Anthropic's transcript shows it correctly used `/sandbox/output/Fahed_Mrad_DBA_Defence_Presentation.pptx`.
+- (b) Phase 075 part: when Step 7 errored, the error-handling surfaced a Resume button (B-260519-03) instead of letting the agent loop recover — that's the streaming-layer bug.
+**Fix surface:** (a) System prompt should explicitly tell models "always write outputs to `/sandbox/output/`". (b) The Resume button surfacing is covered by B-260519-03's fix.
+
+### B-260519-10 — OpenRouter re-rendered Steps 1 + 2 mid-flight (UI duplication)
+**Severity:** minor (confusing UX)
+**Trigger:** OpenRouter Round 3 after Step 3 errored.
+**Symptoms:** After the matplotlib `ModuleNotFoundError`, the transcript shows Steps 1 (search-documents, 0ms) and 2 (analyze_document, 183ms) re-rendering with very fast durations. Either the tool-card renderer is duplicating cards or the model re-issued the same calls and got cache hits.
+**Fix surface:** Audit `frontend/src/components/chat/ToolCallPanel.tsx` (or wherever step cards render) for de-duplication keyed on `tool_call_id`. If the model genuinely re-called, that's a model-side waste; if the frontend duplicated the same `tool_call_id` into a second card, that's a reducer bug.
 
 ---
 
-## Re-confirmation of existing UAT findings
+## Updated UAT findings (carry-forward from 075-UAT.md)
 
-All 4 prior `075-UAT.md` issues reproduced in this cross-provider run:
-
-| Prior UAT Issue | Round 1 (OpenAI) | Round 2 (Anthropic) | Round 3 (OpenRouter) |
+| Original UAT issue | Round 1 (OpenAI) | Round 2 (Anthropic) | Round 3 (OpenRouter) |
 |---|---|---|---|
-| Test 2 — Duplicate `/messages` after `/snapshot` | ✓ Reproduced on existing-thread reload (earlier); no execute path in this specific run | N/A (snapshot+POST /messages flow — pure create) | N/A (similar pure create flow) |
-| Test 3 — Resume button bug | Resume button stays hidden (silent freeze) — the "fix" too aggressive | Frontend blank — N/A | **Resume button DOES appear** (B-260519-03) — fix incomplete for OpenRouter |
-| Test 4 — Line-by-line stdout | Not separately tested; execute_code in agent loop produced no progressive output | N/A (UI blank) | Bottom indicator was visible but no progressive stdout (not separately verified) |
-| Test 5 — Bottom indicator desync | Reproduced (clears mid-stream) | N/A (nothing renders) | Reproduced (indicator cleared during execute_code) |
-| Test 7 — Heartbeat preserved | Reproduced (indicator clears within seconds of silent windows) | N/A | Reproduced |
+| Test 2 — Duplicate `/messages` after `/snapshot` | Reproduced earlier on existing-thread reload | N/A (new-thread flow) | N/A |
+| Test 3 — Resume button bug | Stays hidden (silent freeze) — "fix" too aggressive | N/A (UI blank during run) | **Resume button DOES appear** (B-260519-03) |
+| Test 4 — Line-by-line stdout (SC #2) | **Confirmed broken** — no progressive output | **Confirmed broken** — no live rendering at all | **Confirmed broken** — Resume blocks observation |
+| Test 5 — Bottom indicator desync | Reproduced (clears mid-stream) | N/A | Reproduced |
+| Test 7 — Heartbeat preserved | Reproduced (indicator clears during silent windows) | N/A | Reproduced |
 
 ---
 
-## LangSmith Trace Coverage
+## LangSmith + Supabase Cross-Check Evidence
 
-LangSmith REST API queried at `https://api.smith.langchain.com/api/v1/runs/query` against session `agentic-rag-module2` (id `202729d6-b901-485a-a3f9-04d979086eba`).
+**LangSmith** (session `agentic-rag-module2`, id `202729d6-b901-485a-a3f9-04d979086eba`):
+- ✓ Every LLM call lands in LangSmith
+- ✓ Tool calls (`search-documents`, `sub-agent` for analyze_document) traced correctly
+- ✓ `ls_model_name` is accurate per call
+- ✗ `name` field is always `ChatOpenAI`, `ls_provider` always `openai` regardless of actual provider (B-260519-04)
+- ✗ For Anthropic Round 2: NO Sonnet traces, only Haiku (B-260519-05)
 
-- ✓ All LLM calls land in LangSmith
-- ✓ `search-documents` tool calls and `sub-agent` (analyze_document) traces are present and named correctly
-- ✗ All `name` fields are `ChatOpenAI` — wrong for Anthropic + OpenRouter (B-260519-04)
-- ✗ All `ls_provider` fields are `openai` — wrong for non-OpenAI providers (B-260519-04)
-- ✓ `ls_model_name` field IS correct for all 3 providers (good for cost analysis)
-
----
-
-## Supabase Cross-Check
-
-Verified via backend `/threads` + `/snapshot` + `/messages` REST endpoints (which proxy Supabase):
-
-| Round | Thread ID | Backend Result |
-|-------|-----------|----------------|
-| 1 | `e00649c9-99a5-44ae-98cb-a3f4842a29d6` | ✓ assistant message saved, 5 tool_calls, run_status=completed |
-| 2 | `117a5ad2-a9ed-4172-99d0-9eaa9e3ca1ca` | ✓ assistant message saved, **13 tool_calls**, run_status=completed |
-| 3 | `f795def5-1572-43a0-8689-ed7f6f6f7cb0` | 🔄 still streaming when observation ended; user message saved |
-
-**Inference:** Backend (agent loop + DB persistence) is healthy across all 3 providers. The UX bugs are entirely in the streaming/rendering layer between Redis Stream → SSE producer → frontend reducer.
+**Supabase via backend REST** (`/threads`, `/snapshot`, `/messages`):
+- ✓ All 3 runs' assistant messages and tool_calls successfully persisted to DB
+- ✓ Backend agent loop is healthy across all 3 providers
+- ✓ The UX bugs are entirely in the **streaming/rendering layer**, not in the agent or persistence layer
 
 ---
 
-## Priority Recommendation for Phase 075.1
+## Phase 075.1 Plan Proposal (4 plans, ranked by impact)
 
-Given the 3-layer SSE-DEBUG agent's diagnosis was confirmed across all 3 providers, but two NEW provider-specific bugs surfaced, here's the proposed Phase 075.1 plan split (now 4 plans instead of 2):
+### Plan 01 — Universal stream-end recovery (HIGH PRIORITY)
+**Scope:** Frontend only. Closes B-260519-03, Test 3 silent freeze, "stuck on Running code until refresh" universal symptom.
+- Widen `_isTransientBufferExpired` (rename to `_isTransientStreamEnd`) at `StreamsProvider.tsx:104-117` to ALSO probe `/snapshot` on:
+  - `kind === "done"` when any tool_call.status is still `running`/`preparing`
+  - Generic error payloads when run started recently AND no terminal frame received
+  - Plain `reader.done` from `api.ts:477` defensive close
+- Always reconcile against `/snapshot.active_runs` after any non-explicit terminal — if backend says still streaming, re-attach SSE from `snapshot.since_cursors[run_id]`
+- Add a Chrome MCP UAT test: 45-second `time.sleep` cell completes and UI shows result without manual reload
 
-1. **Plan 01 — Frontend universal stream-end recovery** (Layer A from SSE-DEBUG agent)
-   - Widen `_isTransientBufferExpired` to handle ALL stream-end patterns: `kind: done` with running tool_calls, generic error payloads, OpenRouter's `provider_disconnect`, etc.
-   - Always probe `/snapshot` on any non-explicit-terminal stream-end and reconcile from server truth
-   - Closes B-260519-03 (OpenRouter Resume button) + Test 3 (OpenAI silent freeze)
+### Plan 02 — Backend SSE transport stability (HIGH PRIORITY)
+**Scope:** Backend only. Closes the root cause SSE-break that underlies everything.
+- Wrap `harvest_output_files` at `sandbox_service.py:67-149` in `run_in_threadpool` (D-v2.5-01 violation fix)
+- Extract drain-loop line-buffer into a pure `drain_step` helper with deterministic unit tests (no Docker required)
+- Add a narrow safety-net post-completion stdout emit gated on `_emitted_stdout_line_count == 0` (so if line-by-line truly produced nothing, the final `exec_result.stdout` still ships — prevents zero-output regressions in case of further bugs)
+- Fix `test_075_code_stdout_progressive.py:54-57` skipif to use per-function decorators that actually fire under `asyncio_mode=auto`, OR adopt the `PG_AVAILABLE + seeded_thread` pattern from `test_075_tool_args_progress.py`
 
-2. **Plan 02 — Backend SSE transport stability** (Layer B from SSE-DEBUG agent)
-   - Wrap `harvest_output_files` in `run_in_threadpool` (D-v2.5-01 violation fix)
-   - Extract drain-loop line-buffer into pure helper for deterministic unit tests
-   - Closes the SSE-break root cause that underlies all 3 rounds
+### Plan 03 — Anthropic content-block rendering + sticky indicator (MEDIUM PRIORITY)
+**Scope:** Frontend only. Closes B-260519-01 (Anthropic blank during run), Test 5 (bottom-indicator clear).
+- Fix the StreamsProvider reducer for Anthropic's mixed text + tool_use block ordering (BUG-260514-02 root cause that D-075-15 deferred)
+- Fix MessageItem.tsx sticky-cache reset trigger: change from provider-level `isStreaming` to per-message `runStatus` terminal state (per INDICATOR-DEBUG agent's diagnosis)
+- Add an Anthropic-specific Chrome MCP UAT scenario as regression guard
 
-3. **Plan 03 — Anthropic content-block rendering** (NEW — from B-260519-01)
-   - Fix the StreamsProvider reducer + MessageItem renderer for Anthropic's mixed text + tool_use block ordering
-   - Independent verification: an Anthropic-specific Chrome MCP UAT scenario
-   - Closes B-260519-01 (Anthropic blank UI)
+### Plan 04 — Observability + polish (LOW PRIORITY but cheap)
+**Scope:** Backend + frontend, small footprint. Closes the rest.
+- Delete stale `loadMessages(thread.id)` at `ChatArea.tsx:166` — closes Test 2 dual-`/messages` (per MESSAGES-DEBUG agent's single-line fix)
+- Snapshot endpoint: skip Redis probe when `active_runs == []` — closes B-260519-02
+- LangSmith tracing: set `ls_provider` + trace `name` per-provider — closes B-260519-04
+- Sub-agent model: surface in UI OR document the downgrade clearly, AND fix Anthropic main-loop model routing — closes B-260519-05
+- System prompt: add "if you hit ImportError, try `pip install <pkg>`" — closes B-260519-08
+- System prompt: add "always write outputs to `/sandbox/output/`" — partially closes B-260519-09 (a)
+- Audit code_stdout vs code_stderr styling in frontend — closes B-260519-07
+- Pre-install `python-pptx`, `matplotlib`, `numpy`, `pandas` in the sandbox Docker image — eliminates B-260519-08 root cause + speeds up Rounds 2+3 by ~15s each
+- Optional: ToolCallPanel de-duplication keyed on tool_call_id — closes B-260519-10
 
-4. **Plan 04 — Snapshot empty-thread + observability polish** (NEW — from B-260519-02 + B-260519-04 + B-260519-05)
-   - Skip Redis probe when `active_runs == []` in `/snapshot` (B-260519-02)
-   - Fix LangSmith provider/name tagging per-provider (B-260519-04)
-   - Surface sub-agent model downgrade in UI + correctly route Anthropic Sonnet selection (B-260519-05)
-   - Bonus: also fixes the duplicate `/messages` call from MESSAGES-DEBUG (single-line `ChatArea.tsx:166` delete)
-
-Plans 01 + 03 can ship parallel (both frontend, non-overlapping files). Plan 02 should ship first since it removes the root-cause noise. Plan 04 is the cleanup bucket.
+### Execution order
+- **Plan 02 first** (backend root cause) — once `harvest_output_files` is in threadpool, the SSE stream stays alive long enough for the terminal frame to arrive; many downstream symptoms vanish.
+- **Plan 01 + Plan 03 parallel** (both frontend, non-overlapping files: Plan 01 owns transient filter + reconcile; Plan 03 owns reducer + MessageItem sticky)
+- **Plan 04 last** (polish bundle, can ship as a single small PR)
 
 ---
 
-## Open Items for Subsequent Verification
+## Open Verification Items
 
-1. **Round 3 (OpenRouter) end-state** — I observed the Resume button at T+255s but didn't wait for terminal/completion. Need to either let it run to completion OR click Resume and document the resume flow behavior.
-2. **OpenAI sub-agent downgrade** — Is `gpt-5.4-mini` an intentional cost optimization for `analyze_document`? If so, document in PROJECT.md so it's not mistaken for a bug.
-3. **B-260519-01 retest after Plan 03 ships** — Run the same Anthropic prompt and verify the UI renders progressively.
-4. **PPTX output verification** — None of the 3 rounds were observed to completion at the UI level. Round 1 + Round 2 reached `run_status=completed` on the backend, but the actual generated .pptx file (if any) was never visually confirmed. Need to query `documents` table for any generated files attached to the runs.
+1. After Plan 02 + Plan 01 ship, retest the 45-second sleep cell — UI should auto-recover.
+2. After Plan 03 ships, retest the Anthropic dissertation prompt — UI should render live, not blank-until-refresh.
+3. After Plan 04 ships, confirm `claude-sonnet-4-6` selection in UI actually routes to Sonnet (LangSmith should show Sonnet traces, not Haiku).
+4. Round 1's pptx output file was never harvested (OpenAI failed before generation); Round 3's pptx was created but not at `/sandbox/output/`. Only Round 2's `Fahed_Mrad_DBA_Defence_Presentation.pptx` (634 KB) is downloadable. The user has not been able to actually download/open any of the 3 attempts.
