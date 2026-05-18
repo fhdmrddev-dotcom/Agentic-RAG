@@ -51,8 +51,16 @@ patterns-established:
 requirements-completed: [POLISH-SEED-009-01]
 
 # Metrics
-duration: ~15min (Tasks 1+2 code-complete; Task 3 awaiting Live UAT checkpoint)
+duration: ~15min code + operator-driven Live UAT
 completed: 2026-05-18
+
+# Deferred (split from this plan)
+deferred:
+  - id: D-074-01-DEFER-1
+    item: "Backend has no `logging.basicConfig()` — Python defaults to WARNING, so the clamp's `logger.info(...)` breadcrumb is currently invisible in uvicorn stdout. Functionally the clamp still runs; only observability is muted."
+    why_deferred: "Out of scope for SEED-009 (resolver fix). Belongs in a logging-config polish phase that wires INFO emission for all app loggers at once."
+    surfaced_during: "Phase 074 Plan 01 Live UAT (2026-05-18) — operator drove the haiku-4-5 + MODEL_OUTPUT_LIMITS=65536 protocol, runs completed with status='completed' and no 400 errors, but the clamp log line did not appear in backend stdout (root cause: no basicConfig)."
+    re_open_trigger: "When wiring structured logging or before any future UAT that depends on INFO-level breadcrumbs."
 ---
 
 # Phase 074 Plan 01: SEED-009 Max-Tokens Clamp Summary
@@ -61,10 +69,10 @@ completed: 2026-05-18
 
 ## Performance
 
-- **Duration:** ~15 min (Tasks 1+2 code path; Task 3 paused at checkpoint pending Live UAT)
+- **Duration:** ~15 min code + operator-driven Live UAT
 - **Started:** 2026-05-18T14:05:55Z (per STATE.md)
 - **Tasks 1+2 completed (static gates green):** 2026-05-18T~14:21Z
-- **Task 3 status:** awaiting checkpoint:human-verify (Live UAT)
+- **Task 3 (Live UAT):** operator-approved 2026-05-18 — see "Live UAT (Task 3) — Operator Approved" below
 - **Tasks committed:** 3 of 3 code-complete commits (Tasks 1+2); Task 3 is UAT-only, no files
 - **Files modified:** 3 (1 created, 2 modified)
 
@@ -137,25 +145,28 @@ Three minor deviations, all in scope and documented:
 
 None. RED→GREEN TDD cycle clean. Plan's interfaces block and Patterns A/B were accurate to the file state, which made the refactor low-friction.
 
-## Live UAT (Task 3) — Awaiting Checkpoint
+## Live UAT (Task 3) — Operator Approved
 
-**Status:** `checkpoint:human-verify` — pending operator drive
+**Status:** ✅ APPROVED by operator 2026-05-18
 
-**Pre-flight already complete:**
-- All static gates green (5 logical tests / 7 parametrized cases pass via `cd backend && venv/Scripts/python -m pytest tests/unit/test_resolve_max_tokens.py -q` → `7 passed`)
-- Sanity check confirms: `MODEL_CAPABILITIES['claude-haiku-4-5-20251001']['max_output_tokens'] == 64000`
+**Pre-flight (Tasks 1+2 static gates):** all green
+- 5 logical tests / 7 parametrized cases pass via `cd backend && venv/Scripts/python -m pytest tests/unit/test_resolve_max_tokens.py -q` → `7 passed`
+- `MODEL_CAPABILITIES['claude-haiku-4-5-20251001']['max_output_tokens'] == 64000`
 - `MODEL_CAPABILITIES['claude-opus-4-7']['max_output_tokens'] == 128000` (Rule-1 deviation locked)
 - `'max_output_tokens' not in MODEL_CAPABILITIES['gemini-3-flash-preview']` (intentional omission verified)
 
-**UAT protocol** (full version in PLAN.md `<how-to-verify>`):
-1. Stop running uvicorn; add `MODEL_OUTPUT_LIMITS=claude-haiku-4-5-20251001=65536` to `backend/.env`
-2. Restart uvicorn (`cd backend && venv/Scripts/python -m uvicorn app.main:app --reload --workers 1`)
-3. Drive a long-output prompt against `claude-haiku-4-5-20251001` in the chat UI at `http://localhost:5173/`
-4. Expect: backend stdout emits `INFO ... clamped max_tokens for model=claude-haiku-4-5-20251001: 65536 -> 64000`
-5. Expect: chat completes; Supabase `runs` row shows `status='completed'`, `error IS NULL`, `model='claude-haiku-4-5-20251001'`
-6. Remove the env override; restart uvicorn; smoke-test nominal request
+**Live UAT result** (operator-driven 2026-05-18):
 
-**Resume signal:** Operator types `approved` after confirming all 3 success markers (log line present + `runs.status='completed'` + no 400 errors in backend logs).
+| Success marker | Result | Evidence |
+|---|---|---|
+| Chat completes against `claude-haiku-4-5-20251001` with `MODEL_OUTPUT_LIMITS=65536` override | ✅ PASS | 2 haiku runs (`e3da29a7-…` + `ff467725-…`) reached `status='completed'`, `error IS NULL` per Supabase `runs` query |
+| No 400 `BadRequestError` in backend stdout across UAT window | ✅ PASS | Full uvicorn log inspected; no 4xx on `/runs/.../stream` endpoints |
+| Original Phase 067.5 bug signature absent | ✅ PASS | `output_tokens` recorded as 7263 + 31926 (both under cap); no `max_tokens > 64000 violation` error |
+| Clamp log breadcrumb `clamped max_tokens for model=... 65536 -> 64000` in stdout | ⚠ NOT OBSERVED — see D-074-01-DEFER-1 | Backend has no `logging.basicConfig()` (only `logging.getLogger("asyncio").setLevel(logging.ERROR)` in `app/main.py:21`); Python's default WARNING level silently drops all `logger.info(...)` calls app-wide |
+
+**Verdict:** Approved. The functional outcome the clamp exists to produce (no 400 from over-cap requests) is confirmed in production traffic. The unit tests (7/7) prove the clamp logic in isolation. The missing log line is **not** evidence the clamp didn't fire — it's a separate observability gap that affects every `logger.info(...)` call in the app and was not visible to the planner at plan time. Tracked as D-074-01-DEFER-1.
+
+**No follow-up code required for SEED-009.** Logging-config polish belongs in a dedicated phase that wires basicConfig (or structured logging) once for the whole app.
 
 ## Threat Model Compliance
 
@@ -164,9 +175,6 @@ Plan's `<threat_model>` requested mitigation for `T-074-01` (Tampering — opera
 ## Next Phase Readiness
 
 **Code-complete for Plan 074-01.** Sibling Plan 074-02 (SEED-011 test_059 fixture cleanup) executes in parallel on its own worktree. Both plans land independently before the orchestrator's `/gsd:verify-work` pass for Phase 074.
-
-**Awaiting:**
-- Task 3 Live UAT operator drive (orchestrator owns scheduling)
 
 **No blockers** for downstream phases. The clamp gate is transparent to every existing call site — Anthropic dispatcher at `threads.py:1419` and `create_adaptive_streaming_chat` at `openai_service.py:801` are byte-identical post-edit (`git diff backend/app/api/threads.py | wc -l` → 0).
 
@@ -191,4 +199,4 @@ Plan's `<threat_model>` requested mitigation for `T-074-01` (Tampering — opera
 
 *Phase: 074-seed-009-seed-011-polish-bundle*
 *Plan: 01 (SEED-009 max-tokens clamp)*
-*Completed: 2026-05-18 (Tasks 1+2 code-complete; Task 3 awaiting Live UAT checkpoint)*
+*Completed: 2026-05-18 — Tasks 1+2 code-complete (static gates green), Task 3 Live UAT approved by operator (with D-074-01-DEFER-1 noted for logging-config polish)*
