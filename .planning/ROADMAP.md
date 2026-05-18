@@ -445,7 +445,7 @@ Plans:
   3. Live UAT: `claude-haiku-4-5-20251001` run with `max_tokens=65536` succeeds (was 400 BadRequestError; surfaced during Phase 067.5 cycle 5).
   4. `pytest backend/tests/integration/test_059_disconnect.py -q` is 3/3 PASS without `RuntimeError: Event loop is closed` — the `_reset_redis_singleton` autouse fixture pattern from `test_062_stream_replay.py:36-51` is pasted in.
 **Plans:**
-- [x] 074-01-PLAN.md — SEED-009: extend MODEL_CAPABILITIES with max_output_tokens + single-chokepoint clamp in `_resolve_max_tokens` + per-model verified-2026-05-18 values + unit tests + live UAT (Wave 1; autonomous=false — live UAT checkpoint) [2026-05-18]
+2/2 plans complete
 - [x] 074-02-PLAN.md — SEED-011: hoist `_reset_redis_singleton` autouse fixture into new `backend/tests/integration/conftest.py` + delete 2 local copies + 4-file pytest ship gate (Wave 1; autonomous=true; parallel-able with Plan 01) [2026-05-18]
 
 ### Phase 075: SEED-008 + tool_args_progress Polish Bundle
@@ -639,7 +639,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
 | 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
 | 073 — asyncpg Pool Integration | 4/4 | Complete    | 2026-05-17 |
-| 074 — SEED-009 + SEED-011 Polish Bundle | 0/2 | Not started | — |
+| 074 — SEED-009 + SEED-011 Polish Bundle | 2/2 | Complete    | 2026-05-18 |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
 | 076 — Confidence Recalibration | 0/2 | Not started | — |
 | 077 — Multi-Worker Validation Harness | 0/3 | Not started | — |
