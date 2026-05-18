@@ -66,8 +66,10 @@ import {
   postMessage,
   subscribeToRun,
   getActiveRuns,
+  getSnapshot,
   cancelRun,
   type StreamCallbacks,
+  type ThreadSnapshot,
 } from "@/lib/api"
 import {
   useStreamsStore,
@@ -470,25 +472,51 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
         // Phase 068 (L-068-02 + L-068-05): reconcile in-flight lock +
         // runId-match dedup. Source: useMessages.ts:948-1144.
+        // Phase 075 D-075-02: atomic swap — the parallel
+        // Promise.all([getActiveRuns, loadMessages]) chain collapses into a
+        // single getSnapshot() call. Server-derived since_cursors seed
+        // lastSeenOffsetRef on first attach (D-075-01) so the per-run
+        // subscribeToRun call picks up the seeded cursor automatically.
         reconcile: async (threadId, surfaceId = "chat") => {
           // Phase 063.1 (D-063.1-11 / Gap-005): top-of-function in-flight guard.
           if (reconcileInFlightRef.current) return
           reconcileInFlightRef.current = true
           try {
-            let activeRuns: Awaited<ReturnType<typeof getActiveRuns>>
+            let snapshot: ThreadSnapshot
             try {
-              // CONTEXT.md "Reconciliation Hook Ordering": active-runs and messages
-              // MUST be fetched in parallel.
-              const [runs] = await Promise.all([
-                getActiveRuns(threadId),
-                useStreamsStore.getState().actions.loadMessages(threadId, surfaceId),
-              ])
-              activeRuns = runs
+              // Phase 075 D-075-02: ATOMIC SWAP — single round-trip replaces
+              // the Promise.all([getActiveRuns, loadMessages]) chain.
+              snapshot = await getSnapshot(threadId)
             } catch (err) {
               console.error("reconcile failed:", err)
               return
             }
 
+            // Hydrate messages bucket — same MERGE 3-clause filter as
+            // loadMessages used so live in-flight temp placeholders are
+            // preserved across the swap (L-068-06 / L-068.5-02 carryover).
+            // Predicate is byte-identical to loadMessages's filter.
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+              const dbRunIds = new Set(snapshot.messages.filter((m) => m.runId).map((m) => m.runId))
+              const liveTempPlaceholders = prev.filter(
+                (m) =>
+                  m.id.startsWith("temp-") &&
+                  m.runId &&
+                  (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
+              )
+              return [...snapshot.messages, ...liveTempPlaceholders]
+            })
+
+            // Phase 075 D-075-01: seed lastSeenOffsetRef from server cursors
+            // ONLY for run_ids not already in the map (existing client
+            // cursors win on subsequent reconciles).
+            for (const [rid, cursor] of Object.entries(snapshot.since_cursors)) {
+              if (!lastSeenOffsetRef.current.has(rid)) {
+                lastSeenOffsetRef.current.set(rid, cursor)
+              }
+            }
+
+            const activeRuns = snapshot.active_runs
             for (const run of activeRuns) {
               // Pitfall 3 cross-thread safety: only attach if this thread is still
               // the viewing thread when reconcile started.
