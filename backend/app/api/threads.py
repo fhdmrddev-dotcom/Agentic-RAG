@@ -2204,16 +2204,22 @@ async def send_message(
                                     # callbacks and the async producer in 061).
                                     sandbox_queue: asyncio.Queue = asyncio.Queue()
 
+                                    # Phase 075 D-075-05/06: callbacks now carry captured_at for
+                                    # monotonic-timestamp assertion in SC #2 + reset the silent-
+                                    # window heartbeat clock (D-075-08). Item type renamed from
+                                    # 'code_stdout' → 'stdout_chunk' because the drain consumer
+                                    # (Task 3) line-buffers chunks and emits one 'code_stdout'
+                                    # SSE event per complete line.
                                     def on_stdout(chunk: str):
                                         loop.call_soon_threadsafe(
                                             sandbox_queue.put_nowait,
-                                            {"type": "code_stdout", "content": chunk}
+                                            {"type": "stdout_chunk", "content": chunk, "captured_at": time_mod.time()}
                                         )
 
                                     def on_stderr(chunk: str):
                                         loop.call_soon_threadsafe(
                                             sandbox_queue.put_nowait,
-                                            {"type": "code_stderr", "content": chunk}
+                                            {"type": "stderr_chunk", "content": chunk, "captured_at": time_mod.time()}
                                         )
 
                                     # Ensure /sandbox/output exists via shell (reliable across container
@@ -2275,18 +2281,61 @@ async def send_message(
 
                                     wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
 
+                                    # Phase 075 D-075-05: write user code to a uniquely-named file
+                                    # inside the container so `python -u {file}` can stream stdout
+                                    # line-by-line. session.copy_to_runtime is preferred over the
+                                    # heredoc fallback (multi-line user code with arbitrary
+                                    # quoting hazards). Marker filename uses uuid4 to avoid
+                                    # collisions across concurrent tool calls on the same session.
+                                    import tempfile as _tempfile_local
+                                    import os as _os_local
+                                    code_file = f"/tmp/run-{_uuid_mod.uuid4().hex}.py"
+                                    with _tempfile_local.NamedTemporaryFile(
+                                        mode="w", encoding="utf-8", suffix=".py", delete=False
+                                    ) as _tmp_fp:
+                                        _tmp_fp.write(wrapped_code)
+                                        _local_tmp_path = _tmp_fp.name
+                                    try:
+                                        session.copy_to_runtime(_local_tmp_path, code_file)
+                                    finally:
+                                        try:
+                                            _os_local.unlink(_local_tmp_path)
+                                        except OSError:
+                                            pass
+
+                                    # Phase 075 D-075-05: libraries install hoisted out of
+                                    # session.run() (which we no longer call). session.install()
+                                    # uses the same pip-cache + pip-executable path the run()
+                                    # call used internally. Empty list is a no-op.
+                                    if libraries:
+                                        try:
+                                            session.install(libraries=libraries)
+                                        except Exception as _install_err:
+                                            logger.warning(
+                                                "sandbox library install failed thread=%s err=%s",
+                                                thread_id, type(_install_err).__name__,
+                                            )
+
                                     start_time = time_mod.time()
 
                                     def _run_sync():
-                                        exec_result = session.run(
-                                            wrapped_code,
-                                            libraries=libraries,
+                                        # Phase 075 D-075-05: bypass InteractiveSandboxSession.run()
+                                        # — its on_stdout/on_stderr params are unused (verified in
+                                        # ~/site-packages/llm_sandbox/interactive.py lines 234-235).
+                                        # Use the streaming execute_command path with `python -u`
+                                        # to force unbuffered stdout (RESEARCH Pitfall 1). The
+                                        # high-level wrapper at llm_sandbox/docker.py:43-60 flips
+                                        # exec_run(stream=True, demux=True) and dispatches each
+                                        # decoded chunk to on_stdout/on_stderr via
+                                        # mixins._process_stream_output.
+                                        exec_result = session.execute_command(
+                                            f"python -u {code_file}",
                                             on_stdout=on_stdout,
                                             on_stderr=on_stderr,
                                         )
                                         loop.call_soon_threadsafe(
                                             sandbox_queue.put_nowait,
-                                            {"type": "_done", "result": exec_result}
+                                            {"type": "_done", "result": exec_result, "captured_at": time_mod.time()}
                                         )
                                         return exec_result
 
