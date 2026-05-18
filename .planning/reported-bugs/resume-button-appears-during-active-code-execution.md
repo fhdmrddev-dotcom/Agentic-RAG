@@ -123,3 +123,23 @@ CLAUDE.md MANDATORY rule.
 3. `frontend/src/providers/StreamsProvider.tsx:689-700` — gate Resume on
    confirmed terminal `runs.status` (via reconcile fetch), not on
    provisional SSE error
+
+## Fold timeline
+
+- 2026-05-18 / Phase 075 Plan 01 — Plan 01 ships the fix via D-075-13:
+  - `runs.py:replay_tail_consumer` now carries `recently_active` + `runs_status`
+    discriminator fields on the `buffer_expired_during_tail` SSE error payload
+    (Postgres `public.runs.status` probe via `maybe_single()` with fail-safe to
+    terminal-flip on probe error).
+  - `frontend/src/lib/api.ts` `buffer_expired_*` mapping kept byte-identical at
+    the SSE-parser layer; the transient/recoverable decision moved to the
+    StreamsProvider consumer (075-PATTERNS.md §12 — consumer-side layering).
+  - `frontend/src/providers/StreamsProvider.tsx` both onTerminal sites now call
+    `getSnapshot(threadId)` via the new `_isTransientBufferExpired` helper
+    before flipping `runStatus: "failed"`. If the snapshot's `active_runs`
+    still contains the run_id in `status: "streaming"`, the handler exits
+    early — re-attach on the next reconcile cycle via the seeded
+    `lastSeenOffsetRef` cursor; Resume button stays hidden.
+  - Status flip pre-confirmed during discuss-phase; this note records the
+    actual shipping artifacts. Closure validation (`folded` → `closed`)
+    happens at Phase 075 verify-work.
