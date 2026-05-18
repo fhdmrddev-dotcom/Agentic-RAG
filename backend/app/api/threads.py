@@ -22,9 +22,12 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase, get_redis
 import redis.asyncio as aioredis
+# Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
+# probe → 503+Retry-After:10 fallback (mirrors runs.py:354-370 pattern).
+from redis.exceptions import RedisError
 from app.models.message import MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
-from app.models.thread import ThreadCreate, ThreadResponse, ThreadUpdate
+from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
 from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
@@ -502,6 +505,69 @@ async def list_threads(
 
 
 # Phase 062 (D-062-02, D-062-03, D-062-04, D-062-12, D-062-14, T-062-01).
+# Phase 075 D-075-03: shared runs-FK merge helper for /messages and /snapshot.
+# Extracted verbatim from the inline merge that lived in get_messages
+# (threads.py:795-816 pre-extraction). Both callers MUST pass kwargs — the
+# leading `*` enforces keyword-only args so positional-arg confusion can't
+# regress the call sites (RESEARCH Pitfall 4). T-063.1-01 (cross-user
+# 404-before-runs-SELECT) and T-063.1-04 (no extra fields beyond run_id +
+# run_status) carry verbatim — the SELECT below still enumerates
+# "run_id, message_id, status" only.
+async def _enrich_messages_with_runs(
+    messages: list[dict],
+    *,
+    thread_id: str,
+    user_id: str,
+    supabase: Client,
+) -> list[dict]:
+    """D-075-03: shared runs-FK merge for /messages and /snapshot.
+
+    Extracted verbatim from threads.py:795-816 (Phase 063.1 D-063.1-13 /
+    Gap-002 / WR-01). Mutates `messages` in place and returns the same list
+    for caller-side fluent composition.
+
+    Both queries hit existing indexes — messages: thread_id; runs:
+    idx_runs_history on (user_id, thread_id, started_at DESC) per migration
+    035 line 44. Result-set sizes are bounded by thread length.
+
+    WR-01 carry-forward: order by started_at DESC and prefer the FIRST run
+    per message_id. public.runs.message_id has no UNIQUE constraint
+    (migration 035 line 24 — only an FK with ON DELETE SET NULL), so in
+    rare collision cases (buffer-expired retries, partial failure paths,
+    producer races) multiple runs can share message_id. With DESC +
+    first-wins-and-skip, the most recently started run wins deterministically
+    — the one whose status is most likely to drive the correct Resume UX.
+
+    Defense-in-depth: .eq("user_id", ...) alongside RLS policy
+    runs_select_own (migration 035 lines 47-49). Mirrors list_active_runs
+    at threads.py:543-551 (D-062-12).
+    """
+    runs_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, message_id, status")
+        .eq("thread_id", thread_id)
+        .eq("user_id", user_id)
+        .order("started_at", desc=True)
+    )
+    runs_by_message: dict[str, dict] = {}
+    for r in (runs_resp.data or []):
+        mid = r.get("message_id")
+        if mid is None or mid in runs_by_message:
+            continue  # keep the first (most recent) per message_id
+        runs_by_message[mid] = r
+
+    # Zip — assistant rows with FK matches get run_id/run_status populated;
+    # user rows and pre-run-backed assistant rows return null (Resume button
+    # only renders when runStatus === "failed", so null is the correct
+    # "no Resume" signal).
+    for m in messages:
+        run = runs_by_message.get(m["id"])
+        m["run_id"] = run["run_id"] if run else None
+        m["run_status"] = run["status"] if run else None
+
+    return messages
+
+
 # Surface the durable per-run lifecycle table as a streaming-only filter.
 # Lives in threads.py (under the /threads prefix) per D-062-14; the other
 # two 062 endpoints (GET /runs/{id}/stream + DELETE /runs/{id}) live in
@@ -549,6 +615,108 @@ async def list_active_runs(
         .order("started_at", desc=True)
     )
     return runs_resp.data or []
+
+
+# Phase 075 D-075-01 / D-075-02 / D-075-03 / D-075-04: one-round-trip reconcile
+# primitive. Replaces the frontend's 3-call cold-cache chain (getActiveRuns +
+# loadMessages + per-run subscribeToRun?since=) with a single combined fetch.
+# Auth posture mirrors GET /messages + GET /active-runs exactly:
+#   - dual .eq("user_id") defense-in-depth alongside RLS (D-062-12)
+#   - cross-user → 404 not 403 (T-062-01)
+#   - maybe_single() not single() (CR-01 — avoids PGRST116 → 500 leak)
+# Redis-down posture mirrors GET /runs/{rid}/stream:
+#   - xinfo_stream wrapped in asyncio.wait_for(timeout=2.0) per active run
+#   - RedisError / asyncio.TimeoutError / OSError → 503 + Retry-After: 10 (D-062-13)
+@router.get("/{thread_id}/snapshot", response_model=ThreadSnapshotResponse)
+async def get_snapshot(
+    thread_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """D-075-01: one-round-trip reconcile primitive.
+
+    Returns {messages, active_runs, since_cursors} so StreamsProvider.reconcile
+    replaces its 3-call sequential chain with a single fetch.
+    """
+    # Step 1: ownership SELECT (CR-01: maybe_single, not single).
+    # T-062-01 mitigation — this fires FIRST so cross-user requests 404 before
+    # any messages/runs SELECT can leak data.
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = thread_resp.data if thread_resp is not None else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    # Step 2: messages SELECT + D-075-03 helper merge.
+    msgs_resp = await aexec(
+        supabase.table("messages")
+        .select("*")
+        .eq("thread_id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .order("created_at")
+    )
+    messages = msgs_resp.data or []
+    messages = await _enrich_messages_with_runs(
+        messages,
+        thread_id=str(thread_id),
+        user_id=current_user["id"],
+        supabase=supabase,
+    )
+
+    # Step 3: active_runs SELECT (mirror of /active-runs at threads.py:543-551).
+    # Same defense-in-depth + status='streaming' partial-index filter.
+    runs_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, started_at, status")
+        .eq("thread_id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .eq("status", "streaming")
+        .order("started_at", desc=True)
+    )
+    active_runs = runs_resp.data or []
+
+    # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
+    # On any Redis failure (RedisError / TimeoutError / OSError), the entire
+    # endpoint returns 503 + Retry-After: 10 — no partial/degraded shape
+    # (D-075-04). The since_cursors field is contractually required when
+    # active_runs is non-empty.
+    since_cursors: dict[str, str] = {}
+    for run in active_runs:
+        rid = str(run["run_id"])
+        try:
+            info = await asyncio.wait_for(
+                redis.xinfo_stream(f"run:{rid}"),
+                timeout=2.0,
+            )
+        except (RedisError, asyncio.TimeoutError, OSError):
+            # T-073-04 / D-074-03: identifier-only log format string —
+            # never log message/args content.
+            logger.exception("Redis unreachable on GET /threads/%s/snapshot", thread_id)
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Streaming infrastructure unavailable"},
+                headers={"Retry-After": "10"},
+            )
+        first_entry = info.get("first-entry") if info else None
+        if first_entry and len(first_entry) >= 1:
+            cursor = first_entry[0]
+            since_cursors[rid] = (
+                cursor.decode() if isinstance(cursor, bytes) else cursor
+            )
+        else:
+            since_cursors[rid] = "0"
+
+    return {
+        "messages": messages,
+        "active_runs": active_runs,
+        "since_cursors": since_cursors,
+    }
 
 
 @router.post("", response_model=ThreadResponse, status_code=status.HTTP_201_CREATED)
@@ -755,65 +923,19 @@ async def get_messages(
     )
     messages = msgs_resp.data or []
 
-    # 2. D-063.1-13 / Gap-002 fix: enrich each assistant row with run_id +
-    # run_status from public.runs via the message_id FK (migration 035 line 24,
-    # ON DELETE SET NULL). Two queries + Python merge per project convention —
-    # the codebase has NO precedent for PostgREST embedded selects (verified
-    # via grep audit in 063.1-PATTERNS.md line 1001).
-    #
-    # Both queries hit existing indexes — messages: thread_id; runs:
-    # idx_runs_history on (user_id, thread_id, started_at DESC) per migration
-    # 035 line 44. Result-set sizes are bounded by thread length.
-    #
-    # Defense-in-depth: .eq("user_id", ...) alongside RLS policy
-    # runs_select_own (migration 035 lines 47-49). Mirrors list_active_runs
-    # at threads.py:393-401 (D-062-12).
-    #
-    # T-063.1-01 mitigation: the threads ownership SELECT above runs FIRST,
-    # so cross-user requests 404 before reaching this runs SELECT. Verified
-    # by tests/integration/test_063_1_messages_runs_join.py
-    # (test_cross_user_messages_get_404_no_leak).
-    #
-    # T-063.1-04 mitigation: runs SELECT explicitly enumerates
-    # "run_id, message_id, status" — does NOT include error/model/provider/
-    # input_tokens/output_tokens. Pydantic MessageResponse only carries
-    # run_id and run_status, so no accidental field leakage.
-    #
-    # D-062-14 file-layout: this endpoint lives at line 580; the new merge
-    # extends to ~line 640 — well outside the off-limits 2057-2076 region.
-    # WR-01 fix: order by started_at DESC and prefer the FIRST run per
-    # message_id. public.runs.message_id has no UNIQUE constraint
-    # (migration 035 line 24 — only an FK with ON DELETE SET NULL), so in
-    # rare collision cases (buffer-expired retries, partial failure paths,
-    # producer races) multiple runs can share message_id. Without an
-    # explicit ORDER BY the dict comprehension was last-write-wins under
-    # the supabase-py response's implementation-defined order, and the
-    # response could attach an arbitrary (e.g. older `failed`) run's
-    # status to the assistant row. With DESC + first-wins-and-skip, the
-    # most recently started run wins deterministically — the one whose
-    # status is most likely to drive the correct Resume UX.
-    runs_resp = await aexec(
-        supabase.table("runs")
-        .select("run_id, message_id, status")
-        .eq("thread_id", thread_id)
-        .eq("user_id", current_user["id"])
-        .order("started_at", desc=True)
+    # 2. Phase 075 D-075-03: shared helper does the runs-FK merge so both
+    # /messages and /snapshot route through one source of truth.
+    # T-063.1-01 mitigation still holds: the threads ownership SELECT above
+    # runs FIRST, so cross-user requests 404 before reaching the runs SELECT
+    # inside the helper. T-063.1-04 mitigation also carries — helper
+    # explicitly enumerates "run_id, message_id, status" only. WR-01 fix
+    # (DESC + first-wins-per-message-id) lives inside the helper now.
+    messages = await _enrich_messages_with_runs(
+        messages,
+        thread_id=thread_id,
+        user_id=current_user["id"],
+        supabase=supabase,
     )
-    runs_by_message: dict[str, dict] = {}
-    for r in (runs_resp.data or []):
-        mid = r.get("message_id")
-        if mid is None or mid in runs_by_message:
-            continue  # keep the first (most recent) per message_id
-        runs_by_message[mid] = r
-
-    # 3. Zip — assistant rows with FK matches get run_id/run_status populated;
-    # user rows and pre-run-backed assistant rows return null (Resume button
-    # only renders when runStatus === "failed", so null is the correct
-    # "no Resume" signal).
-    for m in messages:
-        run = runs_by_message.get(m["id"])
-        m["run_id"] = run["run_id"] if run else None
-        m["run_status"] = run["status"] if run else None
 
     return messages
 
