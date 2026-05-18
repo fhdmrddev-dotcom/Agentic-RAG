@@ -42,7 +42,8 @@
 - [x] **POLISH-SEED-009-01**: `claude-haiku-4-5-20251001` runs no longer 400 with `max_tokens > 64000`. `MODEL_CAPABILITIES.max_output_tokens` populated for all currently-listed Anthropic models.
 - [ ] **POLISH-SEED-010-01**: `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10` produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter-routed models.
 - [x] **POLISH-SEED-011-01**: `pytest backend/tests/integration/test_059_disconnect.py -q` is 3/3 PASS without `RuntimeError: Event loop is closed`.
-- [ ] **POLISH-TOOL-PROG-01**: Tools other than `execute_code` emit `tool_args_progress` SSE events when their argument JSON exceeds 5 KB during streaming.
+- [x] **POLISH-TOOL-PROG-01
+**: Tools other than `execute_code` emit `tool_args_progress` SSE events when their argument JSON exceeds 5 KB during streaming.
 
 ### Theme E — Opportunistic Code-Quality (Cluster G)
 
