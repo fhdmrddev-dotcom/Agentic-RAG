@@ -2429,15 +2429,11 @@ async def send_message(
                                     end_time = time_mod.time()
                                     duration_ms = int((end_time - start_time) * 1000)
 
-                                    # Emit stdout/stderr lines from result (on_stdout callbacks
-                                    # are no-ops in InteractiveSandboxSession — output only
-                                    # available after execution completes)
-                                    if exec_result.stdout:
-                                        for line in exec_result.stdout.splitlines():
-                                            await _emit(redis, run_id, 'code_stdout', content=line)
-                                    if exec_result.stderr:
-                                        for line in exec_result.stderr.splitlines():
-                                            await _emit(redis, run_id, 'code_stderr', content=line)
+                                    # Phase 075 D-075-07: post-completion stdout/stderr emit DELETED —
+                                    # mid-flight per-line emit (Tasks 2-3) owns every line; this block
+                                    # would double-emit on the SSE wire. The exec_result.stdout / .stderr
+                                    # attrs are STILL read below for backend-side error-marker detection;
+                                    # only the SSE wire writes are removed.
 
                                     # Derive actual exit code — InteractiveSandboxSession may
                                     # return 0 even when Python raises an exception.
