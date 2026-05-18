@@ -444,20 +444,19 @@ async def _capture_anthropic_events(events_iter, seeded_thread_info: dict):
     app.dependency_overrides[get_current_user] = lambda: OWNER_USER
 
     try:
-        # Patch the user_settings to force the Anthropic agent-loop branch.
-        from app.services import user_settings_service as _uss
-        from app.models.user_settings import UserSettings
+        # Patch load_user_settings to force active_provider="anthropic" so
+        # threads.py agent loop takes the Anthropic branch. The real
+        # load_user_settings is wrapped so all other fields (embedding,
+        # retrieval, sandbox, etc.) come from the dev .env unchanged.
+        from app.models.user_settings import load_user_settings as _real_load
 
-        def _force_anthropic_settings(*a, **k):
-            return UserSettings(
-                user_id=user_id,
-                active_provider="anthropic",
-                llm_model="claude-sonnet-4-6",
-                openai_api_key=None,
-                anthropic_api_key="test-key",
-                openrouter_api_key=None,
-                google_api_key=None,
-            )
+        def _force_anthropic_settings(uid, *a, **k):
+            base = _real_load(uid, *a, **k)
+            return base.model_copy(update={
+                "active_provider": "anthropic",
+                "llm_model": "claude-sonnet-4-6",
+                "llm_api_key": "test-anthropic-key",
+            })
 
         # First call returns the big-args events; second+ calls return a
         # quick finish event so the agent loop terminates without
@@ -484,7 +483,10 @@ async def _capture_anthropic_events(events_iter, seeded_thread_info: dict):
         ), patch(
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
-        ), patch.object(_uss, "get_user_settings", side_effect=_force_anthropic_settings):
+        ), patch(
+            "app.api.threads.load_user_settings",
+            side_effect=_force_anthropic_settings,
+        ):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as ac:

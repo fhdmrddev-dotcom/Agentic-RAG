@@ -1620,6 +1620,20 @@ async def send_message(
                                         if _idx not in _announced_tools_ant:
                                             _announced_tools_ant.add(_idx)
                                             await _emit(redis, run_id, 'tool_preparing', name=_ant_event['name'], index=_idx)
+                                    elif _etype == "tool_args_progress":
+                                        # Phase 075 D-075-10: route Anthropic-path
+                                        # tool_args_progress yields from
+                                        # anthropic_service.stream_anthropic to
+                                        # _emit. Filter logic (execute_code skip)
+                                        # already applied at the producer side;
+                                        # this dispatch is a straight pass-through.
+                                        await _emit(
+                                            redis, run_id, "tool_args_progress",
+                                            tool_index=_ant_event["tool_index"],
+                                            name=_ant_event["name"],
+                                            args_so_far=_ant_event["args_so_far"],
+                                            total_args_bytes_so_far=_ant_event["total_args_bytes_so_far"],
+                                        )
                                     elif _etype == "tool_start":
                                         # Fired at content_block_stop — arguments now complete.
                                         # tool_preparing was already emitted above; just populate buffer.

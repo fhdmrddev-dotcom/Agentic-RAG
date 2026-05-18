@@ -165,6 +165,13 @@ def stream_anthropic(
 
     tool_blocks: dict[int, dict] = {}  # index -> {id, name, arguments}
     finish_reason: str = "stop"
+    # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary counter.
+    # Resets each time this generator is invoked (one invocation per LLM
+    # call, mirroring the OpenAI-path per-iteration reset in threads.py).
+    # NOTE: D-075-11's calling_mode filter doesn't apply here —
+    # anthropic_service is only used for the NATIVE provider path;
+    # STRUCTURED mode bypasses this generator entirely.
+    _tool_args_emit_boundary: dict[int, int] = {}
 
     with client.messages.stream(**stream_kwargs) as stream:
         for event in stream:
@@ -204,6 +211,33 @@ def stream_anthropic(
                 elif delta.type == "input_json_delta":
                     if event.index in tool_blocks:
                         tool_blocks[event.index]["arguments"] += delta.partial_json
+                        # Phase 075 D-075-09/10/11: yield tool_args_progress
+                        # on every 5KB cumulative-byte boundary for non-
+                        # execute_code tools. The calling_mode filter from
+                        # D-075-11 does NOT apply here — anthropic_service is
+                        # only invoked from the NATIVE provider path.
+                        tb = tool_blocks[event.index]
+                        _tool_name = tb["name"]
+                        if _tool_name and _tool_name != "execute_code":
+                            _bytes_total = len(tb["arguments"].encode("utf-8"))
+                            _new_boundary = _bytes_total // 5120
+                            _last_boundary = _tool_args_emit_boundary.get(event.index, 0)
+                            if _new_boundary > _last_boundary:
+                                _tool_args_emit_boundary[event.index] = _new_boundary
+                                # D-075-09: args_so_far is the LAST 5KB of
+                                # the cumulative accumulator (sliding-window
+                                # tail). UTF-8-aware byte slice + decode
+                                # errors="ignore" drops any invalid trailing
+                                # codepoint bytes left by the byte boundary.
+                                _tail_bytes = tb["arguments"].encode("utf-8")[-5120:]
+                                _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
+                                yield {
+                                    "type": "tool_args_progress",
+                                    "tool_index": event.index,
+                                    "name": _tool_name,
+                                    "args_so_far": _args_so_far,
+                                    "total_args_bytes_so_far": _bytes_total,
+                                }
 
             elif event_type == "content_block_stop":
                 # Tool block is now complete — parse accumulated JSON and yield tool_start
