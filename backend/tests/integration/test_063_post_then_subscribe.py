@@ -42,26 +42,6 @@ from tests.integration.test_059_disconnect import _reset_sse_starlette_app_statu
 THREAD_A = str(uuid4())
 
 
-@pytest.fixture(autouse=True)
-def _reset_redis_singleton():
-    """Reset app.dependencies._redis so each test gets a Redis client bound to
-    its own per-test event loop (pytest-asyncio function-scope creates a fresh
-    loop per test). Without this, a singleton created in test N's loop is
-    invoked by test N+1 against a closed loop → RuntimeError("Event loop is closed").
-
-    Mirrors the rationale of test_059_disconnect's _reset_sse_starlette_app_status
-    fixture (RESEARCH.md Pitfall 6) — same loop-binding trap, different module.
-    Required for any test that hits the real `get_redis()` singleton (no Redis
-    dependency override). Verbatim copy from test_062_stream_replay.py:36-51
-    per D-062-14 / 063-PATTERNS.md "Shared Patterns: Test fixture: Redis
-    singleton reset" mandate.
-    """
-    import app.dependencies as _deps
-    _deps._redis = None
-    yield
-    _deps._redis = None
-
-
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_post_then_get_stream_renders_full_response(redis_client):
