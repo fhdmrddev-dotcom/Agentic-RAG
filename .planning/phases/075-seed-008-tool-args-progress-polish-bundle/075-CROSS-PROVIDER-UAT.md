@@ -128,6 +128,22 @@
 **Symptoms:** After the matplotlib `ModuleNotFoundError`, the transcript shows Steps 1 (search-documents, 0ms) and 2 (analyze_document, 183ms) re-rendering with very fast durations. Either the tool-card renderer is duplicating cards or the model re-issued the same calls and got cache hits.
 **Fix surface:** Audit `frontend/src/components/chat/ToolCallPanel.tsx` (or wherever step cards render) for de-duplication keyed on `tool_call_id`. If the model genuinely re-called, that's a model-side waste; if the frontend duplicated the same `tool_call_id` into a second card, that's a reducer bug.
 
+### B-260519-11 — Output-files panel repeats the same files across every sandbox-execute step
+**Severity:** major (UX clutter + confusion + possible storage cost)
+**Trigger:** Anthropic Round 2 multi-step sandbox build (most pronounced — 9 cells in a row).
+**Symptoms:** Each execute_code cell renders an "Output files" panel listing the files in `/sandbox/output/` after that cell completes. Because subsequent cells inherit the directory state, every later cell's panel shows **all the files from prior cells PLUS any new ones**. Anthropic Round 2's transcript shows the same 8 chart PNGs listed across 5 successive step panels (Generate radar → Build slides 1-7 → Build slides 8-15 → QA markitdown → QA shape count), and `fahed_mrad_defence_part1.pptx` + `Fahed_Mrad_DBA_Defence_Presentation.pptx` shown across the last 3-4 panels.
+**Why it's a real bug, not just verbose:**
+- Visual clutter: user has to scroll past the same 8 files 5+ times before finding the final output
+- Cognitive overhead: user can't tell which files were NEWLY created by which cell
+- Possible storage cost: if each "Output files" link wraps a fresh signed URL or download, that's N×M redundant uploads/signing
+- Inconsistent with mental model: a step's output should be what that step PRODUCED, not the whole accumulated sandbox state
+**Fix surface options:**
+- (a) **Delta view (preferred):** the output-files panel for each cell shows only files NEW or CHANGED in that cell (set difference vs prior cell's snapshot)
+- (b) **Single-pinned view:** show the accumulated state once at the end of the agent loop (or pinned at the top), not in every cell
+- (c) **Hybrid:** delta per cell + a "Final outputs" pinned panel at the end
+**Recommendation:** Option (a) — cleanest mental model. Each cell shows what it produced; old files are still accessible via the pinned latest-state panel at completion.
+**Implementation:** likely in `backend/app/services/sandbox_service.py:harvest_output_files` (compute delta vs last harvest) AND frontend tool-card renderer (display delta + the cumulative pinned panel). Files-listing happens at end of each cell, so a per-cell "previous_files" tracker on the run state is enough to compute the diff.
+
 ---
 
 ## Updated UAT findings (carry-forward from 075-UAT.md)
@@ -183,17 +199,25 @@
 - Add an Anthropic-specific Chrome MCP UAT scenario as regression guard
 
 ### Plan 04 — Observability + sub-agent transparency + polish (MEDIUM PRIORITY after the routing audit)
-**Scope:** Backend + frontend, small surface, high information density. Closes the remaining 7 bugs.
+**Scope:** Backend + frontend, small surface, high information density. Closes the remaining 8 bugs.
+
+**Unification principle:** Every transparency / observability fix in this plan applies **uniformly across all providers** (OpenAI, Anthropic, Google, OpenRouter, Ollama). The sub-agent downgrade is invisible for every provider today (gpt-5.4-mini for OpenAI, Haiku for Anthropic, Flash for Google, none for OpenRouter/Ollama). The fix surfaces it consistently regardless of provider — not just for Anthropic.
+
 - Delete stale `loadMessages(thread.id)` at `ChatArea.tsx:166` — closes Test 2 dual-`/messages` (per MESSAGES-DEBUG agent's single-line fix)
 - Snapshot endpoint: skip Redis probe when `active_runs == []` — closes B-260519-02
 - **LangSmith Anthropic wrap** — add `@traceable(name="ChatAnthropic", run_type="llm")` (or `wrap_anthropic` if available in the installed langsmith) to `anthropic_service.stream_anthropic`. **High-priority sub-bug** of B-260519-04 because it makes Anthropic runs un-debuggable today.
 - LangSmith provider/name tagging — set `ls_provider` and trace `name` per actual provider; remove the hardcoded `ChatOpenAI` label for non-OpenAI calls — closes B-260519-04
-- **Sub-agent transparency** — backend: log `sub-agent invoked tool=X main_model=Y sub_model=Z reason=cost_default` per invocation. Frontend: surface `sub_agent_model` in the tool-card metadata (read from new field on tool_call payload). Settings UI: expose the `sub_agent_model` override knob (already exists at `user_settings.sub_agent_model`, just not in UI). Closes B-260519-05 with current design intact.
-- System prompt: add "if you hit ImportError, try `pip install <pkg>` first" — closes B-260519-08
-- System prompt: add "always write outputs to `/sandbox/output/`" — partially closes B-260519-09 (a)
+- **Sub-agent transparency (UNIFIED across all providers)** — closes B-260519-05 with current routing design intact:
+  - **Backend (all providers):** log `sub-agent invoked tool=X main_model=Y sub_model=Z reason=cost_default` per invocation in `sub_agent_service.py:run_sub_agent`. Provider-agnostic — fires for every sub-agent call.
+  - **Backend payload (all providers):** add a `sub_agent_model` field to the tool_call result payload that the agent loop emits (in `threads.py` wherever the tool_call_result is built). Same field name and shape regardless of which provider was active.
+  - **Frontend tool-card metadata (all providers):** the tool-card hover/expand view reads `tool_call.sub_agent_model` (when present, i.e. when the call was a sub-agent) and renders a small "Sub-agent: {model_id}" line. Same component, same render, regardless of provider — visible for gpt-5.4-mini, claude-haiku-4-5-20251001, gemini-2.5-flash, and the user's selected OpenRouter/Ollama model alike.
+  - **Settings UI (all providers):** expose `sub_agent_model` override knob (already exists at `user_settings.sub_agent_model`, just not in UI). A single dropdown that applies to whichever provider is active, with a "Use provider default" option that resolves to `_SUB_AGENT_MODEL_DEFAULTS[provider]` at call time.
+- System prompt (all providers): add "if you hit ImportError, try `pip install <pkg>` first" — closes B-260519-08
+- System prompt (all providers): add "always write outputs to `/sandbox/output/`" — partially closes B-260519-09 (a)
 - Audit `code_stdout` vs `code_stderr` styling in `frontend/src/components/chat/` — closes B-260519-07
 - Pre-install `python-pptx`, `matplotlib`, `numpy`, `pandas` in the sandbox Docker image — eliminates B-260519-08 root cause + speeds up Rounds 2+3 by ~15s each
 - ToolCallPanel de-duplication keyed on `tool_call_id` — closes B-260519-10
+- **Output-files panel delta view (NEW)** — closes B-260519-11. Backend: `harvest_output_files` returns the delta vs the previous cell's snapshot (track `previous_files: list[str]` on the run state). Frontend: each tool-card renders only the new/changed files for that cell; a pinned "Final outputs" panel at the end of the agent loop shows the accumulated final state.
 
 ### Deferred from Plan 04 (out of scope for 075.1)
 - Per-tool sub-agent model routing (e.g., `analyze_document → Haiku`, `code_planning → Sonnet`). Today's flat per-provider default is fine for the single sub-agent tool we have. Revisit in Skill Studio or Settings polish milestone.
