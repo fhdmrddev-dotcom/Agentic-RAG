@@ -4,11 +4,11 @@ title: Bottom chat indicator goes blank during code-execution pauses while top t
 reported: 2026-05-14
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/typing-indicator, frontend/tool-card-display, UX/perceived-responsiveness]
-folded_into: null
+folded_into: "075"
 related_seeds: [SEED-008]
-re_open_trigger: null
+re_open_trigger: "Phase 075 ships and bottom indicator still goes blank during a >5s silent window inside a code-execution cell — closure validation: D-075-14 sticky-text + code_stdout subscription didn't reach the bottom indicator component."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7

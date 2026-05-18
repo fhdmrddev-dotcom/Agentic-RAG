@@ -4,11 +4,11 @@ title: Resume button appears mid-stream during long code execution
 reported: 2026-05-18
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat-ui, backend/sse, backend/redis-streams]
-folded_into: null
+folded_into: "075"
 related_seeds: [SEED-007, SEED-008, SEED-025]
-re_open_trigger: null
+re_open_trigger: "Phase 075 ships and operator still observes Resume button appearing mid-stream during a long sandbox cell — closure validation: snapshot endpoint's reconcile-fetch path (D-075-13) didn't gate Resume on confirmed terminal runs.status."
 reproduces_on:
   branch: v2.5-dev
   commit: 2996d0a

@@ -8,7 +8,7 @@ status: deferred
 affected_areas: [backend/agent-loop, backend/system-prompts, frontend/chat-surface, provider/anthropic-native-sdk]
 folded_into: null
 related_seeds: []
-re_open_trigger: "Phase 075 polish bundle planning OR any system-prompt redesign touching anthropic_service.py / threads.py agent loop terminal frame OR v2.7 Agent Workspace milestone planning. Reviewed during /gsd:discuss-phase 074 (2026-05-17) — not folded because root cause is system-prompt/terminal-frame OR frontend block-ordering, not the max_tokens clamp surface Phase 074 covers."
+re_open_trigger: "v2.7 Agent Workspace milestone planning OR any future Anthropic-path system-prompt redesign in anthropic_service.py / threads.py agent-loop terminal frame OR optional v2.6 polish phase 075.1 if user feedback escalates. Reviewed during /gsd:discuss-phase 075 (2026-05-18) — deferred again per D-075-15: root cause is system-prompt/terminal-frame OR frontend block-ordering, orthogonal to Phase 075's SSE/snapshot/sandbox plumbing surface; folding would ~3x phase size and cross into provider-parity prompt engineering. Originally reviewed during /gsd:discuss-phase 074 (2026-05-17) with the same conclusion (D-074-10)."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7
