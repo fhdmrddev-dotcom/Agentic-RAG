@@ -445,8 +445,8 @@ Plans:
   3. Live UAT: `claude-haiku-4-5-20251001` run with `max_tokens=65536` succeeds (was 400 BadRequestError; surfaced during Phase 067.5 cycle 5).
   4. `pytest backend/tests/integration/test_059_disconnect.py -q` is 3/3 PASS without `RuntimeError: Event loop is closed` — the `_reset_redis_singleton` autouse fixture pattern from `test_062_stream_replay.py:36-51` is pasted in.
 **Plans:**
-- [ ] 074-01-PLAN.md — SEED-009: extend MODEL_CAPABILITIES with max_output_tokens + single-chokepoint clamp in `_resolve_max_tokens` + per-model verified-2026-05-18 values + unit tests + live UAT (Wave 1; autonomous=false — live UAT checkpoint)
-- [ ] 074-02-PLAN.md — SEED-011: hoist `_reset_redis_singleton` autouse fixture into new `backend/tests/integration/conftest.py` + delete 2 local copies + 4-file pytest ship gate (Wave 1; autonomous=true; parallel-able with Plan 01)
+- [x] 074-01-PLAN.md — SEED-009: extend MODEL_CAPABILITIES with max_output_tokens + single-chokepoint clamp in `_resolve_max_tokens` + per-model verified-2026-05-18 values + unit tests + live UAT (Wave 1; autonomous=false — live UAT checkpoint) [2026-05-18]
+- [x] 074-02-PLAN.md — SEED-011: hoist `_reset_redis_singleton` autouse fixture into new `backend/tests/integration/conftest.py` + delete 2 local copies + 4-file pytest ship gate (Wave 1; autonomous=true; parallel-able with Plan 01) [2026-05-18]
 
 ### Phase 075: SEED-008 + tool_args_progress Polish Bundle
 **Goal**: Thread switch cold-cache latency drops ≥50% (snapshot endpoint), sandbox stdout streams line-by-line as it's captured, and non-execute_code tools emit `tool_args_progress` SSE for >5KB argument JSON.
