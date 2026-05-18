@@ -186,7 +186,10 @@ export interface StreamCallbacks {
   // Phase 066 D-066-06: 4th kind 'timed_out' — distinct from 'error' (LLM/system failure)
   // and 'cancelled' (user-Stop). Hooks set runStatus='timed_out' on this; MessageItem
   // renders the "Agent reached time limit" banner + Resume button per D-066-09/10.
-  onTerminal: (kind: "done" | "error" | "cancelled" | "timed_out", error?: string) => void
+  // Phase 075 D-075-13: return type widened to Promise<void> | void so the
+  // StreamsProvider onTerminal wrapper can await the getSnapshot probe before
+  // deciding whether to flip runStatus (BUG-260518-01 reconcile-fetch path).
+  onTerminal: (kind: "done" | "error" | "cancelled" | "timed_out", error?: string) => Promise<void> | void
   onTitleUpdate?: (title: string) => void
   onToolPreparing?: (name: string, index: number) => void
   onToolStart?: (name: string, args: Record<string, string>) => void

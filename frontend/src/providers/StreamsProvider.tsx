@@ -84,6 +84,38 @@ import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 // selector result is shallow-equal across stores.
 const EMPTY_ARRAY: Message[] = []
 
+/**
+ * Phase 075 D-075-13 / BUG-260518-01: detect transient buffer_expired_*
+ * terminal events. Returns true if the run is still streaming per the
+ * snapshot endpoint, meaning the frontend should re-attach instead of
+ * flipping runStatus to "failed".
+ *
+ * Called BEFORE any state mutation in both onTerminal handlers (RESEARCH
+ * Pitfall 5: prevent Resume button flicker — the snapshot probe MUST
+ * happen before flipping `isStreaming: false`).
+ *
+ * Returns false (= treat as terminal) on:
+ *   - non-error kinds (done / cancelled / timed_out)
+ *   - error kinds with non-buffer_expired payloads
+ *   - snapshot fetch failures (fail-safe to terminal behavior)
+ *   - snapshot returns active_runs that doesn't include the runId, or the
+ *     matching entry is not in status "streaming"
+ */
+async function _isTransientBufferExpired(
+  kind: "done" | "error" | "cancelled" | "timed_out",
+  errorPayload: string | undefined,
+  threadId: string,
+  runId: string,
+): Promise<boolean> {
+  if (kind !== "error") return false
+  if (!errorPayload?.startsWith?.("buffer_expired")) return false
+  const snapshot = await getSnapshot(threadId).catch(() => null)
+  if (!snapshot) return false
+  return snapshot.active_runs.some(
+    (r) => r.run_id === runId && r.status === "streaming",
+  )
+}
+
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random()}`
 }
@@ -566,7 +598,15 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 setMessages: setMessagesForBucketBound(surfaceId, threadId),
               })
               const originalOnTerminal = callbacks.onTerminal
-              callbacks.onTerminal = (kind, errorPayload) => {
+              callbacks.onTerminal = async (kind, errorPayload) => {
+                // Phase 075 D-075-13 / BUG-260518-01: reconcile-fetch before
+                // any state mutation (Pitfall 5: prevent Resume button
+                // flicker). If the run is still streaming per snapshot,
+                // do NOT flip runStatus, do NOT unsub — SSE will reconnect
+                // on the next reconcile cycle via lastSeenOffsetRef cursor.
+                if (await _isTransientBufferExpired(kind, errorPayload, threadId, run.run_id)) {
+                  return
+                }
                 useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
                   if (!prev.some((m) => m.id === targetId)) return prev
                   return prev.map((m) => {
@@ -714,7 +754,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             })
 
             const originalOnTerminal = callbacks.onTerminal
-            callbacks.onTerminal = (kind, errorPayload) => {
+            callbacks.onTerminal = async (kind, errorPayload) => {
+              // Phase 075 D-075-13 / BUG-260518-01: reconcile-fetch before
+              // any state mutation (Pitfall 5: prevent Resume button
+              // flicker). The registered run id here is registeredRunId
+              // (sendMessage path) — different local from the reconcile
+              // reattach loop's `run.run_id`. Shared helper guarantees no
+              // divergence between the two sites.
+              if (
+                registeredRunId &&
+                (await _isTransientBufferExpired(kind, errorPayload, threadId, registeredRunId))
+              ) {
+                return
+              }
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
                 if (!prev.some((m) => m.id === assistantId)) return prev
                 return prev.map((m) => {
