@@ -67,3 +67,11 @@ Two interventions:
 - Live repro 2026-05-14 (user observation during the dissertation defense pptx generation session): 169-second chart-generation cell with top indicator animating + bottom indicator blank.
 - Phase 067.4 R-5 — `code_output_line` SSE event (heartbeat for long-running sandbox cells).
 - SEED-008 Gap 2 — line-by-line stdout streaming (this bug is the chat-indicator complement of that gap).
+
+## Fold timeline
+
+- 2026-05-18 / Phase 075 discuss-phase — frontmatter flipped open → folded, folded_into: "075" per D-075-14.
+- 2026-05-18 / Phase 075 Plan 02 — fix shipped via two-part intervention:
+  - **Part (a) sticky text**: `frontend/src/components/chat/MessageItem.tsx` gained `stickyLabelRef<string | null>` that retains the last non-null `outerBannerLabel(...)` value during `isStreaming`. The bottom indicator renders `stickyBottomLabel` (computed label or sticky fallback) in place of the prior inline ternary. No more clearing to blank during silent windows inside long tool calls.
+  - **Part (b) code_stdout subscription**: implicit via the existing `onCodeStdout` handler at `frontend/src/providers/StreamsProvider.tsx:310-322` — each new per-line `code_stdout` event from Plan 02's `session.execute_command` rewire mutates the active tool_call's `outputLines`, which re-renders MessageItem and refreshes the sticky text. No explicit subscription required.
+- Closure validation: Chrome MCP UAT at t=30s/60s/120s during a long pptx-generation cell (matplotlib renders) — deferred to `/gsd:verify-work` session per auto-mode protocol. Status flip folded → closed pending UAT.
