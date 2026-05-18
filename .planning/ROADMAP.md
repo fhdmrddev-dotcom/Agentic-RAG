@@ -460,6 +460,11 @@ Plans:
   3. `tool_args_progress` SSE event fires for non-`execute_code` tools when argument JSON exceeds 5 KB during streaming; payload shape `{tool_index, args_so_far ≤5KB chunk, total_args_bytes_so_far}`. Integration test on `analyze_document` with a long-form prompt.
   4. Existing `code_executing` heartbeat (Phase 067.4 Plan 03) is preserved — `code_stdout` re-wire is additive.
 
+**Plans:** 3 plans
+- [ ] 075-01-PLAN.md — Snapshot endpoint full stack + BUG-260518-01 Resume-mid-stream fix (Wave 1; new `GET /threads/{id}/snapshot` + `_enrich_messages_with_runs` extraction + atomic-swap in StreamsProvider.reconcile + onTerminal reconcile-fetch on buffer_expired_* — D-075-01/02/03/04/13)
+- [ ] 075-02-PLAN.md — Line-by-line code_stdout SSE rewire + BUG-260514-03 bottom-indicator fix (Wave 1, parallel-able; `session.execute_command("python -u", on_stdout, on_stderr)` replaces session.run + line-buffer accumulator + silent-window heartbeat + DELETE post-completion emit + sticky bottom-indicator text — D-075-05/06/07/08/14)
+- [ ] 075-03-PLAN.md — tool_args_progress SSE primitive (Wave 1, parallel-able; OpenAI delta accumulator + Anthropic input_json_delta + execute_code + STRUCTURED filters + 5KB sliding-window tail; backend-only no frontend — D-075-09/10/11/12)
+
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
 **Depends on**: Phase 071.3

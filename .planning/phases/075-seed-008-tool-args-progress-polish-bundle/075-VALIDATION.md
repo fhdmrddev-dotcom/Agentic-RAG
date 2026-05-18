@@ -1,9 +1,9 @@
 ---
 phase: 075
 slug: seed-008-tool-args-progress-polish-bundle
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-18
 ---
 
@@ -105,11 +105,11 @@ Shared fixture: `backend/tests/integration/conftest.py` provides `_reset_redis_s
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (3 new test files)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter (after Wave 0 and per-task acceptance criteria are mapped by the planner)
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies (plan-checker confirmed)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (3 new test files — Task 1 in each plan creates them)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (test_075_*.py runtime <30s combined)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-05-18

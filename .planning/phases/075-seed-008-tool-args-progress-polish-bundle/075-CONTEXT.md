@@ -118,7 +118,7 @@ Three narrow streaming-UX upgrades + two folded bug fixes, bundled into one poli
 - `frontend/src/providers/StreamsProvider.tsx:689-720` — `onTerminal` handler that flips `runStatus: "failed"` on `kind === "error"` (BUG-260518-01 reconcile-fetch wiring per D-075-13)
 - `frontend/src/lib/api.ts:135-136, 281, 452-467` — current `getActiveRuns`, `subscribeToRun`, `getMessages` helpers (new `getSnapshot` joins; old helpers stay)
 - `frontend/src/lib/api.ts:390-408, 449` — `buffer_expired_*` error mapping (transient mapping per D-075-13)
-- `frontend/src/hooks/useMessages.ts:572-590` — Phase 067.5 Branch D-3 streaming-bucket guard (**PRESERVE VERBATIM** per D-075-02 + Theme C REQ)
+- `frontend/src/providers/StreamsProvider.tsx:419-435` — Phase 067.5 Branch D-3 streaming-bucket guard in the `clearThreadBucket` action with predicate `tid && tid !== streamingThreadIdRef.current` (**PRESERVE VERBATIM** per D-075-02 + Theme C REQ). Note: the original D-075-02 cited `useMessages.ts:572-590` — post-Phase 068 lift, useMessages.ts is now 89 lines total and the guard moved to StreamsProvider.tsx. Confirmed by 075-RESEARCH.md Discovery 3 + 075-PATTERNS.md.
 - `frontend/src/components/chat/MessageItem.tsx:118` — Resume button visibility condition (BUG-260518-01 reference per D-075-13)
 - `frontend/src/types/index.ts:113` — `runStatus` enum (reference for snapshot's active_runs type + Resume-button-still-hidden invariant)
 - Bottom-indicator component (planner identifies via grep for the typing indicator hook — likely under `frontend/src/components/chat/` or `frontend/src/hooks/`) for BUG-260514-03 sticky text per D-075-14
