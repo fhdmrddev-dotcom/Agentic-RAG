@@ -1666,6 +1666,12 @@ async def send_message(
                                 tool_calls_buffer: dict = {}
                                 finish_reason: str | None = None
                                 _announced_tools: set[int] = set()
+                                # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary
+                                # counter for tool_args_progress emits. Resets alongside
+                                # tool_calls_buffer / _announced_tools at each agent-loop
+                                # iteration to prevent cross-round leakage (a stale boundary
+                                # from iteration N would silence the emit in iteration N+1).
+                                _tool_args_emit_boundary: dict[int, int] = {}
 
                                 # Phase 066 D-066-02 + D-066-03 + D-066-11: per-LLM-call
                                 # timer + close-then-raise. Resolve budget before each
@@ -1736,6 +1742,41 @@ async def send_message(
                                                     await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
                                             if tc.function and tc.function.arguments:
                                                 tool_calls_buffer[idx]["arguments"] += tc.function.arguments
+                                                # Phase 075 D-075-09/10/11: emit tool_args_progress
+                                                # on every 5KB cumulative-byte boundary for non-
+                                                # execute_code tools in NATIVE calling mode. Skip
+                                                # execute_code (deferred to v3.0 Skill Studio per
+                                                # REQUIREMENTS.md line 65). Skip STRUCTURED mode
+                                                # (args arrive at finish_reason parse time, not
+                                                # progressively — there's no streaming accumulator
+                                                # to walk on that path).
+                                                _tool_name = tool_calls_buffer[idx]["name"]
+                                                if (
+                                                    _tool_name
+                                                    and _tool_name != "execute_code"
+                                                    and calling_mode != CallingMode.STRUCTURED
+                                                ):
+                                                    _bytes_total = len(
+                                                        tool_calls_buffer[idx]["arguments"].encode("utf-8")
+                                                    )
+                                                    _new_boundary = _bytes_total // 5120
+                                                    _last_boundary = _tool_args_emit_boundary.get(idx, 0)
+                                                    if _new_boundary > _last_boundary:
+                                                        _tool_args_emit_boundary[idx] = _new_boundary
+                                                        # D-075-09: args_so_far is the LAST 5KB of
+                                                        # the cumulative accumulator (sliding-window
+                                                        # tail). UTF-8-aware byte slice + decode
+                                                        # errors="ignore" drops any invalid trailing
+                                                        # codepoint bytes left by the byte boundary.
+                                                        _tail_bytes = tool_calls_buffer[idx]["arguments"].encode("utf-8")[-5120:]
+                                                        _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
+                                                        await _emit(
+                                                            redis, run_id, "tool_args_progress",
+                                                            tool_index=idx,
+                                                            name=_tool_name,
+                                                            args_so_far=_args_so_far,
+                                                            total_args_bytes_so_far=_bytes_total,
+                                                        )
 
                                 await _drain_stream_with_close_on_cancel(
                                     stream,
