@@ -68,13 +68,14 @@ class ModelCapability(TypedDict, total=False):
 
     ``total=False`` so partial entries are allowed — only ``native_tools`` and
     ``provider`` were previously required; Phase 066 D-066-03 adds
-    ``llm_call_timeout_seconds`` as optional. Models without this field fall
-    back to the 180s unknown-model default at the lookup site
-    (``get_per_call_timeout`` below).
+    ``llm_call_timeout_seconds`` as optional, Phase 074 D-074-06 adds
+    ``max_output_tokens`` as the hard API cap. Models without these fields
+    fall back to runtime defaults at the lookup site.
     """
     native_tools: bool
     provider: str  # documentation only; actual provider from user settings
     llm_call_timeout_seconds: int  # Phase 066 D-066-03 — per-LLM-call deadline
+    max_output_tokens: int  # Phase 074 D-074-06 — hard API cap (vendor docs); clamp ceiling
 
 
 # Capability registry: which models support native API tool calling.
@@ -89,43 +90,62 @@ class ModelCapability(TypedDict, total=False):
 #   240s  — agentic / capable models
 #   600s  — slow reasoning (extended thinking; Anthropic Issue #51568)
 # Resolved by ``get_per_call_timeout(model_id, settings)`` below.
+#
+# Phase 074 D-074-06: per-model `max_output_tokens` carries the hard API
+# cap (what the upstream provider's API refuses to exceed). Values
+# verified live against each upstream provider's docs on 2026-05-18 —
+# see .planning/phases/074-seed-009-seed-011-polish-bundle/074-RESEARCH.md
+# §"Verified per-model max_output_tokens registry" for citation per row.
+# Read at openai_service._resolve_max_tokens (clamp gate) via
+# MODEL_CAPABILITIES.get(model_id, {}).get("max_output_tokens").
+# Re-verify Anthropic table at every new snapshot release (Pitfall 5).
 MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # OpenAI — proven native tool support
-    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
-    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
-    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
-    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
-    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60},
-    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180},
-    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240},
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60},
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90},
-    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
-    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
-    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600},
+    # max_output_tokens verified against per-model OpenAI docs 2026-05-18
+    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384},
+    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  16384},
+    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  32768},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  32768},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens":  16384},
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000},
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000},  # representative-class per memory feedback_model_names_representative.md
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000},  # representative-class
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000},  # representative-class
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000},
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},
+    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},
+    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},  # representative-class — o4 follows o3 family
     # Anthropic direct — native tool_use
-    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600},  # extended thinking — Issue #51568
-    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600},
-    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240},
-    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240},
-    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90},
+    # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
+    # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
+    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000},  # extended thinking — Issue #51568
+    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000},
+    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000},
+    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000},
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90, "max_output_tokens":  64000},
     # Google direct — native function calling
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60},
+    # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536},
+    # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
+    # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
+    # Add a value here once Google publishes the GA spec for these IDs.
     "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90},
     "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240},
     # OpenRouter — mixed; start safe with structured mode
-    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
-    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
-    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
-    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
-    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
-    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600},
+    # max_output_tokens verified per upstream provider's model card 2026-05-18
+    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192},
+    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192},
+    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  32768},
+    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072},
+    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536},
+    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536},
+    # minimax-01 — legacy/discontinued ID; no clear vendor doc as of 2026-05-18; OMITTED
+    # per RESEARCH.md A5 recommendation (pass-through preferred over guessed 16384).
     "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
-    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
-    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
+    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072},
+    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":  16384},
 }
 
 
