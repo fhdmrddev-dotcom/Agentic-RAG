@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from typing import TYPE_CHECKING
 
 from openai import OpenAI
 
-from app.config import settings, get_model_capability
+from app.config import settings, get_model_capability, MODEL_CAPABILITIES
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -657,34 +660,71 @@ def _resolve_max_tokens(
     4. _MODEL_OUTPUT_DEFAULTS — hardcoded per-model practical limits.
     5. _PROVIDER_DEFAULT_MAX_TOKENS — per-provider fallback.
     6. _FALLBACK_MAX_TOKENS for unknown/legacy providers.
+
+    Phase 074 D-074-01: After resolution, ALL priority branches flow through
+    a single clamp gate at the bottom of this function. The clamp returns
+    ``min(resolved, MODEL_CAPABILITIES[model]["max_output_tokens"])`` when an
+    entry exists and ``resolved`` exceeds it; pass-through otherwise per
+    D-074-02. The function was refactored from a 6-early-return shape to
+    single-return to ensure the clamp covers every priority branch
+    (RESEARCH.md Pitfall 1).
     """
     if explicit is not None:
-        return explicit
+        resolved = explicit
+    else:
+        provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
 
-    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+        # For native providers: skip user override to prevent stale slider values
+        # from silently capping output. (GEN-05 defense-in-depth)
+        resolved_from_priority: int | None = None
+        if provider.lower() not in NATIVE_PROVIDERS:
+            user_max_tokens = getattr(user_settings, "llm_max_output_tokens", 0) if user_settings else 0
+            if user_max_tokens > 0:
+                resolved_from_priority = user_max_tokens
 
-    # For native providers: skip user override to prevent stale slider values
-    # from silently capping output. (GEN-05 defense-in-depth)
-    if provider.lower() not in NATIVE_PROVIDERS:
-        user_max_tokens = getattr(user_settings, "llm_max_output_tokens", 0) if user_settings else 0
-        if user_max_tokens > 0:
-            return user_max_tokens
+        if resolved_from_priority is None:
+            env_val = settings.llm_max_output_tokens
+            env_default = 8192  # matches the default in config.py
+            if env_val != env_default:
+                # User deliberately set LLM_MAX_OUTPUT_TOKENS in .env — respect it for all providers
+                resolved_from_priority = env_val
 
-    env_val = settings.llm_max_output_tokens
-    env_default = 8192  # matches the default in config.py
-    if env_val != env_default:
-        # User deliberately set LLM_MAX_OUTPUT_TOKENS in .env — respect it for all providers
-        return env_val
+        if resolved_from_priority is None:
+            model = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
+            if model:
+                env_overrides = _parse_model_output_limits(settings.model_output_limits)
+                if model in env_overrides:
+                    resolved_from_priority = env_overrides[model]
+                elif model in _MODEL_OUTPUT_DEFAULTS:
+                    resolved_from_priority = _MODEL_OUTPUT_DEFAULTS[model]
 
-    model = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
-    if model:
-        env_overrides = _parse_model_output_limits(settings.model_output_limits)
-        if model in env_overrides:
-            return env_overrides[model]
-        if model in _MODEL_OUTPUT_DEFAULTS:
-            return _MODEL_OUTPUT_DEFAULTS[model]
+        if resolved_from_priority is None:
+            resolved_from_priority = _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
 
-    return _PROVIDER_DEFAULT_MAX_TOKENS.get(provider.lower(), _FALLBACK_MAX_TOKENS)
+        resolved = resolved_from_priority
+
+    # Phase 074 D-074-01: Clamp gate. Single chokepoint covers all priority
+    # branches above (explicit value, env override, per-model default, etc.).
+    # Pass-through if registry entry missing OR max_output_tokens key absent
+    # per D-074-02. RESEARCH.md Open Question 2: strip ONLY the OpenRouter
+    # `:exacto` quality-routing suffix (openai_service.py:838-840) before lookup.
+    # Do NOT use a generic `split(":")[0]` — that would also strip legitimate
+    # suffixes like `:free` on `minimax/minimax-m2.5:free`, which is a real
+    # upstream model card with its own registry entry (cap=16384), and the
+    # stripped form `minimax/minimax-m2.5` is NOT in the registry, so the clamp
+    # would silently lose protection for the `:free` tier. Targeted
+    # `.removesuffix(":exacto")` keeps both paths working.
+    model_id = (user_settings.llm_model if user_settings else "") or settings.llm_model or ""
+    if model_id:
+        lookup_key = model_id.removesuffix(":exacto") if model_id.endswith(":exacto") else model_id
+        cap = MODEL_CAPABILITIES.get(lookup_key, {}).get("max_output_tokens")
+        if cap and resolved > cap:
+            logger.info(
+                "clamped max_tokens for model=%s: %d -> %d",
+                lookup_key, resolved, cap,
+            )
+            return cap
+    return resolved
 
 
 def _uses_max_completion_tokens(model: str) -> bool:
