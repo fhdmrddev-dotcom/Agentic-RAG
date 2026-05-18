@@ -198,6 +198,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 **Wave 4 — Verify**
 
 - [ ] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — Validate final default-set output (post-071.3: camelot + pymupdf_full + legacy + `none` equations) against the user's reference PDF + DOCX baseline (ground truth: 35 tables / 59 figures on user thesis). Verify `--workers 2` doesn't regress the CONCUR-01 binding gate (`backend/tests/integration/test_058_concurrency.py`). Verify SEED-007 lift didn't regress 067.5 cycles (Chrome MCP + Playwright e2e against 063 / 063.1 / 067.x specs). (2 plans)
+- [ ] **Phase 082.5: Error Handler Foundation** — Urgent slice of SEED-026: global FastAPI exception handler + structured `ErrorResponse{code, user_message, admin_message, trace_id, timestamp, run_id, thread_id}` model + `logging.basicConfig` (closes D-074-01-DEFER-1) + new `app_errors` audit table + frontend `ApiError` typed parsing. Stops backend SDK internals from leaking to users; gives admins a `trace_id` to correlate user reports with server-side state before any production-shape rollout. Frontend toast lib + admin error inspector deferred to v2.7 (SEED-026 pillars 4-5). (2 plans)
 
 Full details below in **Phase Details**.
 
@@ -547,7 +548,7 @@ Plans:
 
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
 **Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
-**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1
+**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1, Phase 082.5
 **Plans**: 2
 **Requirements**: (cross-cutting verification — all 21 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
 **Success Criteria** (what must be TRUE):
@@ -556,6 +557,19 @@ Plans:
   3. Phase 067.5 Branch D-3 `clearMessages` guard regression test green; 5/5 lived-experience cycles on Chrome MCP show no empty-thread-until-refresh repro post-StreamsProvider lift.
   4. `pdf_extraction_runs` telemetry table populated for every document re-ingested during the verification pass; admin can query per-document extractor lineage + durations (per-aspect composer signature `composable[<text>/<tables>/<images>/<equations>]` per 071.3).
   5. Milestone-close audit confirms all 21 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
+
+### Phase 082.5: Error Handler Foundation (SEED-026 urgent slice)
+**Goal**: User-visible error messages stop leaking backend SDK internals, every `logger.error/info/warning` call surfaces to a single configured sink, and every error response carries a `trace_id` that links the client report to a server-side record. Closes D-074-01-DEFER-1 in the same patch.
+**Depends on**: Nothing (independent of v2.6 multi-worker / extraction tracks)
+**Plans**: 2 (planner may split as scope dictates)
+**Requirements**: (cross-cutting infra — no new v2.6 REQ-ID; addresses SEED-026 pillars 1-3 + D-074-01-DEFER-1)
+**Success Criteria** (what must be TRUE):
+  1. `backend/app/main.py` registers `@app.exception_handler(Exception)` and `@app.exception_handler(HTTPException)` that convert any thrown exception into a Pydantic `ErrorResponse(code: str, user_message: str, admin_message: str | None, trace_id: str, timestamp: datetime, run_id: str | None, thread_id: str | None)`. Untrusted exception detail is sanitized — internal SDK error strings (e.g., `supabase-py APIError`, `asyncpg.exceptions.X`, `anthropic._exceptions.X`) never reach `user_message`.
+  2. `logging.basicConfig(level=logging.INFO, format=<JSON or structured text>)` lives in `app.main` startup — every `logger.info/warning/error/exception` call in the 36 affected modules now emits to stdout. D-074-01-DEFER-1 is verifiably closed: re-running the Phase 074 Live UAT with `MODEL_OUTPUT_LIMITS` override now shows the clamp `logger.info` breadcrumb in uvicorn stdout.
+  3. A new `app_errors` table records every `ErrorResponse` issued (`code, user_id, run_id, thread_id, admin_message, trace_id, timestamp, request_path`). RLS owners-only (`user_id`); admin role exempt (admin role TBD — Phase 082.5 includes a minimal `is_admin` boolean on `auth.users` metadata or `app_settings.admin_user_ids` allowlist for now, full RBAC deferred to SEED-012).
+  4. Every `ErrorResponse` carries the same `trace_id` used by LangSmith and the new `app_errors` row, so an admin can join "user reported X at HH:MM" → backend log line → LangSmith trace → `app_errors` row by a single id.
+  5. `lib/api.ts` parses `ErrorResponse` shape and exposes a typed `ApiError { code, user_message, trace_id }`. No frontend toast lib in this phase (deferred to v2.7 per SEED-026 pillar 4) — but the parsed shape replaces the current generic `Error("Failed to ...")` throws so a follow-up phase can drop a toast lib in without re-plumbing.
+  6. `asyncio.CancelledError` is NOT caught by the global handler (normal stream-disconnect signal, not an error — distinguished per SEED-026 Open Question 4).
 
 ---
 
@@ -648,7 +662,8 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 080 — VPS Runbook + Deployment Guide Correction | 0/1 | Not started | — |
 | 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
-| **Total (v2.6)** | **4/40** | **In progress** | **—** |
+| 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
+| **Total (v2.6)** | **4/42** | **In progress** | **—** |
 
 ---
 
