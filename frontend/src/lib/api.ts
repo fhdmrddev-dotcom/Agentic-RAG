@@ -45,11 +45,20 @@ export async function createThread(title = "New Chat", folderId?: string | null)
   return res.json() as Promise<Thread>
 }
 
-export async function getMessages(threadId: string, signal?: AbortSignal): Promise<Message[]> {
-  const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers, signal })
-  if (!res.ok) throw new Error("Failed to get messages")
-  // Phase 063.1 (D-063.1-13/15): backend now LEFT JOINs public.runs and returns
+// Phase 075 D-075-03 (frontend half): shared MessageResponse DTO + mapper used
+// by both getMessages and getSnapshot. Extracted from the inline destructure
+// that previously lived inside getMessages; byte-identical mapping behavior.
+type MessageResponseDTO = Message & {
+  source_refs?: Citation[]
+  confidence_level?: string
+  confidence_avg_similarity?: number
+  confidence_disclaimer?: string | null
+  run_id?: string | null
+  run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
+}
+
+function _mapMessageResponse(m: MessageResponseDTO): Message {
+  // Phase 063.1 (D-063.1-13/15): backend LEFT JOINs public.runs and returns
   // run_id + run_status (snake_case) on assistant rows; user rows + pre-run-backed
   // assistant rows return null for both. Extend the inline response shape and
   // map snake → camel in the same destructure pass that already converts
@@ -59,45 +68,40 @@ export async function getMessages(threadId: string, signal?: AbortSignal): Promi
   // `run_id: UUID | None = None`, so the wire JSON carries `null` for
   // user rows and pre-run-backed assistant rows. The frontend Message
   // type declares `runId?: string` (optional, NOT `| null`), so we MUST
-  // coerce null → undefined here in the mapper. Without coercion,
-  // consumers doing `m.runId === undefined` would mis-classify a `null`
-  // as "present-but-null" rather than "absent." Truthy checks
-  // (`m.runId && ...`) currently happen to work, but this hardens
-  // against future call sites assuming the type contract literally.
-  const data = await res.json() as Array<Message & {
-    source_refs?: Citation[]
-    confidence_level?: string
-    confidence_avg_similarity?: number
-    confidence_disclaimer?: string | null
-    run_id?: string | null
-    run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
-  }>
-  // Map DB column names to frontend field names
-  return data.map((m) => {
-    const {
-      source_refs,
-      confidence_level,
-      confidence_avg_similarity,
-      confidence_disclaimer,
-      run_id,
-      run_status,
-      ...rest
-    } = m
-    const mapped: Message = {
-      ...rest,
-      citations: (source_refs ?? []) as Citation[],
-      runId: run_id ?? undefined,
-      runStatus: run_status ?? undefined,
+  // coerce null → undefined here in the mapper.
+  const {
+    source_refs,
+    confidence_level,
+    confidence_avg_similarity,
+    confidence_disclaimer,
+    run_id,
+    run_status,
+    ...rest
+  } = m
+  const mapped: Message = {
+    ...rest,
+    citations: (source_refs ?? []) as Citation[],
+    runId: run_id ?? undefined,
+    runStatus: run_status ?? undefined,
+  }
+  if (confidence_level) {
+    mapped.confidence = {
+      level: confidence_level as "high" | "medium" | "low",
+      avg_similarity: confidence_avg_similarity ?? 0,
+      disclaimer: confidence_disclaimer ?? null,
     }
-    if (confidence_level) {
-      mapped.confidence = {
-        level: confidence_level as "high" | "medium" | "low",
-        avg_similarity: confidence_avg_similarity ?? 0,
-        disclaimer: confidence_disclaimer ?? null,
-      }
-    }
-    return mapped
-  })
+  }
+  return mapped
+}
+
+export async function getMessages(threadId: string, signal?: AbortSignal): Promise<Message[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/messages`, { headers, signal })
+  if (!res.ok) throw new Error("Failed to get messages")
+  const data = await res.json() as MessageResponseDTO[]
+  // Phase 075 D-075-03: delegate to shared mapper so getSnapshot reuses it
+  // byte-identically.
+  return data.map(_mapMessageResponse)
 }
 
 export async function listModels(): Promise<{ models: string[]; default: string }> {
@@ -156,6 +160,19 @@ export interface ActiveRun {
   run_id: string
   started_at: string
   status: "streaming"
+}
+
+/** Phase 075 D-075-01: ThreadSnapshotResponse mirror. One-round-trip reconcile
+ * primitive — backend GET /threads/{tid}/snapshot composes messages +
+ * active_runs + per-run since_cursors into a single fetch. The frontend
+ * StreamsProvider.reconcile swaps its 3-call chain for a single getSnapshot()
+ * call (D-075-02 atomic swap). since_cursors map keys are run_ids; values are
+ * Redis stream cursor strings (e.g., "1731936000000-0" or "0").
+ */
+export interface ThreadSnapshot {
+  messages: Message[]
+  active_runs: ActiveRun[]
+  since_cursors: Record<string, string>
 }
 
 /** Phase 063 / Phase 066: callback shape for subscribeToRun. Mirrors the legacy POST-stream
@@ -391,6 +408,14 @@ export async function subscribeToRun(
           callbacks.onTerminal("done")
           return
         } else if (t === "error") {
+          // Phase 075 D-075-13: buffer_expired_* errors stay terminal at the
+          // api.ts layer (faithful SSE-to-callback bridge). The
+          // transient/recoverable decision is made in the StreamsProvider
+          // onTerminal consumer (075-PATTERNS.md §12 — consumer-side
+          // layering chosen over api.ts remap). The full error payload
+          // (including the new D-075-13 recently_active + runs_status
+          // discriminator fields) is passed through verbatim as the
+          // parsed.error string so the consumer can inspect it.
           callbacks.onTerminal("error", parsed.error as string | undefined)
           return
         } else if (t === "timed_out") {
@@ -464,6 +489,41 @@ export async function getActiveRuns(
   })
   if (!res.ok) throw new Error("Failed to list active runs")
   return (await res.json()) as ActiveRun[]
+}
+
+/** Phase 075 D-075-01 + D-075-02: one-round-trip reconcile primitive.
+ *
+ * Replaces the parallel Promise.all([getActiveRuns, loadMessages]) at
+ * StreamsProvider.reconcile (tsx:478-485) with a single fetch. Server-derived
+ * since_cursors seed lastSeenOffsetRef on first attach (existing client
+ * cursors win on subsequent reconciles per D-075-01). getMessages and
+ * getActiveRuns stay exported (used outside the reconcile hot path per
+ * D-075-02 — no removal).
+ *
+ * Backend returns 404 on cross-user (T-062-01) and 503 + Retry-After: 10 on
+ * Redis-down (D-062-13). Both surface as a generic Error to the caller; the
+ * StreamsProvider consumer routes via its existing error handler.
+ */
+export async function getSnapshot(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<ThreadSnapshot> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/snapshot`, {
+    headers,
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to fetch snapshot (status ${res.status})`)
+  const data = (await res.json()) as {
+    messages: MessageResponseDTO[]
+    active_runs: ActiveRun[]
+    since_cursors: Record<string, string>
+  }
+  return {
+    messages: data.messages.map(_mapMessageResponse),
+    active_runs: data.active_runs,
+    since_cursors: data.since_cursors,
+  }
 }
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the
