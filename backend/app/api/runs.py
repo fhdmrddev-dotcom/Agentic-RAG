@@ -77,7 +77,15 @@ logger = logging.getLogger(__name__)
 #   - Break on first TERMINAL_TYPES entry
 #   - finally: pass (D-061-03 — consumer disconnect MUST NOT cancel producer)
 # ───────────────────────────────────────────────────────────────────────
-async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
+async def replay_tail_consumer(
+    redis,
+    run_id: UUID,
+    since: str,
+    settings,
+    *,
+    supabase: Client | None = None,
+    user_id: str | None = None,
+):
     """Two-mode XREAD consumer with `since` cursor (D-062-05/07).
 
     Mirrors app.api.threads.event_consumer verbatim except for the initial
@@ -85,6 +93,15 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
     Multi-consumer fan-out is implicit at the Redis layer: XREAD is non-
     destructive, so any number of replay_tail_consumer instances on the
     same run_id receive identical sequences (foundation for SC#4).
+
+    Phase 075 D-075-13 / BUG-260518-01: when the buffer expires mid-tail,
+    we now probe `public.runs.status` (when supabase + user_id are
+    provided) to distinguish a heartbeat-gap during an in-flight cell from
+    a genuine TTL-expiry. The discriminator is added to the SSE error
+    payload as `recently_active` (bool) + `runs_status` (str | None) so
+    the frontend can re-attach instead of flipping the Resume button on.
+    `supabase` / `user_id` are keyword-only so legacy callers (which pass
+    none) still work — they just get the fail-safe terminal-flip behavior.
     """
     stream_key = f"run:{run_id}"
     last_id = since
@@ -226,11 +243,48 @@ async def replay_tail_consumer(redis, run_id: UUID, since: str, settings):
                 # deadline. Emit a synthetic terminal-shaped error event and
                 # return so the client gets a clean close instead of waiting
                 # the full consumer_timeout_seconds for this consumer.
+                #
+                # Phase 075 D-075-13 / BUG-260518-01: distinguish heartbeat-gap
+                # from genuine TTL-expiry. The runs row outlives the Redis
+                # buffer (D-062-06); a streaming row + missing key means the
+                # producer is mid-cell (long execute_code or silent matplotlib
+                # render) and the frontend should re-attach, not flip Resume on.
+                # Inline payload extension chosen over a second consumer-side
+                # decoder (075-PATTERNS.md §8 option (a)); mirrors
+                # _synthetic_terminal_generator at runs.py:298-319 which
+                # already reads runs.status for the TTL-expired-after-completion
+                # case. Fail-safe on probe error: fall through to terminal-flip
+                # behavior (recently_active=False, runs_status=None).
                 try:
                     if not await redis.exists(stream_key):
+                        runs_status: str | None = None
+                        recently_active: bool = False
+                        if supabase is not None and user_id is not None:
+                            try:
+                                probe = await aexec(
+                                    supabase.table("runs")
+                                    .select("status")
+                                    .eq("run_id", str(run_id))
+                                    .eq("user_id", user_id)
+                                    .maybe_single()
+                                )
+                                probe_row = probe.data if probe is not None else None
+                                if probe_row:
+                                    runs_status = probe_row.get("status")
+                                    recently_active = runs_status == "streaming"
+                            except Exception:
+                                # Fail-safe to terminal-flip on Postgres probe error.
+                                # T-073-04 / D-074-03: identifier-only format string.
+                                logger.exception(
+                                    "runs.status probe failed for run=%s during "
+                                    "buffer_expired_during_tail",
+                                    run_id,
+                                )
                         yield {"data": json.dumps({
                             "type": "error",
                             "error": "buffer_expired_during_tail",
+                            "runs_status": runs_status,
+                            "recently_active": recently_active,
                         })}
                         return
                 except asyncio.CancelledError:
@@ -375,7 +429,17 @@ async def stream_run(
     # breaks naturally and the response closes (D-062-05).
     if buffer_exists:
         return EventSourceResponse(
-            replay_tail_consumer(redis=redis, run_id=run_id, since=since, settings=settings),
+            # Phase 075 D-075-13: pass supabase + user_id so the consumer can
+            # distinguish heartbeat-gap from genuine TTL-expiry on
+            # buffer_expired_during_tail (BUG-260518-01 backend half).
+            replay_tail_consumer(
+                redis=redis,
+                run_id=run_id,
+                since=since,
+                settings=settings,
+                supabase=supabase,
+                user_id=current_user["id"],
+            ),
             ping=None,
         )
 
