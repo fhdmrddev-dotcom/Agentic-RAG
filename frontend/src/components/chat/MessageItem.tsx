@@ -1,3 +1,4 @@
+import { useRef } from "react"
 import { Bot, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,40 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
           : `${toolLabel(activeTool.name)}…`
       })()
     : null
+
+  // Phase 075 D-075-14 (a) — BUG-260514-03 sticky bottom-indicator text.
+  // outerBannerLabel(activeTool, hasAnyTools, …) can transiently return null
+  // between macro-state transitions inside a long tool call (notably during
+  // a silent matplotlib render window where no fresh state-change event arrives
+  // — the prior 169-second chart cell repro). Without retention the bottom
+  // indicator clears to blank and the user reads "stuck."
+  //
+  // Behavior: while isStreaming, retain the last non-null computed label and
+  // render it when computedLabel is null. On terminal (isStreaming === false)
+  // reset the sticky ref so the next stream starts fresh.
+  //
+  // Part (b) of D-075-14 — re-anchor on code_stdout — is covered implicitly:
+  // each new code_stdout SSE event mutates the active tool_call's outputLines
+  // (StreamsProvider.tsx:310-322 onCodeStdout handler), which re-renders
+  // MessageItem; the recompute below picks up activeTool and refreshes the
+  // sticky text. No explicit subscription needed in this component — the
+  // tool-call mutation IS the subscription.
+  const stickyLabelRef = useRef<string | null>(null)
+  const computedLabel = isStreaming
+    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
+    : null
+  if (isStreaming && computedLabel !== null) {
+    stickyLabelRef.current = computedLabel
+  } else if (!isStreaming) {
+    stickyLabelRef.current = null
+  }
+  const stickyBottomLabel: string | null = isStreaming
+    ? (computedLabel ?? stickyLabelRef.current)
+    : message.runStatus === "timed_out"
+      ? "Agent reached time limit"
+      : message.runStatus === "cancelled" || message.stopped
+        ? "Response stopped"
+        : null
 
   return (
     <div
@@ -144,15 +179,12 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
           // Shown regardless of isStreaming so SSE drops don't cause a blank
           <span className="flex items-center gap-2 text-muted-foreground text-sm mt-1.5 animate-fadeSlideUp">
             {isStreaming && <Loader2 className="w-3.5 h-3.5 animate-spin text-primary flex-shrink-0" />}
-            <span className="italic">
-              {isStreaming
-                ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
-                : message.runStatus === "timed_out"
-                  ? "Agent reached time limit"   /* Phase 066 D-066-10 — system per-LLM-call deadline fired */
-                  : message.runStatus === "cancelled" || message.stopped
-                    ? "Response stopped"          /* user clicked Stop (D-066-10); stopped fallback for legacy pre-runStatus rows */
-                    : null /* D-067-02: no mid-stream chrome — terminal states only carry text. Match Claude/ChatGPT. */}
-            </span>
+            {/* Phase 075 D-075-14 / BUG-260514-03: stickyBottomLabel retains the
+                last non-null label across silent windows inside long tool calls
+                (matplotlib renders, sandbox time.sleep, etc.) so the bottom
+                indicator no longer goes blank. Computed above the JSX —
+                see stickyLabelRef comment block. */}
+            <span className="italic">{stickyBottomLabel}</span>
             {isStreaming && (
               <span className="flex gap-1 items-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
