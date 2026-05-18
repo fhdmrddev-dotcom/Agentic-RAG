@@ -2352,27 +2352,78 @@ async def send_message(
                                     # `start_time` was captured at line 2086. The pre-existing
                                     # 10 s keepalive cadence (D-061-10 SSE-timeout protection) is
                                     # preserved by tracking `_heartbeat_last`.
-                                    _heartbeat_last = time_mod.time()
+                                    # Phase 075 D-075-06 + D-075-08: line-buffered per-line emit
+                                    # + silent-window heartbeat. Docker streams stdout as bytes
+                                    # chunks (not always per-line); the accumulator splits each
+                                    # chunk on '\n', emits one code_stdout SSE event per complete
+                                    # line, and retains the trailing partial for the next chunk.
+                                    # On _done we flush any trailing partial BEFORE breaking so no
+                                    # line is dropped. The heartbeat fires only during silent
+                                    # windows (≥1s with no stdout/stderr); _last_output_at is
+                                    # reset ONLY by stdout_chunk/stderr_chunk handlers (Pitfall 7
+                                    # — never by the heartbeat itself, otherwise silent workloads
+                                    # would emit one heartbeat at +1s then go dead).
+                                    _stdout_partial = ""
+                                    _stderr_partial = ""
+                                    _last_output_at = time_mod.time()
+                                    _heartbeat_last = time_mod.time()  # 10s keepalive cadence — preserved from D-061-10
                                     _HEARTBEAT_INTERVAL_S = 1.0
                                     while True:
                                         try:
-                                            # D-067.4-R5-01: tighten the wait_for budget to
-                                            # honor the heartbeat cadence; the 10 s keepalive
-                                            # is preserved by tracking last keepalive below.
                                             item = await asyncio.wait_for(sandbox_queue.get(), timeout=_HEARTBEAT_INTERVAL_S)
                                         except asyncio.TimeoutError:
                                             now = time_mod.time()
-                                            elapsed = now - start_time
-                                            await _emit(redis, run_id, 'code_executing',
-                                                        tool_index=tool_index, elapsed_seconds=round(elapsed, 1))
-                                            # Preserve 10 s keepalive cadence (D-061-10).
+                                            # D-075-08: heartbeat ONLY during silent windows (≥1s
+                                            # with no stdout/stderr). Pitfall 7: do NOT reset
+                                            # _last_output_at here — only stdout/stderr chunks
+                                            # reset it. SC #4 invariant: silent time.sleep(5)
+                                            # cell emits ≥4 code_executing events; chatty cell
+                                            # emits 0 because every chunk resets the clock.
+                                            if now - _last_output_at >= _HEARTBEAT_INTERVAL_S:
+                                                elapsed = now - start_time
+                                                await _emit(redis, run_id, 'code_executing',
+                                                            tool_index=tool_index, elapsed_seconds=round(elapsed, 1))
+                                            # Preserve 10s keepalive cadence (D-061-10) unchanged.
                                             if now - _heartbeat_last >= 10.0:
                                                 await _emit(redis, run_id, 'keepalive')
                                                 _heartbeat_last = now
                                             continue
+
                                         if item["type"] == "_done":
+                                            # D-075-07: flush trailing partial lines BEFORE break
+                                            # so monotonic captured_at holds and no line is dropped.
+                                            if _stdout_partial:
+                                                await _emit(redis, run_id, "code_stdout",
+                                                            content=_stdout_partial, captured_at=time_mod.time())
+                                                _stdout_partial = ""
+                                            if _stderr_partial:
+                                                await _emit(redis, run_id, "code_stderr",
+                                                            content=_stderr_partial, captured_at=time_mod.time())
+                                                _stderr_partial = ""
                                             break
-                                        await _emit(redis, run_id, item['type'], **{k: v for k, v in item.items() if k != 'type'})
+
+                                        if item["type"] == "stdout_chunk":
+                                            _last_output_at = item["captured_at"]
+                                            # Normalize CRLF → LF so Windows-style line endings
+                                            # don't leak as bare '\r'.
+                                            combined = (_stdout_partial + item["content"]).replace("\r\n", "\n")
+                                            lines = combined.split("\n")
+                                            _stdout_partial = lines.pop()   # trailing partial (may be "")
+                                            for line in lines:
+                                                await _emit(redis, run_id, "code_stdout",
+                                                            content=line, captured_at=item["captured_at"])
+                                        elif item["type"] == "stderr_chunk":
+                                            _last_output_at = item["captured_at"]
+                                            combined = (_stderr_partial + item["content"]).replace("\r\n", "\n")
+                                            lines = combined.split("\n")
+                                            _stderr_partial = lines.pop()
+                                            for line in lines:
+                                                await _emit(redis, run_id, "code_stderr",
+                                                            content=line, captured_at=item["captured_at"])
+                                        else:
+                                            # Safety net: any other item type flows through the
+                                            # generic emit (none today; future-proof).
+                                            await _emit(redis, run_id, item['type'], **{k: v for k, v in item.items() if k != 'type'})
 
                                     exec_result = await fut
                                     end_time = time_mod.time()
