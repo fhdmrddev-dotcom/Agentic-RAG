@@ -51,30 +51,48 @@
 **Symptoms:** During the execute_code step, the SSE stream's stream-end pattern surfaces the "Resume run" button **while backend is still alive**. Plan 01's `_isTransientBufferExpired` filter doesn't match OpenRouter's stream-end format.
 **Fix surface:** `frontend/src/providers/StreamsProvider.tsx:104-117` — widen the transient filter to probe `/snapshot` on (a) `kind === "done"` when any tool_call.status is `running`/`preparing`, AND (b) any error payload when the run started recently AND no terminal frame was emitted yet. Pairs naturally with SSE-DEBUG agent's Layer A fix.
 
-### B-260519-04 — LangSmith provider mislabeling (observability)
-**Severity:** info
-**Trigger:** Any LLM call using Anthropic or OpenRouter as the provider.
-**Symptoms:** All LangSmith traces are labeled `name: ChatOpenAI` and `extra.metadata.ls_provider: openai` regardless of actual provider. The `ls_model_name` field IS correct (so cost analysis still works), but the `name` and `ls_provider` fields make provider-specific debugging confusing.
-**Evidence:** Trace breakdown across all 3 rounds:
-```
-9  openai/gpt-5.4-mini/ChatOpenAI
-8  openai/gpt-4.1/ChatOpenAI
-6  openai/gpt-5.4/ChatOpenAI
-5  openai/moonshotai/kimi-k2.6:exacto/ChatOpenAI    ← OpenRouter mis-tagged
-3  openai/claude-haiku-4-5-20251001/ChatOpenAI      ← Anthropic mis-tagged
-```
-**Fix surface:** Wherever LangSmith tracing is initialized in the backend (likely `anthropic_service.py` for Anthropic + the OpenRouter routing layer). Set `ls_provider` and trace `name` per-provider.
+### B-260519-04 — LangSmith Anthropic main-loop is UNTRACED + provider mislabel for traced calls (REFRAMED after code review)
+**Severity:** major (was: info — escalated after finding the Anthropic gap)
+**Trigger:** Any LLM call using Anthropic as the provider; secondary mislabel issue affects any non-OpenAI provider.
+**Root cause from code (verified):**
+- LangSmith tracing is wired via `wrap_openai(client)` at `backend/app/services/openai_service.py:539-540` — it ONLY wraps the OpenAI client.
+- Anthropic main-loop uses raw `anthropic.Anthropic` SDK at `backend/app/services/anthropic_service.py:128` (`stream_anthropic`). It is **NOT WRAPPED**. Confirmed by inline comment at `backend/app/api/threads.py:1567-1573`: "anthropic_service.py uses raw anthropic.Anthropic — the GeneratorExit-trace pollution is OpenAI-only".
+- → **Result: Anthropic main-loop calls do NOT appear in LangSmith at all.** Total observability gap.
+- The Haiku traces I saw for Anthropic Round 2 are the SUB-AGENT only (which uses the OpenAI client even for Anthropic, against an OpenAI-compatible endpoint — see `sub_agent_service.py:40` + `openai_service.get_llm_client`). Those traces ARE wrapped, hence labeled `ChatOpenAI`.
+- For OpenRouter (OpenAI-compatible API), wrap_openai catches everything, but the trace name and `ls_provider` are hardcoded to "openai".
+**Fix surface:**
+- (a) Add LangSmith wrapping to the Anthropic path. Options: use `langsmith.wrappers.wrap_anthropic` (if available in the installed langsmith version), OR wrap the streaming calls with `@traceable(name="ChatAnthropic", run_type="llm")`. Closes the Anthropic blind-spot.
+- (b) Set `ls_provider` and trace `name` per actual provider (don't rely on the wrap_openai default labels).
+- Both fixes are small, independent, and high-value for debugging future provider-specific issues.
 
-### B-260519-05 — User-selected model not propagated; sub-agents force cheaper model invisibly
-**Severity:** major (cost + behavior surprise)
-**Trigger:** Select `claude-sonnet-4-6` or `gpt-5.4` in the UI; observe LangSmith.
-**Symptoms:**
-- Anthropic Round 2: user selected `claude-sonnet-4-6`, ALL LangSmith traces are `claude-haiku-4-5-20251001`. Sonnet was NEVER called.
-- OpenAI Round 1: user selected `gpt-5.4`, main loop is `gpt-5.4` (correct), but sub-agents for `analyze_document` are silently `gpt-5.4-mini`.
-**Suspected cause:** Two issues:
-- (a) Sub-agent infrastructure unilaterally downgrades to the cheaper sibling for tool sub-calls — undocumented in UI, no override.
-- (b) For Anthropic, the MAIN loop is also downgrading. Either the model-routing config has a stale default for Anthropic, or the UI's selection isn't reaching the agent-runner.
-**Fix surface:** `backend/app/api/threads.py` agent-runner — surface user-selected model to main loop; expose sub-agent model as a separate config; log "user requested {sonnet-4-6}, downgrading sub-agent to {haiku}" so behavior is auditable.
+### B-260519-05 — Sub-agent silently downgrades to cheaper model; no UI surface (REFRAMED — by design, but invisible)
+**Severity:** major (was: major — same severity, refined cause)
+**Trigger:** Any agentic loop that invokes a sub-agent tool (currently only `analyze_document`).
+**Root cause from code (verified):**
+- `backend/app/config.py:255-261` defines `_SUB_AGENT_MODEL_DEFAULTS`:
+  ```python
+  {"anthropic": "claude-haiku-4-5-20251001",
+   "openai":    "gpt-5.4-mini",
+   "google":    "gemini-2.5-flash",
+   "openrouter": "",   # falls back to user's selected model
+   "ollama":    ""}
+  ```
+- `backend/app/services/sub_agent_service.py:46-61` applies this default when no explicit override (`user_settings.sub_agent_model` or `settings.sub_agent_model`) exists.
+- Inline comment at `sub_agent_service.py:43-46` justifies the design: *"Sub-agents always use their dedicated model — the main agent handles generation. Escalating to the orchestrator model caused sub-agents to use the expensive main model (e.g. gpt-4.1) even for pure document analysis tasks, burning TPM quota."*
+- **The MAIN loop IS using the user-selected model correctly** — verified at `threads.py:1545`: `_model_id = body.model or user_settings.llm_model` is passed to `stream_anthropic(model=_model_id, ...)`. So Anthropic Round 2's main loop DID use Sonnet-4-6 (it's just invisible per B-260519-04).
+- **The sub-agent downgrade is intentional cost optimization** but: (1) the user has no way to know it's happening, (2) `_SUB_AGENT_MODEL_DEFAULTS` is a flat per-provider mapping with no per-task routing.
+
+**Best practice for sub-agent model assignment** (from research):
+- ✓ **Per-task routing** — cheap models (Haiku, mini, flash) for extraction/summarization; capable models for reasoning, coding, planning. The current single-tier-per-provider mapping handles `analyze_document` well (extraction is Haiku-appropriate) but won't scale gracefully as more sub-agent tools are added.
+- ✓ **Transparency in UI** — surface the sub-agent model in the tool card metadata. Right now the user sees "Analyzing document — Fahed Mrad Chapters 1 to 4.docx — 79.9s" with no indication that Haiku was used instead of their selected Sonnet.
+- ✓ **User-overridable** — `user_settings.sub_agent_model` already exists as an override knob, but isn't exposed in the Settings UI.
+- ✓ **Logged + auditable** — log an info line per sub-agent invocation: `sub-agent invoked tool=analyze_document main_model=claude-sonnet-4-6 sub_model=claude-haiku-4-5-20251001 reason=cost_default`. Currently silent.
+
+**Fix surface:** Three layers, can ship in Plan 04:
+- Backend: add an info log per sub-agent invocation with both models + reason.
+- Frontend: include the sub-agent model in the tool-card hover/expand view (read from existing tool_call metadata; backend needs to add a `sub_agent_model` field to the tool_call result payload).
+- Settings UI: expose `sub_agent_model` override with helpful defaults + a "Use main model" escape hatch.
+- (Future scope, not Plan 04): per-tool routing config (`sub_agent_models: { analyze_document: "haiku", reasoning_task: "sonnet" }`) — defer to a Skill Studio or Settings polish phase.
 
 ### B-260519-06 — Frontend isStreaming state diverges from backend active_runs over long runs
 **Severity:** major
@@ -164,17 +182,21 @@
 - Fix MessageItem.tsx sticky-cache reset trigger: change from provider-level `isStreaming` to per-message `runStatus` terminal state (per INDICATOR-DEBUG agent's diagnosis)
 - Add an Anthropic-specific Chrome MCP UAT scenario as regression guard
 
-### Plan 04 — Observability + polish (LOW PRIORITY but cheap)
-**Scope:** Backend + frontend, small footprint. Closes the rest.
+### Plan 04 — Observability + sub-agent transparency + polish (MEDIUM PRIORITY after the routing audit)
+**Scope:** Backend + frontend, small surface, high information density. Closes the remaining 7 bugs.
 - Delete stale `loadMessages(thread.id)` at `ChatArea.tsx:166` — closes Test 2 dual-`/messages` (per MESSAGES-DEBUG agent's single-line fix)
 - Snapshot endpoint: skip Redis probe when `active_runs == []` — closes B-260519-02
-- LangSmith tracing: set `ls_provider` + trace `name` per-provider — closes B-260519-04
-- Sub-agent model: surface in UI OR document the downgrade clearly, AND fix Anthropic main-loop model routing — closes B-260519-05
-- System prompt: add "if you hit ImportError, try `pip install <pkg>`" — closes B-260519-08
+- **LangSmith Anthropic wrap** — add `@traceable(name="ChatAnthropic", run_type="llm")` (or `wrap_anthropic` if available in the installed langsmith) to `anthropic_service.stream_anthropic`. **High-priority sub-bug** of B-260519-04 because it makes Anthropic runs un-debuggable today.
+- LangSmith provider/name tagging — set `ls_provider` and trace `name` per actual provider; remove the hardcoded `ChatOpenAI` label for non-OpenAI calls — closes B-260519-04
+- **Sub-agent transparency** — backend: log `sub-agent invoked tool=X main_model=Y sub_model=Z reason=cost_default` per invocation. Frontend: surface `sub_agent_model` in the tool-card metadata (read from new field on tool_call payload). Settings UI: expose the `sub_agent_model` override knob (already exists at `user_settings.sub_agent_model`, just not in UI). Closes B-260519-05 with current design intact.
+- System prompt: add "if you hit ImportError, try `pip install <pkg>` first" — closes B-260519-08
 - System prompt: add "always write outputs to `/sandbox/output/`" — partially closes B-260519-09 (a)
-- Audit code_stdout vs code_stderr styling in frontend — closes B-260519-07
+- Audit `code_stdout` vs `code_stderr` styling in `frontend/src/components/chat/` — closes B-260519-07
 - Pre-install `python-pptx`, `matplotlib`, `numpy`, `pandas` in the sandbox Docker image — eliminates B-260519-08 root cause + speeds up Rounds 2+3 by ~15s each
-- Optional: ToolCallPanel de-duplication keyed on tool_call_id — closes B-260519-10
+- ToolCallPanel de-duplication keyed on `tool_call_id` — closes B-260519-10
+
+### Deferred from Plan 04 (out of scope for 075.1)
+- Per-tool sub-agent model routing (e.g., `analyze_document → Haiku`, `code_planning → Sonnet`). Today's flat per-provider default is fine for the single sub-agent tool we have. Revisit in Skill Studio or Settings polish milestone.
 
 ### Execution order
 - **Plan 02 first** (backend root cause) — once `harvest_output_files` is in threadpool, the SSE stream stays alive long enough for the terminal frame to arrive; many downstream symptoms vanish.
