@@ -56,33 +56,54 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
       })()
     : null
 
-  // Phase 075 D-075-14 (a) — BUG-260514-03 sticky bottom-indicator text.
-  // outerBannerLabel(activeTool, hasAnyTools, …) can transiently return null
-  // between macro-state transitions inside a long tool call (notably during
-  // a silent matplotlib render window where no fresh state-change event arrives
-  // — the prior 169-second chart cell repro). Without retention the bottom
-  // indicator clears to blank and the user reads "stuck."
+  // Phase 075.1 Plan 03 Task 2 — BUG-260514-03 + B-260519-07 indicator portion.
+  // Phase 075 D-075-14 (a) introduced a sticky bottom-indicator cache that
+  // retained the last non-null `outerBannerLabel(...)` value across silent
+  // windows inside long tool calls so the bottom indicator wouldn't go blank
+  // (notably during silent matplotlib render windows where no fresh
+  // state-change event arrives — the prior 169-second chart cell repro).
   //
-  // Behavior: while isStreaming, retain the last non-null computed label and
-  // render it when computedLabel is null. On terminal (isStreaming === false)
-  // reset the sticky ref so the next stream starts fresh.
+  // Phase 075 used the provider-level `isStreaming` prop as the cache reset
+  // trigger. That breaks under PARALLEL runs on the same surface: when ANY
+  // run completes, isStreaming flips false and the sticky cache resets for
+  // THIS message — even when this message's own runStatus is still
+  // "streaming" (B-260519-07 / Plan 075-INDICATOR-DEBUG diagnosis).
+  //
+  // Plan 03 swaps the gating signal to per-message `runStatus`. The literal
+  // codebase enum values (frontend/src/types/index.ts:113) are:
+  //   "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
+  //
+  // Reset trigger (post-Plan-03):
+  //   - runStatus === "streaming"  → retain (regardless of isStreaming)
+  //   - runStatus terminal (completed/failed/cancelled/timed_out) → reset
+  //   - runStatus === undefined    → treat as terminal (legacy DB-loaded row;
+  //     matches the Phase 075 isStreaming==false behavior for those rows)
   //
   // Part (b) of D-075-14 — re-anchor on code_stdout — is covered implicitly:
   // each new code_stdout SSE event mutates the active tool_call's outputLines
-  // (StreamsProvider.tsx:310-322 onCodeStdout handler), which re-renders
-  // MessageItem; the recompute below picks up activeTool and refreshes the
-  // sticky text. No explicit subscription needed in this component — the
-  // tool-call mutation IS the subscription.
+  // (StreamsProvider.tsx onCodeStdout handler), which re-renders MessageItem;
+  // the recompute below picks up activeTool and refreshes the sticky text.
+  // No explicit subscription needed in this component — the tool-call
+  // mutation IS the subscription.
+  //
+  // Note on the JSX gating downstream (lines 181, 188, 214, 221): the dots
+  // animation + spinner remain gated on the provider-level `isStreaming` —
+  // it's correct to hide the spinner when no run is active anywhere on the
+  // surface, even if the sticky label is still rendered. During a silent
+  // window for THIS message after another concurrent run completed, the
+  // label keeps showing without the spinner — the correct UX per
+  // B-260519-07 indicator-portion scope.
   const stickyLabelRef = useRef<string | null>(null)
-  const computedLabel = isStreaming
+  const isMessageStreaming = message.runStatus === "streaming"
+  const computedLabel = isMessageStreaming
     ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
     : null
-  if (isStreaming && computedLabel !== null) {
+  if (isMessageStreaming && computedLabel !== null) {
     stickyLabelRef.current = computedLabel
-  } else if (!isStreaming) {
+  } else if (!isMessageStreaming) {
     stickyLabelRef.current = null
   }
-  const stickyBottomLabel: string | null = isStreaming
+  const stickyBottomLabel: string | null = isMessageStreaming
     ? (computedLabel ?? stickyLabelRef.current)
     : message.runStatus === "timed_out"
       ? "Agent reached time limit"
