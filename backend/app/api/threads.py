@@ -733,6 +733,20 @@ async def get_snapshot(
     )
     active_runs = runs_resp.data or []
 
+    # Phase 075.1 Plan 04 (B-260519-02) — short-circuit when there are no
+    # active runs to probe. The empty for-loop below is already a no-op, but
+    # the explicit early-return locks in the intent: brand-new threads with
+    # zero rows in `runs` MUST return 200 with empty since_cursors WITHOUT
+    # touching Redis at all. Future refactors that add unconditional Redis
+    # work in this branch (e.g. cleanup probes) would otherwise re-introduce
+    # the 503-on-empty-thread regression UAT B-260519-02 observed.
+    if not active_runs:
+        return {
+            "messages": messages,
+            "active_runs": [],
+            "since_cursors": {},
+        }
+
     # Step 4: per-active-run since_cursors via xinfo_stream (D-075-01).
     # On any Redis failure (RedisError / TimeoutError / OSError), the entire
     # endpoint returns 503 + Retry-After: 10 — no partial/degraded shape
@@ -2121,6 +2135,22 @@ async def send_message(
                                         })
                                         await _emit(redis, run_id, 'sub_agent_start', filename=doc['filename'], task=args['task'])
                                         sub_agent_content = ""
+                                        # Phase 075.1 Plan 04 (B-260519-05) — capture the effective
+                                        # model resolved by sub_agent_service so we can surface it
+                                        # in persisted_tool_calls (spread below) and in the
+                                        # frontend tool-card. Mirrors sub_agent_service.run_sub_agent's
+                                        # resolution rules (user override > env override > provider default).
+                                        _sub_agent_effective_model = (
+                                            (user_settings.sub_agent_model if user_settings else "")
+                                            or settings.sub_agent_model
+                                            or _SUB_AGENT_MODEL_DEFAULTS.get(
+                                                getattr(user_settings, "active_provider", "") or "",
+                                                "",
+                                            )
+                                            or (user_settings.llm_model if user_settings else "")
+                                            or body.model
+                                            or settings.llm_model
+                                        )
                                         try:
                                             for text_chunk in run_sub_agent(doc["content"], doc["filename"], args["task"], model=body.model, user_settings=user_settings):
                                                 # Detect fallback sentinel emitted by sub_agent_service
@@ -2128,6 +2158,10 @@ async def send_message(
                                                     try:
                                                         sentinel = json.loads(text_chunk)
                                                         await _emit(redis, run_id, 'fallback_model', original_model=sentinel['original_model'], fallback_model=sentinel['fallback_model'])
+                                                        # The fallback model actually ran the request — update
+                                                        # the effective model so the persisted payload reflects
+                                                        # what produced the content.
+                                                        _sub_agent_effective_model = sentinel.get('fallback_model', _sub_agent_effective_model)
                                                     except (json.JSONDecodeError, KeyError):
                                                         pass
                                                     continue
@@ -2139,7 +2173,12 @@ async def send_message(
                                                 sub_agent_content = f"Sub-agent analysis failed: {sa_err}"
                                         await _emit(redis, run_id, 'sub_agent_done')
                                         tool_result = sub_agent_content
-                                        sub_agent_record = {"filename": doc["filename"], "task": args["task"], "content": sub_agent_content}
+                                        sub_agent_record = {
+                                            "filename": doc["filename"],
+                                            "task": args["task"],
+                                            "content": sub_agent_content,
+                                            "effective_model": _sub_agent_effective_model,
+                                        }
                             elif tool_name == "load_skill":
                                 skill_name = args.get("skill_name", "")
                                 # Emit skill_activated SSE event immediately (SKIL-12)
@@ -2811,6 +2850,11 @@ async def send_message(
                             "result": persisted_result,
                             "status": "done",
                             **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
+                            # Phase 075.1 Plan 04 (B-260519-05) — surface the resolved
+                            # sub-agent model id in the tool_call_result payload so the
+                            # frontend tool-card can render "Sub-agent: {model_id}" and
+                            # the user sees the silent downgrade transparency.
+                            **({"sub_agent_model": sub_agent_record.get("effective_model", "")} if sub_agent_record else {}),
                         })
                     # Continue to next iteration to let LLM respond with tool results in context
 

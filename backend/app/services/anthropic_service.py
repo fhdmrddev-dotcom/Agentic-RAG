@@ -25,6 +25,21 @@ import anthropic
 
 from app.config import settings
 
+# Phase 075.1 Plan 04 (B-260519-04) — LangSmith @traceable wrap for the
+# Anthropic main-loop generator. langsmith.wrappers.wrap_anthropic is NOT
+# available in the installed langsmith version (verified at plan-time),
+# so we use the @traceable decorator path. @traceable handles generator
+# functions per langsmith docs — captures inputs at call entry, run_type
+# = "llm" surfaces the call in the LangSmith UI under the LLM trace bucket
+# distinguishable from the OpenAI-path's wrap_openai-tagged traces.
+try:
+    from langsmith import traceable as _ls_traceable
+except ImportError:  # pragma: no cover — langsmith always installed in prod
+    def _ls_traceable(*_args, **_kwargs):  # type: ignore[no-redef]
+        def _wrap(fn):
+            return fn
+        return _wrap
+
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
@@ -125,6 +140,7 @@ def _convert_tools_to_anthropic(tools: list[dict]) -> list[dict]:
     return anthropic_tools
 
 
+@_ls_traceable(name="ChatAnthropic", run_type="llm")
 def stream_anthropic(
     messages: list[dict],
     tools: list[dict],

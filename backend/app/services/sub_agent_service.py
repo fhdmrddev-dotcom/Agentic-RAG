@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import openai
 from typing import TYPE_CHECKING, Generator
 
@@ -11,6 +12,8 @@ from app.services.openai_service import get_llm_client, _uses_max_completion_tok
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
+
+logger = logging.getLogger(__name__)
 
 
 @traceable(name="sub-agent", run_type="llm")
@@ -59,6 +62,24 @@ def run_sub_agent(
             or model
             or settings.llm_model
         )
+
+    # Phase 075.1 Plan 04 (B-260519-05) — log per sub-agent invocation. Surfaces
+    # the model downgrade that was silent in Phase 075. Identifier-only fields
+    # per T-073-04 / D-074-03 — never log prompt content. Today's only
+    # sub-agent tool is `analyze_document`; expand the literal when more land.
+    _main_model = (user_settings.llm_model if user_settings else None) or settings.llm_model or ""
+    _reason = (
+        "user_settings_override" if (user_settings and user_settings.sub_agent_model)
+        else "env_override" if settings.sub_agent_model
+        else "cost_default"
+    )
+    logger.info(
+        "sub-agent invoked tool=%s main_model=%s sub_model=%s reason=%s",
+        "analyze_document",
+        _main_model,
+        effective_model,
+        _reason,
+    )
 
     # Sub-agents get as many tokens as possible for thorough extractions,
     # but capped by the sub-agent model's actual API limit.
