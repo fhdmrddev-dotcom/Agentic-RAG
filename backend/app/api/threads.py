@@ -139,6 +139,58 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     )
 
 
+# Phase 075.1 Plan 02 Task 2 — pure drain step.
+# Deterministic, no async, no Docker. Extracted from the inline
+# accumulator in the sandbox drain loop (`while True` consumer near
+# the execute_code branch) so the line-buffer logic can be exercised
+# by deterministic unit tests at backend/tests/unit/test_075_1_drain_step.py
+# without requiring a running Docker daemon.
+#
+# Contract:
+#   item = {"type": "stdout_chunk"|"stderr_chunk", "content": str, "captured_at": float}
+#   state = {"stdout_partial": str, "stderr_partial": str}
+#   returns (emit_calls, new_state) where each emit_call is a tuple
+#   (event_type, content, captured_at). The caller is responsible for
+#   awaiting `_emit(redis, run_id, event_type, content=..., captured_at=...)`
+#   for each entry and merging new_state back into its loop-local state.
+#
+# Invariants:
+#   - captured_at on emitted tuples is item["captured_at"] verbatim —
+#     never a fresh time.time() reading. This preserves SC #2's
+#     monotonic-captured_at assertion in test_075_code_stdout_progressive.py.
+#   - CRLF normalises to LF before split so Windows-style line endings
+#     don't leak as bare '\r' (D-075-06 + PATTERNS.md §4).
+#   - Unknown item types are no-ops (state passes through unchanged) —
+#     the caller handles _done and other terminal items separately.
+def drain_step(
+    item: dict,
+    state: dict,
+) -> tuple[list[tuple[str, str, float]], dict]:
+    """Pure transform: chunk + state → emit calls + new state."""
+    emit_calls: list[tuple[str, str, float]] = []
+    stdout_partial = state.get("stdout_partial", "")
+    stderr_partial = state.get("stderr_partial", "")
+    item_type = item.get("type")
+    if item_type == "stdout_chunk":
+        captured_at = item["captured_at"]
+        combined = (stdout_partial + item["content"]).replace("\r\n", "\n")
+        lines = combined.split("\n")
+        stdout_partial = lines.pop()
+        for line in lines:
+            emit_calls.append(("code_stdout", line, captured_at))
+    elif item_type == "stderr_chunk":
+        captured_at = item["captured_at"]
+        combined = (stderr_partial + item["content"]).replace("\r\n", "\n")
+        lines = combined.split("\n")
+        stderr_partial = lines.pop()
+        for line in lines:
+            emit_calls.append(("code_stderr", line, captured_at))
+    return emit_calls, {
+        "stdout_partial": stdout_partial,
+        "stderr_partial": stderr_partial,
+    }
+
+
 # Phase 067.1 Plan 01 Track A: drain-into-queue helper.
 #
 # Why this exists: langsmith-py 0.2.3..0.8.2's `_TracedStream.__iter__` is a
@@ -2418,8 +2470,20 @@ async def send_message(
                                     # reset ONLY by stdout_chunk/stderr_chunk handlers (Pitfall 7
                                     # — never by the heartbeat itself, otherwise silent workloads
                                     # would emit one heartbeat at +1s then go dead).
-                                    _stdout_partial = ""
-                                    _stderr_partial = ""
+                                    # Phase 075.1 Plan 02 Task 2: line-buffer state hoisted into
+                                    # a dict that flows through the pure drain_step helper at
+                                    # module scope. Equivalent state shape to the prior
+                                    # `_stdout_partial` / `_stderr_partial` locals — refactor
+                                    # is mechanical, not behavioural.
+                                    _drain_state: dict = {"stdout_partial": "", "stderr_partial": ""}
+                                    # Counters used by the post-completion safety-net at the
+                                    # _done branch (Plan 02 Task 2): if the mid-flight per-line
+                                    # emit path produced ZERO lines but exec_result.stdout has
+                                    # content, emit one consolidated code_stdout so output is
+                                    # never silently lost (defense-in-depth against future
+                                    # regressions in the streaming line-buffer path).
+                                    _emitted_stdout_line_count = 0
+                                    _emitted_stderr_line_count = 0
                                     _last_output_at = time_mod.time()
                                     _heartbeat_last = time_mod.time()  # 10s keepalive cadence — preserved from D-061-10
                                     _HEARTBEAT_INTERVAL_S = 1.0
@@ -2447,34 +2511,58 @@ async def send_message(
                                         if item["type"] == "_done":
                                             # D-075-07: flush trailing partial lines BEFORE break
                                             # so monotonic captured_at holds and no line is dropped.
-                                            if _stdout_partial:
+                                            if _drain_state["stdout_partial"]:
                                                 await _emit(redis, run_id, "code_stdout",
-                                                            content=_stdout_partial, captured_at=time_mod.time())
-                                                _stdout_partial = ""
-                                            if _stderr_partial:
+                                                            content=_drain_state["stdout_partial"],
+                                                            captured_at=time_mod.time())
+                                                _emitted_stdout_line_count += 1
+                                                _drain_state["stdout_partial"] = ""
+                                            if _drain_state["stderr_partial"]:
                                                 await _emit(redis, run_id, "code_stderr",
-                                                            content=_stderr_partial, captured_at=time_mod.time())
-                                                _stderr_partial = ""
+                                                            content=_drain_state["stderr_partial"],
+                                                            captured_at=time_mod.time())
+                                                _emitted_stderr_line_count += 1
+                                                _drain_state["stderr_partial"] = ""
+                                            # Phase 075.1 Plan 02 Task 2 — post-completion
+                                            # safety-net (per 075-CROSS-PROVIDER-UAT.md Plan 02
+                                            # scope). If the mid-flight emit produced ZERO lines
+                                            # but the final exec_result has stdout content, emit
+                                            # ONE consolidated code_stdout so output isn't
+                                            # silently lost. Guards against future regressions
+                                            # in the streaming line-buffer path. Same for stderr.
+                                            # Fires BEFORE break so the terminal frame still
+                                            # ships AFTER the safety-net emit (consumer ordering
+                                            # invariant preserved).
+                                            _exec_result = item.get("result")
+                                            if _exec_result is not None:
+                                                _final_stdout = (getattr(_exec_result, "stdout", "") or "").strip()
+                                                _final_stderr = (getattr(_exec_result, "stderr", "") or "").strip()
+                                                if _emitted_stdout_line_count == 0 and _final_stdout:
+                                                    await _emit(redis, run_id, "code_stdout",
+                                                                content=_final_stdout,
+                                                                captured_at=time_mod.time())
+                                                if _emitted_stderr_line_count == 0 and _final_stderr:
+                                                    await _emit(redis, run_id, "code_stderr",
+                                                                content=_final_stderr,
+                                                                captured_at=time_mod.time())
                                             break
 
-                                        if item["type"] == "stdout_chunk":
+                                        if item["type"] in ("stdout_chunk", "stderr_chunk"):
+                                            # Reset silent-window heartbeat clock on any output
+                                            # (D-075-08 / Pitfall 7 — only stdout/stderr chunks
+                                            # reset it).
                                             _last_output_at = item["captured_at"]
-                                            # Normalize CRLF → LF so Windows-style line endings
-                                            # don't leak as bare '\r'.
-                                            combined = (_stdout_partial + item["content"]).replace("\r\n", "\n")
-                                            lines = combined.split("\n")
-                                            _stdout_partial = lines.pop()   # trailing partial (may be "")
-                                            for line in lines:
-                                                await _emit(redis, run_id, "code_stdout",
-                                                            content=line, captured_at=item["captured_at"])
-                                        elif item["type"] == "stderr_chunk":
-                                            _last_output_at = item["captured_at"]
-                                            combined = (_stderr_partial + item["content"]).replace("\r\n", "\n")
-                                            lines = combined.split("\n")
-                                            _stderr_partial = lines.pop()
-                                            for line in lines:
-                                                await _emit(redis, run_id, "code_stderr",
-                                                            content=line, captured_at=item["captured_at"])
+                                            # Pure helper extracts the line-buffer math into
+                                            # module scope so it's exercised by
+                                            # tests/unit/test_075_1_drain_step.py without Docker.
+                                            emit_calls, _drain_state = drain_step(item, _drain_state)
+                                            for evt_type, content, captured_at in emit_calls:
+                                                await _emit(redis, run_id, evt_type,
+                                                            content=content, captured_at=captured_at)
+                                                if evt_type == "code_stdout":
+                                                    _emitted_stdout_line_count += 1
+                                                else:
+                                                    _emitted_stderr_line_count += 1
                                         else:
                                             # Safety net: any other item type flows through the
                                             # generic emit (none today; future-proof).
@@ -2528,10 +2616,23 @@ async def send_message(
                                     execution_id = exec_row.data[0]["id"] if exec_row.data else None
 
                                     # Harvest output files from container (SAND-07, SAND-08)
+                                    # Phase 075.1 Plan 02 Task 1 — D-v2.5-01 fix
+                                    # (075-CROSS-PROVIDER-UAT.md headline finding):
+                                    # harvest_output_files performs synchronous blocking I/O
+                                    # (Supabase Storage uploads, sandbox_files INSERTs, local
+                                    # file reads) directly on the async event loop. Pre-fix,
+                                    # this starved the SSE keepalive after the cell completed,
+                                    # tearing down the stream before the terminal frame
+                                    # shipped — producing the universal "stuck on Running
+                                    # code until F5" symptom across all three providers
+                                    # (OpenAI, Anthropic, OpenRouter). run_in_threadpool
+                                    # offloads to anyio's worker pool so the loop stays
+                                    # responsive. See CLAUDE.md Rules + D-v2.5-01.
                                     output_file_list = []
                                     if execution_id and actual_exit_code == 0:
-                                        output_file_list = harvest_output_files(
-                                            session, execution_id, current_user["id"], supabase
+                                        output_file_list = await run_in_threadpool(
+                                            harvest_output_files,
+                                            session, execution_id, current_user["id"], supabase,
                                         )
 
                                     # Emit completion event (SAND-06) with file list

@@ -182,6 +182,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [ ] **Phase 073: asyncpg Pool Integration** — Replace sync `supabase-py` calls in streaming endpoint + ingestion task with asyncpg. New `_pg_pool` singleton at `dependencies.py`. Forward-fill `runs.input_tokens` / `runs.output_tokens` from LLM `usage` in the `_drain_stream_with_close_on_cancel` finalize path (TOKEN-COL-01 attaches here — see FLAGS below). (4 plans)
 - [ ] **Phase 074: SEED-009 + SEED-011 Polish Bundle** — `MODEL_CAPABILITIES.max_output_tokens` field + `_clamp_max_tokens` in `anthropic_service.py` + `_reset_redis_singleton` autouse fixture in `test_059_disconnect.py`. (2 plans)
 - [ ] **Phase 075: SEED-008 + tool_args_progress Polish Bundle** — `GET /threads/{id}/snapshot` combined endpoint + line-by-line `code_stdout` SSE re-wire + `tool_args_progress` SSE event for non-execute_code tools. (3 plans)
+- [ ] **Phase 075.1: Cross-Provider Streaming Stability + Observability Polish Bundle** (INSERTED) — Close 11 bugs from `075-CROSS-PROVIDER-UAT.md` (v4): universal SSE-break (frontend stuck on "Running code" until F5; root cause `harvest_output_files` blocking on async loop, D-v2.5-01 violation), Anthropic content-block render mid-stream, snapshot 503 on empty threads, sub-agent silent downgrade with no UI surface, LangSmith Anthropic untraced + provider mislabel, OpenAI ModuleNotFoundError give-up, OpenRouter sandbox path inconsistency, stdout-in-red styling, ToolCallPanel dup, output-files cumulative-repeat. (4 plans)
 
 **Wave 2 — Depends on Wave 1**
 
@@ -464,6 +465,20 @@ Plans:
 - [ ] 075-01-PLAN.md — Snapshot endpoint full stack + BUG-260518-01 Resume-mid-stream fix (Wave 1; new `GET /threads/{id}/snapshot` + `_enrich_messages_with_runs` extraction + atomic-swap in StreamsProvider.reconcile + onTerminal reconcile-fetch on buffer_expired_* — D-075-01/02/03/04/13)
 - [ ] 075-02-PLAN.md — Line-by-line code_stdout SSE rewire + BUG-260514-03 bottom-indicator fix (Wave 1, parallel-able; `session.execute_command("python -u", on_stdout, on_stderr)` replaces session.run + line-buffer accumulator + silent-window heartbeat + DELETE post-completion emit + sticky bottom-indicator text — D-075-05/06/07/08/14)
 - [ ] 075-03-PLAN.md — tool_args_progress SSE primitive (Wave 1, parallel-able; OpenAI delta accumulator + Anthropic input_json_delta + execute_code + STRUCTURED filters + 5KB sliding-window tail; backend-only no frontend — D-075-09/10/11/12)
+
+### Phase 075.1: Cross-Provider Streaming Stability + Observability Polish Bundle (INSERTED)
+
+**Goal:** Close the 11 bugs catalogued in `075-CROSS-PROVIDER-UAT.md` (v4) — universal SSE-break (frontend stuck on "Running code" until F5), Anthropic content-block render failure mid-stream, snapshot 503 on empty threads, sub-agent silent downgrade with no UI surface, LangSmith Anthropic main-loop untraced + provider mislabel, OpenAI ModuleNotFoundError give-up, OpenRouter sandbox path inconsistency + Resume-button surfacing, stdout-in-red styling, ToolCallPanel duplication, output-files panel cumulative-repeat. 4-plan split locked: Plan 01 universal stream-end recovery (frontend), Plan 02 backend SSE transport stability (root cause: `harvest_output_files` blocking on async loop), Plan 03 Anthropic content-block rendering + sticky indicator, Plan 04 observability + sub-agent transparency + polish bundle.
+**Requirements**: TBD
+**Depends on:** Phase 075
+**Plans:** 4 plans (planned; not yet broken down)
+
+Plans:
+- [ ] TBD — Plan 01 universal stream-end recovery (frontend; `_isTransientBufferExpired` widen + `/snapshot.active_runs` reconcile on terminal)
+- [ ] TBD — Plan 02 backend SSE transport stability (`harvest_output_files` → `run_in_threadpool` per D-v2.5-01; drain_step pure helper + post-completion safety-net emit; test skipif fix)
+- [ ] TBD — Plan 03 Anthropic content-block rendering + sticky indicator (StreamsProvider reducer fix for mixed text + tool_use ordering; MessageItem sticky-cache per-message runStatus)
+- [ ] TBD — Plan 04 observability + sub-agent transparency + polish (LangSmith Anthropic wrap + per-provider ls_provider/name tagging; sub-agent model logged + payload field + tool-card metadata + Settings UI override; system-prompt pip install + /sandbox/output hints; pre-install python-pptx/matplotlib/numpy/pandas in sandbox image; ToolCallPanel dedup; output-files delta view; code_stdout vs code_stderr styling audit; snapshot Redis-probe short-circuit on empty active_runs; delete stale loadMessages on ChatArea mount)
+- run /gsd-plan-phase 075.1 to break down
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.

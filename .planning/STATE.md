@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: verifying
+status: executing
 stopped_at: Completed 075-03-PLAN.md
-last_updated: "2026-05-18T19:32:35.187Z"
-last_activity: 2026-05-18
+last_updated: "2026-05-19T18:59:19.865Z"
+last_activity: 2026-05-19 -- Phase 075.1 execution started
 progress:
-  total_phases: 22
+  total_phases: 23
   completed_phases: 13
-  total_plans: 44
+  total_plans: 48
   completed_plans: 46
-  percent: 100
+  percent: 96
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075 — seed-008-tool-args-progress-polish-bundle
+**Current focus:** Phase 075.1 — cross-provider-streaming-stability-observability-polish-bund
 
 ## Current Position
 
-Phase: 075 (seed-008-tool-args-progress-polish-bundle) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-05-18
+Phase: 075.1 (cross-provider-streaming-stability-observability-polish-bund) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 075.1
+Last activity: 2026-05-19 -- Phase 075.1 execution started
 
 ## PRD-reset outputs (committed)
 
@@ -245,6 +245,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 - Phase 067 added 2026-05-07: Frontend Streaming-UX Fix — close the 5-issue carry-forward dossier (UX-067-01..05) surfaced by Phase 066's live UAT (empty first-paint, "Saving response…" thrash, refresh-required first-paint, redis log noise on tab cycle, tool-call iteration boundary surfacing). Re-runs Phase 066 Plan 05 Task 2 protocol to close out SC#6 live verification deferred from 066.
 - v2.6 ROADMAP.md authored 2026-05-12: 15 phases (068–082) across 4 waves derived directly from PRD §12 outline. All 21 v2.6 REQ-IDs mapped; TOKEN-COL-01 (added at signoff post-§12) attached to Phase 073 (asyncpg finalize path) per FLAG F-1. Phases 068/069/070 form Wave 0 (foundational, no inter-wave dependencies); 071-075 form Wave 1 (parallel RAG + asyncpg + polish); 076-078 form Wave 2; 079-081 form Wave 3 (release-gating); 082 forms Wave 4 (cross-cutting verify). Headline path: 069→070→071→076 (Docling) + 073→077→078→079 (multi-worker) + 068 (Streams Provider parallel) → 082 (verify). Phased rollout per Q-v2.6-02 recommendation (NOT atomic like v2.5 D-v2.5-11).
 - Phase 071.1 inserted after Phase 071 on 2026-05-15: Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback (URGENT). Carry-forward from Phase 071 close-out (commit 270eaca): SC#1 live 20%-delta binding gate RED on user thesis pair due to Docling table/layout stall on pages 26-31. Scope per 071-VERIFICATION.md Finding 3: full run_in_threadpool wrap of remaining sync supabase-py calls in /reextract, per-call document_timeout enforcement, do_table_structure / images_scale env knobs, PyMuPDF subprocess fallback wired into the route, friendly-fixture validation, then SC#1 retry on thesis pair.
+- Phase 075.1 inserted after Phase 075 on 2026-05-19: Cross-Provider Streaming Stability + Observability Polish Bundle (URGENT). Carry-forward from Phase 075 cross-provider UAT (`075-CROSS-PROVIDER-UAT.md` v4): 11 bugs catalogued with universal SSE-break confirmed (POLISH-SEED-008-02 live line-by-line code streaming doesn't work in production for any provider — frontend stuck on "Running code" until F5 across OpenAI / Anthropic / OpenRouter). Root cause: `harvest_output_files` at `sandbox_service.py:67-149` runs synchronous blocking I/O on the async event loop (D-v2.5-01 violation), starving SSE keepalive before the terminal frame ships. 4-plan scope locked: Plan 01 universal stream-end recovery (frontend transient-filter widen + `/snapshot.active_runs` reconcile), Plan 02 backend SSE transport stability (`harvest_output_files` → `run_in_threadpool` + pure drain_step helper + post-completion safety-net emit + test skipif fix), Plan 03 Anthropic content-block rendering + sticky bottom indicator, Plan 04 observability + sub-agent transparency + polish (LangSmith Anthropic wrap + per-provider ls_provider/name tagging; sub-agent model logged/payload/tool-card metadata + Settings UI override; system-prompt pip install + /sandbox/output hints; ToolCallPanel dedup; output-files delta view; code_stdout vs code_stderr styling; snapshot 503 short-circuit; delete stale loadMessages on ChatArea mount). Plan 02 ships first (backend root cause); Plans 01 + 03 parallel after; Plan 04 last.
 
 ### Decisions
 
@@ -454,4 +455,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 074 (SEED-009 + SEED-011 Polish Bundle) — 2 plans — 2026-05-17T20:45:49.326Z
+**Planned Phase:** 075.1 (cross-provider-streaming-stability-observability-polish-bund) — 4 plans — 2026-05-19T18:51:10.602Z

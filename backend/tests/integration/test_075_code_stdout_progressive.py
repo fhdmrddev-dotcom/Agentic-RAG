@@ -51,7 +51,18 @@ from app.services.openai_service import CallingMode
 from tests.integration._run_helpers import _build_mock_supabase
 
 
-pytestmark = pytest.mark.skipif(
+# Phase 075.1 Plan 02 Task 3 fix: under pytest-asyncio's asyncio_mode=auto,
+# module-level `pytestmark = pytest.mark.skipif(...)` can collect tests but
+# silently no-op them when the condition fires inside the asyncio event-loop
+# dispatch — they appear "passed" without actually executing the bodies. The
+# Plan 02 ship gate (5/5 PASS on this file) thus could silently regress to
+# 0/5 ACTUALLY-RAN with no visible signal. Switch to a per-function
+# decorator that fires BEFORE the event loop attaches — same pattern as
+# test_075_tool_args_progress.py (Phase 074 D-074-11). Per-function decorators
+# also make the skip visible at collection time (pytest --collect-only -q
+# lists 4 test items; with SANDBOX_ENABLED unset, pytest -v shows 4 SKIPPED
+# lines with the documented reason).
+_SANDBOX_REQUIRED = pytest.mark.skipif(
     not os.environ.get("SANDBOX_ENABLED"),
     reason="Requires Docker daemon (SANDBOX_ENABLED=1)",
 )
@@ -235,6 +246,7 @@ async def _capture_sandbox_run(chunks_factory, timeout: float = 60.0):
     return events
 
 
+@_SANDBOX_REQUIRED
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 async def test_five_step_printer_produces_progressive_events():
@@ -264,6 +276,7 @@ async def test_five_step_printer_produces_progressive_events():
     )
 
 
+@_SANDBOX_REQUIRED
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 async def test_captured_at_monotonic():
@@ -276,6 +289,7 @@ async def test_captured_at_monotonic():
     )
 
 
+@_SANDBOX_REQUIRED
 @pytest.mark.asyncio
 @pytest.mark.timeout(60)
 async def test_no_duplicate_emit_at_completion():
@@ -309,6 +323,7 @@ async def test_no_duplicate_emit_at_completion():
     )
 
 
+@_SANDBOX_REQUIRED
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_silent_workload_emits_heartbeat():
