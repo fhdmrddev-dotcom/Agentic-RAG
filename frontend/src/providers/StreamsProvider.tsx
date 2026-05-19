@@ -203,7 +203,25 @@ type ThreadBoundSetMessages = (
   updater: Message[] | ((prev: Message[]) => Message[]),
 ) => void
 
-function makeStreamCallbacks(opts: {
+/**
+ * Phase 075.1 Plan 03 Task 1 — exported for unit tests covering the Anthropic
+ * mixed text + tool_use content-block ordering reducer (B-260519-01). The full
+ * <StreamsProvider> surface stays private behind named hooks (D-068-03); this
+ * single internal factory is hoisted to the module's public surface ONLY so
+ * `StreamsProvider.anthropic-ordering.test.ts` can drive each callback directly
+ * without spinning up the full provider render tree (mirrors Plan 01's
+ * `_isTransientStreamEnd` export-for-tests pattern; avoids the pre-existing
+ * waitFor-timeout flakes in streamsProvider.test.tsx).
+ *
+ * REDUCER INVARIANT (locked by anthropic-ordering tests):
+ * Every callback below that calls `setMessages((prev) => prev.map((m) => ...))`
+ * MUST preserve `m.content` via spread. Only `onDelta` may mutate content, and
+ * only by appending (`content: m.content + delta`). Any other callback that
+ * returns `{ ...m, content: "" }` or `{ ...m, content: <something else> }` is
+ * a regression — Anthropic's interleaved text + tool_use stream relies on this
+ * invariant to keep accumulating text across tool blocks.
+ */
+export function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
   onTitleUpdate?: (title: string) => void
@@ -246,6 +264,12 @@ function makeStreamCallbacks(opts: {
             startedAt: undefined,
             iteration: currentIteration,
           }
+          // Plan 03 Task 1 invariant: `content` is INTENTIONALLY omitted —
+          // spread preserves the in-progress assistant text accumulated by
+          // prior onDelta calls. Anthropic's mixed text + tool_use ordering
+          // (anthropic_service.py:194-259) requires this preservation so that
+          // text streamed BEFORE a tool_use block isn't lost when the block
+          // opens.
           return { ...m, isPlanning: false, tool_calls: [...(m.tool_calls ?? []), preparingEntry] }
         }),
       )
@@ -284,6 +308,9 @@ function makeStreamCallbacks(opts: {
               },
             ]
           }
+          // Plan 03 Task 1 invariant: `content` is INTENTIONALLY omitted —
+          // spread preserves accumulated text. See onToolPreparing for the
+          // Anthropic mixed text + tool_use ordering rationale.
           return { ...m, isPlanning: false, tool_calls: updatedCalls }
         }),
       )
