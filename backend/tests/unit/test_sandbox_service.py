@@ -165,17 +165,18 @@ class TestHarvestOutputFiles:
         table_mock.execute.return_value = MagicMock()
         mock_supabase.table.return_value = table_mock
 
-        result = harvest_output_files(
+        delta_files, current_files_set = harvest_output_files(
             session=mock_session,
             execution_id="exec-123",
             user_id="user-456",
             supabase=mock_supabase,
         )
 
-        assert len(result) == 1
-        assert result[0]["filename"] == "chart.png"
-        assert result[0]["url"] == "https://example.com/signed/chart.png"
-        assert result[0]["size"] == len(b"fake-png-data")
+        assert len(delta_files) == 1
+        assert delta_files[0]["filename"] == "chart.png"
+        assert delta_files[0]["url"] == "/sandbox-outputs/user-456/exec-123/chart.png"
+        assert delta_files[0]["size"] == len(b"fake-png-data")
+        assert current_files_set == {"chart.png"}
 
         # Verify storage upload was called
         storage_bucket.upload.assert_called_once()
@@ -201,14 +202,15 @@ class TestHarvestOutputFiles:
 
         mock_supabase = MagicMock()
 
-        result = harvest_output_files(
+        delta_files, current_files_set = harvest_output_files(
             session=mock_session,
             execution_id="exec-empty",
             user_id="user-456",
             supabase=mock_supabase,
         )
 
-        assert result == []
+        assert delta_files == []
+        assert current_files_set == set()
         # Storage and DB should NOT be called
         mock_supabase.storage.from_.assert_not_called()
         mock_supabase.table.assert_not_called()
@@ -237,7 +239,7 @@ class TestHarvestOutputFiles:
         table_mock.execute.return_value = MagicMock()
         mock_supabase.table.return_value = table_mock
 
-        result = harvest_output_files(
+        delta_files, current_files_set = harvest_output_files(
             session=mock_session,
             execution_id="exec-789",
             user_id="user-abc",
@@ -248,10 +250,6 @@ class TestHarvestOutputFiles:
         upload_args = storage_bucket.upload.call_args[0]
         assert upload_args[0] == "user-abc/exec-789/output.csv"
 
-        assert len(result) == 1
-        assert result[0]["filename"] == "output.csv"
-
-        # Verify create_signed_url called with path and 3600 expiry
-        storage_bucket.create_signed_url.assert_called_once_with(
-            "user-abc/exec-789/output.csv", 3600
-        )
+        assert len(delta_files) == 1
+        assert delta_files[0]["filename"] == "output.csv"
+        assert current_files_set == {"output.csv"}
