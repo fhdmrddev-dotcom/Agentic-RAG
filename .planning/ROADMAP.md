@@ -474,11 +474,10 @@ Plans:
 **Plans:** 4 plans (planned; not yet broken down)
 
 Plans:
-- [ ] TBD — Plan 01 universal stream-end recovery (frontend; `_isTransientBufferExpired` widen + `/snapshot.active_runs` reconcile on terminal)
-- [ ] TBD — Plan 02 backend SSE transport stability (`harvest_output_files` → `run_in_threadpool` per D-v2.5-01; drain_step pure helper + post-completion safety-net emit; test skipif fix)
-- [ ] TBD — Plan 03 Anthropic content-block rendering + sticky indicator (StreamsProvider reducer fix for mixed text + tool_use ordering; MessageItem sticky-cache per-message runStatus)
-- [ ] TBD — Plan 04 observability + sub-agent transparency + polish (LangSmith Anthropic wrap + per-provider ls_provider/name tagging; sub-agent model logged + payload field + tool-card metadata + Settings UI override; system-prompt pip install + /sandbox/output hints; pre-install python-pptx/matplotlib/numpy/pandas in sandbox image; ToolCallPanel dedup; output-files delta view; code_stdout vs code_stderr styling audit; snapshot Redis-probe short-circuit on empty active_runs; delete stale loadMessages on ChatArea mount)
-- run /gsd-plan-phase 075.1 to break down
+- [ ] 075.1-01-PLAN.md — Plan 01 universal stream-end recovery (frontend; `_isTransientBufferExpired` widen + `/snapshot.active_runs` reconcile on terminal)
+- [x] 075.1-02-PLAN.md — Plan 02 backend SSE transport stability (`harvest_output_files` → `run_in_threadpool` per D-v2.5-01; drain_step pure helper + post-completion safety-net emit; test skipif fix)
+- [ ] 075.1-03-PLAN.md — Plan 03 Anthropic content-block rendering + sticky indicator (StreamsProvider reducer fix for mixed text + tool_use ordering; MessageItem sticky-cache per-message runStatus)
+- [ ] 075.1-04-PLAN.md — Plan 04 observability + sub-agent transparency + polish (LangSmith Anthropic wrap + per-provider ls_provider/name tagging; sub-agent model logged + payload field + tool-card metadata + Settings UI override; system-prompt pip install + /sandbox/output hints; pre-install python-pptx/matplotlib/numpy/pandas in sandbox image; ToolCallPanel dedup; output-files delta view; code_stdout vs code_stderr styling audit; snapshot Redis-probe short-circuit on empty active_runs; delete stale loadMessages on ChatArea mount)
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
