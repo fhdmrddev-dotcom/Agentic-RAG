@@ -53,7 +53,7 @@
  *                      store; async actions throw notMounted. Safe.
  * RESEARCH §Pitfall 5: Throwing stubs surface pre-mount usage instantly.
  */
-import { useEffect, useRef, type PropsWithChildren } from "react"
+import { useEffect, useRef, type PropsWithChildren, type MutableRefObject } from "react"
 import type {
   Message,
   ToolCall,
@@ -85,35 +85,109 @@ import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 const EMPTY_ARRAY: Message[] = []
 
 /**
- * Phase 075 D-075-13 / BUG-260518-01: detect transient buffer_expired_*
- * terminal events. Returns true if the run is still streaming per the
- * snapshot endpoint, meaning the frontend should re-attach instead of
- * flipping runStatus to "failed".
+ * Phase 075.1 Plan 01: widened from the Phase 075 buffer_expired-only filter
+ * (was `_isTransientBufferExpired`). A "transient stream end" is any SSE
+ * close that arrives while the backend snapshot says the run is still
+ * streaming. We probe /snapshot to decide.
  *
- * Called BEFORE any state mutation in both onTerminal handlers (RESEARCH
- * Pitfall 5: prevent Resume button flicker — the snapshot probe MUST
- * happen before flipping `isStreaming: false`).
+ * Triggers (any of these may be transient):
+ *   - kind === "error" + errorPayload starts with "buffer_expired"
+ *     (preserved from Phase 075 D-075-13)
+ *   - kind === "error" + any other errorPayload (NEW — generic error
+ *     fall-through; covers OpenRouter / Anthropic / OpenAI mid-stream
+ *     wire closures that previously flipped runStatus to "failed")
+ *   - kind === "done" + at least one tool_call.status in {running, preparing}
+ *     (NEW — premature done before tool results land; B-260519-03 OpenRouter
+ *     "Resume mid-stream" repro)
+ *   - kind === "reader_done" (NEW — plain reader.done surfaced from
+ *     api.ts:477 defensive close; was silent pre-Plan-01 because api.ts
+ *     emitted onTerminal("done") on raw reader-close, which the helper
+ *     short-circuited before the snapshot probe)
  *
- * Returns false (= treat as terminal) on:
- *   - non-error kinds (done / cancelled / timed_out)
- *   - error kinds with non-buffer_expired payloads
- *   - snapshot fetch failures (fail-safe to terminal behavior)
- *   - snapshot returns active_runs that doesn't include the runId, or the
- *     matching entry is not in status "streaming"
+ * Returns false (= terminal) on:
+ *   - kind in {cancelled, timed_out} (explicit user/backend terminal —
+ *     never transient)
+ *   - kind === "done" with no running/preparing tool_calls (genuine
+ *     completion stays terminal — short-circuits before the snapshot probe)
+ *   - snapshot fetch failure (fail-safe; D-075-04 invariant preserved)
+ *   - snapshot says run is not in active_runs OR not status:"streaming"
+ *
+ * Called BEFORE any state mutation in both onTerminal handlers (Phase 075
+ * RESEARCH Pitfall 5: prevent Resume button flicker — the snapshot probe
+ * MUST happen before flipping `isStreaming: false`).
+ *
+ * Exported for unit tests; the rest of the StreamsProvider surface stays
+ * private behind named hooks (D-068-03).
  */
-async function _isTransientBufferExpired(
-  kind: "done" | "error" | "cancelled" | "timed_out",
+export async function _isTransientStreamEnd(
+  kind: "done" | "error" | "cancelled" | "timed_out" | "reader_done",
   errorPayload: string | undefined,
   threadId: string,
   runId: string,
+  toolCalls: ToolCall[] | undefined,
 ): Promise<boolean> {
-  if (kind !== "error") return false
-  if (!errorPayload?.startsWith?.("buffer_expired")) return false
+  // Explicit terminals are never transient — short-circuit without touching
+  // the network. Both branches map to a final runStatus on the consumer side.
+  if (kind === "cancelled" || kind === "timed_out") return false
+
+  // For kind === "done", only treat as transient when running/preparing tools
+  // are still open (premature done before tool results land). Genuine
+  // completions short-circuit before the snapshot probe — saves a round-trip
+  // on the happy path.
+  if (kind === "done") {
+    const stillWorking = (toolCalls ?? []).some(
+      (tc) => tc.status === "running" || tc.status === "preparing",
+    )
+    if (!stillWorking) return false
+  }
+  // kind === "error" and kind === "reader_done" both proceed to the snapshot
+  // probe unconditionally (any errorPayload value triggers the probe — the
+  // snapshot is the source of truth, NOT the error string).
+  // errorPayload is intentionally read by consumers (buffer_expired hook for
+  // the loadMessages fallback) but never gates the decision here.
+  void errorPayload
+
   const snapshot = await getSnapshot(threadId).catch(() => null)
   if (!snapshot) return false
   return snapshot.active_runs.some(
     (r) => r.run_id === runId && r.status === "streaming",
   )
+}
+
+/**
+ * Phase 075.1 Plan 01 Task 2: shared snapshot-probe-and-reattach helper.
+ *
+ * Called by BOTH onTerminal handlers (reconcile + sendMessage) AFTER
+ * `_isTransientStreamEnd` returned true. Responsibilities:
+ *   1. Re-fetch /snapshot (the transient filter already probed, but it
+ *      could have been called more than 100 ms ago; treat that probe as
+ *      "decision" and this fetch as "fresh cursor seed").
+ *   2. Seed lastSeenOffsetRef from `snapshot.since_cursors[runId]` ONLY
+ *      when the ref has no entry for the runId yet (D-075-01: server
+ *      cursors are first-attach defaults; client cursors win on
+ *      subsequent reconnects).
+ *   3. Invoke the caller-supplied `reattach(runId, since)` to open a
+ *      fresh SSE subscription via the existing subscribeToRun machinery.
+ *
+ * Returns true on successful reattach; false on snapshot failure (caller
+ * MUST fall through to the terminal-flip behavior to avoid leaving the
+ * placeholder stuck in "streaming" state).
+ */
+async function _reattachAfterTransient(
+  threadId: string,
+  runId: string,
+  lastSeenOffsetRef: MutableRefObject<Map<string, string>>,
+  reattach: (runId: string, since: string) => void,
+): Promise<boolean> {
+  const snapshot = await getSnapshot(threadId).catch(() => null)
+  if (!snapshot) return false
+  const seedCursor = snapshot.since_cursors[runId]
+  if (seedCursor && !lastSeenOffsetRef.current.has(runId)) {
+    lastSeenOffsetRef.current.set(runId, seedCursor)
+  }
+  const since = lastSeenOffsetRef.current.get(runId) ?? "0"
+  reattach(runId, since)
+  return true
 }
 
 function makeTempId() {
@@ -599,13 +673,53 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               })
               const originalOnTerminal = callbacks.onTerminal
               callbacks.onTerminal = async (kind, errorPayload) => {
-                // Phase 075 D-075-13 / BUG-260518-01: reconcile-fetch before
-                // any state mutation (Pitfall 5: prevent Resume button
-                // flicker). If the run is still streaming per snapshot,
-                // do NOT flip runStatus, do NOT unsub — SSE will reconnect
-                // on the next reconcile cycle via lastSeenOffsetRef cursor.
-                if (await _isTransientBufferExpired(kind, errorPayload, threadId, run.run_id)) {
-                  return
+                // Phase 075.1 Plan 01: widened transient-stream-end probe.
+                // Read the placeholder's current tool_calls from the store so
+                // the helper can detect "kind === 'done' with active tools".
+                // RESEARCH §Pattern 5: read via getState() (no ref mirror).
+                const currentBucket =
+                  useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
+                const currentToolCalls = currentBucket.find((m) => m.id === targetId)?.tool_calls
+                if (
+                  await _isTransientStreamEnd(
+                    kind,
+                    errorPayload,
+                    threadId,
+                    run.run_id,
+                    currentToolCalls,
+                  )
+                ) {
+                  // Phase 075.1 Task 2: re-attach instead of flipping
+                  // runStatus. Build a fresh AbortController + reuse the
+                  // already-bound callbacks so cursor handler + placeholder
+                  // targeting carry over. If snapshot fetch fails, fall
+                  // through to the terminal-flip branch below (fail-safe).
+                  const reattached = await _reattachAfterTransient(
+                    threadId,
+                    run.run_id,
+                    lastSeenOffsetRef,
+                    (rid, since) => {
+                      const newController = new AbortController()
+                      subscriptionsRef.current.set(rid, newController)
+                      useStreamsStore.setState((s) => ({
+                        subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(rid),
+                      }))
+                      // Fire-and-forget — same shape as the outer
+                      // subscribeToRun() call below. Errors logged but not
+                      // surfaced (the next reconcile cycle will retry).
+                      subscribeToRun(rid, since, callbacks, newController.signal).catch(
+                        (err) => {
+                          if (!(err instanceof Error && err.name === "AbortError")) {
+                            console.error("reconcile reattach subscribeToRun failed:", err)
+                          }
+                        },
+                      )
+                    },
+                  )
+                  if (reattached) return
+                  // Snapshot fetch failed during reattach — fall through to
+                  // the terminal flip below so the placeholder is not left
+                  // stuck in "streaming" state forever (fail-safe path).
                 }
                 useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
                   if (!prev.some((m) => m.id === targetId)) return prev
@@ -614,6 +728,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     if (kind === "done") return { ...m, runStatus: "completed" }
                     if (kind === "error") return { ...m, runStatus: "failed" }
                     if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
+                    if (kind === "reader_done") return { ...m, runStatus: "completed" }
                     // kind === "cancelled"
                     return { ...m, runStatus: "cancelled" }
                   })
@@ -755,17 +870,50 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
             const originalOnTerminal = callbacks.onTerminal
             callbacks.onTerminal = async (kind, errorPayload) => {
-              // Phase 075 D-075-13 / BUG-260518-01: reconcile-fetch before
-              // any state mutation (Pitfall 5: prevent Resume button
-              // flicker). The registered run id here is registeredRunId
-              // (sendMessage path) — different local from the reconcile
-              // reattach loop's `run.run_id`. Shared helper guarantees no
-              // divergence between the two sites.
-              if (
-                registeredRunId &&
-                (await _isTransientBufferExpired(kind, errorPayload, threadId, registeredRunId))
-              ) {
-                return
+              // Phase 075.1 Plan 01: widened transient-stream-end probe.
+              // sendMessage path uses `registeredRunId` (populated after the
+              // POST returns); reconcile path uses `run.run_id`. Shared
+              // helper guarantees the two sites agree on the decision matrix.
+              if (registeredRunId) {
+                // Read placeholder tool_calls from the store so the helper
+                // can detect "kind === 'done' with active tools" (e.g.,
+                // OpenRouter B-260519-03 premature-done scenario).
+                const currentBucket =
+                  useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
+                const currentToolCalls = currentBucket.find((m) => m.id === assistantId)?.tool_calls
+                if (
+                  await _isTransientStreamEnd(
+                    kind,
+                    errorPayload,
+                    threadId,
+                    registeredRunId,
+                    currentToolCalls,
+                  )
+                ) {
+                  // Re-attach using the shared helper. Snapshot fetch failure
+                  // falls through to terminal flip (fail-safe).
+                  const reattached = await _reattachAfterTransient(
+                    threadId,
+                    registeredRunId,
+                    lastSeenOffsetRef,
+                    (rid, since) => {
+                      const newController = new AbortController()
+                      subscriptionsRef.current.set(rid, newController)
+                      useStreamsStore.setState((s) => ({
+                        subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(rid),
+                      }))
+                      subscribeToRun(rid, since, callbacks, newController.signal).catch(
+                        (err) => {
+                          if (!(err instanceof Error && err.name === "AbortError")) {
+                            console.error("sendMessage reattach subscribeToRun failed:", err)
+                          }
+                        },
+                      )
+                    },
+                  )
+                  if (reattached) return
+                  // Fall through on snapshot fetch failure (fail-safe).
+                }
               }
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
                 if (!prev.some((m) => m.id === assistantId)) return prev
@@ -774,6 +922,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   if (kind === "done") return { ...m, runStatus: "completed" }
                   if (kind === "error") return { ...m, runStatus: "failed" }
                   if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
+                  if (kind === "reader_done") return { ...m, runStatus: "completed" }
                   // kind === "cancelled"
                   return { ...m, runStatus: "cancelled", stopped: true }
                 })
