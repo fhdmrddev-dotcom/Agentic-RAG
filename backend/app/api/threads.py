@@ -2528,10 +2528,23 @@ async def send_message(
                                     execution_id = exec_row.data[0]["id"] if exec_row.data else None
 
                                     # Harvest output files from container (SAND-07, SAND-08)
+                                    # Phase 075.1 Plan 02 Task 1 — D-v2.5-01 fix
+                                    # (075-CROSS-PROVIDER-UAT.md headline finding):
+                                    # harvest_output_files performs synchronous blocking I/O
+                                    # (Supabase Storage uploads, sandbox_files INSERTs, local
+                                    # file reads) directly on the async event loop. Pre-fix,
+                                    # this starved the SSE keepalive after the cell completed,
+                                    # tearing down the stream before the terminal frame
+                                    # shipped — producing the universal "stuck on Running
+                                    # code until F5" symptom across all three providers
+                                    # (OpenAI, Anthropic, OpenRouter). run_in_threadpool
+                                    # offloads to anyio's worker pool so the loop stays
+                                    # responsive. See CLAUDE.md Rules + D-v2.5-01.
                                     output_file_list = []
                                     if execution_id and actual_exit_code == 0:
-                                        output_file_list = harvest_output_files(
-                                            session, execution_id, current_user["id"], supabase
+                                        output_file_list = await run_in_threadpool(
+                                            harvest_output_files,
+                                            session, execution_id, current_user["id"], supabase,
                                         )
 
                                     # Emit completion event (SAND-06) with file list
