@@ -189,7 +189,16 @@ export interface StreamCallbacks {
   // Phase 075 D-075-13: return type widened to Promise<void> | void so the
   // StreamsProvider onTerminal wrapper can await the getSnapshot probe before
   // deciding whether to flip runStatus (BUG-260518-01 reconcile-fetch path).
-  onTerminal: (kind: "done" | "error" | "cancelled" | "timed_out", error?: string) => Promise<void> | void
+  // Phase 075.1 Plan 01: 5th kind 'reader_done' — defensive close from the
+  // SSE reader loop when no explicit terminal SSE event was seen. Pre-Plan-01
+  // this fired as ('done', undefined); the consumer-side widened transient
+  // filter (StreamsProvider _isTransientStreamEnd) treats this as a probe
+  // trigger so a snapshot-streaming run can re-attach instead of being
+  // mis-flipped to "completed".
+  onTerminal: (
+    kind: "done" | "error" | "cancelled" | "timed_out" | "reader_done",
+    error?: string,
+  ) => Promise<void> | void
   onTitleUpdate?: (title: string) => void
   onToolPreparing?: (name: string, index: number) => void
   onToolStart?: (name: string, args: Record<string, string>) => void
@@ -289,7 +298,10 @@ export async function postMessage(
  *   - SSE event {type:'done'} → fires onDone() once; stream stays open for suggestions
  *   - SSE event {type:'stream_end'} → onTerminal('done') and return
  *   - AbortError on reader.read() → silent return (caller-initiated cancel via signal)
- *   - Reader closes without explicit terminal → defensive onTerminal('done')
+ *   - Reader closes without explicit terminal → defensive onTerminal('reader_done')
+ *     (Phase 075.1 Plan 01: was 'done' pre-Plan-01; consumer-side widened
+ *     transient filter probes /snapshot on 'reader_done' so a still-streaming
+ *     run can re-attach instead of being mis-flipped to 'completed'.)
  */
 export async function subscribeToRun(
   runId: string,
@@ -474,7 +486,12 @@ export async function subscribeToRun(
   }
 
   // Defensive: reader closed without explicit terminal SSE event.
-  callbacks.onTerminal("done")
+  // Phase 075.1 Plan 01: surface this as `reader_done` instead of `done` so
+  // the StreamsProvider widened transient filter can probe /snapshot before
+  // flipping runStatus to "completed". Pre-Plan-01 this fell through silently
+  // — if the backend run was still streaming (e.g., the SSE wire was killed
+  // by a transient network blip), the UI showed "Running code" until F5.
+  callbacks.onTerminal("reader_done")
 }
 
 /** Phase 063 / Phase 062 contract: list streaming runs the requesting user
