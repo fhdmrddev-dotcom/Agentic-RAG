@@ -453,7 +453,20 @@ SYSTEM_PROMPT = (
     "do not repeat raw output verbatim.\n"
     "- Output files (.pptx, .docx, .pdf, .png, etc.) are automatically shown as download cards in the UI — "
     "do NOT write markdown links or URLs for them. Mention the filename naturally: "
-    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'.\n"
+    "'I've created `report.pptx` with 8 slides covering...' — never '[filename](url)' or 'Download: link'.\n\n"
+
+    # Phase 075.1 Plan 04 (B-260519-08 + B-260519-09) — sandbox conventions.
+    # Applies uniformly to OpenAI, Anthropic, Google, OpenRouter, Ollama —
+    # all providers see this same SYSTEM_PROMPT (unification principle).
+    "## Code execution conventions\n"
+    "- Always write output files (charts, documents, decks, etc.) to `/sandbox/output/`. "
+    "Files written elsewhere are NOT harvested into the download panel — the user can't access them. "
+    "Use absolute paths: `/sandbox/output/chart.png`, NOT `chart.png` or `/tmp/chart.png`.\n"
+    "- If you hit `ImportError` or `ModuleNotFoundError`, install the missing package first via "
+    "`pip install <pkg>` (use `!pip install <pkg>` or `subprocess.run(['pip', 'install', '<pkg>'])` inside the cell) "
+    "then retry the code. Do NOT give up after the first import failure. "
+    "Common packages are pre-installed (python-pptx, matplotlib, numpy, pandas); "
+    "other packages can be installed at runtime in seconds.\n"
 )
 
 
@@ -1552,6 +1565,13 @@ async def send_message(
                     and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
                 )
                 _structured_tools_injected = False
+
+                # Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — per-run
+                # cumulative set of sandbox output files. Drives the delta-view
+                # render in each cell + the final pinned "Final outputs" panel
+                # emit at the end of the agent loop. Initialised empty; updated
+                # by each harvest_output_files call.
+                _previous_files_in_run: set[str] = set()
 
                 for iteration in range(max_iterations):
                     # D-04 (Phase 56): emit iteration_start at the top of every iteration.
@@ -2667,12 +2687,21 @@ async def send_message(
                                     # (OpenAI, Anthropic, OpenRouter). run_in_threadpool
                                     # offloads to anyio's worker pool so the loop stays
                                     # responsive. See CLAUDE.md Rules + D-v2.5-01.
-                                    output_file_list = []
+                                    output_file_list: list[dict] = []
                                     if execution_id and actual_exit_code == 0:
-                                        output_file_list = await run_in_threadpool(
+                                        # Phase 075.1 Plan 04 (B-260519-11) — delta view.
+                                        # harvest_output_files now returns (delta, current_set);
+                                        # delta is what this cell renders (only new/changed
+                                        # files), current_set replaces _previous_files_in_run so
+                                        # the next iteration's call sees the updated cumulative.
+                                        # See sandbox_service.harvest_output_files docstring for
+                                        # the contract.
+                                        delta_files, _previous_files_in_run = await run_in_threadpool(
                                             harvest_output_files,
                                             session, execution_id, current_user["id"], supabase,
+                                            _previous_files_in_run,
                                         )
+                                        output_file_list = delta_files
 
                                     # Emit completion event (SAND-06) with file list
                                     await _emit(redis, run_id, 'code_execution_complete', exit_code=actual_exit_code, duration_ms=duration_ms, execution_id=execution_id, output_files=output_file_list)
@@ -2857,6 +2886,20 @@ async def send_message(
                             **({"sub_agent_model": sub_agent_record.get("effective_model", "")} if sub_agent_record else {}),
                         })
                     # Continue to next iteration to let LLM respond with tool results in context
+
+                # Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — pinned final-outputs
+                # panel emit. After the agent loop terminates (break or natural end),
+                # emit the cumulative file set so the frontend can render a single
+                # "Final outputs" panel below the per-cell delta panels. This is the
+                # consumer's authoritative end-of-run file list and closes the
+                # cumulative-repeat symptom (12 download links for 1 desired file).
+                if _previous_files_in_run:
+                    await _emit(
+                        redis,
+                        run_id,
+                        'final_output_files',
+                        files=[{"filename": fname} for fname in sorted(_previous_files_in_run)],
+                    )
 
                 # Fallback: if the loop ended with no content produced, emit a safe message
                 if not full_content:

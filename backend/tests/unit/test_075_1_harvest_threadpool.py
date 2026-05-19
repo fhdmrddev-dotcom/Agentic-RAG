@@ -105,12 +105,20 @@ async def test_harvest_offloaded_keeps_loop_responsive(tmp_path):
     )
 
     # Harvest still returns the expected shape.
-    assert isinstance(result, list)
-    assert len(result) == 1
-    entry = result[0]
+    # Phase 075.1 Plan 04 (B-260519-11) — signature extended from
+    # `list[dict]` to `tuple[list[dict], set[str]]`. previous_files=None
+    # (legacy mode default) returns (all_files, current_set). Tests
+    # adapted to the new tuple shape; the per-entry contract is unchanged.
+    assert isinstance(result, tuple)
+    files, current_set = result
+    assert isinstance(files, list)
+    assert isinstance(current_set, set)
+    assert len(files) == 1
+    entry = files[0]
     assert entry["filename"] == "chart.png"
     assert entry["url"] == "/sandbox-outputs/user-075-1/exec-075-1/chart.png"
     assert entry["size"] == len(b"fake-png-data")
+    assert current_set == {"chart.png"}
 
 
 @pytest.mark.asyncio
@@ -150,8 +158,15 @@ async def test_harvest_returns_same_shape_via_threadpool():
         mock_supabase,
     )
 
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert set(result[0].keys()) == {"filename", "url", "size"}
-    assert result[0]["filename"] == "out.csv"
-    assert result[0]["url"] == "/sandbox-outputs/user-shape-test/exec-shape-test/out.csv"
+    # Phase 075.1 Plan 04 (B-260519-11) — signature extended from
+    # `list[dict]` to `tuple[list[dict], set[str]]`. Legacy mode
+    # (previous_files=None) returns (all_files, current_set).
+    assert isinstance(result, tuple)
+    files, current_set = result
+    assert isinstance(files, list)
+    assert isinstance(current_set, set)
+    assert len(files) == 1
+    assert set(files[0].keys()) == {"filename", "url", "size"}
+    assert files[0]["filename"] == "out.csv"
+    assert files[0]["url"] == "/sandbox-outputs/user-shape-test/exec-shape-test/out.csv"
+    assert current_set == {"out.csv"}

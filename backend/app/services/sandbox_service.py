@@ -27,7 +27,19 @@ class SandboxSessionManager:
         self._evict_expired()
 
         if thread_id not in _sessions:
-            session = InteractiveSandboxSession(lang="python", verbose=False)
+            # Phase 075.1 Plan 04 (B-260519-08) — opt-in custom sandbox image.
+            # Set SANDBOX_IMAGE env var (e.g. agentic-rag-sandbox:075.1) to use
+            # the project-specific image built from backend/Dockerfile.sandbox
+            # with python-pptx / matplotlib / numpy / pandas pre-installed.
+            # When unset (local dev that hasn't built the image), falls back
+            # to llm_sandbox's default Python image. Build with:
+            #   docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:075.1 backend/
+            session_kwargs: dict = {"lang": "python", "verbose": False}
+            custom_image = os.environ.get("SANDBOX_IMAGE")
+            if custom_image:
+                session_kwargs["image"] = custom_image
+                logger.info("Sandbox session using custom image %s for thread %s", custom_image, thread_id)
+            session = InteractiveSandboxSession(**session_kwargs)
             session.open()
             _sessions[thread_id] = session
             logger.info("Sandbox session opened for thread %s", thread_id)
@@ -69,12 +81,34 @@ def harvest_output_files(
     execution_id: str,
     user_id: str,
     supabase,
-) -> list[dict]:
+    previous_files: set[str] | None = None,
+) -> tuple[list[dict], set[str]]:
     """Copy files from /sandbox/output/ in the container, upload to Supabase Storage,
-    insert sandbox_files rows, and return file metadata with signed URLs.
+    insert sandbox_files rows, and return delta + cumulative file metadata.
 
-    Returns a list of dicts: [{"filename": str, "url": str, "size": int}, ...]
-    Returns empty list if /sandbox/output/ is empty or inaccessible.
+    Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — signature extended
+    from `-> list[dict]` to `-> tuple[list[dict], set[str]]` to support the
+    output-files delta view. The agent loop tracks `previous_files` across
+    iterations so each cell's "Output files" panel renders ONLY files new
+    or changed in that cell; the cumulative final set drives the pinned
+    "Final outputs" panel at the end of the loop (closes the
+    "12 download links for 1 desired file" cognitive-load symptom).
+
+    Args:
+        previous_files: set of filenames already harvested in earlier cells
+            of the same run. None (default) = legacy mode — returns ALL
+            current files as the delta (matches Phase 075 cumulative-render
+            behavior). The second tuple element is always populated so a
+            caller can start tracking later.
+
+    Returns:
+        (delta_files, current_files_set)
+          - delta_files: list of {"filename", "url", "size"} for this cell's
+            new/changed files (frontend renders these per-cell). When
+            previous_files is None, this is the full list.
+          - current_files_set: cumulative set of filenames now in
+            /sandbox/output (caller passes back as previous_files on the
+            next iteration).
     """
     output_files: list[dict] = []
     try:
@@ -146,4 +180,10 @@ def harvest_output_files(
     except Exception as e:
         logger.error("Failed to harvest output files: %s", e, exc_info=True)
 
-    return output_files
+    # Phase 075.1 Plan 04 (B-260519-11) — delta view. previous_files=None
+    # = legacy mode (return all files as delta); set = delta-only filter.
+    current_files_set = {f["filename"] for f in output_files}
+    if previous_files is None:
+        return output_files, current_files_set
+    delta_files = [f for f in output_files if f["filename"] not in previous_files]
+    return delta_files, current_files_set
