@@ -452,6 +452,16 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
+    // Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01) — pinned
+    // final-outputs panel. Reducer stamps the cumulative file list onto the
+    // assistant message; MessageItem renders the panel below the per-cell
+    // delta outputs in each execute_code tool card. The reducer never
+    // mutates `m.content` (Plan 03 invariant — only onDelta appends).
+    onFinalOutputFiles: (files: { filename: string; url?: string }[]) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, finalOutputFiles: files } : m)),
+      )
+    },
     onSources: (sources: SourceReference[]) => {
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)),

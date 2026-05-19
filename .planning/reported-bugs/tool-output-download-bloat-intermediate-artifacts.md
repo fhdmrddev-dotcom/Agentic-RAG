@@ -4,9 +4,9 @@ title: Tool-output download list shows every intermediate artifact, not just the
 reported: 2026-05-14
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/tool-card-display, frontend/code-execution-output, frontend/chat-surface, UX/cognitive-load]
-folded_into: null
+folded_into: "075.1"
 related_seeds: [SEED-008]
 re_open_trigger: null
 reproduces_on:
@@ -71,3 +71,29 @@ Two interventions that would address this:
 - Live repro 2026-05-14 (user-pasted transcript inline in conversation): Anthropic-routed pptx-generation session producing 12 output files where 1 was the intended deliverable.
 - Comparison: OpenAI-routed identical prompt produced cleaner final-only download UX.
 - Related: Phase 067.4 closing UAT tool-call iteration boundary surfacing (SC#6 substantive 5/5).
+
+## Resolution
+
+**Folded into Phase 075.1 Plan 04 (Wave 3 polish bundle, 2026-05-20).** The
+backend delta filter in `harvest_output_files` + the `final_output_files`
+SSE event + the pinned "Final outputs" panel in `MessageItem` close the
+cumulative-repeat symptom this report described.
+
+Concrete changes:
+- `backend/app/services/sandbox_service.py` — `harvest_output_files`
+  signature extended to `tuple[list[dict], set[str]]` with
+  `previous_files: set[str] | None = None`. When the caller threads its
+  cumulative set through, the harvest returns ONLY files new since the
+  prior cell.
+- `backend/app/api/threads.py` — agent loop tracks `_previous_files_in_run`
+  across iterations; emits one `final_output_files` SSE event after the
+  loop terminates carrying the cumulative set.
+- `frontend/src/lib/api.ts` + `frontend/src/providers/StreamsProvider.tsx`
+  — new `onFinalOutputFiles` callback + reducer stamps
+  `message.finalOutputFiles`.
+- `frontend/src/components/chat/MessageItem.tsx` — pinned panel renders
+  the cumulative file list once at the bottom of the assistant turn.
+
+Status transitions to `closed` once Phase 075.1 UAT
+(`075-CROSS-PROVIDER-UAT.md` B-260519-11) confirms the symptom no longer
+reproduces against the Anthropic-routed dissertation-defense pptx prompt.

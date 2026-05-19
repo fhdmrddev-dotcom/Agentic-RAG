@@ -245,6 +245,23 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
             <span className="italic">Thinking…</span>
           </div>
         )}
+        {/* Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01) — pinned
+            final-outputs panel. Backend emits one `final_output_files` SSE
+            event after the agent loop terminates carrying the cumulative
+            sandbox filenames; StreamsProvider stamps it on the assistant
+            message; MessageItem renders the panel below per-cell delta panels
+            inside ToolCallPanel/ExecuteCodeBlock. Closes the 12-download-
+            links-for-1-desired-file cumulative-repeat symptom. */}
+        {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
+          <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
+            <div className="text-xs font-semibold mb-2 text-foreground/80">Final outputs</div>
+            <ul className="text-xs space-y-1 font-mono text-foreground/70">
+              {message.finalOutputFiles.map((f) => (
+                <li key={f.filename}>{f.filename}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   )
