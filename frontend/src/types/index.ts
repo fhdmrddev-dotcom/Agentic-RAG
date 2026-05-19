@@ -50,6 +50,13 @@ export interface ToolCall {
    * ToolCallPanel to render "Step N" gradient dividers between iteration groups.
    * Undefined for tool calls loaded from DB (historical messages — no divider). */
   iteration?: number
+  /** Phase 075.1 Plan 04 Atom D (B-260519-05): the resolved sub-agent model id
+   * for sub-agent-driven tool calls (today only `analyze_document`). Backend
+   * sets this in persisted_tool_calls so the tool-card can render the
+   * "Sub-agent: {model_id}" transparency line — surfaces the silent downgrade
+   * (e.g. claude-sonnet-4-6 main agent → claude-haiku-4-5-20251001 sub-agent)
+   * that was invisible pre-Plan-04. Absent for non-sub-agent tools. */
+  sub_agent_model?: string
 }
 
 export interface SourceReference {
@@ -111,6 +118,14 @@ export interface Message {
   runId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
+  /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
+   * sandbox-output file list emitted by the backend `final_output_files`
+   * SSE event after the agent loop terminates. Drives the pinned
+   * "Final outputs" panel rendered below the per-cell delta panels in
+   * ToolCallPanel — closes the cumulative-repeat symptom where a 12-file
+   * run rendered 12 download links per cell. Absent for runs that produced
+   * no output files. */
+  finalOutputFiles?: { filename: string; url?: string }[]
 }
 
 export interface DocumentMetadata {

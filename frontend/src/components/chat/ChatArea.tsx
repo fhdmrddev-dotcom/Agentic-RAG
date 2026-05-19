@@ -163,7 +163,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // The unconditional clearMessages() was the literal in-app cause of the
     // BUG-260513-01 blank window. Deletion regression cost: zero — no
     // existing test asserts the call (verified during Plan 01 authoring).
-    loadMessages(thread.id).catch(console.error)
+    //
+    // Phase 075.1 Plan 04 — Test 2 / MESSAGES-DEBUG agent's single-line fix
+    // (Test 2 dual-`/messages` after `/snapshot` closure):
+    // setViewingThread (in StreamsProvider) already fires reconcile internally
+    // (StreamsProvider.tsx:495-501 — Phase 068 Task 2c). The prior
+    // loadMessages(thread.id) here was a duplicate trigger producing a second
+    // /messages request per thread switch. Snapshot-based reconcile is now
+    // the sole data source post-Phase-075 — the dedicated /messages endpoint
+    // is no longer called from ChatArea on mount. Retry handler at line ~61
+    // still calls loadMessages for the manual Retry button — intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.id])
 

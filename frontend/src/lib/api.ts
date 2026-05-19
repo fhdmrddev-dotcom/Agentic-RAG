@@ -225,6 +225,13 @@ export interface StreamCallbacks {
     outputFiles: OutputFile[],
     error?: string,
   ) => void
+  /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
+   * sandbox-output file list emitted after the agent loop terminates.
+   * StreamsProvider stores this on the assistant message as
+   * `finalOutputFiles`; MessageItem renders the pinned "Final outputs"
+   * panel below the per-cell delta panels. Backend wire event type is
+   * `final_output_files`. Payload shape: { filename: string; url?: string }[]. */
+  onFinalOutputFiles?: (files: { filename: string; url?: string }[]) => void
   onSources?: (sources: SourceReference[]) => void
   onCitations?: (citations: Citation[]) => void
   onConfidence?: (
@@ -401,6 +408,16 @@ export async function subscribeToRun(
             parsed.duration_ms as number,
             (parsed.output_files ?? []) as OutputFile[],
             parsed.error as string | undefined,
+          )
+        // Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01) —
+        // cumulative final-outputs panel. Backend emits exactly one
+        // `final_output_files` event after the agent loop terminates,
+        // carrying the cumulative filename set from _previous_files_in_run.
+        // The reducer in StreamsProvider stamps it on the assistant message
+        // as `finalOutputFiles`; MessageItem renders the pinned panel.
+        else if (t === "final_output_files" && callbacks.onFinalOutputFiles)
+          callbacks.onFinalOutputFiles(
+            (parsed.files ?? []) as { filename: string; url?: string }[],
           )
         else if (t === "sources" && callbacks.onSources)
           callbacks.onSources((parsed.sources ?? []) as SourceReference[])

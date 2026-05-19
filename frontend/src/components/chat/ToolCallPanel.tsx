@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
@@ -530,17 +530,39 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
 // ---- Main panel ----
 
 export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount, activatedSkills }: Props) {
-  if (!toolCalls || toolCalls.length === 0) return null
+  // Phase 075.1 Plan 04 Atom B (B-260519-10) — dedup tool cards keyed on
+  // tool_call_id. OpenRouter mid-flight re-render of cached calls produced
+  // visible duplicates in UAT Round 3. Dedup preserves first occurrence
+  // ordering so the timeline / displayItems sort below behaves the same;
+  // only the duplicate suffix entries get dropped.
+  const deduplicatedToolCalls = useMemo(() => {
+    const seen = new Set<string>()
+    const result: ToolCall[] = []
+    for (const tc of toolCalls ?? []) {
+      const key = tc.id || `${tc.name}-${tc.startedAt ?? ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      result.push(tc)
+    }
+    return result
+  }, [toolCalls])
 
-  const hasInterrupted = toolCalls.some((tc) => tc.status === "interrupted")
-  const allDone = toolCalls.every((tc) => tc.status === "done" || tc.status === "interrupted") &&
+  if (!deduplicatedToolCalls || deduplicatedToolCalls.length === 0) return null
+
+  const hasInterrupted = deduplicatedToolCalls.some((tc) => tc.status === "interrupted")
+  const allDone = deduplicatedToolCalls.every((tc) => tc.status === "done" || tc.status === "interrupted") &&
     (!subAgent || subAgent.status === "done")
 
 const [expanded, setExpanded] = useState(true)
 
   const isExpanded = expanded
-  const totalTime = allDone && !isPlanning ? formatTotalDuration(toolCalls) : null
-  const activeTool = toolCalls.find((tc) => tc.status === "running" || tc.status === "preparing")
+  // Phase 075.1 Plan 04 Atom B — every read of the tool list inside the
+  // render uses the deduplicated list so the dedup is authoritative for
+  // ALL derived state (counts, active-tool lookup, header label, display
+  // ordering). Reverting any single line to read `toolCalls` would
+  // re-introduce the visible duplicate.
+  const totalTime = allDone && !isPlanning ? formatTotalDuration(deduplicatedToolCalls) : null
+  const activeTool = deduplicatedToolCalls.find((tc) => tc.status === "running" || tc.status === "preparing")
 
   const stepPrefix = (iterationCount != null && iterationCount >= 0)
     ? `Step ${iterationCount + 1}`
@@ -550,15 +572,15 @@ const [expanded, setExpanded] = useState(true)
   //   - panel is still actively working (NOT allDone)
   //   - we are NOT in the explicit `isPlanning` between-rounds gap
   //   - no tool is currently running
-  //   - at least one tool has run already (toolCalls.length > 0)
+  //   - at least one tool has run already (deduplicatedToolCalls.length > 0)
   // Pure derivation from existing state — no new SSE event, no new prop.
-  const isSynthesizing = !allDone && !isPlanning && !activeTool && toolCalls.length > 0
+  const isSynthesizing = !allDone && !isPlanning && !activeTool && deduplicatedToolCalls.length > 0
 
   const headerLabel = (() => {
     if (allDone && !isPlanning) {
       return hasInterrupted
-        ? `Stopped — used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
-        : `Used ${toolCalls.length} tool${toolCalls.length > 1 ? "s" : ""}`
+        ? `Stopped — used ${deduplicatedToolCalls.length} tool${deduplicatedToolCalls.length > 1 ? "s" : ""}`
+        : `Used ${deduplicatedToolCalls.length} tool${deduplicatedToolCalls.length > 1 ? "s" : ""}`
     }
     // Phase 56 D-03/D-05/D-07: Step N prefix + task phase label (D-07 mapping from active tool name).
     if (activeTool) {
@@ -585,7 +607,7 @@ const [expanded, setExpanded] = useState(true)
     | { kind: 'tool'; tc: ToolCall; t: number }
     | { kind: 'skill'; activation: SkillActivation; t: number }
   const displayItems: DisplayItem[] = [
-    ...toolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.status === "preparing" ? Infinity : (tc.startedAt ?? Date.now()) })),
+    ...deduplicatedToolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.status === "preparing" ? Infinity : (tc.startedAt ?? Date.now()) })),
     ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
   ].sort((a, b) => a.t - b.t)
 
@@ -733,6 +755,20 @@ const [expanded, setExpanded] = useState(true)
                         )}
                       </span>
                     </div>
+
+                    {/* Phase 075.1 Plan 04 Atom D (B-260519-05) — sub-agent
+                        transparency line. Surfaces the silent downgrade so
+                        the user sees that an analyze_document call ran on
+                        e.g. claude-haiku-4-5 even though the main agent is
+                        claude-sonnet-4-6. Renders only when the backend
+                        populated tc.sub_agent_model (today only the
+                        analyze_document branch — extends naturally when
+                        more sub-agent tools land). */}
+                    {tc.sub_agent_model && (
+                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground/70 italic font-mono">
+                        Sub-agent: {tc.sub_agent_model}
+                      </div>
+                    )}
 
                     {/* Preparing indicator bar — only visible during "preparing" state */}
                     {tc.status === "preparing" && (

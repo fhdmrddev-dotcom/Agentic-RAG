@@ -1,0 +1,30 @@
+# Phase 075.1 Plan 04 (B-260519-08) — sandbox base image with common
+# data-science + document-generation packages pre-installed.
+#
+# Why: pre-Plan-04, the agent loop crashed on first ModuleNotFoundError
+# because the default llm_sandbox image had no python-pptx / matplotlib /
+# numpy / pandas. OpenAI gpt-5.4 gave up after the failure (UAT
+# B-260519-08); other providers retried with pip install but cost the user
+# a 10-30s warm-up per cell. Pre-installing the four hot packages makes
+# the dissertation-defense prompt succeed on first try and saves the
+# warm-up cost on every other code-execution prompt that touches charts
+# or documents.
+#
+# Image versions pinned for supply-chain stability (T-075.1-04-04).
+# Pull from the default PyPI index — no arbitrary registries.
+FROM python:3.11-slim
+
+# Phase 075.1 Plan 04 — common pre-installs. Pin to specific versions to
+# keep wheel cache deterministic across builds; bump versions deliberately
+# in a follow-up phase if upstream releases bring a needed fix.
+RUN pip install --no-cache-dir \
+    python-pptx==1.0.2 \
+    matplotlib==3.9.2 \
+    numpy==2.1.3 \
+    pandas==2.2.3
+
+# Mirror llm_sandbox default workdir + ensure the output directory exists
+# so harvest_output_files's copy_from_runtime("/sandbox/output", tmpdir)
+# never 404s on a clean cell.
+WORKDIR /sandbox
+RUN mkdir -p /sandbox/output

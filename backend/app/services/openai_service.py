@@ -523,21 +523,41 @@ def get_explorer_tools() -> list[dict]:
 
 
 def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
+    # Phase 075.1 Plan 04 (B-260519-04 second half) — capture provider context
+    # so the LangSmith wrap can distinguish OpenRouter / Ollama (both routed
+    # via the OpenAI-compatible API) from native OpenAI traces.
     if user_settings is not None:
         kwargs: dict = {"api_key": user_settings.llm_api_key}
         if user_settings.llm_base_url:
             kwargs["base_url"] = user_settings.llm_base_url
+        provider = user_settings.active_provider or "openai"
     else:
         kwargs = {"api_key": settings.llm_api_key}
         if settings.llm_base_url:
             kwargs["base_url"] = settings.llm_base_url
+        provider = "openai"
     client = OpenAI(**kwargs)
     # Auto-trace all LLM calls (inputs, system prompt, tools, outputs) via LangSmith
     # when a LangSmith API key is configured. Best-effort — never blocks startup.
     if settings.langsmith_api_key:
         try:
             from langsmith.wrappers import wrap_openai
-            client = wrap_openai(client)  # type: ignore[assignment]
+            # Phase 075.1 Plan 04 (B-260519-04) — pass per-provider chat_name so
+            # OpenRouter/Ollama traces show up as ChatOpenrouter/ChatOllama in
+            # LangSmith, not the hardcoded "ChatOpenAI" label. The installed
+            # langsmith wrap_openai signature is
+            # `(client, *, tracing_extra=None, chat_name="ChatOpenAI",
+            #   completions_name="OpenAI")` — verified at plan-time.
+            client = wrap_openai(client, chat_name=f"Chat{provider.title()}")  # type: ignore[assignment]
+        except TypeError:
+            # Older langsmith without chat_name kwarg — fall back to the
+            # generic ChatOpenAI label. Provider context still flows via the
+            # parent agent-loop trace name; this is a graceful degradation.
+            try:
+                from langsmith.wrappers import wrap_openai
+                client = wrap_openai(client)  # type: ignore[assignment]
+            except Exception:
+                pass
         except Exception:
             pass
     return client
