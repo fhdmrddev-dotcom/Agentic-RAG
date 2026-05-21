@@ -311,17 +311,33 @@ export function makeStreamCallbacks(opts: {
                 : tc,
             )
           } else {
-            updatedCalls = [
-              ...existingCalls,
-              {
-                id: `running-${Date.now()}`,
-                name,
-                args,
-                status: "running" as const,
-                startedAt: Date.now(),
-                iteration: currentIteration,
-              },
-            ]
+            // Phase 075.2 Plan 01 Task 2 (D-075.2-01): idempotency-on-replay
+            // guard. If WR-02 reattach replayed a tool_start whose preparing
+            // entry was already finalized (status running or done), treat as
+            // no-op instead of appending a fresh duplicate. Safe because
+            // parallel_tool_calls: false is enforced backend-side (verified
+            // in RESEARCH §Q5). This was the BUG-260521-01 trigger: cursor-0
+            // replay would hit this else-branch and stamp a fresh
+            // `running-${Date.now()}` entry, producing a visible duplicate
+            // card for ~10-15s until snapshot reconcile collapsed it.
+            const finalizedIdx = existingCalls.findIndex(
+              (tc) => tc.name === name && (tc.status === "running" || tc.status === "done"),
+            )
+            if (finalizedIdx !== -1) {
+              updatedCalls = existingCalls  // no-op; same-name entry already exists
+            } else {
+              updatedCalls = [
+                ...existingCalls,
+                {
+                  id: `running-${Date.now()}`,
+                  name,
+                  args,
+                  status: "running" as const,
+                  startedAt: Date.now(),
+                  iteration: currentIteration,
+                },
+              ]
+            }
           }
           // Plan 03 Task 1 invariant: `content` is INTENTIONALLY omitted —
           // spread preserves accumulated text. See onToolPreparing for the
@@ -330,12 +346,20 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
-    onToolEnd: (name, result) => {
+    // Phase 075.2 Plan 01 Task 2 (D-075.2-04 / WR-01): optional `id`
+    // parameter for tool_call_id matching. When present, matches by
+    // tc.id === id (deterministic for future parallel-tool support).
+    // When absent (today's wire shape per RESEARCH §Q1), falls back to
+    // tc.name === name (byte-identical to pre-change behavior).
+    // Backend wire-up of tool_call_id is intentionally out-of-scope
+    // for this phase; the frontend ships id-ready as a no-op until
+    // a future phase lights the wire-side plumbing.
+    onToolEnd: (name, result, id) => {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
-            tc.name === name && tc.status === "running"
+            (id ? tc.id === id : tc.name === name) && tc.status === "running"
               ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
               : tc,
           )
