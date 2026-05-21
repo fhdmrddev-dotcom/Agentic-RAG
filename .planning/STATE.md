@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 076
+Phase: 075.2
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-05-21
+Last activity: 2026-05-21 — Phase 075.1 shipped + UAT 11/13 PASS; 2 regressions deferred to inserted Phase 075.2
 
 ## PRD-reset outputs (committed)
 
