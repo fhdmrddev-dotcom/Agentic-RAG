@@ -4,9 +4,9 @@ title: ToolCallPanel transiently renders duplicate card during streaming, collap
 reported: 2026-05-21
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/components/chat/ToolCallPanel, frontend/providers/StreamsProvider]
-folded_into: null
+folded_into: "075.2"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

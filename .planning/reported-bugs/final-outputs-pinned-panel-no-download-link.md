@@ -4,9 +4,9 @@ title: Pinned "Final outputs" panel renders filenames as plain text, no download
 reported: 2026-05-21
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/components/chat/MessageItem]
-folded_into: null
+folded_into: "075.2"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
