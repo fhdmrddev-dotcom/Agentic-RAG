@@ -480,6 +480,17 @@ Plans:
 - [x] 075.1-03-PLAN.md — Plan 03 Anthropic content-block rendering + sticky indicator (StreamsProvider reducer fix for mixed text + tool_use ordering; MessageItem sticky-cache per-message runStatus)
 - [x] 075.1-04-PLAN.md — Plan 04 observability + sub-agent transparency + polish (LangSmith Anthropic wrap + per-provider ls_provider/name tagging; sub-agent model logged + payload field + tool-card metadata + Settings UI override; system-prompt pip install + /sandbox/output hints; pre-install python-pptx/matplotlib/numpy/pandas in sandbox image; ToolCallPanel dedup; output-files delta view; code_stdout vs code_stderr styling audit; snapshot Redis-probe short-circuit on empty active_runs; delete stale loadMessages on ChatArea mount)
 
+### Phase 075.2: ToolCallPanel Dedup + Final Outputs Download Link (INSERTED)
+
+**Goal:** Close 2 frontend defects deferred from Phase 075.1 Chrome MCP UAT (2026-05-21) — (1) BUG-260521-01: ToolCallPanel transiently renders a duplicate card on the FIRST tool of a run (collapses to one on snapshot reconcile after ~10-15s; cross-provider — OpenAI gpt-4.1, Anthropic claude-sonnet-4-6 confirmed, OpenRouter inferred); end state correct but the transient window misleads the user. Root cause hypothesis: streaming-side reducer creates a fresh `running-${Date.now()}` id when `onToolStart` can't find a `preparing` entry, then snapshot reconcile merges to canonical `tool_call_id`. Fix at the streaming-state vs canonical-state mismatch in `StreamsProvider.tsx` `onToolPreparing` / `onToolStart` paths + dedup-key fallback hardening at `ToolCallPanel.tsx:538`. (2) BUG-260521-02: pinned "Final outputs" panel in `MessageItem.tsx:255-264` renders filenames as plain text — reuse the per-cell `<OutputFileCard>` from `ExecuteCodeBlock.tsx` to surface download + size badge + ghost-border + downloading spinner. Bonus pickup folded into same wave (same files): WR-01 (`onToolEnd` matches by name+status, should match by `tool_call_id`) + WR-02 (two-probe getSnapshot race in `_isTransientStreamEnd` / `_reattachAfterTransient`) from `075.1-REVIEW.md`. Out of scope: WR-03 (covered under dedup hardening), IN-01/02/04 (backend, orthogonal), BUG-260514-02 (deferred to v2.7 Agent Workspace).
+**Requirements**: TBD
+**Depends on:** Phase 075.1
+**Plans:** 2
+
+Plans:
+- [ ] 075.2-01-PLAN.md — Plan 01 BUG-260521-01 reducer-quality pass (Wave 1; frontend; `StreamsProvider.tsx` `onToolStart` streaming-id ↔ canonical-id reconcile + `onToolEnd` id-match per WR-01 + `_isTransientStreamEnd` snapshot threading per WR-02 + `ToolCallPanel.tsx:538` dedup-key fallback hardening per WR-03 — D-075.2-01/02/03/04)
+- [ ] 075.2-02-PLAN.md — Plan 02 BUG-260521-02 Final Outputs download link (Wave 1, parallel-able; frontend; reuse `<OutputFileCard>` from `ExecuteCodeBlock.tsx` in `MessageItem.tsx:255-264` Final Outputs panel; planner picks export-from-ExecuteCodeBlock vs extract-to-shared based on import-graph inspection — D-075.2-05/06/07)
+
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
 **Depends on**: Phase 071.3
