@@ -538,12 +538,18 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
   const deduplicatedToolCalls = useMemo(() => {
     const seen = new Set<string>()
     const result: ToolCall[] = []
-    for (const tc of toolCalls ?? []) {
-      const key = tc.id || `${tc.name}-${tc.startedAt ?? ''}`
-      if (seen.has(key)) continue
+    // Phase 075.2 Plan 01 Task 3 (D-075.2-01 §2 / WR-03): fallback key
+    // includes idx tiebreaker so two same-name entries without ids (and
+    // without startedAt) cannot collide and get silently deduped. Dead
+    // code once the Task 2 onToolStart replay-idempotency guard is in,
+    // but ships as defense-in-depth so the next edge case in this
+    // neighborhood cannot produce a silent dedup.
+    ;(toolCalls ?? []).forEach((tc, idx) => {
+      const key = tc.id || `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+      if (seen.has(key)) return
       seen.add(key)
       result.push(tc)
-    }
+    })
     return result
   }, [toolCalls])
 
