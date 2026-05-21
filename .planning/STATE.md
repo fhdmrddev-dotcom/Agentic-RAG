@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
+status: planning
 stopped_at: Completed 075-03-PLAN.md
-last_updated: "2026-05-19T18:59:19.865Z"
-last_activity: 2026-05-19 -- Phase 075.1 execution started
+last_updated: "2026-05-21T20:33:14.026Z"
+last_activity: 2026-05-21 — Phase 075.1 shipped + UAT 11/13 PASS; 2 regressions deferred to inserted Phase 075.2
 progress:
-  total_phases: 23
+  total_phases: 24
   completed_phases: 14
-  total_plans: 48
-  completed_plans: 46
-  percent: 61
+  total_plans: 50
+  completed_plans: 50
+  percent: 100
 ---
 
 # Project State
@@ -455,4 +455,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 075.1 (cross-provider-streaming-stability-observability-polish-bund) — 4 plans — 2026-05-19T18:51:10.602Z
+**Planned Phase:** 075.2 (ToolCallPanel Dedup + Final Outputs Download Link) — 2 plans — 2026-05-21T20:33:14.015Z
