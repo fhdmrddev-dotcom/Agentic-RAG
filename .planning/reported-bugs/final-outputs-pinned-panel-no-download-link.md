@@ -8,8 +8,8 @@ status: partial-closed
 affected_areas: [frontend/components/chat/MessageItem]
 folded_into: "075.2"
 related_seeds: []
-re_open_trigger: "Backend SSE final_output_files payload now carries url + size (see BUG-260522-01) — re-verify pinned panel click-to-download via Chrome MCP."
-related: [BUG-260522-01]
+re_open_trigger: "Backend SSE final_output_files payload now carries url + size (see BUG-260522-02) — re-verify pinned panel click-to-download via Chrome MCP."
+related: [BUG-260522-02]
 closed_partial_on: 2026-05-22
 reproduces_on:
   branch: v2.5-dev
@@ -23,8 +23,8 @@ reproduces_on:
 > achieved; the url-optional fallback render path is verified live (Chrome MCP UAT,
 > Anthropic claude-sonnet-4-6, primes-matplotlib). Click-to-download still does NOT
 > work because the backend SSE `final_output_files` event emits `{filename: ...}` only
-> — see BUG-260522-01 for the data-layer follow-up. This bug's presentation-half is
-> closed; the download-half rolls forward as BUG-260522-01.
+> — see BUG-260522-02 for the data-layer follow-up. This bug's presentation-half is
+> closed; the download-half rolls forward as BUG-260522-02.
 
 # BUG-260521-02: Pinned "Final outputs" panel renders filenames as plain text, no download link
 
