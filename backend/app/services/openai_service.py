@@ -865,23 +865,33 @@ def create_adaptive_streaming_chat(
     
     effective_tokens = resolved_tokens  # GEN-01: full budget always — no reduction
     
+    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+
     kwargs: dict = {
         "model": effective_model,
         "messages": messages,
         "stream": True,
-        # Phase 073 D-073-08 (TOKEN-COL-01): enable usage on every streaming call
-        # globally. OpenAI: emits one extra final chunk with chunk.usage populated
-        # and empty choices=[] (Pitfall 2 — _drain_stream_with_close_on_cancel
-        # runs the iterator to natural StopIteration, so the trailing chunk WILL
-        # be delivered). OpenRouter: officially deprecated as of 2026 (always
-        # returns usage now per Pitfall 8) — flag is a forward-compatible no-op.
-        # ONE flip covers BOTH providers (config.py:_PROVIDER_BASE_URLS routes
-        # openrouter through the same client.chat.completions.create call).
-        "stream_options": {"include_usage": True},
         token_param: effective_tokens,
     }
-    
-    provider = (user_settings.active_provider if user_settings else "") or settings.llm_provider or ""
+
+    # Phase 073 D-073-08 (TOKEN-COL-01): enable usage on every streaming call
+    # globally. OpenAI: emits one extra final chunk with chunk.usage populated
+    # and empty choices=[] (Pitfall 2 — _drain_stream_with_close_on_cancel
+    # runs the iterator to natural StopIteration, so the trailing chunk WILL
+    # be delivered). OpenRouter: officially deprecated as of 2026 (always
+    # returns usage now per Pitfall 8) — flag is a forward-compatible no-op.
+    # ONE flip covers BOTH providers (config.py:_PROVIDER_BASE_URLS routes
+    # openrouter through the same client.chat.completions.create call).
+    #
+    # Quick task 260522-gdg — Google EXCLUDED. Google's OpenAI-compat layer
+    # puts `usage` on EVERY chunk (alongside content), not just the final
+    # chunk. The chunk handler at threads.py:1806-1816 early-returns when it
+    # sees usage, discarding the content/tool_calls in the same chunk. Until
+    # Phase 075.3 lands a defensive chunk handler + Google token-accounting
+    # path, gating this flag off restores Google content delivery at the cost
+    # of NULL runs.input_tokens / runs.output_tokens for Google runs only.
+    if provider.lower() != "google":
+        kwargs["stream_options"] = {"include_usage": True}
 
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
@@ -906,6 +916,25 @@ def create_adaptive_streaming_chat(
             # Tool schemas are injected into system prompt by caller (threads.py)
             pass
     
+    # Quick task 260522-gdg — Google-only request-shape log. Captures what
+    # we're actually sending to Google's OpenAI-compat endpoint so we can spot
+    # rejected params or compat-layer mismatches. Remove after Phase 075.3.
+    if provider.lower() == "google":
+        _key = (user_settings.llm_api_key if user_settings else "") or ""
+        _base = (user_settings.llm_base_url if user_settings else "") or ""
+        logger.warning(
+            "[GOOGLE-DIAG] stream-create model=%s key_len=%d base_url=%s "
+            "kwargs_keys=%s has_tools=%s tool_count=%d tool_choice=%r "
+            "has_stream_options=%s has_max_tokens=%s has_parallel_tc=%s",
+            kwargs.get("model"), len(_key), _base,
+            sorted(kwargs.keys()),
+            "tools" in kwargs, len(kwargs.get("tools") or []),
+            kwargs.get("tool_choice"),
+            "stream_options" in kwargs,
+            "max_tokens" in kwargs or "max_completion_tokens" in kwargs,
+            "parallel_tool_calls" in kwargs,
+        )
+
     stream = client.chat.completions.create(**kwargs)
     return stream, calling_mode
 
