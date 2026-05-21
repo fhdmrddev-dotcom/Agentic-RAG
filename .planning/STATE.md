@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Completed 075-03-PLAN.md
 last_updated: "2026-05-19T18:59:19.865Z"
 last_activity: 2026-05-19 -- Phase 075.1 execution started
 progress:
   total_phases: 23
-  completed_phases: 13
+  completed_phases: 14
   total_plans: 48
   completed_plans: 46
-  percent: 96
+  percent: 61
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 075.1 (cross-provider-streaming-stability-observability-polish-bund) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 075.1
-Last activity: 2026-05-19 -- Phase 075.1 execution started
+Phase: 076
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-21
 
 ## PRD-reset outputs (committed)
 

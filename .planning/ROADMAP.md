@@ -472,7 +472,7 @@ Plans:
 **Goal:** Close the 11 bugs catalogued in `075-CROSS-PROVIDER-UAT.md` (v4) — universal SSE-break (frontend stuck on "Running code" until F5), Anthropic content-block render failure mid-stream, snapshot 503 on empty threads, sub-agent silent downgrade with no UI surface, LangSmith Anthropic main-loop untraced + provider mislabel, OpenAI ModuleNotFoundError give-up, OpenRouter sandbox path inconsistency + Resume-button surfacing, stdout-in-red styling, ToolCallPanel duplication, output-files panel cumulative-repeat. 4-plan split locked: Plan 01 universal stream-end recovery (frontend), Plan 02 backend SSE transport stability (root cause: `harvest_output_files` blocking on async loop), Plan 03 Anthropic content-block rendering + sticky indicator, Plan 04 observability + sub-agent transparency + polish bundle.
 **Requirements**: TBD
 **Depends on:** Phase 075
-**Plans:** 4 plans (planned; not yet broken down)
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 075.1-01-PLAN.md — Plan 01 universal stream-end recovery (frontend; `_isTransientBufferExpired` widen + `/snapshot.active_runs` reconcile on terminal)
