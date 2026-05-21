@@ -125,10 +125,18 @@ export async function _isTransientStreamEnd(
   threadId: string,
   runId: string,
   toolCalls: ToolCall[] | undefined,
-): Promise<boolean> {
+): Promise<ThreadSnapshot | null> {
+  // Phase 075.2 Plan 01 Task 1 (D-075.2-03): return ThreadSnapshot | null
+  // instead of boolean so callers can thread the snapshot to
+  // _reattachAfterTransient without a second getSnapshot probe (eliminates
+  // the WR-02 two-probe race where the run can terminate between the
+  // transient-filter probe and the reattach probe, falling back to cursor 0
+  // and replaying tool_start events — the suspected trigger for
+  // BUG-260521-01's first-tool duplicate card).
+
   // Explicit terminals are never transient — short-circuit without touching
   // the network. Both branches map to a final runStatus on the consumer side.
-  if (kind === "cancelled" || kind === "timed_out") return false
+  if (kind === "cancelled" || kind === "timed_out") return null
 
   // For kind === "done", only treat as transient when running/preparing tools
   // are still open (premature done before tool results land). Genuine
@@ -138,7 +146,7 @@ export async function _isTransientStreamEnd(
     const stillWorking = (toolCalls ?? []).some(
       (tc) => tc.status === "running" || tc.status === "preparing",
     )
-    if (!stillWorking) return false
+    if (!stillWorking) return null
   }
   // kind === "error" and kind === "reader_done" both proceed to the snapshot
   // probe unconditionally (any errorPayload value triggers the probe — the
@@ -148,10 +156,11 @@ export async function _isTransientStreamEnd(
   void errorPayload
 
   const snapshot = await getSnapshot(threadId).catch(() => null)
-  if (!snapshot) return false
-  return snapshot.active_runs.some(
+  if (!snapshot) return null
+  const isStreaming = snapshot.active_runs.some(
     (r) => r.run_id === runId && r.status === "streaming",
   )
+  return isStreaming ? snapshot : null
 }
 
 /**
@@ -173,14 +182,20 @@ export async function _isTransientStreamEnd(
  * MUST fall through to the terminal-flip behavior to avoid leaving the
  * placeholder stuck in "streaming" state).
  */
-async function _reattachAfterTransient(
+export async function _reattachAfterTransient(
+  snapshot: ThreadSnapshot,
   threadId: string,
   runId: string,
   lastSeenOffsetRef: MutableRefObject<Map<string, string>>,
   reattach: (runId: string, since: string) => void,
 ): Promise<boolean> {
-  const snapshot = await getSnapshot(threadId).catch(() => null)
-  if (!snapshot) return false
+  // Phase 075.2 Plan 01 Task 1 (D-075.2-03): snapshot threaded in by
+  // the caller; the second internal getSnapshot probe has been DELETED.
+  // Eliminates the WR-02 race window where the run can terminate between
+  // probes, falling back to cursor "0" and replaying every tool_start
+  // event for the run (suspected BUG-260521-01 trigger).
+  // threadId is retained for context/logging parity with the caller.
+  void threadId
   const seedCursor = snapshot.since_cursors[runId]
   if (seedCursor && !lastSeenOffsetRef.current.has(runId)) {
     lastSeenOffsetRef.current.set(runId, seedCursor)
@@ -296,17 +311,33 @@ export function makeStreamCallbacks(opts: {
                 : tc,
             )
           } else {
-            updatedCalls = [
-              ...existingCalls,
-              {
-                id: `running-${Date.now()}`,
-                name,
-                args,
-                status: "running" as const,
-                startedAt: Date.now(),
-                iteration: currentIteration,
-              },
-            ]
+            // Phase 075.2 Plan 01 Task 2 (D-075.2-01): idempotency-on-replay
+            // guard. If WR-02 reattach replayed a tool_start whose preparing
+            // entry was already finalized (status running or done), treat as
+            // no-op instead of appending a fresh duplicate. Safe because
+            // parallel_tool_calls: false is enforced backend-side (verified
+            // in RESEARCH §Q5). This was the BUG-260521-01 trigger: cursor-0
+            // replay would hit this else-branch and stamp a fresh
+            // `running-${Date.now()}` entry, producing a visible duplicate
+            // card for ~10-15s until snapshot reconcile collapsed it.
+            const finalizedIdx = existingCalls.findIndex(
+              (tc) => tc.name === name && (tc.status === "running" || tc.status === "done"),
+            )
+            if (finalizedIdx !== -1) {
+              updatedCalls = existingCalls  // no-op; same-name entry already exists
+            } else {
+              updatedCalls = [
+                ...existingCalls,
+                {
+                  id: `running-${Date.now()}`,
+                  name,
+                  args,
+                  status: "running" as const,
+                  startedAt: Date.now(),
+                  iteration: currentIteration,
+                },
+              ]
+            }
           }
           // Plan 03 Task 1 invariant: `content` is INTENTIONALLY omitted —
           // spread preserves accumulated text. See onToolPreparing for the
@@ -315,12 +346,20 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
-    onToolEnd: (name, result) => {
+    // Phase 075.2 Plan 01 Task 2 (D-075.2-04 / WR-01): optional `id`
+    // parameter for tool_call_id matching. When present, matches by
+    // tc.id === id (deterministic for future parallel-tool support).
+    // When absent (today's wire shape per RESEARCH §Q1), falls back to
+    // tc.name === name (byte-identical to pre-change behavior).
+    // Backend wire-up of tool_call_id is intentionally out-of-scope
+    // for this phase; the frontend ships id-ready as a no-op until
+    // a future phase lights the wire-side plumbing.
+    onToolEnd: (name, result, id) => {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
-            tc.name === name && tc.status === "running"
+            (id ? tc.id === id : tc.name === name) && tc.status === "running"
               ? { ...tc, status: "done" as const, endedAt: Date.now(), result: result ?? tc.result }
               : tc,
           )
@@ -754,9 +793,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     },
                   )
                   if (reattached) return
-                  // Snapshot fetch failed during reattach — fall through to
-                  // the terminal flip below so the placeholder is not left
-                  // stuck in "streaming" state forever (fail-safe path).
+                  // Phase 075.2 Plan 01 Task 1: _reattachAfterTransient now
+                  // always returns true (no internal getSnapshot probe to
+                  // fail). The `if (reattached) return` shape is preserved
+                  // for symmetry but the fall-through is currently dead.
                 }
                 useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
                   if (!prev.some((m) => m.id === targetId)) return prev
@@ -918,18 +958,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 const currentBucket =
                   useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
                 const currentToolCalls = currentBucket.find((m) => m.id === assistantId)?.tool_calls
-                if (
-                  await _isTransientStreamEnd(
-                    kind,
-                    errorPayload,
-                    threadId,
-                    registeredRunId,
-                    currentToolCalls,
-                  )
-                ) {
-                  // Re-attach using the shared helper. Snapshot fetch failure
-                  // falls through to terminal flip (fail-safe).
+                // Phase 075.2 Plan 01 Task 1 (D-075.2-03): single-probe pattern.
+                // Snapshot is threaded into _reattachAfterTransient so the
+                // helper does NOT call getSnapshot again. See helper docstring.
+                const transientSnapshot = await _isTransientStreamEnd(
+                  kind,
+                  errorPayload,
+                  threadId,
+                  registeredRunId,
+                  currentToolCalls,
+                )
+                if (transientSnapshot) {
+                  // Re-attach using the shared helper.
                   const reattached = await _reattachAfterTransient(
+                    transientSnapshot,
                     threadId,
                     registeredRunId,
                     lastSeenOffsetRef,
@@ -949,7 +991,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     },
                   )
                   if (reattached) return
-                  // Fall through on snapshot fetch failure (fail-safe).
+                  // Phase 075.2 Plan 01 Task 1: _reattachAfterTransient now
+                  // always returns true. Fall-through preserved for symmetry
+                  // but currently dead.
                 }
               }
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {

@@ -202,7 +202,11 @@ export interface StreamCallbacks {
   onTitleUpdate?: (title: string) => void
   onToolPreparing?: (name: string, index: number) => void
   onToolStart?: (name: string, args: Record<string, string>) => void
-  onToolEnd?: (name: string, result?: string) => void
+  // Phase 075.2 Plan 01 Task 2 (D-075.2-04 / WR-01): optional id?:string
+  // for future tool_call_id matching. Backend wire-up deferred (RESEARCH
+  // §Q1: tool_end SSE today carries name + result only). When undefined
+  // the reducer falls back to tc.name match (byte-identical legacy behavior).
+  onToolEnd?: (name: string, result: string | undefined, id?: string) => void
   onSubAgentStart?: (filename: string, task: string) => void
   onSubAgentDelta?: (text: string) => void
   onSubAgentDone?: () => void
