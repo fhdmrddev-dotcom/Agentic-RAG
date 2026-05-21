@@ -4,16 +4,27 @@ title: Pinned "Final outputs" panel renders filenames as plain text, no download
 reported: 2026-05-21
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: partial-closed
 affected_areas: [frontend/components/chat/MessageItem]
 folded_into: "075.2"
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Backend SSE final_output_files payload now carries url + size (see BUG-260522-01) — re-verify pinned panel click-to-download via Chrome MCP."
+related: [BUG-260522-01]
+closed_partial_on: 2026-05-22
 reproduces_on:
   branch: v2.5-dev
   commit: 0cd7990
   date: 2026-05-21
 ---
+
+> **2026-05-22 partial-closed note:** Phase 075.2 Plan 02 shipped the OutputFileCard
+> reuse in `MessageItem.tsx:255-264` and the pinned panel now renders the card stack
+> with `data-testid="final-outputs-panel"`. Visual consistency vs the per-cell card is
+> achieved; the url-optional fallback render path is verified live (Chrome MCP UAT,
+> Anthropic claude-sonnet-4-6, primes-matplotlib). Click-to-download still does NOT
+> work because the backend SSE `final_output_files` event emits `{filename: ...}` only
+> — see BUG-260522-01 for the data-layer follow-up. This bug's presentation-half is
+> closed; the download-half rolls forward as BUG-260522-01.
 
 # BUG-260521-02: Pinned "Final outputs" panel renders filenames as plain text, no download link
 

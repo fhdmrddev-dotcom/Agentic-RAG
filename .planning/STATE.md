@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
+status: executing
 stopped_at: Completed 075-03-PLAN.md
-last_updated: "2026-05-21T20:33:14.026Z"
-last_activity: 2026-05-21 — Phase 075.1 shipped + UAT 11/13 PASS; 2 regressions deferred to inserted Phase 075.2
+last_updated: "2026-05-21T20:34:24.730Z"
+last_activity: 2026-05-21 -- Phase --phase execution started
 progress:
   total_phases: 24
   completed_phases: 14
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.1 — cross-provider-streaming-stability-observability-polish-bund
+**Current focus:** Phase --phase — 075.2
 
 ## Current Position
 
-Phase: 075.2
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-21 — Phase 075.1 shipped + UAT 11/13 PASS; 2 regressions deferred to inserted Phase 075.2
+Phase: --phase (075.2) — EXECUTING
+Plan: 1 of --name
+Status: Executing Phase --phase
+Last activity: 2026-05-21 -- Phase --phase execution started
 
 ## PRD-reset outputs (committed)
 
