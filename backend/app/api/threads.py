@@ -1797,25 +1797,8 @@ async def send_message(
                                 # `_last_per_call_budget` (captured above) are
                                 # consumed by the outer agent_runner's
                                 # `except asyncio.TimeoutError` formatter.
-                                # Quick task 260522-gdg — Google-only per-chunk counter.
-                                # Captures the actual chunk shape Google's OpenAI-compat returns
-                                # to distinguish "zero chunks" from "chunks with empty choices=[]".
-                                # Remove after Phase 075.3 lands.
-                                _gdiag_chunk_count = [0] if active_provider_name == "google" else None
-                                _gdiag_chunk_samples: list = [] if active_provider_name == "google" else None  # type: ignore[assignment]
-
                                 async def _on_chunk_openai(chunk):
                                     nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                                    # Quick task 260522-gdg — chunk-level diagnostic for Google.
-                                    if _gdiag_chunk_count is not None:
-                                        _gdiag_chunk_count[0] += 1
-                                        if len(_gdiag_chunk_samples) < 3:
-                                            _gdiag_chunk_samples.append({
-                                                "n": _gdiag_chunk_count[0],
-                                                "has_usage": getattr(chunk, "usage", None) is not None,
-                                                "has_choices": bool(getattr(chunk, "choices", None)),
-                                                "raw": str(chunk)[:300],
-                                            })
                                     # Phase 073 TOKEN-COL-01 (D-073-08): final usage chunk has empty choices=[]
                                     # and populated chunk.usage. Other chunks have chunk.usage=None. Pitfall 2:
                                     # _drain_stream_with_close_on_cancel iterates the stream to natural
@@ -1985,33 +1968,6 @@ async def send_message(
                         "Iteration %d finish_reason=%r tool_calls_buffered=%d",
                         iteration, finish_reason, len(tool_calls_buffer),
                     )
-
-                    # Quick task 260522-gdg — Google-only per-iteration diagnostic.
-                    # Captures the shape needed to pin which of the 4 parity gaps
-                    # (include_usage / parallel_tool_calls / tool_choice=none /
-                    # tool-result format) is driving the 15-iteration loop on all
-                    # Gemini models. Remove after Phase 075.3 lands.
-                    if active_provider_name == "google":
-                        _gdiag_tcs = [
-                            {
-                                "idx": _i,
-                                "name": _tc.get("name") or "<empty>",
-                                "id_len": len(_tc.get("id") or ""),
-                                "args_len": len(_tc.get("arguments") or ""),
-                                "args_preview": (_tc.get("arguments") or "")[:120],
-                            }
-                            for _i, _tc in tool_calls_buffer.items()
-                        ]
-                        logger.warning(
-                            "[GOOGLE-DIAG] iter=%d model=%s finish_reason=%r "
-                            "force_no_tools=%s content_len=%d tool_calls=%d "
-                            "chunks_received=%s chunk_samples=%s details=%s",
-                            iteration, _model_id, finish_reason, force_no_tools,
-                            len(full_content), len(tool_calls_buffer),
-                            (_gdiag_chunk_count[0] if _gdiag_chunk_count is not None else "n/a"),
-                            (_gdiag_chunk_samples if _gdiag_chunk_samples is not None else "n/a"),
-                            _gdiag_tcs,
-                        )
 
                     if finish_reason == "length" and tool_calls_buffer:
                         # length limit hit while streaming tool arguments — discard partial call

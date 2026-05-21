@@ -39,15 +39,15 @@ The user-facing error message at `threads.py:2910` reports *"empty response afte
 
 `backend/app/services/openai_service.py`: gate `stream_options.include_usage` on `provider.lower() != "google"`. One conditional, ~25 lines including the new explanatory comment block. Restores Google content delivery at the cost of NULL `runs.input_tokens` / `runs.output_tokens` for Google runs only — the Phase 073-04 SC#3 forward-fill emits its existing `"runs.usage missing"` warning as designed.
 
-## Diagnostic instrumentation (left in place, tagged for removal in Phase 075.3)
+## Diagnostic instrumentation (added → confirmed root cause → REMOVED same day)
 
-Three `logger.warning` blocks gated on `active_provider_name == "google"`:
+Three `logger.warning` blocks gated on `active_provider_name == "google"` were added during investigation, fired exactly the data needed to pinpoint the chunk-handler early-return, then removed in the same quick task once the hotfix was verified working. Net zero residual code in the backend:
 
-1. `threads.py:1971-1992` — per-iteration shape (finish_reason, tool_calls, content_len, chunks_received, chunk_samples).
-2. `threads.py:1800-1817` — per-chunk counter + first-3-chunks raw sample, populated inside `_on_chunk_openai`.
-3. `openai_service.py:909-923` — one-shot request-kwargs log at stream creation (model, key_len, base_url, kwargs_keys, tool_count, gate states).
+1. `threads.py:~1971` — per-iteration shape log (REMOVED).
+2. `threads.py:~1800` — per-chunk counter + first-3-chunks raw sample (REMOVED).
+3. `openai_service.py:~909` — one-shot request-kwargs log at stream creation (REMOVED).
 
-Total surface: ~50 LOC of removable instrumentation. Phase 075.3 Plan 02 owns removal.
+Removal reasoning: fix is end-to-end verified; ongoing monitoring isn't needed; Phase 075.3 is not imminent, so if diagnostics are needed during that phase they're added fresh against the new code shape. Backend stays clean.
 
 ## Live UAT (2026-05-22)
 
@@ -57,20 +57,19 @@ Total surface: ~50 LOC of removable instrumentation. Phase 075.3 Plan 02 owns re
 
 Other Gemini models not yet retested but expected GREEN by same code path (all 5 share the OpenAI-compat route + chunk handler).
 
-## Carry-forward to Phase 075.3 (slimmed scope)
+## Carry-forward to Phase 075.3 (further slimmed — now 1 plan)
 
-**Plan 01 — Defensive chunk handler + Google token accounting**
-- Remove the early-`return` after usage accumulation in `_on_chunk_openai`; let chunks with both usage AND content be fully processed.
-- Add provider-aware accumulator: overwrite-last-wins for Google (per-chunk cumulative usage), accumulate-`+=` for OpenAI/OpenRouter (final-chunk-only emission). Decision point: research Google compat doc; if per-chunk usage is delta, accumulate works; if cumulative, overwrite-last-wins.
+**Plan 01 — Defensive chunk handler + Google token accounting (only plan)**
+- Remove the early-`return` after usage accumulation in `_on_chunk_openai` at `threads.py:1816`; let chunks with both usage AND content be fully processed.
+- Add provider-aware accumulator: overwrite-last-wins for Google (per-chunk cumulative usage), accumulate-`+=` for OpenAI/OpenRouter (final-chunk-only emission). Decision point: research Google compat doc OR add a quick repro probe; if per-chunk usage is delta, accumulate works; if cumulative, overwrite-last-wins.
 - Integration test for "chunks with both usage AND content" shape on a Google-spec mock.
-- Revert the Path A `stream_options.include_usage` gate (no longer needed once handler is defensive).
-
-**Plan 02 — Diagnostic removal + BUG-260522-01**
-- Remove the 3 diagnostic logging blocks (~50 LOC). Atomic revert of this quick task's instrumentation.
-- Fix the misleading `max_iterations` message at `threads.py:2910` to report actual iteration count.
+- Revert the Path A `stream_options.include_usage` gate at `openai_service.py:886-893` (no longer needed once handler is defensive); confirm `runs.input_tokens` / `runs.output_tokens` populate on Google runs again.
 - All 5 Gemini models green-light Chrome MCP UAT.
 
-**Decision:** Native Google SDK split (the parallel option considered earlier — `google_service.py` mirroring `anthropic_service.py`) **deferred to v3.1** alongside the planned Provider key management UI. Architectural appeal stands (multi-modal, parity with Anthropic) but no longer the cheapest fix for the user-facing bug.
+**Decisions baked in:**
+- **BUG-260522-01** (misleading `max_iterations` message) routed to **Phase 082.5 Error Handler Foundation** — its `ErrorResponse{user_message, admin_message}` model with sanitization is the natural home; not bundled into 075.3.
+- **Native Google SDK split** (`google_service.py` mirroring `anthropic_service.py`) **deferred to v3.1** alongside the planned Provider key management UI. Architectural appeal stands (multi-modal, parity with Anthropic) but no longer the cheapest fix for the user-facing bug, which is now closed.
+- **Diagnostic re-add (if needed during 075.3)** — re-introduce against the new code shape with fresh eyes; do NOT reach for what was removed here.
 
 ## Related memory pointers
 
@@ -79,9 +78,8 @@ Other Gemini models not yet retested but expected GREEN by same code path (all 5
 - [[feedback_preserve_engine_optionality]] — supports the eventual native split
 - [[reference_local_dev_app]] — repro environment
 
-## Commits
+## Commits (all on `v2.5-dev`)
 
-(staged shape, awaiting user confirm before `git commit`)
-- `fix(google): exclude stream_options.include_usage for Google compat (Path A hotfix)` — `openai_service.py`
-- `chore(google): add Google-only diagnostic logging for chunk shape + request kwargs` — `threads.py` + `openai_service.py`
-- `docs(quick): 260522-gdg PLAN + SUMMARY + BUG-260522-01 report`
+1. `ee3b1f9 fix(google): exclude stream_options.include_usage for Google compat` — `openai_service.py` hotfix + `threads.py` diagnostic blocks (bundled because diagnostic data validated the hotfix in same commit).
+2. `2e46b6b docs(quick): 260522-gdg PLAN + SUMMARY + BUG-260522-01` — planning artifacts.
+3. *(this commit)* `chore(google): remove diagnostic logging — fix verified, backend clean` — strips the 3 diagnostic blocks now that the hotfix is end-to-end confirmed.

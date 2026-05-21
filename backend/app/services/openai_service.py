@@ -916,25 +916,6 @@ def create_adaptive_streaming_chat(
             # Tool schemas are injected into system prompt by caller (threads.py)
             pass
     
-    # Quick task 260522-gdg — Google-only request-shape log. Captures what
-    # we're actually sending to Google's OpenAI-compat endpoint so we can spot
-    # rejected params or compat-layer mismatches. Remove after Phase 075.3.
-    if provider.lower() == "google":
-        _key = (user_settings.llm_api_key if user_settings else "") or ""
-        _base = (user_settings.llm_base_url if user_settings else "") or ""
-        logger.warning(
-            "[GOOGLE-DIAG] stream-create model=%s key_len=%d base_url=%s "
-            "kwargs_keys=%s has_tools=%s tool_count=%d tool_choice=%r "
-            "has_stream_options=%s has_max_tokens=%s has_parallel_tc=%s",
-            kwargs.get("model"), len(_key), _base,
-            sorted(kwargs.keys()),
-            "tools" in kwargs, len(kwargs.get("tools") or []),
-            kwargs.get("tool_choice"),
-            "stream_options" in kwargs,
-            "max_tokens" in kwargs or "max_completion_tokens" in kwargs,
-            "parallel_tool_calls" in kwargs,
-        )
-
     stream = client.chat.completions.create(**kwargs)
     return stream, calling_mode
 
