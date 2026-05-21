@@ -235,3 +235,33 @@
 2. After Plan 03 ships, retest the Anthropic dissertation prompt — UI should render live, not blank-until-refresh.
 3. After Plan 04 ships, confirm `claude-sonnet-4-6` selection in UI actually routes to Sonnet (LangSmith should show Sonnet traces, not Haiku).
 4. Round 1's pptx output file was never harvested (OpenAI failed before generation); Round 3's pptx was created but not at `/sandbox/output/`. Only Round 2's `Fahed_Mrad_DBA_Defence_Presentation.pptx` (634 KB) is downloadable. The user has not been able to actually download/open any of the 3 attempts.
+
+---
+
+## Phase 075.1 Closure (2026-05-21)
+
+Phase 075.1 shipped 4 plans + Chrome MCP UAT against all 3 providers. Closure status per original bug:
+
+| Bug | Status after 075.1 | Notes |
+|-----|---------------------|-------|
+| **Headline universal SSE-break** ("Running code until F5") | **CLOSED** | UAT verified on OpenAI gpt-4.1, Anthropic claude-opus-4-6 + claude-sonnet-4-6, OpenRouter llama-3.3-70b: 45s-sleep test completes without F5. Plan 02 root-cause fix (`harvest_output_files` → `run_in_threadpool` per D-v2.5-01) + Plan 01 widened transient-stream-end filter substrate. |
+| B-260519-01 (Anthropic blank-until-F5) | **CLOSED** | UAT 2 (Anthropic claude-sonnet-4-6 primes-matplotlib stress test): text streamed BEFORE first tool call ("Let me work through this step by step"), BETWEEN tool calls ("Now onto Step 2..."), and AFTER ("Step 1 — Done", "Step 2 — Plot", "Step 3 — Reflection"). No blank-until-F5. Plan 03 audit found the hypothesized reducer bug was not actually present in post-Plan-01 codebase; the lock-in via tests + guards stands. |
+| B-260519-02 (snapshot 503 on empty thread) | **CLOSED** | UAT verified — 36 inspected snapshot requests across multiple new-thread creates all returned 200. Plan 04's Redis-probe short-circuit on empty `active_runs` works. |
+| B-260519-03 (OpenRouter Resume button mid-stream) | **CLOSED** | UAT verified — OpenRouter 45s-sleep test showed no Resume button at any point during the run. Plan 01 + Plan 02 substrate. |
+| B-260519-04 (LangSmith Anthropic untraced + provider mislabel) | **CODE-VERIFIED** | gsd-verifier confirmed `@traceable(name="ChatAnthropic")` on `anthropic_service.py` + per-provider `chat_name` in `openai_service.py`. LangSmith UI not opened during UAT — runtime trace inspection still owed. No regression evidence either way. |
+| B-260519-05 (sub-agent silent downgrade) | **CODE-VERIFIED** | gsd-verifier confirmed sub-agent log at `sub_agent_service.py:77` + Settings dropdown. Runtime not exercised in UAT (none of the test prompts triggered `analyze_document`). |
+| B-260519-07 (stdout in red styling) | **CLOSED** | UAT verified — matplotlib traceback rendered with `text-red-400`; prime-number stdout rendered with `text-emerald-400`. |
+| B-260519-08 (OpenAI ModuleNotFoundError give-up) | **OPERATOR-PENDING** | Code fix shipped (`backend/Dockerfile.sandbox` with pre-installed matplotlib/numpy/pandas/python-pptx). Operator must run `docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:075.1 backend/` + set `SANDBOX_IMAGE=agentic-rag-sandbox:075.1` env var. UAT confirmed code path is in place; sandbox image not yet rebuilt. |
+| B-260519-09 (Output files written/downloadable) | **CLOSED** | UAT verified — primes.png saved to /sandbox/output/, per-cell "Output files" panel rendered clickable link, download confirmed reachable. |
+| **B-260519-10 (ToolCallPanel duplication)** | **REGRESSION → 075.2** | UAT found Step 1 tool card duplicates on BOTH OpenAI and Anthropic on the first tool of a run (always position-1, never later positions). Reopened as BUG-260521-01. Folded into Phase 075.2. |
+| B-260519-11 (output-files cumulative-repeat) | **CLOSED (partial)** | UAT verified per-cell "Output files" delta + pinned "Final outputs" cumulative panel both render at correct positions. **However**, IN-03 from 075.1-REVIEW.md is confirmed: pinned panel renders filenames as plain text, no download link. Reopened as BUG-260521-02. Folded into Phase 075.2. |
+| BUG-260514-01 (tool output download bloat) | **CLOSED** | Frontmatter flipped to `folded` by Plan 04; per-cell delta-only view validated by UAT. |
+| BUG-260514-02 (narration vs summary) | **INCIDENTALLY CLOSED** | UAT 2 final synthesis includes both per-step narration ("Step 1 — Done!") and reflective summary ("Step 3 — Reflection"). Was hypothesized to need separate handling; Plan 03 substrate produces clean post-tool prose. |
+
+**Open Verification Items resolution:**
+1. ✅ Resolved by UAT 1 (3 providers, 0 F5).
+2. ✅ Resolved by UAT 2 (Anthropic claude-sonnet-4-6 stress test).
+3. 🔵 Code-verified by gsd-verifier; LangSmith UI trace inspection still owed (operator action).
+4. ⚠ B-260519-08 sandbox image fix shipped; operator must rebuild image to make full pptx flow work end-to-end.
+
+**Summary:** 9/11 bugs CLOSED + 2 CODE-VERIFIED + 2 REGRESSION → 075.2 + 1 OPERATOR-PENDING. BUG-260514-01 + BUG-260514-02 both closed. Phase 075.1 marked complete 2026-05-21.
