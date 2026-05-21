@@ -756,25 +756,29 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 const currentBucket =
                   useStreamsStore.getState().bucketsBySurface.get(surfaceId)?.get(threadId) ?? []
                 const currentToolCalls = currentBucket.find((m) => m.id === targetId)?.tool_calls
-                if (
-                  await _isTransientStreamEnd(
-                    kind,
-                    errorPayload,
-                    threadId,
-                    run.run_id,
-                    currentToolCalls,
-                  )
-                ) {
+                // Phase 075.2 Plan 01 Task 1 (D-075.2-03): single-probe pattern.
+                // _isTransientStreamEnd returns the threaded ThreadSnapshot | null,
+                // which feeds _reattachAfterTransient so the helper does NOT call
+                // getSnapshot a second time (eliminates the WR-02 two-probe race
+                // on this reconcile path — mirror of the sendMessage-path edit).
+                const transientSnapshot = await _isTransientStreamEnd(
+                  kind,
+                  errorPayload,
+                  threadId,
+                  run.run_id,
+                  currentToolCalls,
+                )
+                if (transientSnapshot) {
                   // Phase 075.1 Task 2: re-attach instead of flipping
                   // runStatus. Build a fresh AbortController + reuse the
                   // already-bound callbacks so cursor handler + placeholder
-                  // targeting carry over. If snapshot fetch fails, fall
-                  // through to the terminal-flip branch below (fail-safe).
+                  // targeting carry over.
                   const reattached = await _reattachAfterTransient(
+                    transientSnapshot,
                     threadId,
                     run.run_id,
                     lastSeenOffsetRef,
-                    (rid, since) => {
+                    (rid: string, since: string) => {
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       useStreamsStore.setState((s) => ({
