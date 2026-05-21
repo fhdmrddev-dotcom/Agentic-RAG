@@ -8,6 +8,7 @@ import { ConfidenceBadge } from "./ConfidenceBadge"
 import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
+import { OutputFileCard } from "./OutputFileCard"
 import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 
 interface Props {
@@ -255,11 +256,22 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
         {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
           <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
             <div className="text-xs font-semibold mb-2 text-foreground/80">Final outputs</div>
-            <ul className="text-xs space-y-1 font-mono text-foreground/70">
-              {message.finalOutputFiles.map((f) => (
-                <li key={f.filename}>{f.filename}</li>
+            {/* Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): swap the
+                plain <li>{filename}</li> rows for the shared OutputFileCard so
+                the pinned panel matches the per-cell ExecuteCodeBlock card
+                (icon + filename + size badge + ghost-border + hover state +
+                Bearer-fetch download). OutputFileCard renders a plain-filename
+                row (no anchor, no download) for legacy entries that lack
+                `url` (D-075.2-05 back-compat / RESEARCH §Q4). The empty-state
+                guard above (`finalOutputFiles.length > 0`) is preserved per
+                D-075.2-07 — panel does not render when the array is absent
+                or empty. data-testid="final-outputs-panel" is preserved for
+                the existing Plan04 frontend test. */}
+            <div className="space-y-1.5">
+              {message.finalOutputFiles.map((f, i) => (
+                <OutputFileCard key={i} file={f} />
               ))}
-            </ul>
+            </div>
           </div>
         )}
       </div>
