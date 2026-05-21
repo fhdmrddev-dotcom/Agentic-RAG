@@ -1,32 +1,15 @@
 import { useState, useRef, useEffect } from "react"
-import type { MouseEvent } from "react"
-import { Terminal, CheckCircle2, XCircle, Loader2, Download, Clock, ChevronDown, ChevronRight } from "lucide-react"
+import { Terminal, CheckCircle2, XCircle, Loader2, Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { downloadSandboxOutput, DownloadError } from "@/lib/api"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
+import { OutputFileCard } from "./OutputFileCard"
 
-// D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
-// by the backend's harvest_output_files (e.g. "/sandbox-outputs/{path}"). The
-// `API_BASE` constant inside lib/api.ts is not exported, so we read the env
-// var directly here. Kept module-local because ExecuteCodeBlock is currently
-// the only consumer that resolves OutputFile.url.
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ""
-
-function resolveOutputUrl(url: string): string {
-  // D-067.2-03: new sandbox outputs store relative URLs (`/sandbox-outputs/{path}`);
-  // prepend API_BASE for those. Legacy outputs (already-stored long-form
-  // signed URLs starting with "http") pass through unchanged — they decay
-  // after 1h as before (legacy decay accepted per CONTEXT.md § Claude's
-  // Discretion).
-  if (url.startsWith("/")) return `${API_BASE}${url}`
-  return url
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+// Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): `OutputFileCard` +
+// `API_BASE` + `resolveOutputUrl` + `formatBytes` were extracted to
+// `./OutputFileCard.tsx` so the pinned Final Outputs panel in
+// `MessageItem.tsx` can reuse the same card shape. This file now consumes
+// the shared component directly — per-cell rendering behavior is
+// byte-identical to pre-refactor.
 
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
@@ -35,69 +18,6 @@ function formatDuration(ms: number): string {
 
 interface ExecuteCodeBlockProps {
   tc: ToolCall
-}
-
-// Phase 067.3 (D-067.3-R2-03/04): JS blob fetch+download click intercept.
-// onClick prevents the default anchor navigation (which would hit 401 because
-// browsers send only cookies, not Authorization: Bearer), runs the helper
-// from lib/api.ts which injects the Bearer token via fetch, follows the
-// 302 to Supabase CDN, and triggers a programmatic <a download> click.
-// The static <a href> is preserved so right-click "Save link as" still
-// has a real target — the resulting raw click will 401, which is an
-// accepted UX trade-off (rare in chat-history context).
-function OutputFileCard({ file }: { file: OutputFile }) {
-  const [downloading, setDownloading] = useState(false)
-  const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
-
-  const handleClick = async (e: MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault()
-    if (downloading) return
-    setDownloading(true)
-    setDownloadError(null)
-    try {
-      await downloadSandboxOutput(file.url, file.filename)
-    } catch (err) {
-      // D-067.3-R2-04 status-specific copy; messages already set inside the helper.
-      if (err instanceof DownloadError) {
-        setDownloadError({ status: err.status, message: err.message })
-      } else {
-        setDownloadError({ status: "network", message: "Download failed — try again." })
-      }
-      // Auto-clear after 3s — non-blocking, lightweight feedback (no toast lib in repo).
-      setTimeout(() => setDownloadError(null), 3000)
-    } finally {
-      setDownloading(false)
-    }
-  }
-
-  return (
-    <a
-      href={resolveOutputUrl(file.url)} /* preserved so right-click 'Save link as' has a real target — accepted 401 trade-off (D-067.3-R2-03) */
-      download={file.filename}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={handleClick}
-      aria-disabled={downloading}
-      className={cn(
-        "flex items-center gap-2.5 rounded-md ghost-border px-3 py-2 text-xs transition-colors group",
-        downloading ? "bg-muted/30 opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
-        downloadError ? "border border-red-500/40" : "",
-      )}
-    >
-      {downloading ? (
-        <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
-      ) : (
-        <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-      )}
-      <span className="flex-1 min-w-0 flex flex-col">
-        <span className="font-mono text-foreground/80 truncate">{file.filename}</span>
-        {downloadError && (
-          <span className="text-red-400 text-[10px] truncate">{downloadError.message}</span>
-        )}
-      </span>
-      <span className="text-muted-foreground/50 flex-shrink-0">{formatBytes(file.size)}</span>
-    </a>
-  )
 }
 
 function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreaming: boolean }) {
