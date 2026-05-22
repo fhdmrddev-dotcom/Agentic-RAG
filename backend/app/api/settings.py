@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 from supabase import Client
 
+from app.config import MODEL_CAPABILITIES, _infer_provider_for
 from app.dependencies import get_current_user, get_supabase
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
@@ -61,6 +62,15 @@ class FullSettingsResponse(BaseModel):
     sub_agent_max_output_tokens: int
     sub_agent_model: str
     resolved_sub_agent_model: str
+    # Phase 075.3 D-075.3-13: registry-known model_ids (frontend uses this set
+    # to decide whether to render the "unverified" badge inline next to each
+    # model in the main LLM dropdown + selected-label).
+    verified_models: list[str]
+    # Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
+    # mapping (frontend reads this to substitute {provider} in the tooltip text
+    # without mirroring the inference table client-side — RESEARCH.md §6
+    # Approach b, zero-drift over Approach a's 5-pattern client mirror).
+    inferred_provider_for: dict[str, str]
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -151,6 +161,20 @@ def _build_response(s=None) -> FullSettingsResponse:
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,
         resolved_sub_agent_model=resolve_sub_agent_model(s),
+        # Phase 075.3 D-075.3-13: snapshot of registry-known model_ids
+        # (sorted for stable client diffs / test assertions).
+        verified_models=sorted(MODEL_CAPABILITIES.keys()),
+        # Phase 075.3 D-075.3-13 + D-075.3-12: build the inferred-provider map
+        # only for model_ids the user has configured (via providers[*].models)
+        # that are NOT in the registry. Keeps the payload small (one entry per
+        # unknown). Iterates providers[*].models because that's the canonical
+        # source of truth for the Settings dropdown surface.
+        inferred_provider_for={
+            m: _infer_provider_for(m)
+            for p in s.providers
+            for m in p.models
+            if m and m not in MODEL_CAPABILITIES
+        },
     )
 
 

@@ -869,6 +869,13 @@ export interface FullAppSettings {
   resolved_sub_agent_model: string
   llm_max_output_tokens: number
   openrouter_tool_strategy: "quality" | "native" | "xml"
+  // Phase 075.3 D-075.3-13: registry-known model_ids — frontend uses this set
+  // to decide whether to render the "unverified" badge inline next to each
+  // model in the main LLM dropdown + selected-label.
+  verified_models: string[]
+  // Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
+  // mapping; frontend reads this to substitute {provider} in the tooltip text.
+  inferred_provider_for: Record<string, string>
 }
 
 export type AppSettings = FullAppSettings
