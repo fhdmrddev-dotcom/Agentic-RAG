@@ -4,12 +4,12 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: executing
 stopped_at: Phase 075.3 context gathered
-last_updated: "2026-05-21T22:17:59.065Z"
+last_updated: "2026-05-22T19:39:50.962Z"
 last_activity: 2026-05-21 -- Phase --phase execution started
 progress:
   total_phases: 25
   completed_phases: 15
-  total_plans: 50
+  total_plans: 52
   completed_plans: 52
   percent: 100
 ---
@@ -456,4 +456,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 075.2 (ToolCallPanel Dedup + Final Outputs Download Link) — 2 plans — 2026-05-21T20:33:14.015Z
+**Planned Phase:** 075.3 (defensive-chunk-handler-google-token-accounting) — 2 plans — 2026-05-22T19:39:50.946Z
