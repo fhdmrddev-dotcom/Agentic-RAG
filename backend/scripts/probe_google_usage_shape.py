@@ -48,14 +48,25 @@ def main() -> None:
         base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
     )
 
-    print("Probing gemini-2.5-flash with prompt 'count to five'...")
+    # Longer prompt to force multi-chunk output — Google's compat layer
+    # non-deterministically batches small responses into single chunks
+    # (260522-gdg captured 2-chunk "hi" responses; an earlier "count to five"
+    # probe today batched into 1 chunk → INCONCLUSIVE). A long, list-style
+    # prompt reliably emits ≥3 chunks so cumulative-vs-delta can be locked
+    # from real numbers.
+    prompt = (
+        "List 10 different fruits, one per line. For each fruit, write a "
+        "single sentence (~20 words) describing its taste, color, and a "
+        "common dish that uses it. Do not number the lines."
+    )
+    print(f"Probing gemini-2.5-flash with multi-chunk-forcing prompt (~{len(prompt)} chars)...")
     print()
     stream = client.chat.completions.create(
         model="gemini-2.5-flash",
-        messages=[{"role": "user", "content": "count to five"}],
+        messages=[{"role": "user", "content": prompt}],
         stream=True,
         stream_options={"include_usage": True},
-        max_tokens=200,
+        max_tokens=800,
     )
 
     chunks_seen: list[dict] = []
