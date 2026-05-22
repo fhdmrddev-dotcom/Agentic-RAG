@@ -874,24 +874,18 @@ def create_adaptive_streaming_chat(
         token_param: effective_tokens,
     }
 
-    # Phase 073 D-073-08 (TOKEN-COL-01): enable usage on every streaming call
-    # globally. OpenAI: emits one extra final chunk with chunk.usage populated
-    # and empty choices=[] (Pitfall 2 — _drain_stream_with_close_on_cancel
-    # runs the iterator to natural StopIteration, so the trailing chunk WILL
-    # be delivered). OpenRouter: officially deprecated as of 2026 (always
-    # returns usage now per Pitfall 8) — flag is a forward-compatible no-op.
-    # ONE flip covers BOTH providers (config.py:_PROVIDER_BASE_URLS routes
-    # openrouter through the same client.chat.completions.create call).
-    #
-    # Quick task 260522-gdg — Google EXCLUDED. Google's OpenAI-compat layer
-    # puts `usage` on EVERY chunk (alongside content), not just the final
-    # chunk. The chunk handler at threads.py:1806-1816 early-returns when it
-    # sees usage, discarding the content/tool_calls in the same chunk. Until
-    # Phase 075.3 lands a defensive chunk handler + Google token-accounting
-    # path, gating this flag off restores Google content delivery at the cost
-    # of NULL runs.input_tokens / runs.output_tokens for Google runs only.
-    if provider.lower() != "google":
-        kwargs["stream_options"] = {"include_usage": True}
+    # Phase 073 D-073-08 (TOKEN-COL-01) + Phase 075.3 D-075.3-05: enable
+    # ``stream_options.include_usage`` on every streaming call for ALL
+    # providers, including Google. The defensive chunk handler at
+    # ``threads.py:_on_chunk_openai`` (Phase 075.3 D-075.3-03/04) is
+    # provider-aware: Google's per-chunk cumulative ``usage`` (probe-locked
+    # CUMULATIVE in 075.3-01-PLAN.md <probe_result>, 2026-05-22) is handled
+    # via overwrite-last-wins inside ``_accumulate_chunk_usage``. OpenAI's
+    # final-chunk-only emission (empty ``choices=[]`` + populated ``usage``)
+    # still sums via ``+=``. OpenRouter is forward-compatible per Pitfall 8.
+    # The quick-task 260522-gdg google-exclusion gate is reverted — Path A
+    # is superseded by the defensive handler.
+    kwargs["stream_options"] = {"include_usage": True}
 
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
