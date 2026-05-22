@@ -1,5 +1,6 @@
 import logging
-from typing import TypedDict
+import re
+from typing import Literal, TypedDict
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -72,11 +73,18 @@ class ModelCapability(TypedDict, total=False):
     ``llm_call_timeout_seconds`` as optional, Phase 074 D-074-06 adds
     ``max_output_tokens`` as the hard API cap. Models without these fields
     fall back to runtime defaults at the lookup site.
+
+    Phase 075.3 D-075.3-08 adds ``capability_source`` — ``"registry"`` for
+    verified entries in ``MODEL_CAPABILITIES``, ``"inferred"`` for the
+    pattern-based fallback emitted by ``get_model_capability`` for unknown
+    model_ids. Used by ``backend/app/api/threads.py:1210`` to preserve the
+    D-067.3-N01-02 active-provider fallback for inferred-provider models.
     """
     native_tools: bool
     provider: str  # documentation only; actual provider from user settings
     llm_call_timeout_seconds: int  # Phase 066 D-066-03 — per-LLM-call deadline
     max_output_tokens: int  # Phase 074 D-074-06 — hard API cap (vendor docs); clamp ceiling
+    capability_source: Literal["registry", "inferred"]  # Phase 075.3 D-075.3-08
 
 
 # Capability registry: which models support native API tool calling.
@@ -103,60 +111,166 @@ class ModelCapability(TypedDict, total=False):
 MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # OpenAI — proven native tool support
     # max_output_tokens verified against per-model OpenAI docs 2026-05-18
-    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384},
-    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  16384},
-    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  32768},
-    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  32768},
-    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens":  16384},
-    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000},
-    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000},  # representative-class per memory feedback_model_names_representative.md
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000},  # representative-class
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000},  # representative-class
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000},
-    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},
-    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},
-    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000},  # representative-class — o4 follows o3 family
-    # Anthropic direct — native tool_use
+    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  32768, "capability_source": "registry"},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  32768, "capability_source": "registry"},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry"},
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class per memory feedback_model_names_representative.md    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry"},
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},
+    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},
+    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},  # representative-class — o4 follows o3 family    # Anthropic direct — native tool_use
     # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
     # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
-    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000},  # extended thinking — Issue #51568
-    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000},
-    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000},
-    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000},
-    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90, "max_output_tokens":  64000},
+    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry"},  # extended thinking — Issue #51568    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry"},
+    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90, "max_output_tokens":  64000, "capability_source": "registry"},
     # Google direct — native function calling
     # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536},
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536, "capability_source": "registry"},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry"},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry"},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "capability_source": "registry"},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "capability_source": "registry"},
     # gemini-3.5-flash — representative-class per memory feedback_model_names_representative.md.
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
-    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536},
+    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry"},
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
-    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192},
-    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192},
-    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  32768},
-    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072},
-    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536},
-    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536},
+    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192, "capability_source": "registry"},
+    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
+    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  32768, "capability_source": "registry"},
+    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072, "capability_source": "registry"},
+    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536, "capability_source": "registry"},
+    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536, "capability_source": "registry"},
     # minimax-01 — legacy/discontinued ID; no clear vendor doc as of 2026-05-18; OMITTED
     # per RESEARCH.md A5 recommendation (pass-through preferred over guessed 16384).
-    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240},
-    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072},
-    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":  16384},
+    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "capability_source": "registry"},
+    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072, "capability_source": "registry"},
+    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":  16384, "capability_source": "registry"},
 }
 
 
+# ── Phase 075.3 D-075.3-06/07/08/09: pattern-based inference for unknown model_ids ──
+# Ordered list of (compiled-regex, provider) tuples — first match wins.
+# Patterns chosen per ROADMAP SC#4 + RESEARCH.md §4 edge-case enumeration:
+#   gpt-*       → openai
+#   o1..o9 (-|$) → openai (explicit range; o10+ falls to ollama fallback — D-075.3-06)
+#   claude-*    → anthropic
+#   gemini-*    → google
+#   */* (slash) → openrouter
+#   else        → ollama (fallback per _INFERENCE_FALLBACK_PROVIDER)
+#
+# All patterns are anchored at ``^`` with bounded character classes to keep
+# ``re.search`` linear in the input length — T-075.3-02-01 ReDoS mitigation.
+_INFERENCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"^gpt-", re.IGNORECASE), "openai"),
+    (re.compile(r"^o[1-9](-|$)", re.IGNORECASE), "openai"),
+    (re.compile(r"^claude-", re.IGNORECASE), "anthropic"),
+    (re.compile(r"^gemini-", re.IGNORECASE), "google"),
+    (re.compile(r"^[^/\s]+/[^/\s]+"), "openrouter"),
+]
+_INFERENCE_FALLBACK_PROVIDER: str = "ollama"
+
+# D-075.3-07: safe defaults per inferred provider. native_tools True for the
+# big-3 (openai/anthropic/google); False for openrouter/ollama. max_output_tokens
+# 8192 for big-3 + ollama; 4096 for openrouter (more heterogeneous backends,
+# safer ceiling). Timeout 90s for all (matches the D-066-03 "fast / mini-tier").
+_BIG_3_PROVIDERS: frozenset[str] = frozenset({"openai", "anthropic", "google"})
+_INFERRED_DEFAULT_MAX_TOKENS: dict[str, int] = {
+    "openai": 8192,
+    "anthropic": 8192,
+    "google": 8192,
+    "openrouter": 4096,
+    "ollama": 8192,
+}
+_INFERRED_DEFAULT_TIMEOUT_S: int = 90
+
+# D-075.3-09: module-level dedup. Safe under D-v2.5-02 single-uvicorn-worker
+# (CLAUDE.md project rule). Each process starts empty; restart clears state.
+# Multi-worker (D-PRD-12 / Phase 079) will need a different strategy (per-worker
+# allowed; or move dedup to a Redis SET) — flag for revisit at that phase.
+_WARNED_UNKNOWN_MODEL_IDS: set[str] = set()
+
+
+def _infer_provider_for(model_id: str) -> str:
+    """Pure helper: classify a model_id into an inferred provider bucket.
+
+    Phase 075.3 D-075.3-06. Boundary cases (None / empty / whitespace) degrade
+    to the fallback bucket (``ollama``). Exposed at module level so
+    ``backend/app/api/settings.py`` can populate the ``inferred_provider_for``
+    dict for the frontend "unverified" tooltip without mirroring the inference
+    table client-side (RESEARCH.md §6 Approach b).
+    """
+    if not model_id or not str(model_id).strip():
+        return _INFERENCE_FALLBACK_PROVIDER
+    for pattern, provider in _INFERENCE_PATTERNS:
+        if pattern.search(model_id):
+            return provider
+    return _INFERENCE_FALLBACK_PROVIDER
+
+
+def _build_inferred_defaults(model_id: str, provider: str) -> ModelCapability:
+    """Construct safe-default ``ModelCapability`` for an unknown model_id.
+
+    Phase 075.3 D-075.3-07 + D-075.3-08 + D-075.3-09. Caps follow:
+      max_output_tokens: 8192 (openai/anthropic/google/ollama), 4096 (openrouter)
+      llm_call_timeout_seconds: 90 (all)
+      native_tools: True (big-3 openai/anthropic/google), False (openrouter/ollama)
+
+    Emits a once-per-process ``model_capability_unknown`` warning the first
+    time each distinct ``model_id`` is observed. Logging is parameterized
+    (``logger.warning("... %s ...", model_id, ...)``) so control chars in
+    ``model_id`` are escaped by the formatter — T-075.3-02-02 mitigation.
+    """
+    cap: ModelCapability = {
+        "native_tools": provider in _BIG_3_PROVIDERS,
+        "provider": provider,
+        "llm_call_timeout_seconds": _INFERRED_DEFAULT_TIMEOUT_S,
+        "max_output_tokens": _INFERRED_DEFAULT_MAX_TOKENS.get(provider, 8192),
+        "capability_source": "inferred",
+    }
+    # Warn-once dedup (D-075.3-09). Skip for None/empty — those don't represent
+    # meaningful operator triage signal.
+    if model_id and model_id not in _WARNED_UNKNOWN_MODEL_IDS:
+        _WARNED_UNKNOWN_MODEL_IDS.add(model_id)
+        logger.warning(
+            "model_capability_unknown model_id=%s inferred_provider=%s safe_defaults_applied=True",
+            model_id,
+            provider,
+        )
+    return cap
+
+
 def get_model_capability(model_id: str) -> ModelCapability:
-    """Return capability for a model. Unknown models default to structured mode (safe)."""
-    return MODEL_CAPABILITIES.get(model_id, {"native_tools": False, "provider": "unknown"})
+    """Return capability for a ``model_id``.
+
+    Phase 075.3 D-075.3-08: registry hit returns verified caps with
+    ``capability_source="registry"``; registry miss falls back to pattern-based
+    provider inference + safe defaults (``capability_source="inferred"``), with
+    once-per-process warning log per D-075.3-09.
+
+    The pre-075.3 behavior was ``{"native_tools": False, "provider": "unknown"}``
+    sentinel; the ``threads.py:1210`` D-067.3-N01-02 active-provider fallback
+    now branches on ``capability_source == "registry"`` instead of
+    ``provider != "unknown"`` to preserve the fallback semantics for inferred
+    providers — a totally-garbage model_id (ollama bucket fallback) shouldn't
+    yank routing to Ollama unexpectedly when the user has an explicit
+    ``active_provider`` set.
+    """
+    if model_id in MODEL_CAPABILITIES:
+        return MODEL_CAPABILITIES[model_id]
+    # Boundary guard — None / empty / whitespace-only degrades to fallback
+    # bucket without warning noise (caller likely passed a missing setting).
+    if not model_id or not str(model_id).strip():
+        return _build_inferred_defaults(model_id or "", _INFERENCE_FALLBACK_PROVIDER)
+    return _build_inferred_defaults(model_id, _infer_provider_for(model_id))
 
 
 # ── Phase 066 D-066-03: per-LLM-call timeout resolution ─────────────────
