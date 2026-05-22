@@ -9,6 +9,7 @@ import type { FullAppSettings, ProviderInfo, SettingsUpdate, AuditEntry } from "
 import { Check, Eye, EyeOff, Save, RotateCcw, Download, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MemorySection } from "@/components/settings/MemorySection"
+import { ModelPillRow } from "@/components/settings/ModelPillRow"
 
 const KEY_PLACEHOLDER = "***"
 
@@ -527,6 +528,12 @@ export function SettingsPage() {
   const [llmMaxOutputTokens, setLlmMaxOutputTokens] = useState(0)
   const [openrouterToolStrategy, setOpenrouterToolStrategy] = useState<"quality" | "native" | "xml">("quality")
 
+  // Phase 075.3 D-075.3-13: registry-known model_ids + inferred-provider hints
+  // sourced from FullAppSettings.verified_models / .inferred_provider_for.
+  // Used by ModelPillRow + selected-label badge to flag unregistered models.
+  const [verifiedModels, setVerifiedModels] = useState<Set<string>>(new Set())
+  const [inferredProviderFor, setInferredProviderFor] = useState<Record<string, string>>({})
+
   const hydrate = (data: FullAppSettings) => {
     setS(data)
     setActiveProvider(data.active_provider)
@@ -563,6 +570,10 @@ export function SettingsPage() {
     setResolvedSubAgentModel(data.resolved_sub_agent_model ?? "")
     setLlmMaxOutputTokens(data.llm_max_output_tokens ?? 0)
     setOpenrouterToolStrategy(data.openrouter_tool_strategy ?? "quality")
+    // Phase 075.3 D-075.3-13: defensive ?? so an old backend response without
+    // the fields doesn't crash the frontend; the badge simply won't render.
+    setVerifiedModels(new Set(data.verified_models ?? []))
+    setInferredProviderFor(data.inferred_provider_for ?? {})
   }
 
   useEffect(() => {
@@ -757,26 +768,27 @@ export function SettingsPage() {
               <SectionCard title="Active Model" description="Default model used when starting a new chat.">
                 <FieldRow label="Model">
                   <TextInput value={llmModel} onChange={setLlmModel} placeholder="e.g. gpt-4o" />
+                  {/* Phase 075.3 D-075.3-10/12: amber "unverified" chip next to the
+                      currently-selected llmModel label when it's not in the registry. */}
+                  {llmModel && !verifiedModels.has(llmModel) && (
+                    <span
+                      className="ml-2 text-[10px] font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full ghost-border"
+                      title={`This model isn't in our verified registry. Using inferred provider: ${inferredProviderFor[llmModel] ?? "ollama"}. Safe defaults applied (max_tokens=${(inferredProviderFor[llmModel] ?? "") === "openrouter" ? 4096 : 8192}, timeout=90s).`}
+                    >
+                      unverified
+                    </span>
+                  )}
                 </FieldRow>
                 {activeModels && (
                   <div className="py-2">
                     <p className="text-xs text-muted-foreground mb-1">Available from active provider:</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeModels.split(",").map((m) => m.trim()).filter(Boolean).map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => setLlmModel(m)}
-                          className={cn(
-                            "text-[11px] px-2.5 py-1 rounded-full ghost-border transition-all",
-                            llmModel === m
-                              ? "bg-primary/10 text-primary border-primary/30 font-medium"
-                              : "bg-muted/30 text-muted-foreground hover:text-foreground",
-                          )}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
+                    <ModelPillRow
+                      models={activeModels.split(",").map((m) => m.trim()).filter(Boolean)}
+                      llmModel={llmModel}
+                      verifiedModels={verifiedModels}
+                      inferredProviderFor={inferredProviderFor}
+                      onSelect={setLlmModel}
+                    />
                   </div>
                 )}
               </SectionCard>
