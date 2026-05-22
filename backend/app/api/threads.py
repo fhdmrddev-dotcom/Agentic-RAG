@@ -1206,8 +1206,19 @@ async def send_message(
         # Explicit override already applied to _user_settings.active_provider above.
         _resolved_provider = _user_settings.active_provider
     else:
-        _capability_provider = get_model_capability(_resolved_model).get("provider", "unknown")
-        if _capability_provider != "unknown":
+        _capability = get_model_capability(_resolved_model) or {}
+        _capability_provider = _capability.get("provider", "unknown")
+        # Phase 075.3 D-075.3-08: only override the active provider when the
+        # registry has a verified entry. After 075.3 get_model_capability no
+        # longer returns provider="unknown" for unknown model_ids — it returns
+        # a pattern-inferred provider (gpt-* → openai, gemini-* → google, etc.)
+        # with capability_source="inferred". Falling through to active-provider
+        # for inferred entries preserves D-067.3-N01-02 semantics: a totally
+        # garbage model_id (which falls into the ollama fallback bucket)
+        # shouldn't yank routing to Ollama when the user has an explicit
+        # active_provider set.
+        _capability_source = _capability.get("capability_source", "registry")
+        if _capability_provider != "unknown" and _capability_source == "registry":
             _resolved_provider = _capability_provider
             # Align _user_settings so downstream agent_runner reads see the
             # resolved provider for SDK selection (D-067.3-N01-04). The
