@@ -547,6 +547,51 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
     return unique
 
 
+def _accumulate_chunk_usage(
+    chunk,
+    provider: str,
+    input_total: int | None,
+    output_total: int | None,
+) -> tuple[int | None, int | None]:
+    """Provider-aware usage accumulator for OpenAI-compat streaming chunks.
+
+    Phase 075.3 D-075.3-03 + D-075.3-01-probe-locked (2026-05-22, verdict =
+    CUMULATIVE, pinned in 075.3-01-PLAN.md ``<probe_result>``).
+
+    - **Google** (OpenAI-compat) emits ``chunk.usage`` with **cumulative
+      running totals** on every chunk (alongside ``delta.content`` /
+      ``delta.tool_calls``). The Google branch **overwrites** the running
+      total each chunk (last-wins). Summing via ``+=`` would over-count
+      by 2-3× (silent billing-accounting corruption).
+    - **OpenAI** emits ``chunk.usage`` only on the final chunk with empty
+      ``choices=[]`` (Phase 073 D-073-08). The OpenAI branch sums via
+      ``+=`` (initialised from None on first usage chunk).
+    - **OpenRouter** is forward-compatible per Pitfall 8 (deprecation 2026
+      — always returns usage now). Same ``+=`` branch — if a stray
+      mid-stream usage chunk ever appears alongside the final emission,
+      the sum is correct.
+    - Unknown / ollama / empty / anthropic-via-compat / made-up provider
+      names fall through to ``+=`` (safe default matching OpenAI shape).
+
+    Pure function: no I/O, no closure capture. Trivially unit-testable;
+    see ``backend/tests/unit/test_chunk_handler_provider_aware.py``.
+    """
+    u = getattr(chunk, "usage", None)
+    if u is None:
+        return input_total, output_total
+    _i = getattr(u, "prompt_tokens", 0) or 0
+    _o = getattr(u, "completion_tokens", 0) or 0
+    if provider == "google":
+        # D-075.3-01 probe-locked: cumulative running totals → overwrite-last-wins.
+        # Re-flip to the ``+=`` branch ONLY if the probe verdict in
+        # 075.3-01-PLAN.md <probe_result> changes to DELTA on a future re-run.
+        return _i, _o
+    # OpenAI / OpenRouter / Ollama / Anthropic-via-compat / unknown → += sum.
+    if input_total is None:
+        return _i, _o
+    return input_total + _i, (output_total or 0) + _o
+
+
 # Phase 063 (D-063-01): the module-level `event_consumer` async generator that
 # previously lived here was DELETED in the hard cutover. POST /threads/{tid}/messages
 # no longer returns SSE; the live equivalent for GET /runs/{rid}/stream is
@@ -1785,6 +1830,17 @@ async def send_message(
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
 
+                                # Phase 075.3 D-075.3-03: capture the active provider name
+                                # ONCE here (outside the per-chunk closure) so
+                                # ``_accumulate_chunk_usage`` can branch on it without
+                                # re-looking up MODEL_CAPABILITIES per chunk. Sourced
+                                # from the same registry used elsewhere in this file
+                                # for provider gating (mirrors the
+                                # ``get_model_capability(_resolved_model).get("provider", "unknown")``
+                                # pattern at line ~1160).
+                                _active_cap = get_model_capability(_model_id) or {}
+                                active_provider_name = (_active_cap.get("provider") or "unknown").lower()
+
                                 # Phase 067.1 Plan 01 Track A: drain-into-queue.
                                 # Wraps the per-chunk body so that the sync
                                 # `for chunk in stream:` loop runs in a thread
@@ -1799,21 +1855,22 @@ async def send_message(
                                 # `except asyncio.TimeoutError` formatter.
                                 async def _on_chunk_openai(chunk):
                                     nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                                    # Phase 073 TOKEN-COL-01 (D-073-08): final usage chunk has empty choices=[]
-                                    # and populated chunk.usage. Other chunks have chunk.usage=None. Pitfall 2:
-                                    # _drain_stream_with_close_on_cancel iterates the stream to natural
-                                    # StopIteration so the trailing chunk WILL be delivered.
-                                    if getattr(chunk, "usage", None) is not None:
-                                        u = chunk.usage
-                                        _i = getattr(u, "prompt_tokens", 0) or 0
-                                        _o = getattr(u, "completion_tokens", 0) or 0
-                                        if input_tokens_total is None:
-                                            input_tokens_total = _i
-                                            output_tokens_total = _o
-                                        else:
-                                            input_tokens_total += _i
-                                            output_tokens_total += _o
-                                        return  # usage chunk has empty choices=[]; no delta/tool work
+                                    # Phase 075.3 D-075.3-03 + D-075.3-04: defensive provider-aware
+                                    # accumulator. Google emits ``usage`` on EVERY chunk alongside
+                                    # ``delta.content`` / ``delta.tool_calls`` (per quick-task
+                                    # 260522-gdg live capture + D-075.3-01 probe verdict CUMULATIVE).
+                                    # OpenAI / OpenRouter / Anthropic-via-compat emit ``usage`` only
+                                    # on the final ``choices=[]`` chunk (Phase 073 D-073-08).
+                                    # Branch inside ``_accumulate_chunk_usage``; DO NOT early-return
+                                    # on ``chunk.usage`` — chunks with both ``usage`` and
+                                    # ``delta.content`` / ``delta.tool_calls`` must flow through to
+                                    # the delta processing below (Google's shape).
+                                    input_tokens_total, output_tokens_total = _accumulate_chunk_usage(
+                                        chunk,
+                                        active_provider_name,
+                                        input_tokens_total,
+                                        output_tokens_total,
+                                    )
                                     if not chunk.choices:
                                         return
                                     choice = chunk.choices[0]
