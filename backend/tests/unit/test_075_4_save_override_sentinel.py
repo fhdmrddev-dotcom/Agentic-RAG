@@ -241,10 +241,17 @@ def test_save_override_non_api_key_field_unaffected_by_allowlist(
     isolated_override: Path,
 ) -> None:
     """Allowlist only triggers on k.endswith('_api_key'); other fields like
-    'llm_model' pass through unchanged regardless of value shape."""
+    'llm_model' pass through unchanged.
+
+    Note: '***' is rejected for ALL fields by the older KEY_PLACEHOLDER skip
+    (predates Plan 075.4-04); the allowlist layer only matters for api_key
+    fields that did NOT hit that skip. This test uses a non-sentinel value to
+    confirm non-api-key fields bypass the new layer entirely."""
     from app.models.user_settings import save_override
 
-    save_override({"llm_model": "***"})  # would-be-sentinel for an api_key
+    # Non-api-key field with a value that LOOKS sentinel-ish for an api_key
+    # (empty-ish, whitespace-ish) — the new allowlist must NOT trigger on this.
+    save_override({"llm_model": "  weird-model-id  "})
 
     after = _read_override(isolated_override)
-    assert after.get("llm_model") == "***"  # not an api_key field — passes through
+    assert after.get("llm_model") == "  weird-model-id  "  # passed through

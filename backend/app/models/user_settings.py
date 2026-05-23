@@ -8,6 +8,7 @@ The override file is never committed (gitignored like .env).
 from __future__ import annotations
 
 import json
+import logging
 import time as _time
 from enum import Enum
 from pathlib import Path
@@ -16,6 +17,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.config import settings as env_settings, MODEL_CAPABILITIES
+
+logger = logging.getLogger(__name__)
 
 
 class OpenRouterToolStrategy(str, Enum):
@@ -35,6 +38,45 @@ KNOWN_PROVIDERS = {
 }
 
 KEY_PLACEHOLDER = "***"
+
+# Plan 075.4-04 D-075.4-F1 — sentinel allowlist guard for save_override.
+# Defense-in-depth wrapping the existing KEY_PLACEHOLDER skip. Closes WR-02
+# (Phase 075.3 orchestrator data-loss footgun). Phase 081.1 (Settings
+# Architecture Unification) replaces save_override entirely — port this
+# logic to 081.1's new codepath (FORWARD-REF #4 + #5).
+_PROVIDER_KEY_PREFIXES: dict[str, str] = {
+    "openai_api_key": "sk-",
+    "anthropic_api_key": "sk-ant-",
+    "openrouter_api_key": "sk-or-",
+    # google_api_key: length-only minimum (~35-40 chars)
+    # ollama_api_key: any non-sentinel non-empty
+}
+_SENTINEL_VALUES: frozenset[str] = frozenset({"***", "__KEEP__", "••••••"})
+
+
+def _is_valid_api_key(key: str, value: str) -> bool:
+    """Plan 075.4-04 D-075.4-F1: allowlist guard.
+
+    Returns True if ``value`` looks like a real api_key for ``key``. Returns
+    False for empty / whitespace / sentinel / wrong-provider-prefix / too-short
+    google keys. Non-api-key fields (key NOT in _PROVIDER_KEY_PREFIXES and not
+    google/ollama) fall through as True — the guard in ``save_override`` only
+    invokes this helper when ``key.endswith("_api_key")``.
+    """
+    if not value or not value.strip():
+        return False
+    if value in _SENTINEL_VALUES:
+        return False
+    if "•" in value or value.replace("*", "").strip() == "":
+        return False
+    prefix = _PROVIDER_KEY_PREFIXES.get(key)
+    if prefix is not None:
+        return value.startswith(prefix)
+    if key == "google_api_key":
+        return len(value) >= 30
+    if key == "ollama_api_key":
+        return True
+    return True
 
 
 class LLMProvider(BaseModel):
@@ -132,12 +174,25 @@ def _load_override() -> dict[str, Any]:
 
 
 def save_override(updates: dict[str, Any]) -> None:
-    """Merge `updates` into the override file. Skips KEY_PLACEHOLDER values."""
+    """Merge `updates` into the override file. Skips KEY_PLACEHOLDER values.
+
+    Plan 075.4-04 D-075.4-F1/F2 — defense-in-depth sentinel allowlist; closes
+    WR-02. Phase 081.1 (Settings Architecture Unification) replaces save_override
+    entirely — port the _is_valid_api_key allowlist logic forward (FORWARD-REF
+    #4 + #5).
+    """
     global _override_cache_time
     current = _load_override()
     for k, v in updates.items():
         if v == KEY_PLACEHOLDER:
             continue  # "***" = keep existing key, don't overwrite
+        # Plan 075.4-04 D-075.4-F1 — allowlist layer (wraps existing KEY_PLACEHOLDER skip)
+        if k.endswith("_api_key") and v is not None and not _is_valid_api_key(k, str(v)):
+            logger.warning(
+                "rejected api_key write — sentinel/invalid format detected for key=%s",
+                k,
+            )
+            continue
         if v is None:
             current.pop(k, None)  # None = remove override, fall back to env
         else:
