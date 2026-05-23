@@ -7,6 +7,7 @@ severity: minor                   # blocking | major | minor | info
 status: open                      # open | folded | deferred | external-noted | closed
 affected_areas: []                # e.g., [frontend/streaming, backend/ingestion, RAG/multimodal, skills, sandbox]
 folded_into: null                 # phase number when folded (e.g., "068") — set when status flips to folded
+verified_closed_by: null          # phase number (e.g., "075.6") that verified the bug no longer reproduces — set alongside status=closed
 related_seeds: []                 # SEED-NNN ids if this bug correlates with a planted seed
 re_open_trigger: null             # required when status=deferred — concrete condition that re-surfaces it
 reproduces_on:                    # commit/version where the bug was observed

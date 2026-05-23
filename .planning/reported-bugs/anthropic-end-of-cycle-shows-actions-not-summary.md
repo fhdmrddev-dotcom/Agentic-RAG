@@ -8,7 +8,7 @@ status: deferred
 affected_areas: [backend/agent-loop, backend/system-prompts, frontend/chat-surface, provider/anthropic-native-sdk]
 folded_into: null
 related_seeds: []
-re_open_trigger: "v2.7 Agent Workspace milestone planning OR any future Anthropic-path system-prompt redesign in anthropic_service.py / threads.py agent-loop terminal frame OR optional v2.6 polish phase 075.1 if user feedback escalates. Reviewed during /gsd:discuss-phase 075 (2026-05-18) — deferred again per D-075-15: root cause is system-prompt/terminal-frame OR frontend block-ordering, orthogonal to Phase 075's SSE/snapshot/sandbox plumbing surface; folding would ~3x phase size and cross into provider-parity prompt engineering. Originally reviewed during /gsd:discuss-phase 074 (2026-05-17) with the same conclusion (D-074-10)."
+re_open_trigger: "v2.7 Agent Workspace milestone planning OR a focused Anthropic-path system-prompt / agent-loop terminal-frame phase reaches design phase — at that point re-litigate root cause (system-prompt vs frontend block-ordering of mixed text+tool_use). Reviewed again during /gsd:plan-phase 075.6 (2026-05-23) — deferred again per D-075.6-D2: orthogonal to 075.6's SSE wire-format + frontend rendering-component surface; folding would ~3x phase size and cross into prompt engineering. Consistent with prior deferrals D-075-15 (2026-05-18) and D-074-10 (2026-05-17)."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7
@@ -92,3 +92,7 @@ The Phase 067.1 system-prompt redesign work targeted exactly this class of issue
 - Phase 067.1 Plan 02 SUMMARY — system-prompt redesign for multi-step pipelines (`.planning/milestones/v2.5-phases/067.1-agent-streaming-and-behavior-polish/`).
 - `backend/app/services/llm_router.py` (or equivalent) — Anthropic native SDK dispatch entry point.
 - Phase 053 (Cross-Provider Tool Calling Reliability) — closest prior phase on provider parity.
+
+## Defer history
+
+- 2026-05-23 / Phase 075.6 Plan 03 (D-075.6-D2) — deferred again per consistent precedent (D-075-15, D-074-10). Root cause is Anthropic system-prompt / agent-loop terminal-frame OR frontend block-ordering of mixed text+tool_use — orthogonal to 075.6's SSE-event + frontend-rendering-component surface. Folding into 075.6 would ~3x phase size and cross into prompt engineering. `re_open_trigger` refreshed to point at v2.7 Agent Workspace milestone planning OR a focused Anthropic-path system-prompt / agent-loop terminal-frame phase.

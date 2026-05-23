@@ -4,11 +4,12 @@ title: Bottom chat indicator goes blank during code-execution pauses while top t
 reported: 2026-05-14
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: closed
 affected_areas: [frontend/streaming, frontend/typing-indicator, frontend/tool-card-display, UX/perceived-responsiveness]
-folded_into: "075"
+folded_into: "075.6"
+verified_closed_by: "075.6"
 related_seeds: [SEED-008]
-re_open_trigger: "Phase 075 ships and bottom indicator still goes blank during a >5s silent window inside a code-execution cell — closure validation: D-075-14 sticky-text + code_stdout subscription didn't reach the bottom indicator component."
+re_open_trigger: "Working badge fails to appear at top of active assistant turn during streaming on any provider — supersedes the original bottom-indicator path per D-075.6-D1."
 reproduces_on:
   branch: v2.5-dev
   commit: f3349b7
@@ -75,3 +76,4 @@ Two interventions:
   - **Part (a) sticky text**: `frontend/src/components/chat/MessageItem.tsx` gained `stickyLabelRef<string | null>` that retains the last non-null `outerBannerLabel(...)` value during `isStreaming`. The bottom indicator renders `stickyBottomLabel` (computed label or sticky fallback) in place of the prior inline ternary. No more clearing to blank during silent windows inside long tool calls.
   - **Part (b) code_stdout subscription**: implicit via the existing `onCodeStdout` handler at `frontend/src/providers/StreamsProvider.tsx:310-322` — each new per-line `code_stdout` event from Plan 02's `session.execute_command` rewire mutates the active tool_call's `outputLines`, which re-renders MessageItem and refreshes the sticky text. No explicit subscription required.
 - Closure validation: Chrome MCP UAT at t=30s/60s/120s during a long pptx-generation cell (matplotlib renders) — deferred to `/gsd:verify-work` session per auto-mode protocol. Status flip folded → closed pending UAT.
+- 2026-05-23 / Phase 075.6 Plan 03 (D-075.6-D1) — superseded and closed. The `✦ Working` badge introduced by Phase 075.6 Plan 03 Req #8 (pinned at the top of the active assistant turn, gated on `(activeTool || isPlanning) && !allToolsDone`) is a structurally-better signal than the bottom-indicator sticky-text path (top-of-bubble + branded + pinned + animated). The bottom indicator may still go blank during silent windows, but the Working badge at the top of the assistant bubble now answers "is it still running?" definitively. `re_open_trigger` refreshed to watch for the Working badge itself failing to appear during streaming on any provider. Frontmatter flipped folded → closed, `verified_closed_by: "075.6"`.
