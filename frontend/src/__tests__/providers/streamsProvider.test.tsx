@@ -112,12 +112,15 @@ beforeEach(() => {
   // does not leak. setState replaces only the keys provided (NOT a deep reset),
   // but actions get re-registered on each <StreamsProvider> mount so the
   // throwing-stub actions from the store module file are not visible to tests.
+  // Plan 075.4-01 D-075.4-A1: per-thread fields. Reset to fresh empties.
   useStreamsStore.setState({
     bucketsBySurface: new Map(),
     viewedThreadId: null,
-    isStreaming: false,
-    fallbackNotice: null,
-    subscriptionsByRunId: new Set<string>(),
+    streamingThreads: new Set<string>(),
+    fallbackNotices: new Map<string, string>(),
+    reconcileErrors: new Map<string, Error>(),
+    loadingThreads: new Set<string>(),
+    subscriptionsByThread: new Map<string, Set<string>>(),
   })
   mockGetMessages.mockResolvedValue([])
   mockGetActiveRuns.mockResolvedValue([])
@@ -212,8 +215,11 @@ describe("Phase 068 — L-068-07 cleanup on onTerminal (subscriptionsByRunId mir
     expect(cbA).toBeTruthy()
 
     // Mirror should show run-A as subscribed.
+    // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
     await waitFor(() => {
-      expect(useStreamsStore.getState().subscriptionsByRunId.has("run-A")).toBe(true)
+      expect(
+        useStreamsStore.getState().subscriptionsByThread.get("thread-A")?.has("run-A"),
+      ).toBe(true)
     })
 
     // Fire onTerminal('done') — subscriptionsRef.delete fires inside this path.
@@ -223,8 +229,11 @@ describe("Phase 068 — L-068-07 cleanup on onTerminal (subscriptionsByRunId mir
 
     // Mirror should reflect the delete synchronously (onTerminal calls
     // setState within the same act() tick).
+    // Plan 075.4-01 D-075.4-A1: inner-Set-empty-then-delete-key GC means
+    // the entire thread-A entry vanishes from the Map.
     await waitFor(() => {
-      expect(useStreamsStore.getState().subscriptionsByRunId.has("run-A")).toBe(false)
+      const inner = useStreamsStore.getState().subscriptionsByThread.get("thread-A")
+      expect(inner === undefined || !inner.has("run-A")).toBe(true)
     })
 
     void sendPromise
@@ -1339,7 +1348,8 @@ describe("Phase 068.5 — retry banner: silent retry at 1s, then surfaces banner
     })
 
     // Banner state remains null — retry succeeded.
-    expect(useStreamsStore.getState().reconcileError).toBeNull()
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors.
+    expect(useStreamsStore.getState().reconcileErrors.get("T1") ?? null).toBeNull()
     // Two getMessages calls fired (initial + retry).
     expect(mockGetMessages.mock.calls.length).toBeGreaterThanOrEqual(2)
   })
@@ -1372,22 +1382,29 @@ describe("Phase 068.5 — retry banner: silent retry at 1s, then surfaces banner
       await loadPromise!
     })
 
-    const errState = useStreamsStore.getState().reconcileError
-    expect(errState).not.toBeNull()
-    expect(errState?.threadId).toBe("T1")
-    expect(errState?.error.message).toBe("network")
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors Map.
+    const errForT1 = useStreamsStore.getState().reconcileErrors.get("T1")
+    expect(errForT1).toBeTruthy()
+    expect(errForT1?.message).toBe("network")
+    // Cross-thread isolation: other threads have no entry.
+    expect(useStreamsStore.getState().reconcileErrors.has("T2")).toBe(false)
   })
 
-  it("Test 3 — setState({ reconcileError: null }) dismisses the banner state", async () => {
-    // Pre-seed an error
-    useStreamsStore.setState({
-      reconcileError: { threadId: "T1", error: new Error("network") },
-    })
-    expect(useStreamsStore.getState().reconcileError).not.toBeNull()
+  it("Test 3 — clearing reconcileErrors for a thread dismisses the banner state", async () => {
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors Map.
+    // Pre-seed an error for thread T1.
+    useStreamsStore.setState((s) => ({
+      reconcileErrors: new Map(s.reconcileErrors).set("T1", new Error("network")),
+    }))
+    expect(useStreamsStore.getState().reconcileErrors.get("T1")).toBeTruthy()
 
-    // Dismiss
-    useStreamsStore.setState({ reconcileError: null })
-    expect(useStreamsStore.getState().reconcileError).toBeNull()
+    // Dismiss by deleting the T1 key.
+    useStreamsStore.setState((s) => {
+      const next = new Map(s.reconcileErrors)
+      next.delete("T1")
+      return { reconcileErrors: next }
+    })
+    expect(useStreamsStore.getState().reconcileErrors.has("T1")).toBe(false)
   })
 
   it("Test 4 — L-068.5-02 MERGE 3-clause filter survives the retry wrap (static-grep placeholder)", () => {
@@ -1439,14 +1456,15 @@ describe("Phase 068.5 — retry banner: AbortError is NOT a fetch failure (no re
     })
 
     // No banner state — AbortError is not a fetch failure.
-    expect(useStreamsStore.getState().reconcileError).toBeNull()
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors.
+    expect(useStreamsStore.getState().reconcileErrors.has("T1")).toBe(false)
     // Only the initial attempt fired — no retry was scheduled.
     // (Defensive: AbortError early-returns inside the catch, before the retry branch.)
     expect(mockGetMessages.mock.calls.length).toBe(1)
   })
 })
 
-describe("Phase 068.5 Gap-01 — loadingThreadId state slot", () => {
+describe("Phase 068.5 Gap-01 — loadingThreads per-thread Set (Plan 075.4-01 D-075.4-A1)", () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -1454,11 +1472,13 @@ describe("Phase 068.5 Gap-01 — loadingThreadId state slot", () => {
     vi.useRealTimers()
   })
 
-  it("initial value is null (no fetch in flight at store creation)", () => {
-    expect(useStreamsStore.getState().loadingThreadId).toBeNull()
+  it("initial value is empty Set (no fetch in flight at store creation)", () => {
+    // Plan 075.4-01 D-075.4-A1: loadingThreads is now a per-thread Set,
+    // not a single global threadId. Empty Set = no fetches pending.
+    expect(useStreamsStore.getState().loadingThreads.size).toBe(0)
   })
 
-  it("loadMessages sets loadingThreadId at start and clears it on success", async () => {
+  it("loadMessages adds threadId to loadingThreads at start and removes it on success", async () => {
     mockGetMessages.mockReset()
     // Resolve slowly so we can observe the intermediate state.
     let resolveFetch: ((value: Message[]) => void) | null = null
@@ -1476,8 +1496,9 @@ describe("Phase 068.5 Gap-01 — loadingThreadId state slot", () => {
       loadPromise = result.current.loadMessages("T1")
     })
 
-    // Mid-flight: loadingThreadId should point at T1.
-    expect(useStreamsStore.getState().loadingThreadId).toBe("T1")
+    // Mid-flight: loadingThreads should contain T1 (and only T1).
+    expect(useStreamsStore.getState().loadingThreads.has("T1")).toBe(true)
+    expect(useStreamsStore.getState().loadingThreads.has("T2")).toBe(false)
 
     // Resolve the fetch.
     await act(async () => {
@@ -1485,11 +1506,11 @@ describe("Phase 068.5 Gap-01 — loadingThreadId state slot", () => {
       await loadPromise!
     })
 
-    // After resolution: cleared back to null.
-    expect(useStreamsStore.getState().loadingThreadId).toBeNull()
+    // After resolution: T1 removed from the Set.
+    expect(useStreamsStore.getState().loadingThreads.has("T1")).toBe(false)
   })
 
-  it("loadMessages clears loadingThreadId on final failure (after both attempts reject)", async () => {
+  it("loadMessages removes threadId on final failure (after both attempts reject)", async () => {
     mockGetMessages.mockReset()
     mockGetMessages.mockRejectedValue(new Error("network"))
 
@@ -1505,10 +1526,10 @@ describe("Phase 068.5 Gap-01 — loadingThreadId state slot", () => {
       await loadPromise!
     })
 
-    // Even with reconcileError populated, loadingThreadId clears so the
+    // Even with reconcileErrors populated, loadingThreads cleared so the
     // skeleton doesn't compound with the retry banner.
-    expect(useStreamsStore.getState().loadingThreadId).toBeNull()
-    expect(useStreamsStore.getState().reconcileError).not.toBeNull()
+    expect(useStreamsStore.getState().loadingThreads.has("T1")).toBe(false)
+    expect(useStreamsStore.getState().reconcileErrors.get("T1")).toBeTruthy()
   })
 })
 

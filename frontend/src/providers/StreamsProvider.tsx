@@ -114,7 +114,8 @@ const EMPTY_ARRAY: Message[] = []
  *
  * Called BEFORE any state mutation in both onTerminal handlers (Phase 075
  * RESEARCH Pitfall 5: prevent Resume button flicker — the snapshot probe
- * MUST happen before flipping `isStreaming: false`).
+ * MUST happen before flipping the streaming-flag off; Plan 075.4-01 changed
+ * that flag from the legacy global boolean into a per-thread Set delete).
  *
  * Exported for unit tests; the rest of the StreamsProvider surface stays
  * private behind named hooks (D-068-03).
@@ -242,7 +243,7 @@ export function makeStreamCallbacks(opts: {
   onTitleUpdate?: (title: string) => void
   setMessages: ThreadBoundSetMessages
 }): StreamCallbacks {
-  const { assistantId, onTitleUpdate, setMessages } = opts
+  const { assistantId, threadId, onTitleUpdate, setMessages } = opts
   // D-067-03: closure-tracked iteration counter, stamped onto each ToolCall
   // created in onToolPreparing/onToolStart. Updated on every iteration_start
   // SSE event BEFORE setMessages.
@@ -537,12 +538,67 @@ export function makeStreamCallbacks(opts: {
       )
     },
     onFallbackModel: (original: string, fallback: string) => {
-      useStreamsStore.setState({
-        fallbackNotice: `Model ${original} unavailable — using ${fallback}.`,
-      })
-      setTimeout(() => useStreamsStore.setState({ fallbackNotice: null }), 4000)
+      // Plan 075.4-01 D-075.4-A1: per-thread fallbackNotice. Copy-then-mutate
+      // the Map so React/Zustand sees a fresh reference. Closure-captured
+      // threadId from opts means we never write to the wrong thread's key.
+      const notice = `Model ${original} unavailable — using ${fallback}.`
+      useStreamsStore.setState((s) => ({
+        fallbackNotices: new Map(s.fallbackNotices).set(threadId, notice),
+      }))
+      setTimeout(() => {
+        useStreamsStore.setState((s) => {
+          const next = new Map(s.fallbackNotices)
+          next.delete(threadId)
+          return { fallbackNotices: next }
+        })
+      }, 4000)
     },
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan 075.4-01 D-075.4-A1 — per-thread state mutation helpers.
+//
+// All 19 write sites that pre-Plan 075.4 mutated `subscriptionsByRunId`
+// (flat Set<runId>) now route through these helpers, which copy-then-mutate
+// the per-thread `subscriptionsByThread: Map<threadId, Set<runId>>` shape.
+// Inner-Set-empty-then-delete-key GC keeps the outer Map free of stale
+// per-thread entries once all runs on a thread terminate.
+//
+// Helpers return the NEXT state slice (not the full state), so callers fold
+// them into a Zustand setState partial via `{ subscriptionsByThread: next }`.
+// ─────────────────────────────────────────────────────────────────────────────
+function _addRunToThread(
+  current: Map<string, Set<string>>,
+  threadId: string,
+  runId: string,
+): Map<string, Set<string>> {
+  const next = new Map(current)
+  const innerCur = next.get(threadId) ?? new Set<string>()
+  const inner = new Set(innerCur)
+  inner.add(runId)
+  next.set(threadId, inner)
+  return next
+}
+
+function _removeRunFromThread(
+  current: Map<string, Set<string>>,
+  threadId: string,
+  runId: string,
+): Map<string, Set<string>> {
+  const innerCur = current.get(threadId)
+  if (!innerCur || !innerCur.has(runId)) return current
+  const next = new Map(current)
+  const inner = new Set(innerCur)
+  inner.delete(runId)
+  if (inner.size === 0) {
+    // GC: drop the threadId key when its Set goes empty so size==0
+    // queries stay correct without scanning every thread.
+    next.delete(threadId)
+  } else {
+    next.set(threadId, inner)
+  }
+  return next
 }
 
 export function StreamsProvider({ children }: PropsWithChildren) {
@@ -600,6 +656,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // useMessages.ts:589-598) — refuse to wipe a bucket whose thread is
         // currently being streamed into. Predicate text matches the
         // acceptance-criterion grep exactly. Source: useMessages.ts:572-601.
+        //
+        // Plan 075.4-01 D-075.4-A1 NOTE: the Branch D-3 inequality predicate
+        // BELOW is preserved verbatim per Phase 067.5 contract. The only change
+        // inside the setState callback is dropping the now-obsolete global
+        // streaming-flag return key: that global flip was a remnant from the
+        // pre-067.5 wipe path (the bucket-wipe was assumed to imply a
+        // streaming-end), but in the per-thread model the streaming-end SSE
+        // handler in sendMessage's finally block owns the
+        // streamingThreads.delete(tid) write authoritatively. Bucket deletion
+        // is now structurally orthogonal to streaming-state membership.
         clearThreadBucket: (surface) => {
           const tid = activeThreadIdRef.current
           if (tid && tid !== streamingThreadIdRef.current) {
@@ -612,7 +678,6 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               nextBuckets.set(surface, nextSurf)
               return {
                 bucketsBySurface: nextBuckets,
-                isStreaming: false,
               }
             })
           }
@@ -738,8 +803,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // WR-06 fix: RESERVE the subscription slot BEFORE firing subscribeToRun.
               const controller = new AbortController()
               subscriptionsRef.current.set(run.run_id, controller)
+              // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
               useStreamsStore.setState((s) => ({
-                subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(run.run_id),
+                subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run.run_id),
               }))
 
               const callbacks: StreamCallbacks = makeStreamCallbacks({
@@ -781,8 +847,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     (rid: string, since: string) => {
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
+                      // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
                       useStreamsStore.setState((s) => ({
-                        subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(rid),
+                        subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, rid),
                       }))
                       // Fire-and-forget — same shape as the outer
                       // subscribeToRun() call below. Errors logged but not
@@ -815,12 +882,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   })
                 })
                 // L-068-07: cleanup on onTerminal (BL-03 fix).
+                // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
                 subscriptionsRef.current.delete(run.run_id)
-                useStreamsStore.setState((s) => {
-                  const next = new Set(s.subscriptionsByRunId)
-                  next.delete(run.run_id)
-                  return { subscriptionsByRunId: next }
-                })
+                useStreamsStore.setState((s) => ({
+                  subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, run.run_id),
+                }))
                 if (errorPayload === "buffer_expired") {
                   useStreamsStore
                     .getState()
@@ -848,13 +914,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 })
                 .finally(() => {
                   // BL-03 safety net.
+                  // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
                   if (subscriptionsRef.current.has(run.run_id)) {
                     subscriptionsRef.current.delete(run.run_id)
-                    useStreamsStore.setState((s) => {
-                      const next = new Set(s.subscriptionsByRunId)
-                      next.delete(run.run_id)
-                      return { subscriptionsByRunId: next }
-                    })
+                    useStreamsStore.setState((s) => ({
+                      subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, run.run_id),
+                    }))
                   }
                   // Pitfall 5 (terminal-time merge).
                   useStreamsStore
@@ -909,7 +974,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             ...prev,
             assistantMsg,
           ])
-          useStreamsStore.setState({ isStreaming: true })
+          // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads.
+          useStreamsStore.setState((s) => ({
+            streamingThreads: new Set(s.streamingThreads).add(threadId),
+          }))
 
           const controller = new AbortController()
           abortControllerRef.current = controller
@@ -926,10 +994,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             registeredRunId = run_id
 
             // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages.
-            // L-068-07 (open side): track in subscriptionsByRunId mirror.
+            // L-068-07 (open side): track in subscriptionsByThread mirror.
+            // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
             subscriptionsRef.current.set(run_id, controller)
             useStreamsStore.setState((s) => ({
-              subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(run_id),
+              subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run_id),
             }))
 
             // WR-04 fix: swap temp user id for real, stamp run_id on assistant placeholder.
@@ -982,8 +1051,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     (rid, since) => {
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
+                      // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
                       useStreamsStore.setState((s) => ({
-                        subscriptionsByRunId: new Set(s.subscriptionsByRunId).add(rid),
+                        subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, rid),
                       }))
                       subscribeToRun(rid, since, callbacks, newController.signal).catch(
                         (err) => {
@@ -1014,14 +1084,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               })
               // L-068-07: BL-03 fix — subscriptionsRef cleanup belongs in
               // onTerminal, NOT the finally chain. Mirror updates alongside.
+              // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
               if (registeredRunId) {
                 subscriptionsRef.current.delete(registeredRunId)
                 const runIdToRemove = registeredRunId
-                useStreamsStore.setState((s) => {
-                  const next = new Set(s.subscriptionsByRunId)
-                  next.delete(runIdToRemove)
-                  return { subscriptionsByRunId: next }
-                })
+                useStreamsStore.setState((s) => ({
+                  subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
+                }))
               }
               // Pitfall 8: TTL-expired buffer fallback.
               if (errorPayload === "buffer_expired") {
@@ -1054,17 +1123,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             abortControllerRef.current = null
             isSendingRef.current = false
             streamingThreadIdRef.current = null
-            useStreamsStore.setState({ isStreaming: false })
+            // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads delete.
+            // This is the AUTHORITATIVE streaming-end write — clearThreadBucket
+            // no longer writes here (D-075.4-A1 invariant; see L:617).
+            useStreamsStore.setState((s) => {
+              const next = new Set(s.streamingThreads)
+              next.delete(threadId)
+              return { streamingThreads: next }
+            })
             // L-068-07 safety net: only delete if entry still present (catch
             // paths where onTerminal didn't fire).
+            // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
             if (registeredRunId && subscriptionsRef.current.has(registeredRunId)) {
               subscriptionsRef.current.delete(registeredRunId)
               const runIdToRemove = registeredRunId
-              useStreamsStore.setState((s) => {
-                const next = new Set(s.subscriptionsByRunId)
-                next.delete(runIdToRemove)
-                return { subscriptionsByRunId: next }
-              })
+              useStreamsStore.setState((s) => ({
+                subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
+              }))
             }
 
             // Always clear planning flag on stream end.
@@ -1176,7 +1251,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // MessageList can distinguish "fetch in flight, show skeleton" from
           // "genuinely empty thread, hide skeleton." Cleared in the outer
           // finally below (covers success, abort, retry, final-failure paths).
-          useStreamsStore.setState({ loadingThreadId: threadId })
+          // Plan 075.4-01 D-075.4-A1: per-thread loadingThreads.
+          useStreamsStore.setState((s) => ({
+            loadingThreads: new Set(s.loadingThreads).add(threadId),
+          }))
           const tryFetch = async (attempt: number): Promise<void> => {
             // D-060-03: cancel the previous in-flight getMessages fetch.
             loadAbortRef.current?.abort()
@@ -1212,8 +1290,15 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 068.5: clear any prior banner state on success (handles
               // transient outage recovery — first attempt fails, retry succeeds,
               // or user clicks Retry and the fresh fetch succeeds).
-              if (useStreamsStore.getState().reconcileError?.threadId === threadId) {
-                useStreamsStore.setState({ reconcileError: null })
+              // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors. The
+              // threadId predicate is no longer needed — the Map key naturally
+              // scopes the delete to the right thread.
+              if (useStreamsStore.getState().reconcileErrors.has(threadId)) {
+                useStreamsStore.setState((s) => {
+                  const next = new Map(s.reconcileErrors)
+                  next.delete(threadId)
+                  return { reconcileErrors: next }
+                })
               }
             } catch (err) {
               // Existing AbortError handling — early return, no retry, no banner.
@@ -1244,23 +1329,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 return tryFetch(1)
               }
               // Second failure → banner (D-068.5-08 + D-068.5-09)
-              useStreamsStore.setState({
-                reconcileError: {
+              // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors.
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(
                   threadId,
-                  error: err instanceof Error ? err : new Error(String(err)),
-                },
-              })
+                  err instanceof Error ? err : new Error(String(err)),
+                ),
+              }))
             }
           }
           try {
             await tryFetch(0)
           } finally {
-            // Phase 068.5 Gap-01: clear the loading marker, but ONLY if we're
-            // still the owner of it — a concurrent load may have started for
-            // a different thread and clobbered our setState above.
-            if (useStreamsStore.getState().loadingThreadId === threadId) {
-              useStreamsStore.setState({ loadingThreadId: null })
-            }
+            // Phase 068.5 Gap-01: clear the loading marker.
+            // Plan 075.4-01 D-075.4-A1: per-thread loadingThreads. The
+            // "still the owner" guard from the old global flag is no longer
+            // meaningful because each thread now owns its own Set membership —
+            // a concurrent load for a DIFFERENT thread cannot clobber this
+            // thread's bit. Always delete this thread's entry on exit.
+            useStreamsStore.setState((s) => {
+              if (!s.loadingThreads.has(threadId)) return {}
+              const next = new Set(s.loadingThreads)
+              next.delete(threadId)
+              return { loadingThreads: next }
+            })
           }
         },
       },
@@ -1329,9 +1421,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     const throttledWrite = makeThrottle(writeNow, 500)
     throttledWriteRef.current = throttledWrite
     // B-02 fix: selector-bound subscription — only fires when bucketsBySurface
-    // reference changes, NOT on every reconcileError / isStreaming /
-    // subscriptionsByRunId / loadingThreadId / viewedThreadId / fallbackNotice
+    // reference changes, NOT on every reconcileErrors / streamingThreads /
+    // subscriptionsByThread / loadingThreads / viewedThreadId / fallbackNotices
     // setState. Avoids wasted serialization on bookkeeping state.
+    // (Plan 075.4-01 D-075.4-A1: comment updated for per-thread field names.)
     // Requires `subscribeWithSelector` middleware in the store factory.
     const unsubscribe = useStreamsStore.subscribe(
       (state) => state.bucketsBySurface,
@@ -1372,10 +1465,45 @@ export const useStreamActions = (): StreamsState["actions"] =>
 // (MessageInput disabled, MessageList scroll, MessageItem spinner) reads via
 // this named hook. Plan 2 Task 3 audit confirmed live consumers across
 // ChatArea/MessageList/MessageItem — Branch A (hoist) required.
+//
+// Plan 075.4-01 D-075.4-A1: back-compat any-thread-streaming check. New
+// thread-scoped consumers should use `useStreamingForThread(threadId)` below;
+// this hook is kept for legacy call sites that need "any stream alive."
 export const useIsStreaming = (): boolean =>
-  useStreamsStore((state) => state.isStreaming)
+  useStreamsStore((state) => state.streamingThreads.size > 0)
 
-// useStreamSubscriptions reads from the Zustand-visible `subscriptionsByRunId`
-// mirror.
+// useStreamSubscriptions reads from the per-thread `subscriptionsByThread`
+// mirror — scans every thread's inner Set for the runId. Plan 075.4-01
+// D-075.4-A1: this is O(threads) not O(1) but callers query a known runId
+// rarely (per-message subscription gating), so the linear scan is acceptable.
 export const useStreamSubscriptions = (runId: string): boolean =>
-  useStreamsStore((state) => state.subscriptionsByRunId.has(runId))
+  useStreamsStore((state) => {
+    for (const inner of state.subscriptionsByThread.values()) {
+      if (inner.has(runId)) return true
+    }
+    return false
+  })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan 075.4-01 D-075.4-A1 — thread-scoped selectors.
+//
+// Closes BUG-260523-01: consumers read per-thread state directly so Thread A
+// streaming no longer gates Thread B's composer. Each selector returns null /
+// false for `null` threadId so call sites can pass `thread?.id ?? null` without
+// branching on the optional.
+//
+// Phase 082 (cross-cutting verification) inherits these as the canonical
+// thread-scoped surface — additions go BELOW (alphabetical) so the existing
+// 4 stay grep-stable.
+// ─────────────────────────────────────────────────────────────────────────────
+export const useStreamingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.streamingThreads.has(threadId) : false))
+
+export const useLoadingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.loadingThreads.has(threadId) : false))
+
+export const useReconcileErrorForThread = (threadId: string | null): Error | null =>
+  useStreamsStore((s) => (threadId ? (s.reconcileErrors.get(threadId) ?? null) : null))
+
+export const useFallbackNoticeForThread = (threadId: string | null): string | null =>
+  useStreamsStore((s) => (threadId ? (s.fallbackNotices.get(threadId) ?? null) : null))

@@ -7,6 +7,18 @@
  * reconcile + loadMessages + stopStream + resumeFromFailed). Post-lift target:
  * < 100 LOC (RESEARCH §Recommendation #4 plan-checker assertion).
  *
+ * Plan 075.4-01 D-075.4-A1: `isStreaming` + `fallbackNotice` are now THREAD-
+ * SCOPED under the hood. The public destructure shape that ChatArea consumes
+ * (`{ messages, isStreaming, fallbackNotice, ... }`) is preserved BYTE-
+ * IDENTICAL — only the values it sees change from "any thread streaming?" to
+ * "is the VIEWED thread streaming?" and from a global fallback notice to the
+ * viewed thread's notice. Direct thread-scoped reads (e.g. ChatArea's composer
+ * `disabled` prop at L:221) go through the new
+ * `useStreamingForThread(thread?.id)` selector — which is the actual close-out
+ * for BUG-260523-01 (composer locked globally during any stream). This hook's
+ * `isStreaming` value would NOT close the bug if ChatArea continued to read it
+ * — see ChatArea.tsx Task 3 for the L:221 rewrite.
+ *
  * isStreaming AUDIT (Plan 2 Task 3 — Branch A required):
  *   `grep -rn isStreaming frontend/src/components/` returns 22 hits across:
  *     - ChatArea.tsx:29 (destructure), :219 (<MessageInput disabled={isStreaming} />),
@@ -29,7 +41,8 @@ import {
   useThreadMessages,
   useStreamActions,
   useViewingThread,
-  useIsStreaming,
+  useStreamingForThread,
+  useFallbackNoticeForThread,
 } from "@/providers/StreamsProvider"
 
 interface UseMessages {
@@ -60,13 +73,23 @@ interface UseMessages {
 export function useMessages(): UseMessages {
   const viewedThreadId = useViewingThread()
   const messages = useThreadMessages(viewedThreadId, "chat")
-  const isStreaming = useIsStreaming()
+  // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The `isStreaming` value
+  // ChatArea destructures from this hook now means "is the VIEWED thread
+  // streaming?" — closes BUG-260523-01 at this surface (the destructured prop
+  // no longer reflects ANY-thread-streaming). For the composer `disabled` prop
+  // in ChatArea (Task 3 / L:221), prefer the direct selector
+  // `useStreamingForThread(thread?.id ?? null)` so the disable derives from
+  // the OWNING thread id (not viewedThreadId), giving the correct behavior on
+  // background-streaming threads. `fallbackNotice` becomes the viewed thread's
+  // notice (null when there is no viewed thread).
+  const isStreaming = useStreamingForThread(viewedThreadId)
+  const fallbackNotice = useFallbackNoticeForThread(viewedThreadId)
   const actions = useStreamActions()
   return useMemo<UseMessages>(
     () => ({
       messages,
       isStreaming,
-      fallbackNotice: null,
+      fallbackNotice,
       loadMessages: (threadId) => actions.loadMessages(threadId, "chat"),
       sendMessage: (threadId, content, model, onTitleUpdate, agentMode, provider) =>
         actions.sendMessage(threadId, content, {
@@ -83,6 +106,6 @@ export function useMessages(): UseMessages {
       reconcile: (threadId) => actions.reconcile(threadId, "chat"),
       resumeFromFailed: actions.resumeFromFailed,
     }),
-    [messages, isStreaming, actions],
+    [messages, isStreaming, fallbackNotice, actions],
   )
 }
