@@ -4,7 +4,7 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 075.6 context gathered
-last_updated: "2026-05-23T17:15:27.391Z"
+last_updated: "2026-05-23T18:17:34.671Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 27
@@ -486,4 +486,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 075.4 (Cross-Provider Cleanup + Per-Thread State + E2E Backstop (INSERTED)) — 5 plans — 2026-05-23T04:26:36.537Z
+**Planned Phase:** 075.6 (Live Streaming UX + Cross-Provider Parity) — 3 plans — 2026-05-23T18:17:34.661Z
