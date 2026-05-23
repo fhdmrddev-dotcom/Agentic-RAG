@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
+import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { toolLabel, toolSummary as getToolSummary, taskPhaseLabel } from "@/lib/toolMeta"
 
 interface Props {
@@ -617,6 +618,29 @@ const [expanded, setExpanded] = useState(true)
     ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
   ].sort((a, b) => a.t - b.t)
 
+  // 075.6 Plan 02 / SPEC Req #4: default-expand-for-active-preparing rule.
+  // The LAST tool in displayItems whose status === "preparing" is the
+  // ACTIVE preparing tool (per Boundary Keeper Round 1: "expanded for active
+  // preparing tool, collapsed for past preparing tools"). Past preparing
+  // tools (rare — would require multiple back-to-back preparing entries for
+  // the same agent loop iteration) render collapsed by default.
+  const lastPreparingIndex = (() => {
+    for (let i = displayItems.length - 1; i >= 0; i--) {
+      const it = displayItems[i]
+      if (it.kind === 'tool' && it.tc.status === 'preparing') return i
+    }
+    return -1
+  })()
+
+  // 075.6 Plan 02 / SPEC Req #4: per-tool-id expanded state for the
+  // <ToolArgsLivePanel> chevron toggle. Default value follows the default-
+  // for-active rule (i === lastPreparingIndex). useState inside the map
+  // callback is NOT React-safe; lift to a component-scope Record keyed by
+  // tc.id so each panel instance has its own user-toggle state.
+  const [panelExpanded, setPanelExpanded] = useState<Record<string, boolean>>({})
+  const togglePanel = (id: string, defaultExpanded: boolean) =>
+    setPanelExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }))
+
   return (
     <div className={cn(
       "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
@@ -790,6 +814,28 @@ const [expanded, setExpanded] = useState(true)
                     {/* Preparing indicator bar — only visible during "preparing" state */}
                     {tc.status === "preparing" && (
                       <div className="mt-1.5 h-0.5 rounded-full bg-gradient-to-r from-primary/30 to-primary/10 animate-pulse" />
+                    )}
+
+                    {/* 075.6 Plan 02 / SPEC Req #4: live code panel during
+                        preparing. The inline (X.X KB) byte counter above
+                        REMAINS for the no-argsCodeText case (e.g., non-
+                        execute_code tools that emit tool_args_progress with
+                        byte count but no code body); when the panel renders,
+                        its header carries its own at-a-glance byte counter
+                        per SPEC §Boundaries (byte counter stays inside the
+                        new panel).
+                        Default-expanded for the ACTIVE preparing tool
+                        (i === lastPreparingIndex), collapsed for past
+                        preparing tools. User can toggle either way via the
+                        chevron. */}
+                    {tc.status === "preparing" && tc.argsCodeText && tc.argsCodeText.length > 0 && tc.argsBytesStreamed != null && (
+                      <ToolArgsLivePanel
+                        title={`Generating ${tc.name === "execute_code" ? "code" : toolLabel(tc.name)}…`}
+                        contentText={tc.argsCodeText}
+                        byteCount={tc.argsBytesStreamed}
+                        expanded={panelExpanded[tc.id] ?? (i === lastPreparingIndex)}
+                        onToggle={() => togglePanel(tc.id, i === lastPreparingIndex)}
+                      />
                     )}
 
                     {/* Expandable parameters */}
