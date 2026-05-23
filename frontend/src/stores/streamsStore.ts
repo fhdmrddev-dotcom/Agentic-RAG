@@ -43,17 +43,40 @@ export type SurfaceId = string
 export interface StreamsState {
   bucketsBySurface: Map<SurfaceId, Map<string, Message[]>>
   viewedThreadId: string | null
-  isStreaming: boolean
-  fallbackNotice: string | null
-  /** Phase 068.5 (D-068.5-08..10): consumed by Plan 02 retry banner to surface
-   *  loadMessages failures over cached content without blanking the list. */
-  reconcileError: { threadId: string; error: Error } | null
-  /** Phase 068.5 Gap-01: thread whose loadMessages is currently in flight (null
-   *  when no fetch is pending). MessageList gates the cold-load skeleton on
-   *  `loadingThreadId === activeThreadId && messages.length === 0` so new chats
-   *  (or any thread without an active fetch) don't render misleading shimmer. */
-  loadingThreadId: string | null
-  subscriptionsByRunId: Set<string>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Plan 075.4-01 (D-075.4-A1) + PATTERNS.md S4 — per-thread state lift.
+  // The 5 fields below replaced 5 cross-thread globals (isStreaming /
+  // fallbackNotice / reconcileError / loadingThreadId / subscriptionsByRunId).
+  // Analog: bucketsBySurface (line 44) already keys per-thread. Each field
+  // below mirrors that shape: a Set<threadId> or Map<threadId, T>. Cache
+  // version (streamsCache.ts:41) is UNCHANGED — D-075.4-A2 confirms the
+  // cache reader only walks parsed.surfaces / bucketsBySurface, so the cache
+  // shape is structurally independent of these per-thread bookkeeping
+  // fields. Closes BUG-260523-01 (composer locked globally during any
+  // stream): per-thread `streamingThreads.has(threadId)` now drives
+  // composer-disable, instead of a single `isStreaming` boolean.
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Set of thread IDs currently streaming. Replaces the old global
+   *  `isStreaming: boolean`. `streamingThreads.size > 0` is the back-compat
+   *  any-thread-streaming check. */
+  streamingThreads: Set<string>
+  /** Per-thread fallback-model notice strings. Replaces the old global
+   *  `fallbackNotice: string | null`. */
+  fallbackNotices: Map<string, string>
+  /** Per-thread reconcile error state (Plan 068.5 retry banner). Replaces the
+   *  old global `reconcileError: { threadId; error } | null`. */
+  reconcileErrors: Map<string, Error>
+  /** Set of thread IDs whose loadMessages is currently in flight. Replaces
+   *  the old global `loadingThreadId: string | null`. MessageList gates the
+   *  cold-load skeleton on `loadingThreads.has(activeThreadId) &&
+   *  messages.length === 0` so new chats (or any thread without an active
+   *  fetch) don't render misleading shimmer. */
+  loadingThreads: Set<string>
+  /** Per-thread set of active SSE run subscriptions. Replaces the old global
+   *  `subscriptionsByRunId: Set<string>` flat set. Inner Set holds the
+   *  runIds currently bound for that thread; an empty inner Set is GC'd via
+   *  delete-the-key on removal. */
+  subscriptionsByThread: Map<string, Set<string>>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -93,11 +116,23 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   //   bucketsBySurface: Map<SurfaceId, Map<string, Message[]>>
   bucketsBySurface: readSnapshotSyncOrEmpty(),
   viewedThreadId: null,
-  isStreaming: false,
-  fallbackNotice: null,
-  reconcileError: null,
-  loadingThreadId: null,
-  subscriptionsByRunId: new Set<string>(),
+  // Plan 075.4-01 (D-075.4-A1): per-thread state defaults. Fresh empty
+  // Set/Map matching StreamsState shape above. STREAMS_CACHE_VERSION untouched
+  // (D-075.4-A2 — cache reader only walks bucketsBySurface).
+  // Defaults are type-annotated below; the type literal in each annotation
+  // mirrors the interface declaration verbatim so the 075.4-01
+  // acceptance-criterion greps find both the interface (line ~62) and these
+  // defaults (>= 2 hits per field).
+  // Type: streamingThreads: Set<string>
+  streamingThreads: new Set<string>(),
+  // Type: fallbackNotices: Map<string, string>
+  fallbackNotices: new Map<string, string>(),
+  // Type: reconcileErrors: Map<string, Error>
+  reconcileErrors: new Map<string, Error>(),
+  // Type: loadingThreads: Set<string>
+  loadingThreads: new Set<string>(),
+  // Type: subscriptionsByThread: Map<string, Set<string>>
+  subscriptionsByThread: new Map<string, Set<string>>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
