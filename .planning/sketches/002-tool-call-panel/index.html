@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sketch 002 — Tool Call Panel</title>
+  <link rel="stylesheet" href="../themes/default.css" />
+  <style>
+    body { padding-top: 56px; }
+
+    .canvas {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    .specimen-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin: 28px 0 14px;
+    }
+    .specimen-header h2 {
+      font-family: var(--font-headline);
+      font-size: var(--text-md);
+      font-weight: 600;
+      margin: 0;
+    }
+    .specimen-header .sub {
+      font-size: var(--text-xs);
+      color: var(--color-text-dim);
+      font-family: var(--font-mono);
+    }
+    .state-label {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--color-text-dim);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    /* ─── Shared tool primitives ─── */
+    .icon {
+      width: 22px; height: 22px;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .icon.search { background: var(--color-primary-dim); color: var(--color-primary); }
+    .icon.run { background: var(--color-primary-dim); color: var(--color-primary); }
+    .icon.done { background: var(--color-success-dim); color: var(--color-success); }
+    .icon.err { background: var(--color-danger-dim); color: var(--color-danger); }
+
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: var(--radius-full);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pill.running { background: var(--color-primary-dim); color: var(--color-primary); }
+    .pill.running .dot { animation: dotBounce 1.4s ease-in-out infinite; }
+    .pill.done { background: var(--color-success-dim); color: var(--color-success); }
+    .pill.err { background: var(--color-danger-dim); color: var(--color-danger); }
+
+    .caret {
+      display: inline-block;
+      width: 2px; height: 14px;
+      background: var(--color-primary);
+      vertical-align: -2px;
+      margin-left: 1px;
+      animation: caretBlink 1s steps(2) infinite;
+    }
+
+    /* ═════════ Variant A — Unified card with progressive disclosure ═════════ */
+    .va-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      animation: fadeSlideUp 0.3s var(--ease-out) forwards;
+    }
+    .va-card.active {
+      border-color: var(--color-primary-glow);
+      box-shadow: var(--shadow-glow-primary);
+    }
+    .va-card.err.active { border-color: var(--color-danger); }
+
+    .va-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: background var(--dur-fast);
+    }
+    .va-head:hover { background: var(--color-accent); }
+    .va-head .meta { flex: 1; min-width: 0; }
+    .va-head .name {
+      font-weight: 600;
+      font-size: var(--text-sm);
+    }
+    .va-head .args {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .va-head .chev {
+      color: var(--color-text-dim);
+      font-size: var(--text-sm);
+      transition: transform var(--dur-fast);
+    }
+    .va-card.open .va-head .chev { transform: rotate(90deg); }
+    .va-body {
+      display: none;
+      border-top: 1px solid var(--color-border);
+      background: var(--color-bg);
+      padding: 12px 14px;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      max-height: 280px;
+      overflow-y: auto;
+      line-height: 1.7;
+    }
+    .va-card.open .va-body { display: block; }
+    .va-stream-line.new { animation: fadeSlideUp 0.2s var(--ease-out) forwards; }
+
+    /* Progress bar for running */
+    .va-prog {
+      height: 2px;
+      background: var(--color-primary-dim);
+      position: relative;
+      overflow: hidden;
+    }
+    .va-prog::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / 0.5), transparent);
+      animation: progressShimmer 1.8s ease-in-out infinite;
+    }
+
+    /* ═════════ Variant B — Stacked step rows ═════════ */
+    .vb-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      animation: fadeSlideUp 0.3s var(--ease-out) forwards;
+    }
+    .vb-card.active { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+    .vb-card.err.active { border-color: var(--color-danger); }
+    .vb-head {
+      padding: 10px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid var(--color-border);
+      background: hsl(220 30% 8% / 0.5);
+    }
+    .vb-head .name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+    .vb-head .timer {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--color-text-dim);
+    }
+    .vb-step-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--color-border-soft);
+      font-size: var(--text-sm);
+      animation: toolSlideIn 0.25s var(--ease-out) forwards;
+    }
+    .vb-step-row:last-child { border-bottom: none; }
+    .vb-step-row .marker {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 2px;
+      background: var(--color-surface);
+      border: 2px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--color-text-dim);
+    }
+    .vb-step-row.done .marker {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: hsl(216 45% 4%);
+    }
+    .vb-step-row.done .marker::after { content: '✓'; font-size: 9px; font-weight: 700; }
+    .vb-step-row.active .marker {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-dim);
+      animation: brandPulse 1.5s ease-in-out infinite;
+    }
+    .vb-step-row.err .marker {
+      background: var(--color-danger);
+      border-color: var(--color-danger);
+    }
+    .vb-step-row .label { flex: 1; min-width: 0; }
+    .vb-step-row .label .text { color: var(--color-text); }
+    .vb-step-row .label .detail {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+    .vb-step-row .duration {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--color-text-dim);
+      flex-shrink: 0;
+    }
+    .vb-step-row.active .duration { color: var(--color-primary); }
+    .vb-step-row.expanded .body {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: var(--color-bg);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--color-text-muted);
+      max-height: 160px;
+      overflow-y: auto;
+      width: 100%;
+    }
+
+    /* ═════════ Variant C — Inline streaming editor inset ═════════ */
+    .vc-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      animation: fadeSlideUp 0.3s var(--ease-out) forwards;
+    }
+    .vc-card.active { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+    .vc-card.err.active { border-color: var(--color-danger); }
+    .vc-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: hsl(220 30% 8% / 0.65);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .vc-head .name {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+    }
+    .vc-head .lang-chip {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 2px 7px;
+      background: var(--color-accent);
+      color: var(--color-text-muted);
+      border-radius: var(--radius-full);
+    }
+
+    .vc-editor {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      background: #0d1117;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .vc-gutter {
+      background: hsl(220 30% 7%);
+      color: var(--color-text-dim);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      text-align: right;
+      padding: 8px 8px 8px 0;
+      line-height: 1.7;
+      user-select: none;
+      border-right: 1px solid var(--color-border);
+    }
+    .vc-code {
+      padding: 8px 12px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.7;
+      color: #c9d1d9;
+      white-space: pre;
+    }
+    .vc-code .kw { color: #ff7b72; }
+    .vc-code .str { color: #a5d6ff; }
+    .vc-code .num { color: #79c0ff; }
+    .vc-code .fn { color: #d2a8ff; }
+    .vc-code .cmt { color: #8b949e; font-style: italic; }
+    .vc-code .new { animation: fadeSlideUp 0.2s var(--ease-out) forwards; }
+
+    .vc-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: hsl(220 30% 9%);
+      border-top: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--color-border);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--color-text-dim);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .vc-divider .live {
+      margin-left: auto;
+      color: var(--color-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .vc-divider .live .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: dotBounce 1.4s ease-in-out infinite;
+    }
+
+    .vc-output {
+      padding: 10px 12px;
+      background: #0d1117;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: #c9d1d9;
+      max-height: 140px;
+      overflow-y: auto;
+      line-height: 1.65;
+    }
+    .vc-output .line.stderr { color: #ffa198; }
+    .vc-output .line.new { animation: fadeSlideUp 0.2s var(--ease-out) forwards; }
+
+    .vc-foot {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: hsl(220 30% 7%);
+      font-size: var(--text-xs);
+      color: var(--color-text-muted);
+    }
+    .vc-foot .timer {
+      font-family: var(--font-mono);
+      color: var(--color-text-dim);
+    }
+    .vc-foot .actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+    .vc-foot button {
+      background: transparent;
+      border: 1px solid var(--color-border);
+      color: var(--color-text-muted);
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      font-family: var(--font-sans);
+    }
+    .vc-foot button:hover {
+      background: var(--color-accent);
+      color: var(--color-text);
+    }
+
+    /* Output preview (image-style) */
+    .vc-chart-preview {
+      margin: 6px 12px 10px;
+      padding: 12px;
+      background: linear-gradient(135deg, hsl(220 30% 9%), hsl(220 30% 11%));
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .vc-chart-preview .chart-icon {
+      width: 40px; height: 40px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+      display: flex; align-items: center; justify-content: center;
+      color: #fff;
+      font-size: 18px;
+    }
+    .vc-chart-preview .chart-meta { flex: 1; }
+    .vc-chart-preview .chart-name { font-size: var(--text-sm); color: var(--color-text); font-weight: 500; }
+    .vc-chart-preview .chart-sub { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); }
+
+    .variant { display: none; }
+    .variant.active { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════════
+       VARIANT NAV
+       ════════════════════════════════════════════════════════════ -->
+  <div class="variant-nav">
+    <span class="label">Sketch 002 ▸ Tool Call Panel</span>
+    <button class="variant-tab" data-target="a">A: Unified Card</button>
+    <button class="variant-tab" data-target="b">B: Stacked Steps</button>
+    <button class="variant-tab active" data-target="c">C: Editor Inset <span class="star">★</span></button>
+    <span style="margin-left:auto; font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono)">what shape is a single tool call?</span>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       VARIANT A — Unified Card with Progressive Disclosure
+       ════════════════════════════════════════════════════════════ -->
+  <div id="variant-a" class="variant">
+    <div class="canvas">
+      <div style="text-align:center; color:var(--color-text-dim); font-size:11px; font-family:var(--font-mono); margin-bottom:18px;">
+        A · One card per tool call. Args inline in header. Click to expand for body. Refinement of current pattern.
+      </div>
+
+      <!-- Running state -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">running — 8.0s</span></div>
+      <span class="state-label">▶ ACTIVE</span>
+      <div class="va-card active open">
+        <div class="va-head">
+          <div class="icon run">▶</div>
+          <div class="meta">
+            <div class="name">execute_code</div>
+            <div class="args">python · charting Q3 YoY vs Q2 baseline</div>
+          </div>
+          <span class="pill running"><span class="dot"></span>running</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="va-body">
+          <div class="va-stream-line">import pandas as pd</div>
+          <div class="va-stream-line">import matplotlib.pyplot as plt</div>
+          <div class="va-stream-line"></div>
+          <div class="va-stream-line">q3_rev = 28.4; q3_prev = 21.7</div>
+          <div class="va-stream-line">q2_rev = 24.1; q2_prev = 19.8</div>
+          <div class="va-stream-line">yoy_q3 = (q3_rev - q3_prev) / q3_prev * 100</div>
+          <div class="va-stream-line new">yoy_q2 = (q2_rev - q2_prev) / q2_prev * 100<span class="caret"></span></div>
+        </div>
+        <div class="va-prog"></div>
+      </div>
+
+      <!-- Done state (collapsed) -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">done — collapsed by default</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="va-card">
+        <div class="va-head" onclick="this.parentElement.classList.toggle('open')">
+          <div class="icon done">✓</div>
+          <div class="meta">
+            <div class="name">execute_code</div>
+            <div class="args">python · charted YoY vs Q2 baseline · output: chart.png</div>
+          </div>
+          <span class="pill done"><span class="dot"></span>done · 11.3s</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="va-body">
+          <div class="va-stream-line cmt">7 lines · 1 output file</div>
+          <div class="va-stream-line">yoy_q3 = 30.87</div>
+          <div class="va-stream-line">yoy_q2 = 21.71</div>
+          <div class="va-stream-line">[chart saved to chart.png]</div>
+        </div>
+      </div>
+
+      <!-- Search done -->
+      <div class="specimen-header"><h2>search_documents</h2><span class="sub">done — same shape, different icon</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="va-card">
+        <div class="va-head" onclick="this.parentElement.classList.toggle('open')">
+          <div class="icon search">🔍</div>
+          <div class="meta">
+            <div class="name">search_documents</div>
+            <div class="args">query: "Q3 2026 financial report"  ·  folder: finance/</div>
+          </div>
+          <span class="pill done"><span class="dot"></span>4 results · 1.2s</span>
+          <span class="chev">▸</span>
+        </div>
+      </div>
+
+      <!-- Error state -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">error — failure case</span></div>
+      <span class="state-label">✗ ERROR</span>
+      <div class="va-card err active">
+        <div class="va-head" onclick="this.parentElement.classList.toggle('open')">
+          <div class="icon err">!</div>
+          <div class="meta">
+            <div class="name">execute_code</div>
+            <div class="args">python · ModuleNotFoundError: scipy</div>
+          </div>
+          <span class="pill err"><span class="dot"></span>failed · 0.8s</span>
+          <span class="chev">▸</span>
+        </div>
+      </div>
+
+      <p style="margin-top:32px; padding:14px; border:1px dashed var(--color-border); border-radius:8px; font-size:var(--text-sm); color:var(--color-text-muted);">
+        <strong style="color:var(--color-text)">Reading the variant:</strong> one container does everything — args in header, body for stream/output, status pill carries timer + result count. Familiar pattern, low surprise, but body content (code, search results, file outputs) all squeeze into the same plain mono block.
+      </p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       VARIANT B — Stacked Step Rows
+       ════════════════════════════════════════════════════════════ -->
+  <div id="variant-b" class="variant">
+    <div class="canvas">
+      <div style="text-align:center; color:var(--color-text-dim); font-size:11px; font-family:var(--font-mono); margin-bottom:18px;">
+        B · Each phase of the tool call is its own row. Scannable pipeline-style history. Like CI step output.
+      </div>
+
+      <!-- Running state -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">running — 8s into 4 phases</span></div>
+      <span class="state-label">▶ ACTIVE</span>
+      <div class="vb-card active">
+        <div class="vb-head">
+          <div class="icon run">▶</div>
+          <div class="name">execute_code</div>
+          <span class="timer">8.0s elapsed</span>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text">Args received</div>
+            <div class="detail">python · 6 lines of code</div>
+          </div>
+          <div class="duration">0.1s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text">Sandbox container ready</div>
+            <div class="detail">agentic-rag-sandbox:075.1</div>
+          </div>
+          <div class="duration">1.4s</div>
+        </div>
+        <div class="vb-step-row active">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text">Running python<span class="caret"></span></div>
+            <div class="detail">stdout · 4 lines emitted</div>
+          </div>
+          <div class="duration">6.5s</div>
+        </div>
+        <div class="vb-step-row">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text" style="color:var(--color-text-dim);">Capturing output</div>
+            <div class="detail">queued</div>
+          </div>
+          <div class="duration" style="color:var(--color-text-dim);">—</div>
+        </div>
+      </div>
+
+      <!-- Done state -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">done — full history preserved</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="vb-card">
+        <div class="vb-head">
+          <div class="icon done">✓</div>
+          <div class="name">execute_code</div>
+          <span class="timer">11.3s · 4 phases</span>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Args received</div><div class="detail">python · 6 lines</div></div>
+          <div class="duration">0.1s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Sandbox container ready</div><div class="detail">agentic-rag-sandbox:075.1</div></div>
+          <div class="duration">1.4s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Ran python</div><div class="detail">7 stdout lines</div></div>
+          <div class="duration">9.0s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Captured output</div><div class="detail">chart.png · 142 KB</div></div>
+          <div class="duration">0.8s</div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="specimen-header"><h2>search_documents</h2><span class="sub">done — same row pattern</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="vb-card">
+        <div class="vb-head">
+          <div class="icon done">🔍</div>
+          <div class="name">search_documents</div>
+          <span class="timer">1.2s · 2 phases</span>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text">Embedded query</div>
+            <div class="detail">"Q3 2026 financial report"</div>
+          </div>
+          <div class="duration">0.4s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text">Retrieved 4 documents</div>
+            <div class="detail">12 chunks · top score 0.91</div>
+          </div>
+          <div class="duration">0.8s</div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">error — failure point visible</span></div>
+      <span class="state-label">✗ ERROR</span>
+      <div class="vb-card err active">
+        <div class="vb-head">
+          <div class="icon err">!</div>
+          <div class="name">execute_code</div>
+          <span class="timer" style="color:var(--color-danger);">0.8s · failed at phase 3</span>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Args received</div><div class="detail">python · 8 lines</div></div>
+          <div class="duration">0.1s</div>
+        </div>
+        <div class="vb-step-row done">
+          <div class="marker"></div>
+          <div class="label"><div class="text">Sandbox container ready</div></div>
+          <div class="duration">0.5s</div>
+        </div>
+        <div class="vb-step-row err">
+          <div class="marker"></div>
+          <div class="label">
+            <div class="text" style="color:var(--color-danger);">Run failed</div>
+            <div class="detail" style="color:var(--color-danger);">ModuleNotFoundError: scipy</div>
+          </div>
+          <div class="duration">0.2s</div>
+        </div>
+      </div>
+
+      <p style="margin-top:32px; padding:14px; border:1px dashed var(--color-border); border-radius:8px; font-size:var(--text-sm); color:var(--color-text-muted);">
+        <strong style="color:var(--color-text)">Reading the variant:</strong> the tool call decomposes into observable phases. The active phase pulses; done phases show duration. Failure mode is immediately clear — you see exactly which step broke. Costs more vertical space, but makes the agent's machinery legible.
+      </p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       VARIANT C — Editor Inset (Cursor / Jupyter-style)
+       ════════════════════════════════════════════════════════════ -->
+  <div id="variant-c" class="variant active">
+    <div class="canvas">
+      <div style="text-align:center; color:var(--color-text-dim); font-size:11px; font-family:var(--font-mono); margin-bottom:18px;">
+        C · Code is the focus. Editor inset with gutter + syntax. stdout below in its own region. Like Jupyter cell with live execution.
+      </div>
+
+      <!-- Running state -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">running — code streaming live</span></div>
+      <span class="state-label">▶ ACTIVE</span>
+      <div class="vc-card active">
+        <div class="vc-head">
+          <div class="icon run">▶</div>
+          <div class="name">execute_code</div>
+          <span class="lang-chip">python</span>
+          <span class="pill running" style="margin-left:auto;"><span class="dot"></span>running</span>
+        </div>
+        <div class="vc-editor scrollbar-thin">
+          <div class="vc-gutter"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div></div>
+          <div class="vc-code"><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+
+q3_rev = <span class="num">28.4</span>; q3_prev = <span class="num">21.7</span>
+q2_rev = <span class="num">24.1</span>; q2_prev = <span class="num">19.8</span>
+yoy_q3 = (q3_rev - q3_prev) / q3_prev * <span class="num">100</span>
+<span class="new">yoy_q2 = (q2_rev - q2_prev) / q2_prev * <span class="num">100</span><span class="caret"></span></span></div>
+        </div>
+        <div class="vc-divider">
+          <span>STDOUT</span>
+          <span class="live"><span class="dot"></span>streaming</span>
+        </div>
+        <div class="vc-output scrollbar-thin">
+          <div class="line">q3_rev = 28.4</div>
+          <div class="line">q2_rev = 24.1</div>
+          <div class="line new">yoy_q3 = 30.87<span class="caret"></span></div>
+        </div>
+        <div class="vc-foot">
+          <span class="timer">8.0s · sandbox warm</span>
+          <div class="actions">
+            <button>Copy code</button>
+            <button>Expand</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Done state with output preview -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">done — output preview lands inline</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="vc-card">
+        <div class="vc-head">
+          <div class="icon done">✓</div>
+          <div class="name">execute_code</div>
+          <span class="lang-chip">python</span>
+          <span class="pill done" style="margin-left:auto;"><span class="dot"></span>done · 11.3s</span>
+        </div>
+        <div class="vc-editor scrollbar-thin">
+          <div class="vc-gutter"><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div></div>
+          <div class="vc-code"><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt
+
+q3_rev = <span class="num">28.4</span>; q3_prev = <span class="num">21.7</span>
+q2_rev = <span class="num">24.1</span>; q2_prev = <span class="num">19.8</span>
+yoy_q3 = (q3_rev - q3_prev) / q3_prev * <span class="num">100</span>
+yoy_q2 = (q2_rev - q2_prev) / q2_prev * <span class="num">100</span></div>
+        </div>
+        <div class="vc-divider"><span>STDOUT</span><span style="margin-left:auto; color:var(--color-text-dim);">7 lines</span></div>
+        <div class="vc-output scrollbar-thin">
+          <div class="line">yoy_q3 = 30.87</div>
+          <div class="line">yoy_q2 = 21.71</div>
+          <div class="line">[chart saved to chart.png]</div>
+        </div>
+        <div class="vc-chart-preview">
+          <div class="chart-icon">📈</div>
+          <div class="chart-meta">
+            <div class="chart-name">chart.png</div>
+            <div class="chart-sub">142 KB · matplotlib · click to view</div>
+          </div>
+          <button style="background:transparent; border:1px solid var(--color-border); color:var(--color-text-muted); font-size:11px; padding:4px 10px; border-radius:4px; cursor:pointer;">Open</button>
+        </div>
+        <div class="vc-foot">
+          <span class="timer">11.3s · 1 output file</span>
+          <div class="actions">
+            <button>Copy code</button>
+            <button>Re-run</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- search_documents in editor-inset variant - different shape since not code -->
+      <div class="specimen-header"><h2>search_documents</h2><span class="sub">done — results card (not code)</span></div>
+      <span class="state-label">✓ COMPLETE</span>
+      <div class="vc-card">
+        <div class="vc-head">
+          <div class="icon done">🔍</div>
+          <div class="name">search_documents</div>
+          <span class="lang-chip">query</span>
+          <span class="pill done" style="margin-left:auto;"><span class="dot"></span>4 results · 1.2s</span>
+        </div>
+        <div style="padding: 12px 14px; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); border-bottom: 1px solid var(--color-border-soft);">
+          <span style="color:var(--color-text-dim);">query</span> &rsaquo; "Q3 2026 financial report" &nbsp;<span style="color:var(--color-text-dim);">folder</span> &rsaquo; finance/
+        </div>
+        <div style="padding: 8px 14px;">
+          <div style="display:flex; gap:10px; padding:8px 0; border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm);">
+            <span style="font-family:var(--font-mono); color:var(--color-success); font-size:11px;">0.91</span>
+            <div>Q3-2026-financials.pdf <span style="color:var(--color-text-dim); font-family:var(--font-mono); font-size:11px;">· chunk 4 of 12</span></div>
+          </div>
+          <div style="display:flex; gap:10px; padding:8px 0; border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm);">
+            <span style="font-family:var(--font-mono); color:var(--color-success); font-size:11px;">0.84</span>
+            <div>FY26-mid-year-board.pptx <span style="color:var(--color-text-dim); font-family:var(--font-mono); font-size:11px;">· slide 12</span></div>
+          </div>
+          <div style="display:flex; gap:10px; padding:8px 0; font-size: var(--text-sm);">
+            <span style="font-family:var(--font-mono); color:var(--color-success); font-size:11px;">0.81</span>
+            <div>revenue-detail-q3.xlsx <span style="color:var(--color-text-dim); font-family:var(--font-mono); font-size:11px;">· sheet "monthly"</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="specimen-header"><h2>execute_code</h2><span class="sub">error — stderr region surfaces the trace</span></div>
+      <span class="state-label">✗ ERROR</span>
+      <div class="vc-card err active">
+        <div class="vc-head">
+          <div class="icon err">!</div>
+          <div class="name">execute_code</div>
+          <span class="lang-chip">python</span>
+          <span class="pill err" style="margin-left:auto;"><span class="dot"></span>failed · 0.8s</span>
+        </div>
+        <div class="vc-divider"><span style="color:var(--color-danger);">STDERR</span><span style="margin-left:auto; color:var(--color-danger);">traceback</span></div>
+        <div class="vc-output scrollbar-thin">
+          <div class="line stderr">Traceback (most recent call last):</div>
+          <div class="line stderr">  File "&lt;sandbox&gt;", line 3, in &lt;module&gt;</div>
+          <div class="line stderr">    from scipy import stats</div>
+          <div class="line stderr">ModuleNotFoundError: No module named 'scipy'</div>
+        </div>
+        <div class="vc-foot">
+          <span class="timer" style="color:var(--color-danger);">failed at line 3 · 0.8s</span>
+          <div class="actions">
+            <button>Copy traceback</button>
+            <button>Re-run</button>
+          </div>
+        </div>
+      </div>
+
+      <p style="margin-top:32px; padding:14px; border:1px dashed var(--color-border); border-radius:8px; font-size:var(--text-sm); color:var(--color-text-muted);">
+        <strong style="color:var(--color-text)">Reading the variant:</strong> code becomes a real editor pane (gutter, syntax highlighting, lang chip). stdout/stderr live in their own clearly-labeled region. File outputs land as preview cards. Non-code tools (search, read_file) get a different inner shape — same outer container.
+      </p>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SKETCH TOOLBAR
+       ════════════════════════════════════════════════════════════ -->
+  <div class="sketch-toolbar">
+    <span>002</span>
+    <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+      <option value="default">Default</option>
+    </select>
+    <button onclick="location.reload()">↻ Reload</button>
+  </div>
+
+  <script>
+    document.querySelectorAll('.variant-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.target;
+        document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('variant-' + target).classList.add('active');
+        tab.classList.add('active');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+
+    // Click-to-expand for va-card and vb-step-row when not bound inline
+    document.querySelectorAll('.va-card .va-head').forEach(h => {
+      if (!h.onclick) {
+        h.addEventListener('click', () => h.parentElement.classList.toggle('open'));
+      }
+    });
+  </script>
+</body>
+</html>
