@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 075.4-02-PLAN.md (Wave 1 — cross-provider cleanup + Gemini thought_signature)
-last_updated: "2026-05-23T07:48:11.290Z"
+stopped_at: Completed 075.4-03-PLAN.md (Wave 1 — streaming reliability + content-hash output dedup; closes BUG-260522-01, BUG-260522-02, BUG-260523-03, BUG-260521-02 + terminal-status race fix + iter-cap drop guard + trim warn + Anthropic LangSmith re-verify)
+last_updated: "2026-05-23T08:16:49.394Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
   completed_phases: 16
   total_plans: 58
-  completed_plans: 57
-  percent: 98
+  completed_plans: 58
+  percent: 100
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
 Status: Ready to execute
 Last activity: 2026-05-23
@@ -237,6 +237,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P05 | 22min | 5 tasks | 12 files |
 | Phase 075.4 P01 | 20min | 4 tasks | 8 files |
 | Phase 075.4 P02 | 30min | 3 tasks | 7 files |
+| Phase 075.4 P03 | 40min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -345,6 +346,10 @@ Recent decisions affecting v2.5 work:
 - Plan 075.4-02: UnknownProviderError(ValueError) raised at lifespan startup; _PROVIDER_BASE_URLS single source of truth (D-075.4-B1/B2/B3)
 - Plan 075.4-02: ModelCapability extended with uses_max_completion_tokens + supports_parallel_tools optional fields; registry-or-inference pattern applied to 6 sites (D-075.4-NN)
 - Plan 075.4-02: Gemini-3 thought_signature captured (capture/echo/persist 3-stage wiring) — closes BUG-260523-02 (D-075.4-C1/C2/C3)
+- Plan 075.4-03: _shielded_finalize step swap (step 2/3) closes terminal-status race; SSE 'done' now implies DB-committed by construction. Phase 067.4 Rule 3 suggestion ordering invariant preserved (suggestion block runs in agent body before finally).
+- Plan 075.4-03: SHA-256 content-hash sandbox output dedup with supersedes detection structurally closes BUG-260523-03 + naturally closes BUG-260522-02 + auto-closes BUG-260521-02 via re_open_trigger. dict[content_hash, meta] shape pivots from set[str] filename dedup.
+- Plan 075.4-03: migration 048 widens messages_role_check to allow role='system' for D-075.4-E1 persistence path. Pre-migration the INSERT is fail-silent (try/except + WARNING log); SSE event remains the user-visible signal. Apply via Supabase Studio SQL editor (CLAUDE.md rule).
+- Plan 075.4-03: Anthropic LangSmith @traceable re-verified — decorator already wires correctly; only a documentation comment added above @_ls_traceable at anthropic_service.py:143. Test uses skipif gate on LANGSMITH_TRACING because conftest.py:13 sets it to 'false' for default test runs (avoids live API pings).
 
 ### Pending Todos
 
@@ -384,8 +389,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-23T07:48:11.283Z
-Stopped at: Completed 075.4-02-PLAN.md (Wave 1 — cross-provider cleanup + Gemini thought_signature)
+Last session: 2026-05-23T08:16:49.383Z
+Stopped at: Completed 075.4-03-PLAN.md (Wave 1 — streaming reliability + content-hash output dedup; closes BUG-260522-01, BUG-260522-02, BUG-260523-03, BUG-260521-02 + terminal-status race fix + iter-cap drop guard + trim warn + Anthropic LangSmith re-verify)
 
 ### Next session: pending USER actions
 
