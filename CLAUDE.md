@@ -117,6 +117,10 @@ These rules exist because the v2.6 075.x cascade (8 phases on the same streaming
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature.
 
+## Project skills
+
+- **Sketch findings for Agentic RAG** (design decisions, CSS patterns, visual direction for the live-execution UX — run-card frame, tool-call panel shape, long-run composition) → `Skill("sketch-findings-agentic-rag")`. Auto-load when building or refactoring ToolCallPanel, StreamsProvider, MessageItem, useMessages, or any chat-surface component touching the agent's mid-execution moment.
+
 ## graphify
 
 This project has a graphify knowledge graph at `graphify-out/`.

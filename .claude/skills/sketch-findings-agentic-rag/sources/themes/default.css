@@ -1,0 +1,260 @@
+/* ─────────────────────────────────────────────────────────────
+   Sketch Theme: Aether Deep Midnight (Calm Instrument)
+   Mirrors the live frontend tokens in frontend/src/index.css :.dark
+   so sketches look and feel like the real product.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* Core surfaces (HSL channels from Aether Intelligence – "Digital Curator") */
+  --color-bg: hsl(216 45% 4%);
+  --color-bg-elev1: hsl(220 40% 5%);          /* sidebar */
+  --color-surface: hsl(220 30% 7%);            /* card */
+  --color-surface-hi: hsl(220 30% 8%);         /* popover */
+  --color-muted: hsl(220 30% 11%);
+  --color-accent: hsl(220 25% 14%);
+  --color-secondary: hsl(217 27% 12%);
+
+  --color-text: hsl(226 60% 97%);
+  --color-text-muted: hsl(220 16% 65%);
+  --color-text-dim: hsl(220 16% 45%);
+
+  --color-border: hsl(220 20% 16%);
+  --color-border-soft: hsl(220 20% 16% / 0.5);
+
+  --color-primary: hsl(239 100% 82%);          /* soft indigo */
+  --color-primary-strong: hsl(239 84% 67%);
+  --color-primary-dim: hsl(239 100% 82% / 0.15);
+  --color-primary-glow: hsl(239 100% 82% / 0.35);
+
+  --color-accent-violet: hsl(258 90% 66%);
+  --color-success: hsl(142 71% 45%);
+  --color-success-dim: hsl(142 71% 45% / 0.15);
+  --color-warning: hsl(38 92% 60%);
+  --color-warning-dim: hsl(38 92% 60% / 0.15);
+  --color-danger: hsl(0 72% 51%);
+  --color-danger-dim: hsl(0 72% 51% / 0.15);
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-headline: 'Manrope', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.9rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.65rem;
+  --text-3xl: 2.1rem;
+
+  /* Spacing (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Shapes */
+  --radius-sm: 6px;
+  --radius-md: 10px;     /* matches --radius: 0.625rem in app */
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Shadows (deeper, deep-midnight-tuned) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-glow-primary: 0 0 24px hsl(239 100% 82% / 0.18);
+  --shadow-inset: inset 0 1px 0 hsl(220 20% 20% / 0.5);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Animations (preserved from app for language consistency) ─── */
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes brandPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-primary-glow); }
+  50% { box-shadow: 0 0 0 6px hsl(239 100% 82% / 0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes dotBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes progressShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes checkPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes toolSlideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes caretBlink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ─── Common helpers used across sketches ─── */
+
+.mono { font-family: var(--font-mono); }
+.headline { font-family: var(--font-headline); }
+.text-muted { color: var(--color-text-muted); }
+.text-dim { color: var(--color-text-dim); }
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: hsl(220 16% 45% / 0.25);
+  border-radius: 3px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: hsl(220 16% 45% / 0.45);
+}
+
+.progress-bar {
+  position: relative;
+  overflow: hidden;
+  height: 2px;
+  background: var(--color-primary-dim);
+  border-radius: 1px;
+}
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-primary-glow),
+    hsl(258 90% 66% / 0.6),
+    transparent
+  );
+  animation: progressShimmer 1.8s ease-in-out infinite;
+}
+
+/* Sketch toolbar (shared across all sketches) */
+.sketch-toolbar {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  z-index: 9999;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  opacity: 0.35;
+  transition: opacity var(--dur-base) var(--ease-out);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.sketch-toolbar:hover { opacity: 1; }
+.sketch-toolbar select,
+.sketch-toolbar button {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+.sketch-toolbar button:hover { background: rgba(255, 255, 255, 0.16); }
+
+/* Variant nav (shared) */
+.variant-nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: hsl(220 40% 5% / 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--color-border);
+  padding: 10px 20px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-family: var(--font-sans);
+}
+.variant-nav .label {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 8px;
+}
+.variant-tab {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.variant-tab:hover {
+  background: var(--color-accent);
+  color: var(--color-text);
+}
+.variant-tab.active {
+  background: var(--color-primary-dim);
+  color: var(--color-primary);
+  border-color: var(--color-primary-glow);
+}
+.variant-tab .star { color: var(--color-warning); margin-left: 6px; }
