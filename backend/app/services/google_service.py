@@ -35,12 +35,45 @@ in openai_service.py + threads.py is removed in the same commit train.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 from typing import Any, Generator
 
 from google import genai
 from google.genai import types
+
+
+def _encode_signature_for_json(sig: Any) -> str:
+    """Google's native SDK returns ``thought_signature`` as raw protobuf bytes,
+    which is not JSON-serializable. Downstream code (token estimator, DB
+    persistence, _convert_messages_to_google on the next round) needs a JSON-safe
+    string. Base64 is the canonical encoding for opaque-bytes-in-JSON and
+    round-trips losslessly. If the value is already a str (e.g. cached from a
+    prior reload), return as-is so we're idempotent."""
+    if not sig:
+        return ""
+    if isinstance(sig, str):
+        return sig
+    if isinstance(sig, (bytes, bytearray)):
+        return base64.b64encode(bytes(sig)).decode("ascii")
+    # Defensive fallback: convert via str() for unexpected types.
+    return str(sig)
+
+
+def _decode_signature_for_part(sig: str) -> Any:
+    """Reverse of _encode_signature_for_json. The Google SDK's
+    ``Part.thought_signature`` field accepts EITHER a base64 str OR raw bytes
+    (Pydantic auto-deserializes). We hand it bytes for safety so the wire
+    serialization is deterministic."""
+    if not sig:
+        return None
+    try:
+        return base64.b64decode(sig)
+    except (ValueError, TypeError):
+        # If decode fails the cached value was probably already bytes-like or
+        # something we can't reverse — pass through and let the SDK raise.
+        return sig
 
 # Phase 075.5 — match the LangSmith @traceable pattern from anthropic_service.py:35-41.
 # wrap_google_genai is not yet released in the installed langsmith version
@@ -162,10 +195,10 @@ def _convert_messages_to_google(messages: list[dict]) -> tuple[list[types.Conten
                     except (AttributeError, TypeError):
                         pass
                 if sig:
-                    # thought_signature is base64-encoded bytes on the Part — SDK
-                    # accepts either bytes or base64 str.
+                    # Cached signature is a base64-string (see _encode_signature_for_json
+                    # on the capture path). Decode back to raw bytes for the SDK Part.
                     try:
-                        fc_part.thought_signature = sig
+                        fc_part.thought_signature = _decode_signature_for_part(sig)
                     except (AttributeError, TypeError):
                         logger.debug("Could not attach thought_signature to function_call Part (SDK shape changed?)")
                 parts.append(fc_part)
@@ -400,7 +433,12 @@ def stream_google(
                     # Capture thought_signature from the Part (Gemini-3+); store
                     # on the buffer entry so the upstream agent loop can persist
                     # it into messages.tool_calls jsonb for next-round echo.
-                    sig = getattr(part, "thought_signature", None) or ""
+                    # Google's SDK returns this as raw protobuf bytes; the
+                    # downstream pipeline (token-estimate json.dumps, asyncpg
+                    # jsonb persist, _convert_messages_to_google on the next
+                    # round) all need a JSON-safe string — base64 encode here.
+                    raw_sig = getattr(part, "thought_signature", None)
+                    sig = _encode_signature_for_json(raw_sig)
                     tool_blocks[idx] = {
                         "id": fc_id or f"call_{idx}",
                         "name": name,

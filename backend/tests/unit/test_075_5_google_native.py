@@ -180,6 +180,48 @@ def test_sanitize_strips_additional_properties_recursively() -> None:
     assert out["properties"]["filter"]["description"] == "string map"
 
 
+def test_signature_encode_decode_round_trip() -> None:
+    """Google's SDK returns thought_signature as raw bytes, but the downstream
+    pipeline (token-estimate json.dumps, asyncpg jsonb persist) needs a
+    JSON-safe string. _encode_signature_for_json base64-encodes; _decode does
+    the reverse. Round-trip must be lossless.
+
+    Live-2026-05-23 regression context: without this, the agent loop hit
+    `TypeError: Object of type bytes is not JSON serializable` at
+    context_window.py:146 (estimate_messages_tokens) after Gemini returned a
+    tool call. DB persistence also failed for the same reason."""
+    from app.services.google_service import _encode_signature_for_json, _decode_signature_for_part
+    import json
+
+    raw = b"opaque protobuf bytes \x00\xff\x12\xff\x00 trailer"
+    encoded = _encode_signature_for_json(raw)
+    assert isinstance(encoded, str), "encoded value must be a str for JSON safety"
+    # Must round-trip through json.dumps (this is the path that broke in production)
+    payload = json.dumps({"thought_signature": encoded})
+    parsed = json.loads(payload)
+    assert parsed["thought_signature"] == encoded
+    decoded = _decode_signature_for_part(encoded)
+    assert decoded == raw, "round-trip lossy — Gemini round 2 would 400"
+
+
+def test_signature_encode_idempotent_on_str() -> None:
+    """A signature already encoded as str (e.g. cached from a prior thread reload
+    where the value was read back as base64 str from jsonb) must pass through
+    unchanged — encoder must be idempotent so we don't double-encode."""
+    from app.services.google_service import _encode_signature_for_json
+    pre_encoded = "cmF3IHNpZ25hdHVyZSBieXRlcw=="
+    assert _encode_signature_for_json(pre_encoded) == pre_encoded
+
+
+def test_signature_encode_empty_returns_empty_string() -> None:
+    """Falsy inputs (None, empty bytes, empty str) all collapse to '' so the
+    persist site's conditional spread (`{} if not sig`) treats them as absent."""
+    from app.services.google_service import _encode_signature_for_json
+    assert _encode_signature_for_json(None) == ""
+    assert _encode_signature_for_json(b"") == ""
+    assert _encode_signature_for_json("") == ""
+
+
 def test_real_tools_pass_sanitize_without_offending_field() -> None:
     """Audit-level: the project's real get_tools() output (incl. search_documents
     and query_tables) must not carry additionalProperties / $ref / oneOf after
