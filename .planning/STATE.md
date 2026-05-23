@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 075.4-05-PLAN.md (Wave 0 bootstrap)
-last_updated: "2026-05-23T07:04:06.751Z"
+stopped_at: Completed 075.4-01-PLAN.md (Wave 1 — per-thread state cleanup)
+last_updated: "2026-05-23T07:30:30.633Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
   completed_phases: 16
   total_plans: 58
-  completed_plans: 55
-  percent: 95
+  completed_plans: 56
+  percent: 97
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
 Status: Ready to execute
 Last activity: 2026-05-23
@@ -235,6 +235,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075 P02 | 9min | 7 tasks | 4 files |
 | Phase 075 P03 | 13min | 4 tasks | 3 files |
 | Phase 075.4 P05 | 22min | 5 tasks | 12 files |
+| Phase 075.4 P01 | 20min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -335,6 +336,11 @@ Recent decisions affecting v2.5 work:
 - Phase 075.4 Plan 05 (Wave 0): Bug-report frontmatter (7 reports) was already in target state from /gsd:discuss-phase 075.4 sweep — Task 5 verified via grep; no edits required.
 - Phase 075.4 Plan 05 (Wave 0): vitest.config.ts gained exclude tests/e2e/** so Playwright scenario-NN-*.spec.ts files don't get picked up by vitest's default glob and crash under jsdom.
 - Phase 075.4 Plan 05 (Wave 0): fk_aware_runs_factory uses dual-path supabase resolution (caller fixture preferred -> env fallback -> pytest.skip) so the suite-wide conftest works for both mock-Supabase unit tests and real-Postgres binding tests.
+- Phase 075.4 Plan 01: 5 cross-thread globals lifted to per-thread Map/Set in streamsStore.ts (D-075.4-A1); STREAMS_CACHE_VERSION unchanged at 1 (D-075.4-A2 — cache reader walks bucketsBySurface only)
+- Phase 075.4 Plan 01: 4 new thread-scoped selectors in StreamsProvider (useStreamingForThread / useLoadingForThread / useReconcileErrorForThread / useFallbackNoticeForThread); useIsStreaming back-compat preserved via streamingThreads.size > 0
+- Phase 075.4 Plan 01: 067.5 Branch D-3 guard predicate preserved VERBATIM (tid !== streamingThreadIdRef.current); inside-the-setState change drops isStreaming: false return key (per-thread sendMessage finally owns streamingThreads.delete authoritatively)
+- Phase 075.4 Plan 01: BUG-260523-01 closed at ChatArea L:222 — composer disabled prop reads useStreamingForThread(thread?.id) so Thread A streaming no longer disables Thread B's composer; banner predicate at L:319 simplified since per-thread Map naturally scopes
+- Phase 075.4 Plan 01: 8 pre-existing test failures (7 streamsProvider + 1 useMessages) DEFERRED to Plan 075.4-06 — verified pre-existing via git stash round-trip on commit 16ba3ea; root cause is Phase 075 D-075-02 reconcile→getSnapshot swap (mockGetActiveRuns no longer wired); logged at 075.4-deferred-items.md D-075.4-01-DEFER-1
 
 ### Pending Todos
 
@@ -374,8 +380,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-23T07:04:06.743Z
-Stopped at: Completed 075.4-05-PLAN.md (Wave 0 bootstrap)
+Last session: 2026-05-23T07:30:30.624Z
+Stopped at: Completed 075.4-01-PLAN.md (Wave 1 — per-thread state cleanup)
 
 ### Next session: pending USER actions
 
