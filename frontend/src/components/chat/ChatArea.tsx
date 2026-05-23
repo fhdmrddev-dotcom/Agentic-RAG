@@ -212,7 +212,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   // lives in this component anyway. The `reconcile` destructure was dropped
   // from the useMessages() call above — no remaining consumer in this file.
 
-  const handleSend = async (content: string) => {
+  // Plan 075.4-04 D-075.4-SC#6 — stabilize callbacks for React.memo(MessageItem)
+  // shallow-eq path. handleSend is the chat-input wired callback; onSendMessage
+  // is the stable identity passed to MessageList → MessageItem (suggestion
+  // pill onSelect). onResume mirrors the same useCallback-stabilization
+  // pattern for the Resume button on failed/timed_out assistant messages.
+  const handleSend = useCallback(async (content: string) => {
     let activeThread = thread
     if (!activeThread) {
       activeThread = await onCreateThread(scopeFolderId)
@@ -236,7 +241,25 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       agentMode,
       selectedProvider || undefined,
     )
-  }
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
+
+  // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
+  // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
+  // unchanged; rename-to-onSendMessage solely so the memo'd MessageItem sees a
+  // ref-stable prop across parent re-renders.
+  const onSendMessage = useCallback(
+    (content: string) => { void handleSend(content) },
+    [handleSend],
+  )
+
+  // Plan 075.4-04 D-075.4-SC#6 — onResume stabilization. resumeFromFailed
+  // already has stable identity from the StreamsProvider Zustand action layer,
+  // but wrapping in useCallback here makes the dependency contract explicit
+  // and protects against future re-binding inside the provider.
+  const onResume = useCallback(
+    (message: Parameters<typeof resumeFromFailed>[0]) => resumeFromFailed(message),
+    [resumeFromFailed],
+  )
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped composer enablement; closes
   // BUG-260523-01 at the `disabled` prop below. `isStreaming` here is the
@@ -381,9 +404,9 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         messages={messages}
         isStreaming={isStreaming}
         isLoading={isLoadingThisThread}
-        onSendMessage={handleSend}
+        onSendMessage={onSendMessage}
         showSuggestions={agentMode !== "explorer"}
-        onResume={resumeFromFailed}
+        onResume={onResume}
       />
       {inputBar}
     </div>

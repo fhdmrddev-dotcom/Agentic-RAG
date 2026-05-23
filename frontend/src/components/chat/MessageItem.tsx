@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { memo, useRef } from "react"
 import { Bot, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
@@ -19,7 +19,14 @@ interface Props {
   onResume?: (message: Message) => void
 }
 
-export function MessageItem({ message, isStreaming, onSendMessage, onResume }: Props) {
+// Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.
+// ChatArea stabilizes onSendMessage + onResume via useCallback (ref-stable
+// across parent re-renders); StreamsProvider mutates messagesByThread by
+// REPLACE (not in-place push), so message prop identity reliably changes
+// only when the message actually changed. Named inner function preserves
+// DevTools display name. Target: ≥30% MessageItem render-cost reduction on
+// 50-message thread during streaming (verified via React DevTools profiler).
+export const MessageItem = memo(function MessageItem({ message, isStreaming, onSendMessage, onResume }: Props) {
   const isUser = message.role === "user"
 
   if (isUser) {
@@ -277,4 +284,4 @@ export function MessageItem({ message, isStreaming, onSendMessage, onResume }: P
       </div>
     </div>
   )
-}
+})
