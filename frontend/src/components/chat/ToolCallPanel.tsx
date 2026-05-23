@@ -662,7 +662,15 @@ const [expanded, setExpanded] = useState(true)
           (it): it is Extract<DisplayItem, { kind: "tool" }> =>
             it.kind === "tool" && it.tc.status === "done",
         )
-  const shouldCollapse = completedBeforeActive.length >= 3
+  // 2026-05-24 fix: collapsed-summary count uses TOTAL items before active
+  // (any kind: tool + skill), not only completed tools. Prior to this fix
+  // the label said e.g. "Completed 3 steps" while the active row was
+  // labelled "Step 7" because skill rows / undefined-status tools were
+  // excluded from the count. The visible "Step N" header is derived from
+  // `tc.iteration + 1` (line ~805) so the count needs to reflect every
+  // row the user can see being hidden by collapse, not a subset.
+  const hiddenStepsCount = activeIndex === -1 ? 0 : activeIndex
+  const shouldCollapse = hiddenStepsCount >= 3
   const [stepsCollapsed, setStepsCollapsed] = useState(true)
 
   // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
@@ -722,35 +730,54 @@ const [expanded, setExpanded] = useState(true)
       {/* Body */}
       {isExpanded && (
         <div className="px-4 pb-3.5 space-y-1 border-t border-border/20 min-w-0 overflow-hidden">
+          {/* 2026-05-24 fix: render a persistent bidirectional toggle when
+              shouldCollapse is true so the user can re-collapse after
+              expanding (the prior render only showed the toggle when
+              stepsCollapsed=true, leaving no way back). The toggle now
+              shows "Show N earlier steps" when collapsed and
+              "Hide earlier steps" when expanded. */}
+          {shouldCollapse && stepsCollapsed && (
+            <div
+              key="collapsed-steps-summary"
+              data-testid="collapsed-steps-summary"
+              data-iteration-min={collapsedIterationMin}
+              className="pt-2.5"
+            >
+              <button
+                type="button"
+                onClick={() => setStepsCollapsed(false)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+                <span>Show {hiddenStepsCount} earlier steps</span>
+              </button>
+            </div>
+          )}
+          {shouldCollapse && !stepsCollapsed && (
+            <div
+              key="expanded-steps-collapse"
+              data-testid="expanded-steps-collapse"
+              className="pt-2.5"
+            >
+              <button
+                type="button"
+                onClick={() => setStepsCollapsed(true)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                <span>Hide earlier steps</span>
+              </button>
+            </div>
+          )}
           {displayItems.map((item, i) => {
             // 075.6 Plan 03 / Req #7: step-list collapse short-circuit.
-            // When shouldCollapse is true and the user has not expanded, render
-            // a single summary row at i === 0 in place of the first collapsed
-            // item, then null-return for 1 ≤ i < activeIndex. activeIndex and
-            // beyond render normally; the iteration divider above the active
-            // step continues to derive prevToolIteration from displayItems[i-1]
-            // (the LAST collapsed item) so the iter-N → iter-(N+1) boundary
-            // above the active step fires correctly (Pitfall 6 / L5).
+            // When shouldCollapse is true and the user has not expanded, hide
+            // items in positions 0 .. activeIndex-1. activeIndex and beyond
+            // render normally; the iteration divider above the active step
+            // continues to derive prevToolIteration from displayItems[i-1]
+            // (the LAST hidden item) so the iter-N → iter-(N+1) boundary
+            // above the active step still fires correctly (Pitfall 6 / L5).
             if (shouldCollapse && stepsCollapsed && i < activeIndex) {
-              if (i === 0) {
-                return (
-                  <div
-                    key="collapsed-steps-summary"
-                    data-testid="collapsed-steps-summary"
-                    data-iteration-min={collapsedIterationMin}
-                    className="pt-2.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setStepsCollapsed(false)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                      <span>Completed {completedBeforeActive.length} steps</span>
-                    </button>
-                  </div>
-                )
-              }
               return null
             }
             if (item.kind === 'skill') {
