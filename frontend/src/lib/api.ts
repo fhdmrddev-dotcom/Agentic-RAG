@@ -208,7 +208,12 @@ export interface StreamCallbacks {
    * tool_calls[N].argsBytesStreamed so the UI can show "Generating ... (12.7 KB)"
    * while the tool is still in "preparing" state. Pre-fix behavior was zero
    * progress signal during 60-120s execute_code generation. */
-  onToolArgsProgress?: (toolIndex: number, name: string, totalArgsBytesSoFar: number) => void
+  /** 075.6 Plan 02 / Req #5: 4th positional arg `codeSoFar?: string` carries the
+   * cumulative tool-args code text (FULL concatenation, NOT the 5 KB tail).
+   * Optional for backward compat with pre-Plan-01 wire events that don't
+   * carry `code_so_far`. Plan 02 reducer applies longer-string-wins on
+   * tc.argsCodeText. */
+  onToolArgsProgress?: (toolIndex: number, name: string, totalArgsBytesSoFar: number, codeSoFar?: string) => void
   // Phase 075.2 Plan 01 Task 2 (D-075.2-04 / WR-01): optional id?:string
   // for future tool_call_id matching. Backend wire-up deferred (RESEARCH
   // §Q1: tool_end SSE today carries name + result only). When undefined
@@ -394,6 +399,10 @@ export async function subscribeToRun(
             parsed.tool_index as number,
             parsed.name as string,
             parsed.total_args_bytes_so_far as number,
+            // 075.6 Plan 02 / Req #5: Plan 01 backend ships the FULL cumulative
+            // args string here (NOT the 5 KB tail — that's `args_so_far`).
+            // Undefined for pre-Plan-01 wire events (backward compat).
+            parsed.code_so_far as string | undefined,
           )
         else if (t === "tool_end" && callbacks.onToolEnd)
           callbacks.onToolEnd(parsed.name as string, parsed.result as string | undefined)
