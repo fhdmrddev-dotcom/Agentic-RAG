@@ -44,3 +44,12 @@ llm-sandbox[docker]>=0.3.37
 # rule-based table extractor. ~80 MB install (opencv + pdfium + pdfminer.six).
 # Lazy-imported inside aspects/tables.py::camelot_tables (Pattern SP-4).
 camelot-py[base]>=1.0.0,<2.0.0
+
+# Phase 075.5 — Google native SDK adoption (D-075.5-01).
+# Replaces the OpenAI-compatible Gemini path (which silently dropped
+# extra_content.google.thought_signature through openai-python's serialization,
+# causing Gemini-3+ 400 INVALID_ARGUMENT on multi-tool rounds — see
+# .planning/phases/075.4/075.4-VERIFICATION.md GAP-075.4-01).
+# google-genai >= 1.55.0 includes automatic thought_signature handling for
+# Gemini 3 function calling.
+google-genai>=1.55.0

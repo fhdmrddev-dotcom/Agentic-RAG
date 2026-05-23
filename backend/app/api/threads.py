@@ -37,6 +37,7 @@ from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
+from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
 
 # Sandbox import — always available at module scope so per-request paths
@@ -1074,12 +1075,15 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
     tool_calls: emits a plain {"role": "assistant", "content": ...}.
     User messages pass through unchanged.
 
-    Plan 075.4-02 D-075.4-C3: provider-gated ``extra_content.google.thought_signature``
-    echo on rebuild when ``active_provider == "google"`` AND the stored row carries
-    a truthy ``thought_signature`` value. Closes BUG-260523-02 (Gemini-3 400
-    INVALID_ARGUMENT on multi-tool round 2 — Google's API requires the signature
-    be echoed back on every continuation call). Mirrors Anthropic's thinking_block
-    echo idiom. No schema change: ``messages.tool_calls`` is already ``jsonb``.
+    Phase 075.5 D-075.5-01 (supersedes 075.4-02 D-075.4-C3): ``thought_signature`` is
+    echoed as a TOP-LEVEL field on each rebuilt tool_call dict when the stored row
+    carries one. The Google native SDK path in google_service.py reads this and
+    attaches the signature to the function_call Part so Gemini-3+ round-trips it
+    correctly (closes BUG-260523-02 for real — the old extra_content shape didn't
+    survive openai-python's serialization through Google's OpenAI-compat endpoint).
+    The ``active_provider`` arg is kept for back-compat but is no longer load-bearing
+    (non-Google providers ignore the field). No schema change: ``messages.tool_calls``
+    is already ``jsonb``.
     """
     messages: list[dict] = []
     for msg in history_rows:
@@ -1104,12 +1108,15 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                                 "name": tc["name"],
                                 "arguments": json.dumps(tc.get("args", {})),
                             },
-                            # Plan 075.4-02 D-075.4-C3 — echo thought_signature for google.
-                            # Provider-gated to keep the OpenAI / Anthropic / OpenRouter
-                            # paths byte-identical (no extra_content key emitted).
+                            # Phase 075.5 D-075.5-01 — echo thought_signature as a
+                            # top-level field. google_service._convert_messages_to_google
+                            # reads this and attaches it to the function_call Part for
+                            # native SDK round-trip. Non-Google providers ignore unknown
+                            # fields, so this is safe across all paths (provider-gating
+                            # removed — simpler + correct for reload-after-Google-run case).
                             **(
-                                {"extra_content": {"google": {"thought_signature": tc["thought_signature"]}}}
-                                if active_provider == "google" and tc.get("thought_signature")
+                                {"thought_signature": tc["thought_signature"]}
+                                if tc.get("thought_signature")
                                 else {}
                             ),
                         }
@@ -1515,9 +1522,10 @@ async def send_message(
                     active_system_prompt = active_system_prompt + disabled_note
 
             messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-            # Plan 075.4-02 D-075.4-C3 — pass active_provider so the rebuild can
-            # echo extra_content.google.thought_signature for Gemini-3 multi-tool
-            # continuations (closes BUG-260523-02).
+            # Phase 075.5 D-075.5-01: _reconstruct_history echoes thought_signature
+            # as a top-level field; google_service.py reads it in
+            # _convert_messages_to_google. active_provider is passed for back-compat
+            # but no longer load-bearing (non-Google providers ignore the field).
             messages.extend(
                 _reconstruct_history(
                     history_resp.data,
@@ -1915,8 +1923,122 @@ async def send_message(
                                 )
                                 break  # stream completed
 
+                            elif active_provider_name == "google":
+                                # --- Google native SDK path (Phase 075.5 D-075.5-01) ---
+                                # Mirrors the Anthropic branch above. Native google-genai
+                                # SDK round-trips thought_signature automatically — no more
+                                # extra_content.google.thought_signature serialization hack
+                                # through openai-python (which silently dropped it through
+                                # Google's OpenAI-compat endpoint).
+                                from app.services.openai_service import _resolve_max_tokens
+                                from app.config import get_per_call_timeout  # Phase 066 D-066-03
+                                _g_max_tokens = _resolve_max_tokens(None, user_settings)
+                                _g_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
+                                _g_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                                _model_id = body.model or user_settings.llm_model
+                                per_call_budget = get_per_call_timeout(_model_id, settings)
+                                _last_iteration = iteration
+                                _last_model_id = _model_id
+                                _last_per_call_budget = per_call_budget
+                                _g_gen = stream_google(
+                                    messages=messages,
+                                    tools=_g_tools,
+                                    system_prompt=active_system_prompt,
+                                    model=_model_id,
+                                    api_key=_g_api_key,
+                                    max_tokens=_g_max_tokens,
+                                    force_no_tools=force_no_tools,
+                                )
+                                tool_calls_buffer: dict = {}
+                                finish_reason: str | None = None
+                                _announced_tools_g: set[int] = set()
+
+                                async def _on_chunk_google(_g_event):
+                                    """Normalized-event callback mirroring _on_chunk_anthropic.
+
+                                    Event schema is identical (see google_service.py docstring),
+                                    so this is structurally a copy of the Anthropic branch — kept
+                                    inline for readability and so future provider-specific event
+                                    additions can branch without touching the Anthropic path.
+                                    """
+                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
+                                    _etype = _g_event.get("type")
+                                    # Phase 073 TOKEN-COL-01 — usage / usage_delta accounting.
+                                    # Google's SDK emits cumulative usage_metadata on every chunk;
+                                    # google_service.py normalizes that into one initial 'usage'
+                                    # + per-chunk 'usage_delta' (output_tokens incremental).
+                                    if _etype == "usage":
+                                        _i = _g_event.get("input_tokens", 0) or 0
+                                        _o = _g_event.get("output_tokens", 0) or 0
+                                        if input_tokens_total is None:
+                                            input_tokens_total = _i
+                                            output_tokens_total = _o
+                                        else:
+                                            input_tokens_total += _i
+                                            output_tokens_total += _o
+                                        return
+                                    elif _etype == "usage_delta":
+                                        _o = _g_event.get("output_tokens", 0) or 0
+                                        if output_tokens_total is None:
+                                            output_tokens_total = _o
+                                        else:
+                                            output_tokens_total += _o
+                                        return
+                                    if _etype == "delta":
+                                        _text = _g_event.get("content", "")
+                                        if _text:
+                                            full_content += _text
+                                            await _emit(redis, run_id, 'delta', content=_text)
+                                    elif _etype == "tool_preparing":
+                                        _idx = _g_event.get("index", len(tool_calls_buffer))
+                                        if _idx not in _announced_tools_g:
+                                            _announced_tools_g.add(_idx)
+                                            await _emit(redis, run_id, 'tool_preparing', name=_g_event['name'], index=_idx)
+                                    elif _etype == "tool_args_progress":
+                                        # Phase 075 D-075-10 parity — pass-through to SSE.
+                                        await _emit(
+                                            redis, run_id, "tool_args_progress",
+                                            tool_index=_g_event["tool_index"],
+                                            name=_g_event["name"],
+                                            args_so_far=_g_event["args_so_far"],
+                                            total_args_bytes_so_far=_g_event["total_args_bytes_so_far"],
+                                        )
+                                    elif _etype == "tool_start":
+                                        _idx = len(tool_calls_buffer)
+                                        # Preserve thought_signature on the buffer entry so the
+                                        # NEXT iteration's _convert_messages_to_google call can
+                                        # attach it to the function_call Part for the SDK to
+                                        # round-trip. Without this, Gemini-3 400s on round 2+.
+                                        tool_calls_buffer[_idx] = {
+                                            "id": _g_event["id"],
+                                            "name": _g_event["name"],
+                                            "arguments": json.dumps(_g_event.get("args", {})),
+                                            # google_service.stream_google attaches the sig to
+                                            # the corresponding finish event's tool_calls list,
+                                            # but we also include it here as a hint. The
+                                            # authoritative copy is set below in the finish branch.
+                                        }
+                                    elif _etype == "finish":
+                                        finish_reason = _g_event.get("finish_reason", "stop")
+                                        # D-075.5-01: hydrate thought_signature onto each
+                                        # tool_calls_buffer entry from the finish event's
+                                        # tool_calls list. stream_google guarantees the order
+                                        # matches insertion order (idx == position).
+                                        _fin_tcs = _g_event.get("tool_calls", []) or []
+                                        for _i, _ftc in enumerate(_fin_tcs):
+                                            if _i in tool_calls_buffer and _ftc.get("thought_signature"):
+                                                tool_calls_buffer[_i]["thought_signature"] = _ftc["thought_signature"]
+
+                                await _drain_stream_with_close_on_cancel(
+                                    _g_gen,
+                                    per_call_budget,
+                                    _on_chunk_google,
+                                    close_fn=_g_gen.close,
+                                )
+                                break  # stream completed
+
                             else:
-                                # --- OpenAI / Google / OpenRouter / Ollama path (unchanged) ---
+                                # --- OpenAI / OpenRouter / Ollama path (unchanged) ---
                                 stream, calling_mode = create_adaptive_streaming_chat(
                                     messages=messages,
                                     model=body.model,
@@ -2018,13 +2140,6 @@ async def send_message(
                                             idx = tc.index
                                             if idx not in tool_calls_buffer:
                                                 tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                                # Plan 075.4-02 D-075.4-C1 + C2 — initialize per-tool-call
-                                                # thought_signature slot for google ONLY. Closure-local per-run
-                                                # (Phase 073 model: dies with run, no schema change). Single-
-                                                # worker-safe under D-v2.5-02; future multi-worker unaffected
-                                                # because a run never crosses workers (D-v2.5-08).
-                                                if active_provider_name == "google":
-                                                    tool_calls_buffer[idx]["thought_signature"] = ""
                                             if tc.id:
                                                 tool_calls_buffer[idx]["id"] = tc.id
                                             if tc.function and tc.function.name:
@@ -2034,28 +2149,12 @@ async def send_message(
                                                 if idx not in _announced_tools:
                                                     _announced_tools.add(idx)
                                                     await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
-
-                                            # Plan 075.4-02 D-075.4-C2 — extract from
-                                            # extra_content.google.thought_signature. Provider-gated
-                                            # so non-google streams don't pay the attribute lookup cost.
-                                            # The signature may arrive in a chunk with empty content
-                                            # OR alongside name/arguments — do NOT gate on delta.content
-                                            # / tc.function.arguments being present (closes BUG-260523-02
-                                            # Gemini-3 multi-tool 400 INVALID_ARGUMENT on round 2).
-                                            #
-                                            # openai-python ChoiceDeltaToolCall has
-                                            # model_config={"extra": "allow"}, so extra_content arrives
-                                            # as model_extra (verified via SDK introspection +
-                                            # Google AI Developers Forum 2026-05-23).
-                                            if active_provider_name == "google":
-                                                extra = getattr(tc, "extra_content", None) or (
-                                                    getattr(tc, "model_extra", None) or {}
-                                                ).get("extra_content")
-                                                if extra:
-                                                    sig = (extra.get("google") or {}).get("thought_signature") or ""
-                                                    if sig:
-                                                        tool_calls_buffer[idx]["thought_signature"] = sig
-
+                                            # Phase 075.5 D-075.5-03: the OpenAI-compat
+                                            # extra_content.google.thought_signature
+                                            # capture is REMOVED. Google now goes through
+                                            # the native SDK path at line ~1918 above —
+                                            # this branch only handles OpenAI / OpenRouter /
+                                            # Ollama, none of which use thought_signature.
                                             if tc.function and tc.function.arguments:
                                                 tool_calls_buffer[idx]["arguments"] += tc.function.arguments
                                                 # Phase 075 D-075-09/10/11: emit tool_args_progress
@@ -2283,14 +2382,19 @@ async def send_message(
                                 "id": tc["id"],
                                 "type": "function",
                                 "function": {"name": tc["name"], "arguments": tc["arguments"]},
-                                # Plan 075.4-02 D-075.4-C3 (in-flight stage) — echo the
-                                # captured google thought_signature on the same round so
-                                # round N+1's API call carries it. Without this the unit
-                                # tests still pass (capture + persist + reload) but live
-                                # multi-round runs hit Gemini-3 400 INVALID_ARGUMENT
-                                # "Function call is missing a thought_signature".
+                                # Phase 075.5 D-075.5-01/03: carry thought_signature as a
+                                # top-level field on the tool_call dict. google_service.py
+                                # `_convert_messages_to_google` reads this and attaches it
+                                # to the Part so the native SDK round-trips it on the next
+                                # round. The OpenAI-compat extra_content.google.* shape
+                                # (Phase 075.4-02 attempt) is OBSOLETE — openai-python's
+                                # serialization silently dropped that field, causing
+                                # Gemini-3+ 400 INVALID_ARGUMENT on multi-tool rounds.
+                                # The native SDK + this top-level field round-trip is
+                                # proven by the end-to-end smoke test executed at adoption
+                                # time (see GAP-075.4-01 hotfix history).
                                 **(
-                                    {"extra_content": {"google": {"thought_signature": tc["thought_signature"]}}}
+                                    {"thought_signature": tc["thought_signature"]}
                                     if tc.get("thought_signature")
                                     else {}
                                 ),

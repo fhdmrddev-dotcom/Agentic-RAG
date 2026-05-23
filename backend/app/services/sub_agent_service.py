@@ -51,13 +51,38 @@ def run_sub_agent(
         or settings.sub_agent_model
     )
 
-    if override_model:
+    # Phase 075.5 D-075.5-04 — sub-agent provider follows main provider.
+    # If override_model is set but doesn't belong to the active provider's
+    # model list, fall back to the provider's _SUB_AGENT_MODEL_DEFAULTS entry
+    # (or main model). Without this, a user who switches active provider
+    # without updating sub_agent_model would silently route a Google model
+    # name through an OpenAI client → 400. The frontend Settings UI already
+    # filters the visible options to active-provider models; this is the
+    # runtime safety net for stale/cross-provider picks.
+    _active_provider = (user_settings.active_provider if user_settings else "") or ""
+    _active_models = (user_settings.llm_models if (user_settings and getattr(user_settings, "llm_models", None)) else "")
+    _active_models_list = [m.strip() for m in _active_models.split(",") if m.strip()] if _active_models else []
+    _provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(_active_provider, "")
+
+    if override_model and _active_models_list and override_model not in _active_models_list:
+        # Stale picker — log + fall back so the call doesn't 400.
+        logger.warning(
+            "sub_agent_model=%r is not in active provider=%r's model list — "
+            "falling back to default to avoid cross-provider call. Update the "
+            "Settings page to pick a valid sub-agent model for this provider.",
+            override_model, _active_provider,
+        )
+        effective_model = (
+            _provider_default
+            or (user_settings.llm_model if user_settings else None)
+            or model
+            or settings.llm_model
+        )
+    elif override_model:
         effective_model = override_model
     else:
-        provider = user_settings.active_provider if user_settings else ""
-        provider_default = _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
         effective_model = (
-            provider_default
+            _provider_default
             or (user_settings.llm_model if user_settings else None)
             or model
             or settings.llm_model
