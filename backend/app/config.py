@@ -80,6 +80,7 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gemini-3-flash-preview":               600_000,  # actual 1M — practical cap
     "gemini-3.1-pro-preview":               600_000,  # actual 1M — 600K practical cap
     "gemini-3.5-flash":                     600_000,  # actual 1M — practical cap (representative-class, mirrors 2.5-flash)
+    "gemini-3.1-flash-lite":                600_000,  # actual 1M — practical cap (Gemini-3 budget production tier)
     # ── OpenRouter ──────────────────────────────────────────────────────────
     "meta-llama/llama-3.3-70b-instruct":    100_000,  # actual 128k
     "deepseek/deepseek-r1":                 100_000,  # actual 128k via OpenRouter
@@ -183,6 +184,9 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
     "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    # gemini-3.1-flash-lite — production budget tier in the Gemini-3 family;
+    # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
+    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192, "capability_source": "registry"},

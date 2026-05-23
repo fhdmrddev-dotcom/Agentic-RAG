@@ -14,6 +14,12 @@ from starlette.concurrency import run_in_threadpool
 # left over from the legacy SSE-on-POST path (deleted in D-063-01).
 import openai
 from openai import APIError
+# Phase 075.5 T-260523-05 — catch native provider errors too, not only OpenAI.
+# Without these, Anthropic BadRequestError (billing, etc.) and Google native
+# errors fell through to the broad Exception handler and surfaced as the
+# generic "An unexpected error occurred" message, with no actionable hint.
+import anthropic
+from google.genai import errors as google_errors
 try:
     from anthropic import APIError as AnthropicAPIError
 except ImportError:
@@ -3313,7 +3319,11 @@ async def send_message(
                   # `async with asyncio.timeout(...)` blocks at lines 1240/1327
                   # before re-raise — see D-066-11).
                   raise
-              except APIError as e:
+              except (APIError, anthropic.APIError, google_errors.APIError) as e:
+                  # Phase 075.5 T-260523-05 — broadened from openai-only to
+                  # also include native Anthropic + Google SDK error classes,
+                  # so the actionable keyword-mapped messages below fire for
+                  # ALL providers, not just OpenAI/OpenRouter.
                   logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
                   err_str = str(e)
                   err_lower = err_str.lower()
@@ -3338,15 +3348,25 @@ async def send_message(
                           "*The conversation has grown too long for this model's context window. "
                           "Please start a new chat or reduce the amount of history.*"
                       )
-                  elif _is_transient_provider_error(e):
+                  elif isinstance(e, APIError) and _is_transient_provider_error(e):
+                      # isinstance guard: _is_transient_provider_error reads
+                      # openai-specific attrs (e.body.get, .status_code shape).
+                      # For Anthropic/Google we skip the transient classification
+                      # rather than risk an AttributeError inside the catch.
                       user_msg = (
                           "*The AI provider is temporarily unavailable. Please try again in a moment.*"
                       )
                   else:
                       user_msg = f"*LLM API error: {err_str}*"
-                  if not full_content:
-                      full_content += user_msg
-                      await _emit(redis, run_id, 'delta', content=user_msg)
+                  # Phase 075.5 T-260523-05 — always emit the actionable message
+                  # as a delta. The prior `if not full_content` guard meant that
+                  # provider errors mid-run (after several successful tool calls)
+                  # were silently swallowed: the user saw a "long pause" instead
+                  # of "your Anthropic credit is exhausted". Preserve prior
+                  # streamed content AND append the error explanation so the
+                  # final assistant message tells the user what happened.
+                  full_content += user_msg
+                  await _emit(redis, run_id, 'delta', content=user_msg)
                   await _emit(redis, run_id, 'error', message=err_str)
                   # Phase 066 Plan 04 Rule 1 fix: re-raise so the OUTER classifier
                   # at lines ~2249-2294 sets _terminal_status='failed' on
