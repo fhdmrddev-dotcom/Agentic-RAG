@@ -15,6 +15,33 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "ollama": "",  # resolved dynamically from ollama_base_url
 }
 
+
+# Plan 075.4-02 D-075.4-B1/B2/B3 — typed unknown-provider exception; FORWARD-REF #6
+# retrofit hook for Phase 082.5 unified error sink. Keep .provider + .known_providers
+# attribute names stable so the future sink can route via trace_id without breaking.
+class UnknownProviderError(ValueError):
+    """Phase 075.4 D-075.4-B3: typed unknown-provider exception with structured attrs.
+
+    Subclass of ``ValueError`` so existing ``except ValueError`` callers keep
+    working (back-compat). Raised by ``resolve_llm_provider`` at FastAPI
+    lifespan startup when ``LLM_PROVIDER`` resolves to a name not registered
+    in ``_PROVIDER_BASE_URLS`` (the single source of truth for known providers
+    per D-075.4-B2). This replaces the silent-ollama-fallthrough failure mode
+    documented in 075.4-RESEARCH §Plan 02 Site 1.
+
+    Forward-ref hook: Phase 082.5 unified error sink will catch and route this
+    via trace_id (FORWARD-REF #6 — keep .provider + .known_providers stable).
+    """
+
+    def __init__(self, provider: str, known_providers: list[str]):
+        self.provider = provider
+        self.known_providers = known_providers
+        super().__init__(
+            f"Unknown LLM_PROVIDER '{provider}'. "
+            f"Known providers: {', '.join(known_providers)}. "
+            f"Register a new provider in backend/app/config.py::_PROVIDER_BASE_URLS."
+        )
+
 # Main-agent context budget by provider. Used as fallback when no model-specific
 # entry exists in MODEL_CONTEXT_DEFAULTS or MODEL_CONTEXT_LIMITS.
 PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
@@ -85,6 +112,12 @@ class ModelCapability(TypedDict, total=False):
     llm_call_timeout_seconds: int  # Phase 066 D-066-03 — per-LLM-call deadline
     max_output_tokens: int  # Phase 074 D-074-06 — hard API cap (vendor docs); clamp ceiling
     capability_source: Literal["registry", "inferred"]  # Phase 075.3 D-075.3-08
+    # Plan 075.4-02 D-075.4-NN — registry-or-inference fields that subsume the
+    # hardcoded startswith / frozenset heuristics in openai_service.py. Optional
+    # by ``total=False``; lookup callers fall back to inferred defaults when
+    # absent (preserves back-compat for inferred-provider models).
+    uses_max_completion_tokens: bool  # Plan 075.4-02 — o-series + gpt-5+
+    supports_parallel_tools: bool  # Plan 075.4-02 — currently False for google
 
 
 # Capability registry: which models support native API tool calling.
@@ -116,14 +149,14 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  32768, "capability_source": "registry"},
     "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  32768, "capability_source": "registry"},
     "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry"},
-    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class per memory feedback_model_names_representative.md
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000, "capability_source": "registry"},  # representative-class
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry"},
-    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},
-    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},
-    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry"},  # representative-class — o4 follows o3 family
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class per memory feedback_model_names_representative.md
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class — o4 follows o3 family
     # Anthropic direct — native tool_use
     # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
     # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
@@ -134,18 +167,22 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90, "max_output_tokens":  64000, "capability_source": "registry"},
     # Google direct — native function calling
     # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536, "capability_source": "registry"},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry"},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry"},
+    # Plan 075.4-02 D-075.4-NN — google rows carry supports_parallel_tools=False
+    # because Google's OpenAI-compat layer rejects parallel_tool_calls. This is
+    # the registry-driven replacement for the openai_service.py _NO_PARALLEL_TOOL_CALLS
+    # frozenset({"google"}) heuristic (legacy fallback stays as defense-in-depth).
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "capability_source": "registry"},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "capability_source": "registry"},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "capability_source": "registry", "supports_parallel_tools": False},
     # gemini-3.5-flash — representative-class per memory feedback_model_names_representative.md.
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
-    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry"},
+    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192, "capability_source": "registry"},
@@ -424,6 +461,14 @@ class Settings(BaseSettings):
         if not provider:
             return self  # legacy mode: LLM_API_KEY / LLM_BASE_URL used as-is
 
+        # Plan 075.4-02 D-075.4-B1/B2: _PROVIDER_BASE_URLS is now the single
+        # source of truth for known providers. The api-key resolution map
+        # (a different concern) lives below; membership validation MUST go
+        # through _PROVIDER_BASE_URLS.keys() so adding a new provider is a
+        # one-edit operation (D-075.4-B2 — no second hardcoded list to drift).
+        if provider not in _PROVIDER_BASE_URLS:
+            raise UnknownProviderError(provider, list(_PROVIDER_BASE_URLS.keys()))
+
         key_map: dict[str, str] = {
             "openai": self.openai_api_key,
             "anthropic": self.anthropic_api_key,
@@ -431,11 +476,6 @@ class Settings(BaseSettings):
             "openrouter": self.openrouter_api_key,
             "ollama": "ollama",  # Ollama doesn't require a real key
         }
-        if provider not in key_map:
-            raise ValueError(
-                f"Unknown LLM_PROVIDER '{provider}'. "
-                f"Must be one of: {', '.join(key_map)}"
-            )
 
         resolved_key = key_map[provider]
         if resolved_key:
