@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
+status: ready_to_plan
 stopped_at: Phase 075.6 context gathered
-last_updated: "2026-05-23T18:17:34.671Z"
-last_activity: 2026-05-23
+last_updated: "2026-05-23T18:21:15.500Z"
+last_activity: 2026-05-23 -- Phase 075.6 execution started
 progress:
   total_phases: 27
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 58
   completed_plans: 60
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.4 — cross-provider-cleanup-per-thread-state-e2e-backstop-inserte
+**Current focus:** Phase 075.6 — live-streaming-ux-cross-provider-parity
 
 ## Current Position
 
