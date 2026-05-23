@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 075.4-03-PLAN.md (Wave 1 — streaming reliability + content-hash output dedup; closes BUG-260522-01, BUG-260522-02, BUG-260523-03, BUG-260521-02 + terminal-status race fix + iter-cap drop guard + trim warn + Anthropic LangSmith re-verify)
-last_updated: "2026-05-23T08:16:49.394Z"
+stopped_at: Completed 075.4-04-PLAN.md (Wave 2 — perf + UX + sentinel guard + Settings 2-click flushSync fix; closes WR-02, BUG-260523-03 UI, Settings 2-click)
+last_updated: "2026-05-23T08:39:55.480Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
   completed_phases: 16
   total_plans: 58
-  completed_plans: 58
+  completed_plans: 59
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
 Status: Ready to execute
 Last activity: 2026-05-23
@@ -238,6 +238,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P01 | 20min | 4 tasks | 8 files |
 | Phase 075.4 P02 | 30min | 3 tasks | 7 files |
 | Phase 075.4 P03 | 40min | 3 tasks | 5 files |
+| Phase 075.4 P04 | 16min | 4 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -350,6 +351,10 @@ Recent decisions affecting v2.5 work:
 - Plan 075.4-03: SHA-256 content-hash sandbox output dedup with supersedes detection structurally closes BUG-260523-03 + naturally closes BUG-260522-02 + auto-closes BUG-260521-02 via re_open_trigger. dict[content_hash, meta] shape pivots from set[str] filename dedup.
 - Plan 075.4-03: migration 048 widens messages_role_check to allow role='system' for D-075.4-E1 persistence path. Pre-migration the INSERT is fail-silent (try/except + WARNING log); SSE event remains the user-visible signal. Apply via Supabase Studio SQL editor (CLAUDE.md rule).
 - Plan 075.4-03: Anthropic LangSmith @traceable re-verified — decorator already wires correctly; only a documentation comment added above @_ls_traceable at anthropic_service.py:143. Test uses skipif gate on LANGSMITH_TRACING because conftest.py:13 sets it to 'false' for default test runs (avoids live API pings).
+- Plan 075.4-04 Task 1 narrow-fix: flushSync wrap of setSavingAI/setError/setSubAgentModelError in SettingsPage handleSaveAIModel (closes 2-click bug via D-075.4-F3 protocol); diff 4+/3- well under ≤10-line bound; live Chrome DevTools UAT deferred to Plan 075.4-06 (chrome-devtools MCP not in executor session)
+- Plan 075.4-04 Task 2: save_override sentinel allowlist guard with _PROVIDER_KEY_PREFIXES matrix (sk-/sk-ant-/sk-or-) + _SENTINEL_VALUES frozenset; rejected api_key writes log WARNING and skip silently (no HTTP 422 — that escalation is Phase 081.1 territory per D-075.4-F2); 20/20 unit + integration tests GREEN
+- Plan 075.4-04 Task 3: React.memo MessageItem + useMemo MarkdownRenderer + ChatArea useCallback delegates (onSendMessage + onResume); 6 memo tests GREEN using vi.hoisted() factory pattern
+- Plan 075.4-04 Task 4: lazy(import) RetrievalTrendChart splits ~359 KB recharts off main bundle (verified via vite build — index-DpQeoDpY.js has zero Recharts strings); ExecuteCodeBlock per-line stderr badge; OutputFileCard supersedes prop consumes Plan 03 dedup field
 
 ### Pending Todos
 
@@ -389,8 +394,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-23T08:16:49.383Z
-Stopped at: Completed 075.4-03-PLAN.md (Wave 1 — streaming reliability + content-hash output dedup; closes BUG-260522-01, BUG-260522-02, BUG-260523-03, BUG-260521-02 + terminal-status race fix + iter-cap drop guard + trim warn + Anthropic LangSmith re-verify)
+Last session: 2026-05-23T08:39:40.673Z
+Stopped at: Completed 075.4-04-PLAN.md (Wave 2 — perf + UX + sentinel guard + Settings 2-click flushSync fix; closes WR-02, BUG-260523-03 UI, Settings 2-click)
 
 ### Next session: pending USER actions
 
