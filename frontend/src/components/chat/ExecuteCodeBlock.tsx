@@ -32,36 +32,55 @@ function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreami
     }
   }, [lines.length])
 
+  // 2026-05-24 UX refinement: replace the hardcoded near-black zinc-900
+  // container with a theme-aware card surface that keeps the terminal
+  // affordance (monospace, line-by-line, per-stream colour coding) while
+  // integrating with the Deep Midnight palette. Adds a small header strip
+  // so the user can see at a glance what kind of pane this is (was "messy
+  // and not organised" per 2026-05-23 UAT feedback).
   return (
-    <div
-      ref={containerRef}
-      className="rounded-md bg-zinc-900/80 p-2.5 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto"
-    >
-      {lines.map((line, i) => (
-        <div
-          key={i}
-          className={cn(
-            "flex items-start gap-1.5",
-            line.kind === "stdout" ? "text-emerald-400" : "text-red-400"
-          )}
-          style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
-        >
-          {/* Plan 075.4-04 D-075.4-SC#6 — inline stderr badge alongside red lines.
-              Sits beside the line content so the operator can disambiguate
-              stderr from red-coloured stdout (some libraries print warnings to
-              stdout with ANSI red). Per-line badge complements the error-box
-              below (which renders only for `errorMessage`, not per-line). */}
-          {line.kind === "stderr" && (
-            <span className="inline-flex items-center rounded-sm bg-red-500/15 px-1 py-0 text-[9px] uppercase tracking-wider text-red-400 font-semibold leading-tight flex-shrink-0 mt-0.5">
-              stderr
-            </span>
-          )}
-          <span className="flex-1 min-w-0">{line.content}</span>
-        </div>
-      ))}
-      {isStreaming && lines.length > 0 && (
-        <span className="inline-block w-1.5 h-3 bg-emerald-400/50 animate-pulse rounded-sm" />
-      )}
+    <div className="rounded-md border border-border/40 bg-card/60 overflow-hidden">
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-border/30 bg-muted/30">
+        <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/80">
+          Terminal output
+        </span>
+        {isStreaming && (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-1" />
+        )}
+        <span className="ml-auto text-[9px] font-mono text-muted-foreground/50">
+          {lines.length} {lines.length === 1 ? "line" : "lines"}
+        </span>
+      </div>
+      <div
+        ref={containerRef}
+        className="px-2.5 py-2 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto"
+      >
+        {lines.map((line, i) => (
+          <div
+            key={i}
+            className={cn(
+              "flex items-start gap-1.5",
+              line.kind === "stdout" ? "text-foreground/85" : "text-red-400"
+            )}
+            style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+          >
+            {/* Plan 075.4-04 D-075.4-SC#6 — inline stderr badge alongside red lines.
+                Sits beside the line content so the operator can disambiguate
+                stderr from red-coloured stdout (some libraries print warnings to
+                stdout with ANSI red). Per-line badge complements the error-box
+                below (which renders only for `errorMessage`, not per-line). */}
+            {line.kind === "stderr" && (
+              <span className="inline-flex items-center rounded-sm bg-red-500/15 px-1 py-0 text-[9px] uppercase tracking-wider text-red-400 font-semibold leading-tight flex-shrink-0 mt-0.5">
+                stderr
+              </span>
+            )}
+            <span className="flex-1 min-w-0">{line.content}</span>
+          </div>
+        ))}
+        {isStreaming && lines.length > 0 && (
+          <span className="inline-block w-1.5 h-3 bg-primary/60 animate-pulse rounded-sm" />
+        )}
+      </div>
     </div>
   )
 }

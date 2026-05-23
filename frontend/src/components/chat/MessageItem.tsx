@@ -140,16 +140,24 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         {/* 075.6 Plan 03 / Req #8 — pinned ✦ Working badge at top of active
-            assistant turn. Gated on (activeTool || isPlanning) && !allToolsDone
-            per SPEC §Requirement 8 derivation. Folds BUG-260514-03
-            (streaming-indicator-top-bottom-desync) per D-075.6-D1 — the
-            Working badge structurally supersedes the bottom-indicator
-            sticky-text path. Derived values activeTool (L53-55),
-            allToolsDone (L49), and message.isPlanning (L107 area) already
-            exist — zero new derivations. Renders unconditionally so the
-            stable outer wrapper preserves the DOM node across visibility
-            transitions (Pitfall 5 mitigation in tandem with React.memo). */}
-        <WorkingBadge visible={(!!activeTool || !!message.isPlanning) && !allToolsDone} />
+            assistant turn. Folds BUG-260514-03 per D-075.6-D1.
+            2026-05-24 UX refinement: hide the badge whenever the ToolCallPanel
+            is rendering, because that panel's header already shows live
+            activity ("Step N — Running code…" + spinner + shimmer bar) and
+            the duplicated indicator made the page look noisy. The badge now
+            only surfaces during the planning gap — isPlanning is true but no
+            tool_calls have started yet — which IS the long-silence window
+            the original BUG-260514-03 re_open_trigger cared about. The
+            stable outer wrapper still preserves the DOM node across
+            visibility transitions (Pitfall 5 mitigation in tandem with
+            React.memo). */}
+        <WorkingBadge
+          visible={
+            !!message.isPlanning &&
+            (message.tool_calls?.length ?? 0) === 0 &&
+            !allToolsDone
+          }
+        />
         {message.tool_calls && message.tool_calls.length > 0 && (
           <ToolCallPanel
             toolCalls={message.tool_calls}
