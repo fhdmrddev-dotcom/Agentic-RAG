@@ -120,6 +120,22 @@ Each gets a row in the admin shell's "Behavior" section (new — distinct from t
 
 All DB-backed settings reads go through a short-TTL cache (~30s, matches `backend/app/models/user_settings.py:27` `_TTL_CACHE`). Admin writes invalidate the cache row for the changed key only. No global cache flush. No process restart needed.
 
+### 6. Chat-UI ModelPicker surfacing for user-added custom model↔provider mappings
+
+(Added 2026-05-23 — operator question raised after Phase 075.4 context-gathering.)
+
+Once the admin UI lets any model_id be bound to any provider (with `model_capabilities_overrides` as the data layer), the chat-area ModelPicker needs to decide how custom user-added mappings appear:
+
+| Surfacing option | Description | Trade-off |
+|---|---|---|
+| Fold into provider group | Custom `gpt-5.5-mega` mapped to `openai` shows up inside the "OpenAI" section alongside built-in models | Cleanest UX; user thinks in provider→model. Loses visibility into "this is a user-added entry" |
+| New "Custom" / "Other" category | All user-added mappings collected under a "Custom" section regardless of provider | Visible audit signal ("I added this"); easier to spot a typo. But forces the user to remember which group "their" model lives in |
+| Both (provider group + Custom-marker badge) | Show in the provider's group with a small "custom" badge | Best of both worlds; ~10 LOC extra in the picker. **Recommended** |
+
+Decision deferred to `/gsd:discuss-phase 081.1`. Reference at plan-phase time so the admin-UI scope includes the chat-UI display shape, not just the data layer.
+
+**Related Phase 075.4 context:** Phase 075.4 Plan 02 sweep is the prerequisite — 081.1's DB-backed registry replaces `MODEL_CAPABILITIES` cleanly only because Plan 02 routed all 7 hardcoded sites through `get_model_capability()`.
+
 ## Scope question for whoever picks this up
 
 **Option A — Fold into v3.1 plan-phase.** v3.1 already touches the same surfaces (admin shell, `model_capabilities_overrides`, audit log). Adding `app_settings` rows for title-drafting + sub-agent + `settings_override.json` migration is a natural extension. Cost: v3.1 grows by ~2-3 plans.
