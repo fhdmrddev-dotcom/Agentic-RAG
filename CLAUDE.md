@@ -69,6 +69,23 @@ User-observed bugs from manual testing live in `.planning/reported-bugs/`. Each 
 
 **Status lifecycle:** `open` → `folded` (when a phase claims it) → `closed` (when the shipped phase verifiably closes it). Reports can also be `deferred` (with `re_open_trigger`) or `external-noted` (won't ever fold).
 
+## UAT scoreboard recipe (MANDATORY)
+
+Phase 075.4 Plan 05 (D-075.4-H1 Wave 0) — closes the assumption-driven-UAT gap that cost insert-phases 067.5, 075.1, 075.2, 075.3, 075.4. ROADMAP SC#10 verbatim:
+
+> Any phase touching streaming, agent loop, provider routing, or UI state MUST include UAT rows for cross-provider × multi-tool × parallel-thread × long-message scenarios.
+
+**The 4-axis bandwidth:**
+
+| Axis | Required coverage |
+|------|-------------------|
+| Cross-provider | OpenAI, Anthropic, Google, OpenRouter (4 providers — pick one representative model per axis) |
+| Multi-tool | At least 1 row exercising 2+ tools in one prompt (e.g., `search_documents` + `execute_code`) |
+| Parallel-thread | At least 1 row with Thread A streaming while Thread B accepts a new prompt |
+| Long-message | At least 1 row with ≥ 50 prior messages OR a ≥ 5 KB user prompt |
+
+UAT rows MUST be authored under VALIDATION.md, NOT in PLAN.md tasks. Phase verification only passes when all 4 axes are exercised — Plan 05 E2E backstop covers 1-3 automated; long-message stays manual per provider.
+
 ## graphify
 
 This project has a graphify knowledge graph at `graphify-out/`.
