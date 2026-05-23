@@ -504,7 +504,7 @@ Plans:
 
 **Requirements:** TBD (decisions baked at /gsd:discuss-phase 075.3)
 
-**Plans:** 2 plans (planned)
+**Plans:** 2 plans (planned 2026-05-22 — 075.3-01-PLAN.md + 075.3-02-PLAN.md written)
 
 **Success Criteria** (what must be TRUE):
   1. `_on_chunk_openai` at `threads.py:1806-1816` does NOT early-`return` after accumulating `chunk.usage` — content chunks that also carry `usage` flow through to `delta.content` processing.
@@ -516,7 +516,7 @@ Plans:
   7. Chrome MCP UAT confirms green on all 5 Gemini models (`gemini-2.5-flash`, `gemini-2.5-pro`, plus 3 others from `MODEL_CAPABILITIES`) — content delivered correctly AND `runs.input_tokens` / `runs.output_tokens` populated non-NULL post-completion. PLUS one negative-test pass: add `gemini-99-flash` (intentionally unregistered) via Settings, send a "hi" prompt, confirm content streams + warning logs + UI badge appears.
 
 Plans:
-- [ ] 075.3-01-PLAN.md — Plan 01 defensive chunk handler + provider-aware accumulator + Path A revert + 5-Gemini Chrome MCP UAT (run /gsd:plan-phase 075.3 to break down)
+- [ ] 075.3-01-PLAN.md — Plan 01 defensive chunk handler + provider-aware accumulator (extract _accumulate_chunk_usage helper) + Path A revert at openai_service.py:886-893 + 6-Gemini Chrome MCP UAT + Wave 0 live probe locks Google cumulative-vs-delta shape
 - [ ] 075.3-02-PLAN.md — Plan 02 unknown-model graceful degradation: pattern-based provider inference + safe-default fallback table in `get_model_capability` + `model_capability_unknown` warning log + frontend "unverified" Settings badge + negative-test UAT
 
 **Carry-forward decisions (baked in from quick-task 260522-gdg + 2026-05-22 strategic alignment, do NOT re-litigate):**
@@ -525,6 +525,53 @@ Plans:
 - DB-backed `model_capabilities_overrides` table + hot-reload cache + admin Settings UI for editing caps → Phase 081.1 (Settings Architecture Unification, already in v2.6 roadmap) — NOT in 075.3 scope.
 - Provider `/models` endpoint probe + admin "verify & promote" workflow → v3.1 (Provider key management UI) — NOT in 075.3 scope.
 - Diagnostic re-add (if needed during 075.3) — write fresh against the new code shape; do NOT reach for what was removed in quick-task 260522-gdg.
+
+### Phase 075.4: Cross-Provider Cleanup + Per-Thread State + E2E Backstop (INSERTED)
+
+**Goal:** Close the 6 open bugs (BUG-260523-01..04 + BUG-260522-02 + empty-response-fallback) as a coherent cleanup, eliminate the 5 cross-thread global state pollutions in `streamsStore.ts`, eliminate the 7 provider/model hardcoded sites that bypass the Phase 075.3 inference fallback, ship the streaming/agent-loop reliability fixes (terminal-status race, content-hash output dedup, sub-agent truncation warning, iteration-cap drop guard), land the perf + UX + safety wins (React.memo, useMemo, lazy recharts, sentinel guard against api_key clobber, Settings form-state fix), and install the smallest E2E test backstop (Playwright + frontend CI) that would have caught all 4 BUG-260523-* before they shipped. After this phase ships, Phases 076 → 082.5 proceed without insert-phases because the test backstop + the normative UAT recipe rule (cross-provider × multi-tool × parallel-thread × long-message) catches what phase-internal UATs have been missing.
+
+**Origin:** Operator caught 4 cross-provider regressions during real-world testing after 075.3 closeout (2026-05-23). 4-axis audit (provider hardcoding + streaming reliability + perf + test coverage) surfaced 6 root-cause buckets spanning the filed bugs + 12 additional latent issues. Full evidence at `.planning/AUDIT-2026-05-23-cross-cutting-cleanup.md` (commit `1cecde5`); alignment-checked against remaining v2.6 phases (076..082.5) + v2.7+ outlook = 0 hard conflicts + 6 documentable forward-references. Plan-mode artifact at `~/.claude/plans/serialized-rolling-puppy.md`.
+
+**Depends on:** Phase 075.3 (consumes the `get_model_capability()` registry-or-inference pattern from 075.3 Plan 02; Plan 02 of 075.4 extends that pattern to 6 other hardcoded sites).
+
+**Requirements:** TBD (decisions baked at /gsd:discuss-phase 075.4; the headline new decision is D-075.4-NN: "unknown provider = explicit error, NOT silent ollama default").
+
+**Plans:** 5 plans (proposed 2026-05-23 — full scope in `~/.claude/plans/serialized-rolling-puppy.md` + audit doc)
+
+**Success Criteria** (what must be TRUE):
+  1. All 5 globals in `frontend/src/stores/streamsStore.ts` (`isStreaming`, `loadingThreadId`, `reconcileError`, `fallbackNotice`, `subscriptionsByRunId`) are promoted to per-thread keys with per-thread selectors. Cross-thread bleed-through eliminated. 067.5 empty-thread-until-refresh regression test added (Phase 082 inherits coverage).
+  2. Gemini 3 / 3.5 / 3.1-pro-preview run multi-tool agent flows without 400 INVALID_ARGUMENT — `thought_signature` captured from Google chunks AND echoed on next round when `active_provider == "google"`. Unit test row + multi-tool integration test green.
+  3. The 6 other hardcoded provider/model sites (config.py:447 `_PROVIDER_BASE_URLS`, openai_service.py:758-762 `_uses_max_completion_tokens`, context_window.py:106 tiktoken gate, threads.py:1679 Anthropic-native gate, openai_service.py:896 `_NO_PARALLEL_TOOL_CALLS`, threads.py:1106-1109 `_reconstruct_history`) use the Phase 075.3 Plan 02 registry-or-inference pattern. Unknown provider raises a clear startup error (D-075.4-NN); does NOT silently fall through to ollama.
+  4. Streaming reliability fixes shipped: SSE `done` event fires AFTER `runs.status` UPDATE (terminal-status race closed); `_previous_files_in_run` keyed by content hash not filename (BUG-260523-03 dup outputs); sub-agent truncation warning surfaces when parent context drops user-intent; iteration-cap silent drop becomes a visible warning.
+  5. BUG-260522-02 closed (final_output_files backend payload includes url + size, ~30 lines). empty-response-fallback-misleading-iter-count closed (adjacent to iteration-cap fix). Anthropic LangSmith `@traceable` verified producing traces (the 0-traces-in-agentic-rag-module2 gap observed 2026-05-23).
+  6. Perf wins shipped: `React.memo(MessageItem)`, `useMemo` on `MarkdownRenderer` output, lazy `recharts` via `React.lazy` for Library Health, `SANDBOX_IMAGE` env var documented prominently, `stderr` badge next to red lines in `ExecuteCodeBlock`. Verified via React DevTools profiler on a 50-message thread during streaming (≥30% render-cost reduction target).
+  7. Safety guards shipped: defensive sentinel guard in `backend/app/models/user_settings.py::save_override` rejects any api_key write matching `***` / `__KEEP__` / common sentinel patterns (closes WR-02 from 075.3 REVIEW, prevents the data-loss footgun the orchestrator hit during 075.3 UAT). Settings form-state "needs 2 clicks to save" bug fixed.
+  8. E2E backstop shipped: Playwright + 6 scenarios that each map to a regression class (parallel composers / Gemini-3 multi-tool / OpenRouter single final output / SSE done→UI settled <500ms / unknown-model inference fallback / cross-provider iteration-count parity). Each scenario asserts a clean LangSmith trace. Teardown asserts no orphaned `runs.status='streaming'` rows.
+  9. Dev-infra cleanup shipped: `scripts/restart-backend.ps1` + `scripts/restart-backend.sh` handle the Windows multiprocessing-spawn orphan-worker case (closes the phantom-port issue the orchestrator hit during 075.3 UAT); `/health` endpoint added or documented; new `.github/workflows/frontend-tests.yml` runs vitest + Playwright on PR; 44 pre-existing backend test failures triaged (delete-dead / fix-real / mock-drift).
+  10. CLAUDE.md updated with normative UAT recipe rule: "Any phase touching streaming, agent loop, provider routing, or UI state MUST include UAT rows for cross-provider × multi-tool × parallel-thread × long-message scenarios."
+
+Plans:
+- [ ] 075.4-01-PLAN.md — Per-thread state cleanup (frontend) — refactor 5 globals in streamsStore.ts to per-thread Maps/Sets; new per-thread selectors; update ChatArea/MessageList/MessageItem consumers; add 067.5 regression test
+- [ ] 075.4-02-PLAN.md — Gemini 3 thought_signature + provider-agnostic hardcoding sweep (backend) — capture+echo thought_signature for google; apply Phase 075.3 Plan 02 registry-or-inference pattern to 6 hardcoded sites; explicit-error gate at _PROVIDER_BASE_URLS
+- [ ] 075.4-03-PLAN.md — Streaming + agent-loop reliability + remaining bugs (backend) — terminal-status race, content-hash output dedup, sub-agent truncation warning, iteration-cap drop guard, BUG-260522-02 backend fix (~30 lines), empty-response-fallback close, Anthropic LangSmith @traceable re-verify, skill-loading hygiene audit
+- [ ] 075.4-04-PLAN.md — Perf + UX + safety (frontend + small backend) — React.memo MessageItem, useMemo MarkdownRenderer, lazy recharts, SANDBOX_IMAGE docs, stderr badge, defensive sentinel guard in save_override (WR-02), Settings form-state 2-click fix, "supersedes previous" UI affordance for output dedup, verify new-chat cold-load uses snapshot
+- [ ] 075.4-05-PLAN.md — E2E backstop + dev infra + normative process (test infra) — Playwright + 6 scenarios with LangSmith assertions + DB-state teardown; restart-backend scripts (Windows orphan-worker aware); /health endpoint; frontend-tests.yml CI workflow; triage 44 pre-existing backend test failures; CLAUDE.md normative UAT recipe rule
+
+**Forward-references (must be honored by downstream phases — captured in plan files):**
+- → Phase 077/079 (multi-worker enable): Plan 02's `_WARNED_UNKNOWN_MODEL_IDS: set[str]` module-level dedup is single-worker-safe per D-v2.5-02; under `--workers N` becomes warn-once-per-worker (acceptable noise). Do NOT pre-emptively Redis-back it.
+- → Phase 079: Plan 05's `restart-backend.ps1` assumes single worker; update path documented in script header for when 079 enables `--workers 2`.
+- → Phase 081.1 (Settings Architecture Unification): Plan 04's sentinel guard in `save_override` is interim defense-in-depth; when 081.1 replaces save_override entirely, port the defensive logic forward.
+- → Phase 081.1: Plan 04's "2-click save" fix lands now (small, prevents user pain); 081.1's rewrite must preserve the fix.
+- → Phase 082 (cross-cutting verification): Plan 01's 067.5 regression test is inherited; Plan 05's Playwright infrastructure is the test substrate 082 rides on.
+- → Phase 082.5 (Error Handler Foundation): Plan 03's user-visible warnings use lightweight inline pattern; 082.5 retrofits to unified error sink + trace_id. Do NOT pre-build a sophisticated error system in 075.4.
+
+**Carry-forward decisions (baked at proposal time, do NOT re-litigate at discuss-phase):**
+- BUG-260523-04 root cause fix (Anthropic 22-iter loop) — E2E scenario 6 in Plan 05 measures it; actual root-cause fix needs trace data Plan 03/05 unlocks. NOT in 075.4 scope — defer to focused phase after 075.4 ships.
+- MIME fidelity in `import_skill` (known prior-milestone gap) — ingestion axis, NOT in 075.4 streaming/agent-loop scope.
+- SEED-006 / 020 / 021 (extraction quality) — ingestion axis, NOT in 075.4.
+- Full `settings_override.json` rewrite — Phase 081.1 owns it.
+- Unified error sink + `trace_id` — Phase 082.5 owns it.
+- Multi-worker enable — Phase 079 owns it.
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.

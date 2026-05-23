@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 075.3 fully complete (Plans 01 + 02 both shipped + verified); ready to advance to next phase per ROADMAP
-last_updated: "2026-05-23T02:00:00.000Z"
-last_activity: 2026-05-23 -- Phase 075.3 Plan 02 closed (SUMMARY.md written) — local-path 21/21 pytest + 6/6 vitest + Wave 4 UAT 6/7 STRICT PASS + 1 PARTIAL (Assertion 4 structurally unsatisfiable on synthetic model_id, documented)
+stopped_at: Phase 075.3 fully complete + cross-cutting audit landed; Phase 075.4 (Cross-Provider Cleanup + Per-Thread State + E2E Backstop) inserted as next phase
+last_updated: "2026-05-23T06:30:00.000Z"
+last_activity: 2026-05-23 -- Phase 075.3 closed (commits 6b75802 Plan 01 SUMMARY + ab6e47c Plan 02 SUMMARY + 46e8a63 VERIFICATION 7/7 + dbc81b6 REVIEW 0c/2w/5i + 80a824c 075.2 Gap #1 close); operator surfaced 4 cross-provider regressions (BUG-260523-01..04 filed at 44a1641); 4-axis audit + 075.4 proposal authored (1cecde5); 075.4 ready for /gsd:discuss-phase
 progress:
-  total_phases: 25
-  completed_phases: 15
+  total_phases: 26
+  completed_phases: 16
   total_plans: 52
   completed_plans: 52
   percent: 100
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 075.3
+**Current focus:** Phase 075.4 — Cross-Provider Cleanup + Per-Thread State + E2E Backstop (inserted 2026-05-23)
 
 ## Current Position
 
-Phase: 075.3 (defensive-chunk-handler-google-token-accounting) — COMPLETE (2/2 plans shipped)
-Plan: 2 of 2 — Waves 0-4 GREEN; SUMMARY.md written, commit pending
-Status: Phase 075.3 fully closed — both plans shipped + SUMMARY.md written; ready for next phase per ROADMAP
-Last activity: 2026-05-23 -- Phase 075.3 Plan 02 SUMMARY written (commit pending); local-path 21/21 pytest + 6/6 vitest GREEN; Wave 4 UAT 6/7 STRICT PASS + 1 PARTIAL (Assertion 4 structural unsatisfiability documented honestly)
+Phase: 075.3 (defensive-chunk-handler-google-token-accounting) — CLOSED 2026-05-23 (2/2 plans shipped + VERIFICATION 7/7 + REVIEW 0c/2w/5i + override accepted on Assertion 4)
+Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
+Status: 075.3 fully shipped; cross-cutting audit landed at .planning/AUDIT-2026-05-23-cross-cutting-cleanup.md (commit 1cecde5); plan-mode artifact at ~/.claude/plans/serialized-rolling-puppy.md; awaiting 075.4 GSD discussion
+Last activity: 2026-05-23 -- 075.3 closed; 4 cross-provider regressions filed (BUG-260523-01..04 at 44a1641); 4-axis audit + 5-plan 075.4 proposal authored + alignment-checked against remaining v2.6 phases (076..082.5) + v2.7+ outlook = 0 hard conflicts + 6 documentable forward-references; 075.4 inserted into ROADMAP
 
 ## PRD-reset outputs (committed)
 
