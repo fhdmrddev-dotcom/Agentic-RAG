@@ -105,20 +105,24 @@ async def test_harvest_offloaded_keeps_loop_responsive(tmp_path):
     )
 
     # Harvest still returns the expected shape.
-    # Phase 075.1 Plan 04 (B-260519-11) — signature extended from
-    # `list[dict]` to `tuple[list[dict], set[str]]`. previous_files=None
-    # (legacy mode default) returns (all_files, current_set). Tests
-    # adapted to the new tuple shape; the per-entry contract is unchanged.
+    # Plan 075.4-03 D-075.4-D1/D2 — signature pivoted from
+    # `tuple[list[dict], set[str]]` to `tuple[list[dict], dict[str, dict]]`.
+    # previous_files=None (legacy mode default) returns (all_files, current_dict).
+    # Tests adapted to the new dict-keyed-by-content-hash shape;
+    # the per-entry contract for delta is unchanged.
     assert isinstance(result, tuple)
-    files, current_set = result
+    files, current = result
     assert isinstance(files, list)
-    assert isinstance(current_set, set)
+    assert isinstance(current, dict)
     assert len(files) == 1
     entry = files[0]
     assert entry["filename"] == "chart.png"
     assert entry["url"] == "/sandbox-outputs/user-075-1/exec-075-1/chart.png"
     assert entry["size"] == len(b"fake-png-data")
-    assert current_set == {"chart.png"}
+    # current is dict[content_hash, meta]; one file → one entry
+    assert len(current) == 1
+    meta = next(iter(current.values()))
+    assert meta["filename"] == "chart.png"
 
 
 @pytest.mark.asyncio
@@ -158,15 +162,21 @@ async def test_harvest_returns_same_shape_via_threadpool():
         mock_supabase,
     )
 
-    # Phase 075.1 Plan 04 (B-260519-11) — signature extended from
-    # `list[dict]` to `tuple[list[dict], set[str]]`. Legacy mode
-    # (previous_files=None) returns (all_files, current_set).
+    # Plan 075.4-03 D-075.4-D1/D2 — signature pivoted to
+    # `tuple[list[dict], dict[str, dict]]`. Legacy mode (previous_files=None)
+    # returns (all_files, current_dict).
     assert isinstance(result, tuple)
-    files, current_set = result
+    files, current = result
     assert isinstance(files, list)
-    assert isinstance(current_set, set)
+    assert isinstance(current, dict)
     assert len(files) == 1
+    # Delta entries (the public emit shape) carry filename/url/size only.
+    # The internal content_hash field added by Plan 075.4-03 is stripped
+    # from delta entries (only present on output_files list internally) —
+    # caller emits the delta dicts straight to the SSE wire.
     assert set(files[0].keys()) == {"filename", "url", "size"}
     assert files[0]["filename"] == "out.csv"
     assert files[0]["url"] == "/sandbox-outputs/user-shape-test/exec-shape-test/out.csv"
-    assert current_set == {"out.csv"}
+    assert len(current) == 1
+    meta = next(iter(current.values()))
+    assert meta["filename"] == "out.csv"

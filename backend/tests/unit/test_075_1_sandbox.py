@@ -23,11 +23,18 @@ import pytest
 
 def _build_mock_session_with_files(filenames: list[str]):
     """Build a MagicMock session whose copy_from_runtime writes the given
-    filenames into the destination tmpdir."""
+    filenames into the destination tmpdir.
+
+    Plan 075.4-03 D-075.4-D1: each file gets a UNIQUE payload (filename-
+    derived) so the SHA-256 content-hash dedup treats them as distinct.
+    Pre-Plan-03 this used a constant ``b"x"*4`` which now collapses N
+    files to 1 hash under the new dedup.
+    """
     def _copy_from_runtime(_src_path, tmpdir):
         for fname in filenames:
             with open(os.path.join(tmpdir, fname), "wb") as f:
-                f.write(b"x" * 4)  # 4-byte stub payload per file
+                # Unique-per-filename payload guarantees distinct SHA-256.
+                f.write(f"stub-payload-for-{fname}".encode("utf-8"))
 
     session = MagicMock()
     session.execute_command = MagicMock()
@@ -44,8 +51,11 @@ def _build_mock_supabase():
 
 
 def test_harvest_delta_first_call_with_empty_previous_returns_all_files() -> None:
-    """First call with previous_files=set() returns all files as delta + the
-    full current set as the cumulative."""
+    """First call with previous_files={} returns all files as delta + the
+    full current dict as the cumulative.
+
+    Plan 075.4-03 D-075.4-D1/D2: pivot from set[str] to dict[content_hash, meta].
+    """
     from app.services.sandbox_service import harvest_output_files
 
     session = _build_mock_session_with_files(["a.png", "b.png", "c.png"])
@@ -56,56 +66,86 @@ def test_harvest_delta_first_call_with_empty_previous_returns_all_files() -> Non
         execution_id="exec-1",
         user_id="u-1",
         supabase=sb,
-        previous_files=set(),
+        previous_files={},
     )
     assert isinstance(result, tuple), "Must return tuple after Plan 04 signature extension"
-    delta_files, current_set = result
+    delta_files, current = result
     assert {f["filename"] for f in delta_files} == {"a.png", "b.png", "c.png"}
-    assert current_set == {"a.png", "b.png", "c.png"}
+    # current is now dict[content_hash, meta]; check the projected filenames
+    assert isinstance(current, dict)
+    assert {meta["filename"] for meta in current.values()} == {"a.png", "b.png", "c.png"}
 
 
 def test_harvest_delta_second_call_returns_only_new_files() -> None:
-    """Second call with a non-empty previous_files set returns only the new files."""
+    """Second call where previous_files already contains 3 of the 4 hashes
+    returns only the new (4th) file in the delta.
+
+    Plan 075.4-03 D-075.4-D1: previous_files keyed by content hash, not filename.
+    """
+    import hashlib
     from app.services.sandbox_service import harvest_output_files
 
     session = _build_mock_session_with_files(["a.png", "b.png", "c.png", "d.png"])
     sb = _build_mock_supabase()
 
+    # Pre-compute hashes for a/b/c (the helper writes unique-per-filename payloads).
+    def _h(fname: str) -> str:
+        return hashlib.sha256(f"stub-payload-for-{fname}".encode("utf-8")).hexdigest()
+
+    previous = {
+        _h("a.png"): {"filename": "a.png", "url": "/u/exec/a.png", "size": 21, "iteration": 0},
+        _h("b.png"): {"filename": "b.png", "url": "/u/exec/b.png", "size": 21, "iteration": 0},
+        _h("c.png"): {"filename": "c.png", "url": "/u/exec/c.png", "size": 21, "iteration": 0},
+    }
+
     result = harvest_output_files(
         session=session,
         execution_id="exec-1",
         user_id="u-1",
         supabase=sb,
-        previous_files={"a.png", "b.png", "c.png"},
+        previous_files=previous,
     )
-    delta_files, current_set = result
+    delta_files, current = result
+    # Only d.png is new — a/b/c hashes match previous → skipped.
     assert {f["filename"] for f in delta_files} == {"d.png"}
-    assert current_set == {"a.png", "b.png", "c.png", "d.png"}
+    # current dict contains all 4 hashes from THIS iteration's harvest.
+    assert {meta["filename"] for meta in current.values()} == {"a.png", "b.png", "c.png", "d.png"}
 
 
 def test_harvest_delta_no_new_files_returns_empty_delta() -> None:
-    """Third call where no files are new returns an empty delta but the set is preserved."""
+    """Third call where every file's hash is already tracked → empty delta."""
+    import hashlib
     from app.services.sandbox_service import harvest_output_files
 
     session = _build_mock_session_with_files(["a.png", "b.png", "c.png"])
     sb = _build_mock_supabase()
 
+    def _h(fname: str) -> str:
+        return hashlib.sha256(f"stub-payload-for-{fname}".encode("utf-8")).hexdigest()
+
+    previous = {
+        _h("a.png"): {"filename": "a.png", "url": "/u/exec/a.png", "size": 21, "iteration": 0},
+        _h("b.png"): {"filename": "b.png", "url": "/u/exec/b.png", "size": 21, "iteration": 0},
+        _h("c.png"): {"filename": "c.png", "url": "/u/exec/c.png", "size": 21, "iteration": 0},
+    }
+
     result = harvest_output_files(
         session=session,
         execution_id="exec-1",
         user_id="u-1",
         supabase=sb,
-        previous_files={"a.png", "b.png", "c.png"},
+        previous_files=previous,
     )
-    delta_files, current_set = result
+    delta_files, current = result
     assert delta_files == []
-    assert current_set == {"a.png", "b.png", "c.png"}
+    # current still records this iteration's hashes
+    assert {meta["filename"] for meta in current.values()} == {"a.png", "b.png", "c.png"}
 
 
 def test_harvest_legacy_mode_returns_all_files_as_tuple() -> None:
     """previous_files=None (default) returns a tuple where the first element
     is the full list (matches Phase 075 behavior) and the second element is
-    the current set so callers can start tracking later."""
+    the cumulative dict so callers can start tracking later."""
     from app.services.sandbox_service import harvest_output_files
 
     session = _build_mock_session_with_files(["a.png", "b.png"])
@@ -117,13 +157,15 @@ def test_harvest_legacy_mode_returns_all_files_as_tuple() -> None:
         user_id="u-1",
         supabase=sb,
     )
-    # Plan 04 signature change: always returns a tuple. Callers that pass
-    # previous_files=None get the full list as delta (legacy behavior) plus
-    # the cumulative set.
+    # Plan 075.4-03 D-075.4-D1/D2: always returns a tuple. Callers that
+    # pass previous_files=None get the full list as delta (legacy behavior)
+    # plus the per-iteration current dict.
     assert isinstance(result, tuple)
-    all_files, current_set = result
+    all_files, current = result
     assert {f["filename"] for f in all_files} == {"a.png", "b.png"}
-    assert current_set == {"a.png", "b.png"}
+    # current is now dict[content_hash, meta]; distinct payloads → distinct hashes.
+    assert isinstance(current, dict)
+    assert {meta["filename"] for meta in current.values()} == {"a.png", "b.png"}
 
 
 def test_system_prompt_contains_sandbox_hints_for_all_providers() -> None:

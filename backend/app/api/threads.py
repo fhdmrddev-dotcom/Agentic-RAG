@@ -1645,12 +1645,20 @@ async def send_message(
                 )
                 _structured_tools_injected = False
 
-                # Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — per-run
-                # cumulative set of sandbox output files. Drives the delta-view
-                # render in each cell + the final pinned "Final outputs" panel
-                # emit at the end of the agent loop. Initialised empty; updated
-                # by each harvest_output_files call.
-                _previous_files_in_run: set[str] = set()
+                # Plan 075.4-03 D-075.4-D1/D2 — closure-local per-run dict
+                # keyed by SHA-256 content hash → meta dict {filename, url,
+                # size, iteration}. PATTERNS.md S5 SHA-256 + S2 closure-local
+                # per-run state. Pivot from set[str] (filename-only) to
+                # dict[content_hash, meta] structurally closes BUG-260523-03
+                # (OpenRouter dup outputs), BUG-260522-02 (no url/size in
+                # final_output_files emit), and BUG-260521-02 (no download
+                # link in pinned panel — auto-closes via re_open_trigger).
+                # Per Plan 04 (Wave 2): emit carries `supersedes: <prev_fname>`
+                # when iteration N produces a different hash for the same
+                # filename — OutputFileCard reads this for the "Replaces:"
+                # affordance. Plan 04 Wave 0 historical context:
+                # B-260519-11 + BUG-260514-01 (per-run cumulative state).
+                _previous_files_in_run: dict[str, dict] = {}
 
                 for iteration in range(max_iterations):
                     # D-04 (Phase 56): emit iteration_start at the top of every iteration.
@@ -2815,18 +2823,23 @@ async def send_message(
                                     # responsive. See CLAUDE.md Rules + D-v2.5-01.
                                     output_file_list: list[dict] = []
                                     if execution_id and actual_exit_code == 0:
-                                        # Phase 075.1 Plan 04 (B-260519-11) — delta view.
-                                        # harvest_output_files now returns (delta, current_set);
-                                        # delta is what this cell renders (only new/changed
-                                        # files), current_set replaces _previous_files_in_run so
-                                        # the next iteration's call sees the updated cumulative.
-                                        # See sandbox_service.harvest_output_files docstring for
-                                        # the contract.
-                                        delta_files, _previous_files_in_run = await run_in_threadpool(
+                                        # Plan 075.4-03 D-075.4-D1/D2 — content-hash dedup
+                                        # signature. harvest_output_files now returns:
+                                        #   delta: this cell's NEW/changed files (with
+                                        #     optional `supersedes` key)
+                                        #   current: dict[content_hash, meta] for THIS
+                                        #     iteration's files only — caller MERGES into the
+                                        #     cumulative _previous_files_in_run so prior
+                                        #     iterations' files survive across the loop.
+                                        # See sandbox_service.harvest_output_files docstring
+                                        # for the full contract.
+                                        delta_files, _iter_files = await run_in_threadpool(
                                             harvest_output_files,
                                             session, execution_id, current_user["id"], supabase,
                                             _previous_files_in_run,
+                                            iteration,
                                         )
+                                        _previous_files_in_run.update(_iter_files)
                                         output_file_list = delta_files
 
                                     # Emit completion event (SAND-06) with file list
@@ -3022,18 +3035,28 @@ async def send_message(
                         })
                     # Continue to next iteration to let LLM respond with tool results in context
 
-                # Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — pinned final-outputs
-                # panel emit. After the agent loop terminates (break or natural end),
-                # emit the cumulative file set so the frontend can render a single
-                # "Final outputs" panel below the per-cell delta panels. This is the
-                # consumer's authoritative end-of-run file list and closes the
+                # Plan 075.4-03 D-075.4-D1/D2 — pinned final-outputs panel emit.
+                # After the agent loop terminates (break or natural end), emit
+                # the cumulative file set so the frontend can render a single
+                # "Final outputs" panel below the per-cell delta panels.
+                #
+                # The list comprehension iterates ``_previous_files_in_run.values()``
+                # (per-hash meta dicts) and projects filename + url + size — this
+                # NATURALLY closes BUG-260522-02 (pre-fix the emit was filename-only,
+                # leaving the frontend pinned panel with no download URL) AND
+                # auto-closes BUG-260521-02 per its re_open_trigger.
+                #
+                # Historical context (B-260519-11 + BUG-260514-01): closes the
                 # cumulative-repeat symptom (12 download links for 1 desired file).
                 if _previous_files_in_run:
                     await _emit(
                         redis,
                         run_id,
                         'final_output_files',
-                        files=[{"filename": fname} for fname in sorted(_previous_files_in_run)],
+                        files=[
+                            {"filename": meta["filename"], "url": meta["url"], "size": meta["size"]}
+                            for meta in _previous_files_in_run.values()
+                        ],
                     )
 
                 # Fallback: if the loop ended with no content produced, emit a safe message

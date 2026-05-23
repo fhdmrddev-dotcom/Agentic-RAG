@@ -5,6 +5,7 @@ when SANDBOX_ENABLED=false the Docker SDK is never loaded.
 """
 from __future__ import annotations
 
+import hashlib  # Plan 075.4-03 D-075.4-D1 — SHA-256 content-hash dedup.
 import logging
 import os
 import tempfile
@@ -81,34 +82,50 @@ def harvest_output_files(
     execution_id: str,
     user_id: str,
     supabase,
-    previous_files: set[str] | None = None,
-) -> tuple[list[dict], set[str]]:
+    previous_files: dict[str, dict] | None = None,
+    iteration: int = 0,
+) -> tuple[list[dict], dict[str, dict]]:
     """Copy files from /sandbox/output/ in the container, upload to Supabase Storage,
     insert sandbox_files rows, and return delta + cumulative file metadata.
 
-    Phase 075.1 Plan 04 (B-260519-11 + BUG-260514-01) — signature extended
-    from `-> list[dict]` to `-> tuple[list[dict], set[str]]` to support the
-    output-files delta view. The agent loop tracks `previous_files` across
-    iterations so each cell's "Output files" panel renders ONLY files new
-    or changed in that cell; the cumulative final set drives the pinned
-    "Final outputs" panel at the end of the loop (closes the
-    "12 download links for 1 desired file" cognitive-load symptom).
+    Phase 075.4-03 Task 1 (D-075.4-D1/D2) — signature pivoted from set-of-
+    filenames dedup to SHA-256 content-hash dedup. Structurally closes:
+      - BUG-260523-03 (OpenRouter renders duplicate outputs across iterations)
+      - BUG-260522-02 (final_output_files SSE payload had no url/size)
+      - BUG-260521-02 (pinned panel no download link — auto-closes via above)
+
+    Plan 04 (Wave 2) hook: when iteration N produces a DIFFERENT hash for
+    the SAME filename, the delta entry carries ``supersedes: <prev_filename>``
+    so OutputFileCard can render the "Replaces: <prev>" affordance.
+
+    Phase 075.1 Plan 04 historical context (B-260519-11 + BUG-260514-01):
+    the agent loop tracks per-iteration cumulative state so each cell's
+    "Output files" panel renders ONLY files new/changed that cell;
+    the cumulative final set drives the pinned "Final outputs" panel at
+    the end of the loop (closes the "12 download links for 1 desired file"
+    cognitive-load symptom).
 
     Args:
-        previous_files: set of filenames already harvested in earlier cells
-            of the same run. None (default) = legacy mode — returns ALL
-            current files as the delta (matches Phase 075 cumulative-render
-            behavior). The second tuple element is always populated so a
-            caller can start tracking later.
+        previous_files: dict keyed by SHA-256 content hash → meta dict
+            ({"filename", "url", "size", "iteration"}) accumulated across
+            earlier iterations of the same run. None (default) = legacy mode
+            — returns ALL current files as the delta (matches Phase 075
+            cumulative-render behavior). The second tuple element is always
+            populated so a caller can start tracking later.
+        iteration: 0-indexed iteration counter; recorded in the meta dict
+            for supersedes provenance (Plan 04 OutputFileCard can render
+            "iteration 2 of 4").
 
     Returns:
-        (delta_files, current_files_set)
+        (delta_files, current_files_dict)
           - delta_files: list of {"filename", "url", "size"} for this cell's
-            new/changed files (frontend renders these per-cell). When
-            previous_files is None, this is the full list.
-          - current_files_set: cumulative set of filenames now in
-            /sandbox/output (caller passes back as previous_files on the
-            next iteration).
+            new/changed files (frontend renders these per-cell). Entries
+            with a hash already in previous_files are SKIPPED. Entries with
+            a NEW hash but a filename matching a previous entry get a
+            ``supersedes: <prev_filename>`` key spread in.
+          - current_files_dict: dict[content_hash, meta] for THIS iteration's
+            files; the caller merges + passes back as previous_files on the
+            next iteration to extend the per-run cumulative state.
     """
     output_files: list[dict] = []
     try:
@@ -133,6 +150,13 @@ def harvest_output_files(
 
                     with open(fpath, "rb") as f:
                         data = f.read()
+
+                    # Plan 075.4-03 D-075.4-D1 — SHA-256 content hash is the
+                    # authoritative dedup key (PATTERNS.md §S5). Filename is
+                    # an operator hint that can lie (model regenerates the
+                    # same chart with a new name; operator renames between
+                    # iterations). Hash is the byte-level truth.
+                    content_hash = hashlib.sha256(data).hexdigest()
 
                     storage_path = f"{user_id}/{execution_id}/{fname}"
 
@@ -176,14 +200,41 @@ def harvest_output_files(
                         "filename": fname,
                         "url": f"/sandbox-outputs/{storage_path}",
                         "size": file_size,
+                        # internal field — stripped before SSE emit by caller
+                        "content_hash": content_hash,
                     })
     except Exception as e:
         logger.error("Failed to harvest output files: %s", e, exc_info=True)
 
-    # Phase 075.1 Plan 04 (B-260519-11) — delta view. previous_files=None
-    # = legacy mode (return all files as delta); set = delta-only filter.
-    current_files_set = {f["filename"] for f in output_files}
+    # Plan 075.4-03 D-075.4-D1/D2 — content-hash dedup with supersedes
+    # detection. previous_files=None = legacy mode (return all files as
+    # delta + populated current dict so a caller can start tracking later).
+    current_files_dict: dict[str, dict] = {}
+    delta_files: list[dict] = []
     if previous_files is None:
-        return output_files, current_files_set
-    delta_files = [f for f in output_files if f["filename"] not in previous_files]
-    return delta_files, current_files_set
+        previous_files = {}
+    # Index previous by filename so we can detect "same filename, different
+    # hash" → supersedes case (PATTERNS.md S5 Plan 04 OutputFileCard hook).
+    prev_by_filename = {meta["filename"]: meta for meta in previous_files.values()}
+
+    for f in output_files:
+        h = f["content_hash"]
+        current_files_dict[h] = {
+            "filename": f["filename"],
+            "url": f["url"],
+            "size": f["size"],
+            "iteration": iteration,
+        }
+        if h in previous_files:
+            continue  # same hash already seen — true duplicate, skip
+        # New hash. Check for supersedes (same filename, different bytes).
+        prev = prev_by_filename.get(f["filename"])
+        delta_entry: dict = {
+            "filename": f["filename"],
+            "url": f["url"],
+            "size": f["size"],
+        }
+        if prev:
+            delta_entry["supersedes"] = prev["filename"]  # Plan 04 OutputFileCard reads this
+        delta_files.append(delta_entry)
+    return delta_files, current_files_dict
