@@ -226,6 +226,120 @@ async def redis_client():
         await client.aclose()
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 075.4-05 Wave 0 — FK-aware runs factory (consumed by Plan 06 Task 3)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Plan 075.4-05 Wave 0 — FK-safe factory; pattern from PROJECT.md Phase
+# 073-04 Rule-1 deviation. Used by Plan 06 triage to fix the 4
+# test_provider_router.py + 2 test_066_langsmith_clean.py FK-violation
+# failures (ForeignKeyViolationError runs_thread_id_fkey).
+#
+# Failure pattern: tests insert a `runs` row without first creating the
+# parent `threads` row (and on local Supabase, threads.user_id has a FK to
+# auth.users.id — so we must also seed an auth.users entry). The factory
+# yields a `make_run(user_id=None, **overrides)` helper that does all three
+# inserts in FK-safe order and cleans up in reverse on teardown.
+#
+# Why pytest_asyncio.fixture: teardown awaits — the factory returns from
+# async context (matches the broader async test suite shape).
+#
+# Supabase client resolution:
+#   - if `supabase_real` fixture exists in caller scope, use it
+#   - else: create a real client from env (SUPABASE_URL +
+#     SUPABASE_SERVICE_ROLE_KEY); skip the test gracefully if neither
+#     is available (mock-only test runs shouldn't crash on import).
+# This dual-path keeps the factory usable both in real-Postgres binding
+# gates (Phase 073 model) and in mock-Supabase unit tests that opt into
+# it via a real supabase fixture.
+
+@pytest_asyncio.fixture
+async def fk_aware_runs_factory(request):
+    """FK-safe runs/threads/auth.users factory.
+
+    Yields ``make_run(user_id=None, **overrides) -> dict`` returning
+    ``{run_id, thread_id, user_id}``. Cleanup is FK-safe-reversed:
+    runs -> threads -> auth.users.
+
+    Args:
+        request: pytest fixture request — used to detect whether the
+            caller scope provides a ``supabase_real`` fixture; if not,
+            we fall back to creating a real client from env.
+
+    Plan 075.4-05 Wave 0. Consumed by Plan 06 Task 3 for the FK-violation
+    cluster. ForeignKey error class: ``runs_thread_id_fkey``.
+    """
+    import uuid
+
+    # Resolve a real supabase client. We try the caller's fixture first;
+    # if that's not declared, build one from env. Tests that don't have
+    # service-role access just skip — the FK-violation cluster only matters
+    # against a real Postgres anyway.
+    supabase = None
+    try:
+        supabase = request.getfixturevalue("supabase_real")
+    except Exception:
+        pass
+
+    if supabase is None:
+        try:
+            from supabase import create_client
+        except ImportError:
+            pytest.skip("supabase-py not importable — cannot build FK-aware factory")
+        url = _os.environ.get("SUPABASE_URL", "")
+        key = _os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        if not url or not key or "test.supabase.co" in url:
+            pytest.skip(
+                "fk_aware_runs_factory requires real SUPABASE_URL + "
+                "SUPABASE_SERVICE_ROLE_KEY (got placeholder/empty)"
+            )
+        supabase = create_client(url, key)
+
+    created = {"users": [], "threads": [], "runs": []}
+
+    async def make_run(user_id=None, **overrides):
+        uid = user_id or str(uuid.uuid4())
+        # Seed auth.users best-effort — the row may already exist on local
+        # dev DB, in which case the insert raises and we ignore it.
+        try:
+            supabase.table("auth.users").insert({"id": uid}).execute()
+            created["users"].append(uid)
+        except Exception:
+            pass
+
+        tid = str(uuid.uuid4())
+        supabase.table("threads").insert(
+            {"id": tid, "user_id": uid, "title": "test"}
+        ).execute()
+        created["threads"].append(tid)
+
+        rid = overrides.pop("id", str(uuid.uuid4()))
+        supabase.table("runs").insert(
+            {"id": rid, "user_id": uid, "thread_id": tid, "status": "queued", **overrides}
+        ).execute()
+        created["runs"].append(rid)
+        return {"run_id": rid, "thread_id": tid, "user_id": uid}
+
+    yield make_run
+
+    # FK-safe cleanup: runs -> threads -> auth.users (reverse insert order).
+    for rid in created["runs"]:
+        try:
+            supabase.table("runs").delete().eq("id", rid).execute()
+        except Exception:
+            pass
+    for tid in created["threads"]:
+        try:
+            supabase.table("threads").delete().eq("id", tid).execute()
+        except Exception:
+            pass
+    for uid in created["users"]:
+        try:
+            supabase.table("auth.users").delete().eq("id", uid).execute()
+        except Exception:
+            pass
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _flushdb_at_session_end():
     """FLUSHDB at session end (D-061-14, D-061-17).
