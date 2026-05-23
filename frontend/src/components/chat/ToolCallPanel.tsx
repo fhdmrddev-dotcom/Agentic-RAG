@@ -641,6 +641,40 @@ const [expanded, setExpanded] = useState(true)
   const togglePanel = (id: string, defaultExpanded: boolean) =>
     setPanelExpanded((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultExpanded) }))
 
+  // 075.6 Plan 03 / SPEC Req #7: step-list collapse predicate.
+  // Threshold N=3 locked per Boundary Keeper Round 1. Collapse window is the
+  // run of consecutive completed (status === "done") tool items STRICTLY
+  // preceding the active (running/preparing) tool item. When the window
+  // length is ≥3, the displayItems map renders ONE summary row at i=0 and
+  // null-returns for 1 ≤ i < activeIndex; expanding the chevron restores
+  // per-row rendering. Iteration divider at L729 walks backward through
+  // displayItems[j] for j=i-1 → 0 to find prevToolIteration — when collapsed,
+  // the immediate predecessor of the active step is the LAST collapsed item,
+  // so the divider above the active step fires correctly for the
+  // iter-N → iter-(N+1) boundary (Pitfall 6 / Landmine L5 mitigation).
+  const activeIndex = displayItems.findIndex(
+    (it) => it.kind === "tool" && (it.tc.status === "running" || it.tc.status === "preparing"),
+  )
+  const completedBeforeActive =
+    activeIndex === -1
+      ? []
+      : displayItems.slice(0, activeIndex).filter(
+          (it): it is Extract<DisplayItem, { kind: "tool" }> =>
+            it.kind === "tool" && it.tc.status === "done",
+        )
+  const shouldCollapse = completedBeforeActive.length >= 3
+  const [stepsCollapsed, setStepsCollapsed] = useState(true)
+
+  // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
+  // collapsed items) as data-iteration-min so future readers can see the
+  // boundary the summary row spans without re-deriving it.
+  const collapsedIterationMin = (() => {
+    const iters = completedBeforeActive
+      .map((it) => it.tc.iteration)
+      .filter((x): x is number => x !== undefined)
+    return iters.length > 0 ? Math.min(...iters) : undefined
+  })()
+
   return (
     <div className={cn(
       "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
@@ -689,6 +723,36 @@ const [expanded, setExpanded] = useState(true)
       {isExpanded && (
         <div className="px-4 pb-3.5 space-y-1 border-t border-border/20 min-w-0 overflow-hidden">
           {displayItems.map((item, i) => {
+            // 075.6 Plan 03 / Req #7: step-list collapse short-circuit.
+            // When shouldCollapse is true and the user has not expanded, render
+            // a single summary row at i === 0 in place of the first collapsed
+            // item, then null-return for 1 ≤ i < activeIndex. activeIndex and
+            // beyond render normally; the iteration divider above the active
+            // step continues to derive prevToolIteration from displayItems[i-1]
+            // (the LAST collapsed item) so the iter-N → iter-(N+1) boundary
+            // above the active step fires correctly (Pitfall 6 / L5).
+            if (shouldCollapse && stepsCollapsed && i < activeIndex) {
+              if (i === 0) {
+                return (
+                  <div
+                    key="collapsed-steps-summary"
+                    data-testid="collapsed-steps-summary"
+                    data-iteration-min={collapsedIterationMin}
+                    className="pt-2.5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setStepsCollapsed(false)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                      <span>Completed {completedBeforeActive.length} steps</span>
+                    </button>
+                  </div>
+                )
+              }
+              return null
+            }
             if (item.kind === 'skill') {
               return (
                 <div key={`skill-${i}-${item.activation.occurredAt}`}>
