@@ -4,14 +4,14 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 075.4 context gathered (8 gray areas locked, 6 bugs routed)
-last_updated: "2026-05-23T03:10:44.133Z"
+last_updated: "2026-05-23T04:26:36.545Z"
 last_activity: 2026-05-23 -- 075.3 closed; 4 cross-provider regressions filed (BUG-260523-01..04 at 44a1641); 4-axis audit + 5-plan 075.4 proposal authored + alignment-checked against remaining v2.6 phases (076..082.5) + v2.7+ outlook = 0 hard conflicts + 6 documentable forward-references; 075.4 inserted into ROADMAP
 progress:
   total_phases: 26
   completed_phases: 16
-  total_plans: 52
+  total_plans: 57
   completed_plans: 54
-  percent: 100
+  percent: 95
 ---
 
 # Project State
@@ -456,4 +456,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 075.3 (defensive-chunk-handler-google-token-accounting) — 2 plans — 2026-05-22T19:39:50.946Z
+**Planned Phase:** 075.4 (Cross-Provider Cleanup + Per-Thread State + E2E Backstop (INSERTED)) — 5 plans — 2026-05-23T04:26:36.537Z
