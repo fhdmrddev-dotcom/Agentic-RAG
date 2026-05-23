@@ -290,6 +290,29 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
+    onToolArgsProgress: (toolIndex: number, _name: string, totalArgsBytesSoFar: number) => {
+      // T-260523-09 (2026-05-23): update argsBytesStreamed on the matching
+      // preparing entry so the UI can render "Generating ... (X.X KB)"
+      // during the long code-generation pauses. Match by the same
+      // `preparing-${index}` id onToolPreparing assigned. Use Math.max so
+      // out-of-order replay events can't make the badge tick backwards.
+      const preparingId = `preparing-${toolIndex}`
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          const idx = calls.findIndex((tc) => tc.id === preparingId && tc.status === "preparing")
+          if (idx === -1) return m
+          const tc = calls[idx]
+          const next = Math.max(tc.argsBytesStreamed ?? 0, totalArgsBytesSoFar)
+          if (next === (tc.argsBytesStreamed ?? 0)) return m
+          const updated = calls.map((c, i) =>
+            i === idx ? { ...c, argsBytesStreamed: next } : c,
+          )
+          return { ...m, tool_calls: updated }
+        }),
+      )
+    },
     onToolStart: (name, args) => {
       setMessages((prev) =>
         prev.map((m) => {

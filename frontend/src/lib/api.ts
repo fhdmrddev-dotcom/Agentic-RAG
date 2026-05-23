@@ -202,6 +202,13 @@ export interface StreamCallbacks {
   onTitleUpdate?: (title: string) => void
   onToolPreparing?: (name: string, index: number) => void
   onToolStart?: (name: string, args: Record<string, string>) => void
+  /** T-260523-09 (2026-05-23): tool args streaming progress. Backend emits
+   * `tool_args_progress` SSE every 5KB of cumulative args streamed from the
+   * LLM during the long code-generation pauses. Handler updates
+   * tool_calls[N].argsBytesStreamed so the UI can show "Generating ... (12.7 KB)"
+   * while the tool is still in "preparing" state. Pre-fix behavior was zero
+   * progress signal during 60-120s execute_code generation. */
+  onToolArgsProgress?: (toolIndex: number, name: string, totalArgsBytesSoFar: number) => void
   // Phase 075.2 Plan 01 Task 2 (D-075.2-04 / WR-01): optional id?:string
   // for future tool_call_id matching. Backend wire-up deferred (RESEARCH
   // §Q1: tool_end SSE today carries name + result only). When undefined
@@ -382,6 +389,12 @@ export async function subscribeToRun(
           callbacks.onToolPreparing(parsed.name as string, parsed.index as number)
         else if (t === "tool_start" && callbacks.onToolStart)
           callbacks.onToolStart(parsed.name as string, parsed.args as Record<string, string>)
+        else if (t === "tool_args_progress" && callbacks.onToolArgsProgress)
+          callbacks.onToolArgsProgress(
+            parsed.tool_index as number,
+            parsed.name as string,
+            parsed.total_args_bytes_so_far as number,
+          )
         else if (t === "tool_end" && callbacks.onToolEnd)
           callbacks.onToolEnd(parsed.name as string, parsed.result as string | undefined)
         else if (t === "sub_agent_start" && callbacks.onSubAgentStart)

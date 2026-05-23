@@ -452,8 +452,12 @@ def stream_google(
                         "name": name,
                         "index": idx,
                     }
-                    # Match OpenAI path's 5KB-boundary progress for non-execute_code.
-                    if name != "execute_code":
+                    # Match OpenAI path's 5KB-boundary progress.
+                    # T-260523-09 (2026-05-23): the prior `!= "execute_code"`
+                    # filter caused total UI silence during the long
+                    # code-generation LLM calls. Removed; frontend renders
+                    # bytes streamed as a badge, not raw code.
+                    if name:
                         args_str = tool_blocks[idx]["arguments"]
                         _bytes_total = len(args_str.encode("utf-8"))
                         if _bytes_total > 0:

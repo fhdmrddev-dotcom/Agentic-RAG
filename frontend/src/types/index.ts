@@ -57,6 +57,14 @@ export interface ToolCall {
    * (e.g. claude-sonnet-4-6 main agent → claude-haiku-4-5-20251001 sub-agent)
    * that was invisible pre-Plan-04. Absent for non-sub-agent tools. */
   sub_agent_model?: string
+  /** T-260523-09 (2026-05-23): cumulative bytes of the tool's args streamed
+   * from the LLM so far, updated by `onToolArgsProgress` SSE callback at
+   * every 5KB boundary. Visible while the tool is in `"preparing"` state —
+   * gives the user a "model is writing X.X KB of code" signal during the
+   * 60-120s execute_code generation pauses that previously looked silent.
+   * Resets implicitly when the tool transitions to `"running"` (final args
+   * are then in tc.args and this field is no longer rendered). */
+  argsBytesStreamed?: number
 }
 
 export interface SourceReference {

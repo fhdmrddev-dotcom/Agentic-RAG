@@ -198,7 +198,20 @@ Driver: Chrome MCP, logged-in as fhdmrd@gmail.com at http://localhost:5173.
   (step rendering) and `frontend/src/components/chat/ChatArea.tsx`
   (scroll behavior).
 
-### T-260523-09 — No progress signal during long LLM code-generation calls (HIGH UX)
+### T-260523-09 — No progress signal during long LLM code-generation calls (HIGH UX) — **CLOSED 2026-05-23**
+
+**Verification status:** ✅ **CLOSED — fix verified end-to-end via Chrome MCP on 2026-05-23.**
+
+| Layer | Evidence |
+|---|---|
+| Backend emit | Across 4 runs, **24 `tool_args_progress` events** fired for `execute_code` (pre-fix: ZERO). Bytes: 5121, 10241 (run 44419a56 iter 3); 5120, 10248, 15361, 20482, 25604, 30724 (iter 4); 5148, 10243 (run 781c743e); 5129, 10253, 15365, 5123, 10241, 15362 (run 2e218679); 5125, 10241, 15361, 20480, 25609, 30726, 35847, 40962 (run 37a1d54d). |
+| SSE dispatcher (`api.ts:392-397`) | Routes `tool_args_progress` to `onToolArgsProgress(toolIndex, name, totalArgsBytesSoFar)` callback. |
+| Reducer (`StreamsProvider.tsx:293-315`) | Math.max-updates `argsBytesStreamed` on the matching `preparing-{toolIndex}` tool entry. |
+| Render (`ToolCallPanel.tsx:743-746`) | Renders `<span class="ml-1.5 font-normal text-foreground/40 not-italic font-mono tabular-nums">(X.X KB)</span>` when `argsBytesStreamed > 0` and status="preparing". |
+| Live DOM proof | Browser MutationObserver captured **16 distinct badge HTML snapshots** across runs 781c743e + 37a1d54d: `(5.0 KB)`, `(10.0 KB)`, `(15.0 KB)`, `(20.0 KB)`, `(25.0 KB)`, `(30.0 KB)`, `(35.0 KB)`, `(40.0 KB)` — each with the exact React-rendered HTML matching ToolCallPanel.tsx:743-746. Window: ~830ms between first and 8th capture. |
+| Screenshots | `.planning/phases/075.5-gemini-native-sdk/screenshots/06_LIVE_BADGE_argsprog.png`, `08_LIVE_BADGE_5KB.png`, `09_LIVE_BADGE_40KB.png` (post-tool_start viewport; badge HTML proven via DOM capture above since the 5KB→40KB transition happened faster than Chrome MCP screenshot round-trip). |
+
+**Original symptom (kept for record):**
 
 - **Symptom**: During Sonnet's 60-120 second LLM calls that generate
   large code blocks (4k–19k chars per call), the UI emits NO events

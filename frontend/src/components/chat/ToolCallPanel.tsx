@@ -734,6 +734,17 @@ const [expanded, setExpanded] = useState(true)
                         {tc.status === "preparing" ? (
                           <span className="font-semibold text-foreground/50 italic">
                             Preparing {toolLabel(tc.name)}…
+                            {/* T-260523-09: bytes-streamed badge during the
+                                long LLM tool-args generation. Replaces the
+                                prior silent "preparing" state with a live
+                                "X.X KB" counter. Visible only when the
+                                backend has emitted at least one 5KB-boundary
+                                tool_args_progress event for this tool. */}
+                            {tc.argsBytesStreamed != null && tc.argsBytesStreamed > 0 && (
+                              <span className="ml-1.5 font-normal text-foreground/40 not-italic font-mono tabular-nums">
+                                ({(tc.argsBytesStreamed / 1024).toFixed(1)} KB)
+                              </span>
+                            )}
                           </span>
                         ) : (
                           <>

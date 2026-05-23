@@ -236,13 +236,20 @@ def stream_anthropic(
                     if event.index in tool_blocks:
                         tool_blocks[event.index]["arguments"] += delta.partial_json
                         # Phase 075 D-075-09/10/11: yield tool_args_progress
-                        # on every 5KB cumulative-byte boundary for non-
-                        # execute_code tools. The calling_mode filter from
-                        # D-075-11 does NOT apply here — anthropic_service is
-                        # only invoked from the NATIVE provider path.
+                        # on every 5KB cumulative-byte boundary. The
+                        # calling_mode filter from D-075-11 does NOT apply
+                        # here — anthropic_service is only invoked from the
+                        # NATIVE provider path.
+                        #
+                        # T-260523-09 (2026-05-23): the prior `_tool_name !=
+                        # "execute_code"` filter caused total UI silence
+                        # during the long (60-120s) code-generation LLM
+                        # calls — the exact moment users most need progress
+                        # feedback. Removed; frontend renders args bytes
+                        # streamed as a compact badge, not raw code.
                         tb = tool_blocks[event.index]
                         _tool_name = tb["name"]
-                        if _tool_name and _tool_name != "execute_code":
+                        if _tool_name:
                             _bytes_total = len(tb["arguments"].encode("utf-8"))
                             _new_boundary = _bytes_total // 5120
                             _last_boundary = _tool_args_emit_boundary.get(event.index, 0)
