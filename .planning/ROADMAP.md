@@ -536,7 +536,7 @@ Plans:
 
 **Requirements:** TBD (decisions baked at /gsd:discuss-phase 075.4; the headline new decision is D-075.4-NN: "unknown provider = explicit error, NOT silent ollama default").
 
-**Plans:** 6 plans (proposed 2026-05-23 as 5; Plan 05 split into 05 + 06 at plan-phase time per plan-checker W-1 — Wave 0 bootstrap separated from Wave 3 finalize for clean orchestrator wave-grouping. Full scope in `~/.claude/plans/serialized-rolling-puppy.md` + audit doc)
+**Plans:** 6/6 plans complete
 
 **Success Criteria** (what must be TRUE):
   1. All 5 globals in `frontend/src/stores/streamsStore.ts` (`isStreaming`, `loadingThreadId`, `reconcileError`, `fallbackNotice`, `subscriptionsByRunId`) are promoted to per-thread keys with per-thread selectors. Cross-thread bleed-through eliminated. 067.5 empty-thread-until-refresh regression test added (Phase 082 inherits coverage).

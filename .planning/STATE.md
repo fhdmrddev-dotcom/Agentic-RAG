@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: verifying
+status: ready_to_plan
 stopped_at: Completed 075.4-06-PLAN.md (Wave 3 finalize — 6 Playwright scenarios + 98-failure triage + 6 FK-cluster fixed via AsyncMock; live operator UAT deferred to Task 4 checkpoint)
 last_updated: "2026-05-23T09:03:36.508Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 58
   completed_plans: 60
-  percent: 100
+  percent: 69
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
-Plan: 6 of 6
+Phase: 076
+Plan: Not started
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
-Status: Phase complete — ready for verification
+Status: Ready to plan
 Last activity: 2026-05-23
 
 ## PRD-reset outputs (committed)
