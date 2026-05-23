@@ -172,6 +172,99 @@ Driver: Chrome MCP, logged-in as fhdmrd@gmail.com at http://localhost:5173.
   terminal SSE event as a `recoverable: bool` field that the
   frontend's resume-button gating consumes.
 
+### T-260523-08 — Step indicator off-screen during long runs (HIGH UX)
+
+- **Symptom**: The agent's step indicator (latest tool / latest action)
+  sits at the TOP of the assistant message bubble. As the agent emits
+  more tools / code / files, the bubble grows. The user scrolls down to
+  follow new content but loses sight of the step indicator at the top.
+  During an 8-minute Sonnet run with 11 iterations and ~5 file outputs
+  the indicator was ~3 viewport heights above the user's scroll position.
+  User has to scroll back up to see "what is happening now."
+- **Severity**: HIGH UX — perceived as silent/stalled, not because
+  nothing is happening but because the activity signal is off-screen.
+- **Concrete observation (run beb391e5, 2026-05-23)**: while iter 5's
+  106s code-gen LLM call was running, the only "still working"
+  indicator was the step name at the top of the bubble — invisible at
+  the user's scroll position.
+- **Fix patterns (pick one)**:
+  - **Sticky step indicator** pinned to top of viewport while scrolling
+    inside the bubble (CSS `position: sticky`).
+  - **Floating activity badge** in a fixed corner of the chat surface
+    showing the current step + elapsed time.
+  - **Auto-scroll to latest activity** (like Claude.ai / ChatGPT).
+  - **Mini-indicator near the input row** ("Running step 5/?: execute_code...").
+- **Where to look**: `frontend/src/components/chat/MessageItem.tsx`
+  (step rendering) and `frontend/src/components/chat/ChatArea.tsx`
+  (scroll behavior).
+
+### T-260523-09 — No progress signal during long LLM code-generation calls (HIGH UX)
+
+- **Symptom**: During Sonnet's 60-120 second LLM calls that generate
+  large code blocks (4k–19k chars per call), the UI emits NO events
+  to the user — no streaming text, no "generating code..." indicator,
+  no progress fraction. Step indicator (T-260523-08) shows
+  "tool_preparing: execute_code" but doesn't visibly progress.
+- **Claude.ai's pattern (for reference)**: shows a collapsed code
+  block with a "Generating code..." indicator + char counter while the
+  tool args stream in. User can expand to see live code OR leave
+  collapsed for clean UX. No raw token waterfall, just clear "still
+  working" feedback with the option to drill in.
+- **Backend root cause (confirmed)**: `anthropic_service.py:245` has
+  an explicit filter `if _tool_name and _tool_name != "execute_code":`
+  that SKIPS `tool_args_progress` emission for `execute_code` calls.
+  This is the EXACT tool whose code-generation LLM call drives the
+  60-120s pauses (4k-19k chars of code per call). The exclusion was
+  likely intended to avoid streaming raw code chunks into the UI, but
+  the net effect is total silence during the biggest user-visible
+  pauses. Confirmed via Redis stream of run beb391e5: 0
+  `tool_args_progress` events across 491 total events, despite 7
+  execute_code calls totaling 80k+ chars of generated code.
+- **Severity**: HIGH UX — single biggest perception driver. Run feels
+  hung when it isn't.
+- **Minimal fix** (one-line, conservative): remove the
+  `!= "execute_code"` exclusion on `anthropic_service.py:245` so
+  execute_code also emits `tool_args_progress` every 5KB. Frontend
+  already handles the event type for other tools; rendering pattern
+  becomes "Generating code... (12.7 KB)" badge instead of raw chunk
+  rendering. Iterate on frontend display separately.
+- **Wider fix**: audit the SAME filter in the OpenAI / Google /
+  OpenRouter service modules — they likely have the same exclusion
+  pattern (the 5KB-boundary mechanism was added in Phase 075 for ALL
+  providers, copy-pasted with the same execute_code exception).
+  Removing it across the board gives unified progress signal during
+  long code-generation calls regardless of provider.
+
+### T-260523-10 — Intermediate files exposed in downloads list (MEDIUM UX)
+
+- **Symptom**: Sonnet's "split-build-combine" strategy on the pptx
+  task produces intermediate files (chart PNGs, defence_part1.pptx,
+  defence_part2.pptx) AS WELL AS the actual deliverable
+  (Fahed_Mrad_DBA_Defence.pptx). All are exposed in the downloads
+  list with no distinction. User asked for ONE pptx; got 7+ files.
+- **Severity**: MEDIUM UX — confusing, but not blocking. User CAN
+  pick the right file from the list.
+- **Trade-offs**:
+  - **Hide all intermediates**: risks hiding files the user actually
+    wants (charts as standalone PNGs).
+  - **Section the file list**: "Final outputs" vs "Intermediate
+    artifacts" with the latter collapsed by default. Requires the
+    agent (or backend) to classify files into the two buckets.
+  - **Last-call-wins**: only show files from the FINAL execute_code
+    iteration. Simple heuristic but assumes the final call is always
+    the deliverable (true for Sonnet's pattern, may not be for other
+    agent strategies).
+  - **Agent-tagged outputs**: extend the `execute_code` tool result
+    schema so the agent can mark `is_final: true` per file. Cleanest
+    but requires prompt-engineering or tool-schema change.
+- **Where to look**: `final_output_files` event emit logic in the
+  agent loop (per run beb391e5 lifecycle: one `final_output_files`
+  event was emitted at terminal, but it appears to include ALL files
+  from all execute_code calls).
+- **Related**: cross-provider impact — Gemini's one-shot pattern
+  doesn't hit this (one execute_code → one pptx). Sonnet's iterative
+  pattern does.
+
 ### T-260523-07 — Anthropic errored runs miss usage tracking (LOW)
 
 - **Symptom**: After my T-260523-05 fix, the err.log shows:
