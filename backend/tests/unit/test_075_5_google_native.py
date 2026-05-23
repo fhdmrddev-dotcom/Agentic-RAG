@@ -151,6 +151,71 @@ def test_empty_tools_returns_empty_list() -> None:
     assert _convert_tools_to_google([]) == []
 
 
+def test_sanitize_strips_additional_properties_recursively() -> None:
+    """Google's OpenAPI subset rejects additionalProperties (per live 2026-05-23
+    error: 'Unknown name "additional_properties" at properties[N].value').
+    Our search_documents.metadata_filter and query_tables.column_filter both
+    use the JSON Schema map-type idiom via additionalProperties; this must be
+    stripped on the Google boundary while leaving OpenAI/Anthropic paths intact."""
+    from app.services.google_service import _sanitize_schema_for_google
+    schema = {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string"},
+            "filter": {
+                "type": "object",
+                "description": "string map",
+                "additionalProperties": {"type": "string"},
+            },
+        },
+        "additionalProperties": False,  # also stripped at top-level
+        "$schema": "http://json-schema.org/draft-07/schema#",
+    }
+    out = _sanitize_schema_for_google(schema)
+    assert "additionalProperties" not in out
+    assert "$schema" not in out
+    assert "additionalProperties" not in out["properties"]["filter"]
+    # Non-stripped fields preserved
+    assert out["properties"]["filter"]["type"] == "object"
+    assert out["properties"]["filter"]["description"] == "string map"
+
+
+def test_real_tools_pass_sanitize_without_offending_field() -> None:
+    """Audit-level: the project's real get_tools() output (incl. search_documents
+    and query_tables) must not carry additionalProperties / $ref / oneOf after
+    going through _convert_tools_to_google. End-to-end live API call against
+    Gemini-3 confirmed at adoption time (2026-05-23) — this test pins the
+    structural property so future tool additions can't silently regress."""
+    from app.services.openai_service import get_tools
+    from app.services.google_service import _convert_tools_to_google
+
+    tools = get_tools(None)
+    assert tools, "get_tools(None) must return at least one tool"
+    gtools = _convert_tools_to_google(tools)
+    assert len(gtools) == 1
+    # Serialize the way the SDK does on the wire
+    dumped = gtools[0].model_dump(exclude_none=True, by_alias=True)
+
+    def find_bad(obj):
+        if isinstance(obj, dict):
+            for k in ("additional_properties", "additionalProperties", "$ref", "oneOf", "anyOf", "allOf"):
+                if k in obj:
+                    return f"{k}={obj[k]!r}"
+            for v in obj.values():
+                hit = find_bad(v)
+                if hit:
+                    return hit
+        elif isinstance(obj, list):
+            for it in obj:
+                hit = find_bad(it)
+                if hit:
+                    return hit
+        return None
+
+    bad = find_bad(dumped)
+    assert bad is None, f"Sanitized wire payload still contains unsupported field: {bad}"
+
+
 # ── Test 7 — finish_reason map ───────────────────────────────────────────────
 
 

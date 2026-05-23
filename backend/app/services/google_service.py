@@ -207,16 +207,68 @@ def _convert_messages_to_google(messages: list[dict]) -> tuple[list[types.Conten
 # ── Translation: OpenAI-shape tools → Google FunctionDeclaration[] ───────────
 
 
+# Google's OpenAPI subset for tool parameter schemas REJECTS these JSON Schema
+# fields with 400 INVALID_ARGUMENT (verified live 2026-05-23 on
+# `additionalProperties` in search_documents.metadata_filter +
+# query_tables.column_filter). The same schemas work fine for OpenAI / Anthropic,
+# so we strip on the Google boundary only — original tool defs in
+# openai_service.get_tools() stay untouched.
+_GOOGLE_UNSUPPORTED_SCHEMA_KEYS: frozenset[str] = frozenset({
+    "additionalProperties",
+    "additional_properties",  # defensive: some serializers emit snake_case
+    "$ref",
+    "$schema",
+    "definitions",
+    "patternProperties",
+    "oneOf",
+    "anyOf",
+    "allOf",
+    "not",
+    "if",
+    "then",
+    "else",
+    "examples",  # Google ignores; safer to strip
+    "$defs",
+    "unevaluatedProperties",
+    "unevaluatedItems",
+})
+
+
+def _sanitize_schema_for_google(schema: Any) -> Any:
+    """Recursively strip JSON Schema fields Google's OpenAPI subset rejects.
+
+    The map-type idiom (``additionalProperties: {type: "string"}``) loses its
+    value-type constraint after this strip — the property still accepts an
+    object, just without per-value schema validation. This is the right
+    trade-off: Google's tool schema isn't expressive enough for arbitrary
+    maps, and our tool implementations handle malformed values defensively
+    (search_documents and query_tables both validate metadata_filter /
+    column_filter at call time before forwarding to Postgres).
+    """
+    if isinstance(schema, dict):
+        return {
+            k: _sanitize_schema_for_google(v)
+            for k, v in schema.items()
+            if k not in _GOOGLE_UNSUPPORTED_SCHEMA_KEYS
+        }
+    if isinstance(schema, list):
+        return [_sanitize_schema_for_google(item) for item in schema]
+    return schema
+
+
 def _convert_tools_to_google(tools: list[dict]) -> list[types.Tool]:
     """Convert OpenAI tools-array → Google Tool (single Tool wrapping all
     function_declarations). The schema bodies are already OpenAPI-shape on both
-    sides, so the conversion is shallow."""
+    sides, but Google strict-validates against its narrower subset, so each
+    parameter schema is sanitized before construction (see
+    _sanitize_schema_for_google)."""
     declarations: list[dict] = []
     for tool in tools or []:
         fn = tool.get("function") or {}
         name = fn.get("name", "")
         description = fn.get("description", "") or ""
-        parameters = fn.get("parameters") or {"type": "object", "properties": {}}
+        raw_parameters = fn.get("parameters") or {"type": "object", "properties": {}}
+        parameters = _sanitize_schema_for_google(raw_parameters)
         if not name:
             continue
         declarations.append({
