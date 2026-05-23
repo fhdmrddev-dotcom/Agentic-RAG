@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { flushSync } from "react-dom"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -584,9 +585,9 @@ export function SettingsPage() {
   }, [])
 
   const handleSaveAIModel = async () => {
-    setSavingAI(true)
-    setError(null)
-    setSubAgentModelError(null)
+    // Plan 075.4-04 Task 1 (D-075.4-F3) — flushSync commits pending onChange
+    // before snapshot; closes 2-click bug. See 075.4-04-DIAGNOSIS-settings-2click.md
+    flushSync(() => { setSavingAI(true); setError(null); setSubAgentModelError(null) })
     try {
       const body: SettingsUpdate = {
         active_provider: activeProvider,
