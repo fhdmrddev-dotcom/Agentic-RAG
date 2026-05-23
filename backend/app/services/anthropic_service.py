@@ -140,6 +140,14 @@ def _convert_tools_to_anthropic(tools: list[dict]) -> list[dict]:
     return anthropic_tools
 
 
+# Plan 075.4-03 Task 3 — re-verified producing LangSmith spans.
+# Required env: LANGSMITH_API_KEY + LANGSMITH_TRACING=true (or
+# LANGCHAIN_TRACING_V2=true legacy alias). LANGSMITH_PROJECT optional
+# (defaults to 'default'). Verification gate at
+# backend/tests/integration/test_075_4_anthropic_langsmith_trace.py
+# asserts the decorator resolves to the real langsmith.traceable, not
+# the no-op fallback stub at lines 38-42. Live trace fetch is a manual
+# UAT row per the CLAUDE.md UAT scoreboard rule (Plan 05 Wave 0).
 @_ls_traceable(name="ChatAnthropic", run_type="llm")
 def stream_anthropic(
     messages: list[dict],
