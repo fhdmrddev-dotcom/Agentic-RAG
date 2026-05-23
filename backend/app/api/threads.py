@@ -2082,7 +2082,21 @@ async def send_message(
                                 # tool_calls_buffer / _announced_tools at each agent-loop
                                 # iteration to prevent cross-round leakage (a stale boundary
                                 # from iteration N would silence the emit in iteration N+1).
-                                _tool_args_emit_boundary: dict[int, int] = {}
+                                #
+                                # Phase 075.6 Plan 01 / Req #3 / RESEARCH L1 mitigation:
+                                # OpenAI native and OpenRouter share this _on_chunk_openai
+                                # callback (both go through the OpenAI Python SDK with
+                                # different base_url) but MUST maintain INDEPENDENT
+                                # 5KB-boundary state per SPEC §Constraints:
+                                # "OpenRouter adapter remains independent of the OpenAI
+                                # adapter (no shared code path) so upstream format
+                                # divergence doesn't silently break". A dedicated
+                                # OpenRouter service module does NOT exist —
+                                # independence is achieved via per-provider boundary
+                                # dicts branched on active_provider_name captured at
+                                # L:2100 below.
+                                _emit_boundary_openai_native: dict[int, int] = {}
+                                _emit_boundary_openrouter: dict[int, int] = {}
 
                                 # Phase 066 D-066-02 + D-066-03 + D-066-11: per-LLM-call
                                 # timer + close-then-raise. Resolve budget before each
@@ -2172,26 +2186,40 @@ async def send_message(
                                             if tc.function and tc.function.arguments:
                                                 tool_calls_buffer[idx]["arguments"] += tc.function.arguments
                                                 # Phase 075 D-075-09/10/11: emit tool_args_progress
-                                                # on every 5KB cumulative-byte boundary for non-
-                                                # execute_code tools in NATIVE calling mode. Skip
-                                                # execute_code (deferred to v3.0 Skill Studio per
-                                                # REQUIREMENTS.md line 65). Skip STRUCTURED mode
-                                                # (args arrive at finish_reason parse time, not
-                                                # progressively — there's no streaming accumulator
-                                                # to walk on that path).
+                                                # on every 5KB cumulative-byte boundary. STRUCTURED
+                                                # mode is still skipped (args arrive at
+                                                # finish_reason parse time, not progressively —
+                                                # there's no streaming accumulator to walk).
+                                                #
+                                                # Phase 075.6 Plan 01 / Req #2: the prior
+                                                # execute_code-tool-name skip filter is REMOVED.
+                                                # The frontend live panel (Plan 02
+                                                # <ToolArgsLivePanel>) renders streaming
+                                                # execute_code args as the LLM types them — the
+                                                # exact moment users most need progress feedback.
                                                 _tool_name = tool_calls_buffer[idx]["name"]
                                                 if (
                                                     _tool_name
-                                                    and _tool_name != "execute_code"
                                                     and calling_mode != CallingMode.STRUCTURED
                                                 ):
+                                                    # Phase 075.6 Plan 01 / Req #3: select
+                                                    # per-provider boundary dict so OpenRouter
+                                                    # aggregation cadence cannot be polluted by
+                                                    # OpenAI native boundary state and vice versa.
+                                                    # `active_provider_name` is captured at L:2100
+                                                    # (outside this closure) and closure-captured.
+                                                    _emit_boundary = (
+                                                        _emit_boundary_openrouter
+                                                        if active_provider_name == "openrouter"
+                                                        else _emit_boundary_openai_native
+                                                    )
                                                     _bytes_total = len(
                                                         tool_calls_buffer[idx]["arguments"].encode("utf-8")
                                                     )
                                                     _new_boundary = _bytes_total // 5120
-                                                    _last_boundary = _tool_args_emit_boundary.get(idx, 0)
+                                                    _last_boundary = _emit_boundary.get(idx, 0)
                                                     if _new_boundary > _last_boundary:
-                                                        _tool_args_emit_boundary[idx] = _new_boundary
+                                                        _emit_boundary[idx] = _new_boundary
                                                         # D-075-09: args_so_far is the LAST 5KB of
                                                         # the cumulative accumulator (sliding-window
                                                         # tail). UTF-8-aware byte slice + decode
@@ -2205,6 +2233,10 @@ async def send_message(
                                                             name=_tool_name,
                                                             args_so_far=_args_so_far,
                                                             total_args_bytes_so_far=_bytes_total,
+                                                            # Phase 075.6 Plan 01 / Req #1: full
+                                                            # cumulative concatenated args (not
+                                                            # the 5 KB tail) — additive field.
+                                                            code_so_far=tool_calls_buffer[idx]["arguments"],
                                                         )
 
                                 await _drain_stream_with_close_on_cancel(

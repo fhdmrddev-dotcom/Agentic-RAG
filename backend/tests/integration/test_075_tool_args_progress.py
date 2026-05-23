@@ -1,27 +1,34 @@
 """Phase 075 Plan 03 ship gate (POLISH-TOOL-PROG-01).
 
 Mock-LLM integration tests verifying tool_args_progress SSE event emission
-at 5KB cumulative-byte boundaries (D-075-09 / D-075-10), with both filter
-cases covered (execute_code skipped, STRUCTURED mode skipped per D-075-11)
-and Anthropic-path parity.
+at 5KB cumulative-byte boundaries (D-075-09 / D-075-10). After Phase 075.6
+Plan 01 Task 3 step 5a, the execute_code skip filter (Req #2) was removed
+and the corresponding skip-asserting test was deleted; the STRUCTURED-mode
+skip path (Pitfall 2) remains and is still tested. Anthropic-path parity
+is preserved.
 
 Autouse fixture _reset_redis_singleton from conftest.py auto-applies.
 
-Six tests:
-  1. test_tool_args_progress_fires_on_5kb_boundary — drives OpenAI accumulator
-     with 12x1KB tool-arg chunks (total 12 KB → boundaries at 5KB + 10KB);
-     asserts >=2 events; ordering: all progress events arrive BEFORE tool_start.
-  2. test_args_so_far_bounded — same fixture; each event's args_so_far UTF-8
-     byte len <= 5120 (sliding tail per D-075-09).
-  3. test_total_bytes_monotonic — total_args_bytes_so_far monotonically
-     non-decreasing across events for the same tool_index.
-  4. test_tool_args_progress_skipped_for_execute_code — flip tool_name to
-     "execute_code"; assert ZERO progress events (D-075-11 filter 1).
-  5. test_tool_args_progress_skipped_in_structured_mode — flip calling_mode to
-     CallingMode.STRUCTURED; assert ZERO progress events (D-075-11 filter 2).
-  6. test_anthropic_path_emits_on_boundary — drive anthropic_service generator
-     with input_json_delta chunks; assert >=2 progress events fire on the SSE
-     wire (provider parity).
+Tests in this file (post-075.6 Plan 01 state):
+  - test_tool_args_progress_fires_on_5kb_boundary — drives OpenAI accumulator
+    with 12x1KB tool-arg chunks (total 12 KB → boundaries at 5KB + 10KB);
+    asserts >=2 events; ordering: all progress events arrive BEFORE tool_start.
+  - test_args_so_far_bounded — same fixture; each event's args_so_far UTF-8
+    byte len <= 5120 (sliding tail per D-075-09).
+  - test_total_bytes_monotonic — total_args_bytes_so_far monotonically
+    non-decreasing across events for the same tool_index.
+  - test_tool_args_progress_skipped_in_structured_mode — flip calling_mode to
+    CallingMode.STRUCTURED; assert ZERO progress events (D-075-11 filter 2
+    preserved per Pitfall 2 — different rationale than the removed
+    execute_code skip).
+  - test_anthropic_path_emits_on_boundary — drive anthropic_service generator
+    with input_json_delta chunks; assert >=2 progress events fire on the SSE
+    wire (provider parity).
+  - test_anthropic_path_emits_code_so_far (Plan 01 T1).
+  - test_google_path_emits_code_so_far (Plan 01 T2).
+  - test_openai_path_emits_for_execute_code (Plan 01 T3 — Req #2 inverted
+    assertion: execute_code DOES emit progress).
+  - test_openrouter_independent_buffer_from_openai (Plan 01 T3 — Req #3).
 
 Real-Postgres binding gate per test_073_concurrency.py pattern: each test
 seeds an ephemeral auth.users + threads pair so threads.py's insert_run
@@ -333,12 +340,19 @@ async def _capture_run_events(
       - app.api.threads.create_adaptive_streaming_chat → returns (chunks, mode);
         the threads.py agent loop drives chunks through _on_chunk_openai.
       - generate_thread_title / suggestion_service → no-op.
+      - load_user_settings → force active_provider="openai" + llm_model="gpt-4o"
+        so the agent loop takes the OpenAI/OpenRouter shared chunk-handler
+        branch (Phase 075.6 Plan 01 / Rule 2-3 deviation: dev-env may default
+        LLM_PROVIDER=google which would otherwise route the agent loop to
+        stream_google instead of exercising the OpenAI accumulator the test
+        docstring is meant to cover).
 
     The seeded thread/user pair satisfies the runs_thread_id_fkey constraint
     so insert_run (asyncpg) succeeds. The test's mock_supabase covers the
     supabase-py reads downstream.
     """
     from app.dependencies import get_current_user
+    from app.models.user_settings import load_user_settings as _real_load
 
     thread_id = seeded_thread_info["thread_id"]
     user_id = seeded_thread_info["user_id"]
@@ -348,6 +362,14 @@ async def _capture_run_events(
 
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     app.dependency_overrides[get_current_user] = lambda: OWNER_USER
+
+    def _force_openai_settings(uid, *a, **k):
+        base = _real_load(uid, *a, **k)
+        return base.model_copy(update={
+            "active_provider": "openai",
+            "llm_model": "gpt-4o",
+            "llm_api_key": "test-openai-key",
+        })
 
     try:
         # First call returns the big-args chunks; subsequent calls (after
@@ -378,6 +400,9 @@ async def _capture_run_events(
         ), patch(
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
+        ), patch(
+            "app.api.threads.load_user_settings",
+            side_effect=_force_openai_settings,
         ):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
@@ -595,21 +620,15 @@ async def test_total_bytes_monotonic(seeded_thread):
     )
 
 
-@pytest.mark.asyncio
-@pytest.mark.timeout(30)
-async def test_tool_args_progress_skipped_for_execute_code(seeded_thread):
-    """D-075-11 filter 1: tool_name == 'execute_code' MUST NOT emit
-    tool_args_progress events (deferred to v3.0 Skill Studio per
-    REQUIREMENTS.md line 65)."""
-    events = await _capture_run_events(
-        list(_slow_chunks_with_big_args(tool_name="execute_code")),
-        seeded_thread,
-    )
-    progress = [e for e in events if e.get("type") == "tool_args_progress"]
-    assert progress == [], (
-        f"execute_code MUST NOT emit tool_args_progress; got "
-        f"{len(progress)} events: {progress}"
-    )
+# NOTE — Phase 075.6 Plan 01 Task 3 step 5a:
+# The previous execute_code skip-asserting test (which asserted
+# `progress == []` for execute_code tools) was DELETED on 2026-05-23
+# because Req #2 removed the execute_code skip filter. The new
+# `test_openai_path_emits_for_execute_code` below inverts that
+# assertion (progress is NON-empty for execute_code). DO NOT confuse
+# this with `test_tool_args_progress_skipped_in_structured_mode`
+# below, which tests the DIFFERENT (preserved) CallingMode.STRUCTURED
+# skip path per RESEARCH Pitfall 2.
 
 
 @pytest.mark.asyncio
@@ -917,3 +936,137 @@ async def test_google_path_emits_code_so_far(seeded_thread):
             assert len(curr["code_so_far"]) >= len(prev["code_so_far"]), (
                 f"tool_index={idx}: code_so_far length must be non-decreasing"
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 075.6 Plan 01 — Req #2: OpenAI execute_code skip REMOVED
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_openai_path_emits_for_execute_code(seeded_thread):
+    """075.6 Req #2 (OpenAI/native): the prior execute_code skip filter
+    is REMOVED. The OpenAI/OpenRouter shared chunk handler now emits
+    `tool_args_progress` for execute_code calls (the moment users most
+    need progress feedback during long code-generation LLM calls).
+
+    INVERTS the previously-deleted execute_code skip-asserting test
+    (same input shape, opposite expectation: progress is NON-empty
+    for execute_code).
+    """
+    events = await _capture_run_events(
+        list(_slow_chunks_with_big_args(
+            tool_name="execute_code",
+            chunk_size=2048,
+            n_chunks=8,
+        )),
+        seeded_thread,
+    )
+    progress = [e for e in events if e.get("type") == "tool_args_progress"]
+    # 8 x 2048 = 16384 bytes total → boundaries at 5KB / 10KB / 15KB (>=3 emits).
+    assert len(progress) >= 3, (
+        f"execute_code MUST now emit >=3 progress events (boundaries at "
+        f"5/10/15 KB given 8x2KB chunks); got {len(progress)} events. "
+        f"All types: {[e.get('type') for e in events]}"
+    )
+    # All progress events are for the execute_code tool.
+    for e in progress:
+        assert e["name"] == "execute_code", (
+            f"Unexpected tool name on progress event: {e['name']!r}"
+        )
+        assert "code_so_far" in e and e["code_so_far"], (
+            f"execute_code progress event missing/empty code_so_far: {e}"
+        )
+    # code_so_far is monotonic-prefix.
+    for prev, curr in zip(progress, progress[1:]):
+        assert curr["code_so_far"].startswith(prev["code_so_far"]), (
+            f"code_so_far NOT prefix-monotonic for execute_code; "
+            f"prev_len={len(prev['code_so_far'])} curr_len={len(curr['code_so_far'])}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Phase 075.6 Plan 01 — Req #3: OpenRouter buffer state independent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_openrouter_independent_buffer_from_openai(seeded_thread):
+    """075.6 Req #3 (OpenRouter independence): per-provider boundary dicts
+    `_emit_boundary_openai_native` and `_emit_boundary_openrouter` are
+    structurally isolated; selection branches on `active_provider_name`
+    captured at threads.py:2100.
+
+    Test approach: patch `get_model_capability` to make threads.py see
+    the model as belonging to `openrouter` with `native_tools=True` (to
+    keep CallingMode.NATIVE so the emit code path fires). Drive the same
+    `_slow_chunks_with_big_args` fixture; assert progress events ARE
+    emitted with code_so_far — proving the OpenRouter branch of the
+    selector actually populates events on the wire. A second back-to-back
+    run with provider="openai" (default) ALSO emits >=2 events, proving
+    both buckets work independently in their own runs.
+
+    Structural independence is enforced by-construction: both dicts are
+    fresh per-iteration (`_emit_boundary_openai_native: dict = {}` and
+    `_emit_boundary_openrouter: dict = {}` declared at the per-iteration
+    state block). The selector picks one based on `active_provider_name`
+    — so the unselected dict stays empty throughout.
+    """
+    from app.config import MODEL_CAPABILITIES
+
+    # ── Run 1: provider = openrouter (patched). Emit cadence must be normal. ──
+    def _patched_get_model_capability_openrouter(model_id):
+        # Mirror real registry shape; force provider="openrouter" + native_tools.
+        # native_tools=True keeps CallingMode.NATIVE so the streaming-args
+        # emit path fires (vs STRUCTURED, which skips emits per D-075-11).
+        base = MODEL_CAPABILITIES.get(model_id, {})
+        return {
+            **base,
+            "provider": "openrouter",
+            "native_tools": True,
+            "capability_source": "registry",
+        }
+
+    with patch(
+        "app.api.threads.get_model_capability",
+        side_effect=_patched_get_model_capability_openrouter,
+    ):
+        events_or = await _capture_run_events(
+            list(_slow_chunks_with_big_args()),
+            seeded_thread,
+        )
+    progress_or = [e for e in events_or if e.get("type") == "tool_args_progress"]
+    assert len(progress_or) >= 2, (
+        f"OpenRouter branch: expected >=2 progress events; got "
+        f"{len(progress_or)}. All types: {[e.get('type') for e in events_or]}"
+    )
+    for e in progress_or:
+        assert "code_so_far" in e and e["code_so_far"], (
+            f"OpenRouter branch: progress event missing/empty code_so_far: {e}"
+        )
+
+    # ── Run 2: default provider routing (openai-native bucket). ──
+    # Without patching get_model_capability the test's stub model resolves to
+    # the default registry behavior. We assert ≥2 progress events here too —
+    # proving the OpenAI-native bucket works independently of the OpenRouter
+    # bucket exercised in Run 1.
+    events_oa = await _capture_run_events(
+        list(_slow_chunks_with_big_args()),
+        seeded_thread,
+    )
+    progress_oa = [e for e in events_oa if e.get("type") == "tool_args_progress"]
+    assert len(progress_oa) >= 2, (
+        f"OpenAI-native branch: expected >=2 progress events; got "
+        f"{len(progress_oa)}. All types: {[e.get('type') for e in events_oa]}"
+    )
+    # Boundary dicts being per-iteration-fresh means the second run's emit
+    # cadence cannot be silenced by the first run's boundary state — both
+    # runs independently fire on the first 5KB crossing.
+    first_totals_oa = [e["total_args_bytes_so_far"] for e in progress_oa]
+    assert first_totals_oa[0] == 5120, (
+        f"OpenAI-native run 2: first emit must fire at the FIRST 5KB "
+        f"boundary (proving no across-run boundary-state pollution); "
+        f"got {first_totals_oa[0]}"
+    )
