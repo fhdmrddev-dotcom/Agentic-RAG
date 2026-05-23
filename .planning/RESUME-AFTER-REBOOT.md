@@ -20,7 +20,7 @@ last_blocker: orphan multiprocessing-spawn workers serving stale code on port 80
 | `d58ab11` | Phase 075.4 verification flipped to `gaps_found` with GAP-075.4-01 documenting the root cause (openai-python SDK serialization unreliable for Google's extra_content) |
 | `2cc234e` | `.planning/phases/075.4-.../075.4-POST-UAT-TRIAGE.md` — 8 operator findings (F-1..F-8) from live cross-provider UAT |
 
-**Frontend config:** `frontend/.env.local` already updated to `VITE_API_BASE_URL=http://localhost:8001` (commit in working tree — verify with `cat frontend/.env.local`).
+**Frontend config:** `frontend/.env.local` reverted to project default `VITE_API_BASE_URL=http://localhost:8000`. The port-8001 detour was a transient workaround for the phantom socket on 127.0.0.1:8000 held by dead PID 13656 with stale code. After the reboot, that phantom is gone — port 8000 is clean and is where every other script/doc/default in the project points.
 
 ## What was proven before the reboot
 
@@ -49,28 +49,29 @@ docker compose -f docker-compose.dev.yml up -d
 supabase start  # if not auto-started
 ```
 
-### 3. Start backend ON PORT 8001 (frontend already points here)
+### 3. Start backend on the project's default port 8000
 
 ```bash
-# Use the hardened restart script (kills orphans + launches headless):
+# Use the hardened restart script (kills any future orphans + launches headless):
 powershell -ExecutionPolicy Bypass -File scripts/restart-backend.ps1
 
 # OR launch directly via bash (also clean):
 cd backend
 rm -f uvicorn.out.log uvicorn.err.log
-nohup ./venv/Scripts/python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --log-level info > uvicorn.out.log 2> uvicorn.err.log &
+nohup ./venv/Scripts/python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info > uvicorn.out.log 2> uvicorn.err.log &
 ```
 
-> **Why no `--reload`?** WatchFiles on Windows was demonstrably failing to load my edits during the session (the worker subprocess inherited cached module state). Without `--reload`, code loads exactly once at startup — predictable. If you want hot-reload back, only ONE worker should run, and restart the WHOLE script between edits.
+> **Why no `--reload`?** WatchFiles on Windows was demonstrably failing to load my edits during the session (worker subprocesses inherited cached module state OR survived their parent reloader). Without `--reload`, code loads exactly once at startup — predictable. If you want hot-reload back later, only ONE worker should run, and you must restart the WHOLE script between edits. Add `--reload` to the uvicorn command if you trust your editor's save-write pattern triggers WatchFiles.
 
 ### 4. Verify backend health
 
 ```bash
-curl http://localhost:8001/health
+curl http://localhost:8000/health
 # Expected: {"status":"ok","redis":"ok"}
 
-netstat -ano | grep "8001.*LISTENING"
-# Expected: exactly ONE listener (one PID)
+netstat -ano | grep "8000.*LISTENING"
+# Expected: exactly ONE listener (one PID). After reboot, the phantom
+# PID 13656 / 15848 entries from the prior session are GONE.
 ```
 
 ### 5. Start frontend (Vite)
@@ -81,9 +82,9 @@ npm run dev
 # Should print: ready in Xms, Local: http://localhost:5173
 ```
 
-### 6. Verify Vite is hitting port 8001
+### 6. Verify Vite is hitting port 8000
 
-In the browser at http://localhost:5173 → DevTools Network tab → any request → URL should be `http://localhost:8001/...` NOT `:8000`.
+In the browser at http://localhost:5173 → DevTools Network tab → any request → URL should be `http://localhost:8000/...` (the project default; this is what every other script/doc expects).
 
 ### 7. Live re-test the Gemini-3 prompt
 
@@ -103,13 +104,14 @@ Most failures so far were stale-process artifacts, not code bugs. Before assumin
 ```bash
 # How many uvicorn workers are running?
 tasklist | grep "python.exe"
-# Look for: 1 reloader (small ~37MB) + 1 worker (large ~200MB). More = orphans.
+# With --reload: 1 reloader (~37MB) + 1 worker (~200MB). More = orphans.
+# Without --reload (recommended per step 3): just 1 process (~200MB).
 
-# What's listening on 8001?
-netstat -ano | grep "8001.*LISTENING"
-# More than one line = orphan port-holders.
+# What's listening on 8000?
+netstat -ano | grep "8000.*LISTENING"
+# Should be exactly ONE listener. More than one = orphan port-holders.
 
-# Which worker is bound to which port?
+# Which worker is bound to which port? Use wmic to inspect command lines:
 wmic process where "Name='python.exe'" get ProcessId,ParentProcessId,CommandLine | head -10
 ```
 
@@ -146,6 +148,6 @@ When you resume, paste this to Claude so the task tracker matches reality:
 
 ## Notes on the cleanup work
 
-- The **stale port-8000 phantom listener** from the original test session may also still be around after reboot — Windows TIME_WAIT can hold sockets briefly. Reboot clears all of it. Port 8001 (where the new backend runs) was never contaminated.
+- **Port stays at 8000** after reboot — the project default that every script, env example, and doc points at. The 8001 detour during the session was a transient workaround for the phantom dead-PID listener on 127.0.0.1:8000; reboot reclaims that socket.
 - `backend/uvicorn.out.log` and `backend/uvicorn.err.log` are the SINGLE source of truth for backend output. Earlier we had logs in 3 places (backend.log at repo root from months ago, plus two uvicorn.* variants); current setup is unambiguous.
 - The `.continue-here.md` style files (anti-pattern handoffs) are not used here — this single doc IS the handoff.
