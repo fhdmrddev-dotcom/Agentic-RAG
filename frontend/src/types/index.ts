@@ -65,6 +65,13 @@ export interface ToolCall {
    * Resets implicitly when the tool transitions to `"running"` (final args
    * are then in tc.args and this field is no longer rendered). */
   argsBytesStreamed?: number
+  /** 075.6 Plan 02 / Req #5: cumulative tool-args code text streamed from the
+   * LLM, updated by `onToolArgsProgress` SSE callback's new `code_so_far`
+   * payload via longer-string-wins. Visible inside <ToolArgsLivePanel> while
+   * `status === "preparing"`. Cleared on tool_start transition so post-start
+   * renders use `tc.args.code` as source of truth (panel collapses but the
+   * byte-counter header stays for at-a-glance scan). */
+  argsCodeText?: string
 }
 
 export interface SourceReference {
