@@ -48,12 +48,15 @@ export function ToolArgsLivePanel({
   // visible viewport at ~256 px. For a >5 KB code stream the panel scrolls;
   // auto-scroll-to-bottom on every contentText change keeps the latest line
   // in view so the "≥5 KB visible" assertion is screenshot-stable.
+  // WR-03 (2026-05-24): include `expanded` in deps so re-expanding the panel
+  // mid-stream jumps to bottom; previously the <pre> mounted with
+  // scrollTop=0 after a collapse → re-expand cycle on streams ≥5 KB.
   const bodyRef = useRef<HTMLPreElement>(null)
   useEffect(() => {
     if (bodyRef.current) {
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight
     }
-  }, [contentText])
+  }, [contentText, expanded])
 
   return (
     <div className="mt-1.5 rounded-md border border-border/30 bg-muted/20">

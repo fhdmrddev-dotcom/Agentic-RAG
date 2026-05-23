@@ -560,7 +560,9 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
   const allDone = deduplicatedToolCalls.every((tc) => tc.status === "done" || tc.status === "interrupted") &&
     (!subAgent || subAgent.status === "done")
 
-const [expanded, setExpanded] = useState(true)
+  // WR-04 (2026-05-24): re-indent — was declared at column 0 inside an
+  // indented function body during an earlier phase merge.
+  const [expanded, setExpanded] = useState(true)
 
   const isExpanded = expanded
   // Phase 075.1 Plan 04 Atom B — every read of the tool list inside the

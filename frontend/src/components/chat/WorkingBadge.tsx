@@ -26,10 +26,17 @@ export interface WorkingBadgeProps {
 }
 
 function WorkingBadgeImpl({ visible, label = "Working" }: WorkingBadgeProps) {
+  // IN-06 (2026-05-24): gate `animate-brandPulse` on `visible` so the keyframe
+  // doesn't continue running on an invisible (empty-content) node. The stable
+  // outer wrapper still preserves the DOM node across visibility transitions
+  // (Pitfall 5 / Landmine L4 mitigation) — only the animation class is gated.
   return (
     <div
       data-testid="working-badge"
-      className="flex items-center gap-1.5 text-xs font-semibold text-primary/80 mb-1 animate-brandPulse"
+      className={
+        "flex items-center gap-1.5 text-xs font-semibold text-primary/80 mb-1" +
+        (visible ? " animate-brandPulse" : "")
+      }
       aria-hidden={!visible}
     >
       {visible && (

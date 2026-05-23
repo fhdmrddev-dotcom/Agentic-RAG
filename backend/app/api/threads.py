@@ -1905,13 +1905,18 @@ async def send_message(
                                         # Phase 075.6 Plan 01 / Req #1: forward
                                         # `code_so_far` so the additive field
                                         # rides the wire end-to-end.
+                                        # WR-01 (2026-05-24): defensive .get for
+                                        # the additive field — if a future
+                                        # adapter drops code_so_far from its
+                                        # yield, the consumer sees "" instead
+                                        # of a KeyError tearing down the run.
                                         await _emit(
                                             redis, run_id, "tool_args_progress",
                                             tool_index=_ant_event["tool_index"],
                                             name=_ant_event["name"],
                                             args_so_far=_ant_event["args_so_far"],
                                             total_args_bytes_so_far=_ant_event["total_args_bytes_so_far"],
-                                            code_so_far=_ant_event["code_so_far"],
+                                            code_so_far=_ant_event.get("code_so_far", ""),
                                         )
                                     elif _etype == "tool_start":
                                         # Fired at content_block_stop — arguments now complete.
@@ -2009,13 +2014,16 @@ async def send_message(
                                         # Phase 075.6 Plan 01 / Req #1: forward
                                         # `code_so_far` so the additive field
                                         # rides the wire end-to-end (Google axis).
+                                        # WR-01 (2026-05-24): defensive .get for
+                                        # the additive field — mirrors the
+                                        # Anthropic dispatch hardening above.
                                         await _emit(
                                             redis, run_id, "tool_args_progress",
                                             tool_index=_g_event["tool_index"],
                                             name=_g_event["name"],
                                             args_so_far=_g_event["args_so_far"],
                                             total_args_bytes_so_far=_g_event["total_args_bytes_so_far"],
-                                            code_so_far=_g_event["code_so_far"],
+                                            code_so_far=_g_event.get("code_so_far", ""),
                                         )
                                     elif _etype == "tool_start":
                                         _idx = len(tool_calls_buffer)
