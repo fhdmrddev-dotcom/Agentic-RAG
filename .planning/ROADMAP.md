@@ -587,7 +587,7 @@ Plans:
 
 **Plans:** 3 plans
 - [x] 075.6-PLAN-01-backend-cross-provider-emit.md — All 4 service adapter emits gain code_so_far + OpenAI execute_code skip removed + per-provider boundary state isolation (Wave 1; Reqs #1/#2/#3; backend-only).
-- [ ] 075.6-PLAN-02-frontend-live-panel-reducer.md — ToolArgsLivePanel component + argsCodeText reducer slice + onToolStart clear + 067.5 D-3 zero-call regression (Wave 2 parallel with 03; Reqs #4/#5).
+- [x] 075.6-PLAN-02-frontend-live-panel-reducer.md — ToolArgsLivePanel component + argsCodeText reducer slice + onToolStart clear + 067.5 D-3 zero-call regression (Wave 2 parallel with 03; Reqs #4/#5).
 - [ ] 075.6-PLAN-03-frontend-ux-bundle.md — Narrow sub-agent gate drop + step-list collapse + WorkingBadge + provider-uniform audit + bug-report frontmatter updates (Wave 2 parallel with 02; Reqs #6/#7/#8/#9 + D-075.6-D1/D2).
 
 **Success Criteria** (what must be TRUE — will be sharpened to falsifiable form at `/gsd:spec-phase 075.6`):
