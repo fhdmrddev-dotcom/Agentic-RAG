@@ -1902,12 +1902,16 @@ async def send_message(
                                         # _emit. Filter logic (execute_code skip)
                                         # already applied at the producer side;
                                         # this dispatch is a straight pass-through.
+                                        # Phase 075.6 Plan 01 / Req #1: forward
+                                        # `code_so_far` so the additive field
+                                        # rides the wire end-to-end.
                                         await _emit(
                                             redis, run_id, "tool_args_progress",
                                             tool_index=_ant_event["tool_index"],
                                             name=_ant_event["name"],
                                             args_so_far=_ant_event["args_so_far"],
                                             total_args_bytes_so_far=_ant_event["total_args_bytes_so_far"],
+                                            code_so_far=_ant_event["code_so_far"],
                                         )
                                     elif _etype == "tool_start":
                                         # Fired at content_block_stop — arguments now complete.

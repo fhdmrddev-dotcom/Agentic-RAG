@@ -268,6 +268,16 @@ def stream_anthropic(
                                     "name": _tool_name,
                                     "args_so_far": _args_so_far,
                                     "total_args_bytes_so_far": _bytes_total,
+                                    # Phase 075.6 Plan 01 / Req #1: additive
+                                    # `code_so_far` field carrying the FULL
+                                    # cumulative concatenated args string
+                                    # (contrast: `args_so_far` is the 5KB
+                                    # sliding-window tail). Used by Plan 02's
+                                    # <ToolArgsLivePanel> to render the
+                                    # in-flight code as it streams from
+                                    # Anthropic. Provider-uniform wire format
+                                    # per SPEC Req #9.
+                                    "code_so_far": tb["arguments"],
                                 }
 
             elif event_type == "content_block_stop":

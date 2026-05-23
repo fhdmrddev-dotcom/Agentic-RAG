@@ -298,6 +298,9 @@ def _anthropic_events_with_big_args(
                 "name": tool_name,
                 "args_so_far": tail,
                 "total_args_bytes_so_far": size,
+                # Phase 075.6 Plan 01 / Req #1: mirror the post-Task-1
+                # production shape — full cumulative concatenated args.
+                "code_so_far": cumulative,
             }
 
     # content_block_stop equivalent — args complete.
@@ -649,3 +652,60 @@ async def test_anthropic_path_emits_on_boundary(seeded_thread):
         f"Anthropic path: expected >=2 progress events; got {len(progress)}. "
         f"All types: {[e.get('type') for e in events]}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Phase 075.6 Plan 01 — Req #1: cross-provider `code_so_far` field
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_anthropic_path_emits_code_so_far(seeded_thread):
+    """075.6 Req #1 (Anthropic): every tool_args_progress event from the
+    Anthropic adapter carries a non-empty `code_so_far` string AND that
+    string is prefix-monotonic across consecutive events for the same
+    tool_index (event N's code_so_far is a string prefix of event N+1's).
+
+    Contrast with `args_so_far` (5 KB sliding-window tail): `code_so_far`
+    is the FULL cumulative concatenated args string — see RESEARCH
+    Pitfall 3.
+    """
+    events = await _capture_anthropic_events(
+        list(_anthropic_events_with_big_args()),
+        seeded_thread,
+    )
+    progress = [e for e in events if e.get("type") == "tool_args_progress"]
+    assert len(progress) >= 2, (
+        f"Anthropic path: expected >=2 progress events with code_so_far; "
+        f"got {len(progress)} events. All types: "
+        f"{[e.get('type') for e in events]}"
+    )
+
+    # Every event carries a non-empty `code_so_far` string.
+    for e in progress:
+        assert "code_so_far" in e, (
+            f"tool_args_progress event missing `code_so_far` key: {e}"
+        )
+        assert isinstance(e["code_so_far"], str) and e["code_so_far"], (
+            f"`code_so_far` must be a non-empty string; got {e['code_so_far']!r}"
+        )
+
+    # Prefix-monotonic across consecutive events sharing the same tool_index.
+    by_index: dict[int, list[dict]] = {}
+    for e in progress:
+        by_index.setdefault(e["tool_index"], []).append(e)
+    for idx, evts in by_index.items():
+        for prev, curr in zip(evts, evts[1:]):
+            assert curr["code_so_far"].startswith(prev["code_so_far"]), (
+                f"tool_index={idx}: code_so_far is NOT prefix-monotonic. "
+                f"prev_len={len(prev['code_so_far'])} "
+                f"curr_len={len(curr['code_so_far'])}; "
+                f"prev[:80]={prev['code_so_far'][:80]!r}; "
+                f"curr[:80]={curr['code_so_far'][:80]!r}"
+            )
+            assert len(curr["code_so_far"]) >= len(prev["code_so_far"]), (
+                f"tool_index={idx}: code_so_far length must be non-decreasing; "
+                f"prev_len={len(prev['code_so_far'])} > "
+                f"curr_len={len(curr['code_so_far'])}"
+            )
