@@ -186,6 +186,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] **Phase 075.2: ToolCallPanel Dedup + Final Outputs Download Link** (INSERTED 2026-05-21, shipped 2026-05-22) — Close 2 defects surfaced by Phase 075.1 Chrome MCP UAT. (1) BUG-260521-01 cross-provider transient duplicate first-tool card — **CLOSED** via Plan 01: WR-02 snapshot threading + `onToolStart` else-branch replay-idempotency + WR-01 onToolEnd id-match + WR-03 dedup-key idx tiebreaker. Chrome MCP UAT confirmed exactly ONE card across t≈3s/10s/15s/30s on OpenAI gpt-4.1 (45s sleep, "Used 1 tool 60.7s") AND Anthropic claude-sonnet-4-6 (primes-matplotlib, "Used 1 tool 12.7s"). (2) BUG-260521-02 pinned Final Outputs missing download link — **PARTIAL CLOSE** via Plan 02: OutputFileCard extracted to shared module + reused in pinned panel (visual consistency achieved, url-optional fallback render verified live). Click-to-download remains broken because backend `_previous_files_in_run: set[str]` deliberately discards URLs (Phase 075.1 Plan 04 Atom E design) — surfaced as BUG-260522-02 for a future phase. Vitest 24/24 + typecheck clean. (2 plans)
 - [ ] **Phase 075.3: Defensive Chunk Handler + Unknown-Model Graceful Degradation** (INSERTED 2026-05-22) — Two-plan bundle. Plan 01: Convert quick-task 260522-gdg Path A hotfix into defensive Path B at the chunk handler (drop `chunk.usage`-triggered early-return, provider-aware usage accumulator, revert Path A gate, restore non-NULL Google token rows). Plan 02: Close the "added a new model from Settings → silent failure" loop — pattern-based provider inference for unknown model_ids (`gpt-*`/`claude-*`/`gemini-*`/`*/*` patterns), safe defaults per inferred provider (conservative `max_output_tokens` / `llm_call_timeout` / `native_tools=True` for Google/OpenAI/Anthropic), `model_capability_unknown` warning log, frontend "unverified — using safe defaults" badge. Chrome MCP UAT across all 5 Gemini models + 1 negative-test pass for an unregistered model_id (e.g., `gemini-3.5-flash`). BUG-260522-01 → Phase 082.5; SEED-028 native Google SDK split → v3.1; DB-backed override table + hot-reload cache + admin UI → Phase 081.1; `/models` endpoint probe + verify-and-promote → v3.1. (2 plans)
 - [ ] **Phase 075.6: Live Streaming UX + Cross-Provider Parity** (INSERTED 2026-05-23) — Three-plan bundle informed by Claude.ai gold-standard comparison (`.planning/phases/075.5-gemini-native-sdk/claude-ai-comparison/COMPARISON.md`). Plan 01: Add `code_so_far: string` field to existing `tool_args_progress` SSE event in all 4 service adapters (anthropic + google + openai + openrouter) — provider-uniform vocabulary so one frontend renders for all providers. Plan 02: Frontend `<ToolArgsLivePanel>` collapsible code panel during `tool_preparing` state; `argsCodeText` reducer slice; auto-collapse on `tool_start`. Plan 03: Surface accumulated `m.sub_agent.content` live for all sub-agent kinds (currently gated to `analyze_document` only); step-list collapse when 3+ completed tool calls precede active step; pinned "✦ Working" badge at top of active assistant turn. UAT covers the mandatory 4-axis bandwidth (CLAUDE.md). Out of scope: file output card polish (T-260523-10 → next polish bundle), live PPTX preview pane (defer), extended-thinking summary surface (defer to thinking-models phase). Closes the felt UX gap behind T-260523-09 (byte counter is interim signal, panel supersedes). (3 plans)
+- [ ] **Phase 075.7: Live-Execution UX Refactor (Run-Card + Tool-Call Panel)** (INSERTED 2026-05-24) — Refactor phase consuming the validated sketch findings (`Skill("sketch-findings-agentic-rag")`) to settle G-1 + G-5 guardrails on the chat surface. Replaces the current ad-hoc rendering with: (a) bracketed Run-Card per assistant turn (sticky header with timer + counter + bot avatar, progress shimmer while active, fold-to-summary on completion), (b) Editor-Inset tool-call panel with per-tool inner-body components (`execute_code` → editor pane + STDOUT/STDERR labeled regions + file-output preview cards; `search_documents` → ranked-result rows; `read_file` → file metadata; outer frame shared, inner body selected by tool name), (c) Focus Mode composition under long-run stress (past tool calls fold to result-summary like `→ yoy_q3 = 30.87%`, only active step keeps full editor, explicit `Next: ...` footer). Depends on Phase 075.6 (`code_so_far` SSE field). UAT covers the mandatory 4-axis bandwidth (CLAUDE.md SC#10). Hot-file ledger flips from "fires" → "satisfied" on `ToolCallPanel.tsx` / `MessageItem.tsx` / `useMessages.ts` / `StreamsProvider.tsx` rows. (~3-4 plans, locked at /gsd:spec-phase + /gsd:plan-phase)
 
 **Wave 2 — Depends on Wave 1**
 
@@ -611,6 +612,37 @@ Plans:
 - Extended-thinking summary collapsible block — NOT in 075.6 scope; only relevant once thinking models are wired in (claude-opus-4-7 Extended Thinking, gpt-5-thinking).
 - T-260523-09 byte-counter (commit `0a5a2db`) stays as interim signal; once 075.6 ships, byte counter becomes redundant inside the live panel — close T-260523-09 with "superseded" disposition.
 - Provider-specific UX branches — FORBIDDEN per `feedback-provider-uniform-ux` memory; if a provider's adapter can't emit the normalized event, the adapter is incomplete (not the UI's problem).
+
+### Phase 075.7: Live-Execution UX Refactor (Run-Card + Tool-Call Panel) (INSERTED)
+
+**Origin:** G-1 (Phase chain cap) + G-5 (Refactor between feature waves) both fire on the same hot files (`ToolCallPanel.tsx` — 5+ touches; `StreamsProvider.tsx` — 4+; `MessageItem.tsx` and `useMessages.ts` — 4+). G-2 satisfied 2026-05-24 by sketch session (commits `10ce3a3` / `f18df4c` / `7fbe609` / `2ea3d7e`) which packaged validated visual decisions into `Skill("sketch-findings-agentic-rag")` with two reference files (`live-run-container.md`, `tool-call-panel.md`). This phase IS the refactor G-1 has been demanding — apply the locked sketch findings to the production chat surface before the next feature wave touches these files.
+
+**Goal:** Migrate the live-execution chat surface from its current ad-hoc rendering to the validated sketch design: bracketed Run-Card per assistant turn (sticky header with timer + counter + bot avatar, progress shimmer while active, fold-to-summary on completion), Editor-Inset tool-call panel with per-tool inner-body components (`execute_code` gets a real editor pane with gutter + syntax + STDOUT/STDERR labeled regions + file-output preview cards; `search_documents` gets ranked-result rows; `read_file` gets file metadata; outer frame is one component, inner body is selected by tool name), Focus Mode composition under long-run stress (past tool calls fold to result-summary `→ yoy_q3 = 30.87%`, only active step keeps full editor, explicit `Next: ...` footer).
+
+**Requirements:** _TBD (likely new `LIVE-EXEC-UX-01` REQ-ID; spec-phase will surface the right binding gate)_
+
+**Depends on:** Phase 075.6 (ships first — the `code_so_far` SSE field on `tool_args_progress` is upstream of the new Editor-Inset panel rendering). Optional pre-req: Phase 068 (StreamsProvider Context Lift) — state-management refactor that complements but doesn't block this visual layer; can ship in either order.
+
+**Plans:** ~3-4 plans (estimated at spec-phase)
+
+**Design contract:** [`Skill("sketch-findings-agentic-rag")`](../.claude/skills/sketch-findings-agentic-rag/SKILL.md) — auto-loads when any chat-surface component is edited per CLAUDE.md routing.
+
+**Predicted files modified:**
+- `frontend/src/components/chat/ToolCallPanel.tsx` (rewrite — G-5 hot file)
+- `frontend/src/components/chat/MessageItem.tsx` (consumer of new RunCard)
+- `frontend/src/hooks/useMessages.ts` (becomes reader-only over time)
+- `frontend/src/providers/StreamsProvider.tsx` (consumer; no contract change unless 068 lands first)
+- New: `frontend/src/components/chat/RunCard.tsx`
+- New: `frontend/src/components/chat/tool-bodies/ExecuteCodeBody.tsx`
+- New: `frontend/src/components/chat/tool-bodies/SearchDocumentsBody.tsx`
+- New: `frontend/src/components/chat/tool-bodies/ReadFileBody.tsx`
+
+**Hot-file ledger update (post-merge):** flip G-5 status from "fires — refactor due" to "satisfied" on the four affected rows in CLAUDE.md.
+
+**UAT bandwidth:** mandatory 4-axis coverage per CLAUDE.md SC#10 (cross-provider × multi-tool × parallel-thread × long-message). Chrome MCP drives all four against the 4 reference scenarios from the sketches.
+
+Plans:
+- [ ] TBD (run `/gsd:spec-phase 075.7` → `/gsd:discuss-phase 075.7` → `/gsd:plan-phase 075.7` to break down)
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
