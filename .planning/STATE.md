@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 075.4-01-PLAN.md (Wave 1 — per-thread state cleanup)
-last_updated: "2026-05-23T07:30:30.633Z"
+stopped_at: Completed 075.4-02-PLAN.md (Wave 1 — cross-provider cleanup + Gemini thought_signature)
+last_updated: "2026-05-23T07:48:11.290Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
   completed_phases: 16
   total_plans: 58
-  completed_plans: 56
-  percent: 97
+  completed_plans: 57
+  percent: 98
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
 Status: Ready to execute
 Last activity: 2026-05-23
@@ -236,6 +236,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075 P03 | 13min | 4 tasks | 3 files |
 | Phase 075.4 P05 | 22min | 5 tasks | 12 files |
 | Phase 075.4 P01 | 20min | 4 tasks | 8 files |
+| Phase 075.4 P02 | 30min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -341,6 +342,9 @@ Recent decisions affecting v2.5 work:
 - Phase 075.4 Plan 01: 067.5 Branch D-3 guard predicate preserved VERBATIM (tid !== streamingThreadIdRef.current); inside-the-setState change drops isStreaming: false return key (per-thread sendMessage finally owns streamingThreads.delete authoritatively)
 - Phase 075.4 Plan 01: BUG-260523-01 closed at ChatArea L:222 — composer disabled prop reads useStreamingForThread(thread?.id) so Thread A streaming no longer disables Thread B's composer; banner predicate at L:319 simplified since per-thread Map naturally scopes
 - Phase 075.4 Plan 01: 8 pre-existing test failures (7 streamsProvider + 1 useMessages) DEFERRED to Plan 075.4-06 — verified pre-existing via git stash round-trip on commit 16ba3ea; root cause is Phase 075 D-075-02 reconcile→getSnapshot swap (mockGetActiveRuns no longer wired); logged at 075.4-deferred-items.md D-075.4-01-DEFER-1
+- Plan 075.4-02: UnknownProviderError(ValueError) raised at lifespan startup; _PROVIDER_BASE_URLS single source of truth (D-075.4-B1/B2/B3)
+- Plan 075.4-02: ModelCapability extended with uses_max_completion_tokens + supports_parallel_tools optional fields; registry-or-inference pattern applied to 6 sites (D-075.4-NN)
+- Plan 075.4-02: Gemini-3 thought_signature captured (capture/echo/persist 3-stage wiring) — closes BUG-260523-02 (D-075.4-C1/C2/C3)
 
 ### Pending Todos
 
@@ -380,8 +384,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-23T07:30:30.624Z
-Stopped at: Completed 075.4-01-PLAN.md (Wave 1 — per-thread state cleanup)
+Last session: 2026-05-23T07:48:11.283Z
+Stopped at: Completed 075.4-02-PLAN.md (Wave 1 — cross-provider cleanup + Gemini thought_signature)
 
 ### Next session: pending USER actions
 
