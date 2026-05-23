@@ -1539,6 +1539,18 @@ async def send_message(
 
             full_content = ""
             persisted_tool_calls: list[dict] = []
+            # Plan 075.4-03 D-075.4-E1 — closure-local per-run system warning
+            # accumulator. Each entry: {kind: "context_truncated" |
+            # "iteration_cap_dropped_tool_calls", message: <user-visible text>}.
+            # Drained at _shielded_finalize time into `messages` rows so the
+            # warning survives reload (RLS-bound to thread owner).
+            # FORWARD-REF #6: the `kind` field is the structured retrofit
+            # hook for Phase 082.5 unified error sink.
+            # NOTE: persistence requires migration 048 to widen the
+            # messages_role_check CHECK constraint to allow role='system'.
+            # Pre-migration the INSERT fails-silent (logged) and the SSE
+            # event remains the user-visible signal.
+            _persisted_system_warnings: list[dict] = []
             # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
             # Both default to None — D-073-09 NULL sentinel if NO iteration produced
             # a usage payload. First successful usage event flips None to int; subsequent
@@ -1630,6 +1642,50 @@ async def send_message(
                     return [_strip_nul(item) for item in obj]
                 return obj
 
+            async def _persist_system_messages(warnings: list[dict]) -> None:
+                """Plan 075.4-03 D-075.4-E1 — persist system_warning rows.
+
+                Each warning becomes a separate ``messages`` row with
+                ``role='system'`` so it survives reload. The structured
+                ``kind`` field is the FORWARD-REF #6 retrofit hook for
+                Phase 082.5's unified error sink (keep names stable).
+
+                CRITICAL: requires migration 048 to widen the
+                ``messages_role_check`` CHECK constraint to allow
+                ``role='system'``. Pre-migration the INSERT will fail
+                with PostgrestAPIError; we catch and log so the warning's
+                SSE event (already emitted) remains the user-visible
+                signal — fail-silent is intentional here, NOT a bug.
+                """
+                for w in warnings:
+                    try:
+                        # Hand-rolled INSERT via supabase client (the
+                        # asyncpg insert_assistant_message helper is
+                        # role-bound to 'assistant'). Encode the kind
+                        # field into tool_calls jsonb so the frontend
+                        # MessageList can render it as a small neutral
+                        # banner via the existing `kind:` consumer pattern
+                        # (D-075.4-E1 + Phase 082.5 retrofit shape).
+                        await aexec(
+                            supabase.table("messages").insert({
+                                "thread_id": thread_id,
+                                "user_id": current_user["id"],
+                                "role": "system",
+                                "content": _strip_nul(w.get("message", "")),
+                                "tool_calls": [{"kind": w.get("kind", "")}],
+                            })
+                        )
+                    except Exception as e:
+                        # Fail-silent: SSE event already shipped; persistence
+                        # is best-effort until migration 048 widens the role
+                        # CHECK. Log at WARNING so operators can grep for
+                        # the migration-needed signal.
+                        logger.warning(
+                            "system_warning persist failed (kind=%s) — "
+                            "migration 048 may be unapplied: %s",
+                            w.get("kind", "?"), e,
+                        )
+
             # GEN-03: Tool results stored in full — no character caps.
             # Context budget managed by trim_messages_to_fit() which drops OLDER messages
             # when total context exceeds the model's budget.
@@ -1670,12 +1726,38 @@ async def send_message(
                     if iteration > 0:
                         await _emit(redis, run_id, 'planning', iteration=iteration)
 
+                    # Plan 075.4-03 D-075.4-E1 — context-truncated warning.
+                    # Capture pre-len so we can detect silent message drops
+                    # post-trim. Sub-agent results can balloon messages
+                    # length per iteration; trim_messages_to_fit drops OLDER
+                    # messages atomically (tool-pair preserved). Pre-Plan-03
+                    # the drop was silent — user saw no signal that earlier
+                    # context was gone. Now: SSE system_warning kind=
+                    # context_truncated + persisted messages row.
+                    _pre_trim_len = len(messages)
                     # Re-trim after tool results have been appended (context grows each iteration)
                     messages = trim_messages_to_fit(
                         messages,
                         max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
                         reserve_recent=settings.context_window_reserve_recent,
                     )
+                    if len(messages) < _pre_trim_len:
+                        _dropped = _pre_trim_len - len(messages)
+                        _trim_msg = (
+                            f"⚠ Earlier messages dropped to fit context window "
+                            f"({_dropped} message(s) removed)."
+                        )
+                        await _emit(redis, run_id, 'system_warning',
+                                    kind="context_truncated",
+                                    message=_trim_msg)
+                        _persisted_system_warnings.append({
+                            "kind": "context_truncated",
+                            "message": _trim_msg,
+                        })
+                        logger.info(
+                            "context_truncated run=%s iteration=%d dropped=%d",
+                            run_id, iteration, _dropped,
+                        )
                     logger.debug(
                         "Agent iteration %d: ~%d tokens in %d messages",
                         iteration,
@@ -2102,6 +2184,33 @@ async def send_message(
                         "Iteration %d finish_reason=%r tool_calls_buffered=%d",
                         iteration, finish_reason, len(tool_calls_buffer),
                     )
+
+                    # Plan 075.4-03 T-075.4-05 — iteration-cap silent-drop guard.
+                    # When force_no_tools=True (final iteration) the agent sent
+                    # tool_choice="none"; if the model produced tool calls anyway,
+                    # there's no NEXT iteration to feed their results into the
+                    # model's user-facing answer. Pre-Plan-03 we silently ran
+                    # them and dropped the results on the floor; trust-erosion
+                    # class T-075.4 mitigates this by surfacing inline + log.
+                    # Belt-and-suspenders: clear the buffer so the downstream
+                    # `if not tool_calls_buffer:` short-circuit fires and the
+                    # tool execution round is skipped (avoids billing for
+                    # tool runs whose output never influences the answer).
+                    if force_no_tools and tool_calls_buffer:
+                        _dropped_count = len(tool_calls_buffer)
+                        _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
+                        logger.warning(
+                            "iteration_cap_dropped_tool_calls run=%s iteration=%d dropped=%d tool_names=%s",
+                            run_id, iteration, _dropped_count, _tool_names,
+                        )
+                        await _emit(redis, run_id, 'system_warning',
+                                    kind="iteration_cap_dropped_tool_calls",
+                                    message=f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.")
+                        _persisted_system_warnings.append({
+                            "kind": "iteration_cap_dropped_tool_calls",
+                            "message": f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.",
+                        })
+                        tool_calls_buffer = {}   # belt-and-suspenders — skip the tool execution round
 
                     if finish_reason == "length" and tool_calls_buffer:
                         # length limit hit while streaming tool arguments — discard partial call
@@ -3064,8 +3173,14 @@ async def send_message(
                     # GEN-07: two distinct messages — context overflow vs empty model response
                     # Context overflow is caught earlier (finish_reason == "length").
                     # This branch = model returned empty content after all iterations/retries.
+                    # Plan 075.4-03 BUG-260522-01 — use the actual iteration
+                    # count, not max_iterations. The model typically returns
+                    # empty after ONE iteration (Google 15-iter loop bug at
+                    # the chunk-handler), not after exhausting the cap. The
+                    # `iteration` loop variable is in scope from the
+                    # enclosing `for iteration in range(max_iterations):`.
                     fallback = (
-                        f"*The model returned an empty response after {max_iterations} iterations. "
+                        f"*The model returned an empty response after {iteration + 1} iteration(s). "
                         "Try breaking the request into smaller steps or switching to a different model.*"
                     )
                     full_content += fallback
@@ -3234,16 +3349,31 @@ async def send_message(
                       exc_info=True,
                   )
 
-              # Phase 32: JSON done event signals main response complete (frontend stops streaming cursor)
-              # Phase 061: this 'done' event flows through the regular MAXLEN-bounded _emit path.
-              # The EXPLICIT terminal sentinel in the producer's finally (via _emit_terminal) is the
-              # safety net for paths that don't reach this line (TimeoutError, exceptions, cancellation)
-              # — that one is exempt from MAXLEN trimming (Pitfall 5).
-              # Phase 067.4 (Rule 3 deviation): suggestion block now precedes this 'done' emit
-              # so SSE-replay readers see suggestions before the consumer's terminal break.
-              await _emit(redis, run_id, 'done')
+              # Plan 075.4-03 T-075.4-04 — terminal-status race fix.
+              # The legacy inline emit of the 'done' SSE event that used to
+              # live here was REMOVED because it fired BEFORE the _shielded_finalize
+              # block ran (which is the writer of runs.status='completed').
+              # The race window: frontend saw `done` SSE arrive while a
+              # fresh GET /threads/{id}/snapshot still returned
+              # status='streaming' for ~tens-of-ms (spikes 100ms+ on slow
+              # hosts). Phase 075.4-03 swaps the _shielded_finalize step
+              # order (finalize_run UPDATE BEFORE _emit_terminal sentinel)
+              # so the terminal sentinel SSE event (which is itself
+              # discriminated as 'done' via TERMINAL_TYPES at line 93) now
+              # implies DB-committed state by construction.
+              # Phase 067.4 Rule 3 invariant PRESERVED: suggestion events
+              # at lines ~3138-3145 above still fire BEFORE the terminal
+              # sentinel because they run in the agent-loop body that
+              # always completes before this `finally:` triggers
+              # _shielded_finalize. See test_075_4_terminal_race.py for
+              # the source-order assertion.
 
-              # Phase 32: True stream end — frontend returns from streamMessage
+              # Phase 32: True stream end — frontend returns from streamMessage.
+              # Plan 075.4-03 note: this event is NOT in TERMINAL_TYPES
+              # (the consumer breaks on `done`/`error`/`cancelled`/
+              # `timed_out` sentinel, not on `stream_end`) so its placement
+              # here is informational only. The terminal sentinel inside
+              # _shielded_finalize is the wire-authority terminator.
               await _emit(redis, run_id, 'stream_end')
 
             except asyncio.TimeoutError:
@@ -3308,21 +3438,36 @@ async def send_message(
                     except BaseException:
                         logger.exception("Shielded persist failed for run %s", run_id)
 
-                    # 2. TERMINAL SENTINEL XADD — MUST come BEFORE EXPIRE (Pitfall 2).
-                    # Use _emit_terminal (no MAXLEN — sentinel must not be trimmed, Pitfall 5).
-                    # Map runs.status enum → SSE TERMINAL_TYPES (D-061-09 vs D-061-12 namespaces).
-                    # CR-02 + WR-03: catch BaseException (incl. CancelledError) so a
-                    # lifespan-shutdown cancel mid-finalize doesn't leave runs row stuck
-                    # in 'streaming'. Also catches KeyError if an unmapped status sneaks
-                    # past the _RUN_STATUS_TO_TERMINAL_TYPE lookup, plus any future
-                    # ValueError from the _emit_terminal type guard.
+                    # Plan 075.4-03 D-075.4-E1 — persist any system_warning
+                    # rows captured during the run. Best-effort (try/except)
+                    # because the messages_role_check constraint pre-migration
+                    # 048 rejects role='system' — INSERT fails-silent; SSE
+                    # event remains the user-visible signal regardless.
                     try:
-                        _terminal_type = _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status]
-                        await _emit_terminal(redis, run_id, _terminal_type, error=_terminal_error)
+                        if _persisted_system_warnings:
+                            await _persist_system_messages(_persisted_system_warnings)
                     except BaseException:
-                        logger.exception("Terminal sentinel XADD failed for run %s", run_id)
+                        logger.exception("Shielded system-warning persist failed for run %s", run_id)
 
-                    # 3. UPDATE runs row — status/error/completed_at/message_id/tokens.
+                    # Plan 075.4-03 T-075.4-04 — STEP-SWAP race fix.
+                    # Legacy order was (2) sentinel → (3) finalize_run, but
+                    # frontend consumes the SSE `done` (which is the
+                    # _emit_terminal payload's discriminator type) as the
+                    # signal that the run is finished — including any
+                    # subsequent GET /threads/{id}/snapshot expectations on
+                    # runs.status. Old order let the consumer see `done`
+                    # BEFORE the DB UPDATE landed.
+                    # New order (post-Plan-03):
+                    #   2. finalize_run UPDATE      (DB commit)
+                    #   3. _emit_terminal sentinel  (SSE consumer breaks)
+                    # Pitfall 2 (terminal-sentinel-before-EXPIRE) still holds
+                    # because EXPIRE (step 4) follows the sentinel (step 3).
+                    # The Phase 067.4 Rule 3 invariant (suggestion events
+                    # emit before terminal sentinel) is preserved because
+                    # suggestions live in the agent body that runs BEFORE
+                    # the finally: that triggers _shielded_finalize.
+
+                    # 2. UPDATE runs row — status/error/completed_at/message_id/tokens.
                     # Phase 073 D-073-04 SITE #2 — flips to asyncpg finalize_run helper.
                     # Phase 073 TOKEN-COL-01 (D-073-09): NULL + warn when SDK never
                     # surfaced usage on any iteration (interrupted stream / provider
@@ -3351,6 +3496,21 @@ async def send_message(
                         )
                     except BaseException:
                         logger.exception("runs row UPDATE failed for run %s", run_id)
+
+                    # 3. TERMINAL SENTINEL XADD — MUST come AFTER finalize_run
+                    # (Plan 075.4-03 race fix) AND BEFORE EXPIRE (Pitfall 2).
+                    # Use _emit_terminal (no MAXLEN — sentinel must not be trimmed, Pitfall 5).
+                    # Map runs.status enum → SSE TERMINAL_TYPES (D-061-09 vs D-061-12 namespaces).
+                    # CR-02 + WR-03: catch BaseException (incl. CancelledError) so a
+                    # lifespan-shutdown cancel mid-finalize doesn't leave runs row stuck
+                    # in 'streaming'. Also catches KeyError if an unmapped status sneaks
+                    # past the _RUN_STATUS_TO_TERMINAL_TYPE lookup, plus any future
+                    # ValueError from the _emit_terminal type guard.
+                    try:
+                        _terminal_type = _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status]
+                        await _emit_terminal(redis, run_id, _terminal_type, error=_terminal_error)
+                    except BaseException:
+                        logger.exception("Terminal sentinel XADD failed for run %s", run_id)
 
                     # 4. EXPIRE Redis stream — 600s completed, 60s failed/cancelled (REDIS-SETUP.md TTL discipline)
                     _ttl = 600 if _terminal_status == "completed" else 60
