@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 075.4 context gathered (8 gray areas locked, 6 bugs routed)
-last_updated: "2026-05-23T04:26:36.545Z"
-last_activity: 2026-05-23 -- 075.3 closed; 4 cross-provider regressions filed (BUG-260523-01..04 at 44a1641); 4-axis audit + 5-plan 075.4 proposal authored + alignment-checked against remaining v2.6 phases (076..082.5) + v2.7+ outlook = 0 hard conflicts + 6 documentable forward-references; 075.4 inserted into ROADMAP
+status: executing
+stopped_at: Completed 075.4-05-PLAN.md (Wave 0 bootstrap)
+last_updated: "2026-05-23T07:04:06.751Z"
+last_activity: 2026-05-23
 progress:
   total_phases: 26
   completed_phases: 16
-  total_plans: 57
-  completed_plans: 54
+  total_plans: 58
+  completed_plans: 55
   percent: 95
 ---
 
@@ -21,14 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.4 — Cross-Provider Cleanup + Per-Thread State + E2E Backstop (inserted 2026-05-23)
+**Current focus:** Phase 075.4 — cross-provider-cleanup-per-thread-state-e2e-backstop-inserte
 
 ## Current Position
 
-Phase: 075.3 (defensive-chunk-handler-google-token-accounting) — CLOSED 2026-05-23 (2/2 plans shipped + VERIFICATION 7/7 + REVIEW 0c/2w/5i + override accepted on Assertion 4)
+Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
+Plan: 2 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
-Status: 075.3 fully shipped; cross-cutting audit landed at .planning/AUDIT-2026-05-23-cross-cutting-cleanup.md (commit 1cecde5); plan-mode artifact at ~/.claude/plans/serialized-rolling-puppy.md; awaiting 075.4 GSD discussion
-Last activity: 2026-05-23 -- 075.3 closed; 4 cross-provider regressions filed (BUG-260523-01..04 at 44a1641); 4-axis audit + 5-plan 075.4 proposal authored + alignment-checked against remaining v2.6 phases (076..082.5) + v2.7+ outlook = 0 hard conflicts + 6 documentable forward-references; 075.4 inserted into ROADMAP
+Status: Ready to execute
+Last activity: 2026-05-23
 
 ## PRD-reset outputs (committed)
 
@@ -233,6 +234,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075 P01 | 11min | 8 tasks | 6 files |
 | Phase 075 P02 | 9min | 7 tasks | 4 files |
 | Phase 075 P03 | 13min | 4 tasks | 3 files |
+| Phase 075.4 P05 | 22min | 5 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -329,6 +331,10 @@ Recent decisions affecting v2.5 work:
 - D-075-14 (BUG-260514-03 fix): sticky bottom-indicator text via stickyLabelRef in MessageItem.tsx; code_stdout subscription IMPLICIT via existing onCodeStdout outputLines mutation that re-renders MessageItem
 - Phase 075 Plan 02: session.run() → session.execute_command(python -u code_file, on_stdout, on_stderr); python -u MANDATORY for unbuffered stdout under Docker tty=False exec_run; libraries install hoisted into separate session.install() call
 - Plan 03 tool_args_progress SSE primitive shipped — OpenAI emit at threads.py:1737-1782 + Anthropic yield at anthropic_service.py:204-236 + threads.py _on_chunk_anthropic dispatch branch routing the new yield to _emit. Both D-075-11 filters enforced (execute_code skip both paths + STRUCTURED skip OpenAI only). All 6 integration tests GREEN.
+- Phase 075.4 Plan 05 (Wave 0): /health endpoint already existed at main.py:140-148 returning {status, redis} — no new health.py created; plan Step 3 fallback satisfied. Verified via TestClient.
+- Phase 075.4 Plan 05 (Wave 0): Bug-report frontmatter (7 reports) was already in target state from /gsd:discuss-phase 075.4 sweep — Task 5 verified via grep; no edits required.
+- Phase 075.4 Plan 05 (Wave 0): vitest.config.ts gained exclude tests/e2e/** so Playwright scenario-NN-*.spec.ts files don't get picked up by vitest's default glob and crash under jsdom.
+- Phase 075.4 Plan 05 (Wave 0): fk_aware_runs_factory uses dual-path supabase resolution (caller fixture preferred -> env fallback -> pytest.skip) so the suite-wide conftest works for both mock-Supabase unit tests and real-Postgres binding tests.
 
 ### Pending Todos
 
@@ -368,8 +374,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 075.4 context gathered (8 gray areas locked, 6 bugs routed)
+Last session: 2026-05-23T07:04:06.743Z
+Stopped at: Completed 075.4-05-PLAN.md (Wave 0 bootstrap)
 
 ### Next session: pending USER actions
 
