@@ -1064,7 +1064,7 @@ async def get_messages(
     return messages
 
 
-def _reconstruct_history(history_rows: list[dict]) -> list[dict]:
+def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
     """
     Reconstruct an OpenAI-compatible multi-turn message list from stored DB rows.
 
@@ -1073,6 +1073,13 @@ def _reconstruct_history(history_rows: list[dict]) -> list[dict]:
     For old assistant messages without tool_call_id (backward compat) or with no
     tool_calls: emits a plain {"role": "assistant", "content": ...}.
     User messages pass through unchanged.
+
+    Plan 075.4-02 D-075.4-C3: provider-gated ``extra_content.google.thought_signature``
+    echo on rebuild when ``active_provider == "google"`` AND the stored row carries
+    a truthy ``thought_signature`` value. Closes BUG-260523-02 (Gemini-3 400
+    INVALID_ARGUMENT on multi-tool round 2 — Google's API requires the signature
+    be echoed back on every continuation call). Mirrors Anthropic's thinking_block
+    echo idiom. No schema change: ``messages.tool_calls`` is already ``jsonb``.
     """
     messages: list[dict] = []
     for msg in history_rows:
@@ -1097,6 +1104,14 @@ def _reconstruct_history(history_rows: list[dict]) -> list[dict]:
                                 "name": tc["name"],
                                 "arguments": json.dumps(tc.get("args", {})),
                             },
+                            # Plan 075.4-02 D-075.4-C3 — echo thought_signature for google.
+                            # Provider-gated to keep the OpenAI / Anthropic / OpenRouter
+                            # paths byte-identical (no extra_content key emitted).
+                            **(
+                                {"extra_content": {"google": {"thought_signature": tc["thought_signature"]}}}
+                                if active_provider == "google" and tc.get("thought_signature")
+                                else {}
+                            ),
                         }
                         for tc in tool_calls_data
                     ],
@@ -1500,7 +1515,15 @@ async def send_message(
                     active_system_prompt = active_system_prompt + disabled_note
 
             messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-            messages.extend(_reconstruct_history(history_resp.data))
+            # Plan 075.4-02 D-075.4-C3 — pass active_provider so the rebuild can
+            # echo extra_content.google.thought_signature for Gemini-3 multi-tool
+            # continuations (closes BUG-260523-02).
+            messages.extend(
+                _reconstruct_history(
+                    history_resp.data,
+                    active_provider=(getattr(user_settings, "active_provider", "") or "").lower(),
+                )
+            )
 
             # Trim conversation history to fit context window before the first LLM call
             messages = trim_messages_to_fit(
@@ -1905,6 +1928,13 @@ async def send_message(
                                             idx = tc.index
                                             if idx not in tool_calls_buffer:
                                                 tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
+                                                # Plan 075.4-02 D-075.4-C1 + C2 — initialize per-tool-call
+                                                # thought_signature slot for google ONLY. Closure-local per-run
+                                                # (Phase 073 model: dies with run, no schema change). Single-
+                                                # worker-safe under D-v2.5-02; future multi-worker unaffected
+                                                # because a run never crosses workers (D-v2.5-08).
+                                                if active_provider_name == "google":
+                                                    tool_calls_buffer[idx]["thought_signature"] = ""
                                             if tc.id:
                                                 tool_calls_buffer[idx]["id"] = tc.id
                                             if tc.function and tc.function.name:
@@ -1914,6 +1944,28 @@ async def send_message(
                                                 if idx not in _announced_tools:
                                                     _announced_tools.add(idx)
                                                     await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
+
+                                            # Plan 075.4-02 D-075.4-C2 — extract from
+                                            # extra_content.google.thought_signature. Provider-gated
+                                            # so non-google streams don't pay the attribute lookup cost.
+                                            # The signature may arrive in a chunk with empty content
+                                            # OR alongside name/arguments — do NOT gate on delta.content
+                                            # / tc.function.arguments being present (closes BUG-260523-02
+                                            # Gemini-3 multi-tool 400 INVALID_ARGUMENT on round 2).
+                                            #
+                                            # openai-python ChoiceDeltaToolCall has
+                                            # model_config={"extra": "allow"}, so extra_content arrives
+                                            # as model_extra (verified via SDK introspection +
+                                            # Google AI Developers Forum 2026-05-23).
+                                            if active_provider_name == "google":
+                                                extra = getattr(tc, "extra_content", None) or (
+                                                    getattr(tc, "model_extra", None) or {}
+                                                ).get("extra_content")
+                                                if extra:
+                                                    sig = (extra.get("google") or {}).get("thought_signature") or ""
+                                                    if sig:
+                                                        tool_calls_buffer[idx]["thought_signature"] = sig
+
                                             if tc.function and tc.function.arguments:
                                                 tool_calls_buffer[idx]["arguments"] += tc.function.arguments
                                                 # Phase 075 D-075-09/10/11: emit tool_args_progress
@@ -2958,6 +3010,15 @@ async def send_message(
                             # frontend tool-card can render "Sub-agent: {model_id}" and
                             # the user sees the silent downgrade transparency.
                             **({"sub_agent_model": sub_agent_record.get("effective_model", "")} if sub_agent_record else {}),
+                            # Plan 075.4-02 D-075.4-C1 — persist google's thought_signature
+                            # in the messages.tool_calls jsonb column when present. The
+                            # _on_chunk_openai capture above populates tc["thought_signature"]
+                            # only when active_provider_name == "google" AND the chunk
+                            # carried a non-empty signature, so this conditional spread is
+                            # naturally provider-gated. Phase 073 closure-local model:
+                            # per-run, dies with run, no schema change (messages.tool_calls
+                            # is jsonb — verified Phase 073 + Phase 067.4).
+                            **({"thought_signature": tc.get("thought_signature")} if tc.get("thought_signature") else {}),
                         })
                     # Continue to next iteration to let LLM respond with tool results in context
 
