@@ -2283,6 +2283,17 @@ async def send_message(
                                 "id": tc["id"],
                                 "type": "function",
                                 "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                                # Plan 075.4-02 D-075.4-C3 (in-flight stage) — echo the
+                                # captured google thought_signature on the same round so
+                                # round N+1's API call carries it. Without this the unit
+                                # tests still pass (capture + persist + reload) but live
+                                # multi-round runs hit Gemini-3 400 INVALID_ARGUMENT
+                                # "Function call is missing a thought_signature".
+                                **(
+                                    {"extra_content": {"google": {"thought_signature": tc["thought_signature"]}}}
+                                    if tc.get("thought_signature")
+                                    else {}
+                                ),
                             }
                             for tc in tool_calls
                         ],

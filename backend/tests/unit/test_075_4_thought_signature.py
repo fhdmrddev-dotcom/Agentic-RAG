@@ -351,3 +351,28 @@ def test_threads_module_has_thought_signature_in_three_stages() -> None:
     # _reconstruct_history signature carries active_provider
     assert "_reconstruct_history" in src
     assert "active_provider:" in src or "active_provider =" in src or "active_provider," in src
+
+
+# ── Test 8 — in-flight stage echo at messages.append (regression for 2026-05-23) ─
+
+
+def test_in_flight_messages_append_echoes_signature_for_google() -> None:
+    """The live multi-round path appends the assistant message with tool_calls
+    to ``messages`` BEFORE the next API call. That path was missing the
+    thought_signature spread (only capture / persist / reload echo were wired),
+    causing Gemini-3 to fire 400 INVALID_ARGUMENT "Function call is missing a
+    thought_signature in functionCall parts" on round 2 in production even when
+    Tests 1-7 (unit-level) passed. This test asserts the in-flight echo spread
+    is present in threads.py source — it is the load-bearing surface."""
+    from app.api import threads as threads_mod
+
+    src = inspect.getsource(threads_mod)
+    # The in-flight echo MUST use the same key shape as the reload echo so the
+    # openai-python ChoiceDeltaToolCall round-trips extra_content.google.
+    # thought_signature to Google's API.
+    assert "in-flight stage" in src, (
+        "Missing the in-flight echo marker. Without this, multi-round Gemini-3 "
+        "runs hit 400 INVALID_ARGUMENT on round 2."
+    )
+    # Conditional spread shape — same as persist + reload paths.
+    assert "tc[\"thought_signature\"]" in src or "tc['thought_signature']" in src
