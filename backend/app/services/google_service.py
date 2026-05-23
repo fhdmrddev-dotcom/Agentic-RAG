@@ -457,6 +457,23 @@ def stream_google(
                     # filter caused total UI silence during the long
                     # code-generation LLM calls. Removed; frontend renders
                     # bytes streamed as a badge, not raw code.
+                    #
+                    # WR-02 (2026-05-24, by-design semantic divergence): Google
+                    # Gemini's OpenAI-compat layer delivers function_call args
+                    # ATOMICALLY in a single chunk — unlike Anthropic
+                    # (`input_json_delta` per partial JSON token) or OpenAI
+                    # native (`tool_calls[].function.arguments` delta per
+                    # network packet). The 5 KB boundary loop below therefore
+                    # fires AT MOST ONCE per tool_call on Google, even for
+                    # large code generations. Consumer reducers (longer-string-
+                    # wins on argsCodeText) handle this transparently, but the
+                    # "live code panel grows during preparing" UX is
+                    # structurally weaker on Google than on the other 3
+                    # providers. Removing the boundary gate would NOT help —
+                    # the underlying SDK simply doesn't expose intermediate
+                    # args chunks. Documented here so future maintainers don't
+                    # mis-diagnose this as a regression. See
+                    # `075.6-REVIEW.md` §WR-02.
                     if name:
                         args_str = tool_blocks[idx]["arguments"]
                         _bytes_total = len(args_str.encode("utf-8"))
