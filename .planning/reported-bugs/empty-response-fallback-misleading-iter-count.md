@@ -4,9 +4,9 @@ title: Empty-response fallback message reports max_iterations (15) instead of ac
 reported: 2026-05-22
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/agent-loop, user-facing-errors]
-folded_into: null
+folded_into: "075.4"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

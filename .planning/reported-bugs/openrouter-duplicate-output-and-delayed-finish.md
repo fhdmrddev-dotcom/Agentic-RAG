@@ -4,9 +4,9 @@ title: OpenRouter agent run emits duplicate pptx outputs + visible "still runnin
 reported: 2026-05-23
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/output-files, backend/agent-loop, openrouter]
-folded_into: null
+folded_into: "075.4"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

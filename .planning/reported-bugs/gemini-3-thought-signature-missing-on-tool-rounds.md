@@ -4,9 +4,9 @@ title: Gemini 3 / 3.5 fail with "Function call is missing a thought_signature" o
 reported: 2026-05-23
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/streaming, backend/openai-compat, google-genai, chunk-handler, tool-rounds]
-folded_into: null
+folded_into: "075.4"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:

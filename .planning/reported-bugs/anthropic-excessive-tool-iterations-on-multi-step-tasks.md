@@ -4,11 +4,11 @@ title: Anthropic agent runs 15+ tool iterations on prompts that completed in 4-6
 reported: 2026-05-23
 surface: Agentic-RAG
 severity: minor
-status: open
+status: deferred
 affected_areas: [backend/agent-loop, anthropic, system-prompt, tool-results]
 folded_into: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Phase 075.4 E2E scenario 6 (cross-provider iteration-count parity) surfaces the magnitude; root-cause fix needs LangSmith trace data Plans 03/05 unlock. Re-open as a focused investigation phase after 075.4 ships."
 reproduces_on:
   branch: v2.5-dev
   commit: 46e8a63

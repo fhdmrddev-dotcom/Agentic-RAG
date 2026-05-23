@@ -2,9 +2,9 @@
 id: BUG-260522-02
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/agent-loop, backend/api/threads, backend/services/sandbox_service, frontend/components/chat/MessageItem]
-folded_into: null
+folded_into: "075.4"
 re_open_trigger: null
 related: [BUG-260521-02, D-075.2-05]
 captured: 2026-05-22
