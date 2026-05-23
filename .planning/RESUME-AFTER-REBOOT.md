@@ -1,153 +1,248 @@
 ---
-created: 2026-05-23T15:30:00Z
-purpose: Resume Phase 075.5 (Google native SDK adoption) live-test loop after a clean machine reboot
+created: 2026-05-23T19:45:00Z (overwrites the 14:30 doc)
+purpose: Resume Phase 075.5 T-260523-09 fix verification in a fresh session, drive end-to-end via Chrome MCP
 status: ready-to-resume
-last_commit: 4d5c517 (hardened restart-backend.ps1)
-last_blocker: orphan multiprocessing-spawn workers serving stale code on port 8001 despite kill attempts; clean reboot eliminates them
+last_commit: 20fe8f7 (helper script + 3 new HIGH UX triage findings)
+uncommitted_wip: T-260523-09 fix code in 6 files (73 insertions, 7 deletions) — UNVERIFIED LIVE
+operator_notes:
+  - Operator restarting machine; new Claude Code session will pick this up
+  - Operator opens a fresh Chrome MCP-controlled browser; do NOT split testing across user-browser + MCP-browser like prior session did
+  - Operator's Anthropic API now has credit (was billing-blocked mid-session)
 ---
 
-# Resume After Reboot — Phase 075.5 (Gemini native SDK)
+# Resume Phase 075.5 — verify T-260523-09 fix end-to-end via Chrome MCP
 
-## What's committed and survives the reboot
+## What landed in this session (committed, stable across reboot)
 
-| Commit | What it does |
+| Commit | Title |
 |---|---|
-| `79d4d57` | New `backend/app/services/google_service.py` (305 → 470 lines) — native Google Gen AI SDK adapter; mirrors `anthropic_service.py` shape; router branch in `threads.py`; sub-agent constraint safety net; 9 unit tests |
-| `c317e62` | `_sanitize_schema_for_google` strips `additionalProperties`, `$ref`, `oneOf`, `anyOf`, etc. from tool parameter schemas (Google's strict OpenAPI subset rejects them with 400); 2 more unit tests |
-| `1768fb1` | `_encode_signature_for_json` / `_decode_signature_for_part` — base64 round-trip for `thought_signature` bytes (Google SDK returns raw bytes, agent loop / json.dumps / DB persist all need JSON-safe str); 3 more unit tests |
-| `4d5c517` | Hardened `scripts/restart-backend.ps1` — kills python.exe + pythonw.exe orphans, polls port for release, launches headless with logs to `backend/uvicorn.{out,err}.log` |
-| `bd8dad9` | Earlier same-session hotfix to the OpenAI-compat in-flight echo (since obsoleted by 075.5 but harmless — keeps non-Google paths working) |
-| `d58ab11` | Phase 075.4 verification flipped to `gaps_found` with GAP-075.4-01 documenting the root cause (openai-python SDK serialization unreliable for Google's extra_content) |
-| `2cc234e` | `.planning/phases/075.4-.../075.4-POST-UAT-TRIAGE.md` — 8 operator findings (F-1..F-8) from live cross-provider UAT |
+| `68e0a38` | `fix(075.5): handle spawn-orphans + ASCII strings in restart-backend.ps1` |
+| `461f1f2` | `fix(075.5): surface provider errors to UI + add gemini-3.1-flash-lite` |
+| `20fe8f7` | `docs+tools(075.5): deep Sonnet observation + 3 new HIGH UX triage findings` |
 
-**Frontend config:** `frontend/.env.local` reverted to project default `VITE_API_BASE_URL=http://localhost:8000`. The port-8001 detour was a transient workaround for the phantom socket on 127.0.0.1:8000 held by dead PID 13656 with stale code. After the reboot, that phantom is gone — port 8000 is clean and is where every other script/doc/default in the project points.
+Read `.planning/phases/075.5-gemini-native-sdk/STEP-3-UAT-TRIAGE.md` for the full
+findings table. 10 items tracked; 2 fixed (T-260523-05 provider errors visible,
+gemini-3.1-flash-lite registered); 1 partially in flight (T-260523-09 — see below).
 
-## What was proven before the reboot
+## What's UNCOMMITTED in the working tree (survives reboot — files persist)
 
-- **Standalone smoke test PASSED** end-to-end against real `gemini-3-flash-preview`: round 1 captured 449-byte thought_signature (now base64-encoded as a 340-char str), round 2 echoed it through native SDK, Gemini returned `finish_reason=stop`. **Architecture works.**
-- **All 14 unit tests GREEN** in `backend/tests/unit/test_075_5_google_native.py`.
-- The bug we keep hitting in the LIVE UI was a stale-process problem, NOT a code problem. Backend workers spawned by killed reloaders survived (multiprocessing.spawn detaches from parent) and kept serving old code on port 8001. The clean reboot eliminates them.
+T-260523-09 — *progress signal during long LLM code-generation calls*. Six files
+changed, +73 / -7 lines:
+
+| File | Change |
+|---|---|
+| `backend/app/services/anthropic_service.py` (~line 245) | Removed `if _tool_name and _tool_name != "execute_code"` filter; now emits `tool_args_progress` for execute_code too |
+| `backend/app/services/google_service.py` (~line 456) | Same removal |
+| `frontend/src/types/index.ts` | Added `argsBytesStreamed?: number` to ToolCall |
+| `frontend/src/lib/api.ts` | Added `onToolArgsProgress` callback + SSE dispatcher branch for `tool_args_progress` |
+| `frontend/src/providers/StreamsProvider.tsx` | Implemented `onToolArgsProgress` handler — Math.max-updates the matching `preparing-{index}` tool's `argsBytesStreamed` |
+| `frontend/src/components/chat/ToolCallPanel.tsx` (~line 736) | Renders ` (X.X KB)` badge next to "Preparing {tool}…" when `argsBytesStreamed > 0` |
+
+**Status: UNVERIFIED LIVE.** Code is plausibly correct but the verification
+attempt was blocked by:
+1. uvicorn-on-Windows reload-failure: WatchFiles "detected changes" but never
+   spawned a new worker. The old worker kept serving stale code. The hardened
+   `scripts/restart-backend.ps1` (commit `68e0a38`) handles this when invoked
+   explicitly — see Step 3 below.
+2. Cross-browser split: prior session drove Chrome MCP in its own browser
+   instance while operator submitted from a separate browser; Chrome MCP
+   couldn't see operator's runs and vice versa. **Do NOT repeat this** — drive
+   the entire test through the Chrome MCP-controlled browser.
 
 ## Steps to resume after reboot
 
-### 1. Confirm git state is intact
+### 1. Confirm git state
 
 ```bash
 cd "/c/Vibe Apps/Agentic RAG"
-git log --oneline -10
-# Top line should be: 4d5c517 fix(075.5): harden restart-backend.ps1 ...
-git status
-# Should show clean working tree (or just .claude/settings.local.json drift)
+git log --oneline -3
+# Top line: 20fe8f7 docs+tools(075.5): deep Sonnet observation ...
+
+git status --short backend/ frontend/
+# Expected uncommitted (T-260523-09 WIP):
+#   M backend/app/services/anthropic_service.py
+#   M backend/app/services/google_service.py
+#   M frontend/src/types/index.ts
+#   M frontend/src/lib/api.ts
+#   M frontend/src/providers/StreamsProvider.tsx
+#   M frontend/src/components/chat/ToolCallPanel.tsx
 ```
 
-### 2. Start infrastructure
+If any of those 6 files is missing from the status, the WIP is lost — read
+the relevant section of `STEP-3-UAT-TRIAGE.md` and re-apply.
+
+### 2. Start infrastructure (auto-start on Docker Desktop boot; verify)
 
 ```bash
-# Supabase + Redis (auto-start on Docker Desktop boot per CLAUDE.md;
-# verify they're up — if not:
-docker compose -f docker-compose.dev.yml up -d
-supabase start  # if not auto-started
+docker ps --filter "name=redis" --format "{{.Names}}\t{{.Status}}"
+# Expected: agentic-rag-redis   Up X minutes (healthy)
+
+supabase status   # if local Supabase isn't auto-started
 ```
 
-### 3. Start backend on the project's default port 8000
+### 3. Start backend via hardened restart script
 
 ```bash
-# Use the hardened restart script (kills any future orphans + launches headless):
+cd "/c/Vibe Apps/Agentic RAG"
 powershell -ExecutionPolicy Bypass -File scripts/restart-backend.ps1
-
-# OR launch directly via bash (also clean):
-cd backend
-rm -f uvicorn.out.log uvicorn.err.log
-nohup ./venv/Scripts/python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info > uvicorn.out.log 2> uvicorn.err.log &
 ```
 
-> **Why no `--reload`?** WatchFiles on Windows was demonstrably failing to load my edits during the session (worker subprocesses inherited cached module state OR survived their parent reloader). Without `--reload`, code loads exactly once at startup — predictable. If you want hot-reload back later, only ONE worker should run, and you must restart the WHOLE script between edits. Add `--reload` to the uvicorn command if you trust your editor's save-write pattern triggers WatchFiles.
-
-### 4. Verify backend health
+The script kills any prior uvicorn tree + spawn-orphan workers, then launches
+headless with stdout/err to `backend/uvicorn.{out,err}.log`. Verify:
 
 ```bash
-curl http://localhost:8000/health
+sleep 4
+curl -s http://localhost:8000/health
 # Expected: {"status":"ok","redis":"ok"}
 
-netstat -ano | grep "8000.*LISTENING"
-# Expected: exactly ONE listener (one PID). After reboot, the phantom
-# PID 13656 / 15848 entries from the prior session are GONE.
+grep -E "Started server|Application startup" backend/uvicorn.err.log | tail -3
+# Expected to see fresh "Started server process [PID]" + "Application startup complete"
 ```
 
-### 5. Start frontend (Vite)
+### 4. Start frontend
 
 ```bash
 cd frontend
 npm run dev
-# Should print: ready in Xms, Local: http://localhost:5173
+# Expected: ready in Xms, Local: http://localhost:5173
 ```
 
-### 6. Verify Vite is hitting port 8000
+### 5. **Drive Chrome MCP end-to-end — do NOT split browsers**
 
-In the browser at http://localhost:5173 → DevTools Network tab → any request → URL should be `http://localhost:8000/...` (the project default; this is what every other script/doc expects).
+The Chrome MCP-controlled browser is its own Chromium instance. The operator
+must NOT also open localhost:5173 in their normal browser for this test, or
+the runs will land in different sessions and the observation won't match.
 
-### 7. Live re-test the Gemini-3 prompt
+```
+Test login: fhdmrd@gmail.com / 123456 (per memory reference_local_dev_app)
+```
 
-- Fresh chat thread
-- Model: `gemini-3-flash-preview`
-- Prompt: `search for Fahed Mrad dissertation, make a professional pptx for defence session and include comprehensive charts and visuals`
-- **Expected after reboot (single clean backend, fresh code load):** the run completes past the first tool call and chains through. No `additional_properties` error, no `bytes is not JSON serializable` error.
+Drive via Chrome MCP:
+1. `mcp__chrome-devtools__navigate_page` to http://localhost:5173/
+2. Verify login state via `take_snapshot`; if at login screen, fill creds + submit
+3. Click "New Chat"
+4. Switch provider picker to **Anthropic**
+5. Switch model picker to **claude-sonnet-4-6**
+6. Fill the prompt via the native-setter + input-event JS pattern that worked
+   for Gemini in the prior session (see api.ts diff in commit `461f1f2` for an
+   example of how the UI dispatches submit):
+   ```js
+   const tb = document.querySelector('textarea[placeholder*="Ask anything"]');
+   const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+   setter.call(tb, 'search for Fahed Mrad dissertation, make a professional pptx for defence session and include comprehensive charts and visuals');
+   tb.dispatchEvent(new Event('input', { bubbles: true }));
+   tb.focus();
+   ```
+7. Then click the submit button (find by `type="submit"`, no text, has svg icon)
+   OR press Enter on the focused textbox via `mcp__chrome-devtools__press_key`.
 
-### 8. If it works → continue to Step 3 of the loop
+   If submit silently no-ops (as it did for Anthropic in the prior session) try:
+   - dispatching mousedown + mouseup + click MouseEvents instead of `.click()`
+   - or using `mcp__chrome-devtools__click` on the button's uid from a fresh snapshot
 
-Step 3 is the **cross-provider Chrome MCP UAT** — same prompt against Sonnet 4.6 / Kimi 2.6 / GPT 5.4 / Gemini-3.5-flash, watching for the other 7 issues (F-2..F-8). I'll drive Chrome MCP, you watch.
+### 6. Watch the run via 4-layer observability
 
-### 9. If it still fails → check process state FIRST
-
-Most failures so far were stale-process artifacts, not code bugs. Before assuming code is broken:
+When `POST /threads/<id>/messages` lands and `/runs/<run_id>/stream` opens,
+record both ids. Then periodically (every ~30s + at any reported pause):
 
 ```bash
-# How many uvicorn workers are running?
-tasklist | grep "python.exe"
-# With --reload: 1 reloader (~37MB) + 1 worker (~200MB). More = orphans.
-# Without --reload (recommended per step 3): just 1 process (~200MB).
-
-# What's listening on 8000?
-netstat -ano | grep "8000.*LISTENING"
-# Should be exactly ONE listener. More than one = orphan port-holders.
-
-# Which worker is bound to which port? Use wmic to inspect command lines:
-wmic process where "Name='python.exe'" get ProcessId,ParentProcessId,CommandLine | head -10
+cd "/c/Vibe Apps/Agentic RAG"
+PYTHONIOENCODING=utf-8 backend/venv/Scripts/python.exe \
+  scripts/observe-run.py <run_id> <thread_id> 2>&1 | tail -80
 ```
 
-If ANY orphans, kill them with `taskkill //F //PID <N>` and restart.
+The helper dumps Redis run-buffer + Supabase Postgres + LangSmith traces +
+backend log grep. **For T-260523-09 verification, the key check is:**
 
-## Task list state (to re-enter in the next session)
+> grep for `tool_args_progress` in the helper's Redis section.
+> Expected: at least 2-3 events on iter 4 (chart code, ~12 KB),
+> 3-4 events on iter 5 (slide builder, ~19 KB),
+> 4-5 events on iter 6 (slide builder part 2, ~24 KB).
+> Pre-fix: ZERO progress events across the whole run (verified in
+> `STEP-3-UAT-TRIAGE.md` T-260523-09 root-cause section).
 
-When you resume, paste this to Claude so the task tracker matches reality:
+ALSO take a Chrome MCP screenshot during one of the long execute_code pauses
+to verify the UI badge `(X.X KB)` renders next to "Preparing Code execution…".
 
+### 7. If verification PASSES
+
+Commit the WIP with message body referencing T-260523-09. Then update
+`STEP-3-UAT-TRIAGE.md` to mark T-260523-09 as CLOSED with the verification
+evidence (Redis event count + screenshot path).
+
+Suggested commit (single-shot):
 ```
-- [x] Step 1a — Phase 075.5 google_service.py draft + smoke test PASSED
-- [x] Step 1b — wire router + sub-agent constraint + delete old path
-- [x] Step 1c — additionalProperties sanitizer
-- [x] Step 1d — thought_signature base64 round-trip
-- [ ] Step 2 — operator re-test Gemini-3 multi-tool (BLOCKED on stale-process orphans, resume after reboot)
-- [ ] Step 3 — Chrome MCP cross-provider live UAT (Sonnet/Kimi/GPT/Gemini)
-- [ ] Step 4 — write capture-only triage doc
-- [ ] Step 5 — operator prioritizes triage findings
-- [ ] Step 6 — fix one at a time with live confirmation
+fix(075.5): T-260523-09 — progress badge during long LLM code-gen pauses
+
+Removes the `!= "execute_code"` filter in anthropic_service.py and
+google_service.py so tool_args_progress fires for execute_code too,
+adds the matching frontend wiring (callback type, dispatcher branch,
+StreamsProvider handler, ToolCallPanel badge).
+
+Pre-fix: ZERO tool_args_progress events across an 8m07s Sonnet 4.6
+run that emitted 80k+ chars of code; UI showed no progress for the
+60-120s LLM-call pauses.
+
+Post-fix: <N> tool_args_progress events on iter 4-7 of equivalent
+run; UI renders "Preparing Code execution… (X.X KB)" live counter
+during each execute_code generation pause.
 ```
 
-## Open items from the earlier UAT (do NOT bundle — fix one at a time per the loop rule)
+### 8. If verification FAILS
 
-| ID | What | Notes |
+Three known failure modes from the prior session attempt:
+
+- **Reload didn't take effect**: the hardened script (Step 3) should prevent
+  this, but if `tool_args_progress` events are still 0 even with a fresh
+  process, double-check `anthropic_service.py:245` reads `if _tool_name:`
+  (not `if _tool_name and _tool_name != "execute_code"`).
+- **Threshold too coarse**: Sonnet's first execute_code call is typically
+  ~4.4 KB (under the 5120-byte boundary). The fix won't show events on that
+  call. Wait for iter 4+ which generates 12-24 KB code blocks. If you want
+  visible feedback on smaller calls, lower the threshold from 5120 to ~1024
+  in both service files.
+- **Anthropic SDK isn't yielding input_json_delta events**: unlikely in the
+  versions pinned in `requirements.txt` (anthropic-py >= 0.45 per Phase 075
+  RESEARCH), but if the SDK stream isn't producing those events, no
+  amount of filter-removal helps. Verify by adding a temporary
+  `logger.debug` inside the `elif delta.type == "input_json_delta":` branch
+  to count call rates.
+
+## Triage items still open (post-this-session, for ongoing work)
+
+From `STEP-3-UAT-TRIAGE.md`:
+
+| ID | Severity | Summary |
 |---|---|---|
-| F-1 | Gemini-3 multi-tool round-trip | Architecturally fixed via 075.5, needs LIVE confirmation after reboot |
-| F-2 | Generic Gemini "Invalid argument" on round 2 | Likely downstream of F-1; re-verify after F-1 is live-confirmed |
-| F-3 | Fake "thinking" / "synthesizing" placeholder | Native SDK exposes a real thinking stream — wiring deferred to follow-on phase |
-| F-4 | Long pauses moving to execute_code | Suspect harvest_output_files D-v2.5-01 violation re-emerged; separate fix |
-| F-5 | Sub-agent UI shows wrong model | Frontend display issue; safety net landed in `sub_agent_service.py`, frontend filter already in place |
-| F-6 | Resume button false-positive | Existing bug report at `.planning/reported-bugs/resume-button-appears-during-active-code-execution.md` |
-| F-7 | Status not reflected in UI | Related to F-4 + F-6 |
-| F-8 | LangSmith errors | Operator reported many — need to check LangSmith REST API for trace cleanliness |
+| T-260523-01 | HIGH | gemini-3.5-flash 90s per-call timeout (single-line config bump) |
+| T-260523-02 | LOW | Chat title accuracy — generated from prompt alone, no agent context |
+| T-260523-06 | MEDIUM | Resume button false-positive on non-recoverable errors (billing, auth) |
+| T-260523-07 | LOW | runs.usage missing for errored Anthropic runs |
+| T-260523-08 | HIGH UX | Step indicator off-screen during long runs (sticky / floating / auto-scroll) |
+| T-260523-10 | MEDIUM UX | Intermediate files exposed in downloads list (Sonnet's split-build-combine) |
 
-## Notes on the cleanup work
+Plus a minor bug observed but not yet captured: **tool_end emitted twice per execute_code**.
+And another: **abandoned LangSmith traces on force-kill** (in-flight runs leave a
+pending trace forever).
 
-- **Port stays at 8000** after reboot — the project default that every script, env example, and doc points at. The 8001 detour during the session was a transient workaround for the phantom dead-PID listener on 127.0.0.1:8000; reboot reclaims that socket.
-- `backend/uvicorn.out.log` and `backend/uvicorn.err.log` are the SINGLE source of truth for backend output. Earlier we had logs in 3 places (backend.log at repo root from months ago, plus two uvicorn.* variants); current setup is unambiguous.
-- The `.continue-here.md` style files (anti-pattern handoffs) are not used here — this single doc IS the handoff.
+## Observability tools available
+
+- `scripts/observe-run.py` (committed in `20fe8f7`): 4-layer run dumper
+  (Redis + Postgres + LangSmith + log grep). Use `PYTHONIOENCODING=utf-8`
+  on Windows.
+- `scripts/restart-backend.ps1` (hardened in `68e0a38`): kills uvicorn tree +
+  spawn-orphans, relaunches headless.
+- Chrome DevTools MCP: drive a real browser; per memory
+  `feedback_chrome_mcp_testing.md` this is the preferred verification harness.
+- LangSmith project: `agentic-rag-module2` (per backend `.env`; don't read env
+  values, just use the project name as fact).
+- Local Supabase Postgres: default `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+- Local Redis: `redis://localhost:6379` (Docker container `agentic-rag-redis`).
+- Redis Insight UI: http://localhost:5540 (browser).
+
+## Why this handoff doc exists
+
+Prior session burned context bouncing between observation tooling and
+verification on a stale backend. Fresh session + clean Chrome MCP browser +
+single source of truth for in-flight runs is faster. **Drive Chrome MCP
+end-to-end, do not split testing across two browsers.**
