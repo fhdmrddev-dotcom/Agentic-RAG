@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
-stopped_at: Completed 075.4-04-PLAN.md (Wave 2 — perf + UX + sentinel guard + Settings 2-click flushSync fix; closes WR-02, BUG-260523-03 UI, Settings 2-click)
-last_updated: "2026-05-23T08:39:55.480Z"
+status: verifying
+stopped_at: Completed 075.4-06-PLAN.md (Wave 3 finalize — 6 Playwright scenarios + 98-failure triage + 6 FK-cluster fixed via AsyncMock; live operator UAT deferred to Task 4 checkpoint)
+last_updated: "2026-05-23T09:03:36.508Z"
 last_activity: 2026-05-23
 progress:
   total_phases: 26
-  completed_phases: 16
+  completed_phases: 17
   total_plans: 58
-  completed_plans: 59
+  completed_plans: 60
   percent: 100
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 Phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop-inserte) — EXECUTING
 Plan: 6 of 6
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-23
 
 ## PRD-reset outputs (committed)
@@ -239,6 +239,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P02 | 30min | 3 tasks | 7 files |
 | Phase 075.4 P03 | 40min | 3 tasks | 5 files |
 | Phase 075.4 P04 | 16min | 4 tasks | 10 files |
+| Phase 075.4 P06 | 70min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -355,6 +356,9 @@ Recent decisions affecting v2.5 work:
 - Plan 075.4-04 Task 2: save_override sentinel allowlist guard with _PROVIDER_KEY_PREFIXES matrix (sk-/sk-ant-/sk-or-) + _SENTINEL_VALUES frozenset; rejected api_key writes log WARNING and skip silently (no HTTP 422 — that escalation is Phase 081.1 territory per D-075.4-F2); 20/20 unit + integration tests GREEN
 - Plan 075.4-04 Task 3: React.memo MessageItem + useMemo MarkdownRenderer + ChatArea useCallback delegates (onSendMessage + onResume); 6 memo tests GREEN using vi.hoisted() factory pattern
 - Plan 075.4-04 Task 4: lazy(import) RetrievalTrendChart splits ~359 KB recharts off main bundle (verified via vite build — index-DpQeoDpY.js has zero Recharts strings); ExecuteCodeBlock per-line stderr badge; OutputFileCard supersedes prop consumes Plan 03 dedup field
+- Plan 075.4-06: FK-violation cluster (6 tests) fixed via AsyncMock-patches on app.api.threads.{insert_run, finalize_run, insert_assistant_message} — not via fk_aware_runs_factory (Rule-1 pragmatic: factory targets real-Postgres binding tests, these files use placeholder SUPABASE_URL). AsyncMock pattern is canonical retrofit for Phase 076/077 cleanup of remaining ~80 bucket-c failures.
+- Plan 075.4-06: scenario-06 (BUG-260523-04 iteration-parity) stays RED by design as measurement gate. Root-cause fix deferred per CONTEXT.md to a future focused-fix phase. Inline assertion message documents the intentional fail; no xfail/skip applied — the failing output IS the measurement artifact.
+- Plan 075.4-06: pytest baseline drifted 95 (RESEARCH) → 98 (live at commit 56c033a). 3-test drift up due to Plans 075.4-01..05 adding tests. Triage doc carries 98 baseline cleanly; post-fix 92 (98-6) confirmed effective.
 
 ### Pending Todos
 
@@ -394,8 +398,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-23T08:39:40.673Z
-Stopped at: Completed 075.4-04-PLAN.md (Wave 2 — perf + UX + sentinel guard + Settings 2-click flushSync fix; closes WR-02, BUG-260523-03 UI, Settings 2-click)
+Last session: 2026-05-23T09:03:36.500Z
+Stopped at: Completed 075.4-06-PLAN.md (Wave 3 finalize — 6 Playwright scenarios + 98-failure triage + 6 FK-cluster fixed via AsyncMock; live operator UAT deferred to Task 4 checkpoint)
 
 ### Next session: pending USER actions
 
