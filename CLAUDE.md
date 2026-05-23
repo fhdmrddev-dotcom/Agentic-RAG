@@ -86,6 +86,37 @@ Phase 075.4 Plan 05 (D-075.4-H1 Wave 0) — closes the assumption-driven-UAT gap
 
 UAT rows MUST be authored under VALIDATION.md, NOT in PLAN.md tasks. Phase verification only passes when all 4 axes are exercised — Plan 05 E2E backstop covers 1-3 automated; long-message stays manual per provider.
 
+## Workflow guardrails (MANDATORY)
+
+These rules exist because the v2.6 075.x cascade (8 phases on the same streaming/UI surface) showed that structural UAT misses lived-experience defects, and the full discuss→plan→execute ceremony is overkill for small work. At every phase-touching conversation, the orchestrator MUST apply these BEFORE proposing the next command.
+
+| Rule | Trigger | Action |
+|---|---|---|
+| **G-1 Phase chain cap** | About to insert `<base>.N` where ≥ 2 prior `<base>.x` phases already exist on the same hot file(s) | Propose a refactor phase on those file(s) FIRST. Block another feature insert until refactor ships. |
+| **G-2 Sketch before plan for UX** | Phase scope mentions live UI, panel render, badge, label, animation, "feels like", visual, or gold-standard comparison | Propose `/gsd:sketch` BEFORE `/gsd:spec-phase` or `/gsd:discuss-phase`. Operator-approved mockup is the acceptance bar. |
+| **G-3 Lightweight commands for small work** | Task scope ≤ 1 file, ≤ 10 lines of source change, no schema/API surface | Propose `/gsd:fast` (inline, no agents) or `/gsd:quick` (commit + state, skip optional agents). NEVER full discuss→plan→execute for 5-line fixes. |
+| **G-4 Lived-experience UAT gate** | Phase touches user-visible UI | Operator-defined "I'd recognize failure here" scenarios at scope-time (not post-hoc). Chrome MCP drives all 3 at phase verification — wire format + screenshot are insufficient. |
+| **G-5 Refactor between feature waves** | ≥ 3 prior phases on the same hot file (see ledger below) | Insert a dedicated refactor phase BEFORE the next feature phase on that file. Audit during discuss-phase. |
+| **G-6 Failure criteria upfront** | Writing SPEC.md or scoping a phase | Include `## How we'd know this failed` section with concrete observable conditions. If failure modes can't be enumerated, scope is not ready to plan. |
+
+**Orchestrator protocol when a guardrail fires:**
+
+1. Surface the violation BEFORE running the requested command — name the rule, name the proposed alternative
+2. If user overrides ("proceed anyway"), proceed but record the override under `STATE.md → Recent Completed Phases → Guardrail overrides` so it's auditable
+3. Never silently apply OR silently skip — every fire is either honored or audited
+
+**Hot-file ledger (update as phases ship):**
+
+| File | Phases touched | G-5 status |
+|---|---|---|
+| `frontend/src/components/chat/ToolCallPanel.tsx` | 067 / 067.5 / 075 / 075.4 / 075.6 (5+) | G-5 fires — refactor due |
+| `backend/app/api/threads.py` | 056 / 058 / 061 / 067 / 073 / 075 / 075.3 / 075.4 / 075.6 (9+) | G-5 fires — extraction due |
+| `frontend/src/providers/StreamsProvider.tsx` | 068 / 075 / 075.4 / 075.6 (4+) | G-5 fires — decomposition due |
+| `frontend/src/hooks/useMessages.ts` | 063 / 063.1 / 067 / 067.5 (4+) | G-5 fires — reducer slice extraction due |
+| `backend/app/services/anthropic_service.py` | 074 / 075 / 075.4 / 075.6 (4+) | G-5 fires — adapter pattern audit due |
+
+When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature.
+
 ## graphify
 
 This project has a graphify knowledge graph at `graphify-out/`.
