@@ -7,6 +7,38 @@ and [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
 
+## Sandbox Setup
+
+The agent's `execute_code` tool runs inside a Docker container managed by
+`llm_sandbox`. To avoid ~10-15s `pip install` warm-up on every new chat,
+build the project's pre-bundled sandbox image once:
+
+```bash
+docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:075.1 backend/
+```
+
+Then add to `backend/.env`:
+
+```
+SANDBOX_IMAGE=agentic-rag-sandbox:075.1
+```
+
+The pre-built image includes matplotlib + numpy + pandas + python-pptx +
+openpyxl + python-docx + pypdf + seaborn + scipy + scikit-learn + plotly
+(Claude.ai-analysis-tool parity).
+
+When `SANDBOX_IMAGE` is unset, `SandboxSessionManager.get_or_create`
+(`backend/app/services/sandbox_service.py:38`) falls back to the bare
+`llm_sandbox` Python image — each new chat then re-installs packages on the
+first `execute_code` call (a 10-15s warm-up the user sees as "Installing
+libraries…").
+
+Sessions are cached per `thread_id` until idle eviction (default 30 min), so
+env-var changes only affect NEW chats — existing chats keep their original
+container until eviction.
+
+---
+
 ## Setup
 
 Requires Python 3.11+. The backend MUST run under its own virtual environment

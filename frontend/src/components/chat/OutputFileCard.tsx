@@ -39,6 +39,14 @@ interface OutputFileCardProps {
     filename: string
     url?: string
     size?: number
+    /** Plan 075.4-04 D-075.4-D2 — populated by Plan 075.4-03's content-hash
+     *  dedup in sandbox_service.harvest_output_files when iteration N produces
+     *  a DIFFERENT SHA-256 for the SAME filename as iteration N-1 (the
+     *  "iteratively-refining pptx" case). Renders a tiny "Replaces:" subline
+     *  so the user can see which previous file the current output supersedes
+     *  — closes BUG-260523-03's user-visible affordance side (backend dedup
+     *  was Plan 03's deliverable; UI surfacing is this Plan 04 wave). */
+    supersedes?: string
   }
 }
 
@@ -64,7 +72,14 @@ export function OutputFileCard({ file }: OutputFileCardProps) {
     return (
       <div className="flex items-center gap-2.5 rounded-md ghost-border px-3 py-2 text-xs bg-muted/30">
         <Download className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 opacity-40" />
-        <span className="flex-1 min-w-0 font-mono text-foreground/60 truncate">{file.filename}</span>
+        <span className="flex-1 min-w-0 flex flex-col">
+          <span className="font-mono text-foreground/60 truncate">{file.filename}</span>
+          {file.supersedes && (
+            <span className="text-[10px] text-muted-foreground/70 truncate">
+              Replaces: {file.supersedes}
+            </span>
+          )}
+        </span>
       </div>
     )
   }
@@ -111,6 +126,13 @@ export function OutputFileCard({ file }: OutputFileCardProps) {
       )}
       <span className="flex-1 min-w-0 flex flex-col">
         <span className="font-mono text-foreground/80 truncate">{file.filename}</span>
+        {/* Plan 075.4-04 D-075.4-D2 — supersedes subline (closes BUG-260523-03 UI side).
+            React auto-escapes text content; no XSS surface introduced. */}
+        {file.supersedes && (
+          <span className="text-[10px] text-muted-foreground/70 truncate">
+            Replaces: {file.supersedes}
+          </span>
+        )}
         {downloadError && (
           <span className="text-red-400 text-[10px] truncate">{downloadError.message}</span>
         )}

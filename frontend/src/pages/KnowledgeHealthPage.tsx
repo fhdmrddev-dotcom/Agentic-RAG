@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { RefreshCw, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,7 +25,11 @@ import type {
   FeedbackStats,
 } from "@/lib/api"
 import { HealthScoreGauge } from "@/components/health/HealthScoreGauge"
-import { RetrievalTrendChart } from "@/components/health/RetrievalTrendChart"
+// Plan 075.4-04 D-075.4-SC#6 — lazy-load RetrievalTrendChart so the ~200 KB
+// recharts dependency lands in a distinct chunk only when Knowledge Health is
+// visited. Suspense fallback reuses the existing <ChartSkeleton /> defined
+// below for byte-identical loading-state chrome.
+const RetrievalTrendChart = lazy(() => import("@/components/health/RetrievalTrendChart").then((m) => ({ default: m.RetrievalTrendChart })))
 import { PaginationControls } from "@/components/health/PaginationControls"
 import { HealthEmptyState } from "@/components/health/HealthEmptyState"
 import { HealthDocumentRow } from "@/components/health/HealthDocumentRow"
@@ -472,7 +476,13 @@ export function KnowledgeHealthPage() {
         {/* Row 2: Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            {trendLoading ? <ChartSkeleton /> : <RetrievalTrendChart data={trend} />}
+            {trendLoading ? (
+              <ChartSkeleton />
+            ) : (
+              <Suspense fallback={<ChartSkeleton />}>
+                <RetrievalTrendChart data={trend} />
+              </Suspense>
+            )}
           </div>
           <div className="flex flex-col gap-3">
             {overviewLoading ? (

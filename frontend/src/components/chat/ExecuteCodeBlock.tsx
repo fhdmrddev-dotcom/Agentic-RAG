@@ -41,11 +41,22 @@ function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreami
         <div
           key={i}
           className={cn(
+            "flex items-start gap-1.5",
             line.kind === "stdout" ? "text-emerald-400" : "text-red-400"
           )}
           style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
         >
-          {line.content}
+          {/* Plan 075.4-04 D-075.4-SC#6 — inline stderr badge alongside red lines.
+              Sits beside the line content so the operator can disambiguate
+              stderr from red-coloured stdout (some libraries print warnings to
+              stdout with ANSI red). Per-line badge complements the error-box
+              below (which renders only for `errorMessage`, not per-line). */}
+          {line.kind === "stderr" && (
+            <span className="inline-flex items-center rounded-sm bg-red-500/15 px-1 py-0 text-[9px] uppercase tracking-wider text-red-400 font-semibold leading-tight flex-shrink-0 mt-0.5">
+              stderr
+            </span>
+          )}
+          <span className="flex-1 min-w-0">{line.content}</span>
         </div>
       ))}
       {isStreaming && lines.length > 0 && (
