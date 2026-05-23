@@ -325,4 +325,64 @@ describe("Phase 075.4 D-075.4-A3 — per-thread streaming preserves cross-thread
     // per-thread state lift. Predicate text matches the acceptance grep.
     expect(true).toBe(true)
   })
+
+  // ===========================================================================
+  // 075.6 Plan 02 — Landmine L6 reconciliation: the Branch D-3 guard's current
+  // home is StreamsProvider.tsx:692-707 (clearThreadBucket action), NOT the
+  // stale useMessages.ts:572-590 reference in SPEC.md. This test asserts that
+  // no 075.6-introduced reducer path (onToolPreparing → onToolArgsProgress
+  // with code_so_far → onToolStart → onComplete) accidentally invokes
+  // clearThreadBucket during a happy-path streaming run. The Phase 067.5
+  // verbatim-survival invariant is already covered by Tests 1-4 above
+  // (predicate text unchanged); THIS test guards against future reducer
+  // refactors that might wire clearThreadBucket into the streaming-event
+  // pipeline by mistake.
+  // ===========================================================================
+  it("Test 5 (075.6) — clearThreadBucket is NEVER called during a 075.6 streaming run with tool_args_progress events (Landmine L6)", async () => {
+    mockPostMessage.mockResolvedValueOnce({
+      run_id: "run-Z",
+      message_id: "user-msg-Z",
+    })
+
+    const recorder = makeSseRecorder()
+    const { result } = renderProvider()
+
+    // Reach into the actions slice via useStreamsStore.getState().actions and
+    // spy on clearThreadBucket. The store is mutated via setState by the
+    // provider on mount; spy on the live function reference.
+    const actions = useStreamsStore.getState().actions
+    const clearSpy = vi.spyOn(actions, "clearThreadBucket")
+
+    await act(async () => {
+      result.current.setViewingThread("thread-z")
+    })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage("thread-z", "hello Z")
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.forRun("run-Z")
+    expect(cb).toBeTruthy()
+
+    // Drive a complete 075.6 reducer-path scenario:
+    //  - onToolPreparing creates preparing entry
+    //  - two onToolArgsProgress calls populate argsBytesStreamed + argsCodeText
+    //  - onToolStart transitions to running + clears argsCodeText
+    //  - onTerminal('done') closes the run
+    act(() => {
+      cb!.onToolPreparing!("execute_code", 0)
+      cb!.onToolArgsProgress!(0, "execute_code", 5121, "CODE_A")
+      cb!.onToolArgsProgress!(0, "execute_code", 10241, "CODE_A_LONG")
+      cb!.onToolStart!("execute_code", { code: "CODE_A_LONG" })
+      cb!.onTerminal("done")
+    })
+
+    // The full streaming run touched 4 new 075.6 reducer entry points and 1
+    // existing terminal handler — none should have called clearThreadBucket.
+    expect(clearSpy).not.toHaveBeenCalled()
+
+    void sendPromise
+  })
 })

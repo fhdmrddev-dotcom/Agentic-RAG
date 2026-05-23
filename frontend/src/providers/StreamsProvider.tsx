@@ -290,12 +290,20 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
-    onToolArgsProgress: (toolIndex: number, _name: string, totalArgsBytesSoFar: number) => {
+    onToolArgsProgress: (toolIndex: number, _name: string, totalArgsBytesSoFar: number, codeSoFar?: string) => {
       // T-260523-09 (2026-05-23): update argsBytesStreamed on the matching
       // preparing entry so the UI can render "Generating ... (X.X KB)"
       // during the long code-generation pauses. Match by the same
       // `preparing-${index}` id onToolPreparing assigned. Use Math.max so
       // out-of-order replay events can't make the badge tick backwards.
+      //
+      // 075.6 Plan 02 / Req #5: 4th param `codeSoFar` carries the FULL
+      // cumulative args text (NOT the 5 KB tail). Apply longer-string-wins
+      // on tc.argsCodeText parallel to the existing Math.max byte-counter
+      // branch. The `tc.status === "preparing"` filter below structurally
+      // closes the late-event race (RESEARCH Pitfall 7): a tool_args_progress
+      // arriving AFTER onToolStart finds no matching preparing entry and is
+      // a no-op.
       const preparingId = `preparing-${toolIndex}`
       setMessages((prev) =>
         prev.map((m) => {
@@ -305,9 +313,14 @@ export function makeStreamCallbacks(opts: {
           if (idx === -1) return m
           const tc = calls[idx]
           const next = Math.max(tc.argsBytesStreamed ?? 0, totalArgsBytesSoFar)
-          if (next === (tc.argsBytesStreamed ?? 0)) return m
+          const nextCode =
+            codeSoFar != null && codeSoFar.length > (tc.argsCodeText ?? '').length
+              ? codeSoFar
+              : tc.argsCodeText
+          const noChange = next === (tc.argsBytesStreamed ?? 0) && nextCode === tc.argsCodeText
+          if (noChange) return m
           const updated = calls.map((c, i) =>
-            i === idx ? { ...c, argsBytesStreamed: next } : c,
+            i === idx ? { ...c, argsBytesStreamed: next, argsCodeText: nextCode } : c,
           )
           return { ...m, tool_calls: updated }
         }),
@@ -331,6 +344,12 @@ export function makeStreamCallbacks(opts: {
                     status: "running" as const,
                     startedAt: Date.now(),
                     iteration: tc.iteration ?? currentIteration,
+                    // 075.6 Plan 02 / Req #5: clear argsCodeText on
+                    // tool_start so post-start renders read from the
+                    // source-of-truth tc.args.code (panel collapses + drops
+                    // cached streaming text; final args parsed by tool_start
+                    // win). Per CONTEXT.md Claude's Discretion.
+                    argsCodeText: undefined,
                   }
                 : tc,
             )

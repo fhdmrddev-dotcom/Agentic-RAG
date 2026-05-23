@@ -1551,3 +1551,182 @@ describe("Phase 068.5 Gap-02 — cross-thread loadMessages merges (static-grep m
     expect(true).toBe(true)
   })
 })
+
+// =============================================================================
+// 075.6 Plan 02 Req #5 — argsCodeText reducer slice
+//
+// Asserts the new `code_so_far` 4th-positional-arg flowing through
+// onToolArgsProgress is folded into tc.argsCodeText via longer-string-wins.
+// Mirrors the existing argsBytesStreamed Math.max branch. Race-close (Pitfall
+// 7) verified by the structural `tc.status === "preparing"` filter at
+// StreamsProvider.tsx:304 — a late tool_args_progress arriving AFTER
+// onToolStart finds no matching preparing entry and is a no-op.
+//
+// Tests 1-3 are red-first TDD against the new reducer slice (would have
+// failed before the Plan 02 reducer extension). Test 4 is a Pitfall 7
+// regression guard — it would pass before AND after Plan 02 lands; its job
+// is to lock the race-close invariant against future reducer refactors.
+// =============================================================================
+describe("075.6 Req #5 — argsCodeText reducer slice", () => {
+  // Helper: drive a sendMessage flow up to the point where the assistant
+  // placeholder + SSE callbacks are available. Returns { cb, assistantId,
+  // sendPromise } so each test can fire its own onTool* sequence.
+  async function setupStreamingThreadWithCallbacks(threadId = "thread-A", runId = "run-A") {
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValueOnce({
+      run_id: runId,
+      message_id: `user-msg-${runId}`,
+    })
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread(threadId)
+    })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(threadId, "hello")
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.forRun(runId) as StreamCallbacks
+    expect(cb).toBeTruthy()
+
+    // The assistant placeholder is the last assistant message in the bucket.
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+    const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+    expect(assistantMsg).toBeTruthy()
+
+    return { cb, assistantId: assistantMsg!.id, threadId, sendPromise, result }
+  }
+
+  function getPreparingTool(threadId: string, toolIndex = 0) {
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+    const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+    return assistantMsg?.tool_calls?.find((tc) => tc.id === `preparing-${toolIndex}`)
+  }
+
+  it("CHUNK_A → CHUNK_A_PLUS_B sets argsCodeText to the longer string", async () => {
+    const { cb, threadId, sendPromise } = await setupStreamingThreadWithCallbacks()
+
+    act(() => {
+      cb.onToolPreparing!("execute_code", 0)
+    })
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 5121, "CHUNK_A")
+    })
+
+    await waitFor(() => {
+      expect(getPreparingTool(threadId)?.argsCodeText).toBe("CHUNK_A")
+    })
+
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 10241, "CHUNK_A_PLUS_B")
+    })
+
+    await waitFor(() => {
+      expect(getPreparingTool(threadId)?.argsCodeText).toBe("CHUNK_A_PLUS_B")
+    })
+
+    void sendPromise
+  })
+
+  it("reverse order (long first, short second) keeps the longer string (idempotency)", async () => {
+    const { cb, threadId, sendPromise } = await setupStreamingThreadWithCallbacks()
+
+    act(() => {
+      cb.onToolPreparing!("execute_code", 0)
+    })
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 10241, "CHUNK_A_PLUS_B")
+    })
+
+    await waitFor(() => {
+      expect(getPreparingTool(threadId)?.argsCodeText).toBe("CHUNK_A_PLUS_B")
+    })
+
+    // Now fire a SHORTER codeSoFar (simulates out-of-order replay where
+    // the earlier 5 KB-boundary event arrives after the 10 KB-boundary).
+    // Reducer must REFUSE to overwrite the longer string.
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 5121, "CHUNK_A")
+    })
+
+    // argsCodeText stays at the longer string.
+    expect(getPreparingTool(threadId)?.argsCodeText).toBe("CHUNK_A_PLUS_B")
+
+    void sendPromise
+  })
+
+  it("onToolStart clears argsCodeText on the transitioning tool", async () => {
+    const { cb, threadId, sendPromise } = await setupStreamingThreadWithCallbacks()
+
+    act(() => {
+      cb.onToolPreparing!("execute_code", 0)
+    })
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 5121, "CHUNK_A")
+    })
+
+    await waitFor(() => {
+      expect(getPreparingTool(threadId)?.argsCodeText).toBe("CHUNK_A")
+    })
+
+    // Fire onToolStart → preparing entry transitions to running; the reducer
+    // also clears argsCodeText on the merged tc so post-start renders read
+    // tc.args.code as source of truth.
+    act(() => {
+      cb.onToolStart!("execute_code", { code: "FINAL_CODE" })
+    })
+
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+      const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+      const tc = assistantMsg?.tool_calls?.find((c) => c.name === "execute_code")
+      // Status flipped from preparing to running, and argsCodeText cleared.
+      expect(tc?.status).toBe("running")
+      expect(tc?.argsCodeText).toBeUndefined()
+    })
+
+    void sendPromise
+  })
+
+  it("late tool_args_progress arriving AFTER onToolStart is a no-op (Pitfall 7 race-close)", async () => {
+    const { cb, threadId, sendPromise } = await setupStreamingThreadWithCallbacks()
+
+    act(() => {
+      cb.onToolPreparing!("execute_code", 0)
+    })
+    // Transition to running BEFORE any tool_args_progress fires.
+    act(() => {
+      cb.onToolStart!("execute_code", { code: "FINAL_CODE" })
+    })
+
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+      const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+      const tc = assistantMsg?.tool_calls?.find((c) => c.name === "execute_code")
+      expect(tc?.status).toBe("running")
+    })
+
+    // Late tool_args_progress arriving AFTER the preparing→running transition.
+    // The reducer's `tc.status === "preparing"` filter at L:304 finds no
+    // matching preparing entry → no write → argsCodeText stays undefined.
+    act(() => {
+      cb.onToolArgsProgress!(0, "execute_code", 5121, "LATE")
+    })
+
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+    const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+    const tc = assistantMsg?.tool_calls?.find((c) => c.name === "execute_code")
+    expect(tc?.status).toBe("running")
+    expect(tc?.argsCodeText).toBeUndefined()
+
+    void sendPromise
+  })
+})
