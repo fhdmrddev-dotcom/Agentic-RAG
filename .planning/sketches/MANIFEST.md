@@ -25,6 +25,7 @@ The acceptance bar for every variant is the **long execution in progress** momen
 |---|----------|--------|
 | 1 | **Live run = bracketed run-card** in conversation flow, with status header (timer + counter + bot avatar), progress shimmer while active, fold-to-summary on completion. | Sketch 001 winner C |
 | 2 | **Tool call = editor inset.** `execute_code` renders as a real editor pane (gutter, syntax highlight, lang chip) with labeled STDOUT/STDERR regions and file outputs as inline preview cards (chart icon, click-to-open). Non-code tools (search, read_file) get their own inner shape inside the same outer frame. Different tools, same container; honest about each tool's native result type. | Sketch 002 winner C |
+| 3 | **Focus Mode under stress.** During a long run: pinned run-card header (timer + counter), past tool calls auto-collapse to compact rows with their *result-summary* (`→ yoy_q3 = 30.87%`), only the active tool keeps its full editor open, explicit "Next: ..." footer surfaces what's queued. Past steps fold to essence, active step gets full attention — directly answers the lived-experience UAT-gap where regressions hid in fast streams. | Sketch 003 winner B |
 
 ## Sketches
 
@@ -32,4 +33,4 @@ The acceptance bar for every variant is the **long execution in progress** momen
 |---|------|----------------|--------|------|
 | 001 | stream-framing | What does the live run **occupy** in the conversation stream? | **C — Run-Card** ★ | layout, structure, chat |
 | 002 | tool-call-panel | What is the **shape** of a single tool call as it runs and finishes? | **C — Editor Inset** ★ | panel, tool, G-5 |
-| 003 | thinking-moment | When the agent is **30+ seconds deep**, how do panels + status + thinking + text compose? | _pending_ | synthesis, long-run |
+| 003 | thinking-moment | When the agent is **30+ seconds deep**, how do panels + status + thinking + text compose? | **B — Focus Mode** ★ | synthesis, long-run |
