@@ -29,7 +29,7 @@ This file ships TWO assertions:
 import asyncio
 import logging
 import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import httpx
@@ -48,6 +48,79 @@ from tests.integration._run_helpers import (  # noqa: E402
 from tests.integration.test_059_disconnect import (  # noqa: F401, E402
     _reset_sse_starlette_app_status,
 )
+
+
+async def _await_producer_via_insert_mock(insert_run_mock: AsyncMock, *, timeout: float = 10.0) -> None:
+    """Phase 075.4-06 Task 3 — Phase-073-04-aware producer-finalization await.
+
+    Mirrors tests/integration/_run_helpers.py::await_producer_finalized but reads
+    the run_id from the AsyncMock-patched ``insert_run`` instead of from the
+    supabase mock's ``runs.insert.call_args``. This is necessary because
+    Phase 073-04 (D-073-04 SC-minimum) flipped the runs INSERT to
+    ``app.db.runs.insert_run`` (asyncpg) — the supabase mock's runs builder is
+    no longer the source of truth for the run_id.
+
+    Alternative considered: ``fk_aware_runs_factory`` (Plan 075.4-05 Task 4
+    suite-wide fixture in backend/tests/conftest.py). Rejected here because
+    the factory seeds parents in a REAL Postgres pool, but this test file
+    uses placeholder SUPABASE_URL so the factory would hit pytest.skip.
+    AsyncMock-patching is the correct idiom for mock-Supabase test files.
+    See 075.4-TEST-TRIAGE.md "Engineering note" for full rationale.
+
+    Behavior contract (D-061.1-01/02/03) preserved verbatim from the helper:
+    look up the producer task in RUN_TASKS; if absent (self-evicted) return;
+    otherwise await with timeout; CancelledError swallowed, TimeoutError fails.
+    """
+    from app.api.threads import RUN_TASKS  # registry — D-061-11
+
+    calls = insert_run_mock.call_args_list
+    assert calls, (
+        "Expected at least one insert_run(...) call (D-061-11 lifecycle / "
+        "Phase 073-04 D-073-04 SC-minimum asyncpg helper)"
+    )
+    # First call is the status='streaming' INSERT at request entry.
+    run_id = calls[0].kwargs.get("run_id")
+    if run_id is None:
+        raise AssertionError(
+            f"insert_run was called without run_id kwarg. Observed kwargs: "
+            f"{[dict(c.kwargs) for c in calls]!r}"
+        )
+
+    task = RUN_TASKS.get(run_id)
+    if task is None:
+        return
+    try:
+        await asyncio.wait_for(task, timeout=timeout)
+    except asyncio.CancelledError:
+        pass
+    except asyncio.TimeoutError:
+        pytest.fail(
+            f"Producer task for run_id={run_id} did not finalize within {timeout}s. "
+            f"RUN_TASKS keys: {list(RUN_TASKS.keys())}"
+        )
+
+
+def _assert_finalize_status(finalize_run_mock: AsyncMock, expected_status: str) -> None:
+    """Phase 075.4-06 Task 3 — assert finalize_run was called with the expected status.
+
+    Phase 073-04 (D-073-04 SC-minimum) flipped the runs UPDATE finalize path
+    from ``_supabase.table("runs").update(...).execute()`` to
+    ``app.db.runs.finalize_run`` (asyncpg). The legacy assertion target
+    ``runs_builder.update.call_args_list`` is now always empty (production
+    code never touches it); the new source-of-truth is the AsyncMock that
+    replaces the asyncpg helper.
+
+    Raises AssertionError when no finalize_run call with ``status=expected_status``
+    is found in the call history.
+    """
+    matching = [
+        c for c in finalize_run_mock.call_args_list
+        if c.kwargs.get("status") == expected_status
+    ]
+    assert matching, (
+        f"Test setup wrong — finalize_run was never called with status={expected_status!r}. "
+        f"Observed kwargs: {[dict(c.kwargs) for c in finalize_run_mock.call_args_list]!r}"
+    )
 
 THREAD_A = str(uuid4())
 
@@ -173,6 +246,12 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
 
     mock_supabase = _build_mock_supabase()
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
+
+    # Phase 075.4-06 Task 3 — patch asyncpg helpers as AsyncMock no-ops so
+    # real Postgres pool never sees runs INSERT/UPDATE/messages INSERT.
+    insert_run_mock = AsyncMock(return_value=None)
+    finalize_run_mock = AsyncMock(return_value=None)
+    insert_message_mock = AsyncMock(return_value=uuid4())
     try:
         with patch(
             "app.api.threads.create_adaptive_streaming_chat",
@@ -183,6 +262,15 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
         ), patch(
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
+        ), patch(
+            "app.api.threads.insert_run",
+            new=insert_run_mock,
+        ), patch(
+            "app.api.threads.finalize_run",
+            new=finalize_run_mock,
+        ), patch(
+            "app.api.threads.insert_assistant_message",
+            new=insert_message_mock,
         ):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
@@ -194,7 +282,7 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
                 ) as r:
                     async for _line in r.aiter_lines():
                         pass
-            await await_producer_finalized(mock_supabase)
+            await _await_producer_via_insert_mock(insert_run_mock)
 
         # Assert: no caplog record contains 'GeneratorExit' in its message
         # OR pathname (covers both langsmith/run_helpers.py:1680 and any
@@ -210,16 +298,10 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
             f"Offending records: {offending}"
         )
 
-        # Sanity: we DID hit the timed_out path (otherwise the negation is vacuous)
-        runs_builder = mock_supabase.table("runs")
-        timed_out_updates = [
-            c for c in runs_builder.update.call_args_list
-            if c.args and c.args[0].get("status") == "timed_out"
-        ]
-        assert timed_out_updates, (
-            "Test setup wrong — must have hit timed_out path (otherwise the "
-            "negation 'no GeneratorExit' is vacuously satisfied)"
-        )
+        # Sanity: we DID hit the timed_out path (otherwise the negation is vacuous).
+        # Phase 075.4-06 Task 3: assertion target shifted from supabase mock to
+        # finalize_run AsyncMock (Phase 073-04 D-073-04 SC-minimum).
+        _assert_finalize_status(finalize_run_mock, "timed_out")
     finally:
         app.dependency_overrides.pop(get_supabase, None)
 
@@ -256,6 +338,12 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
 
     mock_supabase = _build_mock_supabase()
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
+
+    # Phase 075.4-06 Task 3 — patch asyncpg helpers as AsyncMock no-ops so
+    # real Postgres pool never sees runs INSERT/UPDATE/messages INSERT.
+    insert_run_mock = AsyncMock(return_value=None)
+    finalize_run_mock = AsyncMock(return_value=None)
+    insert_message_mock = AsyncMock(return_value=uuid4())
     try:
         with patch(
             "app.api.threads.create_adaptive_streaming_chat",
@@ -266,6 +354,15 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
         ), patch(
             "app.api.threads.generate_thread_title",
             return_value=("T", None),
+        ), patch(
+            "app.api.threads.insert_run",
+            new=insert_run_mock,
+        ), patch(
+            "app.api.threads.finalize_run",
+            new=finalize_run_mock,
+        ), patch(
+            "app.api.threads.insert_assistant_message",
+            new=insert_message_mock,
         ):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:
                 async with c.stream(
@@ -277,7 +374,7 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
                 ) as r:
                     async for _line in r.aiter_lines():
                         pass
-            await await_producer_finalized(mock_supabase)
+            await _await_producer_via_insert_mock(insert_run_mock)
 
         # Track A positive assertion: every captured _end_trace call must
         # use error=None or a clean cancellation type. NEVER GeneratorExit.
@@ -305,14 +402,8 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
 
         # Sanity: we DID hit the timed_out path (otherwise the assertion is
         # vacuous — _end_trace would only be called on natural stream end).
-        runs_builder = mock_supabase.table("runs")
-        timed_out_updates = [
-            c for c in runs_builder.update.call_args_list
-            if c.args and c.args[0].get("status") == "timed_out"
-        ]
-        assert timed_out_updates, (
-            "Test setup wrong — must have hit timed_out path (otherwise the "
-            "Track A assertion is vacuously satisfied via natural stream end)"
-        )
+        # Phase 075.4-06 Task 3: assertion target shifted from supabase mock to
+        # finalize_run AsyncMock (Phase 073-04 D-073-04 SC-minimum).
+        _assert_finalize_status(finalize_run_mock, "timed_out")
     finally:
         app.dependency_overrides.pop(get_supabase, None)

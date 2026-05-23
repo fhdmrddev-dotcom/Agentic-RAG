@@ -120,24 +120,59 @@ def _override_provider_passthrough(effective, provider_id: str):
     return new_settings
 
 
-def _last_runs_insert_payload(mock_supabase) -> dict:
-    """Return the payload of the most-recent runs.insert(...) call.
+def _last_runs_insert_payload(insert_run_mock: AsyncMock) -> dict:
+    """Return the payload of the most-recent insert_run(...) call.
 
-    Mirrors _extract_run_id_from_mock from _run_helpers.py:256-290 but returns
-    the full dict (not just run_id). Filters by status='streaming' so any
-    spawn-failure UPDATE (D-061-04) doesn't pollute the lookup.
+    Phase 075.4-06 Task 3 — FK-violation fix.
+
+    Alternative considered: ``fk_aware_runs_factory`` (Plan 075.4-05 Task 4
+    suite-wide fixture in backend/tests/conftest.py). Rejected here because
+    the factory seeds parents in a REAL Postgres pool (auth.users → threads
+    → runs), but this test file's conftest stack uses placeholder
+    ``SUPABASE_URL=https://test.supabase.co`` so the factory would hit its
+    ``pytest.skip`` path. The factory remains the canonical tool for real-
+    Postgres binding tests; AsyncMock-patching is the correct idiom for
+    mock-Supabase test files like this one (D-075.4-G3 bucket-c bulk
+    pattern). See 075.4-TEST-TRIAGE.md "Engineering note" for full rationale.
+
+    Pre-Phase-073-04: the production code called
+    ``_supabase.table("runs").insert(...).execute()``. This helper used to
+    read from ``mock_supabase.table("runs").insert.call_args_list``.
+
+    Phase 073-04 (D-073-04 SC-minimum) flipped the runs INSERT hot path to
+    ``app.db.runs.insert_run`` (asyncpg). The supabase mock's
+    ``runs.insert.call_args_list`` is now always empty (production code
+    never touches it); the production asyncpg call previously hit real
+    Postgres and FK'd out on ``runs_thread_id_fkey`` because the parent
+    threads row was never seeded.
+
+    The fix swaps the source-of-truth assertion target from the supabase
+    mock to the AsyncMock-patched ``app.api.threads.insert_run``. Callers
+    pass the same AsyncMock here that they applied to the patch. The
+    resulting dict mirrors the legacy supabase payload shape closely
+    enough for the existing test assertions: every field the test asserts
+    on (``provider``, ``model``, ``status``) comes from the kwargs of the
+    asyncpg helper signature defined at backend/app/db/runs.py:26-56.
     """
-    runs_builder = mock_supabase.table("runs")
-    insert_calls = runs_builder.insert.call_args_list
-    assert insert_calls, "Expected at least one runs INSERT call (D-061-11 lifecycle)"
-    for call in insert_calls:
-        payload = call.args[0] if call.args else call.kwargs.get("data")
-        if isinstance(payload, dict) and payload.get("status") == "streaming":
-            return payload
-    raise AssertionError(
-        f"No 'streaming' run insert found. Observed: "
-        f"{[c.args[0] if c.args else c.kwargs.get('data') for c in insert_calls]!r}"
+    calls = insert_run_mock.call_args_list
+    assert calls, (
+        "Expected at least one insert_run(...) call (D-061-11 lifecycle / "
+        "Phase 073-04 D-073-04 SC-minimum asyncpg helper)"
     )
+    # The helper is invoked exactly once per run lifecycle (status='streaming'
+    # at entry). Tests assert on the FIRST call's kwargs.
+    call = calls[0]
+    kwargs = dict(call.kwargs)
+    # Convert any UUID/typed values to strings for assertion parity with the
+    # legacy supabase payload shape (which used str everywhere).
+    return {
+        "provider": kwargs.get("provider"),
+        "model": kwargs.get("model"),
+        "status": kwargs.get("status"),
+        "run_id": str(kwargs.get("run_id")) if kwargs.get("run_id") is not None else None,
+        "thread_id": str(kwargs.get("thread_id")) if kwargs.get("thread_id") is not None else None,
+        "user_id": str(kwargs.get("user_id")) if kwargs.get("user_id") is not None else None,
+    }
 
 
 async def _post_message(client: httpx.AsyncClient, body: dict) -> httpx.Response:
@@ -189,6 +224,14 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
 
     captured_run_id: list[str] = []
 
+    # Phase 075.4-06 Task 3 — FK-violation fix.
+    # Patch the asyncpg helpers as AsyncMock no-ops so the real Postgres pool
+    # never sees a runs INSERT (which FK'd out on runs_thread_id_fkey without
+    # the parent threads row). The test design is mock-supabase throughout;
+    # patching the new helpers preserves that idiom for the Phase 073-04 flip.
+    insert_run_mock = AsyncMock(return_value=None)
+    finalize_run_mock = AsyncMock(return_value=None)
+    insert_message_mock = AsyncMock(return_value=uuid4())  # returns UUID
     try:
         with patch(
             "app.api.threads.load_user_settings",
@@ -208,6 +251,15 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
             return_value=([], None),
+        ), patch(
+            "app.api.threads.insert_run",
+            new=insert_run_mock,
+        ), patch(
+            "app.api.threads.finalize_run",
+            new=finalize_run_mock,
+        ), patch(
+            "app.api.threads.insert_assistant_message",
+            new=insert_message_mock,
         ):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
@@ -218,7 +270,7 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
                 f"Expected 201; got {resp.status_code} body={resp.text[:300]}"
             )
             captured_run_id.append(resp.json()["run_id"])
-            payload = _last_runs_insert_payload(mock_supabase)
+            payload = _last_runs_insert_payload(insert_run_mock)
             return payload
     finally:
         app.dependency_overrides.pop(get_supabase, None)
