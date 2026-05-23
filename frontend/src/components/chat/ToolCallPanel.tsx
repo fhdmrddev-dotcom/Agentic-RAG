@@ -713,9 +713,13 @@ const [expanded, setExpanded] = useState(true)
             const tc = item.tc
             // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
-            // Use persisted sub_agent or live streaming sub_agent
+            // 075.6 Plan 03 / Req #6: drop the narrow `tc.name === "analyze_document"`
+            // gate. Any sub-agent run's live `m.sub_agent.content` (already accumulated
+            // server-side via sub_agent_delta events for ALL sub-agent kinds) now
+            // surfaces inside the parent tool row that triggered it. Precedence rule
+            // unchanged: tool-scoped tc.sub_agent wins over message-scoped subAgent prop.
             const agentState: SubAgentState | undefined =
-              tc.sub_agent ?? (tc.name === "analyze_document" ? subAgent : undefined)
+              tc.sub_agent ?? subAgent
 
             return (
               <div key={i} className="pt-2.5 animate-toolSlideIn" style={{ animationDelay: `${i * 80}ms` }}>
