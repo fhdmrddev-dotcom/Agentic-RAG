@@ -709,3 +709,211 @@ async def test_anthropic_path_emits_code_so_far(seeded_thread):
                 f"prev_len={len(prev['code_so_far'])} > "
                 f"curr_len={len(curr['code_so_far'])}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 075.6 Plan 01 — Req #1: Google adapter `code_so_far` field
+# ---------------------------------------------------------------------------
+
+
+def _google_events_with_big_args(
+    tool_name: str = "analyze_document",
+    chunk_size: int = 1024,
+    n_chunks: int = 12,
+):
+    """Yield events in the shape stream_google() normally yields.
+
+    Mirrors google_service.py — usage, tool_preparing, then
+    tool_args_progress at 5KB boundaries, then tool_start + finish.
+
+    Like the Anthropic fixture, this includes tool_args_progress yields at
+    each 5KB cumulative boundary (post-Task-2 production shape) with the
+    additive `code_so_far` field carrying the FULL cumulative args.
+    The threads.py `_on_chunk_google` dispatch routes those yields
+    through `_emit` end-to-end.
+    """
+    # Initial usage event.
+    yield {"type": "usage", "input_tokens": 10, "output_tokens": 0}
+
+    # tool_preparing — name known.
+    yield {
+        "type": "tool_preparing",
+        "id": "call_g_abc",
+        "name": tool_name,
+        "index": 0,
+    }
+
+    # tool_args_progress yields at each 5KB cumulative boundary.
+    cumulative = ""
+    for i in range(n_chunks):
+        cumulative += "z" * chunk_size
+        size = len(cumulative.encode("utf-8"))
+        if (i + 1) * chunk_size in (5120, 10240):
+            tail = cumulative.encode("utf-8")[-5120:].decode("utf-8", errors="ignore")
+            yield {
+                "type": "tool_args_progress",
+                "tool_index": 0,
+                "name": tool_name,
+                "args_so_far": tail,
+                "total_args_bytes_so_far": size,
+                # Phase 075.6 Plan 01 / Req #1: full cumulative args.
+                "code_so_far": cumulative,
+            }
+
+    # tool_start — args complete.
+    yield {
+        "type": "tool_start",
+        "id": "call_g_abc",
+        "name": tool_name,
+        "args": {"text": cumulative},
+    }
+
+    # Terminal usage_delta + finish so the agent loop stops without tool exec.
+    yield {"type": "usage_delta", "output_tokens": 100}
+    yield {"type": "finish", "finish_reason": "stop", "tool_calls": []}
+
+
+async def _capture_google_events(events_iter, seeded_thread_info: dict):
+    """Drive the Google path: patch stream_google to return events_iter.
+
+    Forces user_settings.active_provider="google" + a Google model so
+    threads.py routes the agent loop through the Google branch
+    (line ~1936 elif active_provider_name == "google":).
+    The seeded thread/user pair satisfies the runs FK constraint.
+    """
+    from app.dependencies import get_current_user
+
+    thread_id = seeded_thread_info["thread_id"]
+    user_id = seeded_thread_info["user_id"]
+    OWNER_USER = {"id": user_id, "email": "phase-075-test@test.local"}
+
+    mock_supabase = _build_mock_supabase()
+
+    app.dependency_overrides[get_supabase] = lambda: mock_supabase
+    app.dependency_overrides[get_current_user] = lambda: OWNER_USER
+
+    try:
+        from app.models.user_settings import load_user_settings as _real_load
+
+        def _force_google_settings(uid, *a, **k):
+            base = _real_load(uid, *a, **k)
+            return base.model_copy(update={
+                "active_provider": "google",
+                "llm_model": "gemini-2.5-flash",
+                "llm_api_key": "test-google-key",
+            })
+
+        _call_counter = {"n": 0}
+
+        def _stream_google_side_effect(*a, **k):
+            _call_counter["n"] += 1
+            if _call_counter["n"] == 1:
+                return _ClosableIterator(events_iter)
+            stop_only = [
+                {"type": "usage", "input_tokens": 1, "output_tokens": 0},
+                {"type": "usage_delta", "output_tokens": 1},
+                {"type": "finish", "finish_reason": "stop", "tool_calls": []},
+            ]
+            return _ClosableIterator(stop_only)
+
+        with patch(
+            "app.api.threads.stream_google",
+            side_effect=_stream_google_side_effect,
+        ), patch(
+            "app.services.suggestion_service.generate_suggestions",
+            return_value=([], None),
+        ), patch(
+            "app.api.threads.generate_thread_title",
+            return_value=("T", None),
+        ), patch(
+            "app.api.threads.load_user_settings",
+            side_effect=_force_google_settings,
+        ):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as ac:
+                resp = await ac.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "analyze the doc please", "agent_mode": "default"},
+                )
+                assert resp.status_code == 201, (
+                    f"POST failed: {resp.status_code} {resp.text[:400]}"
+                )
+                body = resp.json()
+                run_id = body["run_id"]
+
+                runs_builder = mock_supabase.table("runs")
+                runs_builder.execute.side_effect = lambda *a, **k: type("R", (), {
+                    "data": {
+                        "run_id": run_id,
+                        "status": "streaming",
+                        "thread_id": thread_id,
+                        "error": None,
+                    },
+                    "count": None,
+                })()
+
+                await asyncio.sleep(0.3)
+
+                events: list[dict] = []
+                async with ac.stream(
+                    "GET", f"/runs/{run_id}/stream?since=0",
+                    headers={"Authorization": "Bearer test-token"},
+                    timeout=30.0,
+                ) as stream_resp:
+                    async for line in stream_resp.aiter_lines():
+                        if line.startswith("data: "):
+                            payload = json.loads(line[6:])
+                            events.append(payload)
+                            if payload.get("type") in TERMINAL_TYPES:
+                                break
+
+        return events
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_google_path_emits_code_so_far(seeded_thread):
+    """075.6 Req #1 (Google): every tool_args_progress event from the
+    Google adapter carries a non-empty `code_so_far` AND consecutive
+    events for the same tool_index are prefix-monotonic.
+
+    Contrast: `args_so_far` is the 5 KB sliding-window tail; `code_so_far`
+    is the FULL cumulative concatenated args (RESEARCH Pitfall 3).
+    """
+    events = await _capture_google_events(
+        list(_google_events_with_big_args()),
+        seeded_thread,
+    )
+    progress = [e for e in events if e.get("type") == "tool_args_progress"]
+    assert len(progress) >= 2, (
+        f"Google path: expected >=2 progress events with code_so_far; "
+        f"got {len(progress)} events. All types: "
+        f"{[e.get('type') for e in events]}"
+    )
+
+    for e in progress:
+        assert "code_so_far" in e, (
+            f"tool_args_progress event missing `code_so_far` key: {e}"
+        )
+        assert isinstance(e["code_so_far"], str) and e["code_so_far"], (
+            f"`code_so_far` must be a non-empty string; got {e['code_so_far']!r}"
+        )
+
+    by_index: dict[int, list[dict]] = {}
+    for e in progress:
+        by_index.setdefault(e["tool_index"], []).append(e)
+    for idx, evts in by_index.items():
+        for prev, curr in zip(evts, evts[1:]):
+            assert curr["code_so_far"].startswith(prev["code_so_far"]), (
+                f"tool_index={idx}: code_so_far is NOT prefix-monotonic. "
+                f"prev_len={len(prev['code_so_far'])} "
+                f"curr_len={len(curr['code_so_far'])}"
+            )
+            assert len(curr["code_so_far"]) >= len(prev["code_so_far"]), (
+                f"tool_index={idx}: code_so_far length must be non-decreasing"
+            )

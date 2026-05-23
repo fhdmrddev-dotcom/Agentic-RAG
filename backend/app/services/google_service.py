@@ -473,6 +473,13 @@ def stream_google(
                                     "name": name,
                                     "args_so_far": _args_so_far,
                                     "total_args_bytes_so_far": _bytes_total,
+                                    # Phase 075.6 Plan 01 / Req #1: additive
+                                    # `code_so_far` field carrying the FULL
+                                    # cumulative concatenated args string.
+                                    # Equivalent of Anthropic's `tb["arguments"]`
+                                    # — see RESEARCH Pitfall 3 (contrast with
+                                    # `args_so_far` = 5 KB sliding-window tail).
+                                    "code_so_far": tool_blocks[idx]["arguments"],
                                 }
                     # tool_start (args complete on this chunk for Google).
                     yield {

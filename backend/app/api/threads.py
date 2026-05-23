@@ -2006,12 +2006,16 @@ async def send_message(
                                             await _emit(redis, run_id, 'tool_preparing', name=_g_event['name'], index=_idx)
                                     elif _etype == "tool_args_progress":
                                         # Phase 075 D-075-10 parity — pass-through to SSE.
+                                        # Phase 075.6 Plan 01 / Req #1: forward
+                                        # `code_so_far` so the additive field
+                                        # rides the wire end-to-end (Google axis).
                                         await _emit(
                                             redis, run_id, "tool_args_progress",
                                             tool_index=_g_event["tool_index"],
                                             name=_g_event["name"],
                                             args_so_far=_g_event["args_so_far"],
                                             total_args_bytes_so_far=_g_event["total_args_bytes_so_far"],
+                                            code_so_far=_g_event["code_so_far"],
                                         )
                                     elif _etype == "tool_start":
                                         _idx = len(tool_calls_buffer)
