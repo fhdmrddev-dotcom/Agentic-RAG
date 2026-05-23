@@ -752,15 +752,19 @@ def _uses_max_completion_tokens(model: str) -> bool:
 
     OpenAI o-series and GPT-5+ family dropped max_tokens in favour of
     max_completion_tokens. Sending max_tokens to these models returns a 400.
+
+    Plan 075.4-02 D-075.4-NN: registry-first. ``ModelCapability.uses_max_completion_tokens``
+    populated on every o1/o3/o4/gpt-5+ row in config.MODEL_CAPABILITIES. Unregistered
+    models fall back to the startswith heuristic as defense-in-depth so adding a
+    new model like ``gpt-5.5-future`` works without touching this file (or until
+    the new model lands in MODEL_CAPABILITIES with an explicit flag).
     """
-    m = model.lower()
-    # o1 / o3 / o4 reasoning models
-    if m.startswith(("o1", "o3", "o4")):
-        return True
-    # GPT-5 family: gpt-5, gpt-5.1, gpt-5.2, gpt-5.4, gpt-5.4-mini, etc.
-    if m.startswith("gpt-5"):
-        return True
-    return False
+    cap = get_model_capability(model)
+    if cap.get("uses_max_completion_tokens") is not None:
+        return bool(cap["uses_max_completion_tokens"])
+    # Inferred fallback — keep startswith logic as defense-in-depth.
+    m = (model or "").lower()
+    return m.startswith(("o1", "o3", "o4")) or m.startswith("gpt-5")
 
 
 # ── Provider normalization ────────────────────────────────────────────────────
@@ -892,8 +896,21 @@ def create_adaptive_streaming_chat(
             # Native mode: pass tools via API parameter
             kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)
             kwargs["tool_choice"] = "auto"
-            # parallel_tool_calls is not supported by all compat layers — skip for known-bad providers.
-            if provider.lower() not in _NO_PARALLEL_TOOL_CALLS:
+            # Plan 075.4-02 D-075.4-NN — registry-first parallel-tools gate.
+            # Existing semantic: set ``parallel_tool_calls=False`` ONLY for providers
+            # that SUPPORT the kwarg (the kwarg exists to disable parallel tools where
+            # the API supports them; sending it to providers that REJECT it 400s).
+            # registry ``supports_parallel_tools`` populated False on google rows.
+            # Unregistered models infer support via legacy frozenset fallback so
+            # adding a future ``foo-provider`` is registry-only.
+            cap = get_model_capability(effective_model)
+            supports_parallel = cap.get("supports_parallel_tools")
+            if supports_parallel is None:
+                # Inferred fallback: provider-prefix check (legacy behavior).
+                supports_parallel = (
+                    (cap.get("provider", "") or "").lower() not in _NO_PARALLEL_TOOL_CALLS
+                )
+            if supports_parallel:
                 kwargs["parallel_tool_calls"] = False
 
             # OpenRouter quality strategy enhancements

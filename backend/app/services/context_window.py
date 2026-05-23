@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 
-from app.config import settings, PROVIDER_CONTEXT_DEFAULTS, MODEL_CONTEXT_DEFAULTS
+from app.config import settings, PROVIDER_CONTEXT_DEFAULTS, MODEL_CONTEXT_DEFAULTS, get_model_capability
 
 logger = logging.getLogger(__name__)
 
@@ -97,13 +97,20 @@ def estimate_tokens(text: str | None, model: str = "") -> int:
     Falls back to chars/4 heuristic for all other providers or when tiktoken
     is not installed. The `model` parameter is optional — omitting it gives chars/4.
 
+    Plan 075.4-02 D-075.4-NN: registry-driven gate. Replaces the hardcoded
+    ``model.startswith("gpt-") or model.startswith(("o1", "o3"))`` heuristic with
+    ``get_model_capability(model).get("provider") == "openai"``. Unregistered
+    OpenAI models routed via the inference layer (``_infer_provider_for`` matches
+    ``gpt-*`` / ``o1-9-`` patterns) still resolve to ``provider="openai"`` and
+    hit the tiktoken path; non-OpenAI models fall through to chars/4 as before.
+
     Args:
         text: String to estimate. Returns 0 for None/empty.
         model: Model ID (e.g. "gpt-4o"). Empty string or non-OpenAI → chars/4.
     """
     if not text:
         return 0
-    if model and (model.startswith("gpt-") or model.startswith(("o1", "o3"))):
+    if model and get_model_capability(model).get("provider") == "openai":
         enc = _get_cl100k()
         if enc is not None:
             return max(1, len(enc.encode(text)))

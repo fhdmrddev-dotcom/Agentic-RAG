@@ -1676,6 +1676,12 @@ async def send_message(
                         try:
                             active_provider_name = getattr(user_settings, "active_provider", "") or ""
 
+                            # Plan 075.4-02 audit (Site 4): gate is operator-intent via
+                            # active_provider. Models routed through OpenRouter that
+                            # happen to be Claude variants are intentionally NOT pushed
+                            # through the native Anthropic path (operator chose OpenRouter
+                            # for a reason — routing, billing, fallbacks). Registry-aware
+                            # secondary gate considered + rejected; no code change required.
                             if active_provider_name == "anthropic":
                                 # --- Anthropic native SDK path (GEN-02) ---
                                 from app.services.openai_service import _resolve_max_tokens
