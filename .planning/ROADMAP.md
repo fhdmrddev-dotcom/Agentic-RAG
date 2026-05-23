@@ -536,7 +536,7 @@ Plans:
 
 **Requirements:** TBD (decisions baked at /gsd:discuss-phase 075.4; the headline new decision is D-075.4-NN: "unknown provider = explicit error, NOT silent ollama default").
 
-**Plans:** 5 plans (proposed 2026-05-23 — full scope in `~/.claude/plans/serialized-rolling-puppy.md` + audit doc)
+**Plans:** 6 plans (proposed 2026-05-23 as 5; Plan 05 split into 05 + 06 at plan-phase time per plan-checker W-1 — Wave 0 bootstrap separated from Wave 3 finalize for clean orchestrator wave-grouping. Full scope in `~/.claude/plans/serialized-rolling-puppy.md` + audit doc)
 
 **Success Criteria** (what must be TRUE):
   1. All 5 globals in `frontend/src/stores/streamsStore.ts` (`isStreaming`, `loadingThreadId`, `reconcileError`, `fallbackNotice`, `subscriptionsByRunId`) are promoted to per-thread keys with per-thread selectors. Cross-thread bleed-through eliminated. 067.5 empty-thread-until-refresh regression test added (Phase 082 inherits coverage).
@@ -555,7 +555,8 @@ Plans:
 - [ ] 075.4-02-PLAN.md — Gemini 3 thought_signature + provider-agnostic hardcoding sweep (backend) — capture+echo thought_signature for google; apply Phase 075.3 Plan 02 registry-or-inference pattern to 6 hardcoded sites; explicit-error gate at _PROVIDER_BASE_URLS
 - [ ] 075.4-03-PLAN.md — Streaming + agent-loop reliability + remaining bugs (backend) — terminal-status race, content-hash output dedup, sub-agent truncation warning, iteration-cap drop guard, BUG-260522-02 backend fix (~30 lines), empty-response-fallback close, Anthropic LangSmith @traceable re-verify, skill-loading hygiene audit
 - [ ] 075.4-04-PLAN.md — Perf + UX + safety (frontend + small backend) — React.memo MessageItem, useMemo MarkdownRenderer, lazy recharts, SANDBOX_IMAGE docs, stderr badge, defensive sentinel guard in save_override (WR-02), Settings form-state 2-click fix, "supersedes previous" UI affordance for output dedup, verify new-chat cold-load uses snapshot
-- [ ] 075.4-05-PLAN.md — E2E backstop + dev infra + normative process (test infra) — Playwright + 6 scenarios with LangSmith assertions + DB-state teardown; restart-backend scripts (Windows orphan-worker aware); /health endpoint; frontend-tests.yml CI workflow; triage 95 pre-existing backend test failures (revised from stale audit count of 44 — RESEARCH measured 95 on v2.5-dev HEAD 2026-05-23); CLAUDE.md normative UAT recipe rule
+- [ ] 075.4-05-PLAN.md — E2E backstop bootstrap (Wave 0, test infra substrate) — CLAUDE.md normative UAT recipe rule; Playwright config + 3 fixtures (auth env-driven, db-teardown localhost-gated, langsmith poller); restart-backend.{ps1,sh} scripts (Windows orphan-worker aware); /health endpoint; frontend-tests.yml CI workflow; backend/tests/conftest.py FK-aware runs factory; 7 bug-report frontmatter updates (5 folded + 1 deferred + 1 auto-close)
+- [ ] 075.4-06-PLAN.md — E2E backstop finalize (Wave 3, depends on 01-05) — 6 Playwright scenarios mapping 1:1 to regression classes with LangSmith trace assertions + DB-state teardown; 075.4-TEST-TRIAGE.md categorizing 95 pre-existing backend test failures (revised from stale audit count of 44 — RESEARCH measured 95 on v2.5-dev HEAD 2026-05-23); FK-violation cluster fix (~6 failures via Plan 05 fk_aware_runs_factory); operator UAT scoreboard sweep + CI dry-run
 
 **Forward-references (must be honored by downstream phases — captured in plan files):**
 - → Phase 077/079 (multi-worker enable): Plan 02's `_WARNED_UNKNOWN_MODEL_IDS: set[str]` module-level dedup is single-worker-safe per D-v2.5-02; under `--workers N` becomes warn-once-per-worker (acceptable noise). Do NOT pre-emptively Redis-back it.
