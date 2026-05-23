@@ -3,6 +3,12 @@ import { MessageList } from "./MessageList"
 import { MessageInput } from "./MessageInput"
 import { useMessages } from "@/hooks/useMessages"
 import { useStreamsStore } from "@/stores/streamsStore"
+import {
+  useStreamingForThread,
+  useLoadingForThread,
+  useReconcileErrorForThread,
+  useFallbackNoticeForThread,
+} from "@/providers/StreamsProvider"
 import { getProviders } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
 import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
@@ -25,10 +31,13 @@ interface Props {
 }
 
 export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
+  // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
+  // values (isStreaming, fallbackNotice) for back-compat — but the composer
+  // disabled prop and per-thread surfaces go through the direct selectors
+  // below so cross-thread isolation is preserved regardless of which thread
+  // is currently being viewed.
   const {
     messages,
-    isStreaming,
-    fallbackNotice,
     loadMessages,
     sendMessage,
     stopStreaming,
@@ -44,26 +53,41 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
 
-  // Phase 068.5 (D-068.5-08..10): retry banner state + manual retry + dismiss.
-  // The silent-1s-then-banner retry policy lives in StreamsProvider's
-  // loadMessages action body; this surface only reads reconcileError and
-  // exposes Retry / Dismiss affordances over cached content (banner never
-  // blanks the message list — L-068.5-01 / L-068.5-03 preserve cached data).
-  const reconcileError = useStreamsStore((s) => s.reconcileError)
+  // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
+  // (BUG-260523-01 close), MessageList streaming prop, and reconcile/
+  // fallback banners all derive from THIS thread's state — Thread A
+  // streaming no longer disables Thread B's composer.
+  const isStreaming = useStreamingForThread(thread?.id ?? null)
+  const fallbackNotice = useFallbackNoticeForThread(thread?.id ?? null)
+  const reconcileError = useReconcileErrorForThread(thread?.id ?? null)
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when
   // we're actually waiting on data (not on new/empty threads with no fetch).
-  const loadingThreadId = useStreamsStore((s) => s.loadingThreadId)
-  const isLoadingThisThread = !!thread && loadingThreadId === thread.id
+  // Plan 075.4-01 D-075.4-A1: thread-scoped loadingThreads selector.
+  const isLoadingThisThread = useLoadingForThread(thread?.id ?? null)
   const handleRetryReconcile = useCallback(() => {
-    useStreamsStore.setState({ reconcileError: null })
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors — clear this
+    // thread's entry only (no cross-thread bleed).
     if (thread) {
+      useStreamsStore.setState((s) => {
+        if (!s.reconcileErrors.has(thread.id)) return {}
+        const next = new Map(s.reconcileErrors)
+        next.delete(thread.id)
+        return { reconcileErrors: next }
+      })
       loadMessages(thread.id).catch(console.error)
     }
   }, [thread, loadMessages])
   const dismissReconcileError = useCallback(() => {
-    useStreamsStore.setState({ reconcileError: null })
-  }, [])
+    // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors clear.
+    if (!thread) return
+    useStreamsStore.setState((s) => {
+      if (!s.reconcileErrors.has(thread.id)) return {}
+      const next = new Map(s.reconcileErrors)
+      next.delete(thread.id)
+      return { reconcileErrors: next }
+    })
+  }, [thread])
 
   useEffect(() => {
     setAgentMode("default")
@@ -214,6 +238,11 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     )
   }
 
+  // Plan 075.4-01 D-075.4-A1: thread-scoped composer enablement; closes
+  // BUG-260523-01 at the `disabled` prop below. `isStreaming` here is the
+  // value of useStreamingForThread(thread?.id ?? null) (declared at the top
+  // of this component), so Thread A streaming will NOT disable Thread B's
+  // composer.
   const inputBar = (
     <MessageInput
       onSend={handleSend}
@@ -313,9 +342,14 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       {/* Phase 068.5 D-068.5-08..10: silent-1s-then-banner retry banner. Renders
           over cached content when loadMessages fails twice in a row. Dismissable
           (Retry re-fires reconcile; × clears state). Pattern S2 amber-400 chrome,
-          sibling of fallbackNotice slot. threadId predicate prevents stale banner
-          rendering on a thread different from the failing one. */}
-      {reconcileError && reconcileError.threadId === thread?.id && (
+          sibling of fallbackNotice slot.
+
+          Plan 075.4-01 D-075.4-A1: thread-scoped useReconcileErrorForThread
+          returns null for any thread other than thread?.id by construction
+          (per-thread Map keyed by threadId), so the legacy
+          threadId-equality predicate is no longer needed. The selector
+          naturally scopes — no cross-thread bleed. */}
+      {reconcileError && (
         <div
           className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1 flex items-center justify-between"
           data-testid="reconcile-error-banner"
