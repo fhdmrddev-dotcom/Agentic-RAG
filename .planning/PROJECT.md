@@ -310,6 +310,43 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - **Ingestion dependency**: grep/glob/read only work on ingested content, not raw uploaded files
 - **Sandbox**: Docker required for code execution; SANDBOX_ENABLED=false (default) disables all sandbox features safely
 
+## Appendix
+
+### Confidence Calibration (Phase 076, 2026-05-25)
+
+**Extractor defaults at calibration time:** camelot (tables) + pymupdf_full (images) + legacy/pypdf (text) + none (equations)
+**Embedding model:** text-embedding-3-small
+**Sample size:** 121 queries (100 from audit_log + 21 synthetic)
+
+| Metric | Value |
+|--------|-------|
+| Median avg_similarity | 0.4861 |
+| P25 | 0.3807 |
+| P75 | 0.5433 |
+| P10 | 0.3010 |
+| P90 | 0.5642 |
+| Std dev | 0.1330 |
+
+**Bucket proportions at prior thresholds (high >= 0.55 / medium >= 0.40):**
+| Bucket | Proportion | Target |
+|--------|------------|--------|
+| High | 14.0% | ~30% |
+| Medium | 53.7% | ~45% |
+| Low | 32.2% | ~25% |
+
+**Bucket proportions at new thresholds (high >= 0.54 / medium >= 0.38):**
+| Bucket | Proportion | Target |
+|--------|------------|--------|
+| High | 30.6% | ~30% |
+| Medium | 45.5% | ~45% |
+| Low | 24.0% | ~25% |
+
+**Verdict:** ADJUSTED from 0.55/0.40 to 0.54/0.38 -- post-071.3 extraction stack (camelot tables + pymupdf_full images) shifted the score distribution lower (median 0.4861). The prior 0.55 high threshold captured only 14% of queries as "high confidence" (target ~30%). Lowering to 0.54/0.38 restores D-04 target bucket balance within 1% tolerance.
+
+**Telemetry:** pdf_extraction_runs.engine column exists and schema is correct; 0 recent rows because no extraction was triggered in the last 30 days. Column will be populated on next /upload or /reextract.
+
+**Re-run:** `cd backend && venv/Scripts/python.exe ../scripts/calibrate_confidence.py`
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
