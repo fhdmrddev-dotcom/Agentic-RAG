@@ -496,8 +496,23 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             const agentState: SubAgentState | undefined =
               tc.sub_agent ?? subAgent
 
+            // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
+            // Applied to the per-tool wrapper when the tool is running or
+            // preparing. The .tc-active-wrap class lives in index.css (box-shadow
+            // + soft gradient backdrop); the bottom shimmer reuses
+            // .tool-progress-bar positioned absolute at the wrapper's bottom.
+            const isToolActive = tc.status === "running" || tc.status === "preparing"
+
             return (
-              <div key={i} className="pt-2.5 animate-toolSlideIn" style={{ animationDelay: `${i * 80}ms` }}>
+              <div
+                key={i}
+                className={cn(
+                  "pt-2.5 animate-toolSlideIn",
+                  isToolActive && "tc-active-wrap rounded-md px-2",
+                )}
+                data-testid={isToolActive ? "tc-active" : undefined}
+                style={{ animationDelay: `${i * 80}ms` }}
+              >
                 {/* D-067-03: Step N divider on iteration boundary; plain inter-tool separator otherwise.
                     Renders ONLY when (a) not the first item, (b) both current and previous tool items
                     have a defined iteration, (c) iterations differ. Pitfall 4: NEVER above first iteration.
@@ -634,6 +649,18 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                     {/* Sub-agent block (live or restored) */}
                     {agentState && <SubAgentBlock agent={agentState} />}
                   </>
+                )}
+                {/* Phase 075.8 Task 3 (sketch 002 D6): bottom progress shimmer
+                    on every active tool — both the execute_code branch and the
+                    generic-tool branch. Absolute-positioned against the
+                    .tc-active-wrap parent so it sits at the bottom edge
+                    without affecting layout. Top progress is reserved for the
+                    run-card header (sketch D6 — avoid double-shimmer noise). */}
+                {isToolActive && (
+                  <div
+                    className="tool-progress-bar absolute bottom-0 left-0 right-0"
+                    data-testid="tc-bottom-shimmer"
+                  />
                 )}
               </div>
             )
