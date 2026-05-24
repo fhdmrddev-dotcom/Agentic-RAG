@@ -78,6 +78,7 @@ import {
 } from "@/stores/streamsStore"
 import { makeThrottle } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
+import { makeToolKey } from "@/lib/toolKey"
 
 // RESEARCH §Finding #1: module-level constant gives every empty-bucket subscriber
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
@@ -272,8 +273,22 @@ export function makeStreamCallbacks(opts: {
           const preparingId = `preparing-${index}`
           const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
           if (alreadyPreparing) return m
+          // Phase 075.9 T2: stamp the stable client-side key at first
+          // observation. Independent of `preparingId` / future `tc.id`
+          // mutations across the preparing→running transition. Provider
+          // is not currently surfaced through callbacks (callback factory
+          // would need provider routing context); falls back to "unknown",
+          // which is fine — `messageId + name + observedAt + index` is
+          // already collision-stable within a single assistant message.
+          const clientKey = makeToolKey({
+            messageId: assistantId,
+            name,
+            observedAt: Date.now(),
+            index,
+          })
           const preparingEntry: ToolCall = {
             id: preparingId,
+            clientKey,
             name,
             args: {},
             status: "preparing",
@@ -369,14 +384,28 @@ export function makeStreamCallbacks(opts: {
             if (finalizedIdx !== -1) {
               updatedCalls = existingCalls  // no-op; same-name entry already exists
             } else {
+              // Phase 075.9 T2: stamp the stable client-side key at first
+              // observation. Some providers skip the preparing event and go
+              // straight to tool_start (this branch), so the key must be
+              // stamped here too. Uses the current array length as the
+              // tie-break `index` so two same-name + same-millisecond
+              // tool_start events on the same message can't collide.
+              const observedAt = Date.now()
+              const clientKey = makeToolKey({
+                messageId: assistantId,
+                name,
+                observedAt,
+                index: existingCalls.length,
+              })
               updatedCalls = [
                 ...existingCalls,
                 {
-                  id: `running-${Date.now()}`,
+                  id: `running-${observedAt}`,
+                  clientKey,
                   name,
                   args,
                   status: "running" as const,
-                  startedAt: Date.now(),
+                  startedAt: observedAt,
                   iteration: currentIteration,
                 },
               ]

@@ -10,6 +10,7 @@ import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
+import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 
@@ -304,17 +305,27 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
   // visible duplicates in UAT Round 3. Dedup preserves first occurrence
   // ordering so the timeline / displayItems sort below behaves the same;
   // only the duplicate suffix entries get dropped.
+  //
+  // Phase 075.9 T3: PREFER `tc.clientKey` over `tc.id`. The provider-emitted
+  // `tc.id` mutates across the preparing→running transition on some
+  // providers (Anthropic, OpenRouter), so two snapshots of the same logical
+  // tool can produce two distinct dedup keys → both render mid-stream. The
+  // stable `clientKey` stamped by StreamsProvider on creation closes this
+  // root cause. Fallback chain: clientKey > id > composite (for in-flight
+  // tests / DB-loaded messages without a clientKey stamp).
+  //
+  // The composite fallback (`${name}-${startedAt}-${idx}`) is kept ONLY for
+  // the migration window — once every consumer is on clientKey and historical
+  // DB messages get backfilled (or accept clientKey-less rendering), this
+  // can collapse to `tc.clientKey ?? tc.id`.
   const deduplicatedToolCalls = useMemo(() => {
     const seen = new Set<string>()
     const result: ToolCall[] = []
-    // Phase 075.2 Plan 01 Task 3 (D-075.2-01 §2 / WR-03): fallback key
-    // includes idx tiebreaker so two same-name entries without ids (and
-    // without startedAt) cannot collide and get silently deduped. Dead
-    // code once the Task 2 onToolStart replay-idempotency guard is in,
-    // but ships as defense-in-depth so the next edge case in this
-    // neighborhood cannot produce a silent dedup.
     ;(toolCalls ?? []).forEach((tc, idx) => {
-      const key = tc.id || `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+      // REMOVE after migration window: composite fallback for tools without
+      // a clientKey stamp (DB-loaded historical messages, in-flight test
+      // fixtures). New live-SSE tools always have clientKey.
+      const key = tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
       if (seen.has(key)) return
       seen.add(key)
       result.push(tc)
@@ -458,7 +469,7 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                 const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
                 return (
                   <button
-                    key={`step-summary-${i}-${collapsedTc.id ?? collapsedTc.name}`}
+                    key={`step-summary-${i}-${collapsedTc.clientKey ?? collapsedTc.id ?? collapsedTc.name}`}
                     type="button"
                     onClick={() => setStepsCollapsed(false)}
                     data-testid="step-summary-row"
@@ -652,14 +663,45 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                         (i === lastPreparingIndex), collapsed for past
                         preparing tools. User can toggle either way via the
                         chevron. */}
-                    {tc.status === "preparing" && tc.argsCodeText && tc.argsCodeText.length > 0 && tc.argsBytesStreamed != null && (
-                      <ToolArgsLivePanel
-                        title={`Generating ${tc.name === "execute_code" ? "code" : toolLabel(tc.name)}…`}
-                        contentText={tc.argsCodeText}
-                        byteCount={tc.argsBytesStreamed}
-                        expanded={panelExpanded[tc.id] ?? (i === lastPreparingIndex)}
-                        onToggle={() => togglePanel(tc.id, i === lastPreparingIndex)}
-                      />
+                    {tc.status === "preparing" && tc.argsCodeText && tc.argsCodeText.length > 0 && tc.argsBytesStreamed != null && (() => {
+                      // Phase 075.9 T3: panelExpanded Record key now uses
+                      // clientKey (stable across preparing→running). The
+                      // `tc.id ?? `idx-${i}`` fallback covers DB-loaded
+                      // historical messages and in-flight test fixtures
+                      // that pre-date the T2 stamp — REMOVE after migration
+                      // window.
+                      const panelKey = tc.clientKey ?? tc.id ?? `idx-${i}`
+                      // Phase 075.9 T4: for execute_code preparing, suppress
+                      // the panel body — the Shiki editor inset below owns
+                      // the body now (seamless preparing→running handoff,
+                      // no plain-pre → highlighted blink). The header
+                      // "Generating code… (X.X KB)" affordance stays so the
+                      // byte counter is still glanceable.
+                      const isExecuteCode = tc.name === "execute_code"
+                      return (
+                        <ToolArgsLivePanel
+                          title={`Generating ${isExecuteCode ? "code" : toolLabel(tc.name)}…`}
+                          contentText={tc.argsCodeText!}
+                          byteCount={tc.argsBytesStreamed!}
+                          expanded={panelExpanded[panelKey] ?? (i === lastPreparingIndex)}
+                          onToggle={() => togglePanel(panelKey, i === lastPreparingIndex)}
+                          hideBody={isExecuteCode}
+                        />
+                      )
+                    })()}
+
+                    {/* Phase 075.9 T4: live Shiki editor inset during
+                        execute_code preparing. ExecuteCodeEditorInset reads
+                        tc.argsCodeText ?? tc.args.code internally, so the
+                        same inset mounts here (preparing) and inside
+                        ExecuteCodeBody (running/done) — byte-identical
+                        content at the tool_start transition means no
+                        re-mount, no flash, no re-flow. The Suspense
+                        fallback inside the inset shows a plain-pre with
+                        the same font metrics, so even the WASM-load
+                        moment doesn't shift the row. */}
+                    {tc.status === "preparing" && tc.name === "execute_code" && tc.argsCodeText && tc.argsCodeText.length > 0 && (
+                      <ExecuteCodeEditorInset tc={tc} />
                     )}
 
                     {/* Expandable parameters */}

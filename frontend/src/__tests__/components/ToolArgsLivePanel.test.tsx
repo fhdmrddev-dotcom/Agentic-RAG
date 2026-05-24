@@ -90,4 +90,30 @@ describe("ToolArgsLivePanel", () => {
     // Active-preparing panel: body visible (expanded=true).
     expect(screen.getByText("ACTIVE_CODE")).toBeInTheDocument()
   })
+
+  // Phase 075.9 T4: hideBody mode — used by ToolCallPanel for execute_code
+  // preparing state. The Shiki editor inset (ExecuteCodeEditorInset) takes
+  // ownership of the body so the user sees syntax-highlighted code from
+  // the first streamed bytes. The panel reduces to a header-only band.
+  it("hideBody=true: renders header-only band with title + byte counter, NO chevron, NO body", () => {
+    const onToggle = vi.fn()
+    render(
+      <ToolArgsLivePanel
+        title="Generating code…"
+        contentText="THIS_BODY_MUST_NOT_RENDER"
+        byteCount={3072}
+        expanded={true}  // even with expanded=true, hideBody wins
+        onToggle={onToggle}
+        hideBody={true}
+      />,
+    )
+    // Header-only marker present.
+    expect(screen.getByTestId("tool-args-live-panel-header-only")).toBeInTheDocument()
+    // Body NOT rendered.
+    expect(screen.queryByText("THIS_BODY_MUST_NOT_RENDER")).not.toBeInTheDocument()
+    // Byte counter still visible (the "is something happening" affordance).
+    expect(screen.getByText(/3\.0 KB/)).toBeInTheDocument()
+    // No clickable chevron toggle in header-only mode.
+    expect(screen.queryByRole("button")).not.toBeInTheDocument()
+  })
 })

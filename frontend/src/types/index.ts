@@ -73,6 +73,16 @@ export interface ToolCall {
    * renders use `tc.args.code` as source of truth (panel collapses but the
    * byte-counter header stays for at-a-glance scan). */
   argsCodeText?: string
+  /** Phase 075.9 T2: stable client-side identifier stamped on creation by the
+   * streams store reducer. Independent of provider-emitted `tc.id` lifecycle
+   * — `tc.id` is unstable across preparing→running transitions on some
+   * providers, but `clientKey` is stamped ONCE at first observation and
+   * never mutated. UI surfaces (dedup keys, React keys, Record<string, _>
+   * keys) MUST prefer `clientKey` over `id`; see `frontend/src/lib/toolKey.ts`
+   * for the derivation contract. Optional during the 075.9 migration window
+   * for back-compat with DB-loaded historical tool calls (no SSE stream =
+   * no stamp); will tighten to required in a follow-up phase. */
+  clientKey?: string
 }
 
 export interface SourceReference {
