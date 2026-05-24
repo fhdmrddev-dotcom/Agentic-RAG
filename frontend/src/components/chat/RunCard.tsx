@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, Loader2 } from "lucide-react"
+import { Bot, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
@@ -11,7 +11,7 @@ interface RunCardProps {
 }
 
 /**
- * Phase 075.7 Plan 02 — RunCard wrapper for assistant turns with tool_calls.length > 0.
+ * Phase 075.7 RunCard — wrapper for assistant turns with tool_calls.length > 0.
  *
  * Per CONTEXT D-09: MessageItem mounts <RunCard> for tool-bearing turns only.
  *   Pure-text replies render with NO RunCard, NO border.
@@ -20,8 +20,7 @@ interface RunCardProps {
  * Per CONTEXT D-11 (CORRECTED — see RESEARCH §3.2): sticky header uses
  *   `position: sticky; top: 0` against the Radix ScrollArea Viewport that
  *   MessageList.tsx:91 wraps the message list in. No new scroll container
- *   introduced. Verified that no intermediate transform/overflow ancestor
- *   breaks sticky behavior.
+ *   introduced.
  * Per CONTEXT D-12: RunCard owns the TOP sticky header; MessageItem keeps the
  *   BOTTOM stickyLabelRef indicator at MessageItem.tsx:105-120 verbatim.
  *   Two independent sticky surfaces at opposite ends of the message.
@@ -29,30 +28,64 @@ interface RunCardProps {
  *   animate-brandPulse, animate-fadeSlideUp, tool-progress-bar, animate-pulseGlow.
  * Per RESEARCH §6: message.content (final assistant answer) renders OUTSIDE
  *   RunCard in MessageItem so the deferred Anthropic terminal-frame bug
- *   (BUG-260514-02) remains re-litigable. DO NOT pull message.content into
- *   RunCard.
+ *   (BUG-260514-02) remains re-litigable.
  *
- * NOTE: Plan 02 (this plan) scaffolds the `expanded` state initializer but
- * Plan 03 owns the auto-collapse-on-completion behavior, the collapsed-row
- * summary JSX, and the click-to-expand interaction wire. This plan ships the
- * VISUAL FRAME (sticky header + active glow + timer + counter + brand-pulse
- * avatar + inner ToolCallPanel mount). For Plan 02 we keep `expanded` always
- * true so the body still renders for terminal+tools turns — Plan 03 will land
- * the lazy initializer flip AND the collapsed-row JSX together so the user
- * always has something to click.
+ * Plan 03 (this version) adds (atop Plan 02's visual frame):
+ *   - Lazy useState initializer that defaults to collapsed only when terminal
+ *     AND has tools — historical DB-loaded turns mount already collapsed.
+ *   - useEffect with wasStreamingRef one-shot guard so streaming→terminal
+ *     transition auto-collapses live runs (R-6 + CONTEXT D-05/D-07).
+ *   - Collapsed-row JSX `[bot icon] Run · N tool calls · ✓ status · duration ▸`
+ *     shown when `!expanded && isTerminal && hasTools` (sketch live-run-container
+ *     D5 + UI-SPEC §8.2). Click-to-expand restores the full body.
+ *   - Header click is a NO-OP while `runStatus === "streaming"` (CONTEXT D-08).
+ *   - aria-expanded + role="button" + tabIndex management for keyboard a11y.
  */
 export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardProps) {
   const hasTools = (message.tool_calls?.length ?? 0) > 0
   const isStreamingNow = message.runStatus === "streaming"
+  // Terminal predicate per RESEARCH §5.4: any non-"streaming" runStatus —
+  // including undefined for DB-loaded historical messages — is treated as
+  // terminal. The lazy initializer below uses this to mount historical
+  // tool-bearing turns already collapsed.
+  const isTerminal = !isStreamingNow
+  const shouldAutoCollapse = hasTools && isTerminal
 
-  // Lazy initializer — Plan 02 ships always-expanded. Plan 03 flips to
-  // `!shouldAutoCollapse` AND lands the collapsed-row JSX + streaming→terminal
-  // transition effect. See plan-author's discretion note in PLAN.md (action).
-  const [expanded] = useState(() => true)
+  // Lazy initializer (RESEARCH §4.4):
+  //   - DB-loaded historical (terminal + tools): expanded = false
+  //   - Live streaming (streaming OR streaming+notools OR terminal-but-notools): expanded = true
+  // The useEffect below handles the streaming→terminal live transition.
+  const [expanded, setExpanded] = useState(() => !shouldAutoCollapse)
+
+  // One-shot streaming→terminal transition: when SSE flips runStatus from
+  // "streaming" to a terminal value AND the turn has tool_calls > 0, fold
+  // the body down. wasStreamingRef tracks the previous status so a second
+  // collapse doesn't fire after the user has manually expanded a collapsed
+  // terminal turn (R-6 + CONTEXT D-05 + D-07).
+  const wasStreamingRef = useRef(message.runStatus === "streaming")
+  useEffect(() => {
+    if (wasStreamingRef.current && isTerminal && hasTools) {
+      // This is the one-shot streaming→terminal transition (RESEARCH §4.4).
+      // We intentionally use setState in an effect here because the
+      // collapse must happen ONCE on the transition, AND we must respect
+      // a subsequent user-driven expand (so we can't derive expanded purely
+      // from props). The wasStreamingRef guard makes this a one-shot.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExpanded(false)
+    }
+    wasStreamingRef.current = message.runStatus === "streaming"
+  }, [message.runStatus, hasTools, isTerminal])
+
+  // Header click: CONTEXT D-08 mandates this be a NO-OP while streaming, so
+  // the user cannot accidentally hide the live progress they're watching.
+  // Once terminal, the header toggles expand/collapse like a normal button.
+  const handleHeaderClick = () => {
+    if (message.runStatus === "streaming") return  // D-08 no-op
+    setExpanded(v => !v)
+  }
 
   // Timer: recompute elapsed seconds every 250ms during streaming.
-  // Pattern from Phase 56.1 D-03 (ElapsedTimer setInterval(250ms) with cleanup
-  // on unmount). Freezes when streaming ends.
+  // Freezes when streaming ends.
   const startedAtRef = useRef<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
   useEffect(() => {
@@ -98,12 +131,23 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
       {/* Sticky header — pins against the Radix ScrollArea Viewport that
           MessageList.tsx:91 wraps the message list in (RESEARCH §3.2). */}
       <header
-        className="sticky top-0 z-10 backdrop-blur-md bg-popover/92 border-b border-border px-4 py-3 flex items-center gap-3"
+        role="button"
+        tabIndex={isStreamingNow ? -1 : 0}
+        aria-expanded={expanded}
+        onClick={handleHeaderClick}
+        onKeyDown={(e) => {
+          if (isStreamingNow) return  // D-08: keyboard activation also no-op while streaming
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            setExpanded(v => !v)
+          }
+        }}
+        className={cn(
+          "sticky top-0 z-10 backdrop-blur-md bg-popover/92 border-b border-border px-4 py-3 flex items-center gap-3",
+          !isStreamingNow && "cursor-pointer hover:bg-popover/98 transition-colors",
+        )}
       >
-        {/* Brand-pulse avatar — mirrors MessageItem.tsx:137 predicate verbatim.
-            Per UI-SPEC §6.5 the RunCard sticky-header avatar carries the SAME
-            pulse for tool-bearing turns; MessageItem keeps the outer-column
-            pulse as a fallback for tool-less turns. */}
+        {/* Brand-pulse avatar — mirrors MessageItem.tsx:137 predicate verbatim. */}
         <div
           className={cn(
             "flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center shadow-sm shadow-primary/20",
@@ -113,8 +157,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           <Bot className="w-4 h-4 text-white" />
         </div>
 
-        {/* Title + subtitle stack. Title = active-state copy (e.g. "Running
-            code…"); subtitle = current step. */}
+        {/* Title + subtitle stack. */}
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-foreground truncate">
             {headerTitle}
@@ -148,11 +191,43 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           No new keyframes per UI-SPEC §5.2 + R-7. */}
       {isStreamingNow && <div className="tool-progress-bar" />}
 
+      {/* Plan 03 (R-6 + sketch D5 + UI-SPEC §8.2): Collapsed-row JSX —
+          shown when !expanded && terminal && hasTools. Clicking expands the
+          body. Uses existing animate-fadeSlideUp (CONTEXT D-07; R-7 — no
+          new keyframes). */}
+      {!expanded && isTerminal && hasTools && (
+        <button
+          type="button"
+          data-testid="run-card-collapsed"
+          onClick={() => setExpanded(true)}
+          className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors animate-fadeSlideUp text-sm text-muted-foreground"
+          aria-label="Expand run details"
+        >
+          <Bot className="w-4 h-4 text-primary/60 flex-shrink-0" />
+          <span>
+            Run · {message.tool_calls?.length ?? 0} tool
+            {" "}
+            {(message.tool_calls?.length ?? 0) === 1 ? "call" : "calls"}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            {statusGlyph(message.runStatus)} {statusWord(message.runStatus)}
+          </span>
+          {elapsedMs > 0 && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono">{(elapsedMs / 1000).toFixed(1)}s</span>
+            </>
+          )}
+          <ChevronDown className="w-4 h-4 ml-auto flex-shrink-0" />
+        </button>
+      )}
+
       {/* Inner body — existing ToolCallPanel renders the per-tool list,
           narration interleave, step-list collapse-at-3+, active-glow on
           inner tool cards. All preserved verbatim by Plan 01. Plan 03
-          will wire the registry-driven `→ {summary}` row on collapsed
-          past tools INSIDE ToolCallPanel — RunCard does not own that JSX. */}
+          gates the body behind `expanded` (true by default for streaming;
+          false for terminal+tools turns until user clicks to expand). */}
       {expanded && (
         <div className="p-3">
           <ToolCallPanel
@@ -167,3 +242,20 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     </div>
   )
 })
+
+// File-local helpers — UI-SPEC §8.2 copy contract.
+function statusGlyph(s: Message["runStatus"]): string {
+  if (s === "completed" || s === undefined) return "✓"
+  if (s === "failed") return "✗"
+  if (s === "timed_out") return "⏱"
+  if (s === "cancelled") return "■"
+  return "✓"
+}
+
+function statusWord(s: Message["runStatus"]): string {
+  if (s === "completed" || s === undefined) return "done"
+  if (s === "failed") return "failed"
+  if (s === "timed_out") return "timed out"
+  if (s === "cancelled") return "cancelled"
+  return "done"
+}
