@@ -199,6 +199,18 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
           : <ChevronRight className="w-3 h-3" />}
         <span className="font-medium">{summary}</span>
       </button>
+      {/* Phase 075.7 Plan 03 Task 1 (R-4 + sketch live-run-container.md D3 + UI-SPEC §7.5):
+          on collapsed past tool cards, render `→ {summarize(tc)}` one-liner sourced
+          from the TOOL_SUMMARIES registry (shipped in Plan 01). Active tool cards
+          stay fully expanded; only COMPLETED + COLLAPSED tools get the `→` row. */}
+      {!open && tc.status === "done" && (
+        <div
+          data-testid="tool-result-summary"
+          className="ml-0 mt-0.5 font-mono text-xs text-muted-foreground border-t border-border/50 px-3 py-1.5"
+        >
+          → {summarizeToolCall(tc)}
+        </div>
+      )}
       {open && content && (
         <div className="mt-1.5 ml-4.5 rounded-lg bg-card/50 backdrop-blur-md p-2.5 ghost-border">
           {content}
