@@ -187,6 +187,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [ ] **Phase 075.3: Defensive Chunk Handler + Unknown-Model Graceful Degradation** (INSERTED 2026-05-22) — Two-plan bundle. Plan 01: Convert quick-task 260522-gdg Path A hotfix into defensive Path B at the chunk handler (drop `chunk.usage`-triggered early-return, provider-aware usage accumulator, revert Path A gate, restore non-NULL Google token rows). Plan 02: Close the "added a new model from Settings → silent failure" loop — pattern-based provider inference for unknown model_ids (`gpt-*`/`claude-*`/`gemini-*`/`*/*` patterns), safe defaults per inferred provider (conservative `max_output_tokens` / `llm_call_timeout` / `native_tools=True` for Google/OpenAI/Anthropic), `model_capability_unknown` warning log, frontend "unverified — using safe defaults" badge. Chrome MCP UAT across all 5 Gemini models + 1 negative-test pass for an unregistered model_id (e.g., `gemini-3.5-flash`). BUG-260522-01 → Phase 082.5; SEED-028 native Google SDK split → v3.1; DB-backed override table + hot-reload cache + admin UI → Phase 081.1; `/models` endpoint probe + verify-and-promote → v3.1. (2 plans)
 - [ ] **Phase 075.6: Live Streaming UX + Cross-Provider Parity** (INSERTED 2026-05-23) — Three-plan bundle informed by Claude.ai gold-standard comparison (`.planning/phases/075.5-gemini-native-sdk/claude-ai-comparison/COMPARISON.md`). Plan 01: Add `code_so_far: string` field to existing `tool_args_progress` SSE event in all 4 service adapters (anthropic + google + openai + openrouter) — provider-uniform vocabulary so one frontend renders for all providers. Plan 02: Frontend `<ToolArgsLivePanel>` collapsible code panel during `tool_preparing` state; `argsCodeText` reducer slice; auto-collapse on `tool_start`. Plan 03: Surface accumulated `m.sub_agent.content` live for all sub-agent kinds (currently gated to `analyze_document` only); step-list collapse when 3+ completed tool calls precede active step; pinned "✦ Working" badge at top of active assistant turn. UAT covers the mandatory 4-axis bandwidth (CLAUDE.md). Out of scope: file output card polish (T-260523-10 → next polish bundle), live PPTX preview pane (defer), extended-thinking summary surface (defer to thinking-models phase). Closes the felt UX gap behind T-260523-09 (byte counter is interim signal, panel supersedes). (3 plans)
 - [x] **Phase 075.7: Live-Execution UX Refactor (Run-Card + Tool-Call Panel)** (INSERTED 2026-05-24, SHIPPED 2026-05-24) — Refactor phase consuming the validated sketch findings (`Skill("sketch-findings-agentic-rag")`) to settle G-1 + G-5 guardrails on the chat surface. Replaces the current ad-hoc rendering with: (a) bracketed Run-Card per assistant turn (sticky header with timer + counter + bot avatar, progress shimmer while active, fold-to-summary on completion), (b) Editor-Inset tool-call panel with per-tool inner-body components (`execute_code` → editor pane + STDOUT/STDERR labeled regions + file-output preview cards; `search_documents` → ranked-result rows; `read_file` → file metadata; outer frame shared, inner body selected by tool name), (c) Focus Mode composition under long-run stress (past tool calls fold to result-summary like `→ yoy_q3 = 30.87%`, only active step keeps full editor, explicit `Next: ...` footer). Depends on Phase 075.6 (`code_so_far` SSE field). UAT covers the mandatory 4-axis bandwidth (CLAUDE.md SC#10). Hot-file ledger flips from "fires" → "satisfied" on `ToolCallPanel.tsx` / `MessageItem.tsx` / `useMessages.ts` / `StreamsProvider.tsx` rows. (~3-4 plans, locked at /gsd:spec-phase + /gsd:plan-phase)
+- [ ] **Phase 075.8: Live-Execution Visual Polish** (INSERTED 2026-05-24) — Close the 7 documented sketch-fidelity gaps left BEST-EFFORT after 075.7 architectural refactor. Pure rendering polish on existing data — no architecture/schema/API/provider contract changes. Deliverables: universal `<StatusPill>` (replaces icon spinners across tool-bodies), active-tool glow + bottom progress shimmer, per-step result-summary lines (`→ {summarize(tc)}`) on past tools in Focus Mode, explicit `Next: ...` footer mid-run, compact dim `💭 Thinking` row, editor inset for `execute_code` (gutter + Shiki syntax highlighting + Python lang chip), labeled STDOUT/STDERR regions. Sketches are the spec (`Skill("sketch-findings-agentic-rag")` sources 001/002/003) so SPEC/CONTEXT/RESEARCH ceremony skipped. Single wave / 1 plan / 7 tasks. UAT: G-4 mandatory lived-experience pass against the 4 sketch reference scenarios via Chrome MCP. (1 plan)
 
 **Wave 2 — Depends on Wave 1**
 
@@ -645,6 +646,36 @@ Plans:
 - [x] 075.7-01: Extract tool-bodies (ToolCallPanel 957→702 LOC; tool-bodies/ registry shipped 2026-05-24, commit `cd883ca`)
 - [x] 075.7-02: RunCard wrapper (memoized bordered container + sticky header + brand-pulse avatar + 250ms timer + iteration counter + active-glow frame; mounted via single-hunk MessageItem swap 2026-05-24, commits `90aa0a5` + `0adc09e`)
 - [x] 075.7-03: Focus Mode + 4-axis UAT (T1 `5199412` → {summary} render; T2 `ce07a57` RunCard auto-collapse + collapsed-row + click-to-expand; T3 `ffc77d5` 6 Playwright specs scenario-07..12 covering 3 of 4 UAT axes; T4 `db0b6f4` VALIDATION.md + long-message manual UAT auto-approved per AUTO_MODE; T5 [final commit] CLAUDE.md hot-file ledger 4 frontend rows flipped to satisfied — 2026-05-24)
+
+### Phase 075.8: Live-Execution Visual Polish (INSERTED)
+
+**Origin:** Sketches 001/002/003 (`Skill("sketch-findings-agentic-rag")` sources) enumerate 7 visual decisions that Phase 075.7 documented as BEST-EFFORT (not gated). Phase 075.7 UAT verified the architectural seams are correct (cross-thread, per-thread composer, Anthropic DOM order — all PASS 2026-05-24); the sketches still don't match visually. This phase closes that gap.
+
+**Goal:** Close the 7 documented sketch-fidelity gaps left BEST-EFFORT after 075.7 — universal `<StatusPill>` component, active-tool glow + bottom progress shimmer, per-step result-summary on past tools (Focus Mode polish), `Next: ...` footer, compact 💭 thinking row, editor inset for `execute_code` (gutter + Shiki syntax + Python lang chip), labeled STDOUT/STDERR regions. Pure rendering polish on existing data flow.
+
+**Requirements:** Inherits LIVE-EXEC-UX-01 binding gate from Phase 075.7 — extends the same UAT bandwidth (CLAUDE.md SC#10 4-axis).
+
+**Depends on:** Phase 075.7 (consumes the RunCard wrapper + per-tool-body dispatch registry shipped in 075.7-01/02; this phase only touches rendering inside those seams).
+
+**Plans:** 0/1 plans complete
+
+**Design contract:** [`Skill("sketch-findings-agentic-rag")`](../.claude/skills/sketch-findings-agentic-rag/SKILL.md) — sketches ARE the spec; no SPEC.md / CONTEXT.md / RESEARCH.md authored.
+
+**Predicted files modified:**
+- `frontend/src/components/chat/StatusPill.tsx` (NEW, ~40 lines)
+- `frontend/src/components/chat/RunCard.tsx` (Tasks 5+6 — Next-up footer + thinking row)
+- `frontend/src/components/chat/ToolCallPanel.tsx` (Tasks 2+4 — pill sweep + per-step summary)
+- `frontend/src/components/chat/tool-bodies/ExecuteCodeBody.tsx` (Tasks 2+7 — pill swap + editor inset)
+- `frontend/src/components/chat/tool-bodies/ShikiCode.tsx` (NEW, ~30 lines, only if Task 7 lands)
+- `frontend/src/index.css` (Task 3 — glow class + bottom progress; possibly `dotBounce` keyframe)
+- `frontend/package.json` (NEW dep: `shiki` if Task 7 lands)
+
+Estimated effort: 3-4h focused single session. No new schema, no new API, no provider contract change, no architecture refactor.
+
+**UAT bandwidth:** G-4 mandatory — Chrome MCP through 4 sketch reference scenarios (single tool fast, multi-tool Focus Mode, long-running with progress, cross-provider parity).
+
+Plans:
+- [x] 075.8-01: All 7 sketch-gap closures in one wave (7 tasks, parallelizable except Task 7 depends on syntax-library install) — shipped 2026-05-24
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: Completed 075.7-03-focus-mode-and-uat-PLAN.md (Phase 075.7 fully shipped — pending /gsd:verify-work)
-last_updated: "2026-05-24T18:00:00.000Z"
-last_activity: 2026-05-24
+status: executing
+stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
+last_updated: "2026-05-24T12:12:39.302Z"
+last_activity: 2026-05-24 -- Phase 075.8 execution started
 progress:
-  total_phases: 28
+  total_phases: 29
   completed_phases: 18
-  total_plans: 61
-  completed_plans: 65
-  percent: 64
+  total_plans: 62
+  completed_plans: 66
+  percent: 100
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.7 — live-execution-ux-refactor
+**Current focus:** Phase 075.8 — live-execution-visual-polish
 
 ## Current Position
 
-Phase: 076 of 3 (confidence recalibration)
-Plan: Not started
-Next action: `/gsd:verify-work 075.7` — operator drives long-message Chrome MCP UAT (T4 auto-approved checkpoint per AUTO_MODE) + Playwright spec runtime exec (scenarios 07..12 authored, exec deferred)
-Status: Ready to plan
-Last activity: 2026-05-24
+Phase: 075.8 (live-execution-visual-polish) — EXECUTING
+Plan: 1 of 1
+Next action: `/gsd:execute-phase 075.8` — single-wave parallel execution; sketches are the spec; eyeball-vs-sketches UAT after each task batch
+Status: Executing Phase 075.8
+Last activity: 2026-05-24 -- Phase 075.8 execution started
 
 ## PRD-reset outputs (committed)
 
