@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react"
-import { Terminal, CheckCircle2, XCircle, Loader2, Clock, ChevronDown, ChevronRight } from "lucide-react"
+import { Terminal, Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
 import { OutputFileCard } from "../OutputFileCard"
+import { StatusPill, type ToolStatus } from "../StatusPill"
 
 // Phase 075.7 Plan 01 (D-02 atomic extraction): ported verbatim from the
 // legacy execute-code wrapper. Functional behavior preserved (code/STDOUT/
@@ -174,34 +175,32 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
             </span>
           ) : null}
         </span>
-        {/* Duration badge — use executionDurationMs from backend, not startedAt/endedAt */}
-        {isComplete && executionDurationMs != null && executionDurationMs > 0 && (
-          <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
-            <Clock className="w-2.5 h-2.5" />
-            {formatDuration(executionDurationMs)}
-          </span>
-        )}
-        {/* Phase 067.4 R-5 (D-067.4-R5-01 amended): live elapsed counter during
-            execution. Hidden once `executionDurationMs` lands (post-completion
-            duration badge above takes over). Mirrors the post-completion badge
-            shape verbatim — same Clock icon, same formatDuration helper, same
-            Tailwind classes. */}
+        {/* Phase 075.8 Task 2 (sketch 002 D5):
+            - During RUNNING: keep the live elapsed counter (the running
+              StatusPill variant intentionally has no duration suffix), so
+              the user sees the seconds-by-seconds ticker.
+            - On terminal completion: drop the standalone Clock badge — the
+              done/failed pill carries `· {duration}` inline. */}
         {isRunning && !isComplete && tc.elapsedSeconds != null && tc.elapsedSeconds > 0 && (
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
             <Clock className="w-2.5 h-2.5" />
             {formatDuration(tc.elapsedSeconds * 1000)}
           </span>
         )}
-        {/* Status indicator */}
-        <span className="flex-shrink-0">
-          {isRunning && !isComplete ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-          ) : isError ? (
-            <XCircle className="w-3.5 h-3.5 text-red-400" />
-          ) : (
-            <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
-          )}
-        </span>
+        {/* Phase 075.8 Task 2: universal StatusPill replaces the
+            Loader2/XCircle/CheckCircle2 trio. Failed runs surface as the
+            destructive pill (via isError → "failed"); success as the
+            success-green "done · 11.3s". executionDurationMs comes from the
+            backend duration (sandbox-side), preferred over startedAt/endedAt
+            because it strips the iteration loop/queue overhead. */}
+        <StatusPill
+          status={
+            isRunning && !isComplete
+              ? "running"
+              : (isError ? "failed" : "done") as ToolStatus
+          }
+          duration={isComplete ? executionDurationMs : undefined}
+        />
       </div>
 
       {/* Error message (error state only) */}

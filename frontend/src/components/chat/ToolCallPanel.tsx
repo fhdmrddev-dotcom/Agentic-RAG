@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  BookOpen, Zap, Clock, Code2, Terminal, Square,
+  BookOpen, Zap, Clock, Code2, Terminal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
@@ -11,6 +11,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer"
 import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { StatusPill, type ToolStatus } from "./StatusPill"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -59,18 +60,22 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-// ---- Execution time badge ----
-
-function TimeBadge({ tc }: { tc: ToolCall }) {
-  if (!tc.startedAt || !tc.endedAt) return null
-  const duration = tc.endedAt - tc.startedAt
-  return (
-    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
-      <Clock className="w-2.5 h-2.5" />
-      {formatDuration(duration)}
-    </span>
-  )
+// Phase 075.8 Task 2 (sketch 002 D5): map ToolCall.status → StatusPill ToolStatus.
+// "failed" is not directly observable on ToolCall.status (failed execute_code
+// surfaces through ExecuteCodeBody's exitCode path; non-execute_code tools
+// surface errors via parsed.error). Treat anything terminal-but-not-done as
+// done — failures show up via ToolResultBlock's destructive italic line.
+function pillStatus(s: ToolCall["status"]): ToolStatus {
+  if (s === "preparing") return "preparing"
+  if (s === "running") return "running"
+  if (s === "interrupted") return "interrupted"
+  return "done"
 }
+
+// Phase 075.8 Task 2 (sketch 002 D5): TimeBadge was dropped — the StatusPill
+// now carries the `· {duration}` suffix on done/failed/interrupted variants,
+// making the standalone Clock+duration span redundant. ExecuteCodeBody
+// underwent the same swap.
 
 // ---- Live elapsed timer (running tools) ----
 
@@ -553,22 +558,28 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                           </>
                         )}
                       </span>
-                      {/* Duration badge — live timer while running, static badge when done */}
-                      {tc.status === "running" && tc.startedAt != null
-                        ? <ElapsedTimer startedAt={tc.startedAt} />
-                        : <TimeBadge tc={tc} />
-                      }
-                      <span className="flex-shrink-0">
-                        {tc.status === "preparing" ? (
-                          <span className="w-3.5 h-3.5 rounded-full bg-primary/30 animate-pulse inline-block" />
-                        ) : tc.status === "running" ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                        ) : tc.status === "interrupted" ? (
-                          <Square className="w-3.5 h-3.5 text-amber-500" />
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
-                        )}
-                      </span>
+                      {/* Phase 075.8 Task 2 (sketch 002 D5):
+                          - During RUNNING, keep the existing live elapsed
+                            timer (since the pill running variant doesn't
+                            show duration) — gives the user a live ticker.
+                          - During DONE/INTERRUPTED, the pill carries the
+                            duration suffix, so the standalone TimeBadge is
+                            redundant and dropped.
+                          - During PREPARING, no clock is meaningful yet —
+                            the pill's italic verb signals the state. */}
+                      {tc.status === "running" && tc.startedAt != null && (
+                        <ElapsedTimer startedAt={tc.startedAt} />
+                      )}
+                      {/* Phase 075.8 Task 2: universal StatusPill replaces the
+                          ad-hoc Loader2/Square/CheckCircle2 status indicator. */}
+                      <StatusPill
+                        status={pillStatus(tc.status)}
+                        duration={
+                          tc.startedAt != null && tc.endedAt != null
+                            ? tc.endedAt - tc.startedAt
+                            : undefined
+                        }
+                      />
                     </div>
 
                     {/* Phase 075.1 Plan 04 Atom D (B-260519-05) — sub-agent
