@@ -54,17 +54,13 @@ test.describe("@075.7 scenario-07 — RunCard frame", () => {
         // composer already present is acceptable
       })
 
-    // Send a tool-using prompt. Reuses scenario-01's broad composer selector
-    // pattern so a future composer redesign doesn't break the assertion.
-    const composer = page
-      .getByPlaceholder(/message|ask|type a message/i)
-      .or(page.getByRole("textbox").first())
-      .first()
-    await composer.fill(TOOL_PROMPT)
-    await page
-      .getByRole("button", { name: /send|submit/i })
-      .first()
-      .click()
+    // Send a tool-using prompt. Type via pressSequentially (more reliable on
+    // React controlled inputs than .fill()) and submit via Enter — the Send
+    // button click path was unreliable in 075.7 UAT due to canSend timing.
+    const composer = page.getByPlaceholder(/ask anything|message|ask/i).first()
+    await composer.click()
+    await composer.pressSequentially(TOOL_PROMPT, { delay: 5 })
+    await composer.press("Enter")
 
     // Step 1: Assert RunCard mounts during streaming (or shortly after the
     // first tool_call is registered — give it 30s of slack for cold model

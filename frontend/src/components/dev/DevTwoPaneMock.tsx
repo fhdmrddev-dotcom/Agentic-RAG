@@ -26,9 +26,13 @@ export function DevTwoPaneMock() {
   if (!import.meta.env.DEV) return null
 
   return (
+    // `pointer-events-none` on the outer wrapper makes the overlay click-through
+    // so it doesn't intercept clicks on the composer / Send button beneath it
+    // (caught during 075.7 Playwright UAT — see HUMAN-UAT Test 2 notes).
+    // Interactive children (the "tick" button) re-enable pointer events locally.
     <div
       data-testid="dev-two-pane-mock"
-      className="fixed bottom-4 right-4 z-50 grid grid-cols-2 gap-4 rounded border bg-zinc-900 p-4 text-xs text-zinc-100 shadow-lg"
+      className="fixed bottom-4 right-4 z-50 grid grid-cols-2 gap-4 rounded border bg-zinc-900 p-4 text-xs text-zinc-100 shadow-lg pointer-events-none"
       style={{ width: 600 }}
     >
       <PaneA />
@@ -72,7 +76,7 @@ function PaneB() {
       <button
         type="button"
         onClick={handleTick}
-        className="mt-1 rounded bg-emerald-700 px-2 py-1 text-xs hover:bg-emerald-600"
+        className="mt-1 rounded bg-emerald-700 px-2 py-1 text-xs hover:bg-emerald-600 pointer-events-auto"
       >
         tick
       </button>
