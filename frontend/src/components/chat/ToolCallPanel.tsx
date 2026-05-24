@@ -10,6 +10,7 @@ import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
+import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { StatusPill, type ToolStatus } from "./StatusPill"
 
@@ -670,16 +671,38 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                       // that pre-date the T2 stamp — REMOVE after migration
                       // window.
                       const panelKey = tc.clientKey ?? tc.id ?? `idx-${i}`
+                      // Phase 075.9 T4: for execute_code preparing, suppress
+                      // the panel body — the Shiki editor inset below owns
+                      // the body now (seamless preparing→running handoff,
+                      // no plain-pre → highlighted blink). The header
+                      // "Generating code… (X.X KB)" affordance stays so the
+                      // byte counter is still glanceable.
+                      const isExecuteCode = tc.name === "execute_code"
                       return (
                         <ToolArgsLivePanel
-                          title={`Generating ${tc.name === "execute_code" ? "code" : toolLabel(tc.name)}…`}
-                          contentText={tc.argsCodeText}
-                          byteCount={tc.argsBytesStreamed}
+                          title={`Generating ${isExecuteCode ? "code" : toolLabel(tc.name)}…`}
+                          contentText={tc.argsCodeText!}
+                          byteCount={tc.argsBytesStreamed!}
                           expanded={panelExpanded[panelKey] ?? (i === lastPreparingIndex)}
                           onToggle={() => togglePanel(panelKey, i === lastPreparingIndex)}
+                          hideBody={isExecuteCode}
                         />
                       )
                     })()}
+
+                    {/* Phase 075.9 T4: live Shiki editor inset during
+                        execute_code preparing. ExecuteCodeEditorInset reads
+                        tc.argsCodeText ?? tc.args.code internally, so the
+                        same inset mounts here (preparing) and inside
+                        ExecuteCodeBody (running/done) — byte-identical
+                        content at the tool_start transition means no
+                        re-mount, no flash, no re-flow. The Suspense
+                        fallback inside the inset shows a plain-pre with
+                        the same font metrics, so even the WASM-load
+                        moment doesn't shift the row. */}
+                    {tc.status === "preparing" && tc.name === "execute_code" && tc.argsCodeText && tc.argsCodeText.length > 0 && (
+                      <ExecuteCodeEditorInset tc={tc} />
+                    )}
 
                     {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}

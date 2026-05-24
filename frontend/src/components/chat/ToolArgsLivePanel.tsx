@@ -35,6 +35,19 @@ export interface ToolArgsLivePanelProps {
   expanded: boolean
   /** Chevron toggle handler. */
   onToggle: () => void
+  /**
+   * Phase 075.9 T4: when true, render ONLY the header row (title + byte
+   * count, NO chevron, NO expandable body). Used by ToolCallPanel for
+   * `execute_code` preparing state — the Shiki editor inset
+   * (ExecuteCodeEditorInset) takes ownership of the body so the user sees
+   * syntax-highlighted code from the first streamed bytes. The header
+   * remains as a "Generating code… (X.X KB)" affordance so the byte
+   * counter is still glanceable.
+   *
+   * For non-execute_code tools, leave this unset (default false) — the
+   * panel keeps the toggleable plain-pre body unchanged.
+   */
+  hideBody?: boolean
 }
 
 export function ToolArgsLivePanel({
@@ -43,6 +56,7 @@ export function ToolArgsLivePanel({
   byteCount,
   expanded,
   onToggle,
+  hideBody = false,
 }: ToolArgsLivePanelProps) {
   // I-2 / SPEC Req #4 screenshot caveat: max-h-64 overflow-y-auto caps the
   // visible viewport at ~256 px. For a >5 KB code stream the panel scrolls;
@@ -57,6 +71,25 @@ export function ToolArgsLivePanel({
       bodyRef.current.scrollTop = bodyRef.current.scrollHeight
     }
   }, [contentText, expanded])
+
+  // Phase 075.9 T4: header-only mode. Used by execute_code preparing state
+  // where the Shiki editor inset owns the body. Render a non-toggleable
+  // header row with the same "Generating ... (X.X KB)" affordance.
+  if (hideBody) {
+    return (
+      <div
+        data-testid="tool-args-live-panel-header-only"
+        className="mt-1.5 rounded-md border border-border/30 bg-muted/20 flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-foreground/70"
+      >
+        <span className="flex-1 text-left">{title}</span>
+        {byteCount > 0 && (
+          <span className="font-normal text-foreground/40 not-italic font-mono tabular-nums">
+            ({(byteCount / 1024).toFixed(1)} KB)
+          </span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="mt-1.5 rounded-md border border-border/30 bg-muted/20">

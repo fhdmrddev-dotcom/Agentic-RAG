@@ -13,6 +13,56 @@ const ShikiCode = lazy(() =>
   import("./ShikiCode").then(m => ({ default: m.ShikiCode }))
 )
 
+/**
+ * Phase 075.9 T4 — shared editor inset for execute_code.
+ *
+ * Exported so the preparing-state branch in ToolCallPanel can render the
+ * SAME Shiki view as the running/done branch — closes the "code-stream
+ * blink" defect at tool_start. The inset reads `tc.argsCodeText` during
+ * preparing and `tc.args.code` post-start (the reducer's spread at
+ * tool_start makes both fields carry IDENTICAL content at the transition
+ * moment, so the visual swap is byte-stable: no remount, no re-flow).
+ *
+ * The `streaming` prop tells ShikiCode to use React's `useDeferredValue`
+ * so rapid prop changes during the SSE token stream don't re-run the
+ * WASM tokenizer on every keystroke-equivalent update.
+ */
+export function ExecuteCodeEditorInset({ tc }: { tc: ToolCall }) {
+  // Phase 075.9 T4: streaming-first fallback chain. During preparing,
+  // `argsCodeText` carries the cumulative bytes from tool_args_progress;
+  // after tool_start the reducer copies the canonical args.code in and
+  // clears argsCodeText. Reading both with ?? keeps the inset mounted
+  // and byte-stable across the transition.
+  const displayCode = tc.argsCodeText ?? tc.args.code
+  const isStreaming = tc.status === "preparing" && !!tc.argsCodeText
+  if (!displayCode) return null
+  return (
+    <div
+      data-testid="tc-editor"
+      className="mt-2 grid grid-cols-[32px_1fr] bg-[#0d1117] max-h-[180px] overflow-y-auto rounded-md border border-border/40"
+    >
+      <div
+        data-testid="tc-gutter"
+        aria-hidden="true"
+        className="bg-[hsl(220_30%_7%)] text-muted-foreground/60 font-mono text-[11px] text-right py-2 pr-1.5 border-r border-border/40 select-none leading-[1.7]"
+      >
+        {displayCode.split("\n").map((_: string, i: number) => (
+          <div key={i}>{i + 1}</div>
+        ))}
+      </div>
+      <Suspense
+        fallback={
+          <pre className="m-0 px-3 py-2 font-mono text-[11px] leading-[1.7] text-[#c9d1d9] whitespace-pre overflow-x-auto">
+            {displayCode}
+          </pre>
+        }
+      >
+        <ShikiCode code={displayCode} language="python" theme="github-dark" streaming={isStreaming} />
+      </Suspense>
+    </div>
+  )
+}
+
 // Phase 075.7 Plan 01 (D-02 atomic extraction): ported verbatim from the
 // legacy execute-code wrapper. Functional behavior preserved (code/STDOUT/
 // STDERR/OutputFileCard/sticky-bottom-indicator/ToolArgsLivePanel-preparing-
@@ -251,36 +301,13 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
         />
       </div>
 
-      {/* Phase 075.8 Task 7 (sketch 002 D1) — Editor inset for execute_code.
-          Line-number gutter + Shiki-highlighted Python code + max-height
-          scroll. The Python lang chip lives in the header above (the
-          'Python' pill at the top of the row), so we don't double-chip
-          inside the editor frame. */}
-      {tc.args.code && (
-        <div
-          data-testid="tc-editor"
-          className="mt-2 grid grid-cols-[32px_1fr] bg-[#0d1117] max-h-[180px] overflow-y-auto rounded-md border border-border/40"
-        >
-          <div
-            data-testid="tc-gutter"
-            aria-hidden="true"
-            className="bg-[hsl(220_30%_7%)] text-muted-foreground/60 font-mono text-[11px] text-right py-2 pr-1.5 border-r border-border/40 select-none leading-[1.7]"
-          >
-            {tc.args.code.split("\n").map((_: string, i: number) => (
-              <div key={i}>{i + 1}</div>
-            ))}
-          </div>
-          <Suspense
-            fallback={
-              <pre className="m-0 px-3 py-2 font-mono text-[11px] leading-[1.7] text-[#c9d1d9] whitespace-pre overflow-x-auto">
-                {tc.args.code}
-              </pre>
-            }
-          >
-            <ShikiCode code={tc.args.code} language="python" theme="github-dark" />
-          </Suspense>
-        </div>
-      )}
+      {/* Phase 075.8 Task 7 (sketch 002 D1) + 075.9 T4 — Editor inset.
+          Now extracted to ExecuteCodeEditorInset so the preparing-state
+          branch in ToolCallPanel can mount the SAME Shiki view starting
+          from the first ~5 streamed bytes. Reading tc.argsCodeText ??
+          tc.args.code keeps the view mounted across the tool_start
+          transition (no blink, no re-flow). */}
+      <ExecuteCodeEditorInset tc={tc} />
 
       {/* Error message (error state only) */}
       {isError && tc.errorMessage && (
