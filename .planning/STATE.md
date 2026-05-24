@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
 last_updated: "2026-05-24T12:12:39.302Z"
 last_activity: 2026-05-24 -- Phase 075.8 execution started
 progress:
   total_phases: 29
-  completed_phases: 18
+  completed_phases: 19
   total_plans: 62
   completed_plans: 66
-  percent: 100
+  percent: 66
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 075.8 (live-execution-visual-polish) — EXECUTING
-Plan: 1 of 1
+Phase: 076
+Plan: Not started
 Next action: `/gsd:execute-phase 075.8` — single-wave parallel execution; sketches are the spec; eyeball-vs-sketches UAT after each task batch
-Status: Executing Phase 075.8
-Last activity: 2026-05-24 -- Phase 075.8 execution started
+Status: Ready to plan
+Last activity: 2026-05-24
 
 ## PRD-reset outputs (committed)
 

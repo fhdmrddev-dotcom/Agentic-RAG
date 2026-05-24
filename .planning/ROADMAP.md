@@ -657,7 +657,7 @@ Plans:
 
 **Depends on:** Phase 075.7 (consumes the RunCard wrapper + per-tool-body dispatch registry shipped in 075.7-01/02; this phase only touches rendering inside those seams).
 
-**Plans:** 0/1 plans complete
+**Plans:** 1/1 plans complete
 
 **Design contract:** [`Skill("sketch-findings-agentic-rag")`](../.claude/skills/sketch-findings-agentic-rag/SKILL.md) — sketches ARE the spec; no SPEC.md / CONTEXT.md / RESEARCH.md authored.
 
