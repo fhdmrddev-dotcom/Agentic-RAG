@@ -623,7 +623,7 @@ Plans:
 
 **Depends on:** Phase 075.6 (ships first — the `code_so_far` SSE field on `tool_args_progress` is upstream of the new Editor-Inset panel rendering). Optional pre-req: Phase 068 (StreamsProvider Context Lift) — state-management refactor that complements but doesn't block this visual layer; can ship in either order.
 
-**Plans:** ~3-4 plans (estimated at spec-phase)
+**Plans:** 3/3 plans complete
 
 **Design contract:** [`Skill("sketch-findings-agentic-rag")`](../.claude/skills/sketch-findings-agentic-rag/SKILL.md) — auto-loads when any chat-surface component is edited per CLAUDE.md routing.
 

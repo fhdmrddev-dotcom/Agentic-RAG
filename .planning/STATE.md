@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Completed 075.7-03-focus-mode-and-uat-PLAN.md (Phase 075.7 fully shipped — pending /gsd:verify-work)
 last_updated: "2026-05-24T18:00:00.000Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 28
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 61
   completed_plans: 65
-  percent: 100
+  percent: 64
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 075.7 (live-execution-ux-refactor) — COMPLETE (3 of 3 plans shipped 2026-05-24)
-Plan: 3 of 3 (075.7-03-focus-mode-and-uat shipped 2026-05-24)
+Phase: 076 of 3 (confidence recalibration)
+Plan: Not started
 Next action: `/gsd:verify-work 075.7` — operator drives long-message Chrome MCP UAT (T4 auto-approved checkpoint per AUTO_MODE) + Playwright spec runtime exec (scenarios 07..12 authored, exec deferred)
-Status: Phase complete; all plans landed; CLAUDE.md G-1/G-5 guardrails closed on 4 frontend hot files (ToolCallPanel.tsx + MessageItem.tsx + StreamsProvider.tsx + useMessages.ts)
+Status: Ready to plan
 Last activity: 2026-05-24
 
 ## PRD-reset outputs (committed)
