@@ -414,29 +414,17 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* 2026-05-24 fix: render a persistent bidirectional toggle when
-              shouldCollapse is true so the user can re-collapse after
-              expanding (the prior render only showed the toggle when
-              stepsCollapsed=true, leaving no way back). The toggle now
-              shows "Show N earlier steps" when collapsed and
-              "Hide earlier steps" when expanded. */}
-          {shouldCollapse && stepsCollapsed && (
-            <div
-              key="collapsed-steps-summary"
-              data-testid="collapsed-steps-summary"
-              data-iteration-min={collapsedIterationMin}
-              className="pt-2.5"
-            >
-              <button
-                type="button"
-                onClick={() => setStepsCollapsed(false)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span>Show {hiddenStepsCount} earlier steps</span>
-              </button>
-            </div>
-          )}
+          {/* Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
+              Per-step result-summary rows replace the prior aggregate
+              "Show N earlier steps" toggle. Collapsed past steps render
+              as one-line `→ {summary}` rows inline (the sketch D3
+              behavior — "while a run is in flight, completed tool calls
+              auto-collapse to a one-line summary showing their result,
+              not their args"). The aggregate Show-toggle is dropped per
+              PLAN.md Task 4 pick.
+              The "Hide earlier steps" toggle remains visible only when
+              the user has opted into the full-expanded view, so they
+              can re-fold without losing the affordance. */}
           {shouldCollapse && !stepsCollapsed && (
             <div
               key="expanded-steps-collapse"
@@ -454,15 +442,51 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             </div>
           )}
           {displayItems.map((item, i) => {
-            // 075.6 Plan 03 / Req #7: step-list collapse short-circuit.
-            // When shouldCollapse is true and the user has not expanded, hide
-            // items in positions 0 .. activeIndex-1. activeIndex and beyond
-            // render normally; the iteration divider above the active step
-            // continues to derive prevToolIteration from displayItems[i-1]
-            // (the LAST hidden item) so the iter-N → iter-(N+1) boundary
-            // above the active step still fires correctly (Pitfall 6 / L5).
+            // Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
+            // When shouldCollapse + stepsCollapsed, past steps
+            // (positions 0..activeIndex-1) render as one-line result-
+            // summary rows via summarizeToolCall(tc). Clicking the row
+            // expands the full view (sets stepsCollapsed=false).
+            // The iteration divider above the active step still derives
+            // prevToolIteration from displayItems[i-1] (the LAST
+            // collapsed-but-rendered item) — the iter-N → iter-(N+1)
+            // boundary above the active step continues to fire
+            // (Pitfall 6 / Landmine L5 mitigation preserved).
             if (shouldCollapse && stepsCollapsed && i < activeIndex) {
-              return null
+              if (item.kind === 'tool') {
+                const collapsedTc = item.tc
+                const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
+                return (
+                  <button
+                    key={`step-summary-${i}-${collapsedTc.id ?? collapsedTc.name}`}
+                    type="button"
+                    onClick={() => setStepsCollapsed(false)}
+                    data-testid="step-summary-row"
+                    data-iteration-min={i === 0 ? collapsedIterationMin : undefined}
+                    aria-label={`Expand to view ${hiddenStepsCount} earlier steps`}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
+                  >
+                    <span className="opacity-50 flex-shrink-0">→</span>
+                    <span className="truncate flex-1 min-w-0">{summaryText}</span>
+                  </button>
+                )
+              }
+              // Skill rows in collapsed Focus Mode: keep them visible as a
+              // single compact line so the user still sees the activation
+              // happened mid-run.
+              return (
+                <button
+                  key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
+                  type="button"
+                  onClick={() => setStepsCollapsed(false)}
+                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
+                >
+                  <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
+                  <span className="truncate flex-1 min-w-0 italic">
+                    skill: {item.activation.skillName}
+                  </span>
+                </button>
+              )
             }
             if (item.kind === 'skill') {
               return (
