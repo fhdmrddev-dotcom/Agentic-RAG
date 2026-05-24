@@ -19,7 +19,9 @@ import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ToolCallPanel } from "@/components/chat/ToolCallPanel"
-import { ExecuteCodeBlock } from "@/components/chat/ExecuteCodeBlock"
+// Phase 075.7 Plan 01 (D-02): legacy execute-code wrapper renamed to
+// ExecuteCodeBody and relocated under tool-bodies/. Default export.
+import ExecuteCodeBody from "@/components/chat/tool-bodies/ExecuteCodeBody"
 import { MessageItem } from "@/components/chat/MessageItem"
 import type { Message, ToolCall } from "@/types"
 
@@ -115,7 +117,7 @@ describe("Atom C — stdout/stderr terminal-output styling routes by channel", (
       exitCode: 0,
     })
 
-    const { container } = renderWithTooltip(<ExecuteCodeBlock tc={tc} />)
+    const { container } = renderWithTooltip(<ExecuteCodeBody tc={tc} />)
 
     // Verify that each line's parent div has the expected class for its channel.
     // Map text → expected channel + class.

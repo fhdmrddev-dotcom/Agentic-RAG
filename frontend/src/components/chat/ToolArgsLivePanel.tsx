@@ -17,8 +17,8 @@ import { ChevronDown, ChevronRight } from "lucide-react"
  * this panel's header as a small at-a-glance label.
  *
  * Body uses plain `<pre><code>` — NO syntax highlighting in 075.6 (RESEARCH
- * Open Question 3 — deferred); existing ExecuteCodeBlock at
- * ToolCallPanel.tsx:720-721 handles post-start highlighting.
+ * Open Question 3 — deferred); existing tool-bodies/ExecuteCodeBody (Phase
+ * 075.7 rename) handles post-start highlighting.
  */
 export interface ToolArgsLivePanelProps {
   /** Header label, e.g. "Generating code…". Content-agnostic per CONTEXT.md

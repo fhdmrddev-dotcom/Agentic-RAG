@@ -1,0 +1,26 @@
+import type { ToolCall } from "@/types"
+
+// Phase 075.7 Plan 01 (D-02 atomic extraction): lifted from ToolCallPanel.tsx
+// GenericResult (L401-409). Fallback for any tool name not matched by the
+// registry (consumed by summarizeToolCall in tool-bodies/index.ts).
+
+export interface GenericBodyProps {
+  result: string
+}
+
+export function summarize(tc: ToolCall): string {
+  const r = tc.result ?? ""
+  if (!r) return "no output"
+  const cleaned = r.replace(/\s+/g, " ").trim()
+  return cleaned.length > 80 ? cleaned.slice(0, 80) + "…" : cleaned
+}
+
+export default function GenericBody({ result }: GenericBodyProps) {
+  return (
+    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
+      <pre className="text-[10px] font-mono text-foreground/50 whitespace-pre-wrap break-words leading-relaxed">
+        {result.slice(0, 1500)}{result.length > 1500 ? "\n…" : ""}
+      </pre>
+    </div>
+  )
+}

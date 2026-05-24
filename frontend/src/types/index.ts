@@ -42,7 +42,8 @@ export interface ToolCall {
   errorMessage?: string
   /** Phase 067.4 R-5 (D-067.4-R5-01 amended): live elapsed seconds during sandbox
    * execution. Updated by `onCodeExecuting` heartbeat ticks (~1 Hz) while
-   * `status === "running"`; `ExecuteCodeBlock` renders this as a tabular-nums
+   * `status === "running"`; `ExecuteCodeBody` (Phase 075.7 rename of the
+   * legacy execute-code wrapper) renders this as a tabular-nums
    * counter next to the spinner. Replaced by the post-completion duration badge
    * (`executionDurationMs`) once execution completes. */
   elapsedSeconds?: number

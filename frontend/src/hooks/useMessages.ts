@@ -27,7 +27,8 @@
  *       behaviour), :95 (<MessageItem isStreaming={isStreaming && isLastAssistant} />)
  *     - MessageItem.tsx:14,20,62,86,93,99,109,122,135,137,139,147,164,173,180
  *       (spinner / banner / suggestions gating)
- *     - ExecuteCodeBlock.tsx:103,131,255 (terminal spinner — UNRELATED to
+ *     - tool-bodies/ExecuteCodeBody.tsx (Phase 075.7 rename of the legacy
+ *       execute-code wrapper) :103,131,255 (terminal spinner — UNRELATED to
  *       useMessages; reads from local `isRunning` prop)
  *   Conclusion: live consumers across MessageInput disable, MessageList scroll
  *   gating, MessageItem spinner/banner/suggestion gating. Branch A (hoist) is

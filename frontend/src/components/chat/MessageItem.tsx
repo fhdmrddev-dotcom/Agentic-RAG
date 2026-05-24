@@ -278,14 +278,16 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             event after the agent loop terminates carrying the cumulative
             sandbox filenames; StreamsProvider stamps it on the assistant
             message; MessageItem renders the panel below per-cell delta panels
-            inside ToolCallPanel/ExecuteCodeBlock. Closes the 12-download-
+            inside ToolCallPanel / tool-bodies/ExecuteCodeBody (Phase 075.7
+            rename). Closes the 12-download-
             links-for-1-desired-file cumulative-repeat symptom. */}
         {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
           <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
             <div className="text-xs font-semibold mb-2 text-foreground/80">Final outputs</div>
             {/* Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): swap the
                 plain <li>{filename}</li> rows for the shared OutputFileCard so
-                the pinned panel matches the per-cell ExecuteCodeBlock card
+                the pinned panel matches the per-cell ExecuteCodeBody card
+                (Phase 075.7 rename of the legacy execute-code wrapper)
                 (icon + filename + size badge + ghost-border + hover state +
                 Bearer-fetch download). OutputFileCard renders a plain-filename
                 row (no anchor, no download) for legacy entries that lack

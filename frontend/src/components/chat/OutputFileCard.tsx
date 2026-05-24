@@ -33,7 +33,8 @@ function formatBytes(bytes: number): string {
 // `OutputFile` type in `@/types` stays STRICT (`url: string`, `size: number`);
 // only this component's prop shape relaxes both fields. The strict type is a
 // structural subtype of this relaxed shape, so the existing per-cell call site
-// in ExecuteCodeBlock keeps typechecking verbatim.
+// in tool-bodies/ExecuteCodeBody (Phase 075.7 rename) keeps typechecking
+// verbatim.
 interface OutputFileCardProps {
   file: {
     filename: string

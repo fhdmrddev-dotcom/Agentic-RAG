@@ -3,13 +3,12 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  Folder, BookOpen, Zap, Clock, Code2, Terminal, Square,
+  BookOpen, Zap, Clock, Code2, Terminal, Square,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
-import { ExecuteCodeBlock } from "./ExecuteCodeBlock"
+import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { toolLabel, toolSummary as getToolSummary, taskPhaseLabel } from "@/lib/toolMeta"
 
@@ -130,297 +129,15 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
   )
 }
 
-// ---- Result rendering helpers ----
-
-function countTreeNodes(nodes: any[], depth = 0): number {
-  if (!Array.isArray(nodes) || depth > 10) return 0
-  let count = 0
-  for (const node of nodes) {
-    count++
-    if (Array.isArray(node.children)) count += countTreeNodes(node.children, depth + 1)
-    if (Array.isArray(node.documents)) count += node.documents.length
-  }
-  return count
-}
-
-function resultSummary(name: string, parsed: any): string {
-  if (name === "ls") {
-    const folders = parsed.folders?.length ?? 0
-    const docs = parsed.documents?.length ?? 0
-    return `${folders} folder${folders !== 1 ? "s" : ""}, ${docs} document${docs !== 1 ? "s" : ""}`
-  }
-  if (name === "tree") {
-    const count = countTreeNodes(parsed.tree ?? [])
-    return `${count} item${count !== 1 ? "s" : ""}`
-  }
-  if (name === "grep" || name === "glob") {
-    const total = parsed.total ?? parsed.matches?.length ?? 0
-    return `${total} match${total !== 1 ? "es" : ""}`
-  }
-  if (name === "search_documents") {
-    if (Array.isArray(parsed)) return `${parsed.length} chunk${parsed.length !== 1 ? "s" : ""} found`
-    return "View results"
-  }
-  if (name === "query_documents") {
-    if (typeof parsed === "string") return parsed.length > 60 ? parsed.slice(0, 60) + "…" : parsed
-    if (Array.isArray(parsed)) return `${parsed.length} row${parsed.length !== 1 ? "s" : ""}`
-    return "View results"
-  }
-  if (name === "web_search") {
-    return "View search results"
-  }
-  return "View results"
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "completed" ? "text-success" :
-    status === "processing" ? "text-amber-400" :
-    status === "failed" ? "text-destructive" :
-    "text-muted-foreground"
-  return (
-    <span className={cn("ml-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full", color,
-      status === "completed" && "bg-success/10",
-      status === "processing" && "bg-amber-400/10",
-      status === "failed" && "bg-destructive/10",
-    )}>
-      {status}
-    </span>
-  )
-}
-
-function LsResult({ parsed }: { parsed: any }) {
-  const folders: any[] = parsed.folders ?? []
-  const documents: any[] = parsed.documents ?? []
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-      {folders.map((f: any, i: number) => (
-        <div key={i} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
-          <Folder className="w-3.5 h-3.5 text-amber-400/70 flex-shrink-0" />
-          <span className="truncate">{f.name}</span>
-          {f.is_global && (
-            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">global</span>
-          )}
-        </div>
-      ))}
-      {documents.map((d: any, i: number) => (
-        <div key={i} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
-          <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
-          <span className="truncate">{d.filename}</span>
-          {d.status && <StatusBadge status={d.status} />}
-        </div>
-      ))}
-      {folders.length === 0 && documents.length === 0 && (
-        <span className="text-xs text-muted-foreground italic">Empty folder</span>
-      )}
-    </div>
-  )
-}
-
-function TreeNodeRow({ node, depth }: { node: any; depth: number }) {
-  const indent = depth * 16
-  if (depth > 3) return (
-    <div style={{ marginLeft: indent }} className="text-xs text-muted-foreground font-mono">…</div>
-  )
-  return (
-    <>
-      <div style={{ marginLeft: indent }} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
-        {node.type === "folder" ? (
-          <Folder className="w-3.5 h-3.5 text-amber-400/70 flex-shrink-0" />
-        ) : (
-          <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
-        )}
-        <span className="truncate">{node.name}</span>
-        {node.is_global && (
-          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">global</span>
-        )}
-      </div>
-      {Array.isArray(node.documents) && node.documents.map((doc: any, i: number) => (
-        <div
-          key={i}
-          style={{ marginLeft: indent + 16 }}
-          className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5"
-        >
-          <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
-          <span className="truncate">{doc.filename}</span>
-        </div>
-      ))}
-      {Array.isArray(node.children) && node.children.map((child: any, i: number) => (
-        <TreeNodeRow key={i} node={child} depth={depth + 1} />
-      ))}
-    </>
-  )
-}
-
-function TreeResult({ parsed }: { parsed: any }) {
-  const tree: any[] = parsed.tree ?? []
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-0.5">
-      {tree.length === 0 ? (
-        <span className="text-xs text-muted-foreground italic">Empty tree</span>
-      ) : (
-        tree.map((node: any, i: number) => (
-          <TreeNodeRow key={i} node={node} depth={0} />
-        ))
-      )}
-    </div>
-  )
-}
-
-function GrepResult({ parsed }: { parsed: any }) {
-  const matches: any[] = parsed.matches ?? []
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-      {matches.length === 0 ? (
-        <span className="text-xs text-muted-foreground italic">No matches</span>
-      ) : (
-        matches.map((m: any, i: number) => (
-          <div key={i} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
-            <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
-            <span className="truncate">{m.filename}</span>
-          </div>
-        ))
-      )}
-    </div>
-  )
-}
-
-function GlobResult({ parsed }: { parsed: any }) {
-  const matches: any[] = parsed.matches ?? []
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1">
-      {matches.length === 0 ? (
-        <span className="text-xs text-muted-foreground italic">No matches</span>
-      ) : (
-        matches.map((m: any, i: number) => (
-          <div key={i} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
-            <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
-            <span className="truncate">{m.path ?? m.filename}</span>
-          </div>
-        ))
-      )}
-    </div>
-  )
-}
-
-function ReadDocumentResult({ parsed }: { parsed: any }) {
-  const [open, setOpen] = useState(false)
-
-  if (!parsed) return null
-
-  if (parsed.error) {
-    return <div className="mt-1.5 text-xs text-destructive italic">{parsed.error}</div>
-  }
-
-  const isRange = parsed.start_line != null && parsed.end_line != null
-  const header = isRange
-    ? `Lines ${parsed.start_line}\u2013${parsed.end_line}`
-    : "Full document"
-  const content: string = parsed.content ?? ""
-
-  return (
-    <div className="mt-2">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        <span>{header}</span>
-      </button>
-      {open && (
-        <div className="mt-2 ml-5 rounded-lg bg-card/60 ghost-border">
-          <ScrollArea className="max-h-64">
-            <pre className="p-3 text-xs font-mono leading-relaxed text-foreground/80 whitespace-pre-wrap break-words">
-              {content || <span className="italic text-muted-foreground">No content available for this document.</span>}
-            </pre>
-          </ScrollArea>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---- Search documents result ----
-
-function SearchDocumentsResult({ parsed }: { parsed: any }) {
-  if (!Array.isArray(parsed) || parsed.length === 0) return null
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden space-y-1.5">
-      {parsed.map((chunk: any, i: number) => (
-        <div key={i} className="rounded-md bg-muted/20 px-2.5 py-2 space-y-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <FileText className="w-3 h-3 text-primary/60 flex-shrink-0" />
-            <span className="text-[11px] font-mono text-foreground/80 truncate">
-              {chunk.metadata?.filename ?? chunk.filename ?? `Chunk ${i + 1}`}
-            </span>
-            {chunk.similarity != null && (
-              <span className="ml-auto text-[10px] font-mono text-muted-foreground/60 flex-shrink-0">
-                {(chunk.similarity * 100).toFixed(0)}% match
-              </span>
-            )}
-          </div>
-          {chunk.content && (
-            <p className="text-[10px] text-foreground/50 leading-relaxed line-clamp-2 pl-5">
-              {chunk.content.slice(0, 200)}
-            </p>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ---- Query documents result (SQL) ----
-
-function QueryDocumentsResult({ result }: { result: string }) {
-  // query_documents returns a plain string, not JSON
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-      <pre className="text-[11px] font-mono text-foreground/70 whitespace-pre-wrap break-words leading-relaxed">
-        {result}
-      </pre>
-    </div>
-  )
-}
-
-// ---- Web search result ----
-
-function WebSearchResult({ result }: { result: string }) {
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-      <div className="text-[11px] text-foreground/70 leading-relaxed space-y-1">
-        <MarkdownRenderer content={result} className="text-[11px]" />
-      </div>
-    </div>
-  )
-}
-
-// ---- Generic JSON result fallback ----
-
-function GenericResult({ result }: { result: string }) {
-  return (
-    <div className="max-h-48 overflow-y-auto overflow-x-hidden">
-      <pre className="text-[10px] font-mono text-foreground/50 whitespace-pre-wrap break-words leading-relaxed">
-        {result.slice(0, 1500)}{result.length > 1500 ? "\n…" : ""}
-      </pre>
-    </div>
-  )
-}
-
-function renderResult(name: string, parsed: any, rawResult?: string): React.ReactNode {
-  if (name === "ls") return <LsResult parsed={parsed} />
-  if (name === "tree") return <TreeResult parsed={parsed} />
-  if (name === "grep") return <GrepResult parsed={parsed} />
-  if (name === "glob") return <GlobResult parsed={parsed} />
-  if (name === "read_document") return <ReadDocumentResult parsed={parsed} />
-  if (name === "search_documents" && Array.isArray(parsed)) return <SearchDocumentsResult parsed={parsed} />
-  if (name === "query_documents" && rawResult) return <QueryDocumentsResult result={rawResult} />
-  if (name === "web_search" && rawResult) return <WebSearchResult result={rawResult} />
-  // Fallback: show raw result for any other tool
-  if (rawResult) return <GenericResult result={rawResult} />
-  return null
-}
+// ---- Result rendering ----
+// Phase 075.7 Plan 01 (D-02 atomic extraction): all 9 inline *Result
+// components + countTreeNodes helper + resultSummary function + StatusBadge
+// + renderResult dispatch have been lifted into per-tool *Body.tsx files
+// under ./tool-bodies/. Each Body owns its default component AND its named
+// `summarize(tc)` derivation (D-03). The TOOL_BODIES + summarizeToolCall
+// registry consumed by ToolResultBlock (below) is imported at the top of
+// this file. `ToolResultBlock` stays inline per CONTEXT deferred list;
+// only its inner dispatch was swapped to use the registry.
 
 function ToolResultBlock({ tc }: { tc: ToolCall }) {
   const [open, setOpen] = useState(false)
@@ -439,8 +156,36 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
     )
   }
 
-  const summary = parsed ? resultSummary(tc.name, parsed) : (tc.result ? "View results" : null)
-  const content = renderResult(tc.name, parsed, tc.result ?? undefined)
+  // Phase 075.7 Plan 01 (D-02): per-Body summarize() via registry. Fallback
+  // to "View results" preserves pre-refactor behavior for raw-non-JSON
+  // results whose tool name lacks a SUMMARIES entry.
+  const summary = tc.result ? (summarizeToolCall(tc) || "View results") : null
+
+  // Phase 075.7 Plan 01 (D-02): dispatch via TOOL_BODIES registry. Per-Body
+  // prop shapes preserved (ls/tree/grep/glob/read_document/search_documents
+  // take `parsed`; query_documents/web_search take raw `result`). GenericBody
+  // is the fallback for any other tool with a raw result.
+  let content: React.ReactNode = null
+  if (tc.name === "ls" && parsed) {
+    content = <TOOL_BODIES.ls parsed={parsed} />
+  } else if (tc.name === "tree" && parsed) {
+    content = <TOOL_BODIES.tree parsed={parsed} />
+  } else if (tc.name === "grep" && parsed) {
+    content = <TOOL_BODIES.grep parsed={parsed} />
+  } else if (tc.name === "glob" && parsed) {
+    content = <TOOL_BODIES.glob parsed={parsed} />
+  } else if (tc.name === "read_document" && parsed) {
+    content = <TOOL_BODIES.read_document parsed={parsed} />
+  } else if (tc.name === "search_documents" && Array.isArray(parsed)) {
+    content = <TOOL_BODIES.search_documents parsed={parsed} />
+  } else if (tc.name === "query_documents" && tc.result) {
+    content = <TOOL_BODIES.query_documents result={tc.result} />
+  } else if (tc.name === "web_search" && tc.result) {
+    content = <TOOL_BODIES.web_search result={tc.result} />
+  } else if (tc.result) {
+    content = <GenericBody result={tc.result} />
+  }
+
   if (!summary && !content) return null
 
   return (
@@ -839,7 +584,7 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
                 {tc.name === "execute_code" && tc.status !== "preparing" ? (
-                  <ExecuteCodeBlock tc={tc} />
+                  <TOOL_BODIES.execute_code tc={tc} />
                 ) : (
                   <>
                     {/* Tool row */}

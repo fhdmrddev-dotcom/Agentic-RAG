@@ -2,11 +2,19 @@ import { useState, useRef, useEffect } from "react"
 import { Terminal, CheckCircle2, XCircle, Loader2, Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
-import { OutputFileCard } from "./OutputFileCard"
+import { OutputFileCard } from "../OutputFileCard"
+
+// Phase 075.7 Plan 01 (D-02 atomic extraction): ported verbatim from the
+// legacy execute-code wrapper. Functional behavior preserved (code/STDOUT/
+// STDERR/OutputFileCard/sticky-bottom-indicator/ToolArgsLivePanel-preparing-
+// state). Renamed to default export `ExecuteCodeBody`. Editor-inset
+// visual polish (gutter, syntax tokens, labeled STDOUT/STDERR per sketch
+// tool-call-panel.md D1/D3) is BEST-EFFORT per SPEC §Boundaries — NOT a
+// verifier gate. Behavior parity IS gated.
 
 // Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): `OutputFileCard` +
 // `API_BASE` + `resolveOutputUrl` + `formatBytes` were extracted to
-// `./OutputFileCard.tsx` so the pinned Final Outputs panel in
+// `../OutputFileCard.tsx` so the pinned Final Outputs panel in
 // `MessageItem.tsx` can reuse the same card shape. This file now consumes
 // the shared component directly — per-cell rendering behavior is
 // byte-identical to pre-refactor.
@@ -16,7 +24,7 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-interface ExecuteCodeBlockProps {
+interface ExecuteCodeBodyProps {
   tc: ToolCall
 }
 
@@ -85,7 +93,23 @@ function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreami
   )
 }
 
-export function ExecuteCodeBlock({ tc }: ExecuteCodeBlockProps) {
+export function summarize(tc: ToolCall): string {
+  // Priority: file output filename → last STDOUT line → "executed" fallback.
+  if (tc.outputFiles && tc.outputFiles.length > 0) {
+    return `[saved ${tc.outputFiles[0].filename}]`
+  }
+  const lines = tc.outputLines ?? []
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i]
+    if (l.kind === "stdout" && l.content && l.content.trim()) {
+      const text = l.content.trim().split("\n").pop() ?? ""
+      return text.length > 80 ? text.slice(0, 80) + "…" : text
+    }
+  }
+  return "executed"
+}
+
+export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
   const [terminalOpen, setTerminalOpen] = useState(true)
 
   // Derive outputFiles from tc.outputFiles (live) or parse from tc.result (reloaded)

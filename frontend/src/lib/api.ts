@@ -658,9 +658,11 @@ export async function downloadSandboxOutput(
   relativeUrl: string,
   filename: string,
 ): Promise<void> {
-  // Normalize: prepend API_BASE only for relative URLs (matches
-  // ExecuteCodeBlock.tsx resolveOutputUrl shape — keeps the call site
-  // simple by accepting either form).
+  // Normalize: prepend API_BASE only for relative URLs (matches the
+  // resolveOutputUrl shape used by tool-bodies/ExecuteCodeBody.tsx
+  // (Phase 075.7 rename of the legacy execute-code wrapper) — keeps the
+  // call site simple
+  // by accepting either form).
   const url = relativeUrl.startsWith("/") ? `${API_BASE}${relativeUrl}` : relativeUrl
 
   let token: string
