@@ -2105,6 +2105,22 @@ async def send_message(
                                 # L:2100 below.
                                 _emit_boundary_openai_native: dict[int, int] = {}
                                 _emit_boundary_openrouter: dict[int, int] = {}
+                                # Phase 075.10: tool_args_progress emit boundary now
+                                # config-backed via
+                                # app_settings.chat_tool_args_progress_emit_boundary_bytes
+                                # (default 256). Captured ONCE per iteration (alongside
+                                # the per-provider boundary state above) so the
+                                # async chunk callback below reads a local int
+                                # instead of re-walking the settings cache per chunk.
+                                # Defensive helper falls back to pre-075.10 5120 if
+                                # the settings read fails. Tail slice widens
+                                # proportionally so `args_so_far` still ships
+                                # meaningful cumulative context (full cumulative
+                                # buffer continues to flow via `code_so_far`
+                                # per Plan 075.6 Req #1).
+                                from app.models.user_settings import tool_args_progress_emit_boundary_bytes  # noqa: PLC0415 — narrow runtime import to avoid module-load-time cycle
+                                _emit_boundary_bytes = tool_args_progress_emit_boundary_bytes()
+                                _emit_tail_bytes = max(5120, _emit_boundary_bytes * 4)
 
                                 # Phase 066 D-066-02 + D-066-03 + D-066-11: per-LLM-call
                                 # timer + close-then-raise. Resolve budget before each
@@ -2224,16 +2240,25 @@ async def send_message(
                                                     _bytes_total = len(
                                                         tool_calls_buffer[idx]["arguments"].encode("utf-8")
                                                     )
-                                                    _new_boundary = _bytes_total // 5120
+                                                    # Phase 075.10: boundary lowered from
+                                                    # hardcoded 5120 to config-backed default
+                                                    # 256 via
+                                                    # chat_tool_args_progress_emit_boundary_bytes.
+                                                    # Resolved once outside the closure into
+                                                    # _emit_boundary_bytes (closure-captured).
+                                                    _new_boundary = _bytes_total // _emit_boundary_bytes
                                                     _last_boundary = _emit_boundary.get(idx, 0)
                                                     if _new_boundary > _last_boundary:
                                                         _emit_boundary[idx] = _new_boundary
-                                                        # D-075-09: args_so_far is the LAST 5KB of
-                                                        # the cumulative accumulator (sliding-window
-                                                        # tail). UTF-8-aware byte slice + decode
-                                                        # errors="ignore" drops any invalid trailing
-                                                        # codepoint bytes left by the byte boundary.
-                                                        _tail_bytes = tool_calls_buffer[idx]["arguments"].encode("utf-8")[-5120:]
+                                                        # D-075-09 + Phase 075.10: args_so_far is
+                                                        # the LAST _emit_tail_bytes of the
+                                                        # cumulative accumulator (sliding-window
+                                                        # tail, capped at max(5120, boundary*4)).
+                                                        # UTF-8-aware byte slice + decode
+                                                        # errors="ignore" drops any invalid
+                                                        # trailing codepoint bytes left by the
+                                                        # byte boundary.
+                                                        _tail_bytes = tool_calls_buffer[idx]["arguments"].encode("utf-8")[-_emit_tail_bytes:]
                                                         _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
                                                         await _emit(
                                                             redis, run_id, "tool_args_progress",
