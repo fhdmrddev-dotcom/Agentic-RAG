@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: ready_to_execute
-stopped_at: "075.9 shipped-partial 2026-05-24 (frontend wiring + hot-fix 443b4be correct; scenario 1 PASS, scenarios 2-3 BLOCKED-BY-BACKEND, scenario 4 PASS via vitest). Chrome MCP + SSE intercept on gpt-5.4/claude-opus-4-6/gemini-2.5-flash revealed tool_args_progress events never fire for code <5 KB. 075.10 INSERTED 2026-05-24 to lower the 5120-byte boundary + port OpenAI emission."
+stopped_at: "075.9 shipped-partial 2026-05-24. 075.10 INSERTED 2026-05-24 (backend tool_args_progress fine-grained emission across 4 providers — lowers 5120-byte boundary + ports to OpenAI). 075.11 INSERTED 2026-05-24 (agent timeout 3-layer audit — operator observed unexplained 900s wall on claude-opus-4-6; unifies per-LLM-call SDK / agent-loop wall-clock / SSE keepalive under app_settings with public-benchmark tier presets; Default=1200s/20min)."
 last_updated: "2026-05-24T23:30:00.000Z"
 last_activity: 2026-05-24 -- Phase 075.9 closed partial; Phase 075.10 inserted (backend SSE wire-format completeness)
 progress:
-  total_phases: 32
+  total_phases: 33
   completed_phases: 20
-  total_plans: 64
+  total_plans: 65
   completed_plans: 68
-  percent: 62
+  percent: 61
 ---
 
 # Project State
