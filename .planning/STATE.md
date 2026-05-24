@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 076 context gathered
-last_updated: "2026-05-24T19:36:24.688Z"
-last_activity: 2026-05-24
+status: executing
+stopped_at: Completed 076-01-PLAN.md
+last_updated: "2026-05-24T20:27:00Z"
+last_activity: 2026-05-24 -- Phase 076 Plan 01 executed
 progress:
   total_phases: 33
   completed_phases: 21
   total_plans: 67
-  completed_plans: 69
+  completed_plans: 71
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.10 — tool-args-progress-fine-grained-emission
+**Current focus:** Phase 076 — confidence-recalibration
 
 ## Current Position
 
-Phase: 076
-Plan: Not started
-Next action: `/gsd:execute-phase 075.10` — single-wave sequential execution; root causes diagnosed via SSE intercept; lowers 5120→256 boundary on anthropic+google, ports emission to openai
-Status: Ready to plan
-Last activity: 2026-05-24
+Phase: 076 (confidence-recalibration) — EXECUTING
+Plan: 2 of 2
+Next action: `/gsd:execute-phase 076` Plan 02 — apply calibration findings, update thresholds if needed, document in PROJECT.md
+Status: Plan 01 complete, Plan 02 pending
+Last activity: 2026-05-24 -- Phase 076 Plan 01 executed (calibration script created)
 
 ## PRD-reset outputs (committed)
 

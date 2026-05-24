@@ -789,7 +789,7 @@ Plans:
   4. The `pdf_extraction_runs` telemetry makes the per-extractor lineage observable (camelot vs pdfplumber vs future engines) so this calibration is re-litigable if the default-set output drifts.
 
 **Plans:**
-- [ ] 076-01-PLAN.md — Calibration script (scripts/calibrate_confidence.py): env-load + psycopg2 + OpenAI embed + audit_log replay + ~20 synthetic queries + distribution analysis + JSON output + telemetry check (Wave 1; autonomous)
+- [x] 076-01-PLAN.md — Calibration script (scripts/calibrate_confidence.py): env-load + psycopg2 + OpenAI embed + audit_log replay + ~20 synthetic queries + distribution analysis + JSON output + telemetry check (Wave 1; autonomous)
 - [ ] 076-02-PLAN.md — Apply threshold decision + PROJECT.md appendix + test update + schema verification + operator approval (Wave 2; depends on Plan 01; autonomous: false)
 
 ### Phase 077: Multi-Worker Validation Harness
@@ -976,7 +976,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 073 — asyncpg Pool Integration | 4/4 | Complete    | 2026-05-17 |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 2/2 | Complete    | 2026-05-18 |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
-| 076 — Confidence Recalibration | 0/2 | Not started | — |
+| 076 — Confidence Recalibration | 1/2 | In progress | — |
 | 077 — Multi-Worker Validation Harness | 0/3 | Not started | — |
 | 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 0/2 | Not started | — |
