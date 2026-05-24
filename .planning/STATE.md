@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
-stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
-last_updated: "2026-05-24T13:33:26.022Z"
-last_activity: 2026-05-24 -- Phase 075.9 execution started
+status: ready_to_execute
+stopped_at: "075.9 shipped-partial 2026-05-24 (frontend wiring + hot-fix 443b4be correct; scenario 1 PASS, scenarios 2-3 BLOCKED-BY-BACKEND, scenario 4 PASS via vitest). Chrome MCP + SSE intercept on gpt-5.4/claude-opus-4-6/gemini-2.5-flash revealed tool_args_progress events never fire for code <5 KB. 075.10 INSERTED 2026-05-24 to lower the 5120-byte boundary + port OpenAI emission."
+last_updated: "2026-05-24T23:30:00.000Z"
+last_activity: 2026-05-24 -- Phase 075.9 closed partial; Phase 075.10 inserted (backend SSE wire-format completeness)
 progress:
-  total_phases: 31
-  completed_phases: 19
-  total_plans: 63
-  completed_plans: 67
-  percent: 100
+  total_phases: 32
+  completed_phases: 20
+  total_plans: 64
+  completed_plans: 68
+  percent: 62
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.9 — live-execution-fidelity-handoff
+**Current focus:** Phase 075.10 — tool-args-progress-fine-grained-emission (backend SSE wire-format completeness)
 
 ## Current Position
 
-Phase: 075.9 (live-execution-fidelity-handoff) — EXECUTING
-Plan: 1 of 1
-Next action: `/gsd:execute-phase 075.9` — single-wave sequential execution; root causes diagnosed; G-4 lived-experience UAT mandatory at close
-Status: Executing Phase 075.9
-Last activity: 2026-05-24 -- Phase 075.9 execution started
+Phase: 075.10 — tool-args-progress-fine-grained-emission (inserted 2026-05-24)
+Plan: 075.10-PLAN.md written (5 tasks, 1 wave; T1 migration → T2 anthropic → T3 google → T4 openai port → T5 live UAT)
+Next action: `/gsd:execute-phase 075.10` — single-wave sequential execution; root causes diagnosed via SSE intercept; lowers 5120→256 boundary on anthropic+google, ports emission to openai
+Status: Ready to execute
+Last activity: 2026-05-24 -- Phase 075.10 inserted
 
 ## PRD-reset outputs (committed)
 
