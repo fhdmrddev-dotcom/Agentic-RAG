@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 075.7 Plan 01 shipped (atomic commit cd883ca, ToolCallPanel 957->702 LOC)
-last_updated: "2026-05-24T06:09:22.559Z"
+stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
+last_updated: "2026-05-24T06:23:05.558Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 28
   completed_phases: 17
   total_plans: 61
-  completed_plans: 64
+  completed_plans: 65
   percent: 100
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 075.7 (live-execution-ux-refactor) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
 Status: Ready to execute
 Last activity: 2026-05-24
@@ -241,6 +241,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P04 | 16min | 4 tasks | 10 files |
 | Phase 075.4 P06 | 70min | 3 tasks | 9 files |
 | Phase 075.7 P01 | 75min | 1 tasks | 11 files |
+| Phase 075.7 P02 | ~25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -364,6 +365,7 @@ Recent decisions affecting v2.5 work:
 - Phase 075.7 Plan 01: per-Body prop shapes preserved verbatim (parsed vs raw result) — registry dispatch uses explicit if/else chain in ToolResultBlock to avoid broader type re-plumbing inside the atomic commit (D-02)
 - Phase 075.7 Plan 01: ExecuteCodeBody.summarize priority outputFiles[0].filename then last STDOUT line then 'executed' fallback (UI-SPEC §6.3 + RESEARCH §11 Q3 resolved during this plan)
 - Phase 075.7 Plan 01 deviation: comment-only edits in 6 sibling files (useMessages, lib/api, OutputFileCard, ToolArgsLivePanel, MessageItem, types/index) to satisfy R-3 grep gate (grep -rn ExecuteCodeBlock frontend/src returns 0) — zero behavioral change
+- Phase 075.7-02 RunCard wrapper shipped (commits 90aa0a5 + 0adc09e). Memoized bordered container for tool-bearing assistant turns; sticky header against Radix Viewport, brand-pulse avatar, 250ms timer, iteration counter, active-glow frame. Mounts via single-hunk MessageItem swap; pure-text turns unchanged (D-09). All 7 regression invariants byte-identical (memo, stickyLabelRef D-12, WorkingBadge above, MarkdownRenderer/Confidence/Citation/Suggestion/Feedback below, finalOutputFiles panel, animate-brandPulse predicate). ZERO new keyframes (R-7). Plan 03 owns auto-collapse + collapsed-row JSX + summarizeToolCall wire-in.
 
 ### Pending Todos
 
@@ -403,8 +405,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: 2026-05-24T06:09:22.550Z
-Stopped at: Phase 075.7 Plan 01 shipped (atomic commit cd883ca, ToolCallPanel 957->702 LOC)
+Last session: 2026-05-24T06:22:53.006Z
+Stopped at: Completed 075.7-02-runcard-wrapper-PLAN.md
 
 ### Next session: pending USER actions
 

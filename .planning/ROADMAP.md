@@ -642,7 +642,9 @@ Plans:
 **UAT bandwidth:** mandatory 4-axis coverage per CLAUDE.md SC#10 (cross-provider × multi-tool × parallel-thread × long-message). Chrome MCP drives all four against the 4 reference scenarios from the sketches.
 
 Plans:
-- [ ] TBD (run `/gsd:spec-phase 075.7` → `/gsd:discuss-phase 075.7` → `/gsd:plan-phase 075.7` to break down)
+- [x] 075.7-01: Extract tool-bodies (ToolCallPanel 957→702 LOC; tool-bodies/ registry shipped 2026-05-24, commit `cd883ca`)
+- [x] 075.7-02: RunCard wrapper (memoized bordered container + sticky header + brand-pulse avatar + 250ms timer + iteration counter + active-glow frame; mounted via single-hunk MessageItem swap 2026-05-24, commits `90aa0a5` + `0adc09e`)
+- [ ] 075.7-03: Focus Mode + 4-axis UAT (auto-collapse-on-completion + collapsed-row JSX + summarizeToolCall wire-in + Playwright scenarios 07..12 + VALIDATION.md + CLAUDE.md hot-file ledger flip)
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
