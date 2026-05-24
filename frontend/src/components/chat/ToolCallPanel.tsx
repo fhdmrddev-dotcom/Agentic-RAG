@@ -10,7 +10,7 @@ import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
-import { toolLabel, toolSummary as getToolSummary, taskPhaseLabel } from "@/lib/toolMeta"
+import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -57,14 +57,6 @@ function toolSummary(tc: ToolCall) {
 function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(1)}s`
-}
-
-function formatTotalDuration(toolCalls: ToolCall[]): string | null {
-  const starts = toolCalls.filter(tc => tc.startedAt).map(tc => tc.startedAt!)
-  const ends = toolCalls.filter(tc => tc.endedAt).map(tc => tc.endedAt!)
-  if (starts.length === 0 || ends.length === 0) return null
-  const total = Math.max(...ends) - Math.min(...starts)
-  return formatDuration(total)
 }
 
 // ---- Execution time badge ----
@@ -188,28 +180,38 @@ function ToolResultBlock({ tc }: { tc: ToolCall }) {
 
   if (!summary && !content) return null
 
+  // Phase 075.7 Plan 03 T1 + UAT fix (Bug C — duplicate summary rows):
+  //   - When tool is "done" and collapsed: render ONLY the `→ {summary}` row
+  //     (sketch live-run-container D5 / UI-SPEC §7.5 collapsed-row format).
+  //     It is itself the toggle that expands the body on click.
+  //   - When tool is non-done OR expanded: render the chevron-button row
+  //     (pre-Plan-03 toggle pattern) so streaming/preparing/interrupted tools
+  //     and currently-expanded done tools keep the chevron affordance.
+  //   - Never both rows at once.
+  const isDoneAndCollapsed = !open && tc.status === "done"
+
   return (
     <div className="mt-1.5 ml-8">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
-      >
-        {open
-          ? <ChevronDown className="w-3 h-3" />
-          : <ChevronRight className="w-3 h-3" />}
-        <span className="font-medium">{summary}</span>
-      </button>
-      {/* Phase 075.7 Plan 03 Task 1 (R-4 + sketch live-run-container.md D3 + UI-SPEC §7.5):
-          on collapsed past tool cards, render `→ {summarize(tc)}` one-liner sourced
-          from the TOOL_SUMMARIES registry (shipped in Plan 01). Active tool cards
-          stay fully expanded; only COMPLETED + COLLAPSED tools get the `→` row. */}
-      {!open && tc.status === "done" && (
-        <div
+      {isDoneAndCollapsed ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
           data-testid="tool-result-summary"
-          className="ml-0 mt-0.5 font-mono text-xs text-muted-foreground border-t border-border/50 px-3 py-1.5"
+          className="block w-full text-left font-mono text-xs text-muted-foreground hover:text-foreground transition-colors py-0.5"
+          aria-label="Expand tool result"
         >
-          → {summarizeToolCall(tc)}
-        </div>
+          → {summarizeToolCall(tc) || "View results"}
+        </button>
+      ) : (
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          {open
+            ? <ChevronDown className="w-3 h-3" />
+            : <ChevronRight className="w-3 h-3" />}
+          <span className="font-medium">{summary}</span>
+        </button>
       )}
       {open && content && (
         <div className="mt-1.5 ml-4.5 rounded-lg bg-card/50 backdrop-blur-md p-2.5 ghost-border">
@@ -287,7 +289,11 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
 
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount, activatedSkills }: Props) {
+export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
+  // Phase 075.7 Bug D fix: `isPlanning` and `iterationCount` props are still
+  // declared in the Props interface (RunCard.tsx passes them) but are no
+  // longer consumed here. RunCard owns run-level chrome (timer, counter,
+  // header copy); ToolCallPanel renders body content only.
   // Phase 075.1 Plan 04 Atom B (B-260519-10) — dedup tool cards keyed on
   // tool_call_id. OpenRouter mid-flight re-render of cached calls produced
   // visible duplicates in UAT Round 3. Dedup preserves first occurrence
@@ -313,59 +319,14 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
 
   if (!deduplicatedToolCalls || deduplicatedToolCalls.length === 0) return null
 
-  const hasInterrupted = deduplicatedToolCalls.some((tc) => tc.status === "interrupted")
-  const allDone = deduplicatedToolCalls.every((tc) => tc.status === "done" || tc.status === "interrupted") &&
-    (!subAgent || subAgent.status === "done")
-
-  // WR-04 (2026-05-24): re-indent — was declared at column 0 inside an
-  // indented function body during an earlier phase merge.
-  const [expanded, setExpanded] = useState(true)
-
-  const isExpanded = expanded
-  // Phase 075.1 Plan 04 Atom B — every read of the tool list inside the
-  // render uses the deduplicated list so the dedup is authoritative for
-  // ALL derived state (counts, active-tool lookup, header label, display
-  // ordering). Reverting any single line to read `toolCalls` would
-  // re-introduce the visible duplicate.
-  const totalTime = allDone && !isPlanning ? formatTotalDuration(deduplicatedToolCalls) : null
-  const activeTool = deduplicatedToolCalls.find((tc) => tc.status === "running" || tc.status === "preparing")
-
-  const stepPrefix = (iterationCount != null && iterationCount >= 0)
-    ? `Step ${iterationCount + 1}`
-    : null
-
-  // Phase 56 D-07: model is streaming the final answer when:
-  //   - panel is still actively working (NOT allDone)
-  //   - we are NOT in the explicit `isPlanning` between-rounds gap
-  //   - no tool is currently running
-  //   - at least one tool has run already (deduplicatedToolCalls.length > 0)
-  // Pure derivation from existing state — no new SSE event, no new prop.
-  const isSynthesizing = !allDone && !isPlanning && !activeTool && deduplicatedToolCalls.length > 0
-
-  const headerLabel = (() => {
-    if (allDone && !isPlanning) {
-      return hasInterrupted
-        ? `Stopped — used ${deduplicatedToolCalls.length} tool${deduplicatedToolCalls.length > 1 ? "s" : ""}`
-        : `Used ${deduplicatedToolCalls.length} tool${deduplicatedToolCalls.length > 1 ? "s" : ""}`
-    }
-    // Phase 56 D-03/D-05/D-07: Step N prefix + task phase label (D-07 mapping from active tool name).
-    if (activeTool) {
-      const phase = taskPhaseLabel(activeTool.name)
-      const summary = toolSummary(activeTool)
-      const body = summary ? `${phase} — ${summary}` : `${phase}…`
-      return stepPrefix ? `${stepPrefix} — ${body}` : body
-    }
-    if (isSynthesizing) {
-      return stepPrefix ? `${stepPrefix} — Synthesizing answer` : "Synthesizing answer"
-    }
-    if (isPlanning) {
-      return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
-    }
-    // Default fallback (D-07 default) — never empty, never "Working".
-    return stepPrefix ? `${stepPrefix} — Thinking…` : "Thinking…"
-  })()
-
-  const isActivelyWorking = !allDone || isPlanning
+  // Phase 075.7 UAT fix (Bug D — duplicate frame/header):
+  // ToolCallPanel is now BODY-ONLY. RunCard.tsx owns the outer rounded frame,
+  // the sticky header (status + timer + counter + brand-pulse avatar), the
+  // run-level expand/collapse state, and the streaming shimmer band.
+  // Pre-Plan-02 outer header/frame derivations (hasInterrupted, allDone,
+  // totalTime, activeTool, headerLabel, isActivelyWorking, isSynthesizing,
+  // stepPrefix, expanded/setExpanded) were the sole consumers of that chrome
+  // and have been removed alongside it.
 
   // Phase 56 D-09: interleave skill activations with tool calls by timestamp,
   // so skill rows appear inline between the tools in the order they occurred.
@@ -442,53 +403,12 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
     return iters.length > 0 ? Math.min(...iters) : undefined
   })()
 
+  // Phase 075.7 UAT fix (Bug D): RunCard.tsx wraps this component and owns
+  // the outer rounded frame, sticky header (run summary + timer + counter +
+  // brand-pulse avatar), expand/collapse state, and shimmer. ToolCallPanel
+  // renders the tool-list body only — no outer frame, no header.
   return (
-    <div className={cn(
-      "mb-3 rounded-xl overflow-hidden max-w-full text-sm transition-all duration-300",
-      isActivelyWorking
-        ? "bg-primary/5 border border-primary/20 shadow-[0_0_20px_-4px_hsl(239_84%_67%/0.15)]"
-        : "bg-card/80 backdrop-blur-sm ghost-border"
-    )}>
-      {/* Header */}
-      <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-accent/30 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-{!isActivelyWorking ? (
-          hasInterrupted ? (
-            <Square className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          ) : (
-            <CheckCircle2 className="w-4 h-4 text-success flex-shrink-0 animate-checkPop" />
-          )
-        ) : (
-          <div className="flex-shrink-0 animate-pulseGlow rounded-full">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-          </div>
-        )}
-        <span className={cn(
-          "flex-1 text-xs font-semibold tracking-wide truncate",
-          isActivelyWorking ? "text-primary" : "text-muted-foreground"
-        )}>
-          {headerLabel}
-        </span>
-        {/* Total execution time */}
-        {totalTime && (
-          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/50 font-mono tabular-nums flex-shrink-0">
-            <Clock className="w-3 h-3" />
-            {totalTime}
-          </span>
-        )}
-        {isExpanded
-          ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-      </button>
-
-      {/* Shimmer progress bar while tools are running or planning */}
-      {isActivelyWorking && <div className="tool-progress-bar" />}
-
-      {/* Body */}
-      {isExpanded && (
-        <div className="px-4 pb-3.5 space-y-1 border-t border-border/20 min-w-0 overflow-hidden">
+    <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
           {/* 2026-05-24 fix: render a persistent bidirectional toggle when
               shouldCollapse is true so the user can re-collapse after
               expanding (the prior render only showed the toggle when
@@ -707,8 +627,6 @@ export function ToolCallPanel({ toolCalls, subAgent, isPlanning, iterationCount,
               </div>
             )
           })}
-        </div>
-      )}
     </div>
   )
 }

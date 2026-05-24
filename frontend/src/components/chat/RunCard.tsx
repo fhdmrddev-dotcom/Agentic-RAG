@@ -57,24 +57,23 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   //   - streaming → always show body (D-08: user cannot fold a live run)
   //   - terminal + no tools → show body (no collapse target — R-6 exception)
   //   - terminal + tools → collapsed UNLESS user explicitly expanded via click
-  // userExpandedRef is the SOLE writer of the user-toggle state; forceRender
-  // is a useState-as-event trigger so React re-evaluates the derivation.
-  // Reset on message.id change so DB-reload remounts get the default-collapsed
-  // historical view.
-  const userExpandedRef = useRef(false)
-  const [, forceRender] = useState(0)
-  useEffect(() => {
-    userExpandedRef.current = false
-  }, [message.id])
-  const expanded = isStreamingNow || !hasTools || userExpandedRef.current
+  // userExpanded is the user-toggle state; React re-evaluates the derivation
+  // on every render. Reset on message.id change so DB-reload remounts get
+  // the default-collapsed historical view.
+  const [userExpanded, setUserExpanded] = useState(false)
+  // Reset user-toggle when message identity changes (e.g., temp-id → DB-id
+  // swap on first persistence reconcile). Pattern matches the pre-fix
+  // RunCard's setExpanded(false) effect; setState-in-effect is intentional.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setUserExpanded(false) }, [message.id])
+  const expanded = isStreamingNow || !hasTools || userExpanded
 
   // Header click: CONTEXT D-08 mandates this be a NO-OP while streaming, so
   // the user cannot accidentally hide the live progress they're watching.
   // Once terminal, the header toggles expand/collapse like a normal button.
   const handleHeaderClick = () => {
     if (isStreamingNow) return  // D-08 no-op
-    userExpandedRef.current = !userExpandedRef.current
-    forceRender(n => n + 1)
+    setUserExpanded(v => !v)
   }
 
   // Timer: recompute elapsed seconds every 250ms during streaming.
@@ -141,8 +140,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           if (isStreamingNow) return  // D-08: keyboard activation also no-op while streaming
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault()
-            userExpandedRef.current = !userExpandedRef.current
-            forceRender(n => n + 1)
+            setUserExpanded(v => !v)
           }
         }}
         className={cn(
@@ -202,7 +200,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
         <button
           type="button"
           data-testid="run-card-collapsed"
-          onClick={() => { userExpandedRef.current = true; forceRender(n => n + 1) }}
+          onClick={() => setUserExpanded(true)}
           className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors animate-fadeSlideUp text-sm text-muted-foreground"
           aria-label="Expand run details"
         >
