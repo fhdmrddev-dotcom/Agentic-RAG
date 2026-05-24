@@ -133,6 +133,14 @@ class UserEffectiveSettings(BaseModel):
     multimodal_max_vision_calls: int = 100
     multimodal_max_b64_bytes_kb: int = 4096
 
+    # Phase 075.10 (migration 049): tool_args_progress SSE emission cadence.
+    # Lower = more visible streaming for live-code rendering, higher = less SSE
+    # bandwidth. Pre-075.10 the per-provider services hardcoded 5120 — which
+    # for typical code-gen prompts (< 5 KB of code) fired AT MOST ONCE per
+    # tool call. Default 256 ≈ a line of Python per event, matching Claude.ai
+    # parity. See `tool_args_progress_emit_boundary_bytes()` helper below.
+    chat_tool_args_progress_emit_boundary_bytes: int = 256
+
     # Per-aspect extraction engines (Phase 071.2 D-071.2-02/03; migration 045)
     extraction_text_engine_pdf: str = "legacy"
     extraction_text_engine_docx: str = "legacy"
@@ -354,6 +362,11 @@ def load_app_settings() -> UserEffectiveSettings:
         multimodal_max_vision_calls=_int(override, "multimodal_max_vision_calls", 100),
         multimodal_max_b64_bytes_kb=_int(override, "multimodal_max_b64_bytes_kb", 4096),
 
+        # Phase 075.10 (migration 049) — tool_args_progress emit cadence.
+        chat_tool_args_progress_emit_boundary_bytes=_int(
+            override, "chat_tool_args_progress_emit_boundary_bytes", 256
+        ),
+
         # Phase 071.2 D-071.2-03 — per-aspect extraction engines (migration 045)
         extraction_text_engine_pdf=_str(override, "extraction_text_engine_pdf", "legacy"),
         extraction_text_engine_docx=_str(override, "extraction_text_engine_docx", "legacy"),
@@ -386,6 +399,49 @@ def override_provider(effective: UserEffectiveSettings, provider_id: str) -> Use
 
 def load_user_settings(user_id: str, supabase=None) -> UserEffectiveSettings:
     return load_app_settings()
+
+
+# ── Phase 075.10 — tool_args_progress boundary helper ─────────────────────────
+
+# Hardcoded pre-075.10 fallback. Used by `tool_args_progress_emit_boundary_bytes()`
+# if `load_app_settings()` raises for ANY reason (corrupt override file, missing
+# Pydantic field, etc.) so the streaming services never crash on a settings read.
+# Matches the value the per-provider services hardcoded before this knob existed.
+_FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES = 5120
+
+
+def tool_args_progress_emit_boundary_bytes() -> int:
+    """Return the configured byte boundary for ``tool_args_progress`` SSE emits.
+
+    Phase 075.10 (migration 049): each provider's streaming generator
+    (`anthropic_service.stream_anthropic` / `google_service.stream_google`)
+    plus the OpenAI-path's ``_on_chunk_openai`` callback in
+    ``backend/app/api/threads.py`` calls this helper ONCE per stream invocation
+    (NOT per chunk — the file-backed override has a 5s TTL cache but per-event
+    DB-style reads would still be wasteful in the hot loop) to determine when
+    to flush a cumulative-byte boundary event.
+
+    Defensive: if `load_app_settings()` fails for any reason (corrupt override
+    file, missing field after schema rollback, etc.), returns the pre-075.10
+    hardcoded value 5120 instead of raising. The streaming generator must never
+    crash on a settings read.
+
+    Returns:
+        Positive int byte boundary (minimum 1 — clamps any non-positive override
+        up to 1 to avoid a divide-by-zero in the `// boundary` arithmetic).
+    """
+    try:
+        value = load_app_settings().chat_tool_args_progress_emit_boundary_bytes
+    except Exception:  # noqa: BLE001 — defensive: NEVER raise from a streaming hot path.
+        logger.warning(
+            "tool_args_progress_emit_boundary_bytes(): load_app_settings() raised; "
+            "falling back to pre-075.10 hardcoded %d",
+            _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES,
+        )
+        return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
+    if value is None or value <= 0:
+        return _FALLBACK_TOOL_ARGS_EMIT_BOUNDARY_BYTES
+    return int(value)
 
 
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:
