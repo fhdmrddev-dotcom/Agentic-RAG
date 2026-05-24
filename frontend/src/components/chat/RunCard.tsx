@@ -231,6 +231,30 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           false for terminal+tools turns until user clicks to expand). */}
       {expanded && (
         <div className="p-3">
+          {/* Phase 075.8 Task 6 (sketch 001 D7 — Compact thinking row).
+              When isPlanning is active during a streaming turn, render a
+              single dim italic row at the TOP of the run-body. Default-
+              collapsed — there's no expanded thinking content path today
+              (D7 says "click to expand if there's content to show"; we
+              wire the click-to-expand shell so the future thinking-block
+              data can flow in without another component touch). */}
+          {isStreamingNow && message.isPlanning && (
+            <div
+              data-testid="thinking-row"
+              className="px-3 py-1.5 text-xs italic text-muted-foreground/80 flex items-center gap-2"
+              aria-label="Agent is planning the next step"
+            >
+              <span aria-hidden="true">💭</span>
+              <span className="flex-1 truncate">
+                Thinking · planning next step
+              </span>
+              {elapsedMs > 0 && (
+                <span className="font-mono opacity-60 tabular-nums">
+                  {(elapsedMs / 1000).toFixed(1)}s
+                </span>
+              )}
+            </div>
+          )}
           <ToolCallPanel
             toolCalls={message.tool_calls ?? []}
             subAgent={message.sub_agent}
