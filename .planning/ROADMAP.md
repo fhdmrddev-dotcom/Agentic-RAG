@@ -711,7 +711,7 @@ Estimated effort: 3-4h focused single session. No new schema, no new API, no pro
 **UAT bandwidth:** G-4 mandatory — Chrome MCP through 4 felt-experience scenarios (sub-agent dedup mid-stream / live code stream byte-by-byte / long code stream throttle smoothness / Shiki failure recovery via singleton reset).
 
 Plans:
-- [ ] 075.9-01: stable clientKey + live Shiki streaming + WR-01/02 (5 tasks, sequential chain T1→T2→T3→T4→T5)
+- [x] 075.9-01: stable clientKey + live Shiki streaming + WR-01/02 (5 tasks, sequential chain T1→T2→T3→T4→T5) — shipped 2026-05-24
 
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
