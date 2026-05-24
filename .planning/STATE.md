@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 075.7 context gathered
-last_updated: "2026-05-24T05:13:10.275Z"
-last_activity: 2026-05-23
+status: executing
+stopped_at: Phase 075.7 Plan 01 shipped (atomic commit cd883ca, ToolCallPanel 957->702 LOC)
+last_updated: "2026-05-24T06:09:22.559Z"
+last_activity: 2026-05-24
 progress:
   total_phases: 28
   completed_phases: 17
   total_plans: 61
-  completed_plans: 63
+  completed_plans: 64
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.6 — live-streaming-ux-cross-provider-parity
+**Current focus:** Phase 075.7 — live-execution-ux-refactor
 
 ## Current Position
 
-Phase: 076
-Plan: Not started
+Phase: 075.7 (live-execution-ux-refactor) — EXECUTING
+Plan: 2 of 3
 Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
-Status: Ready to plan
-Last activity: 2026-05-23
+Status: Ready to execute
+Last activity: 2026-05-24
 
 ## PRD-reset outputs (committed)
 
@@ -240,6 +240,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P03 | 40min | 3 tasks | 5 files |
 | Phase 075.4 P04 | 16min | 4 tasks | 10 files |
 | Phase 075.4 P06 | 70min | 3 tasks | 9 files |
+| Phase 075.7 P01 | 75min | 1 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -360,6 +361,9 @@ Recent decisions affecting v2.5 work:
 - Plan 075.4-06: FK-violation cluster (6 tests) fixed via AsyncMock-patches on app.api.threads.{insert_run, finalize_run, insert_assistant_message} — not via fk_aware_runs_factory (Rule-1 pragmatic: factory targets real-Postgres binding tests, these files use placeholder SUPABASE_URL). AsyncMock pattern is canonical retrofit for Phase 076/077 cleanup of remaining ~80 bucket-c failures.
 - Plan 075.4-06: scenario-06 (BUG-260523-04 iteration-parity) stays RED by design as measurement gate. Root-cause fix deferred per CONTEXT.md to a future focused-fix phase. Inline assertion message documents the intentional fail; no xfail/skip applied — the failing output IS the measurement artifact.
 - Plan 075.4-06: pytest baseline drifted 95 (RESEARCH) → 98 (live at commit 56c033a). 3-test drift up due to Plans 075.4-01..05 adding tests. Triage doc carries 98 baseline cleanly; post-fix 92 (98-6) confirmed effective.
+- Phase 075.7 Plan 01: per-Body prop shapes preserved verbatim (parsed vs raw result) — registry dispatch uses explicit if/else chain in ToolResultBlock to avoid broader type re-plumbing inside the atomic commit (D-02)
+- Phase 075.7 Plan 01: ExecuteCodeBody.summarize priority outputFiles[0].filename then last STDOUT line then 'executed' fallback (UI-SPEC §6.3 + RESEARCH §11 Q3 resolved during this plan)
+- Phase 075.7 Plan 01 deviation: comment-only edits in 6 sibling files (useMessages, lib/api, OutputFileCard, ToolArgsLivePanel, MessageItem, types/index) to satisfy R-3 grep gate (grep -rn ExecuteCodeBlock frontend/src returns 0) — zero behavioral change
 
 ### Pending Todos
 
@@ -399,8 +403,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 075.7 context gathered
+Last session: 2026-05-24T06:09:22.550Z
+Stopped at: Phase 075.7 Plan 01 shipped (atomic commit cd883ca, ToolCallPanel 957->702 LOC)
 
 ### Next session: pending USER actions
 
