@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aNxEcMQiLrLcLBgSnNxmm1PjTyUAhEIBwY9w55vTnO5wUXJorVHbspooNHS1hgq
+\restrict m6r6OzZMpYyLEldf1v1ezUl0YVsq2BIUo3KbqqX5aTzyYvLZMrCHIttXs3QpV9A
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -256,8 +256,16 @@ CREATE TABLE public.app_settings (
     extraction_image_engine_docx text DEFAULT 'zip_xpath'::text,
     extraction_equation_engine text DEFAULT 'none'::text,
     extraction_per_call_hints_enabled boolean DEFAULT true,
+    chat_tool_args_progress_emit_boundary_bytes integer DEFAULT 256 NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
+
+
+--
+-- Name: COLUMN app_settings.chat_tool_args_progress_emit_boundary_bytes; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.chat_tool_args_progress_emit_boundary_bytes IS 'Byte boundary at which provider services emit tool_args_progress SSE events during tool argument generation. Lower = more visible streaming (per Claude.ai) but more SSE bandwidth. Default 256 ≈ a line of Python every event. Was hardcoded 5120 pre-075.10.';
 
 
 --
@@ -415,7 +423,7 @@ CREATE TABLE public.messages (
     confidence_level text,
     confidence_avg_similarity double precision,
     confidence_disclaimer text,
-    CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text])))
+    CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
 
 ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
@@ -1617,5 +1625,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aNxEcMQiLrLcLBgSnNxmm1PjTyUAhEIBwY9w55vTnO5wUXJorVHbspooNHS1hgq
+\unrestrict m6r6OzZMpYyLEldf1v1ezUl0YVsq2BIUo3KbqqX5aTzyYvLZMrCHIttXs3QpV9A
 
