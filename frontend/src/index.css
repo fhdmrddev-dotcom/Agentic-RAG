@@ -264,6 +264,20 @@
   animation: progressShimmer 1.8s ease-in-out infinite;
 }
 
+/* Phase 075.8 Task 3 (sketch 002 D6): active-tool glow wrapper.
+   Per tool-call-panel.md D6 — when a tool is mid-execution
+   (preparing/running), wrap it with a soft primary-glow box-shadow + a
+   thin top-edge primary tint, and place a bottom progress shimmer (the
+   existing .tool-progress-bar) at the wrapper's bottom edge. Per sketch
+   D6 the bar lives at the BOTTOM (top is reserved for the run-card's
+   own progress band so we don't double-shimmer). */
+.tc-active-wrap {
+  position: relative;
+  background: linear-gradient(180deg, hsl(var(--primary) / 0.05), transparent 60%);
+  box-shadow: 0 0 24px hsl(var(--primary) / 0.18);
+  padding-bottom: 4px; /* leaves vertical room for the absolute bottom shimmer */
+}
+
 /* ─── Markdown rendered output ─── */
 .markdown {
   line-height: 1.75;

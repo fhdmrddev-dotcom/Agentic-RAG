@@ -3,7 +3,7 @@ import {
   ChevronDown, ChevronRight, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
-  BookOpen, Zap, Clock, Code2, Terminal, Square,
+  BookOpen, Zap, Clock, Code2, Terminal,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, SubAgentState, SkillActivation } from "@/types"
@@ -11,6 +11,7 @@ import { MarkdownRenderer } from "./MarkdownRenderer"
 import { TOOL_BODIES, GenericBody, summarizeToolCall } from "./tool-bodies"
 import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
+import { StatusPill, type ToolStatus } from "./StatusPill"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -59,18 +60,22 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-// ---- Execution time badge ----
-
-function TimeBadge({ tc }: { tc: ToolCall }) {
-  if (!tc.startedAt || !tc.endedAt) return null
-  const duration = tc.endedAt - tc.startedAt
-  return (
-    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 font-mono tabular-nums flex-shrink-0">
-      <Clock className="w-2.5 h-2.5" />
-      {formatDuration(duration)}
-    </span>
-  )
+// Phase 075.8 Task 2 (sketch 002 D5): map ToolCall.status → StatusPill ToolStatus.
+// "failed" is not directly observable on ToolCall.status (failed execute_code
+// surfaces through ExecuteCodeBody's exitCode path; non-execute_code tools
+// surface errors via parsed.error). Treat anything terminal-but-not-done as
+// done — failures show up via ToolResultBlock's destructive italic line.
+function pillStatus(s: ToolCall["status"]): ToolStatus {
+  if (s === "preparing") return "preparing"
+  if (s === "running") return "running"
+  if (s === "interrupted") return "interrupted"
+  return "done"
 }
+
+// Phase 075.8 Task 2 (sketch 002 D5): TimeBadge was dropped — the StatusPill
+// now carries the `· {duration}` suffix on done/failed/interrupted variants,
+// making the standalone Clock+duration span redundant. ExecuteCodeBody
+// underwent the same swap.
 
 // ---- Live elapsed timer (running tools) ----
 
@@ -409,29 +414,17 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* 2026-05-24 fix: render a persistent bidirectional toggle when
-              shouldCollapse is true so the user can re-collapse after
-              expanding (the prior render only showed the toggle when
-              stepsCollapsed=true, leaving no way back). The toggle now
-              shows "Show N earlier steps" when collapsed and
-              "Hide earlier steps" when expanded. */}
-          {shouldCollapse && stepsCollapsed && (
-            <div
-              key="collapsed-steps-summary"
-              data-testid="collapsed-steps-summary"
-              data-iteration-min={collapsedIterationMin}
-              className="pt-2.5"
-            >
-              <button
-                type="button"
-                onClick={() => setStepsCollapsed(false)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-                <span>Show {hiddenStepsCount} earlier steps</span>
-              </button>
-            </div>
-          )}
+          {/* Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
+              Per-step result-summary rows replace the prior aggregate
+              "Show N earlier steps" toggle. Collapsed past steps render
+              as one-line `→ {summary}` rows inline (the sketch D3
+              behavior — "while a run is in flight, completed tool calls
+              auto-collapse to a one-line summary showing their result,
+              not their args"). The aggregate Show-toggle is dropped per
+              PLAN.md Task 4 pick.
+              The "Hide earlier steps" toggle remains visible only when
+              the user has opted into the full-expanded view, so they
+              can re-fold without losing the affordance. */}
           {shouldCollapse && !stepsCollapsed && (
             <div
               key="expanded-steps-collapse"
@@ -449,15 +442,51 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             </div>
           )}
           {displayItems.map((item, i) => {
-            // 075.6 Plan 03 / Req #7: step-list collapse short-circuit.
-            // When shouldCollapse is true and the user has not expanded, hide
-            // items in positions 0 .. activeIndex-1. activeIndex and beyond
-            // render normally; the iteration divider above the active step
-            // continues to derive prevToolIteration from displayItems[i-1]
-            // (the LAST hidden item) so the iter-N → iter-(N+1) boundary
-            // above the active step still fires correctly (Pitfall 6 / L5).
+            // Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
+            // When shouldCollapse + stepsCollapsed, past steps
+            // (positions 0..activeIndex-1) render as one-line result-
+            // summary rows via summarizeToolCall(tc). Clicking the row
+            // expands the full view (sets stepsCollapsed=false).
+            // The iteration divider above the active step still derives
+            // prevToolIteration from displayItems[i-1] (the LAST
+            // collapsed-but-rendered item) — the iter-N → iter-(N+1)
+            // boundary above the active step continues to fire
+            // (Pitfall 6 / Landmine L5 mitigation preserved).
             if (shouldCollapse && stepsCollapsed && i < activeIndex) {
-              return null
+              if (item.kind === 'tool') {
+                const collapsedTc = item.tc
+                const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
+                return (
+                  <button
+                    key={`step-summary-${i}-${collapsedTc.id ?? collapsedTc.name}`}
+                    type="button"
+                    onClick={() => setStepsCollapsed(false)}
+                    data-testid="step-summary-row"
+                    data-iteration-min={i === 0 ? collapsedIterationMin : undefined}
+                    aria-label={`Expand to view ${hiddenStepsCount} earlier steps`}
+                    className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
+                  >
+                    <span className="opacity-50 flex-shrink-0">→</span>
+                    <span className="truncate flex-1 min-w-0">{summaryText}</span>
+                  </button>
+                )
+              }
+              // Skill rows in collapsed Focus Mode: keep them visible as a
+              // single compact line so the user still sees the activation
+              // happened mid-run.
+              return (
+                <button
+                  key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
+                  type="button"
+                  onClick={() => setStepsCollapsed(false)}
+                  className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
+                >
+                  <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
+                  <span className="truncate flex-1 min-w-0 italic">
+                    skill: {item.activation.skillName}
+                  </span>
+                </button>
+              )
             }
             if (item.kind === 'skill') {
               return (
@@ -491,8 +520,23 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             const agentState: SubAgentState | undefined =
               tc.sub_agent ?? subAgent
 
+            // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
+            // Applied to the per-tool wrapper when the tool is running or
+            // preparing. The .tc-active-wrap class lives in index.css (box-shadow
+            // + soft gradient backdrop); the bottom shimmer reuses
+            // .tool-progress-bar positioned absolute at the wrapper's bottom.
+            const isToolActive = tc.status === "running" || tc.status === "preparing"
+
             return (
-              <div key={i} className="pt-2.5 animate-toolSlideIn" style={{ animationDelay: `${i * 80}ms` }}>
+              <div
+                key={i}
+                className={cn(
+                  "pt-2.5 animate-toolSlideIn",
+                  isToolActive && "tc-active-wrap rounded-md px-2",
+                )}
+                data-testid={isToolActive ? "tc-active" : undefined}
+                style={{ animationDelay: `${i * 80}ms` }}
+              >
                 {/* D-067-03: Step N divider on iteration boundary; plain inter-tool separator otherwise.
                     Renders ONLY when (a) not the first item, (b) both current and previous tool items
                     have a defined iteration, (c) iterations differ. Pitfall 4: NEVER above first iteration.
@@ -553,22 +597,28 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                           </>
                         )}
                       </span>
-                      {/* Duration badge — live timer while running, static badge when done */}
-                      {tc.status === "running" && tc.startedAt != null
-                        ? <ElapsedTimer startedAt={tc.startedAt} />
-                        : <TimeBadge tc={tc} />
-                      }
-                      <span className="flex-shrink-0">
-                        {tc.status === "preparing" ? (
-                          <span className="w-3.5 h-3.5 rounded-full bg-primary/30 animate-pulse inline-block" />
-                        ) : tc.status === "running" ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                        ) : tc.status === "interrupted" ? (
-                          <Square className="w-3.5 h-3.5 text-amber-500" />
-                        ) : (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-success animate-checkPop" />
-                        )}
-                      </span>
+                      {/* Phase 075.8 Task 2 (sketch 002 D5):
+                          - During RUNNING, keep the existing live elapsed
+                            timer (since the pill running variant doesn't
+                            show duration) — gives the user a live ticker.
+                          - During DONE/INTERRUPTED, the pill carries the
+                            duration suffix, so the standalone TimeBadge is
+                            redundant and dropped.
+                          - During PREPARING, no clock is meaningful yet —
+                            the pill's italic verb signals the state. */}
+                      {tc.status === "running" && tc.startedAt != null && (
+                        <ElapsedTimer startedAt={tc.startedAt} />
+                      )}
+                      {/* Phase 075.8 Task 2: universal StatusPill replaces the
+                          ad-hoc Loader2/Square/CheckCircle2 status indicator. */}
+                      <StatusPill
+                        status={pillStatus(tc.status)}
+                        duration={
+                          tc.startedAt != null && tc.endedAt != null
+                            ? tc.endedAt - tc.startedAt
+                            : undefined
+                        }
+                      />
                     </div>
 
                     {/* Phase 075.1 Plan 04 Atom D (B-260519-05) — sub-agent
@@ -623,6 +673,18 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                     {/* Sub-agent block (live or restored) */}
                     {agentState && <SubAgentBlock agent={agentState} />}
                   </>
+                )}
+                {/* Phase 075.8 Task 3 (sketch 002 D6): bottom progress shimmer
+                    on every active tool — both the execute_code branch and the
+                    generic-tool branch. Absolute-positioned against the
+                    .tc-active-wrap parent so it sits at the bottom edge
+                    without affecting layout. Top progress is reserved for the
+                    run-card header (sketch D6 — avoid double-shimmer noise). */}
+                {isToolActive && (
+                  <div
+                    className="tool-progress-bar absolute bottom-0 left-0 right-0"
+                    data-testid="tc-bottom-shimmer"
+                  />
                 )}
               </div>
             )
