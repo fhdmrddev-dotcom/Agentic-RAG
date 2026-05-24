@@ -1,9 +1,17 @@
-import { useState, useRef, useEffect } from "react"
+import { lazy, Suspense, useState, useRef, useEffect } from "react"
 import { Terminal, Clock, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ToolCall, OutputLine, OutputFile } from "@/types"
 import { OutputFileCard } from "../OutputFileCard"
 import { StatusPill, type ToolStatus } from "../StatusPill"
+
+// Phase 075.8 Task 7 (sketch 002 D1): editor-inset syntax highlighting.
+// Lazy-loaded so the Shiki WASM bundle (~150 KB) doesn't block the first
+// render of a chat that has no execute_code yet. Falls back to a plain
+// mono pre while loading (see ShikiCode for the dual-render contract).
+const ShikiCode = lazy(() =>
+  import("./ShikiCode").then(m => ({ default: m.ShikiCode }))
+)
 
 // Phase 075.7 Plan 01 (D-02 atomic extraction): ported verbatim from the
 // legacy execute-code wrapper. Functional behavior preserved (code/STDOUT/
@@ -41,55 +49,97 @@ function TerminalOutput({ lines, isStreaming }: { lines: OutputLine[]; isStreami
     }
   }, [lines.length])
 
-  // 2026-05-24 UX refinement: replace the hardcoded near-black zinc-900
-  // container with a theme-aware card surface that keeps the terminal
-  // affordance (monospace, line-by-line, per-stream colour coding) while
-  // integrating with the Deep Midnight palette. Adds a small header strip
-  // so the user can see at a glance what kind of pane this is (was "messy
-  // and not organised" per 2026-05-23 UAT feedback).
+  // Phase 075.8 Task 7 (sketch 002 D3 — STDOUT and STDERR are labeled regions).
+  // Partition lines by kind while preserving their original order within each
+  // region, then render two visually-distinct regions stacked: STDOUT first,
+  // STDERR below. Each region gets an uppercase `STDOUT` / `STDERR` divider
+  // per sketch D3 — failure-mode triage immediately surfaces the error band.
+  // Streaming dot still pulses on whichever region last received a line.
+  const stdoutLines: OutputLine[] = []
+  const stderrLines: OutputLine[] = []
+  for (const ln of lines) {
+    if (ln.kind === "stderr") stderrLines.push(ln)
+    else stdoutLines.push(ln)
+  }
+  const lastKind = lines.length > 0 ? lines[lines.length - 1].kind : null
+
   return (
-    <div className="rounded-md border border-border/40 bg-card/60 overflow-hidden">
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-border/30 bg-muted/30">
-        <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/80">
-          Terminal output
-        </span>
-        {isStreaming && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse ml-1" />
-        )}
-        <span className="ml-auto text-[9px] font-mono text-muted-foreground/50">
-          {lines.length} {lines.length === 1 ? "line" : "lines"}
-        </span>
-      </div>
-      <div
-        ref={containerRef}
-        className="px-2.5 py-2 font-mono text-xs leading-relaxed max-h-64 overflow-y-auto"
-      >
-        {lines.map((line, i) => (
+    <div
+      ref={containerRef}
+      className="rounded-md border border-border/40 bg-[#0d1117] overflow-hidden max-h-64 overflow-y-auto"
+    >
+      {stdoutLines.length > 0 && (
+        <>
           <div
-            key={i}
-            className={cn(
-              "flex items-start gap-1.5",
-              line.kind === "stdout" ? "text-foreground/85" : "text-red-400"
-            )}
-            style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+            data-testid="tc-divider-stdout"
+            className="flex items-center px-3 py-1 bg-[hsl(220_30%_9%)] border-b border-border/40 font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground/80"
           >
-            {/* Plan 075.4-04 D-075.4-SC#6 — inline stderr badge alongside red lines.
-                Sits beside the line content so the operator can disambiguate
-                stderr from red-coloured stdout (some libraries print warnings to
-                stdout with ANSI red). Per-line badge complements the error-box
-                below (which renders only for `errorMessage`, not per-line). */}
-            {line.kind === "stderr" && (
-              <span className="inline-flex items-center rounded-sm bg-red-500/15 px-1 py-0 text-[9px] uppercase tracking-wider text-red-400 font-semibold leading-tight flex-shrink-0 mt-0.5">
-                stderr
+            <span>STDOUT</span>
+            {isStreaming && lastKind === "stdout" && (
+              <span className="ml-auto flex items-center gap-1.5 text-primary normal-case">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-dotBounce" />
+                streaming
               </span>
             )}
-            <span className="flex-1 min-w-0">{line.content}</span>
+            {!isStreaming && (
+              <span className="ml-auto text-muted-foreground/50 normal-case">
+                {stdoutLines.length} {stdoutLines.length === 1 ? "line" : "lines"}
+              </span>
+            )}
           </div>
-        ))}
-        {isStreaming && lines.length > 0 && (
-          <span className="inline-block w-1.5 h-3 bg-primary/60 animate-pulse rounded-sm" />
-        )}
-      </div>
+          <div className="px-3 py-2 font-mono text-[11px] leading-[1.65] text-[#c9d1d9]">
+            {stdoutLines.map((line, i) => (
+              <div
+                key={`stdout-${i}`}
+                style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+              >
+                {line.content}
+              </div>
+            ))}
+            {isStreaming && lastKind === "stdout" && (
+              <span className="inline-block w-1.5 h-3 bg-primary/60 animate-pulse rounded-sm align-middle" />
+            )}
+          </div>
+        </>
+      )}
+      {stderrLines.length > 0 && (
+        <>
+          <div
+            data-testid="tc-divider-stderr"
+            className={cn(
+              "flex items-center px-3 py-1 border-b border-border/40 font-mono text-[10px] uppercase tracking-[0.06em]",
+              "bg-destructive/10 text-destructive",
+              stdoutLines.length > 0 && "border-t border-border/40",
+            )}
+          >
+            <span>STDERR</span>
+            {isStreaming && lastKind === "stderr" && (
+              <span className="ml-auto flex items-center gap-1.5 normal-case">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-dotBounce" />
+                streaming
+              </span>
+            )}
+            {!isStreaming && (
+              <span className="ml-auto opacity-60 normal-case">
+                {stderrLines.length} {stderrLines.length === 1 ? "line" : "lines"}
+              </span>
+            )}
+          </div>
+          <div className="px-3 py-2 font-mono text-[11px] leading-[1.65] text-[#ffa198]">
+            {stderrLines.map((line, i) => (
+              <div
+                key={`stderr-${i}`}
+                style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+              >
+                {line.content}
+              </div>
+            ))}
+            {isStreaming && lastKind === "stderr" && (
+              <span className="inline-block w-1.5 h-3 bg-destructive/60 animate-pulse rounded-sm align-middle" />
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -166,14 +216,12 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
           <span className="font-semibold text-foreground/80">
             {isRunning ? "Executing code" : isError ? "Execution failed" : "Code executed"}
           </span>
-          {/* Description (preferred) or raw code preview */}
-          {tc.args.description ? (
+          {/* Phase 075.8 Task 7: description-only hint stays — the inline
+              60-char code preview is dropped because the full code now
+              renders below in the editor inset. */}
+          {tc.args.description && (
             <span className="ml-1.5 opacity-60 italic">{tc.args.description}</span>
-          ) : tc.args.code ? (
-            <span className="ml-1.5 opacity-50">
-              &ldquo;{tc.args.code.slice(0, 60)}{tc.args.code.length > 60 ? "..." : ""}&rdquo;
-            </span>
-          ) : null}
+          )}
         </span>
         {/* Phase 075.8 Task 2 (sketch 002 D5):
             - During RUNNING: keep the live elapsed counter (the running
@@ -202,6 +250,37 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
           duration={isComplete ? executionDurationMs : undefined}
         />
       </div>
+
+      {/* Phase 075.8 Task 7 (sketch 002 D1) — Editor inset for execute_code.
+          Line-number gutter + Shiki-highlighted Python code + max-height
+          scroll. The Python lang chip lives in the header above (the
+          'Python' pill at the top of the row), so we don't double-chip
+          inside the editor frame. */}
+      {tc.args.code && (
+        <div
+          data-testid="tc-editor"
+          className="mt-2 grid grid-cols-[32px_1fr] bg-[#0d1117] max-h-[180px] overflow-y-auto rounded-md border border-border/40"
+        >
+          <div
+            data-testid="tc-gutter"
+            aria-hidden="true"
+            className="bg-[hsl(220_30%_7%)] text-muted-foreground/60 font-mono text-[11px] text-right py-2 pr-1.5 border-r border-border/40 select-none leading-[1.7]"
+          >
+            {tc.args.code.split("\n").map((_: string, i: number) => (
+              <div key={i}>{i + 1}</div>
+            ))}
+          </div>
+          <Suspense
+            fallback={
+              <pre className="m-0 px-3 py-2 font-mono text-[11px] leading-[1.7] text-[#c9d1d9] whitespace-pre overflow-x-auto">
+                {tc.args.code}
+              </pre>
+            }
+          >
+            <ShikiCode code={tc.args.code} language="python" theme="github-dark" />
+          </Suspense>
+        </div>
+      )}
 
       {/* Error message (error state only) */}
       {isError && tc.errorMessage && (
