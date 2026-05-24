@@ -1,0 +1,268 @@
+/**
+ * Phase 075.7 follow-up — reconcile-vs-sendMessage MERGE race regression guard.
+ *
+ * Root cause (see .planning/debug/075-7-live-render-regression.md):
+ *   On a fresh thread, ChatArea's useLayoutEffect fires
+ *   setViewingThread(threadId) which fires reconcile (fire-and-forget).
+ *   Meanwhile sendMessage synchronously writes two optimistic `temp-`
+ *   placeholders WITHOUT a runId (runId is only stamped AFTER postMessage
+ *   resolves). The pre-fix reconcile MERGE predicate REQUIRED `m.runId` to
+ *   keep a temp placeholder — so when getSnapshot resolved before postMessage
+ *   stamped the runId, BOTH placeholders were filtered out and the bucket was
+ *   wiped to []. All subsequent SSE callbacks then no-op'd against the empty
+ *   bucket and nothing rendered until F5.
+ *
+ * Fix (StreamsProvider.tsx:790-808): widen the predicate so temp placeholders
+ * without a runId ALSO survive when a sendMessage is in flight on the same
+ * thread (`isSendingRef.current && streamingThreadIdRef.current === threadId`).
+ *
+ * This test forces the exact race ordering deterministically:
+ *   1. setViewingThread fires reconcile, but getSnapshot is gated on a manual
+ *      resolver so it does NOT resolve yet.
+ *   2. sendMessage runs — writes userMsg + assistantMsg (no runId), then awaits
+ *      postMessage (also gated on a manual resolver).
+ *   3. Resolve getSnapshot FIRST with the empty fresh-thread snapshot — this
+ *      triggers reconcile's setMessagesForBucket while the placeholders are
+ *      still in their no-runId window.
+ *   4. Assert the bucket still contains BOTH temp placeholders (user + assistant).
+ *   5. Resolve postMessage so the test finalises cleanly.
+ *
+ * Without the fix, step 4 fails because the bucket is `[]`.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { renderHook, waitFor, act } from "@testing-library/react"
+import type { ReactNode } from "react"
+
+const {
+  mockPostMessage,
+  mockSubscribeToRun,
+  mockGetMessages,
+  mockGetActiveRuns,
+  mockGetSnapshot,
+  mockCancelRun,
+} = vi.hoisted(() => ({
+  mockPostMessage: vi.fn(),
+  mockSubscribeToRun: vi.fn(),
+  mockGetMessages: vi.fn(),
+  mockGetActiveRuns: vi.fn(),
+  mockGetSnapshot: vi.fn(),
+  mockCancelRun: vi.fn(),
+}))
+
+vi.mock("@/lib/api", () => ({
+  postMessage: mockPostMessage,
+  subscribeToRun: mockSubscribeToRun,
+  getMessages: mockGetMessages,
+  getActiveRuns: mockGetActiveRuns,
+  getSnapshot: mockGetSnapshot,
+  cancelRun: mockCancelRun,
+}))
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
+}))
+
+import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
+import { useStreamsStore } from "@/stores/streamsStore"
+import type { StreamCallbacks } from "@/lib/api"
+
+function renderProvider() {
+  return renderHook(() => useStreamActions(), {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <StreamsProvider>{children}</StreamsProvider>
+    ),
+  })
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorage.clear()
+  useStreamsStore.setState({
+    bucketsBySurface: new Map(),
+    viewedThreadId: null,
+    streamingThreads: new Set<string>(),
+    fallbackNotices: new Map<string, string>(),
+    reconcileErrors: new Map<string, Error>(),
+    loadingThreads: new Set<string>(),
+    subscriptionsByThread: new Map<string, Set<string>>(),
+  })
+  mockGetMessages.mockResolvedValue([])
+  mockGetActiveRuns.mockResolvedValue([])
+  mockCancelRun.mockResolvedValue(undefined)
+  mockSubscribeToRun.mockImplementation(
+    async (_runId: string, _since: string, _cb: StreamCallbacks, _signal?: AbortSignal) => {
+      return new Promise<void>(() => {})
+    },
+  )
+})
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
+
+describe("Phase 075.7 — reconcile-vs-sendMessage MERGE race (fresh-thread fresh-send)", () => {
+  it("preserves both temp placeholders when getSnapshot resolves mid-send (before runId is stamped)", async () => {
+    const THREAD_ID = "thread-fresh"
+    const RUN_ID = "run-fresh"
+    const REAL_USER_MSG_ID = "real-user-msg-id"
+
+    // Gate getSnapshot so reconcile's MERGE fires deterministically AFTER
+    // sendMessage's optimistic writes but BEFORE postMessage stamps the runId.
+    let resolveSnapshot!: (snap: {
+      messages: never[]
+      active_runs: never[]
+      since_cursors: Record<string, string>
+      runs_status: Record<string, string>
+      recently_active: never[]
+    }) => void
+    const snapshotPromise = new Promise<{
+      messages: never[]
+      active_runs: never[]
+      since_cursors: Record<string, string>
+      runs_status: Record<string, string>
+      recently_active: never[]
+    }>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    mockGetSnapshot.mockImplementation(() => snapshotPromise)
+
+    // Gate postMessage so we can resolve it AFTER asserting the bucket survived
+    // the reconcile MERGE pass.
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+
+    const { result } = renderProvider()
+
+    // Step 1: setViewingThread fires reconcile (fire-and-forget).
+    //   getSnapshot is awaited but hasn't resolved yet.
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    // Step 2: kick off sendMessage. Optimistic writes land synchronously.
+    //   Then it awaits postMessage which is still gated.
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(THREAD_ID, "say hi briefly")
+    })
+
+    // Pre-check: bucket contains exactly the two optimistic placeholders, both
+    // missing runId (this is the race window we're testing).
+    const bucketPreReconcile =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    expect(bucketPreReconcile).toHaveLength(2)
+    expect(bucketPreReconcile.every((m) => m.id.startsWith("temp-"))).toBe(true)
+    expect(bucketPreReconcile.every((m) => m.runId === undefined)).toBe(true)
+    const tempUser = bucketPreReconcile.find((m) => m.role === "user")
+    const tempAssistant = bucketPreReconcile.find((m) => m.role === "assistant")
+    expect(tempUser?.content).toBe("say hi briefly")
+    expect(tempAssistant?.content).toBe("")
+
+    // Step 3: resolve getSnapshot with the empty fresh-thread snapshot. This
+    // runs reconcile's setMessagesForBucket MERGE while sendMessage is still
+    // mid-flight (postMessage hasn't resolved → no runId stamped yet).
+    await act(async () => {
+      resolveSnapshot({
+        messages: [],
+        active_runs: [],
+        since_cursors: {},
+        runs_status: {},
+        recently_active: [],
+      })
+      // Let microtasks drain so reconcile's .then chain runs.
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // ASSERT: bucket STILL contains both placeholders. Pre-fix, this is where
+    // the MERGE filtered both out and the bucket became []. Post-fix, the
+    // sendInFlightOnThisThread branch keeps them.
+    const bucketPostReconcile =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    expect(bucketPostReconcile).toHaveLength(2)
+    const survivingUser = bucketPostReconcile.find((m) => m.role === "user")
+    const survivingAssistant = bucketPostReconcile.find((m) => m.role === "assistant")
+    expect(survivingUser?.content).toBe("say hi briefly")
+    expect(survivingAssistant).toBeTruthy()
+
+    // Step 4: resolve postMessage so sendMessage can finish wiring subscription
+    //   and stamp the runId. This validates the end-to-end path still works
+    //   after the predicate change.
+    await act(async () => {
+      resolvePost({ run_id: RUN_ID, message_id: REAL_USER_MSG_ID })
+    })
+
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+
+    const bucketFinal =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const finalUser = bucketFinal.find((m) => m.role === "user")
+    const finalAssistant = bucketFinal.find((m) => m.role === "assistant")
+    expect(finalUser?.id).toBe(REAL_USER_MSG_ID)
+    expect(finalAssistant?.runId).toBe(RUN_ID)
+
+    void sendPromise
+  })
+
+  it("when send is NOT in flight, no-runId temps are still discarded (predicate scope is correct)", async () => {
+    // Negative companion: the widening MUST be gated by
+    // `isSendingRef && streamingThreadIdRef === threadId`. If no send is in
+    // flight, a stray no-runId temp placeholder in the bucket must NOT survive
+    // a reconcile — that would be a different bug (stale optimistic state
+    // leaking across thread navigation).
+    const THREAD_ID = "thread-no-send"
+
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [],
+      since_cursors: {},
+      runs_status: {},
+      recently_active: [],
+    })
+
+    const { result } = renderProvider()
+
+    // Seed a stray no-runId temp placeholder directly into the bucket.
+    useStreamsStore.setState((s) => {
+      const surfMap = new Map(s.bucketsBySurface.get("chat") ?? new Map())
+      surfMap.set(THREAD_ID, [
+        {
+          id: "temp-stray",
+          thread_id: THREAD_ID,
+          user_id: "",
+          role: "assistant",
+          content: "stale",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          tool_calls: [],
+        },
+      ])
+      const nextBuckets = new Map(s.bucketsBySurface)
+      nextBuckets.set("chat", surfMap)
+      return { bucketsBySurface: nextBuckets }
+    })
+
+    // Trigger reconcile via setViewingThread. No sendMessage in flight, so
+    // sendInFlightOnThisThread === false, so the stray temp is filtered out.
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+      expect(bucket).toHaveLength(0)
+    })
+  })
+})

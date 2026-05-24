@@ -781,18 +781,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               return
             }
 
-            // Hydrate messages bucket — same MERGE 3-clause filter as
-            // loadMessages used so live in-flight temp placeholders are
-            // preserved across the swap (L-068-06 / L-068.5-02 carryover).
-            // Predicate is byte-identical to loadMessages's filter.
+            // Hydrate messages bucket. Phase 075.7 follow-up: widen the MERGE
+            // predicate to also preserve temp placeholders that don't yet carry
+            // a runId, provided a sendMessage is in flight on THIS thread.
+            // sendMessage writes two optimistic placeholders synchronously
+            // BEFORE awaiting postMessage (L:988-1018) and only stamps the
+            // runId AFTER postMessage resolves (L:1047). A concurrent reconcile
+            // fired from setViewingThread on a fresh thread races: if
+            // getSnapshot resolves first, the original runId-required predicate
+            // filtered both placeholders out and wiped the bucket, leaving every
+            // subsequent SSE callback a no-op. Symmetric with loadMessages's
+            // `if (isSendingRef.current && streamingThreadIdRef.current ===
+            // threadId) return` at L:1316 — same intent, narrower scope
+            // (preserve untyped temps instead of bailing completely).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
               const dbRunIds = new Set(snapshot.messages.filter((m) => m.runId).map((m) => m.runId))
-              const liveTempPlaceholders = prev.filter(
-                (m) =>
-                  m.id.startsWith("temp-") &&
-                  m.runId &&
-                  (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
-              )
+              const sendInFlightOnThisThread =
+                isSendingRef.current && streamingThreadIdRef.current === threadId
+              const liveTempPlaceholders = prev.filter((m) => {
+                if (!m.id.startsWith("temp-")) return false
+                if (m.runId) {
+                  return !dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)
+                }
+                return sendInFlightOnThisThread
+              })
               return [...snapshot.messages, ...liveTempPlaceholders]
             })
 
