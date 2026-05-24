@@ -2,7 +2,7 @@ import { memo, useRef } from "react"
 import { Bot, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
-import { ToolCallPanel } from "./ToolCallPanel"
+import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
 import { ConfidenceBadge } from "./ConfidenceBadge"
@@ -159,13 +159,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           }
         />
         {message.tool_calls && message.tool_calls.length > 0 && (
-          <ToolCallPanel
-            toolCalls={message.tool_calls}
-            subAgent={message.sub_agent}
-            isPlanning={message.isPlanning}
-            iterationCount={message.iterationCount}
-            activatedSkills={message.activatedSkills}
-          />
+          <RunCard message={message} isStreaming={isStreaming} />
         )}
         {message.activatedSkill && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-primary animate-fadeSlideUp">
