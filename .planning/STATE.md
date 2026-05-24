@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_execute
-stopped_at: "075.9 shipped-partial 2026-05-24. 075.10 INSERTED 2026-05-24 (backend tool_args_progress fine-grained emission across 4 providers — lowers 5120-byte boundary + ports to OpenAI). 075.11 INSERTED 2026-05-24 (agent timeout 3-layer audit — operator observed unexplained 900s wall on claude-opus-4-6; unifies per-LLM-call SDK / agent-loop wall-clock / SSE keepalive under app_settings with public-benchmark tier presets; Default=1200s/20min)."
-last_updated: "2026-05-24T23:30:00.000Z"
-last_activity: 2026-05-24 -- Phase 075.9 closed partial; Phase 075.10 inserted (backend SSE wire-format completeness)
+status: ready_to_plan
+stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
+last_updated: "2026-05-24T16:12:09.290Z"
+last_activity: 2026-05-24 -- Phase 075.10 execution started
 progress:
   total_phases: 33
-  completed_phases: 20
+  completed_phases: 21
   total_plans: 65
   completed_plans: 68
-  percent: 61
+  percent: 64
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 075.10 — tool-args-progress-fine-grained-emission (backend SSE wire-format completeness)
+**Current focus:** Phase 075.10 — tool-args-progress-fine-grained-emission
 
 ## Current Position
 
-Phase: 075.10 — tool-args-progress-fine-grained-emission (inserted 2026-05-24)
-Plan: 075.10-PLAN.md written (5 tasks, 1 wave; T1 migration → T2 anthropic → T3 google → T4 openai port → T5 live UAT)
+Phase: 075.11
+Plan: Not started
 Next action: `/gsd:execute-phase 075.10` — single-wave sequential execution; root causes diagnosed via SSE intercept; lowers 5120→256 boundary on anthropic+google, ports emission to openai
-Status: Ready to execute
-Last activity: 2026-05-24 -- Phase 075.10 inserted
+Status: Ready to plan
+Last activity: 2026-05-24
 
 ## PRD-reset outputs (committed)
 

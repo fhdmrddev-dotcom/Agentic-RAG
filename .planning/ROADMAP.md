@@ -725,7 +725,7 @@ Plans:
 
 **Depends on:** Phase 075.9 (frontend wiring + hot-fix); Phase 075.6 (SSE wire-format origin).
 
-**Plans:** 1 plan (single wave / 5 tasks, sequential T1→T5)
+**Plans:** 1/1 plans complete
 
 **Design contract:** `google_service.py:367-490` is the canonical 5KB-boundary emitter — verbatim-cloneable to the other 2 services with only the OpenAI shape adapter. Claude.ai live-code reference is the visible-streaming target.
 
@@ -744,7 +744,7 @@ Estimated effort: 2h focused single session. No new architecture, no provider co
 **UAT bandwidth:** G-4 mandatory — SSE intercept on each of 4 providers (≥3 `tool_args_progress` events for a 1 KB code body) + Chrome MCP eyeball-vs-Claude.ai parity check.
 
 Plans:
-- [ ] 075.10-01: backend tool_args_progress fine-grained emission across 4 providers (5 tasks, sequential T1→T5)
+- [x] 075.10-01: backend tool_args_progress fine-grained emission across 4 providers (5 tasks, sequential T1→T5)
 
 ### Phase 075.11: Agent Timeout 3-Layer Audit + Unification (INSERTED)
 
