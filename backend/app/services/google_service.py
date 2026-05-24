@@ -364,7 +364,17 @@ def stream_google(
     # the order they're first seen.
     tool_blocks: dict[int, dict] = {}
     next_tool_index = 0
-    # Match the OpenAI path's tool_args_progress 5KB-boundary cadence.
+    # Phase 075.10: tool_args_progress boundary now config-backed (was
+    # hardcoded 5120). Read once per stream invocation — see anthropic_service
+    # for the matching pattern. Defensive helper falls back to 5120 if the
+    # settings read fails. WR-02 (075.6) still applies on Google: the SDK
+    # often ships function_call args ATOMICALLY in a single chunk, so the
+    # boundary loop fires AT MOST ONCE per tool_call regardless of value —
+    # the lower default value just means the one-shot emit happens earlier
+    # in the byte stream when args ARE split across chunks.
+    from app.models.user_settings import tool_args_progress_emit_boundary_bytes  # noqa: PLC0415 — avoid module-load-time cycle
+    _emit_boundary_bytes = tool_args_progress_emit_boundary_bytes()
+    _emit_tail_bytes = max(5120, _emit_boundary_bytes * 4)
     _tool_args_emit_boundary: dict[int, int] = {}
     finish_reason: str = "stop"
     saw_function_call = False
@@ -479,10 +489,20 @@ def stream_google(
                         _bytes_total = len(args_str.encode("utf-8"))
                         if _bytes_total > 0:
                             _last_boundary = _tool_args_emit_boundary.get(idx, 0)
-                            _new_boundary = _bytes_total // 5120
+                            # Phase 075.10: boundary lowered from hardcoded
+                            # 5120 to config-backed default 256
+                            # (chat_tool_args_progress_emit_boundary_bytes).
+                            # Captured outside the chunk loop into
+                            # _emit_boundary_bytes for hot-path safety.
+                            _new_boundary = _bytes_total // _emit_boundary_bytes
                             if _new_boundary > _last_boundary:
                                 _tool_args_emit_boundary[idx] = _new_boundary
-                                _tail_bytes = args_str.encode("utf-8")[-5120:]
+                                # Tail slice widens proportionally so the
+                                # sliding-window payload still ships
+                                # meaningful cumulative context per emit (see
+                                # anthropic_service.py for the matching
+                                # widening logic).
+                                _tail_bytes = args_str.encode("utf-8")[-_emit_tail_bytes:]
                                 _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
                                 yield {
                                     "type": "tool_args_progress",
