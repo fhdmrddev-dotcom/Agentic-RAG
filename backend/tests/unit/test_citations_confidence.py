@@ -17,10 +17,10 @@ LOW_DISCLAIMER = (
 )
 
 CONFIDENCE_THRESHOLDS = {
-    "high": 0.55,
-    "medium_upper": 0.54,
-    "medium_lower": 0.40,
-    "low": 0.39,
+    "high": 0.54,
+    "medium_upper": 0.53,
+    "medium_lower": 0.38,
+    "low": 0.37,
 }
 
 
@@ -50,23 +50,23 @@ class TestComputeConfidence:
     """Tests for _compute_confidence(avg_similarity: float) -> str."""
 
     def test_high_confidence(self):
-        """avg_similarity >= 0.7 maps to 'high'."""
+        """avg_similarity >= 0.54 maps to 'high' (Phase 076 recalibration)."""
         assert _compute_confidence(0.85) == "high"
 
     def test_high_confidence_boundary(self):
-        """Boundary value 0.7 maps to 'high' (inclusive)."""
-        assert _compute_confidence(0.7) == "high"
+        """Boundary value 0.54 maps to 'high' (inclusive, Phase 076)."""
+        assert _compute_confidence(CONFIDENCE_THRESHOLDS["high"]) == "high"
 
     def test_medium_confidence(self):
-        """avg_similarity in [0.40, 0.55) maps to 'medium'."""
+        """avg_similarity in [0.38, 0.54) maps to 'medium' (Phase 076)."""
         assert _compute_confidence(0.45) == "medium"
 
     def test_medium_confidence_boundary(self):
-        """Boundary value 0.5 maps to 'medium' (inclusive)."""
-        assert _compute_confidence(0.5) == "medium"
+        """Boundary value 0.38 maps to 'medium' (inclusive, Phase 076)."""
+        assert _compute_confidence(CONFIDENCE_THRESHOLDS["medium_lower"]) == "medium"
 
     def test_low_confidence(self):
-        """avg_similarity < 0.5 maps to 'low'."""
+        """avg_similarity < 0.38 maps to 'low' (Phase 076)."""
         assert _compute_confidence(0.3) == "low"
 
     def test_low_confidence_zero(self):

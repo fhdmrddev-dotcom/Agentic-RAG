@@ -530,14 +530,20 @@ CONFIDENCE_DISCLAIMER = (
 def _compute_confidence(avg_similarity: float) -> str:
     """Map average cosine similarity to confidence level (D-10).
 
-    Thresholds are calibrated for text-embedding-3-small, where typical
-    top-5 average scores are 0.50–0.70 for prose and 0.35–0.55 for
-    structured/tabular content. The previous 0.7/0.5 thresholds caused
-    almost all correct answers to show as "low" confidence.
+    Thresholds calibrated for text-embedding-3-small. Phase 076 recalibration
+    (2026-05-25, N=121 queries, 100 audit_log + 21 synthetic) adjusted from
+    0.55/0.40 to 0.54/0.38: post-071.3 extraction stack (camelot tables +
+    pymupdf_full images + legacy text) shifted the score distribution lower
+    (median 0.4861 vs prior era). New thresholds restore D-04 target bucket
+    balance -- high 30.6% / medium 45.5% / low 24.0% (target ~30%/45%/25%).
+
+    Prior calibration: Phase 32.5 (2026-04-18) lowered from 0.70/0.50 to
+    0.55/0.40 because text-embedding-3-small produces lower absolute scores
+    than expected.
     """
-    if avg_similarity >= 0.55:
+    if avg_similarity >= 0.54:
         return "high"
-    elif avg_similarity >= 0.40:
+    elif avg_similarity >= 0.38:
         return "medium"
     return "low"
 
@@ -1383,8 +1389,8 @@ async def send_message(
             # (sandbox / web_search / sub-agent) is OUTSIDE the per-call
             # timer — tools own their own timeout discipline.
             #
-            # Worst-case wall-time = max_iterations × per_call_budget (15 × 180s
-            # ≈ 45min for unknown models; per-model overrides in
+            # Worst-case wall-time = max_iterations × per_call_budget (15 × 300s
+            # ≈ 75min for unknown models; per-model overrides in
             # MODEL_CAPABILITIES tune this). The replay-tail consumer's deadline
             # at runs.py (settings.consumer_timeout_seconds) is independent
             # from this scope — it bounds the CONSUMER, not the producer.

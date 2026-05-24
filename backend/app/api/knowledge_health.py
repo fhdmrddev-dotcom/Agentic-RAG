@@ -10,8 +10,8 @@ from app.dependencies import get_current_user, get_supabase
 router = APIRouter(prefix="/knowledge-health", tags=["knowledge-health"])
 
 TOP_N = 10
-LOW_CONF_THRESHOLD = 0.40   # D-02: avg similarity below this = low-confidence
-HIGH_CONF_THRESHOLD = 0.50  # similarity at or above this = "matched well"
+LOW_CONF_THRESHOLD = 0.38   # D-02: avg similarity below this = low-confidence (Phase 076 aligned)
+HIGH_CONF_THRESHOLD = 0.54  # similarity at or above this = "matched well" (Phase 076 aligned)
 WINDOW_DAYS = 30             # D-07: most-retrieved and low-confidence window
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
