@@ -30,17 +30,46 @@ let highlighterPromise: Promise<{
   codeToHtml: (code: string, opts: { lang: string; theme: string }) => string
 }> | null = null
 
+/**
+ * Phase 075.9 T5 — WR-01: reset the singleton on initialization failure so the
+ * next mount retries instead of being permanently stuck on the cached
+ * rejection (offline/blocked-CDN/corrupt-cache → permanently degraded
+ * plain-pre fallback for the rest of the page session).
+ *
+ * The try/catch wrapper inside the IIFE clears `highlighterPromise` to null
+ * on rejection BEFORE rethrowing, so the rethrow propagates to the caller's
+ * `.catch` (the useEffect path) WHILE the singleton goes back to null. The
+ * next ShikiCode mount sees `highlighterPromise === null` and kicks a fresh
+ * WASM init attempt.
+ *
+ * Test hook: exported so vitest can reset between cases when mocking
+ * `import("shiki")` to throw on the first call and succeed on the second.
+ */
+export function __resetShikiHighlighterForTests() {
+  highlighterPromise = null
+}
+
 async function getHighlighter() {
   if (!highlighterPromise) {
     highlighterPromise = (async () => {
-      const shiki = await import("shiki")
-      const hl = await shiki.createHighlighter({
-        themes: ["github-dark"],
-        langs: ["python"],
-      })
-      return {
-        codeToHtml: (code: string, opts: { lang: string; theme: string }) =>
-          hl.codeToHtml(code, opts),
+      try {
+        const shiki = await import("shiki")
+        const hl = await shiki.createHighlighter({
+          themes: ["github-dark"],
+          langs: ["python"],
+        })
+        return {
+          codeToHtml: (code: string, opts: { lang: string; theme: string }) =>
+            hl.codeToHtml(code, opts),
+        }
+      } catch (err) {
+        // WR-01 fix: clear the cached rejected promise so the next mount
+        // retries the WASM init from scratch. Without this reset, ONE bad
+        // init would degrade every subsequent <ShikiCode> mount to the
+        // plain-pre fallback for the rest of the page session — even
+        // after the user is back online.
+        highlighterPromise = null
+        throw err
       }
     })()
   }
