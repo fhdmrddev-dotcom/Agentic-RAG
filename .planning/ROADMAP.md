@@ -788,6 +788,10 @@ Plans:
   3. Existing `messages.confidence_*` schema (per `D-v2.5-12`) is unchanged — column reads/writes preserve the v2.5 contract; only threshold constants change.
   4. The `pdf_extraction_runs` telemetry makes the per-extractor lineage observable (camelot vs pdfplumber vs future engines) so this calibration is re-litigable if the default-set output drifts.
 
+**Plans:**
+- [ ] 076-01-PLAN.md — Calibration script (scripts/calibrate_confidence.py): env-load + psycopg2 + OpenAI embed + audit_log replay + ~20 synthetic queries + distribution analysis + JSON output + telemetry check (Wave 1; autonomous)
+- [ ] 076-02-PLAN.md — Apply threshold decision + PROJECT.md appendix + test update + schema verification + operator approval (Wave 2; depends on Plan 01; autonomous: false)
+
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
 **Depends on**: Phase 073
