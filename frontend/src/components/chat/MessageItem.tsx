@@ -1,5 +1,5 @@
 import { memo, useRef } from "react"
-import { Bot, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 import { RunCard } from "./RunCard"
@@ -136,7 +136,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         data-testid="assistant-bot-icon"
         className={`flex-shrink-0 w-8 h-8 rounded-full gradient-primary flex items-center justify-center mt-0.5 shadow-sm shadow-primary/20${message.runStatus === "streaming" ? " animate-brandPulse" : ""}`}
       >
-        <Bot className="w-4 h-4 text-white" />
+        <Sparkles className="w-4 h-4 text-white" />
       </div>
       <div className="flex-1 min-w-0 pt-0.5">
         {/* 075.6 Plan 03 / Req #8 — pinned ✦ Working badge at top of active
