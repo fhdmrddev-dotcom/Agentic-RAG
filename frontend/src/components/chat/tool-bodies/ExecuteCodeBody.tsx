@@ -236,6 +236,7 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
     } catch { return undefined }
   })()
 
+  const isPreparing = tc.status === "preparing"
   const isRunning = tc.status === "running"
   // Use live outputLines if present; on reload reconstruct from persisted stdout/stderr
   const lines: OutputLine[] = tc.outputLines ?? (() => {
@@ -264,8 +265,19 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
         {/* Label */}
         <span className="flex-1 min-w-0 text-xs text-muted-foreground truncate">
           <span className="font-semibold text-foreground/80">
-            {isRunning ? "Executing code" : isError ? "Execution failed" : "Code executed"}
+            {isPreparing ? "Generating code" : isRunning ? "Executing code" : isError ? "Execution failed" : "Code executed"}
           </span>
+          {/* Phase 075.9 hot-fix: byte counter during preparing — the
+              ToolArgsLivePanel that previously owned this affordance lived
+              in the else branch of ToolCallPanel and is dead code for
+              execute_code now that ExecuteCodeBody renders across all
+              statuses. Keeps the glanceable "is the model still typing"
+              signal alongside the visibly-streaming Shiki tokens. */}
+          {isPreparing && tc.argsBytesStreamed != null && tc.argsBytesStreamed > 0 && (
+            <span className="ml-1.5 opacity-60 font-mono tabular-nums">
+              ({(tc.argsBytesStreamed / 1024).toFixed(1)} KB)
+            </span>
+          )}
           {/* Phase 075.8 Task 7: description-only hint stays — the inline
               60-char code preview is dropped because the full code now
               renders below in the editor inset. */}
@@ -293,9 +305,11 @@ export default function ExecuteCodeBody({ tc }: ExecuteCodeBodyProps) {
             because it strips the iteration loop/queue overhead. */}
         <StatusPill
           status={
-            isRunning && !isComplete
-              ? "running"
-              : (isError ? "failed" : "done") as ToolStatus
+            isPreparing
+              ? "preparing"
+              : isRunning && !isComplete
+                ? "running"
+                : (isError ? "failed" : "done") as ToolStatus
           }
           duration={isComplete ? executionDurationMs : undefined}
         />

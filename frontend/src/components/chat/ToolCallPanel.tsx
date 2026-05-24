@@ -570,7 +570,21 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                 ) : i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
-                {tc.name === "execute_code" && tc.status !== "preparing" ? (
+                {tc.name === "execute_code" ? (
+                  // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL
+                  // execute_code statuses (preparing/running/done). Previously
+                  // the `tc.status !== "preparing"` guard caused a full
+                  // component-tree swap at tool_start: the generic-tool tree
+                  // (with its standalone ExecuteCodeEditorInset) unmounted and
+                  // ExecuteCodeBody mounted fresh, so the Shiki view appeared
+                  // to "blink in" with the final code rather than streaming.
+                  // ExecuteCodeBody itself reads displayCode = argsCodeText ??
+                  // args.code, handles all 3 statuses, and embeds the same
+                  // ExecuteCodeEditorInset — so the inset stays mounted from
+                  // the first streamed byte through completion (true seamless
+                  // handoff). The standalone inset/ToolArgsLivePanel below in
+                  // the else branch are now dead code for execute_code (still
+                  // active for other tools that emit tool_args_progress).
                   <TOOL_BODIES.execute_code tc={tc} />
                 ) : (
                   <>
