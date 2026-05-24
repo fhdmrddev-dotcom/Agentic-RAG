@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react"
 import { Bot, ChevronDown, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Message } from "@/types"
+import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { outerBannerLabel } from "@/lib/toolMeta"
 
@@ -238,11 +238,56 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             iterationCount={message.iterationCount}
             activatedSkills={message.activatedSkills}
           />
+          {/* Phase 075.8 Task 5 (sketch 001 D4 — Next-up footer).
+              While the run is streaming AND there's a forward-look signal
+              (planning between iterations, OR the last tool just finished
+              and the agent is deciding the next step), render a
+              dashed-border row at the bottom of the run body. Per sketch
+              live-run-container D4, this completes the past/present/future
+              triad: past = result-summary rows, present = active tool +
+              header timer, future = this Next-up footer. */}
+          {isStreamingNow && shouldShowNextUp(message, activeTool) && (
+            <div
+              data-testid="next-up-footer"
+              className="mx-1 mt-2 flex items-center gap-2 px-3 py-2 border border-dashed border-border rounded-md text-xs font-mono text-muted-foreground"
+            >
+              <span className="uppercase tracking-wider opacity-60 flex-shrink-0">Next</span>
+              <span className="flex-1 truncate">
+                {nextHint(message, activeTool)}
+              </span>
+              <span className="opacity-50 flex-shrink-0">queued</span>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 })
+
+// Phase 075.8 Task 5 — derive the next-up hint copy from message state.
+// Priority:
+//   1. While there's an active tool, the active step itself is "now" — don't
+//      show a Next: footer (the timer in the header carries the present moment).
+//   2. When isPlanning is true (post-tool, pre-next-tool window), show the
+//      explicit planning copy.
+//   3. Fallback: "deciding next step…" — covers the brief moment between
+//      iteration boundaries before isPlanning flips.
+function shouldShowNextUp(message: Message, activeTool: ToolCall | null): boolean {
+  if (activeTool) return false
+  if (message.isPlanning) return true
+  // If there's at least one done tool and no active tool, the agent is
+  // between iterations — show the deciding placeholder.
+  const tools = message.tool_calls ?? []
+  if (tools.length === 0) return false
+  const lastTool = tools[tools.length - 1]
+  return lastTool.status === "done"
+}
+
+function nextHint(message: Message, activeTool: ToolCall | null): string {
+  if (activeTool) return ""
+  if (message.isPlanning) return "planning next step…"
+  return "deciding next step…"
+}
 
 // File-local helpers — UI-SPEC §8.2 copy contract.
 function statusGlyph(s: Message["runStatus"]): string {
