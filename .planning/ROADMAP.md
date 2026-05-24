@@ -187,7 +187,8 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [ ] **Phase 075.3: Defensive Chunk Handler + Unknown-Model Graceful Degradation** (INSERTED 2026-05-22) — Two-plan bundle. Plan 01: Convert quick-task 260522-gdg Path A hotfix into defensive Path B at the chunk handler (drop `chunk.usage`-triggered early-return, provider-aware usage accumulator, revert Path A gate, restore non-NULL Google token rows). Plan 02: Close the "added a new model from Settings → silent failure" loop — pattern-based provider inference for unknown model_ids (`gpt-*`/`claude-*`/`gemini-*`/`*/*` patterns), safe defaults per inferred provider (conservative `max_output_tokens` / `llm_call_timeout` / `native_tools=True` for Google/OpenAI/Anthropic), `model_capability_unknown` warning log, frontend "unverified — using safe defaults" badge. Chrome MCP UAT across all 5 Gemini models + 1 negative-test pass for an unregistered model_id (e.g., `gemini-3.5-flash`). BUG-260522-01 → Phase 082.5; SEED-028 native Google SDK split → v3.1; DB-backed override table + hot-reload cache + admin UI → Phase 081.1; `/models` endpoint probe + verify-and-promote → v3.1. (2 plans)
 - [ ] **Phase 075.6: Live Streaming UX + Cross-Provider Parity** (INSERTED 2026-05-23) — Three-plan bundle informed by Claude.ai gold-standard comparison (`.planning/phases/075.5-gemini-native-sdk/claude-ai-comparison/COMPARISON.md`). Plan 01: Add `code_so_far: string` field to existing `tool_args_progress` SSE event in all 4 service adapters (anthropic + google + openai + openrouter) — provider-uniform vocabulary so one frontend renders for all providers. Plan 02: Frontend `<ToolArgsLivePanel>` collapsible code panel during `tool_preparing` state; `argsCodeText` reducer slice; auto-collapse on `tool_start`. Plan 03: Surface accumulated `m.sub_agent.content` live for all sub-agent kinds (currently gated to `analyze_document` only); step-list collapse when 3+ completed tool calls precede active step; pinned "✦ Working" badge at top of active assistant turn. UAT covers the mandatory 4-axis bandwidth (CLAUDE.md). Out of scope: file output card polish (T-260523-10 → next polish bundle), live PPTX preview pane (defer), extended-thinking summary surface (defer to thinking-models phase). Closes the felt UX gap behind T-260523-09 (byte counter is interim signal, panel supersedes). (3 plans)
 - [x] **Phase 075.7: Live-Execution UX Refactor (Run-Card + Tool-Call Panel)** (INSERTED 2026-05-24, SHIPPED 2026-05-24) — Refactor phase consuming the validated sketch findings (`Skill("sketch-findings-agentic-rag")`) to settle G-1 + G-5 guardrails on the chat surface. Replaces the current ad-hoc rendering with: (a) bracketed Run-Card per assistant turn (sticky header with timer + counter + bot avatar, progress shimmer while active, fold-to-summary on completion), (b) Editor-Inset tool-call panel with per-tool inner-body components (`execute_code` → editor pane + STDOUT/STDERR labeled regions + file-output preview cards; `search_documents` → ranked-result rows; `read_file` → file metadata; outer frame shared, inner body selected by tool name), (c) Focus Mode composition under long-run stress (past tool calls fold to result-summary like `→ yoy_q3 = 30.87%`, only active step keeps full editor, explicit `Next: ...` footer). Depends on Phase 075.6 (`code_so_far` SSE field). UAT covers the mandatory 4-axis bandwidth (CLAUDE.md SC#10). Hot-file ledger flips from "fires" → "satisfied" on `ToolCallPanel.tsx` / `MessageItem.tsx` / `useMessages.ts` / `StreamsProvider.tsx` rows. (~3-4 plans, locked at /gsd:spec-phase + /gsd:plan-phase)
-- [ ] **Phase 075.8: Live-Execution Visual Polish** (INSERTED 2026-05-24) — Close the 7 documented sketch-fidelity gaps left BEST-EFFORT after 075.7 architectural refactor. Pure rendering polish on existing data — no architecture/schema/API/provider contract changes. Deliverables: universal `<StatusPill>` (replaces icon spinners across tool-bodies), active-tool glow + bottom progress shimmer, per-step result-summary lines (`→ {summarize(tc)}`) on past tools in Focus Mode, explicit `Next: ...` footer mid-run, compact dim `💭 Thinking` row, editor inset for `execute_code` (gutter + Shiki syntax highlighting + Python lang chip), labeled STDOUT/STDERR regions. Sketches are the spec (`Skill("sketch-findings-agentic-rag")` sources 001/002/003) so SPEC/CONTEXT/RESEARCH ceremony skipped. Single wave / 1 plan / 7 tasks. UAT: G-4 mandatory lived-experience pass against the 4 sketch reference scenarios via Chrome MCP. (1 plan)
+- [x] **Phase 075.8: Live-Execution Visual Polish** (INSERTED 2026-05-24, SHIPPED 2026-05-24) — Close the 7 documented sketch-fidelity gaps left BEST-EFFORT after 075.7 architectural refactor. Pure rendering polish on existing data — no architecture/schema/API/provider contract changes. Deliverables: universal `<StatusPill>` (replaces icon spinners across tool-bodies), active-tool glow + bottom progress shimmer, per-step result-summary lines (`→ {summarize(tc)}`) on past tools in Focus Mode, explicit `Next: ...` footer mid-run, compact dim `💭 Thinking` row, editor inset for `execute_code` (gutter + Shiki syntax highlighting + Python lang chip), labeled STDOUT/STDERR regions. Sketches are the spec (`Skill("sketch-findings-agentic-rag")` sources 001/002/003) so SPEC/CONTEXT/RESEARCH ceremony skipped. Single wave / 1 plan / 7 tasks. UAT: G-4 mandatory lived-experience pass against the 4 sketch reference scenarios via Chrome MCP. (1 plan)
+- [ ] **Phase 075.9: Live-Execution Fidelity Handoff** (INSERTED 2026-05-24) — Close two felt-experience defects surfaced during Phase 075.8 manual UAT plus 3 advisory warnings from 075.8 code review. Defect 1: sub-agent (`analyze` etc.) cards visually duplicate mid-stream because `deduplicatedToolCalls` fallback key includes `idx` so the same logical tool at preparing-idx vs running-idx generates two dedup keys; heals only at array compaction post-`tool_start`. Fix: stable client-side `clientKey` stamped at first observation in the streams store, used by all `tc.id`-keyed surfaces (closes WR-03 from 075.8). Defect 2: `execute_code` shows code only AFTER execution completes (Claude.ai shows it streaming line-by-line); the Shiki inset reads final `tc.args.code` while the live `tc.argsCodeText` lives in a separate unhighlighted `<pre><code>` panel that vanishes at `tool_start`. Fix: Shiki inset reads `tc.argsCodeText ?? tc.args.code` with `useDeferredValue` 50ms throttle; ToolArgsLivePanel body suppressed for `execute_code` (header + byte-counter only) since the inset now owns the body. Plus WR-01 (Shiki promise singleton resets `highlighterPromise = null` on rejection) and WR-02 (JSDoc trust contract for `dangerouslySetInnerHTML`). Single wave / 1 plan / 5 tasks. G-1 phase-chain-cap operator-authorized continuation. UAT: G-4 mandatory — sub-agent dedup + live code stream + long code stream + Shiki failure recovery. (1 plan)
 
 **Wave 2 — Depends on Wave 1**
 
@@ -677,6 +678,41 @@ Estimated effort: 3-4h focused single session. No new schema, no new API, no pro
 Plans:
 - [x] 075.8-01: All 7 sketch-gap closures in one wave (7 tasks, parallelizable except Task 7 depends on syntax-library install) — shipped 2026-05-24
 
+### Phase 075.9: Live-Execution Fidelity Handoff (INSERTED)
+
+**Origin:** Two felt-experience defects surfaced during Phase 075.8 manual UAT (operator-observed in lived experience, not caught by orchestrator UAT — exactly the gap [[feedback_uat_lived_experience_gap]] flagged): (1) sub-agent cards (`analyze` and other sub-agents) visually duplicate mid-stream and only heal once the agent loop finishes; (2) `execute_code` shows the code block all-at-once after streaming completes rather than appearing line-by-line like Claude.ai. Both diagnosed to dual root causes — defect 1 shares the same root cause as WR-03 from 075.8 code review (`tc.id` typed optional and used as a stable key, fallback dedup key includes array index so preparing vs running positions don't coalesce); defect 2 is the architectural seam between `ToolArgsLivePanel` (preparing-only, plain text) and the Shiki inset (final-only, highlighted) — both render paths exist but the streaming view doesn't carry Shiki and the highlighted view doesn't show until tool_start.
+
+**Goal:** Streaming → terminal handoff is seamless across the chat surface: tool identity stays stable across preparing/running/done so cards don't visually duplicate, and the `execute_code` editor view stays mounted with Shiki-highlighted code from the first streamed byte through completion (Claude.ai parity).
+
+**Requirements:** Inherits LIVE-EXEC-UX-01 binding gate from Phase 075.7. Extends Phase 075.6's `code_so_far` SSE field consumption (frontend changes only; backend SSE vocabulary unchanged).
+
+**Depends on:** Phase 075.8 (consumes the StatusPill + RunCard + Shiki inset + ToolArgsLivePanel architecture shipped/locked through 075.8).
+
+**Plans:** 1 plan (single wave / 5 tasks)
+
+**Design contract:** Sketches 002 D1 (already covers Shiki-inset rendering) + Claude.ai gold-standard live-stream reference. No new sketch/spec/research/context ceremony — root causes are diagnosed, no design ambiguity.
+
+**Guardrail overrides:** G-1 phase chain cap (075.x cascade now at 9 phases on ToolCallPanel/ExecuteCodeBody hot files) — operator-authorized continuation 2026-05-24 to bundle felt defects + advisory warnings in one atomic phase rather than fragmenting across milestones. Audit trail in PLAN.md frontmatter.
+
+**Predicted files modified:**
+- `frontend/src/lib/toolKey.ts` (NEW, ~25 lines — stable client-side tool key util)
+- `frontend/src/lib/__tests__/toolKey.test.ts` (NEW, ~30 lines)
+- `frontend/src/providers/StreamsProvider.tsx` (stamp `clientKey` at first observation)
+- `frontend/src/types/index.ts` (extend `ToolCall` with `clientKey?: string`)
+- `frontend/src/components/chat/ToolCallPanel.tsx` (migrate `tc.id`-keyed surfaces to `clientKey` + gate ToolArgsLivePanel body for `execute_code`)
+- `frontend/src/components/chat/ToolArgsLivePanel.tsx` (`hideBody` prop OR children slot for execute_code)
+- `frontend/src/components/chat/tool-bodies/ExecuteCodeBody.tsx` (argsCodeText fallback chain in Shiki inset)
+- `frontend/src/components/chat/tool-bodies/ShikiCode.tsx` (streaming prop with `useDeferredValue` throttle + singleton reset on rejection + JSDoc trust contract)
+- `frontend/src/__tests__/providers/streamsProvider_075_9_clientkey.test.tsx` (NEW)
+- `frontend/src/components/chat/ShikiCode.test.tsx` (NEW)
+
+Estimated effort: 3-4h focused single session. No new schema, no new API, no provider contract change.
+
+**UAT bandwidth:** G-4 mandatory — Chrome MCP through 4 felt-experience scenarios (sub-agent dedup mid-stream / live code stream byte-by-byte / long code stream throttle smoothness / Shiki failure recovery via singleton reset).
+
+Plans:
+- [ ] 075.9-01: stable clientKey + live Shiki streaming + WR-01/02 (5 tasks, sequential chain T1→T2→T3→T4→T5)
+
 ### Phase 076: Confidence Recalibration
 **Goal**: Confidence thresholds match the chunk score distribution under the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations), so `messages.confidence_*` reads stay accurate after the extractor swap.
 **Depends on**: Phase 071.3
@@ -881,6 +917,16 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
 | 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
 | **Total (v2.6)** | **4/42** | **In progress** | **—** |
+
+### Phase 83: 075.9
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 82
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 83 to break down)
 
 ---
 
