@@ -189,13 +189,26 @@ def stream_anthropic(
 
     tool_blocks: dict[int, dict] = {}  # index -> {id, name, arguments}
     finish_reason: str = "stop"
-    # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary counter.
+    # Phase 075 D-075-10 + Pitfall 3: per-tool_index boundary counter.
     # Resets each time this generator is invoked (one invocation per LLM
     # call, mirroring the OpenAI-path per-iteration reset in threads.py).
     # NOTE: D-075-11's calling_mode filter doesn't apply here —
     # anthropic_service is only used for the NATIVE provider path;
     # STRUCTURED mode bypasses this generator entirely.
     _tool_args_emit_boundary: dict[int, int] = {}
+    # Phase 075.10: read the boundary ONCE per stream invocation. The
+    # file-backed override has a 5s TTL cache (see _load_override), but a
+    # per-event read still bloats the hot loop unnecessarily — boundary value
+    # is invariant within a single LLM call. Defensive helper returns the
+    # pre-075.10 hardcoded 5120 if the settings read fails for any reason.
+    from app.models.user_settings import tool_args_progress_emit_boundary_bytes  # noqa: PLC0415 — avoid module-load-time cycle
+    _emit_boundary_bytes = tool_args_progress_emit_boundary_bytes()
+    # 075.10: widen the sliding-window tail slice (`code_so_far` is the full
+    # cumulative buffer per Plan 01 Req #1, but `args_so_far` stays a tail to
+    # cap SSE payload size). When operator lowers the boundary to ~256 the
+    # legacy 5120-byte tail still ships plenty of cumulative context per emit;
+    # raising the boundary above 1280 widens the tail proportionally.
+    _emit_tail_bytes = max(5120, _emit_boundary_bytes * 4)
 
     with client.messages.stream(**stream_kwargs) as stream:
         for event in stream:
@@ -251,16 +264,24 @@ def stream_anthropic(
                         _tool_name = tb["name"]
                         if _tool_name:
                             _bytes_total = len(tb["arguments"].encode("utf-8"))
-                            _new_boundary = _bytes_total // 5120
+                            # Phase 075.10: boundary read from
+                            # app_settings.chat_tool_args_progress_emit_boundary_bytes
+                            # (resolved once outside the chunk loop into
+                            # _emit_boundary_bytes). Default 256 ≈ a line of
+                            # Python per event for Claude.ai parity; was
+                            # hardcoded 5120 pre-075.10.
+                            _new_boundary = _bytes_total // _emit_boundary_bytes
                             _last_boundary = _tool_args_emit_boundary.get(event.index, 0)
                             if _new_boundary > _last_boundary:
                                 _tool_args_emit_boundary[event.index] = _new_boundary
-                                # D-075-09: args_so_far is the LAST 5KB of
-                                # the cumulative accumulator (sliding-window
-                                # tail). UTF-8-aware byte slice + decode
-                                # errors="ignore" drops any invalid trailing
-                                # codepoint bytes left by the byte boundary.
-                                _tail_bytes = tb["arguments"].encode("utf-8")[-5120:]
+                                # D-075-09 + Phase 075.10: args_so_far is the
+                                # last _emit_tail_bytes of the cumulative
+                                # accumulator (sliding-window tail, capped at
+                                # max(5120, boundary*4)). UTF-8-aware byte
+                                # slice + decode errors="ignore" drops any
+                                # invalid trailing codepoint bytes left by the
+                                # byte boundary.
+                                _tail_bytes = tb["arguments"].encode("utf-8")[-_emit_tail_bytes:]
                                 _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
                                 yield {
                                     "type": "tool_args_progress",
