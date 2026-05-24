@@ -134,3 +134,94 @@ describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", (
     expect(container.querySelectorAll("[data-testid='iteration-divider']").length).toBe(0)
   })
 })
+
+describe("ToolCallPanel — Phase 075.9 T3 clientKey dedup", () => {
+  // The defect this guards against (the "felt-experience" sub-agent dup):
+  //
+  //   On Anthropic + OpenRouter, the provider can mutate `tc.id` across
+  //   the preparing→running transition. Two consecutive snapshots of the
+  //   same logical tool then carry DIFFERENT `tc.id` values. The old
+  //   dedup key `tc.id || ${name}-${startedAt}-${idx}` saw them as
+  //   distinct → both cards rendered mid-stream.
+  //
+  //   The fix (T3): `deduplicatedToolCalls` now keys on `tc.clientKey ??
+  //   tc.id ?? fallback`. The streams store stamps clientKey at first
+  //   observation and never mutates it (see T2 regression test).
+  //
+  //   This test simulates the buggy provider directly: feed two tool
+  //   entries with DIFFERENT `tc.id` values but the SAME `tc.clientKey`,
+  //   asserting the dedup pass renders exactly ONE card across both.
+
+  it("dedupes two snapshots of the same logical tool when tc.id differs but tc.clientKey is stable", () => {
+    // Simulate the mid-stream state during the preparing→running flip:
+    // the reducer would normally consolidate this into a single entry
+    // via the spread, but if a parent snapshot pushed both states (rare
+    // but observed on OpenRouter retry) the dedup pass MUST collapse them.
+    const stableClientKey = "anthropic|msg-1|analyze_document|1700000000000|0"
+    const toolCalls: ToolCall[] = [
+      // Snapshot 1: preparing entry with provider id "tu_abc"
+      {
+        name: "analyze_document",
+        id: "tu_abc",
+        clientKey: stableClientKey,
+        args: { document_id: "doc-1" },
+        status: "preparing",
+        iteration: 0,
+      } as ToolCall,
+      // Snapshot 2: running entry — provider mutated the id to "tu_def"
+      // BUT the clientKey is still the stamped-at-creation value.
+      {
+        name: "analyze_document",
+        id: "tu_def",
+        clientKey: stableClientKey,
+        args: { document_id: "doc-1" },
+        status: "running",
+        startedAt: 1_700_000_000_500,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // Exactly ONE rendered card for the analyze_document tool. Pre-T3,
+    // the dedup loop would key on the two different tc.id values and
+    // render both → the visible sub-agent-card dup defect.
+    const rows = container.querySelectorAll("[data-testid='tc-active']")
+    expect(rows.length).toBe(1)
+  })
+
+  it("falls back to tc.id when clientKey is missing (back-compat for DB-loaded historical messages)", () => {
+    // DB-loaded historical tool calls don't have a clientKey stamp.
+    // The fallback chain (clientKey > id > composite) must keep them
+    // rendering. Two same-id entries STILL dedup to one (pre-existing
+    // 075.1 / 075.2 behavior).
+    const toolCalls: ToolCall[] = [
+      {
+        name: "execute_code",
+        id: "tu_legacy_1",
+        args: { code: "print(1)" },
+        status: "done",
+        result: JSON.stringify({ stdout: "1", exit_code: 0 }),
+        startedAt: 1_700_000_000_000,
+        endedAt: 1_700_000_000_100,
+        iteration: 0,
+      } as ToolCall,
+      {
+        // Duplicate of the same DB-loaded entry — provider replayed it.
+        name: "execute_code",
+        id: "tu_legacy_1",
+        args: { code: "print(1)" },
+        status: "done",
+        result: JSON.stringify({ stdout: "1", exit_code: 0 }),
+        startedAt: 1_700_000_000_000,
+        endedAt: 1_700_000_000_100,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Exactly one execute_code body rendered (the execute_code body has a
+    // tc-editor inset only when args.code is present — both entries have
+    // it, but dedup should leave only one).
+    const editors = container.querySelectorAll("[data-testid='tc-editor']")
+    expect(editors.length).toBe(1)
+  })
+})
