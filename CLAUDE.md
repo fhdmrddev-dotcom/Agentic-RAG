@@ -109,10 +109,11 @@ These rules exist because the v2.6 075.x cascade (8 phases on the same streaming
 
 | File | Phases touched | G-5 status |
 |---|---|---|
-| `frontend/src/components/chat/ToolCallPanel.tsx` | 067 / 067.5 / 075 / 075.4 / 075.6 (5+) | G-5 fires — refactor due |
+| `frontend/src/components/chat/ToolCallPanel.tsx` | 067 / 067.5 / 075 / 075.4 / 075.6 / 075.7 (6+) | satisfied (075.7 — 2026-05-24) |
+| `frontend/src/components/chat/MessageItem.tsx` | 075 / 075.1 / 075.4 / 075.6 / 075.7 (5+) | satisfied (075.7 — 2026-05-24) |
 | `backend/app/api/threads.py` | 056 / 058 / 061 / 067 / 073 / 075 / 075.3 / 075.4 / 075.6 (9+) | G-5 fires — extraction due |
-| `frontend/src/providers/StreamsProvider.tsx` | 068 / 075 / 075.4 / 075.6 (4+) | G-5 fires — decomposition due |
-| `frontend/src/hooks/useMessages.ts` | 063 / 063.1 / 067 / 067.5 (4+) | G-5 fires — reducer slice extraction due |
+| `frontend/src/providers/StreamsProvider.tsx` | 068 / 075 / 075.4 / 075.6 / 075.7 (5+) | satisfied (075.7 — 2026-05-24) |
+| `frontend/src/hooks/useMessages.ts` | 063 / 063.1 / 067 / 067.5 / 075.7 (5+) | satisfied (075.7 — 2026-05-24) |
 | `backend/app/services/anthropic_service.py` | 074 / 075 / 075.4 / 075.6 (4+) | G-5 fires — adapter pattern audit due |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature.

@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 075.7-02-runcard-wrapper-PLAN.md
-last_updated: "2026-05-24T06:23:05.558Z"
+stopped_at: Completed 075.7-03-focus-mode-and-uat-PLAN.md (Phase 075.7 fully shipped — pending /gsd:verify-work)
+last_updated: "2026-05-24T18:00:00.000Z"
 last_activity: 2026-05-24
 progress:
   total_phases: 28
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 075.7 (live-execution-ux-refactor) — EXECUTING
-Plan: 3 of 3
-Next phase: 075.4 (cross-provider-cleanup-per-thread-state-e2e-backstop) — inserted into ROADMAP, ready for /gsd:discuss-phase
-Status: Ready to execute
+Phase: 075.7 (live-execution-ux-refactor) — COMPLETE (3 of 3 plans shipped 2026-05-24)
+Plan: 3 of 3 (075.7-03-focus-mode-and-uat shipped 2026-05-24)
+Next action: `/gsd:verify-work 075.7` — operator drives long-message Chrome MCP UAT (T4 auto-approved checkpoint per AUTO_MODE) + Playwright spec runtime exec (scenarios 07..12 authored, exec deferred)
+Status: Phase complete; all plans landed; CLAUDE.md G-1/G-5 guardrails closed on 4 frontend hot files (ToolCallPanel.tsx + MessageItem.tsx + StreamsProvider.tsx + useMessages.ts)
 Last activity: 2026-05-24
 
 ## PRD-reset outputs (committed)
@@ -242,6 +242,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.4 P06 | 70min | 3 tasks | 9 files |
 | Phase 075.7 P01 | 75min | 1 tasks | 11 files |
 | Phase 075.7 P02 | ~25min | 2 tasks | 3 files |
+| Phase 075.7 P03 | ~3h (across continuation agents: T1+T2 initial, T3+T4 continuation #1, T5 continuation #2) | 5 tasks | 11 files (7 created: 1 SUMMARY + 6 Playwright specs; 4 modified: ToolCallPanel.tsx + RunCard.tsx + VALIDATION.md + CLAUDE.md) |
 
 ## Accumulated Context
 
@@ -366,6 +367,7 @@ Recent decisions affecting v2.5 work:
 - Phase 075.7 Plan 01: ExecuteCodeBody.summarize priority outputFiles[0].filename then last STDOUT line then 'executed' fallback (UI-SPEC §6.3 + RESEARCH §11 Q3 resolved during this plan)
 - Phase 075.7 Plan 01 deviation: comment-only edits in 6 sibling files (useMessages, lib/api, OutputFileCard, ToolArgsLivePanel, MessageItem, types/index) to satisfy R-3 grep gate (grep -rn ExecuteCodeBlock frontend/src returns 0) — zero behavioral change
 - Phase 075.7-02 RunCard wrapper shipped (commits 90aa0a5 + 0adc09e). Memoized bordered container for tool-bearing assistant turns; sticky header against Radix Viewport, brand-pulse avatar, 250ms timer, iteration counter, active-glow frame. Mounts via single-hunk MessageItem swap; pure-text turns unchanged (D-09). All 7 regression invariants byte-identical (memo, stickyLabelRef D-12, WorkingBadge above, MarkdownRenderer/Confidence/Citation/Suggestion/Feedback below, finalOutputFiles panel, animate-brandPulse predicate). ZERO new keyframes (R-7). Plan 03 owns auto-collapse + collapsed-row JSX + summarizeToolCall wire-in.
+- Phase 075.7-03 Focus Mode + 4-axis UAT shipped (commits 5199412 + ce07a57 + ffc77d5 + db0b6f4 + final docs commit). T1: ToolCallPanel ToolResultBlock renders `<div data-testid="tool-result-summary">→ {summarizeToolCall(tc)}</div>` on collapsed past tools (R-4; UI-SPEC §7.5 styling — ml-8 + border-t border-border/50 + font-mono text-xs text-muted-foreground; literal U+2192 prefix). T2: RunCard auto-collapse useEffect with wasStreamingRef one-shot guard (RESEARCH §4.4); lazy useState initializer covers DB-loaded historical (RESEARCH §5.4); collapsed-row `<button type="button">` JSX with statusGlyph/statusWord helpers matching MessageItem banner copy; handleHeaderClick early-returns when runStatus === 'streaming' (D-08); tabIndex mirrors gate for keyboard parity. R-7 holds (grep @keyframes RunCard.tsx = 0). T3: 6 Playwright specs at frontend/tests/e2e/scenario-{07..12}.spec.ts (CONTEXT correction #4) covering 3 of 4 UAT axes automated; scenario-09 4-sub-test for-loop for cross-provider axis with Anthropic DOM-order preservation gate (RESEARCH §6 protecting BUG-260514-02 re-litigation). T4: long-message manual Chrome MCP UAT auto-approved per AUTO_MODE; surfaced to operator via VALIDATION.md 6-step checklist for /gsd:verify-work 075.7. T5: CLAUDE.md hot-file ledger 4 frontend rows flipped to `satisfied (075.7 — 2026-05-24)` (ToolCallPanel.tsx + MessageItem.tsx [NEW row added per planner brief] + StreamsProvider.tsx + useMessages.ts); 2 backend rows (threads.py + anthropic_service.py) UNCHANGED (out of 075.7 scope). G-1 + G-5 guardrails CLOSED on the chat surface.
 
 ### Pending Todos
 
