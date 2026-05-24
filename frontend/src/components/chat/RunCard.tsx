@@ -49,39 +49,32 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // terminal. The lazy initializer below uses this to mount historical
   // tool-bearing turns already collapsed.
   const isTerminal = !isStreamingNow
-  const shouldAutoCollapse = hasTools && isTerminal
 
-  // Lazy initializer (RESEARCH §4.4):
-  //   - DB-loaded historical (terminal + tools): expanded = false
-  //   - Live streaming (streaming OR streaming+notools OR terminal-but-notools): expanded = true
-  // The useEffect below handles the streaming→terminal live transition.
-  const [expanded, setExpanded] = useState(() => !shouldAutoCollapse)
-
-  // One-shot streaming→terminal transition: when SSE flips runStatus from
-  // "streaming" to a terminal value AND the turn has tool_calls > 0, fold
-  // the body down. wasStreamingRef tracks the previous status so a second
-  // collapse doesn't fire after the user has manually expanded a collapsed
-  // terminal turn (R-6 + CONTEXT D-05 + D-07).
-  const wasStreamingRef = useRef(message.runStatus === "streaming")
+  // Pure-derivation collapse model — see 075.7-DEBUG-runstatus-transition.md.
+  // Replaces a wasStreamingRef one-shot useEffect that could silently miss the
+  // streaming→terminal transition under React 18 batching or temp-id → DB-id
+  // remounts. Rules:
+  //   - streaming → always show body (D-08: user cannot fold a live run)
+  //   - terminal + no tools → show body (no collapse target — R-6 exception)
+  //   - terminal + tools → collapsed UNLESS user explicitly expanded via click
+  // userExpandedRef is the SOLE writer of the user-toggle state; forceRender
+  // is a useState-as-event trigger so React re-evaluates the derivation.
+  // Reset on message.id change so DB-reload remounts get the default-collapsed
+  // historical view.
+  const userExpandedRef = useRef(false)
+  const [, forceRender] = useState(0)
   useEffect(() => {
-    if (wasStreamingRef.current && isTerminal && hasTools) {
-      // This is the one-shot streaming→terminal transition (RESEARCH §4.4).
-      // We intentionally use setState in an effect here because the
-      // collapse must happen ONCE on the transition, AND we must respect
-      // a subsequent user-driven expand (so we can't derive expanded purely
-      // from props). The wasStreamingRef guard makes this a one-shot.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setExpanded(false)
-    }
-    wasStreamingRef.current = message.runStatus === "streaming"
-  }, [message.runStatus, hasTools, isTerminal])
+    userExpandedRef.current = false
+  }, [message.id])
+  const expanded = isStreamingNow || !hasTools || userExpandedRef.current
 
   // Header click: CONTEXT D-08 mandates this be a NO-OP while streaming, so
   // the user cannot accidentally hide the live progress they're watching.
   // Once terminal, the header toggles expand/collapse like a normal button.
   const handleHeaderClick = () => {
-    if (message.runStatus === "streaming") return  // D-08 no-op
-    setExpanded(v => !v)
+    if (isStreamingNow) return  // D-08 no-op
+    userExpandedRef.current = !userExpandedRef.current
+    forceRender(n => n + 1)
   }
 
   // Timer: recompute elapsed seconds every 250ms during streaming.
@@ -101,16 +94,25 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
 
   const elapsedSeconds = (elapsedMs / 1000).toFixed(1)
 
-  // Header copy: outerBannerLabel reuses the existing toolMeta taxonomy
-  // (UI-SPEC §8.2). Picks per-tool phrasing when a tool is running/preparing,
-  // falls back to "Synthesizing answer…" between tools, "Thinking…" while
-  // planning, "Setting up agent…" pre-first-delta.
+  // Header copy is runStatus-aware (075.7-DEBUG fix — Bug A):
+  //   - streaming → outerBannerLabel (per-tool active-state taxonomy from
+  //     Phase 067.1; fallback "Synthesizing answer…" between tools).
+  //   - terminal + tools → static `Run · N tool calls · ✓ done` mirroring the
+  //     collapsed-row copy (sketch live-run-container D5 + UI-SPEC §8.2).
+  //   - terminal + no tools → just the status word.
+  // outerBannerLabel was authored as a streaming-only helper (toolMeta.ts:68);
+  // calling it on terminal turns returned the streaming-phase fallback string
+  // and is the root cause of the "Synthesizing answer…" persistence bug.
   const lastTool = message.tool_calls?.[message.tool_calls.length - 1] ?? null
   const activeTool =
     lastTool && (lastTool.status === "running" || lastTool.status === "preparing")
       ? lastTool
       : null
-  const headerTitle = outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
+  const headerTitle = isStreamingNow
+    ? outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
+    : hasTools
+      ? `Run · ${message.tool_calls?.length ?? 0} tool${(message.tool_calls?.length ?? 0) === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus)}`
+      : statusWord(message.runStatus)
 
   // Step subtitle: `Step N` derived from the 0-based iterationCount stamped
   // by the iteration_start SSE event (CONTEXT interfaces — display as N+1).
@@ -139,7 +141,8 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           if (isStreamingNow) return  // D-08: keyboard activation also no-op while streaming
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault()
-            setExpanded(v => !v)
+            userExpandedRef.current = !userExpandedRef.current
+            forceRender(n => n + 1)
           }
         }}
         className={cn(
@@ -199,7 +202,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
         <button
           type="button"
           data-testid="run-card-collapsed"
-          onClick={() => setExpanded(true)}
+          onClick={() => { userExpandedRef.current = true; forceRender(n => n + 1) }}
           className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-accent/30 transition-colors animate-fadeSlideUp text-sm text-muted-foreground"
           aria-label="Expand run details"
         >
