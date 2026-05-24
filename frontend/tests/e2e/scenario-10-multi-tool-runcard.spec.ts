@@ -38,7 +38,7 @@ test.describe("@075.7 scenario-10 — Multi-tool RunCard", () => {
   test("Single prompt invoking search_documents + execute_code renders both bodies in one RunCard", async ({
     authedPage: page,
   }) => {
-    await expect(page).not.toHaveURL(/\/login/)
+    // Auth gated by authedPage fixture; /login URL persists post-auth.
 
     await page
       .getByRole("button", { name: /new chat/i })

@@ -47,10 +47,15 @@ export const test = base.extend<AuthedFixtures>({
       .first()
       .click()
 
-    // Wait for the redirect away from /login. The app routes authenticated
-    // users to "/" (chat) by default; we don't pin a specific route here so
-    // refactors to the post-login landing page don't break the fixture.
-    await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 })
+    // App quirk: the /login route does NOT redirect after successful auth —
+    // it just re-renders the chat surface inline while the URL stays /login
+    // (verified via Chrome MCP 2026-05-24 during 075.7 UAT). Asserting on
+    // URL change is a false-positive trap. Assert on the chat-surface's
+    // stable visible landmark: the "Ask anything…" composer is the post-auth
+    // gate that's present on every authenticated render.
+    await expect(
+      page.getByPlaceholder(/ask anything/i).first()
+    ).toBeVisible({ timeout: 15_000 })
 
     await use(page)
   },

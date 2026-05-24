@@ -287,6 +287,8 @@ export function MessageInput({
                   onClick={onStop}
                   size="icon"
                   variant="outline"
+                  aria-label="Stop generation"
+                  data-testid="composer-stop"
                   className="h-8 w-8 rounded-lg shrink-0 transition-all border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
                 >
                   <Square className="h-3.5 w-3.5 fill-current" />
@@ -296,6 +298,8 @@ export function MessageInput({
                   onClick={handleSend}
                   disabled={!canSend}
                   size="icon"
+                  aria-label="Send message"
+                  data-testid="composer-send"
                   className={cn(
                     "h-8 w-8 rounded-lg shrink-0 transition-all",
                     canSend && "gradient-primary hover:opacity-90 shadow-sm shadow-primary/20",

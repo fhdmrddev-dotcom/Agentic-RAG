@@ -42,7 +42,7 @@ test.describe("@075.7 scenario-11 — Parallel-thread RunCard (BUG-260523-01 reg
   test("Thread A streaming + Thread B composer enabled; RunCard renders on both threads", async ({
     authedPage: page,
   }) => {
-    await expect(page).not.toHaveURL(/\/login/)
+    // Auth gated by authedPage fixture; /login URL persists post-auth.
 
     // Step 1: Open Thread A and send a tool-using prompt
     await page

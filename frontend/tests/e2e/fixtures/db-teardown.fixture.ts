@@ -78,9 +78,11 @@ export async function assertNoOrphanedStreamingRuns(email: string): Promise<void
   const userId = await findUserIdByEmail(client, email)
   if (!userId) return // no user, no orphans
 
+  // Schema: runs primary key is `run_id`, not `id` (see migration 035 +
+  // supabase/full-schema.sql `runs_pkey PRIMARY KEY (run_id)`).
   const { data, error } = await client
     .from("runs")
-    .select("id, status, thread_id")
+    .select("run_id, status, thread_id")
     .eq("user_id", userId)
     .eq("status", "streaming")
 
@@ -88,7 +90,7 @@ export async function assertNoOrphanedStreamingRuns(email: string): Promise<void
   if (data && data.length > 0) {
     throw new Error(
       `assertNoOrphanedStreamingRuns: found ${data.length} streaming run(s) ` +
-        `for user ${email}. IDs: ${data.map((r) => r.id).join(", ")}. ` +
+        `for user ${email}. IDs: ${data.map((r) => r.run_id).join(", ")}. ` +
         "The streaming lifecycle (Phase 067.5 reconcile + 075.4 per-thread state) " +
         "did not flip terminal state. Inspect runs.status / Redis streams for the leak.",
     )

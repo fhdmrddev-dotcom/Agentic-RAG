@@ -39,7 +39,7 @@ test.describe("@075.7 scenario-08 — Focus mode collapse", () => {
   test("Past tools collapse to → {summary}; click expand restores full visibility", async ({
     authedPage: page,
   }) => {
-    await expect(page).not.toHaveURL(/\/login/)
+    // Auth gated by authedPage fixture; /login URL persists post-auth.
 
     await page
       .getByRole("button", { name: /new chat/i })

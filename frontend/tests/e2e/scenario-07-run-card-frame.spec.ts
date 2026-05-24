@@ -42,7 +42,8 @@ test.describe("@075.7 scenario-07 — RunCard frame", () => {
   test("RunCard mounts on tool-bearing turn + sticky header pins + auto-collapses on terminal", async ({
     authedPage: page,
   }) => {
-    await expect(page).not.toHaveURL(/\/login/)
+    // Auth gated by authedPage fixture (composer-visible assertion).
+    // /login URL persists post-auth — see auth.fixture.ts comment.
 
     // Open a fresh New Chat
     await page

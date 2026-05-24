@@ -39,7 +39,7 @@ test.describe("@075.7 scenario-12 — ExecuteCodeBody rename parity", () => {
   test("ExecuteCodeBody renders code + STDOUT + OutputFileCard identically to pre-refactor", async ({
     authedPage: page,
   }) => {
-    await expect(page).not.toHaveURL(/\/login/)
+    // Auth gated by authedPage fixture; /login URL persists post-auth.
 
     await page
       .getByRole("button", { name: /new chat/i })
