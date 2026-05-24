@@ -378,17 +378,19 @@ def verify_telemetry(conn):
 | A2 | psycopg2 can pass vector embeddings as string-formatted arrays to pgvector | Code Examples | MEDIUM -- may need explicit `::vector` cast or pgvector Python adapter; verify at implementation time |
 | A3 | The user has sufficient audit_log entries to provide meaningful query replay data | Common Pitfalls | LOW -- D-02 compensates with synthetic queries; even 0 audit entries is handled |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Exact pgvector embedding format for psycopg2**
    - What we know: pgvector accepts `'[0.1, 0.2, ...]'::vector` format in SQL
    - What's unclear: Whether psycopg2 needs a custom type adapter or if string casting suffices
    - Recommendation: Test with a simple SELECT first; if needed, use `psycopg2.extensions.adapt` or format as string literal `'[...]'`
+   - RESOLVED: Pass embedding as string `'[f1, f2, ...]'` with `::vector` cast in SQL; no custom psycopg2 adapter needed (Plan 01 action section 7).
 
 2. **User ID to use for calibration**
    - What we know: audit_log is keyed on user_id; document_chunks has RLS via user_id
    - What's unclear: Whether to hardcode the operator's user_id or make it a CLI arg
    - Recommendation: CLI arg with auto-detection from audit_log (pick the user with the most search.query entries)
+   - RESOLVED: CLI arg `--user-id` with auto-detect from audit_log (user with most search.query entries) when not provided (Plan 01 action section 5).
 
 ## Validation Architecture
 
