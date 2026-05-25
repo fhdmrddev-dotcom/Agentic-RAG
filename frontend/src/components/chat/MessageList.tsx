@@ -87,6 +87,24 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
     }
   }, [messages, isStreaming])
 
+  // Phase 076.1 D-01/D-02: Auto-scroll to active tool panel during tool_preparing.
+  // When a tool_preparing fires, the tool panel (ExecuteCodeEditorInset or
+  // ToolArgsLivePanel) renders inside the RunCard body but may be above the
+  // viewport while the user sees "Thinking..." at the bottom. Scroll to the
+  // panel so the streaming code is visible.
+  // Guard: only scroll when user is near the bottom (D-01) so we don't fight
+  // manual scroll position. Uses smooth + nearest per D-02.
+  useEffect(() => {
+    if (!isStreaming || !isNearBottomRef.current) return
+    // Find the last active tool panel in the DOM
+    const el = containerRef.current?.querySelector(
+      '[data-tool-status="preparing"]'
+    ) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }
+  }, [messages, isStreaming])
+
   return (
     <ScrollArea className="flex-1">
       <div ref={containerRef} className="space-y-1 px-6 py-6 max-w-4xl mx-auto">
