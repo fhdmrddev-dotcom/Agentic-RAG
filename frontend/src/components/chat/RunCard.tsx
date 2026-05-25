@@ -279,7 +279,9 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               <span className="flex-1 truncate">
                 {nextHint(message, activeTool)}
               </span>
-              <span className="opacity-50 flex-shrink-0">queued</span>
+              <span className="opacity-50 flex-shrink-0 font-mono tabular-nums">
+                {`${Math.floor(elapsedMs / 1000)}s`}
+              </span>
             </div>
           )}
         </div>
