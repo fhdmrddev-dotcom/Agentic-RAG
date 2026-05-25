@@ -957,11 +957,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   return prev.map((m) => {
                     if (m.id !== targetId) return m
                     if (kind === "done") return { ...m, runStatus: "completed" }
-                    if (kind === "error") return { ...m, runStatus: "failed" }
-                    if (kind === "timed_out") return { ...m, runStatus: "timed_out" }
+                    if (kind === "error") return { ...m, runStatus: "failed", runError: errorPayload ?? undefined }
+                    if (kind === "timed_out") return { ...m, runStatus: "timed_out", runError: errorPayload ?? undefined }
                     if (kind === "reader_done") return { ...m, runStatus: "completed" }
                     // kind === "cancelled"
-                    return { ...m, runStatus: "cancelled" }
+                    return { ...m, runStatus: "cancelled", runError: errorPayload ?? undefined }
                   })
                 })
                 // L-068-07: cleanup on onTerminal (BL-03 fix).
@@ -1158,11 +1158,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 return prev.map((m) => {
                   if (m.id !== assistantId) return m
                   if (kind === "done") return { ...m, runStatus: "completed" }
-                  if (kind === "error") return { ...m, runStatus: "failed" }
-                  if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true }
+                  if (kind === "error") return { ...m, runStatus: "failed", runError: errorPayload ?? undefined }
+                  if (kind === "timed_out") return { ...m, runStatus: "timed_out", stopped: true, runError: errorPayload ?? undefined }
                   if (kind === "reader_done") return { ...m, runStatus: "completed" }
                   // kind === "cancelled"
-                  return { ...m, runStatus: "cancelled", stopped: true }
+                  return { ...m, runStatus: "cancelled", stopped: true, runError: errorPayload ?? undefined }
                 })
               })
               // L-068-07: BL-03 fix — subscriptionsRef cleanup belongs in
