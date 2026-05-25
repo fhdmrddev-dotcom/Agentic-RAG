@@ -361,7 +361,7 @@ SYSTEM_PROMPT = (
     "Pick the ONE tool that best fits the task:\n"
     "- **search_documents** → reading passage content: finding facts, quotes, figures, or explanations *inside* documents. "
     "The returned chunks are pre-extracted relevant passages — read them carefully. If they contain the answer, stop there. "
-    "Use `metadata_filter` to scope by author, date, or document type when the user specifies a source.\n"
+    "Only add `metadata_filter` when the user explicitly asks to scope by author, date, or document type — never guess filter values.\n"
     "- **query_documents** → metadata/structural questions: counts, lists, date-range filters, folder membership, file sizes "
     "(e.g. 'how many PDFs from 2023?', 'list all documents by John', 'which files are in the Reports folder'). "
     "These are SQL-style questions about document attributes, not about what documents say.\n"

@@ -19,10 +19,13 @@ SEARCH_DOCUMENTS_TOOL = {
         "name": "search_documents",
         "description": (
             "Search the user's uploaded documents for relevant information. "
-            "Use metadata_filter to narrow results to specific document attributes "
-            "when the user's request implies a scope (e.g. 'find all 2024 reports', "
-            "'only look in Python tutorials', 'search financial documents'). "
-            "Supported filter keys: document_type, language, author, date."
+            "Returns matching chunks with similarity scores. "
+            "IMPORTANT: call this WITHOUT metadata_filter first. Only add "
+            "metadata_filter when the user explicitly names a document attribute "
+            "to filter on (e.g. 'only search French documents'). Do NOT guess "
+            "filter values like 'paper', 'thesis', or 'survey' — these will "
+            "silently return zero results if the metadata doesn't match exactly. "
+            "Supported filter keys (when needed): document_type, language, author, date."
         ),
         "parameters": {
             "type": "object",
@@ -34,10 +37,11 @@ SEARCH_DOCUMENTS_TOOL = {
                 "metadata_filter": {
                     "type": "object",
                     "description": (
-                        "Optional JSONB containment filter applied to document metadata. "
-                        "Each key-value pair must match the stored metadata exactly. "
-                        "Example: {\"document_type\": \"report\"} or {\"language\": \"French\"}. "
-                        "Omit this parameter when no document-level scoping is needed."
+                        "Optional JSONB containment filter on document metadata. "
+                        "Each key-value pair must match stored metadata EXACTLY "
+                        "(case-insensitive). OMIT this parameter unless the user "
+                        "explicitly asks to scope by a metadata attribute. "
+                        "Wrong values silently return zero results."
                     ),
                     "additionalProperties": {"type": "string"},
                 },
