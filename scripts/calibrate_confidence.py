@@ -20,10 +20,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Constants — current thresholds from threads.py:530-542 (Phase 32.5 calibration)
+# Constants — current thresholds from threads.py:530-542 (Phase 076 calibration)
 # ---------------------------------------------------------------------------
-CURRENT_HIGH_THRESHOLD = 0.55
-CURRENT_MEDIUM_THRESHOLD = 0.40
+CURRENT_HIGH_THRESHOLD = 0.54
+CURRENT_MEDIUM_THRESHOLD = 0.38
 
 # D-04: target bucket proportions (roughly 30% high / 45% medium / 25% low)
 TARGET_BUCKET_PROPORTIONS = {"high": 0.30, "medium": 0.45, "low": 0.25}
@@ -354,7 +354,7 @@ def _analyze_distribution(scores: list[float]) -> dict:
     if high_ok and medium_ok and low_ok:
         analysis["recommended_action"] = "VALIDATED"
         analysis["reasoning"] = (
-            "Bucket proportions at current thresholds (0.55/0.40) are within "
+            f"Bucket proportions at current thresholds ({CURRENT_HIGH_THRESHOLD}/{CURRENT_MEDIUM_THRESHOLD}) are within "
             f"{BUCKET_TOLERANCE:.0%} tolerance of target distribution "
             f"({TARGET_BUCKET_PROPORTIONS}). No threshold change needed."
         )

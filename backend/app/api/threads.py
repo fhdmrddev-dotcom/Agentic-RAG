@@ -445,7 +445,7 @@ SYSTEM_PROMPT = (
 
     "## Confidence & hedging\n"
     "search_documents results include a `similarity` score (0–1). If ALL returned chunks have "
-    "similarity below 0.4, the answer is likely not in the documents — say so explicitly: "
+    "similarity below 0.38, the answer is likely not in the documents — say so explicitly: "
     "\"I couldn't find reliable information about this in your documents. The closest match was "
     "[document name] but the similarity was low.\" Do not fabricate an answer from weak matches.\n\n"
 
