@@ -35,6 +35,10 @@ KNOWN_PROVIDERS = {
     "google":     {"name": "Google Gemini",   "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"},
     "openrouter": {"name": "OpenRouter",      "base_url": "https://openrouter.ai/api/v1"},
     "ollama":     {"name": "Ollama (local)",  "base_url": ""},  # resolved from ollama_base_url
+    "deepseek":   {"name": "DeepSeek",         "base_url": "https://api.deepseek.com/v1"},
+    "moonshot":   {"name": "Moonshot (Kimi)",   "base_url": "https://api.moonshot.cn/v1"},
+    "minimax":    {"name": "MiniMax",           "base_url": "https://api.minimax.chat/v1"},
+    "zhipu":      {"name": "GLM (Zhipu)",       "base_url": "https://open.bigmodel.cn/api/paas/v4"},
 }
 
 KEY_PLACEHOLDER = "***"
@@ -270,7 +274,7 @@ def _build_providers(override: dict) -> list[LLMProvider]:
 
         # For native providers, merge saved list with registry so new registry
         # models appear automatically without requiring manual Settings updates.
-        if pid in ("openai", "anthropic", "google"):
+        if pid in ("openai", "anthropic", "google", "deepseek", "moonshot", "minimax", "zhipu"):
             registry = [
                 m for m, cap in MODEL_CAPABILITIES.items()
                 if cap.get("provider") == pid
