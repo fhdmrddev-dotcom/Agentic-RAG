@@ -195,6 +195,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 **Wave 2 — Depends on Wave 1**
 
 - [x] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. Thresholds adjusted 0.55/0.40 -> 0.54/0.38. (2 plans, shipped 2026-05-25)
+- [ ] **Phase 076.1: Provider Integration + UX Status Fidelity** (INSERTED 2026-05-25) — Two-scope phase informed by 6-provider cross-provider monitoring session. **UX scope:** Make the agent run always feel alive — auto-scroll to active tool panel during `tool_preparing`, surface streaming code preview where the user is looking, differentiate "generating code" vs "executing code" states, surface failure reasons on failed runs, text dedup for repeated narration (Anthropic/DeepSeek 4x). Reuses existing signals — no new SSE events (reverted commit `0dce56a` lesson). **Provider scope:** Add 4 direct OpenAI-compatible provider integrations (DeepSeek `api.deepseek.com`, Kimi/Moonshot `api.moonshot.cn`, MiniMax `api.minimax.chat`, GLM/Zhipu `open.bigmodel.cn`) reusing `openai_service.py` with per-provider base URLs and API keys; keep OpenRouter as generic fallback; set per-provider sub-agent model defaults; per-provider timeout profiles. Absorbs SEED-031.
 - [ ] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; consistent-hashing-on-thread_id sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans)
 - [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
 
@@ -791,6 +792,39 @@ Plans:
 **Plans:**
 2/2 plans complete
 - [x] 076-02-PLAN.md — Apply threshold decision + PROJECT.md appendix + test update + schema verification + operator approval (Wave 2; depends on Plan 01; autonomous: false) — shipped 2026-05-25: ADJUST path taken (0.55/0.40 -> 0.54/0.38), N=121 queries, 30.6%/45.5%/24.0% bucket balance
+
+### Phase 076.1: Provider Integration + UX Status Fidelity (INSERTED 2026-05-25)
+
+**Goal:** Two-scope phase absorbing ALL findings from the 6-provider cross-provider monitoring session. **UX scope:** Make the agent run always feel alive — surface the already-streaming `argsCodeText` code preview where the user is looking (not hidden above the viewport), differentiate "generating code" from "executing code" states, surface failure reasons on failed runs, and deduplicate repeated narration text. Competitive UX research confirms streaming text IS the progress indicator. **Provider scope:** Add 4 direct OpenAI-compatible provider integrations (DeepSeek, Kimi/Moonshot, MiniMax, GLM/Zhipu) reusing `openai_service.py` with per-provider base URLs and API keys; keep OpenRouter as generic fallback for unregistered models; set per-provider sub-agent model defaults and timeout profiles. Absorbs SEED-031.
+**Depends on**: Phase 075.10 (fine-grained `tool_args_progress` emission — already shipped)
+**Requirements**: UX-STATUS-01 (status fidelity), SEED-030 (streaming silence gap), SEED-031 (direct provider integrations)
+**Evidence**: `.planning/reports/SESSION-20260525-ux-status-fidelity-findings.md` (master), `.planning/notes/competitive-ux-long-code-generation.md` (research), 6 per-provider monitoring reports in `.planning/reports/SESSION-20260525-*.md`
+**Critical constraint (UX)**: Do NOT add new SSE events or UI elements — reverted commit `0dce56a` proved this causes React re-renders + text/code leakage. Better utilize EXISTING signals (`tool_args_progress`, `argsCodeText`, `tool_preparing`).
+**Success Criteria** (what must be TRUE):
+
+  _UX Status Fidelity:_
+  1. During `execute_code` tool arg generation (TTFT gap), the user sees streaming code in the viewport — not "Thinking..." with a static byte counter. The `ExecuteCodeEditorInset` (already wired at ToolCallPanel.tsx:717-719) must be visible by auto-scrolling to the active tool panel when `tool_preparing` fires.
+  2. The status label accurately reflects backend state: "Generating code" during `preparing`, "Executing code" during `running`, not "RUNNING" for both. "queued" replaced with elapsed timer or active spinner when delta events are arriving.
+  3. Failed runs surface an error category in the UI — timeout, code error, truncation, or model limit — not just "failed" with zero explanation. Backend run error reason piped to frontend via existing `runs` schema.
+  4. Consecutive identical text blocks from the same assistant turn are deduplicated (Anthropic 4x / DeepSeek 4x narration pattern). Backend or frontend normalization — single occurrence rendered.
+  5. Google's atomic tool args (no progressive streaming) handled honestly: "Waiting for model..." with visible elapsed counter, not pretending to be "queued" or showing an empty code panel.
+  6. Sticky elapsed timer visible during active runs regardless of scroll position (P0).
+  7. Running file count visible during multi-batch runs (Sonnet 4-batch pattern).
+  8. No new SSE event types added. No new fields on existing SSE events for UX scope.
+
+  _Provider Architecture:_
+  9. 4 direct provider integrations added: DeepSeek (`api.deepseek.com`), Kimi/Moonshot (`api.moonshot.cn`), MiniMax (`api.minimax.chat`), GLM/Zhipu (`open.bigmodel.cn`) — each with own `MODEL_CAPABILITIES` entries, `provider` field, env var API keys (`DEEPSEEK_API_KEY`, `MOONSHOT_API_KEY`, `MINIMAX_API_KEY`, `ZHIPU_API_KEY`), and `base_url` routing through `openai_service.py`.
+  10. OpenRouter kept as generic fallback for any model not directly integrated. Model ID routing: if `MODEL_CAPABILITIES[model].provider` matches a direct provider, route direct; else route OpenRouter.
+  11. Per-provider sub-agent model defaults set (e.g., `deepseek-chat` for DeepSeek sub-agents, `moonshot-v1-8k` for Kimi) so sub-agents don't fall back to the main model (DeepSeek monitoring: 893K tokens because sub-agent used deepseek-v4-pro).
+  12. Per-provider timeout profiles in `MODEL_CAPABILITIES` — DeepSeek/Kimi get longer defaults (observed 24min/17min runs).
+
+  _Cross-cutting:_
+  13. Chrome MCP UAT across the DBA PPTX generation task on at least 3 providers (OpenAI + Anthropic + one direct-integrated provider): at no point during the run does the visible screen stay unchanged for >10s (liveness), status labels match backend state (accuracy), and failure reasons surface on failed runs.
+
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:spec-phase 076.1 then /gsd:plan-phase 076.1)
 
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
