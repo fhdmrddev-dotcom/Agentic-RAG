@@ -15,11 +15,15 @@ import { ModelPillRow } from "@/components/settings/ModelPillRow"
 const KEY_PLACEHOLDER = "***"
 
 const PROVIDER_META: Record<string, { label: string; defaultBase: string; keyLabel: string }> = {
-  openai:     { label: "OpenAI",        defaultBase: "api.openai.com",                           keyLabel: "API Key" },
-  anthropic:  { label: "Anthropic",     defaultBase: "api.anthropic.com",                        keyLabel: "API Key" },
-  google:     { label: "Google Gemini", defaultBase: "generativelanguage.googleapis.com",        keyLabel: "API Key" },
-  openrouter: { label: "OpenRouter",    defaultBase: "openrouter.ai",                            keyLabel: "API Key" },
-  ollama:     { label: "Ollama",        defaultBase: "http://localhost:11434",                   keyLabel: "Base URL" },
+  openai:     { label: "OpenAI",                    defaultBase: "api.openai.com",                    keyLabel: "API Key" },
+  anthropic:  { label: "Anthropic",                 defaultBase: "api.anthropic.com",                 keyLabel: "API Key" },
+  google:     { label: "Google Gemini",             defaultBase: "generativelanguage.googleapis.com", keyLabel: "API Key" },
+  deepseek:   { label: "DeepSeek",                  defaultBase: "api.deepseek.com",                  keyLabel: "API Key" },
+  moonshot:   { label: "Moonshot (Kimi)",           defaultBase: "api.moonshot.cn",                   keyLabel: "API Key" },
+  minimax:    { label: "MiniMax",                   defaultBase: "api.minimax.chat",                  keyLabel: "API Key" },
+  zhipu:      { label: "GLM (Zhipu)",               defaultBase: "open.bigmodel.cn",                  keyLabel: "API Key" },
+  openrouter: { label: "OpenRouter (experimental)", defaultBase: "openrouter.ai",                     keyLabel: "API Key" },
+  ollama:     { label: "Ollama",                    defaultBase: "http://localhost:11434",             keyLabel: "Base URL" },
 }
 
 // ── Small reusable components ─────────────────────────────────────────────────
@@ -485,7 +489,7 @@ export function SettingsPage() {
   // Provider states
   const [providerStates, setProviderStates] = useState<ProviderState[]>([])
   const [activeProvider, setActiveProvider] = useState("")
-  const isNativeProvider = ["openai", "anthropic", "google"].includes(activeProvider)
+  const isNativeProvider = ["openai", "anthropic", "google", "deepseek", "moonshot", "minimax", "zhipu"].includes(activeProvider)
 
   // LLM
   const [llmModel, setLlmModel] = useState("")
