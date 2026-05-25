@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { outerBannerLabel } from "@/lib/toolMeta"
+import { categorizeError } from "@/lib/errorCategories"
 
 interface RunCardProps {
   message: Message
@@ -93,6 +94,18 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
 
   const elapsedSeconds = (elapsedMs / 1000).toFixed(1)
 
+  // Phase 076.1-04: Cumulative file count from completed tool call results.
+  // Parses tc.result JSON for output_files arrays across all tool calls.
+  const fileCount = (message.tool_calls ?? []).reduce((sum, tc) => {
+    if ((tc.status === "done" || tc.status === "running") && tc.result) {
+      try {
+        const parsed = JSON.parse(tc.result)
+        if (parsed.output_files) return sum + parsed.output_files.length
+      } catch { /* not JSON or no output_files key */ }
+    }
+    return sum
+  }, 0)
+
   // Header copy is runStatus-aware (075.7-DEBUG fix — Bug A):
   //   - streaming → outerBannerLabel (per-tool active-state taxonomy from
   //     Phase 067.1; fallback "Synthesizing answer…" between tools).
@@ -110,8 +123,8 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   const headerTitle = isStreamingNow
     ? outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
     : hasTools
-      ? `Run · ${message.tool_calls?.length ?? 0} tool${(message.tool_calls?.length ?? 0) === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus)}`
-      : statusWord(message.runStatus)
+      ? `Run · ${message.tool_calls?.length ?? 0} tool${(message.tool_calls?.length ?? 0) === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus, message.runError)}`
+      : statusWord(message.runStatus, message.runError)
 
   // Step subtitle: `Step N` derived from the 0-based iterationCount stamped
   // by the iteration_start SSE event (CONTEXT interfaces — display as N+1).
@@ -182,6 +195,13 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           </span>
         )}
 
+        {/* Phase 076.1-04: Cumulative file count badge — grows during multi-batch runs. */}
+        {fileCount > 0 && (
+          <span className="text-xs text-muted-foreground font-mono flex-shrink-0">
+            {fileCount} {fileCount === 1 ? "file" : "files"}
+          </span>
+        )}
+
         {/* Loader spinner during streaming */}
         {isStreamingNow && (
           <Loader2 className="w-4 h-4 animate-spin text-primary flex-shrink-0" />
@@ -211,8 +231,8 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             {(message.tool_calls?.length ?? 0) === 1 ? "call" : "calls"}
           </span>
           <span aria-hidden="true">·</span>
-          <span>
-            {statusGlyph(message.runStatus)} {statusWord(message.runStatus)}
+          <span title={message.runError || undefined}>
+            {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
           {elapsedMs > 0 && (
             <>
@@ -324,10 +344,16 @@ function statusGlyph(s: Message["runStatus"]): string {
   return "✓"
 }
 
-function statusWord(s: Message["runStatus"]): string {
+function statusWord(s: Message["runStatus"], runError?: string): string {
   if (s === "completed" || s === undefined) return "done"
-  if (s === "failed") return "failed"
-  if (s === "timed_out") return "timed out"
+  if (s === "failed") {
+    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
+    return `failed${suffix}`
+  }
+  if (s === "timed_out") {
+    const suffix = runError ? ` - ${categorizeError(runError).shortLabel}` : ""
+    return `timed out${suffix}`
+  }
   if (s === "cancelled") return "cancelled"
   return "done"
 }

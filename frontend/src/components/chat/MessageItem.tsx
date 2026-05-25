@@ -20,6 +20,29 @@ interface Props {
   onResume?: (message: Message) => void
 }
 
+/**
+ * Phase 076.1 D-07: Render-time dedup for consecutive identical paragraphs.
+ * Splits by \n\n, collapses consecutive duplicates (exact match after trim),
+ * preserves raw data in StreamsProvider unchanged.
+ * Minimum paragraph length threshold: >20 chars (avoids collapsing short
+ * repeated tokens like "---" or blank lines).
+ */
+function dedupParagraphs(text: string): string {
+  if (!text) return text
+  const paragraphs = text.split('\n\n')
+  const deduped: string[] = []
+  let prev = ''
+  for (const p of paragraphs) {
+    const trimmed = p.trim()
+    if (trimmed === prev && trimmed.length > 20) {
+      continue  // Skip consecutive duplicate
+    }
+    deduped.push(p)
+    prev = trimmed
+  }
+  return deduped.join('\n\n')
+}
+
 // Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.
 // ChatArea stabilizes onSendMessage + onResume via useCallback (ref-stable
 // across parent re-renders); StreamsProvider mutates messagesByThread by
@@ -169,7 +192,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         )}
         {message.content ? (
           <div className="text-sm text-foreground">
-            <MarkdownRenderer content={message.content} />
+            <MarkdownRenderer content={message.role === "assistant" ? dedupParagraphs(message.content) : message.content} />
             {isStreaming && !hasRunningTools && (
               <span className="inline-block w-2 h-4 ml-0.5 bg-primary/50 animate-pulse rounded-sm align-text-bottom" />
             )}

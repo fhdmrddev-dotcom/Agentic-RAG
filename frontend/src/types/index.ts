@@ -144,6 +144,12 @@ export interface Message {
   runId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
+  /** Phase 076.1: error string from SSE terminal errorPayload. Populated by
+   * StreamsProvider onTerminal when kind === "error" or "timed_out". Used by
+   * RunCard to display categorized failure reason. Only available for live-
+   * streamed runs (not backfilled from DB — runs.error is not yet in the
+   * messages response). */
+  runError?: string
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted by the backend `final_output_files`
    * SSE event after the agent loop terminates. Drives the pinned
