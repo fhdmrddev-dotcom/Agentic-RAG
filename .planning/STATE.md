@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 Phase: 076.1
 Plan: Not started
-Next action: `/gsd:spec-phase 076.1` then `/gsd:plan-phase 076.1`
-Status: Inserted — ready for spec
+Next action: `/gsd:plan-phase 076.1`
+Status: Context gathered — ready to plan
 Last activity: 2026-05-25
 
 ## PRD-reset outputs (committed)
