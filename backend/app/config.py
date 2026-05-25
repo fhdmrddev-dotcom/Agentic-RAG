@@ -13,6 +13,10 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "google": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "",  # resolved dynamically from ollama_base_url
+    "deepseek": "https://api.deepseek.com/v1",
+    "moonshot": "https://api.moonshot.cn/v1",
+    "minimax": "https://api.minimax.chat/v1",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
 }
 
 
@@ -50,6 +54,10 @@ PROVIDER_CONTEXT_DEFAULTS: dict[str, int] = {
     "google":     180_000,  # Gemini Pro tiers at 200k — stay just below
     "openrouter": 100_000,  # Unknown underlying model — stay conservative
     "ollama":      80_000,  # Local hardware — stay conservative
+    "deepseek":  100_000,  # DeepSeek-V4 actual 64K-1M depending on model — conservative
+    "moonshot":  200_000,  # Kimi K2.6 actual 262k
+    "minimax":   160_000,  # MiniMax M2.7 actual 204k
+    "zhipu":     100_000,  # GLM-4 actual 128k — conservative
 }
 
 # Per-model context budgets (practical input limits, not theoretical maximums).
@@ -90,6 +98,18 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "nvidia/nemotron-3-super-120b-a12b:free": 200_000,  # actual 262k
     "google/gemma-4-26b-a4b-it":             200_000,  # actual 262k
     "google/gemma-4-31b-it:free":            200_000,  # actual 262k — free tier
+    # ── DeepSeek direct ────────────────────────────────────────────────────
+    "deepseek-v4-pro":                      200_000,  # actual 1M — conservative cap
+    "deepseek-chat":                         60_000,  # actual 64k
+    "deepseek-reasoner":                     60_000,  # actual 64k
+    # ── Moonshot/Kimi direct ──────────────────────────────────────────────
+    "kimi-k2.6":                            200_000,  # actual 262k
+    "moonshot-v1-8k":                         7_000,  # actual 8k
+    # ── MiniMax direct ────────────────────────────────────────────────────
+    "minimax-m2.7":                         160_000,  # actual 204k
+    # ── GLM/Zhipu direct ─────────────────────────────────────────────────
+    "glm-4-plus":                           100_000,  # actual 128k
+    "glm-4-flash":                          100_000,  # actual 128k
 }
 
 
@@ -188,6 +208,18 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # gemini-3.1-flash-lite — production budget tier in the Gemini-3 family;
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
     "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    # DeepSeek direct — OpenAI-compatible API at api.deepseek.com
+    "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry"},
+    "deepseek-chat":      {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
+    "deepseek-reasoner":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 8192, "capability_source": "registry"},
+    # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.cn
+    "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},
+    "moonshot-v1-8k":     {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
+    # MiniMax direct — OpenAI-compatible API at api.minimax.chat
+    "minimax-m2.7":       {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
+    # GLM/Zhipu direct — OpenAI-compatible API at open.bigmodel.cn
+    "glm-4-plus":         {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 8192, "capability_source": "registry"},
+    "glm-4-flash":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
@@ -221,6 +253,11 @@ _INFERENCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"^o[1-9](-|$)", re.IGNORECASE), "openai"),
     (re.compile(r"^claude-", re.IGNORECASE), "anthropic"),
     (re.compile(r"^gemini-", re.IGNORECASE), "google"),
+    (re.compile(r"^deepseek-", re.IGNORECASE), "deepseek"),
+    (re.compile(r"^kimi-", re.IGNORECASE), "moonshot"),
+    (re.compile(r"^moonshot-", re.IGNORECASE), "moonshot"),
+    (re.compile(r"^minimax-", re.IGNORECASE), "minimax"),
+    (re.compile(r"^glm-", re.IGNORECASE), "zhipu"),
     (re.compile(r"^[^/\s]+/[^/\s]+"), "openrouter"),
 ]
 _INFERENCE_FALLBACK_PROVIDER: str = "ollama"
@@ -236,6 +273,10 @@ _INFERRED_DEFAULT_MAX_TOKENS: dict[str, int] = {
     "google": 8192,
     "openrouter": 4096,
     "ollama": 8192,
+    "deepseek": 8192,
+    "moonshot": 8192,
+    "minimax": 8192,
+    "zhipu": 8192,
 }
 _INFERRED_DEFAULT_TIMEOUT_S: int = 300
 
@@ -423,6 +464,10 @@ _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
+    "deepseek":  "deepseek-chat",
+    "moonshot":  "moonshot-v1-8k",
+    "minimax":   "minimax-m2.7",    # Only model currently available
+    "zhipu":     "glm-4-flash",
 }
 
 
@@ -433,7 +478,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str
 
     # Active provider — set this to switch between providers
-    # Options: openai | anthropic | google | openrouter | ollama
+    # Options: openai | anthropic | google | openrouter | ollama | deepseek | moonshot | minimax | zhipu
     # Leave blank to use the legacy LLM_API_KEY / LLM_BASE_URL directly.
     llm_provider: str = ""
 
@@ -443,6 +488,12 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     openrouter_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434"
+
+    # Direct provider keys (Phase 076.1 — curated OpenAI-compatible providers)
+    deepseek_api_key: str = ""
+    moonshot_api_key: str = ""
+    minimax_api_key: str = ""
+    zhipu_api_key: str = ""
 
     # Resolved credentials — set directly only in legacy mode (no LLM_PROVIDER).
     # When LLM_PROVIDER is set these are overwritten by the validator below.
@@ -458,6 +509,12 @@ class Settings(BaseSettings):
     google_models: str = ""
     openrouter_models: str = ""
     ollama_models: str = ""
+
+    # Direct provider model lists (Phase 076.1)
+    deepseek_models: str = ""
+    moonshot_models: str = ""
+    minimax_models: str = ""
+    zhipu_models: str = ""
 
     @model_validator(mode="after")
     def resolve_llm_provider(self) -> "Settings":
@@ -479,6 +536,10 @@ class Settings(BaseSettings):
             "google": self.google_api_key,
             "openrouter": self.openrouter_api_key,
             "ollama": "ollama",  # Ollama doesn't require a real key
+            "deepseek": self.deepseek_api_key,
+            "moonshot": self.moonshot_api_key,
+            "minimax": self.minimax_api_key,
+            "zhipu": self.zhipu_api_key,
         }
 
         resolved_key = key_map[provider]
