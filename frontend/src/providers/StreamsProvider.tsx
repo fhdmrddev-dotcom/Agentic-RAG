@@ -597,15 +597,17 @@ export function makeStreamCallbacks(opts: {
         prev.map((m) => (m.id === assistantId ? { ...m, suggestions: questions } : m)),
       )
     },
-    onPlanning: () => {
+    onPlanning: (_iteration: number, hint?: string) => {
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: true } : m)),
+        prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: true, planningHint: hint ?? m.planningHint } : m)),
       )
     },
-    onIterationStart: (iteration: number) => {
+    onIterationStart: (iteration: number, maxIterations?: number) => {
       currentIteration = iteration
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId ? { ...m, iterationCount: iteration } : m)),
+        prev.map((m) => (m.id === assistantId
+          ? { ...m, iterationCount: iteration, ...(maxIterations != null ? { maxIterations } : {}) }
+          : m)),
       )
     },
     onFallbackModel: (original: string, fallback: string) => {

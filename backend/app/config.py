@@ -126,12 +126,13 @@ class ModelCapability(TypedDict, total=False):
 # User-extensible: add new models here after testing.
 #
 # Phase 066 D-066-03: per-model `llm_call_timeout_seconds` carries the
-# per-LLM-call deadline (seconds). The matrix follows RESEARCH.md A1:
-#   60s   — fast non-reasoning (nano-class)
-#   90s   — fast / mini-tier
-#   180s  — default capable models
-#   240s  — agentic / capable models
-#   600s  — slow reasoning (extended thinking; Anthropic Issue #51568)
+# per-LLM-call deadline (seconds). Revised 2026-05-24 to 3-tier model:
+#   180s  — nano/lite budget models (fastest, smallest output)
+#   300s  — standard capable models (mini, flash, haiku tiers)
+#   600s  — flagship capable models (sonnet, pro, gpt-5 tiers)
+#   900s  — reasoning / extended thinking (opus, o-series, deepseek-r1, kimi)
+# The ceiling is generous because simple chats finish fast regardless;
+# the timeout only guards against genuinely hung streams.
 # Resolved by ``get_per_call_timeout(model_id, settings)`` below.
 #
 # Phase 074 D-074-06: per-model `max_output_tokens` carries the hard API
@@ -145,61 +146,61 @@ class ModelCapability(TypedDict, total=False):
 MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # OpenAI — proven native tool support
     # max_output_tokens verified against per-model OpenAI docs 2026-05-18
-    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  32768, "capability_source": "registry"},
-    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens":  32768, "capability_source": "registry"},
-    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens":  16384, "capability_source": "registry"},
-    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 240, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class per memory feedback_model_names_representative.md
-    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
-    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  60, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds":  90, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class — o4 follows o3 family
+    "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
+    "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
+    "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry"},
+    "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class per memory feedback_model_names_representative.md
+    "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
+    "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class — o4 follows o3 family
     # Anthropic direct — native tool_use
     # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
     # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
-    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry"},  # extended thinking — Issue #51568
-    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry"},
-    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000, "capability_source": "registry"},
-    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 240, "max_output_tokens":  64000, "capability_source": "registry"},
-    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds":  90, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},  # extended thinking — Issue #51568
+    "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},
+    "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 300, "max_output_tokens":  64000, "capability_source": "registry"},
     # Google direct — native function calling
     # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
     # Plan 075.4-02 D-075.4-NN — google rows carry supports_parallel_tools=False
     # because Google's OpenAI-compat layer rejects parallel_tool_calls. This is
     # the registry-driven replacement for the openai_service.py _NO_PARALLEL_TOOL_CALLS
     # frozenset({"google"}) heuristic (legacy fallback stays as defense-in-depth).
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 240, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "capability_source": "registry", "supports_parallel_tools": False},
     # gemini-3.5-flash — representative-class per memory feedback_model_names_representative.md.
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
-    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  90, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # gemini-3.1-flash-lite — production budget tier in the Gemini-3 family;
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
-    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds":  60, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
-    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":   8192, "capability_source": "registry"},
-    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
-    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  32768, "capability_source": "registry"},
-    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072, "capability_source": "registry"},
-    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536, "capability_source": "registry"},
-    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  65536, "capability_source": "registry"},
+    "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
+    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":   8192, "capability_source": "registry"},
+    "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry"},
+    "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
+    "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
+    "moonshotai/kimi-k2.6":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
     # minimax-01 — legacy/discontinued ID; no clear vendor doc as of 2026-05-18; OMITTED
     # per RESEARCH.md A5 recommendation (pass-through preferred over guessed 16384).
-    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "capability_source": "registry"},
-    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens": 131072, "capability_source": "registry"},
-    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 240, "max_output_tokens":  16384, "capability_source": "registry"},
+    "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "capability_source": "registry"},
+    "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
+    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  16384, "capability_source": "registry"},
 }
 
 
@@ -236,7 +237,7 @@ _INFERRED_DEFAULT_MAX_TOKENS: dict[str, int] = {
     "openrouter": 4096,
     "ollama": 8192,
 }
-_INFERRED_DEFAULT_TIMEOUT_S: int = 90
+_INFERRED_DEFAULT_TIMEOUT_S: int = 300
 
 # D-075.3-09: module-level dedup. Safe under D-v2.5-02 single-uvicorn-worker
 # (CLAUDE.md project rule). Each process starts empty; restart clears state.
@@ -267,7 +268,7 @@ def _build_inferred_defaults(model_id: str, provider: str) -> ModelCapability:
 
     Phase 075.3 D-075.3-07 + D-075.3-08 + D-075.3-09. Caps follow:
       max_output_tokens: 8192 (openai/anthropic/google/ollama), 4096 (openrouter)
-      llm_call_timeout_seconds: 90 (all)
+      llm_call_timeout_seconds: 300 (all — revised 2026-05-24)
       native_tools: True (big-3 openai/anthropic/google), False (openrouter/ollama)
 
     Emits a once-per-process ``model_capability_unknown`` warning the first
@@ -321,11 +322,10 @@ def get_model_capability(model_id: str) -> ModelCapability:
 
 # ── Phase 066 D-066-03: per-LLM-call timeout resolution ─────────────────
 # Default per-LLM-call timeout for models not enumerated in
-# MODEL_CAPABILITIES. 180s is the conservative middle ground (per
-# RESEARCH.md A1) — wide enough to accommodate typical agent calls
-# without false-positive `timed_out`, narrow enough that
-# pathologically-stalling streams terminate within a reasonable window.
-DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 180
+# MODEL_CAPABILITIES. 300s is generous enough to avoid false-positive
+# timed_out on complex code-generation tasks while still bounding
+# genuinely hung streams.
+DEFAULT_LLM_CALL_TIMEOUT_SECONDS: int = 300
 
 # T-066-05 mitigation: lower / upper bounds for the
 # LLM_CALL_TIMEOUT_OVERRIDES env-var parser. Operator misconfiguration

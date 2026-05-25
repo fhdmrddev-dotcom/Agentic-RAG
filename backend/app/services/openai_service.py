@@ -594,17 +594,18 @@ def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> 
 # Anthropic's compat layer silently defaults to 1024 tokens if max_tokens is
 # unset — always override it. Other providers are lenient but explicit is better.
 #
-# Values chosen as practical ceilings for RAG chat responses. Users needing
-# longer outputs (e.g. full-document rewrites) can override via MODEL_OUTPUT_LIMITS
-# or LLM_MAX_OUTPUT_TOKENS in .env.
+# Per-provider practical ceilings. Revised 2026-05-24: bumped from 16k to 32k
+# across all cloud providers — the app generates code (python-pptx, docx) and
+# analyzes large documents, so 16k caused frequent truncation. Users needing
+# tighter limits can override via MODEL_OUTPUT_LIMITS or LLM_MAX_OUTPUT_TOKENS.
 _PROVIDER_DEFAULT_MAX_TOKENS: dict[str, int] = {
-    "anthropic":  16384,  # Sonnet/Opus support 32k-64k; 16k covers code gen without runaway
-    "google":     16384,  # Gemini 2.5 can do 65k; 16k is plenty and avoids runaway outputs
-    "openai":     16384,  # GPT-4o / GPT-4.1 support 16k+ safely
-    "openrouter": 16384,  # passes through; most hosted models support 16k
-    "ollama":     4096,   # local hardware varies; keep conservative
+    "anthropic":  32768,  # Sonnet/Opus support 64k-128k; 32k handles code gen + long analysis
+    "google":     32768,  # Gemini supports 65k; 32k handles code gen without truncation
+    "openai":     32768,  # GPT-5.x supports 128k; 32k is safe practical ceiling
+    "openrouter": 32768,  # passes through; most hosted models support 32k+
+    "ollama":     8192,   # local hardware varies; keep modest
 }
-_FALLBACK_MAX_TOKENS = 8192  # used when provider is unknown / legacy mode
+_FALLBACK_MAX_TOKENS = 16384  # used when provider is unknown / legacy mode
 
 # Native providers use model-registry values — user slider overrides are ignored.
 # Prevents stale OpenRouter overrides from silently capping Anthropic/OpenAI/Google.
@@ -625,17 +626,19 @@ _MODEL_OUTPUT_DEFAULTS: dict[str, int] = {
     "gpt-5.4-nano":                          16384,  # budget — keep conservative
     "gpt-5.5":                               65536,  # supports 128k; 64K practical ceiling
     # ── Anthropic ───────────────────────────────────────────────────────────
-    "claude-opus-4-7":                       16384,  # flagship — 16K (35% tokenizer overhead)
-    "claude-haiku-4-5-20251001":              8192,  # hard ceiling 8k
+    "claude-opus-4-7":                       32768,  # supports 128k; 32k practical for agentic RAG
+    "claude-haiku-4-5-20251001":             32768,  # supports 64k; 32k practical for sub-agent analysis
     "claude-sonnet-4-5":                     32768,  # supports 64k; 32k practical
     "claude-sonnet-4-6":                     32768,  # supports 64k; 32k practical
-    "claude-opus-4-6":                       16384,  # supports 32k; 16k conservative
+    "claude-opus-4-6":                       32768,  # supports 128k; 32k practical
     # ── Google ──────────────────────────────────────────────────────────────
     "gemini-3.1-pro-preview":                32768,  # preview — conservative ceiling
     "gemini-2.5-pro":                        32768,  # supports 65k; 32k practical
     "gemini-2.5-flash":                      32768,  # supports 65k; 32k practical
-    "gemini-2.5-flash-lite":                 16384,  # lite — keep conservative
+    "gemini-2.5-flash-lite":                 32768,  # supports 65k; 32k practical
     "gemini-3-flash-preview":                32768,  # preview — conservative ceiling
+    "gemini-3.5-flash":                      32768,  # mirrors 2.5-flash ceiling
+    "gemini-3.1-flash-lite":                 32768,  # mirrors 2.5-flash-lite ceiling
     # ── OpenRouter ──────────────────────────────────────────────────────────
     "meta-llama/llama-3.3-70b-instruct":     16384,  # standard
     "deepseek/deepseek-r1":                  16384,  # standard via OpenRouter
