@@ -821,10 +821,13 @@ Plans:
   _Cross-cutting:_
   13. Chrome MCP UAT across the DBA PPTX generation task on at least 3 providers (OpenAI + Anthropic + one direct-integrated provider): at no point during the run does the visible screen stay unchanged for >10s (liveness), status labels match backend state (accuracy), and failure reasons surface on failed runs.
 
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:spec-phase 076.1 then /gsd:plan-phase 076.1)
+- [ ] 076.1-01-PLAN.md - Backend provider config (4 providers in config.py + user_settings.py + .env.example)
+- [ ] 076.1-02-PLAN.md - Settings UI provider entries (PROVIDER_META + OpenRouter relabel)
+- [ ] 076.1-03-PLAN.md - UX status fidelity Part 1 (auto-scroll + status labels + sticky timer + Google atomic)
+- [ ] 076.1-04-PLAN.md - UX status fidelity Part 2 (failure reason + text dedup + file count + UAT)
 
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
