@@ -411,10 +411,6 @@ SYSTEM_PROMPT = (
     "document content and flag the discrepancy explicitly to the user.\n"
     "- **Tool call brevity:** When calling tools, do NOT narrate your plan or reasoning. Just call the tool. "
     "Verbalizing your intent wastes output tokens and can cause the tool call to be cut off mid-stream.\n"
-    "- **Progress narration for multi-step file generation:** When calling execute_code multiple times in sequence "
-    "(e.g. building a presentation in batches), emit a brief 1-sentence status before each call summarizing progress "
-    "(e.g. 'Slides 1-8 complete. Building slides 9-16 with results and charts...'). This is the ONE exception to the "
-    "tool-call-brevity rule — users need visible progress during long generation tasks.\n"
     "- **After analyze_document (file generation task):** If the user asked for a downloadable file, call execute_code "
     "with complete Python code. Do not write long preambles before the tool call — keep text minimal to preserve "
     "output token budget for the code.\n"
@@ -1744,11 +1740,11 @@ async def send_message(
                     # D-04 (Phase 56): emit iteration_start at the top of every iteration.
                     # Frontend uses this to increment the "Step N" counter (D-03).
                     # iteration is 0-indexed; frontend adds +1 for display (Pitfall 1).
-                    await _emit(redis, run_id, 'iteration_start', iteration=iteration, max_iterations=max_iterations)
-                    # Signal to the frontend that the agent is deciding its next action.
-                    # Emits on ALL iterations (including 0) so the "Thinking..." row
-                    # covers the TTFT gap from the very first LLM call.
-                    await _emit(redis, run_id, 'planning', iteration=iteration)
+                    await _emit(redis, run_id, 'iteration_start', iteration=iteration)
+                    # Between tool-call rounds: signal to the frontend that the agent
+                    # is deciding its next action (all prior tools are done).
+                    if iteration > 0:
+                        await _emit(redis, run_id, 'planning', iteration=iteration)
 
                     # Plan 075.4-03 D-075.4-E1 — context-truncated warning.
                     # Capture pre-len so we can detect silent message drops
@@ -1833,7 +1829,6 @@ async def send_message(
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
-                                await _emit(redis, run_id, 'planning', iteration=iteration, hint=f"Calling {_model_id}...")
                                 _ant_gen = stream_anthropic(
                                     messages=messages,
                                     tools=_ant_tools,
@@ -1966,7 +1961,6 @@ async def send_message(
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
-                                await _emit(redis, run_id, 'planning', iteration=iteration, hint=f"Calling {_model_id}...")
                                 _g_gen = stream_google(
                                     messages=messages,
                                     tools=_g_tools,
@@ -2145,7 +2139,6 @@ async def send_message(
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
-                                await _emit(redis, run_id, 'planning', iteration=iteration, hint=f"Calling {_model_id}...")
 
                                 # Phase 075.3 D-075.3-03: capture the active provider name
                                 # ONCE here (outside the per-chunk closure) so

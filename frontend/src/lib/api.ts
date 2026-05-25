@@ -256,8 +256,8 @@ export interface StreamCallbacks {
     disclaimer: string | null,
   ) => void
   onSuggestions?: (questions: string[]) => void
-  onPlanning?: (iteration: number, hint?: string) => void
-  onIterationStart?: (iteration: number, maxIterations?: number) => void
+  onPlanning?: (iteration: number) => void
+  onIterationStart?: (iteration: number) => void
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
@@ -490,9 +490,9 @@ export async function subscribeToRun(
           callbacks.onTerminal("cancelled")
           return
         } else if (t === "planning" && callbacks.onPlanning) {
-          callbacks.onPlanning(parsed.iteration as number, parsed.hint as string | undefined)
+          callbacks.onPlanning(parsed.iteration as number)
         } else if (t === "iteration_start" && callbacks.onIterationStart) {
-          callbacks.onIterationStart(parsed.iteration as number, parsed.max_iterations as number | undefined)
+          callbacks.onIterationStart(parsed.iteration as number)
         } else if (t === "fallback_model" && callbacks.onFallbackModel) {
           callbacks.onFallbackModel(
             parsed.original_model as string,

@@ -113,13 +113,10 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
       ? `Run · ${message.tool_calls?.length ?? 0} tool${(message.tool_calls?.length ?? 0) === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus)}`
       : statusWord(message.runStatus)
 
-  // Step subtitle: `Step N of M` derived from iteration_start SSE event.
+  // Step subtitle: `Step N` derived from the 0-based iterationCount stamped
+  // by the iteration_start SSE event (CONTEXT interfaces — display as N+1).
   const stepLabel =
-    message.iterationCount != null
-      ? message.maxIterations != null
-        ? `Step ${message.iterationCount + 1} of ${message.maxIterations}`
-        : `Step ${message.iterationCount + 1}`
-      : null
+    message.iterationCount != null ? `Step ${message.iterationCount + 1}` : null
 
   return (
     <div
@@ -249,7 +246,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             >
               <span aria-hidden="true">💭</span>
               <span className="flex-1 truncate">
-                {message.planningHint ? `Thinking · ${message.planningHint}` : "Thinking · planning next step"}
+                Thinking · planning next step
               </span>
               {elapsedMs > 0 && (
                 <span className="font-mono opacity-60 tabular-nums">

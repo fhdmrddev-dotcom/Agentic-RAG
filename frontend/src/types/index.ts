@@ -128,10 +128,6 @@ export interface Message {
   tool_calls?: ToolCall[]
   /** Phase 56 D-03/D-04: latest iteration index (0-based) seen on iteration_start SSE event. Frontend adds +1 for display. */
   iterationCount?: number
-  /** Max iterations for this run (from iteration_start SSE event). Enables "Step N of M" display. */
-  maxIterations?: number
-  /** Human-readable hint from the planning SSE event (e.g. "Calling claude-sonnet-4-6..."). */
-  planningHint?: string
   sub_agent?: SubAgentState
   activatedSkill?: string  // Legacy single-skill field (kept for DB-loaded message compat)
   /** Phase 56 D-08/D-09: ordered list of skills activated during the live stream, used for inline rendering in ToolCallPanel. */
