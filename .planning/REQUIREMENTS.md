@@ -18,7 +18,7 @@
 - [x] **RAG-DOCLING-02**: The httpx<0.28 vs supabase 2.10 conflict has a chosen resolution path (per Q-v2.6-01) and is verified in CI: `pytest backend/tests/integration/test_pdf_extractor_*.py` green on the chosen resolution.
 - [x] **RAG-MM-LIFT-01**: `multimodal_service._MAX_VISION_CALLS` and `_MAX_B64_BYTES` are admin-tunable via `app_settings`; default raised to a value that covers ≥80% of figures on a 4 MB academic PDF. Empty-vision-description rows persisted (with `description=''`) instead of dropped, so re-runs can fill in.
 - [x] **RAG-MM-LIFT-02**: DOCX extraction reaches floating shapes and headers/footers via the full `doc.part.related_parts` walk (replaces `inline_shapes`-only).
-- [ ] **RAG-RECAL-01**: Confidence thresholds recalibrated after Docling lands — Q-v2.6-03 chosen path executed and the resulting score distributions documented in PROJECT.md.
+- [x] **RAG-RECAL-01**: Confidence thresholds recalibrated after Docling lands — Q-v2.6-03 chosen path executed and the resulting score distributions documented in PROJECT.md. (Phase 076, shipped 2026-05-25: 0.55/0.40 -> 0.54/0.38)
 
 ### Theme B — Multi-Worker Readiness
 
@@ -137,7 +137,7 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | RAG-DOCLING-02 | 070 — Docling httpx Spike | Complete |
 | RAG-MM-LIFT-01 | 072 — Multimodal Lift + DOCX Completeness | Complete |
 | RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Complete |
-| RAG-RECAL-01 | 076 — Confidence Recalibration | Pending |
+| RAG-RECAL-01 | 076 — Confidence Recalibration | Complete (2026-05-25) |
 | WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Pending |
 | WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Complete |
 | WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Pending |

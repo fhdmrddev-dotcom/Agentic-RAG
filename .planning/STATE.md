@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 076-01-PLAN.md
-last_updated: "2026-05-24T20:27:00Z"
-last_activity: 2026-05-24 -- Phase 076 Plan 01 executed
+stopped_at: Completed 076-02-PLAN.md (Phase 076 complete)
+last_updated: "2026-05-25T06:00:00Z"
+last_activity: 2026-05-25 -- Phase 076 Plan 02 executed (calibration applied, thresholds adjusted 0.54/0.38)
 progress:
   total_phases: 33
   completed_phases: 21
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 076 (confidence-recalibration) — EXECUTING
-Plan: 2 of 2
-Next action: `/gsd:execute-phase 076` Plan 02 — apply calibration findings, update thresholds if needed, document in PROJECT.md
-Status: Plan 01 complete, Plan 02 pending
-Last activity: 2026-05-24 -- Phase 076 Plan 01 executed (calibration script created)
+Phase: 076 (confidence-recalibration) — COMPLETE
+Plan: 2 of 2 (all complete)
+Next action: `/gsd:verify-work 076` or proceed to next phase
+Status: All plans complete. RAG-RECAL-01 closed. Thresholds adjusted 0.55/0.40 -> 0.54/0.38 with documented evidence.
+Last activity: 2026-05-25 -- Phase 076 Plan 02 executed (calibration applied, operator approved)
 
 ## PRD-reset outputs (committed)
 
@@ -133,6 +133,16 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
 ## Recent Completed Phases
+
+### Phase 076: Confidence Recalibration (Complete 2026-05-25)
+
+- 2/2 plans shipped: Plan 01 created reusable calibration script (scripts/calibrate_confidence.py); Plan 02 ran calibration against live corpus (N=121 queries), applied D-04 ADJUST path, documented in PROJECT.md
+- Thresholds adjusted from 0.55/0.40 to 0.54/0.38 — post-071.3 extraction stack (camelot tables + pymupdf_full images + legacy text) shifted chunk score distribution lower (median avg_similarity 0.4861)
+- Bucket proportions restored to D-04 targets: 30.6% high / 45.5% medium / 24.0% low (old thresholds produced 14%/54%/32%)
+- knowledge_health.py LOW_CONF_THRESHOLD + HIGH_CONF_THRESHOLD aligned per D-07; messages.confidence_* schema unchanged (D-v2.5-12 preserved)
+- Telemetry: pdf_extraction_runs.engine schema confirmed; column populates on next extraction
+- RAG-RECAL-01 CLOSED, Q-v2.6-03 EXECUTED
+- Operator reviewed and approved calibration outcome
 
 ### Phase 065: Skills Test Infrastructure Repair (Complete 2026-05-09)
 
@@ -243,6 +253,8 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.7 P01 | 75min | 1 tasks | 11 files |
 | Phase 075.7 P02 | ~25min | 2 tasks | 3 files |
 | Phase 075.7 P03 | ~3h (across continuation agents: T1+T2 initial, T3+T4 continuation #1, T5 continuation #2) | 5 tasks | 11 files (7 created: 1 SUMMARY + 6 Playwright specs; 4 modified: ToolCallPanel.tsx + RunCard.tsx + VALIDATION.md + CLAUDE.md) |
+| Phase 076 P01 | 5min | 1 task | 1 file |
+| Phase 076 P02 | ~15min (split across executor + checkpoint) | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -368,6 +380,8 @@ Recent decisions affecting v2.5 work:
 - Phase 075.7 Plan 01 deviation: comment-only edits in 6 sibling files (useMessages, lib/api, OutputFileCard, ToolArgsLivePanel, MessageItem, types/index) to satisfy R-3 grep gate (grep -rn ExecuteCodeBlock frontend/src returns 0) — zero behavioral change
 - Phase 075.7-02 RunCard wrapper shipped (commits 90aa0a5 + 0adc09e). Memoized bordered container for tool-bearing assistant turns; sticky header against Radix Viewport, brand-pulse avatar, 250ms timer, iteration counter, active-glow frame. Mounts via single-hunk MessageItem swap; pure-text turns unchanged (D-09). All 7 regression invariants byte-identical (memo, stickyLabelRef D-12, WorkingBadge above, MarkdownRenderer/Confidence/Citation/Suggestion/Feedback below, finalOutputFiles panel, animate-brandPulse predicate). ZERO new keyframes (R-7). Plan 03 owns auto-collapse + collapsed-row JSX + summarizeToolCall wire-in.
 - Phase 075.7-03 Focus Mode + 4-axis UAT shipped (commits 5199412 + ce07a57 + ffc77d5 + db0b6f4 + final docs commit). T1: ToolCallPanel ToolResultBlock renders `<div data-testid="tool-result-summary">→ {summarizeToolCall(tc)}</div>` on collapsed past tools (R-4; UI-SPEC §7.5 styling — ml-8 + border-t border-border/50 + font-mono text-xs text-muted-foreground; literal U+2192 prefix). T2: RunCard auto-collapse useEffect with wasStreamingRef one-shot guard (RESEARCH §4.4); lazy useState initializer covers DB-loaded historical (RESEARCH §5.4); collapsed-row `<button type="button">` JSX with statusGlyph/statusWord helpers matching MessageItem banner copy; handleHeaderClick early-returns when runStatus === 'streaming' (D-08); tabIndex mirrors gate for keyboard parity. R-7 holds (grep @keyframes RunCard.tsx = 0). T3: 6 Playwright specs at frontend/tests/e2e/scenario-{07..12}.spec.ts (CONTEXT correction #4) covering 3 of 4 UAT axes automated; scenario-09 4-sub-test for-loop for cross-provider axis with Anthropic DOM-order preservation gate (RESEARCH §6 protecting BUG-260514-02 re-litigation). T4: long-message manual Chrome MCP UAT auto-approved per AUTO_MODE; surfaced to operator via VALIDATION.md 6-step checklist for /gsd:verify-work 075.7. T5: CLAUDE.md hot-file ledger 4 frontend rows flipped to `satisfied (075.7 — 2026-05-24)` (ToolCallPanel.tsx + MessageItem.tsx [NEW row added per planner brief] + StreamsProvider.tsx + useMessages.ts); 2 backend rows (threads.py + anthropic_service.py) UNCHANGED (out of 075.7 scope). G-1 + G-5 guardrails CLOSED on the chat surface.
+
+- Phase 076 Plan 02: D-04 ADJUST path taken — post-071.3 corpus (camelot + pymupdf_full + legacy) shifted avg_similarity distribution lower (median 0.4861); old 0.55/0.40 produced 14%/54%/32% buckets; new 0.54/0.38 restores ~30%/45%/25% D-04 target. knowledge_health.py aligned per D-07. RAG-RECAL-01 CLOSED.
 
 ### Pending Todos
 

@@ -194,7 +194,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 2 — Depends on Wave 1**
 
-- [ ] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. (2 plans)
+- [x] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. Thresholds adjusted 0.55/0.40 -> 0.54/0.38. (2 plans, shipped 2026-05-25)
 - [ ] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; consistent-hashing-on-thread_id sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans)
 - [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
 
@@ -790,7 +790,7 @@ Plans:
 
 **Plans:**
 - [x] 076-01-PLAN.md — Calibration script (scripts/calibrate_confidence.py): env-load + psycopg2 + OpenAI embed + audit_log replay + ~20 synthetic queries + distribution analysis + JSON output + telemetry check (Wave 1; autonomous)
-- [ ] 076-02-PLAN.md — Apply threshold decision + PROJECT.md appendix + test update + schema verification + operator approval (Wave 2; depends on Plan 01; autonomous: false)
+- [x] 076-02-PLAN.md — Apply threshold decision + PROJECT.md appendix + test update + schema verification + operator approval (Wave 2; depends on Plan 01; autonomous: false) — shipped 2026-05-25: ADJUST path taken (0.55/0.40 -> 0.54/0.38), N=121 queries, 30.6%/45.5%/24.0% bucket balance
 
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
