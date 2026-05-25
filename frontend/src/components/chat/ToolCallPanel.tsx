@@ -546,6 +546,7 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                   isToolActive && "tc-active-wrap rounded-md px-2",
                 )}
                 data-testid={isToolActive ? "tc-active" : undefined}
+                data-tool-status={tc.status}
                 style={{ animationDelay: `${i * 80}ms` }}
               >
                 {/* D-067-03: Step N divider on iteration boundary; plain inter-tool separator otherwise.
@@ -615,7 +616,9 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                           </span>
                         ) : (
                           <>
-                            <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+                            <span className="font-semibold text-foreground/80">
+                              {tc.status === "running" ? `Running ${toolLabel(tc.name)}` : toolLabel(tc.name)}
+                            </span>
                             {summary && (
                               <span className="ml-1.5 opacity-50">"{summary}"</span>
                             )}
@@ -665,6 +668,18 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                       <div className="mt-1.5 h-0.5 rounded-full bg-gradient-to-r from-primary/30 to-primary/10 animate-pulse" />
                     )}
 
+                    {/* Phase 076.1 D-10: Google atomic args honest UX — when no
+                        tool_args_progress events fire (atomic delivery), show
+                        "Waiting for model..." instead of empty panel or stale
+                        byte-count badge. Visible only during preparing state
+                        with no argsCodeText and no argsBytesStreamed. */}
+                    {tc.status === "preparing" && (!tc.argsCodeText || tc.argsCodeText.length === 0) && (tc.argsBytesStreamed == null || tc.argsBytesStreamed === 0) && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Waiting for model...</span>
+                      </div>
+                    )}
+
                     {/* 075.6 Plan 02 / SPEC Req #4: live code panel during
                         preparing. The inline (X.X KB) byte counter above
                         REMAINS for the no-argsCodeText case (e.g., non-
@@ -691,10 +706,19 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
                       // no plain-pre → highlighted blink). The header
                       // "Generating code… (X.X KB)" affordance stays so the
                       // byte counter is still glanceable.
+                      // Phase 076.1: isExecuteCode was dead code — execute_code
+                      // is routed to TOOL_BODIES.execute_code at line 573-588
+                      // and never reaches this else branch. Simplified to
+                      // always use toolLabel(tc.name). D-08: surface
+                      // tc.args.description when available.
                       const isExecuteCode = tc.name === "execute_code"
                       return (
                         <ToolArgsLivePanel
-                          title={`Generating ${isExecuteCode ? "code" : toolLabel(tc.name)}…`}
+                          title={
+                            tc.args?.description
+                              ? `Generating ${toolLabel(tc.name)}: ${tc.args.description}`
+                              : `Generating ${toolLabel(tc.name)}…`
+                          }
                           contentText={tc.argsCodeText!}
                           byteCount={tc.argsBytesStreamed!}
                           expanded={panelExpanded[panelKey] ?? (i === lastPreparingIndex)}
