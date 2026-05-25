@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Completed 076-02-PLAN.md (Phase 076 complete)
 last_updated: "2026-05-25T06:00:00Z"
 last_activity: 2026-05-25 -- Phase 076 Plan 02 executed (calibration applied, thresholds adjusted 0.54/0.38)
 progress:
   total_phases: 33
-  completed_phases: 21
+  completed_phases: 22
   total_plans: 67
   completed_plans: 71
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 
 ## Current Position
 
-Phase: 076 (confidence-recalibration) — COMPLETE
-Plan: 2 of 2 (all complete)
+Phase: 077
+Plan: Not started
 Next action: `/gsd:verify-work 076` or proceed to next phase
-Status: All plans complete. RAG-RECAL-01 closed. Thresholds adjusted 0.55/0.40 -> 0.54/0.38 with documented evidence.
-Last activity: 2026-05-25 -- Phase 076 Plan 02 executed (calibration applied, operator approved)
+Status: Ready to plan
+Last activity: 2026-05-25
 
 ## PRD-reset outputs (committed)
 
