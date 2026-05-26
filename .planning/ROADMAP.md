@@ -909,6 +909,10 @@ Plans:
   3. Both docs show the pgbouncer transaction-mode pool sizing curve as a tuning reference for asyncpg under multi-worker.
   4. Doc audit at milestone close confirms no stale "single worker" references remain in the planning tree.
 
+**Plans:** 1 plan
+Plans:
+- [ ] 080-01-PLAN.md — VPS guide update (6 content blocks) + Hostinger guide update (4 content blocks) + stale-reference grep audit (Wave 1; autonomous)
+
 ### Phase 081: SEED-010 OpenRouter UAT
 **Goal**: A ~30-minute UAT pass confirms the synthetic-timeout protocol produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter Kimi-k2.5 and MiniMax-m2.7 routes.
 **Depends on**: Phase 079
