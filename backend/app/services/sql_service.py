@@ -12,6 +12,22 @@ from app.utils.folder_utils import get_globally_visible_folder_ids
 import re
 
 
+def _detect_alias(sql: str, table: str) -> str:
+    """Detect if a table has an alias (e.g. 'documents d' or 'documents AS d')."""
+    m = re.search(
+        rf"\b{table}\b(?:\s+AS\s+|\s+)([a-zA-Z_]\w*)",
+        sql, re.IGNORECASE,
+    )
+    if m:
+        alias = m.group(1).lower()
+        skip = {"where", "order", "group", "limit", "having", "on", "join",
+                "left", "right", "inner", "outer", "cross", "full", "natural",
+                "set", "and", "or", "not", "in", "is", "as", "select"}
+        if alias not in skip:
+            return m.group(1)
+    return table
+
+
 def _inject_user_id(sql: str, user_id: str, global_folder_ids: list[str] | None = None) -> str:
     """
     Inject a user_id WHERE clause into the query.
@@ -26,14 +42,15 @@ def _inject_user_id(sql: str, user_id: str, global_folder_ids: list[str] | None 
     has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
 
     if has_folders and not has_documents:
+        folder_ref = _detect_alias(sql, "folders")
         if global_folder_ids:
             ids_list = ", ".join(f"'{fid}'" for fid in global_folder_ids)
-            condition = f"(folders.user_id = '{user_id}' OR folders.id IN ({ids_list}))"
+            condition = f"({folder_ref}.user_id = '{user_id}' OR {folder_ref}.id IN ({ids_list}))"
         else:
-            condition = f"folders.user_id = '{user_id}'"
+            condition = f"{folder_ref}.user_id = '{user_id}'"
     else:
-        # documents-only or JOIN — scope via documents table
-        condition = f"documents.user_id = '{user_id}'"
+        doc_ref = _detect_alias(sql, "documents")
+        condition = f"{doc_ref}.user_id = '{user_id}'"
 
     # Already has a WHERE clause — append AND
     if re.search(r"\bwhere\b", sql, re.IGNORECASE):
@@ -59,9 +76,11 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     has_documents = bool(re.search(r"\bdocuments\b", sql, re.IGNORECASE))
     has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
     if has_folders and not has_documents:
-        condition = f"folders.id IN ({ids_list})"
+        folder_ref = _detect_alias(sql, "folders")
+        condition = f"{folder_ref}.id IN ({ids_list})"
     else:
-        condition = f"documents.folder_id IN ({ids_list})"
+        doc_ref = _detect_alias(sql, "documents")
+        condition = f"{doc_ref}.folder_id IN ({ids_list})"
     # Already has WHERE (from _inject_user_id) — append AND
     if re.search(r"\bwhere\b", sql, re.IGNORECASE):
         return sql.rstrip() + f" AND {condition}"
