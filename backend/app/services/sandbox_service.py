@@ -20,6 +20,8 @@ _last_used: dict[str, float] = {}
 class SandboxSessionManager:
     """Manages InteractiveSandboxSession instances keyed by thread_id."""
 
+    _docker_client = None
+
     def get_or_create(self, thread_id: str) -> object:
         """Return existing session or create a new one for this thread.
 
@@ -97,7 +99,9 @@ class SandboxSessionManager:
             return None
 
         try:
-            client = docker.from_env()
+            if self._docker_client is None:
+                SandboxSessionManager._docker_client = docker.from_env()
+            client = self._docker_client
             container = client.containers.get(f"sandbox-{thread_id[:12]}")
             if container.status == "running":
                 logger.info(
