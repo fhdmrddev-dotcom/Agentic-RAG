@@ -201,10 +201,10 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 3 — Release-Gating**
 
-- [ ] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` single-worker rule to multi-worker reference; enable `--workers 2` via `WORKER_COUNT` env var; migration 052 (`runs.spawned_by_worker`). (2 plans)
+- [x] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` single-worker rule to multi-worker reference; enable `--workers 2` via `WORKER_COUNT` env var; migration 052 (`runs.spawned_by_worker`). (2/2 plans, shipped 2026-05-27)
 Plans:
 - [x] 079-01-PLAN.md — D-PRD-12 ADR + docs + migration 052 + code + env config (Wave 1; autonomous)
-- [ ] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
+- [x] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
 - [ ] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1 plan)
 - [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
 

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: Phase 079 Plan 01 shipped — D-PRD-12 ADR + migration 052 + config flip + PID write
-stopped_at: Completed 079-01-PLAN.md
-last_updated: "2026-05-26T21:52:56.481Z"
+status: Phase 079 complete — D-v2.5-02 superseded, multi-worker enabled
+stopped_at: Phase 079 complete
+last_updated: "2026-05-27T12:00:00.000Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 35
-  completed_phases: 26
+  completed_phases: 27
   total_plans: 83
-  completed_plans: 86
+  completed_plans: 88
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 079 — D-v2.5-02 Supersession + Multi-Worker Enable
+**Current focus:** Phase 080 — VPS Runbook + Deployment Guide Correction
 
 ## Current Position
 
-Phase: 079
-Plan: 1/2 complete
-Next action: `/gsd:execute-phase 079` (Plan 02 — live verification)
-Status: Phase 079 Plan 01 shipped — D-PRD-12 ADR + migration 052 + config flip + PID write
+Phase: 080
+Plan: 0/1 complete
+Next action: `/gsd:discuss-phase 080`
+Status: Phase 079 complete — D-v2.5-02 superseded, multi-worker enabled
 Last activity: 2026-05-27
 
 ## PRD-reset outputs (committed)
@@ -133,6 +133,16 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
 ## Recent Completed Phases
+
+### Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable (Complete 2026-05-27)
+
+- 2/2 plans shipped; D-v2.5-02 formally superseded by D-PRD-12 ADR; WORKER_COUNT=2 default enabled
+- **D-PRD-12 ADR:** singleton audit table (8 entries), scaling triggers (backpressure-based), re-trigger clause (immediate revert for data corruption, diagnostic-first for non-user-visible); authored in DECISIONS.md between D-PRD-11 and D-PRD-13
+- **Migration 052:** `runs.spawned_by_worker` nullable TEXT column; `insert_run` writes `os.getpid()` at INSERT time
+- **Config flip:** CLAUDE.md single-worker rule replaced with multi-worker D-PRD-12 reference; `.env.example` has `WORKER_COUNT=2`; `restart-backend.ps1` reads WORKER_COUNT with --reload/--workers conditional + 1-16 clamp
+- **Live verification:** 2 workers started (PIDs 65248 + 63464), two-tab smoke test passed, spawned_by_worker populated with distinct PIDs on new runs
+- Code review: 0 critical / 2 warnings (WR-01 TryParse guard, WR-02 dev-default consideration)
+- Requirements closed: WORKER-LIFT-01, WORKER-LIFT-03
 
 ### Phase 076.2: Provider Streaming Parity + DeepSeek Full Integration (Complete 2026-05-26)
 
