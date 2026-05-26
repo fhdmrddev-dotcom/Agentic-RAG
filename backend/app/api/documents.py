@@ -481,7 +481,7 @@ async def upload_document(
         # Detect PostgreSQL unique_violation (code 23505) from the partial index.
         # supabase-py surfaces this as an APIError whose message contains "23505".
         exc_str = str(exc)
-        if "23505" in exc_str or "unique" in exc_str.lower():
+        if "23505" in exc_str:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="File already exists in this folder",
