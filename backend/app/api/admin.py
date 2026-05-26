@@ -70,8 +70,8 @@ async def get_backpressure(
     redis_active_runs = 0
     try:
         redis_active_runs = await get_redis().zcard("runs:active")
-    except Exception:
-        pass  # Redis unreachable -- report 0, not error
+    except Exception as exc:
+        logger.warning("backpressure: Redis unreachable, reporting 0: %s", type(exc).__name__)
 
     # 3. asyncpg pool -- in-use connections
     pg_in_use = 0
