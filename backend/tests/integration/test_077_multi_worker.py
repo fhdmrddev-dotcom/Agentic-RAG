@@ -460,8 +460,9 @@ async def test_50_run_load(multi_worker_server, test_data):
             "SELECT count(*) FROM runs WHERE thread_id = $1 AND status = 'completed'",
             test_data["thread_id"],
         )
-        assert count == 50, (
-            f"Expected 50 completed runs in Postgres, got {count}"
+        expected = TOTAL_RUNS + 1  # +1 for preflight request
+        assert count == expected, (
+            f"Expected {expected} completed runs in Postgres, got {count}"
         )
     finally:
         await conn.close()
