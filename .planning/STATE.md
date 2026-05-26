@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: ready_to_plan
-stopped_at: Completed 076-02-PLAN.md (Phase 076 complete)
-last_updated: "2026-05-25T06:00:00Z"
-last_activity: 2026-05-25 -- Phase 076 Plan 02 executed (calibration applied, thresholds adjusted 0.54/0.38)
+status: planning
+stopped_at: Phase 076 context gathered
+last_updated: "2026-05-25T17:06:17.705Z"
+last_activity: 2026-05-25
 progress:
-  total_phases: 33
+  total_phases: 34
   completed_phases: 22
-  total_plans: 67
+  total_plans: 71
   completed_plans: 71
-  percent: 67
+  percent: 100
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 076 — confidence-recalibration
+**Current focus:** Phase 077 — multi-worker validation harness
 
 ## Current Position
 
-Phase: 076.1
+Phase: 077
 Plan: Not started
-Next action: `/gsd:plan-phase 076.1`
-Status: Context gathered — ready to plan
-Last activity: 2026-05-25
+Next action: `/gsd:discuss-phase 077`
+Status: Phase 076.1 complete — ready for next phase
+Last activity: 2026-05-26
 
 ## PRD-reset outputs (committed)
 
@@ -133,6 +133,17 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
 ## Recent Completed Phases
+
+### Phase 076.1: Provider Integration + UX Status Fidelity (Complete 2026-05-26)
+
+- 4/4 plans shipped + 11 post-UAT fixes; UAT 12/13 passed (1 deferred to SEED-032)
+- **UX Status Fidelity:** auto-scroll to active tool panel on tool_preparing; "Generating code"/"Executing code" status labels; sticky timer bar (elapsed + step + file count + description); elapsed counter replaces static "queued"; failure reason badges via errorCategories.ts + runError on Message; two-pass text dedup (paragraph + sentence level); Google atomic "Waiting for model..." UX
+- **Multi-batch fix (critical):** StreamsProvider dedup guard (Phase 075.2 BUG-260521-01) matched by tool name alone, silently dropping iterations 2+ of same-name tools. Fixed: iteration-aware dedup IDs (`preparing-${iteration}-${index}`) + iteration-scoped finalized guard in onToolStart
+- **Provider Integration:** 4 direct providers (DeepSeek api.deepseek.com, Moonshot api.moonshot.cn, MiniMax api.minimax.chat, Zhipu open.bigmodel.cn) registered across _PROVIDER_BASE_URLS, MODEL_CAPABILITIES, _SUB_AGENT_MODEL_DEFAULTS, _INFERENCE_PATTERNS, Settings UI; KNOWN_PROVIDERS derived from _PROVIDER_BASE_URLS (single source of truth); OpenRouter relabeled "experimental"
+- **DeepSeek:** thinking mode disabled (extra_body.thinking.type="disabled") pending SEED-032; migration 050 (reasoning_content column) + streaming accumulator + DB persist wired as groundwork; title gen refusal guard; deepseek-v4-flash registered with 200K context / 65K output / 300s timeout
+- **Code review:** 4/4 warnings closed (WR-01 fileCount status, WR-02 completedCount status, WR-03 competing scroll effects merged, WR-04 single-source providers)
+- Merged scroll effects into single useEffect (tool panel priority over bottom scroll); error badge reads parsed.error ?? parsed.message for non-terminal SSE events
+- SEED-031 absorbed; SEED-032 planted (DeepSeek thinking mode + real-time UI parity)
 
 ### Phase 076: Confidence Recalibration (Complete 2026-05-25)
 
@@ -510,4 +521,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 076 (Confidence Recalibration) — 2 plans — 2026-05-24T19:36:24.666Z
+**Planned Phase:** 076.1 (provider-integration-ux-status-fidelity) — 4 plans — 2026-05-25T17:06:17.692Z
