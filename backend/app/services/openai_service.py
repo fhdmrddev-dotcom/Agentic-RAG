@@ -903,7 +903,7 @@ def create_adaptive_streaming_chat(
     # full reasoning_content storage + replay.
     if provider == "deepseek" or effective_model.startswith("deepseek-"):
         kwargs.setdefault("extra_body", {})
-        kwargs["extra_body"]["enable_thinking"] = False
+        kwargs["extra_body"]["thinking"] = {"type": "disabled"}
 
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
