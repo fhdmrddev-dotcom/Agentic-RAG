@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3rRCoXNezhRPwMgwxCDeGCWEOIsWyL5BrgIPrUQNbwPtwFW3Az49HJKIBB9P5ym
+\restrict P8GgrV0kBJe94gDaHvqUPmxoep76wVtzf6dDcCSFxb0nd8ENAolv97qKxSjyFtz
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -784,7 +784,7 @@ CREATE UNIQUE INDEX documents_completed_hash_unique_idx ON public.documents USIN
 -- Name: documents_dedup_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (user_id, content_hash, folder_id) WHERE (status <> 'failed'::text);
+CREATE UNIQUE INDEX documents_dedup_idx ON public.documents USING btree (user_id, content_hash, COALESCE(folder_id, '00000000-0000-0000-0000-000000000000'::uuid)) WHERE (status <> 'failed'::text);
 
 
 --
@@ -1626,5 +1626,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3rRCoXNezhRPwMgwxCDeGCWEOIsWyL5BrgIPrUQNbwPtwFW3Az49HJKIBB9P5ym
+\unrestrict P8GgrV0kBJe94gDaHvqUPmxoep76wVtzf6dDcCSFxb0nd8ENAolv97qKxSjyFtz
 
