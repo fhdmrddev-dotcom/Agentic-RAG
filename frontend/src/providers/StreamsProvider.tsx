@@ -270,7 +270,7 @@ export function makeStreamCallbacks(opts: {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
-          const preparingId = `preparing-${index}`
+          const preparingId = `preparing-${currentIteration}-${index}`
           const alreadyPreparing = (m.tool_calls ?? []).some((tc) => tc.id === preparingId)
           if (alreadyPreparing) return m
           // Phase 075.9 T2: stamp the stable client-side key at first
@@ -319,7 +319,7 @@ export function makeStreamCallbacks(opts: {
       // closes the late-event race (RESEARCH Pitfall 7): a tool_args_progress
       // arriving AFTER onToolStart finds no matching preparing entry and is
       // a no-op.
-      const preparingId = `preparing-${toolIndex}`
+      const preparingId = `preparing-${currentIteration}-${toolIndex}`
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
@@ -370,19 +370,15 @@ export function makeStreamCallbacks(opts: {
             )
           } else {
             // Phase 075.2 Plan 01 Task 2 (D-075.2-01): idempotency-on-replay
-            // guard. If WR-02 reattach replayed a tool_start whose preparing
-            // entry was already finalized (status running or done), treat as
-            // no-op instead of appending a fresh duplicate. Safe because
-            // parallel_tool_calls: false is enforced backend-side (verified
-            // in RESEARCH §Q5). This was the BUG-260521-01 trigger: cursor-0
-            // replay would hit this else-branch and stamp a fresh
-            // `running-${Date.now()}` entry, producing a visible duplicate
-            // card for ~10-15s until snapshot reconcile collapsed it.
+            // guard — scoped to currentIteration so multi-batch same-name
+            // tool calls (e.g., execute_code on iterations 1,2,3,4) each get
+            // their own entry. Replay of the SAME iteration's tool_start still
+            // no-ops correctly (same name + same iteration + already finalized).
             const finalizedIdx = existingCalls.findIndex(
-              (tc) => tc.name === name && (tc.status === "running" || tc.status === "done"),
+              (tc) => tc.name === name && tc.iteration === currentIteration && (tc.status === "running" || tc.status === "done"),
             )
             if (finalizedIdx !== -1) {
-              updatedCalls = existingCalls  // no-op; same-name entry already exists
+              updatedCalls = existingCalls  // no-op; same iteration+name entry already exists
             } else {
               // Phase 075.9 T2: stamp the stable client-side key at first
               // observation. Some providers skip the preparing event and go
