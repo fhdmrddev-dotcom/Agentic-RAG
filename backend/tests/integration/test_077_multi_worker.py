@@ -548,13 +548,17 @@ async def test_singleton_no_crosstalk(multi_worker_server, test_data):
 
     redis = aioredis.from_url(_REDIS_TEST_URL)
     try:
-        # Global runs:active must be clean
-        active_count = await redis.zcard("runs:active")
+        # Poll — prior test's finalizer may still be draining
+        for _ in range(10):
+            active_count = await redis.zcard("runs:active")
+            if active_count == 0:
+                break
+            await asyncio.sleep(1.0)
+
         assert active_count == 0, (
             f"runs:active has {active_count} leaked entries from multi-worker run"
         )
 
-        # Per-thread sorted set must be clean
         thread_count = await redis.zcard(f"runs_by_thread:{thread_id}")
         assert thread_count == 0, (
             f"runs_by_thread:{thread_id} has {thread_count} leaked entries"
