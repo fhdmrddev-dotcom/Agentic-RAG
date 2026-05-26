@@ -166,7 +166,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, admin  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -179,6 +179,7 @@ app.include_router(audit.router)
 app.include_router(knowledge_health.router)
 app.include_router(feedback.router)
 app.include_router(sandbox_outputs.router)
+app.include_router(admin.router)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
