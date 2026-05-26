@@ -879,6 +879,11 @@ Plans:
   4. Migration 043 (partial unique index `documents (user_id, content_hash, folder_id) WHERE status != 'failed'`) + atomic `UPDATE ... WHERE status='pending'` compare-and-swap at top of `ingest_document` close the concurrent-upload race; integration test: two parallel `POST /documents/upload` of the same file produce exactly one `documents` row + one set of `document_chunks`.
   5. Title-gen failures in `generate_thread_title` (`threads.py:259-292`) emit `logger.warning` with exception detail before returning the fallback; log-capture unit test asserts the warning fires.
 
+**Plans:**
+- [ ] 078-01-PLAN.md — Config fields + Supabase aclose + title-gen warning (Wave 1)
+- [ ] 078-02-PLAN.md — Context-window protected overrun + dedup CAS + migration 051 (Wave 1)
+- [ ] 078-03-PLAN.md — GET /admin/backpressure endpoint + tests (Wave 2; depends on 078-01)
+
 ### Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable
 **Goal**: A new D-PRD-12 ADR explicitly supersedes the single-worker rule, `CLAUDE.md` reflects the lift, and dev + prod uvicorn configs run `--workers 2` cleanly.
 **Depends on**: Phase 077, Phase 078
