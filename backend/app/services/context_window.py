@@ -212,16 +212,19 @@ def trim_messages_to_fit(
             break
         trimmed_any = True
 
-    # Final build — add marker if any trimming occurred.
-    # Only re-estimate when trimmable is fully exhausted and we haven't already
-    # confirmed a removal, to avoid a redundant token count call on the happy path.
-    protected_only_tokens = (
-        estimate_messages_tokens(_build_candidate(system_msg, [], protected, False))
-        if not trimmed_any and trimmable == []
-        else 0
-    )
-    if trimmed_any or (trimmable == [] and protected_only_tokens > max_tokens):
-        trimmed_any = True
+    # Phase 078 CQ-CTX-01 D-078-01: after trimmable is exhausted, progressively
+    # trim oldest protected messages inward. Hard floor: system_msg + last user msg.
+    # Mirrors Claude.ai / ChatGPT behavior (silently drops older turns, never errors).
+    # D-078-02: no error raised — always return a valid list that fits.
+    if not trimmable:
+        while len(protected) > 1:
+            candidate = _build_candidate(system_msg, [], protected, True)
+            if estimate_messages_tokens(candidate) <= max_tokens:
+                break
+            n_removed = _remove_oldest_atomic(protected)
+            if n_removed == 0:
+                break
+            trimmed_any = True
 
     return _build_candidate(system_msg, trimmable, protected, trimmed_any)
 

@@ -178,15 +178,18 @@ def test_trim_preserves_recent_messages():
         messages.append({"role": "user", "content": f"Message {i} " * 20})
         messages.append({"role": "assistant", "content": f"Reply {i} " * 20})
 
-    # Last 4 messages should be preserved (reserve_recent=4)
-    result = trim_messages_to_fit(messages, max_tokens=200, reserve_recent=4)
+    # Last 4 messages should be preserved when budget is large enough.
+    # Use a generous budget so protected tail fits without D-078-01 progressive trim.
+    result = trim_messages_to_fit(messages, max_tokens=2000, reserve_recent=4)
     last_4 = messages[-4:]
     for msg in last_4:
         assert msg in result
 
 
 def test_trim_all_trimmable_removed_only_protected_remain():
-    """Edge case: if budget is tiny, all trimmable messages are removed; only system + protected remain."""
+    """Edge case: if budget is tiny, all trimmable messages are removed; only system + protected remain.
+    With D-078-01 progressive trim, protected messages may also be trimmed if they exceed max_tokens.
+    Use a budget large enough that the 2 protected messages fit."""
     system_msg = _sys("System prompt.")
     # Build lots of old messages
     messages = [system_msg]
@@ -199,8 +202,8 @@ def test_trim_all_trimmable_removed_only_protected_remain():
     messages.append(recent_user)
     messages.append(recent_assistant)
 
-    # Tiny budget forces removal of all old messages; only system + protected 2 remain
-    result = trim_messages_to_fit(messages, max_tokens=30, reserve_recent=2)
+    # Budget large enough for system + marker + 2 protected, but not old messages
+    result = trim_messages_to_fit(messages, max_tokens=100, reserve_recent=2)
 
     assert result[0] == system_msg
     assert recent_user in result
@@ -434,3 +437,73 @@ def test_tiktoken_no_model_uses_chars_heuristic():
     text = "a" * 40
     # No model arg → chars/4 → 10
     assert estimate_tokens(text) == 10
+
+
+# ---------------------------------------------------------------------------
+# trim_messages_to_fit — protected-only overrun (Phase 078 CQ-CTX-01 D-078-01)
+# ---------------------------------------------------------------------------
+
+def test_trim_protected_overrun_trims_inward():
+    """When trimmable is empty AND protected+system still exceed max_tokens,
+    progressively trim oldest protected messages (D-078-01 progressive trim)."""
+    system_msg = _sys("System prompt.")
+    # Only 2 messages — both land in protected (reserve_recent=2), trimmable is empty
+    protected_old = _user("Protected-but-old message " * 50)   # ~1300 chars = ~325 tokens
+    protected_new = _assistant("Recent reply.")
+
+    messages = [system_msg, protected_old, protected_new]
+    # Token budget smaller than protected_old alone forces trimming into protected
+    result = trim_messages_to_fit(messages, max_tokens=30, reserve_recent=2)
+
+    # System must always be present
+    assert result[0] == system_msg
+    # The long protected_old message should have been trimmed away
+    assert protected_old not in result, "Oldest protected message should be trimmed"
+    # The most recent protected message must survive (hard floor)
+    assert protected_new in result, "Last protected message must be preserved"
+    # Trim marker must be present (trimming occurred)
+    assert any(
+        _TRIM_MARKER in (m.get("content") or "") for m in result
+    ), "Trim marker should be present after protected-only overrun"
+
+
+def test_trim_protected_overrun_inserts_marker():
+    """Marker is inserted when protected-only overrun causes trimming (D-078-01)."""
+    system_msg = _sys("System.")
+    protected_old = _user("Very long protected message. " * 100)
+    protected_new = _assistant("Recent.")
+
+    messages = [system_msg, protected_old, protected_new]
+    result = trim_messages_to_fit(messages, max_tokens=20, reserve_recent=2)
+
+    # A trim marker must be present (trimming occurred)
+    assert any(
+        _TRIM_MARKER in (m.get("content") or "")
+        for m in result
+    ), "Expected _TRIM_MARKER after protected-only overrun trim"
+
+
+def test_trim_protected_overrun_never_errors():
+    """trim_messages_to_fit always returns a list — never raises (D-078-02)."""
+    system_msg = _sys("S" * 1000)   # large system prompt
+    only_msg = _user("U" * 1000)    # only one protected message
+
+    messages = [system_msg, only_msg]
+    # Absurdly small budget — function must not raise
+    result = trim_messages_to_fit(messages, max_tokens=1, reserve_recent=1)
+    assert isinstance(result, list)
+    assert len(result) >= 1  # at minimum system prompt
+
+
+def test_trim_protected_overrun_preserves_last_message():
+    """Hard floor: last message in protected tail is always preserved (D-078-01)."""
+    system_msg = _sys("System.")
+    messages = [system_msg]
+    for i in range(5):
+        messages.append(_user(f"Protected message {i} " * 30))
+    last_msg = _assistant("The very last reply.")
+    messages.append(last_msg)
+
+    result = trim_messages_to_fit(messages, max_tokens=20, reserve_recent=6)
+    # The last message must survive (hard floor)
+    assert last_msg in result, "Last protected message must never be trimmed"

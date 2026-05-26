@@ -469,11 +469,24 @@ async def upload_document(
         "version_number": next_version,
         "is_latest": True,
     }
-    # Phase 071.2 D-071.2-06: wrap documents INSERT in run_in_threadpool.
-    result = await run_in_threadpool(
-        lambda: supabase.table("documents").insert(doc_data).execute()
-    )
-    doc = result.data[0]
+    # Phase 078 CQ-DEDUP-01 D-078-04: catch unique-violation race at INSERT time.
+    # The fast-path SELECT above handles the common case; this catches the narrow
+    # race window where two concurrent uploads pass the SELECT simultaneously.
+    try:
+        result = await run_in_threadpool(
+            lambda: supabase.table("documents").insert(doc_data).execute()
+        )
+        doc = result.data[0]
+    except Exception as exc:
+        # Detect PostgreSQL unique_violation (code 23505) from the partial index.
+        # supabase-py surfaces this as an APIError whose message contains "23505".
+        exc_str = str(exc)
+        if "23505" in exc_str or "unique" in exc_str.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="File already exists in this folder",
+            )
+        raise
 
     # Phase 071.2 D-071.2-05 — schedule heavy work as BackgroundTask. The handler
     # returns 201 within ~1s; _upload_pipeline does storage upload + Layer 2
