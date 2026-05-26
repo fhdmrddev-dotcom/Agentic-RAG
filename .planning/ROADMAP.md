@@ -196,7 +196,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 - [x] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. Thresholds adjusted 0.55/0.40 -> 0.54/0.38. (2 plans, shipped 2026-05-25)
 - [x] **Phase 076.1: Provider Integration + UX Status Fidelity** (INSERTED 2026-05-25, shipped 2026-05-26) — 4 plans + 11 post-UAT fixes. **UX shipped:** auto-scroll to active tool panel, "Generating code"/"Executing code" labels, sticky timer bar, elapsed counter (no more "queued"), failure reason badges, two-pass text dedup, multi-batch tool panels render real-time (iteration-aware dedup fix). **Providers shipped:** DeepSeek/Moonshot/MiniMax/Zhipu direct integration, Settings UI 9 providers, OpenRouter relabeled experimental, single-source KNOWN_PROVIDERS. **DeepSeek:** working with thinking disabled (SEED-032 tracks full thinking mode + real-time UI parity). Migration 050 (reasoning_content column). Code review 4/4 warnings closed.
-- [ ] **Phase 076.2: Provider Streaming Parity + Full Integration** (INSERTED 2026-05-26) — Dedicated provider polish phase closing gaps from 076.1 live testing across ALL 4 curated providers (DeepSeek, Kimi/Moonshot, MiniMax, GLM/Zhipu). **Per-provider streaming parity:** (1) real-time UI reflection — tool panels must render progressively during multi-tool runs for ALL providers, not just Anthropic/OpenAI (DeepSeek confirmed: content appears all at once on completion), (2) sticky timer bar reflecting accurate step/action state per provider, (3) polluted/leaked data cleaned from UI during streaming (repeated narration or raw content). **DeepSeek-specific:** (4) thinking mode full support — reasoning_content round-trip in agent loop in-memory message chain (SEED-032 Gap 1, groundwork from migration 050 + streaming accumulator already in place). **Cross-provider architecture:** (5) sub-agent/title/suggestion model resolution follows the chat's actual model provider, not Settings active_provider — prevents wrong provider handling titles when user switches models, (6) per-provider live UAT with real API keys — multi-turn + multi-tool + title gen + suggestions for all 4 curated providers. Absorbs SEED-032.
+- [ ] **Phase 076.2: Provider Streaming Parity + Full Integration** (INSERTED 2026-05-26) — Dedicated provider polish phase closing gaps from 076.1 live testing across ALL 4 curated providers (DeepSeek, Kimi/Moonshot, MiniMax, GLM/Zhipu). **Per-provider streaming parity:** (1) real-time UI reflection — tool panels must render progressively during multi-tool runs for ALL providers, not just Anthropic/OpenAI (DeepSeek confirmed: content appears all at once on completion), (2) sticky timer bar reflecting accurate step/action state per provider, (3) polluted/leaked data cleaned from UI during streaming (repeated narration or raw content). **DeepSeek-specific:** (4) thinking mode full support — reasoning_content round-trip in agent loop in-memory message chain (SEED-032 Gap 1, groundwork from migration 050 + streaming accumulator already in place). **Cross-provider architecture:** (5) sub-agent/title/suggestion model resolution follows the chat's actual model provider, not Settings active_provider — prevents wrong provider handling titles when user switches models, (6) per-provider live UAT with real API keys — multi-turn + multi-tool + title gen + suggestions for all 4 curated providers. Absorbs SEED-032. Folds BUG-260524-01. (4 plans)
 - [ ] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; consistent-hashing-on-thread_id sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans)
 - [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
 
@@ -829,6 +829,27 @@ Plans:
 - [ ] 076.1-02-PLAN.md - Settings UI provider entries (PROVIDER_META + OpenRouter relabel)
 - [ ] 076.1-03-PLAN.md - UX status fidelity Part 1 (auto-scroll + status labels + sticky timer + Google atomic)
 - [ ] 076.1-04-PLAN.md - UX status fidelity Part 2 (failure reason + text dedup + file count + UAT)
+
+### Phase 076.2: Provider Streaming Parity + Full Integration
+**Inserted:** 2026-05-26
+**Goal**: Close all streaming/integration gaps from 076.1 live testing across 4 curated providers. Ship DeepSeek thinking mode (reasoning_content round-trip). Fix Google Skills registration bug (BUG-260524-01). Verify per-provider model resolution for sub-agent/title/suggestions via UAT. Document provider-side limitations.
+**Depends on**: Phase 076.1
+**Plans**: 4
+**Requirements**: (inserted phase -- scope from CONTEXT.md D-01 through D-12)
+**Success Criteria** (what must be TRUE):
+  1. DeepSeek V4 thinking mode enabled (reasoning_effort="high"); multi-tool runs complete without 400 error (reasoning_content round-trip works in agent loop).
+  2. reasoning_content displays in a collapsible Thinking block in RunCard (collapsed by default, expandable).
+  3. reasoning_delta SSE events stream during DeepSeek thinking; GET /messages returns reasoning_content on assistant messages.
+  4. BUG-260524-01 resolved: Google Skills tool registration investigated with debug logging; fix applied or behavioral finding documented.
+  5. SEED-032 absorbed: Gap 1 (in-memory round-trip) closed; Gap 2 (real-time UI reflection) investigated and documented.
+  6. Cross-provider UAT with D-12 4-axis bandwidth: DeepSeek deep + Kimi/MiniMax/GLM smoke + title/suggestions/skills per provider.
+
+**Plans:** 4 plans
+Plans:
+- [ ] 076.2-01-PLAN.md -- Backend: DeepSeek thinking enable + reasoning_content round-trip + SSE emit + API exposure + unit tests (Wave 1; autonomous)
+- [ ] 076.2-02-PLAN.md -- Frontend: reasoning_content wiring (types + api.ts + StreamsProvider) + RunCard collapsible Thinking block (Wave 2; depends on 01; autonomous)
+- [ ] 076.2-03-PLAN.md -- Google Skills investigation + fix (BUG-260524-01) + debug logging (Wave 2; depends on 01; autonomous)
+- [ ] 076.2-04-PLAN.md -- Cross-provider live UAT with 4-axis bandwidth + VALIDATION.md scoreboard (Wave 3; depends on 01+02+03; autonomous=false)
 
 ### Phase 077: Multi-Worker Validation Harness
 **Goal**: Under `--workers 2` and a 50-parallel-run synthetic load, run-tracking survives cross-worker cancel, sandbox sessions stay sticky to the originating worker via consistent hashing on `thread_id`, and the per-worker Redis singleton initializes without cross-talk.
