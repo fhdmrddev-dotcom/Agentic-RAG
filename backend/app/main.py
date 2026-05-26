@@ -121,12 +121,16 @@ async def lifespan(app_instance):
 
     # Phase 078 (CQ-SUPA-01, D-078-09): close the Supabase singleton client.
     # Runs AFTER asyncpg pool close (step 3), BEFORE sandbox close (step 4).
+    # supabase-py sync Client has no aclose(); check for both async and sync variants.
     try:
         from app.dependencies import _supabase
         if _supabase is not None:
-            await _supabase.aclose()
+            if hasattr(_supabase, "aclose"):
+                await _supabase.aclose()
+            elif hasattr(_supabase, "close"):
+                _supabase.close()
     except Exception:
-        logger.exception("Supabase aclose failed at shutdown")
+        logger.exception("Supabase client close failed at shutdown")
 
     # Shutdown: close all open sandbox sessions to free Docker containers
     if settings.sandbox_enabled:
