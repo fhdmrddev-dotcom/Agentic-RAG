@@ -429,17 +429,27 @@ async def test_50_run_load(multi_worker_server, test_data):
             f"--- Server stderr (last 3000 chars) ---\n{stderr_tail}"
         )
 
-    # Give a brief settling window for Redis cleanup
-    await asyncio.sleep(2.0)
-
-    # Assert Redis runs:active is empty (all runs cleaned up)
+    # Poll for Redis cleanup — finalizers are async tasks with real
+    # asyncpg operations, so the last one may need a few seconds.
     redis = aioredis.from_url(_REDIS_TEST_URL)
     try:
-        active_count = await redis.zcard("runs:active")
-        assert active_count == 0, (
-            f"runs:active should be empty after all runs complete, "
-            f"but has {active_count} entries"
-        )
+        active_count = None
+        for _ in range(10):
+            active_count = await redis.zcard("runs:active")
+            if active_count == 0:
+                break
+            await asyncio.sleep(1.0)
+        if active_count != 0:
+            stderr_tail = ""
+            stderr_path = multi_worker_server.get("stderr_path")
+            if stderr_path and os.path.exists(stderr_path):
+                with open(stderr_path, "rb") as f:
+                    stderr_tail = f.read().decode(errors="replace")[-4000:]
+            assert active_count == 0, (
+                f"runs:active should be empty after all runs complete, "
+                f"but has {active_count} entries\n"
+                f"--- Server stderr (last 4000 chars) ---\n{stderr_tail}"
+            )
     finally:
         await redis.aclose()
 
