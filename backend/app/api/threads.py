@@ -2182,7 +2182,7 @@ async def send_message(
                                 # consumed by the outer agent_runner's
                                 # `except asyncio.TimeoutError` formatter.
                                 async def _on_chunk_openai(chunk):
-                                    nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
+                                    nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total
                                     # Phase 075.3 D-075.3-03 + D-075.3-04: defensive provider-aware
                                     # accumulator. Google emits ``usage`` on EVERY chunk alongside
                                     # ``delta.content`` / ``delta.tool_calls`` (per quick-task
