@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict m6r6OzZMpYyLEldf1v1ezUl0YVsq2BIUo3KbqqX5aTzyYvLZMrCHIttXs3QpV9A
+\restrict 3rRCoXNezhRPwMgwxCDeGCWEOIsWyL5BrgIPrUQNbwPtwFW3Az49HJKIBB9P5ym
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -423,6 +423,7 @@ CREATE TABLE public.messages (
     confidence_level text,
     confidence_avg_similarity double precision,
     confidence_disclaimer text,
+    reasoning_content text,
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
 
@@ -1625,5 +1626,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict m6r6OzZMpYyLEldf1v1ezUl0YVsq2BIUo3KbqqX5aTzyYvLZMrCHIttXs3QpV9A
+\unrestrict 3rRCoXNezhRPwMgwxCDeGCWEOIsWyL5BrgIPrUQNbwPtwFW3Az49HJKIBB9P5ym
 
