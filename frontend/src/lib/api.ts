@@ -55,6 +55,7 @@ type MessageResponseDTO = Message & {
   confidence_disclaimer?: string | null
   run_id?: string | null
   run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
+  reasoning_content?: string | null  // Phase 076.2: DeepSeek thinking mode reasoning_content from backend
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -76,6 +77,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     confidence_disclaimer,
     run_id,
     run_status,
+    reasoning_content,  // Phase 076.2: DeepSeek thinking mode
     ...rest
   } = m
   const mapped: Message = {
@@ -83,6 +85,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     citations: (source_refs ?? []) as Citation[],
     runId: run_id ?? undefined,
     runStatus: run_status ?? undefined,
+    reasoningContent: reasoning_content ?? undefined,  // Phase 076.2
   }
   if (confidence_level) {
     mapped.confidence = {
@@ -182,6 +185,9 @@ export interface ThreadSnapshot {
  */
 export interface StreamCallbacks {
   onDelta: (text: string) => void
+  /** Phase 076.2 D-01: DeepSeek reasoning_content streaming delta.
+   * Accumulates on message.reasoningContent for real-time thinking display. */
+  onReasoningDelta?: (text: string) => void
   onDone: () => void
   // Phase 066 D-066-06: 4th kind 'timed_out' — distinct from 'error' (LLM/system failure)
   // and 'cancelled' (user-Stop). Hooks set runStatus='timed_out' on this; MessageItem
@@ -388,6 +394,8 @@ export async function subscribeToRun(
         const t = parsed.type as string
 
         if (t === "delta") callbacks.onDelta(parsed.content as string)
+        else if (t === "reasoning_delta" && callbacks.onReasoningDelta)
+          callbacks.onReasoningDelta(parsed.content as string)
         else if (t === "title" && callbacks.onTitleUpdate)
           callbacks.onTitleUpdate(parsed.content as string)
         else if (t === "tool_preparing" && callbacks.onToolPreparing)

@@ -158,6 +158,11 @@ export interface Message {
    * run rendered 12 download links per cell. Absent for runs that produced
    * no output files. */
   finalOutputFiles?: { filename: string; url?: string }[]
+  /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
+   * assistant messages from thinking-enabled providers (DeepSeek V4).
+   * Accumulated during streaming via reasoning_delta SSE events.
+   * Rendered in a collapsible "Thinking" block in RunCard. */
+  reasoningContent?: string
 }
 
 export interface DocumentMetadata {

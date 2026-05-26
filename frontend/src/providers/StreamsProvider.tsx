@@ -257,6 +257,17 @@ export function makeStreamCallbacks(opts: {
         ),
       )
     },
+    // Phase 076.2 D-01: accumulate DeepSeek reasoning_content deltas on message.
+    // Same accumulation pattern as onDelta for content.
+    onReasoningDelta: (delta) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, reasoningContent: (m.reasoningContent ?? "") + delta }
+            : m,
+        ),
+      )
+    },
     onDone: () => {
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, isPlanning: false } : m)),

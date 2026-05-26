@@ -1,10 +1,11 @@
 import { memo, useEffect, useRef, useState } from "react"
-import { Bot, ChevronDown, Loader2 } from "lucide-react"
+import { Bot, ChevronDown, ChevronRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Message, ToolCall } from "@/types"
 import { ToolCallPanel } from "./ToolCallPanel"
 import { outerBannerLabel } from "@/lib/toolMeta"
 import { categorizeError } from "@/lib/errorCategories"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface RunCardProps {
   message: Message
@@ -62,6 +63,8 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // on every render. Reset on message.id change so DB-reload remounts get
   // the default-collapsed historical view.
   const [userExpanded, setUserExpanded] = useState(false)
+  // Phase 076.2 D-01: collapsible Thinking block state — collapsed by default.
+  const [thinkingOpen, setThinkingOpen] = useState(false)
   // Reset user-toggle when message identity changes (e.g., temp-id → DB-id
   // swap on first persistence reconcile). Pattern matches the pre-fix
   // RunCard's setExpanded(false) effect; setState-in-effect is intentional.
@@ -251,14 +254,36 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           false for terminal+tools turns until user clicks to expand). */}
       {expanded && (
         <div className="p-3">
-          {/* Phase 075.8 Task 6 (sketch 001 D7 — Compact thinking row).
-              When isPlanning is active during a streaming turn, render a
-              single dim italic row at the TOP of the run-body. Default-
-              collapsed — there's no expanded thinking content path today
-              (D7 says "click to expand if there's content to show"; we
-              wire the click-to-expand shell so the future thinking-block
-              data can flow in without another component touch). */}
-          {isStreamingNow && message.isPlanning && (
+          {/* Phase 076.2 D-01: Collapsible Thinking block for DeepSeek reasoning content.
+              Three rendering states:
+              1. reasoningContent present (streaming or completed): collapsible block
+              2. Streaming + isPlanning + no reasoningContent yet: placeholder shimmer
+              3. Neither: nothing rendered */}
+          {message.reasoningContent ? (
+            <Collapsible open={thinkingOpen} onOpenChange={setThinkingOpen} className="mb-2">
+              <CollapsibleTrigger asChild>
+                <button
+                  data-testid="thinking-trigger"
+                  aria-expanded={thinkingOpen}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/80 hover:text-foreground transition-colors w-full text-left"
+                >
+                  {thinkingOpen ? (
+                    <ChevronDown className="w-3 h-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-3 h-3 shrink-0" />
+                  )}
+                  <span className="truncate">
+                    {isStreamingNow ? "Thinking..." : "Thinking"}
+                  </span>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
+                <div className="px-3 py-2 text-xs text-muted-foreground/70 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border-l-2 border-muted-foreground/20 ml-3">
+                  {message.reasoningContent}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : isStreamingNow && message.isPlanning ? (
             <div
               data-testid="thinking-row"
               className="px-3 py-1.5 text-xs italic text-muted-foreground/80 flex items-center gap-2"
@@ -274,7 +299,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
                 </span>
               )}
             </div>
-          )}
+          ) : null}
           <ToolCallPanel
             toolCalls={message.tool_calls ?? []}
             subAgent={message.sub_agent}
