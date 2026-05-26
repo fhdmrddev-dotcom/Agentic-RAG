@@ -469,7 +469,7 @@ _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
     "deepseek":  "deepseek-v4-flash",
-    "moonshot":  "moonshot-v1-8k",
+    "moonshot":  "kimi-k2.6",
     "minimax":   "minimax-m2.7",    # Only model currently available
     "zhipu":     "glm-4-flash",
 }
