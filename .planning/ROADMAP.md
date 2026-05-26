@@ -862,6 +862,11 @@ Plans:
   3. Sandbox sessions become worker-sticky via consistent hashing on `thread_id`; a re-attached SSE consumer always lands on the same worker that owns the sandbox session for that thread.
   4. Redis singleton initializes per-worker (idempotent); telemetry assertion: `redis.zcard("runs:active")` shows the union across workers, not duplicates.
 
+Plans:
+- [ ] 077-01-PLAN.md — Mock LLM infrastructure + sandbox re-attach production code (Wave 1; autonomous)
+- [ ] 077-02-PLAN.md — 50-run load harness + CONCUR-01 multi-worker gate + singleton validation (Wave 2; depends on 01; autonomous)
+- [ ] 077-03-PLAN.md — Cross-worker cancel verification + sandbox re-attach test (Wave 2; depends on 01; autonomous)
+
 ### Phase 078: Backpressure JSON Primitive + Code-Quality Bundle
 **Goal**: `GET /admin/backpressure` exposes the four bottleneck signals as JSON for the v3.1 dashboard, Supabase singleton shuts down cleanly on lifespan close, protected-only context overrun fails loud (or trims), concurrent-upload races produce exactly one row, and title-gen failures log a warning.
 **Depends on**: Phase 073
