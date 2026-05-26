@@ -14,7 +14,7 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "openrouter": "https://openrouter.ai/api/v1",
     "ollama": "",  # resolved dynamically from ollama_base_url
     "deepseek": "https://api.deepseek.com/v1",
-    "moonshot": "https://api.moonshot.cn/v1",
+    "moonshot": "https://api.moonshot.ai/v1",
     "minimax": "https://api.minimax.chat/v1",
     "zhipu": "https://open.bigmodel.cn/api/paas/v4",
 }
@@ -94,14 +94,16 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "deepseek/deepseek-r1":                 100_000,  # actual 128k via OpenRouter
     "moonshotai/kimi-k2.5":                 200_000,  # actual 262k
     "minimax/minimax-m2.7":                 160_000,  # actual 204k
+    "deepseek/deepseek-v4-pro":             200_000,  # actual 1M — stay conservative via OpenRouter
     "minimax/minimax-m2.5:free":            150_000,  # actual 196k
     "nvidia/nemotron-3-super-120b-a12b:free": 200_000,  # actual 262k
     "google/gemma-4-26b-a4b-it":             200_000,  # actual 262k
     "google/gemma-4-31b-it:free":            200_000,  # actual 262k — free tier
     # ── DeepSeek direct ────────────────────────────────────────────────────
+    "deepseek-v4-flash":                    200_000,  # actual 1M — conservative cap
     "deepseek-v4-pro":                      200_000,  # actual 1M — conservative cap
-    "deepseek-chat":                         60_000,  # actual 64k
-    "deepseek-reasoner":                     60_000,  # actual 64k
+    "deepseek-chat":                         60_000,  # deprecated 2026/07/24 → v4-flash non-thinking
+    "deepseek-reasoner":                     60_000,  # deprecated 2026/07/24 → v4-flash thinking
     # ── Moonshot/Kimi direct ──────────────────────────────────────────────
     "kimi-k2.6":                            200_000,  # actual 262k
     "moonshot-v1-8k":                         7_000,  # actual 8k
@@ -209,6 +211,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
     "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
     # DeepSeek direct — OpenAI-compatible API at api.deepseek.com
+    "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
     "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry"},
     "deepseek-chat":      {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
     "deepseek-reasoner":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 8192, "capability_source": "registry"},
@@ -233,6 +236,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "capability_source": "registry"},
     "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
     "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  16384, "capability_source": "registry"},
+    "deepseek/deepseek-v4-pro":   {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
 }
 
 
@@ -464,7 +468,7 @@ _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "google":     "gemini-2.5-flash",
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
-    "deepseek":  "deepseek-chat",
+    "deepseek":  "deepseek-v4-flash",
     "moonshot":  "moonshot-v1-8k",
     "minimax":   "minimax-m2.7",    # Only model currently available
     "zhipu":     "glm-4-flash",
