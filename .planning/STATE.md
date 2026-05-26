@@ -4,12 +4,12 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: completed
 stopped_at: Phase 080 context gathered
-last_updated: "2026-05-26T22:55:10.412Z"
+last_updated: "2026-05-26T23:16:24.265Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 35
   completed_phases: 27
-  total_plans: 83
+  total_plans: 84
   completed_plans: 87
   percent: 100
 ---
@@ -544,4 +544,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 078 (Backpressure JSON Primitive + Code-Quality Bundle) — 3 plans — 2026-05-26T20:11:52.348Z
+**Planned Phase:** 080 (VPS Runbook + Deployment Guide Correction) — 1 plans — 2026-05-26T23:16:24.256Z
