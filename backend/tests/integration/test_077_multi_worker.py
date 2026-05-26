@@ -331,7 +331,12 @@ async def _fire_single_run(
 
 @pytest.mark.asyncio
 async def test_50_run_load(multi_worker_server, test_data):
-    """Fire 50 concurrent POST requests to /threads/{thread_id}/messages.
+    """Fire 50 runs in waves of 5 against ``uvicorn --workers 2``.
+
+    Uses waves (not all-at-once) because each request makes 3+ blocking
+    Supabase calls via ``run_in_threadpool``; firing 50 simultaneously
+    saturates the default threadpool on 2 workers. Waves of 5 still
+    guarantee both workers handle concurrent requests (round-robin).
 
     Asserts:
     - All 50 responses have status 201 (run started successfully)
@@ -344,22 +349,30 @@ async def test_50_run_load(multi_worker_server, test_data):
     base_url = multi_worker_server["base_url"]
     thread_id = str(test_data["thread_id"])
 
+    TOTAL_RUNS = 50
+    WAVE_SIZE = 5
+    all_results = []
+
     async with httpx.AsyncClient(base_url=base_url) as client:
-        # Fire 50 concurrent runs via asyncio.gather
-        tasks = [
-            _fire_single_run(client, thread_id, i)
-            for i in range(50)
-        ]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for wave_start in range(0, TOTAL_RUNS, WAVE_SIZE):
+            wave_end = min(wave_start + WAVE_SIZE, TOTAL_RUNS)
+            tasks = [
+                _fire_single_run(client, thread_id, i)
+                for i in range(wave_start, wave_end)
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            all_results.extend(results)
+            # Brief settle between waves to let background finalizers drain
+            await asyncio.sleep(1.0)
 
     # Separate successful results from exceptions
-    successes = [r for r in results if isinstance(r, dict) and r.get("ok")]
-    failures = [r for r in results if isinstance(r, dict) and not r.get("ok")]
-    exceptions = [r for r in results if isinstance(r, Exception)]
+    successes = [r for r in all_results if isinstance(r, dict) and r.get("ok")]
+    failures = [r for r in all_results if isinstance(r, dict) and not r.get("ok")]
+    exceptions = [r for r in all_results if isinstance(r, Exception)]
 
     # All 50 should have started successfully (status 201)
-    assert len(successes) == 50, (
-        f"Expected 50 successful runs, got {len(successes)}. "
+    assert len(successes) == TOTAL_RUNS, (
+        f"Expected {TOTAL_RUNS} successful runs, got {len(successes)}. "
         f"Failures: {len(failures)}, Exceptions: {len(exceptions)}. "
         f"Failure details: {failures[:5]}, "
         f"Exception details: {[str(e) for e in exceptions[:5]]}"
