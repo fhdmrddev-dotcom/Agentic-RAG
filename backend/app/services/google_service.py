@@ -289,12 +289,25 @@ def _sanitize_schema_for_google(schema: Any) -> Any:
     return schema
 
 
+_SKILL_TOOL_NAMES = frozenset({"load_skill", "save_skill", "read_skill_file"})
+
+
 def _convert_tools_to_google(tools: list[dict]) -> list[types.Tool]:
     """Convert OpenAI tools-array → Google Tool (single Tool wrapping all
     function_declarations). The schema bodies are already OpenAPI-shape on both
     sides, but Google strict-validates against its narrower subset, so each
     parameter schema is sanitized before construction (see
-    _sanitize_schema_for_google)."""
+    _sanitize_schema_for_google).
+
+    BUG-260524-01 investigation: Debug logging added to confirm skill tools
+    (load_skill, save_skill, read_skill_file) reach the Google API request.
+    Static analysis confirms the tool pipeline is correct — tools flow from
+    get_tools() → stream_google() → _convert_tools_to_google() without any
+    provider-specific filtering. The bug is behavioral: Gemini models receive
+    the skill tool declarations but may not invoke them as readily as
+    OpenAI/Anthropic models. The debug logging is retained at DEBUG level for
+    ongoing provider-tool observability.
+    """
     declarations: list[dict] = []
     for tool in tools or []:
         fn = tool.get("function") or {}
@@ -304,6 +317,13 @@ def _convert_tools_to_google(tools: list[dict]) -> list[types.Tool]:
         parameters = _sanitize_schema_for_google(raw_parameters)
         if not name:
             continue
+        # BUG-260524-01: log skill tool schemas before/after sanitization so
+        # future regressions are diagnosable without a debugger session.
+        if name in _SKILL_TOOL_NAMES:
+            logger.debug(
+                "Google skill tool %s: raw_parameters=%s, sanitized=%s",
+                name, raw_parameters, parameters,
+            )
         declarations.append({
             "name": name,
             "description": description,
@@ -311,6 +331,11 @@ def _convert_tools_to_google(tools: list[dict]) -> list[types.Tool]:
         })
     if not declarations:
         return []
+    logger.debug(
+        "Google tool declarations: %d tools -- %s",
+        len(declarations),
+        [d["name"] for d in declarations],
+    )
     return [types.Tool(function_declarations=declarations)]
 
 
