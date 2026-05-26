@@ -205,7 +205,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 Plans:
 - [x] 079-01-PLAN.md — D-PRD-12 ADR + docs + migration 052 + code + env config (Wave 1; autonomous)
 - [x] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
-- [ ] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1 plan)
+- [x] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1/1 plans, shipped 2026-05-27)
 - [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
 
 **Wave 4 — Verify**
@@ -911,7 +911,7 @@ Plans:
 
 **Plans:** 1 plan
 Plans:
-- [ ] 080-01-PLAN.md — VPS guide update (6 content blocks) + Hostinger guide update (4 content blocks) + stale-reference grep audit (Wave 1; autonomous)
+- [x] 080-01-PLAN.md — VPS guide update (6 content blocks) + Hostinger guide update (4 content blocks) + stale-reference grep audit (Wave 1; autonomous)
 
 ### Phase 081: SEED-010 OpenRouter UAT
 **Goal**: A ~30-minute UAT pass confirms the synthetic-timeout protocol produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter Kimi-k2.5 and MiniMax-m2.7 routes.
@@ -1055,7 +1055,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 077 — Multi-Worker Validation Harness | 3/3 | Complete | 2026-05-27 |
 | 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 1/2 | In progress | — |
-| 080 — VPS Runbook + Deployment Guide Correction | 0/1 | Not started | — |
+| 080 — VPS Runbook + Deployment Guide Correction | 1/1 | Complete | 2026-05-27 |
 | 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
 | 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |

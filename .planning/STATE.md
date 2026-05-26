@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: completed
-stopped_at: Phase 080 context gathered
-last_updated: "2026-05-26T23:16:24.265Z"
-last_activity: 2026-05-27
+status: executing
+stopped_at: Completed 080-01-PLAN.md
+last_updated: "2026-05-26T23:27:06.085Z"
+last_activity: 2026-05-26 -- Phase --phase execution started
 progress:
   total_phases: 35
-  completed_phases: 27
+  completed_phases: 28
   total_plans: 84
-  completed_plans: 87
+  completed_plans: 88
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 080 — VPS Runbook + Deployment Guide Correction
+**Current focus:** Phase --phase — 080
 
 ## Current Position
 
-Phase: 080
-Plan: 0/1 complete
+Phase: --phase (080) — EXECUTING
+Plan: 1 of --name
 Next action: `/gsd:discuss-phase 080`
-Status: Phase 079 complete — D-v2.5-02 superseded, multi-worker enabled
-Last activity: 2026-05-27
+Status: Executing Phase --phase
+Last activity: 2026-05-26 -- Phase --phase execution started
 
 ## PRD-reset outputs (committed)
 
@@ -288,6 +288,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 076 P01 | 5min | 1 task | 1 file |
 | Phase 076 P02 | ~15min (split across executor + checkpoint) | 3 tasks | 4 files |
 | Phase 079 P01 | 4min | 2 tasks | 8 files |
+| Phase 080 P01 | 7 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -417,6 +418,7 @@ Recent decisions affecting v2.5 work:
 
 - Phase 076 Plan 02: D-04 ADJUST path taken — post-071.3 corpus (camelot + pymupdf_full + legacy) shifted avg_similarity distribution lower (median 0.4861); old 0.55/0.40 produced 14%/54%/32% buckets; new 0.54/0.38 restores ~30%/45%/25% D-04 target. knowledge_health.py aligned per D-07. RAG-RECAL-01 CLOSED.
 - D-PRD-12 ADR authored (Phase 079): multi-worker enabled, WORKER_COUNT=2 default, D-v2.5-02 formally superseded
+- Both deployment guides updated with Redis (3 options), EnvironmentFile+WORKER_COUNT systemd, asyncpg pool tuning; prescriptive single-worker refs fixed in ARCHITECTURE.md/CONCERNS.md
 
 ### Pending Todos
 
@@ -456,8 +458,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 080 context gathered
+Last session: 2026-05-26T23:27:06.075Z
+Stopped at: Completed 080-01-PLAN.md
 
 ### Next session: pending USER actions
 
