@@ -197,7 +197,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] **Phase 076: Confidence Recalibration** — Re-run Phase 32.5 calibration on post-071.3 default-set chunks (camelot tables + pymupdf_full images + legacy text + `none` equations); Q-v2.6-03 answer locked at 071.3 close to "re-run on new defaults". Score distributions documented in PROJECT.md. Thresholds adjusted 0.55/0.40 -> 0.54/0.38. (2 plans, shipped 2026-05-25)
 - [x] **Phase 076.1: Provider Integration + UX Status Fidelity** (INSERTED 2026-05-25, shipped 2026-05-26) — 4 plans + 11 post-UAT fixes. **UX shipped:** auto-scroll to active tool panel, "Generating code"/"Executing code" labels, sticky timer bar, elapsed counter (no more "queued"), failure reason badges, two-pass text dedup, multi-batch tool panels render real-time (iteration-aware dedup fix). **Providers shipped:** DeepSeek/Moonshot/MiniMax/Zhipu direct integration, Settings UI 9 providers, OpenRouter relabeled experimental, single-source KNOWN_PROVIDERS. **DeepSeek:** working with thinking disabled (SEED-032 tracks full thinking mode + real-time UI parity). Migration 050 (reasoning_content column). Code review 4/4 warnings closed.
 - [x] **Phase 076.2: Provider Streaming Parity + Full Integration** (INSERTED 2026-05-26, shipped 2026-05-26) — 4 plans + 2 UAT fixes. **DeepSeek shipped:** thinking mode enabled (reasoning_effort="high"), reasoning_content round-trip in agent loop (SEED-032 Gap 1+2 CLOSED), reasoning_delta SSE, collapsible Thinking block in RunCard, 9 unit tests. **Frontend:** reasoning_delta pipeline (types + api.ts + StreamsProvider + RunCard). **Google:** BUG-260524-01 confirmed behavioral (Gemini receives skills but doesn't invoke); debug logging added. **Kimi fixes:** base URL api.moonshot.cn→api.moonshot.ai, sub-agent moonshot-v1-8k→kimi-k2.6. **UAT:** DeepSeek DS-1..5 PASS, Kimi KI-1..3 PASS, MiniMax/GLM deferred (API keys pending). 4 bugs documented (BUG-260526-01..04). Code review 0 blockers / 2 warnings.
-- [ ] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; consistent-hashing-on-thread_id sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans)
+- [x] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; Docker container re-attach sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans, complete 2026-05-27)
 - [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
 
 **Wave 3 — Release-Gating**
@@ -863,9 +863,9 @@ Plans:
   4. Redis singleton initializes per-worker (idempotent); telemetry assertion: `redis.zcard("runs:active")` shows the union across workers, not duplicates.
 
 Plans:
-- [ ] 077-01-PLAN.md — Mock LLM infrastructure + sandbox re-attach production code (Wave 1; autonomous)
-- [ ] 077-02-PLAN.md — 50-run load harness + CONCUR-01 multi-worker gate + singleton validation (Wave 2; depends on 01; autonomous)
-- [ ] 077-03-PLAN.md — Cross-worker cancel verification + sandbox re-attach test (Wave 2; depends on 01; autonomous)
+- [x] 077-01-PLAN.md — Mock LLM infrastructure + sandbox re-attach production code (Wave 1; autonomous) — shipped 2026-05-27
+- [x] 077-02-PLAN.md — 50-run load harness + CONCUR-01 multi-worker gate + singleton validation (Wave 2; depends on 01; autonomous) — shipped 2026-05-27
+- [x] 077-03-PLAN.md — Cross-worker cancel verification + sandbox re-attach test (Wave 2; depends on 01; autonomous) — shipped 2026-05-27
 
 ### Phase 078: Backpressure JSON Primitive + Code-Quality Bundle
 **Goal**: `GET /admin/backpressure` exposes the four bottleneck signals as JSON for the v3.1 dashboard, Supabase singleton shuts down cleanly on lifespan close, protected-only context overrun fails loud (or trims), concurrent-upload races produce exactly one row, and title-gen failures log a warning.
@@ -1041,7 +1041,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 074 — SEED-009 + SEED-011 Polish Bundle | 2/2 | Complete    | 2026-05-18 |
 | 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
 | 076 — Confidence Recalibration | 2/2 | Complete    | 2026-05-25 |
-| 077 — Multi-Worker Validation Harness | 0/3 | Not started | — |
+| 077 — Multi-Worker Validation Harness | 3/3 | Complete | 2026-05-27 |
 | 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 0/2 | Not started | — |
 | 080 — VPS Runbook + Deployment Guide Correction | 0/1 | Not started | — |
