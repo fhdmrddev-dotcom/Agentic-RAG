@@ -909,7 +909,7 @@ Plans:
   3. Both docs show the pgbouncer transaction-mode pool sizing curve as a tuning reference for asyncpg under multi-worker.
   4. Doc audit at milestone close confirms no stale "single worker" references remain in the planning tree.
 
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [x] 080-01-PLAN.md — VPS guide update (6 content blocks) + Hostinger guide update (4 content blocks) + stale-reference grep audit (Wave 1; autonomous)
 
@@ -1055,7 +1055,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 077 — Multi-Worker Validation Harness | 3/3 | Complete | 2026-05-27 |
 | 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 1/2 | In progress | — |
-| 080 — VPS Runbook + Deployment Guide Correction | 1/1 | Complete | 2026-05-27 |
+| 080 — VPS Runbook + Deployment Guide Correction | 1/1 | Complete    | 2026-05-26 |
 | 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
 | 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
