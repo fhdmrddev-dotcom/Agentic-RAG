@@ -21,26 +21,48 @@ interface Props {
 }
 
 /**
- * Phase 076.1 D-07: Render-time dedup for consecutive identical paragraphs.
- * Splits by \n\n, collapses consecutive duplicates (exact match after trim),
- * preserves raw data in StreamsProvider unchanged.
- * Minimum paragraph length threshold: >20 chars (avoids collapsing short
- * repeated tokens like "---" or blank lines).
+ * Phase 076.1 D-07: Render-time dedup for consecutive identical text blocks.
+ * Two-pass approach:
+ *   1. Split by \n\n and collapse consecutive duplicate paragraphs (handles
+ *      models that emit paragraph breaks between repeats).
+ *   2. Detect repeated sentence-sized chunks within a single block (handles
+ *      models like Anthropic/DeepSeek that concatenate repeats without breaks).
+ * Preserves raw data in StreamsProvider unchanged — display-only.
  */
 function dedupParagraphs(text: string): string {
   if (!text) return text
+
+  // Pass 1: paragraph-level dedup (split by \n\n)
   const paragraphs = text.split('\n\n')
   const deduped: string[] = []
   let prev = ''
   for (const p of paragraphs) {
     const trimmed = p.trim()
-    if (trimmed === prev && trimmed.length > 20) {
-      continue  // Skip consecutive duplicate
-    }
+    if (trimmed === prev && trimmed.length > 20) continue
     deduped.push(p)
     prev = trimmed
   }
-  return deduped.join('\n\n')
+
+  // Pass 2: within each paragraph, detect repeated sentence-sized chunks.
+  // If a block contains the same sentence (>30 chars) repeated 2+ times
+  // consecutively, collapse to single occurrence.
+  const result = deduped.map(block => {
+    if (block.length < 80) return block
+    // Split on sentence boundaries (period/exclamation/question + space + capital)
+    const sentences = block.split(/(?<=[.!?])\s+(?=[A-Z])/)
+    if (sentences.length < 2) return block
+    const seen: string[] = []
+    for (const s of sentences) {
+      const trimmed = s.trim()
+      if (trimmed.length > 30 && seen.length > 0 && seen[seen.length - 1] === trimmed) {
+        continue
+      }
+      seen.push(trimmed)
+    }
+    return seen.join(' ')
+  })
+
+  return result.join('\n\n')
 }
 
 // Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.

@@ -71,37 +71,30 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
     const newCount = messages.length
     if (newCount > prevCountRef.current) {
       prevCountRef.current = newCount
-      // BL-05 fix: only auto-scroll when the user is actually near the
-      // bottom (or the listener hasn't attached yet so we have no signal —
-      // the initial-render case where defaulting to scroll feels right).
-      // Use "instant" while streaming to avoid the smooth→instant→smooth
-      // visual jitter on every reconcile / token tick.
       if (isNearBottomRef.current) {
-        bottomRef.current?.scrollIntoView({
-          behavior: isStreaming ? "instant" : "smooth",
-        })
+        // Priority: scroll to active tool panel if one exists (076.1 D-01/D-02),
+        // otherwise scroll to bottom. Single effect prevents competing scrollIntoView
+        // calls that cause jitter (WR-03).
+        const preparingEl = containerRef.current?.querySelector(
+          '[data-tool-status="preparing"]'
+        ) as HTMLElement | null
+        if (isStreaming && preparingEl) {
+          preparingEl.scrollIntoView({ behavior: "smooth", block: "nearest" })
+        } else {
+          bottomRef.current?.scrollIntoView({
+            behavior: isStreaming ? "instant" : "smooth",
+          })
+        }
       }
     } else if (isStreaming && isNearBottomRef.current) {
-      // Existing message growing — only follow if user is near the bottom
-      bottomRef.current?.scrollIntoView({ behavior: "instant" })
-    }
-  }, [messages, isStreaming])
-
-  // Phase 076.1 D-01/D-02: Auto-scroll to active tool panel during tool_preparing.
-  // When a tool_preparing fires, the tool panel (ExecuteCodeEditorInset or
-  // ToolArgsLivePanel) renders inside the RunCard body but may be above the
-  // viewport while the user sees "Thinking..." at the bottom. Scroll to the
-  // panel so the streaming code is visible.
-  // Guard: only scroll when user is near the bottom (D-01) so we don't fight
-  // manual scroll position. Uses smooth + nearest per D-02.
-  useEffect(() => {
-    if (!isStreaming || !isNearBottomRef.current) return
-    // Find the last active tool panel in the DOM
-    const el = containerRef.current?.querySelector(
-      '[data-tool-status="preparing"]'
-    ) as HTMLElement | null
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      const preparingEl = containerRef.current?.querySelector(
+        '[data-tool-status="preparing"]'
+      ) as HTMLElement | null
+      if (preparingEl) {
+        preparingEl.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      } else {
+        bottomRef.current?.scrollIntoView({ behavior: "instant" })
+      }
     }
   }, [messages, isStreaming])
 

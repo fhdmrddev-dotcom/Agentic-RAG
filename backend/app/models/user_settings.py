@@ -16,7 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.config import settings as env_settings, MODEL_CAPABILITIES
+from app.config import settings as env_settings, MODEL_CAPABILITIES, _PROVIDER_BASE_URLS
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +29,21 @@ class OpenRouterToolStrategy(str, Enum):
 # Path to the override file (sits next to .env in the backend dir)
 _OVERRIDE_FILE = Path(__file__).parent.parent.parent / "settings_override.json"
 
+_PROVIDER_DISPLAY_NAMES: dict[str, str] = {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "google": "Google Gemini",
+    "openrouter": "OpenRouter",
+    "ollama": "Ollama (local)",
+    "deepseek": "DeepSeek",
+    "moonshot": "Moonshot (Kimi)",
+    "minimax": "MiniMax",
+    "zhipu": "GLM (Zhipu)",
+}
+
 KNOWN_PROVIDERS = {
-    "openai":     {"name": "OpenAI",         "base_url": ""},
-    "anthropic":  {"name": "Anthropic",       "base_url": "https://api.anthropic.com/v1"},
-    "google":     {"name": "Google Gemini",   "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/"},
-    "openrouter": {"name": "OpenRouter",      "base_url": "https://openrouter.ai/api/v1"},
-    "ollama":     {"name": "Ollama (local)",  "base_url": ""},  # resolved from ollama_base_url
-    "deepseek":   {"name": "DeepSeek",         "base_url": "https://api.deepseek.com/v1"},
-    "moonshot":   {"name": "Moonshot (Kimi)",   "base_url": "https://api.moonshot.cn/v1"},
-    "minimax":    {"name": "MiniMax",           "base_url": "https://api.minimax.chat/v1"},
-    "zhipu":      {"name": "GLM (Zhipu)",       "base_url": "https://open.bigmodel.cn/api/paas/v4"},
+    pid: {"name": _PROVIDER_DISPLAY_NAMES.get(pid, pid), "base_url": url}
+    for pid, url in _PROVIDER_BASE_URLS.items()
 }
 
 KEY_PLACEHOLDER = "***"
