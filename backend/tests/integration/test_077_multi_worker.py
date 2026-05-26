@@ -16,6 +16,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -122,6 +123,14 @@ def multi_worker_server():
         "SANDBOX_ENABLED": "false",
     }
 
+    # Write stderr to a temp file to avoid pipe buffer deadlock.
+    # subprocess.PIPE has a finite OS buffer (~64KB); with 50+ requests
+    # generating log output, the buffer fills and the subprocess blocks
+    # on write, causing all subsequent requests to hang/timeout.
+    stderr_file = tempfile.NamedTemporaryFile(
+        mode="w+b", prefix="uvicorn_077_", suffix=".log", delete=False,
+    )
+
     proc = subprocess.Popen(
         [
             sys.executable, "-m", "uvicorn",
@@ -132,8 +141,8 @@ def multi_worker_server():
         ],
         cwd=backend_dir,
         env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=stderr_file,
     )
 
     base_url = f"http://127.0.0.1:{port}"
@@ -152,15 +161,21 @@ def multi_worker_server():
                 time.sleep(0.5)
 
         if not ready:
-            # Capture stderr for debugging before raising
             proc.terminate()
-            _stdout, _stderr = proc.communicate(timeout=5)
+            proc.wait(timeout=5)
+            stderr_file.seek(0)
+            _stderr = stderr_file.read().decode(errors="replace")[:2000]
             raise RuntimeError(
                 f"uvicorn --workers 2 did not become ready in 30s.\n"
-                f"stderr: {_stderr.decode(errors='replace')[:2000]}"
+                f"stderr: {_stderr}"
             )
 
-        yield {"port": port, "base_url": base_url, "process": proc}
+        yield {
+            "port": port,
+            "base_url": base_url,
+            "process": proc,
+            "stderr_path": stderr_file.name,
+        }
 
     finally:
         # Threat T-077-05: unconditional cleanup
@@ -170,6 +185,11 @@ def multi_worker_server():
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=5)
+        stderr_file.close()
+        try:
+            os.unlink(stderr_file.name)
+        except OSError:
+            pass
 
 
 @pytest.fixture(scope="module")
@@ -371,12 +391,20 @@ async def test_50_run_load(multi_worker_server, test_data):
     exceptions = [r for r in all_results if isinstance(r, Exception)]
 
     # All 50 should have started successfully (status 201)
-    assert len(successes) == TOTAL_RUNS, (
-        f"Expected {TOTAL_RUNS} successful runs, got {len(successes)}. "
-        f"Failures: {len(failures)}, Exceptions: {len(exceptions)}. "
-        f"Failure details: {failures[:5]}, "
-        f"Exception details: {[str(e) for e in exceptions[:5]]}"
-    )
+    if len(successes) != TOTAL_RUNS:
+        # Dump subprocess stderr for debugging
+        stderr_tail = ""
+        stderr_path = multi_worker_server.get("stderr_path")
+        if stderr_path and os.path.exists(stderr_path):
+            with open(stderr_path, "rb") as f:
+                stderr_tail = f.read().decode(errors="replace")[-3000:]
+        assert len(successes) == TOTAL_RUNS, (
+            f"Expected {TOTAL_RUNS} successful runs, got {len(successes)}. "
+            f"Failures: {len(failures)}, Exceptions: {len(exceptions)}. "
+            f"Failure details: {failures[:5]}, "
+            f"Exception details: {[str(e) for e in exceptions[:5]]}\n"
+            f"--- Server stderr (last 3000 chars) ---\n{stderr_tail}"
+        )
 
     # Give a brief settling window for Redis cleanup
     await asyncio.sleep(2.0)
