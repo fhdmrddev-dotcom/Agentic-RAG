@@ -5,7 +5,7 @@ import openai
 from typing import TYPE_CHECKING
 
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
-from app.services.openai_service import get_llm_client, _uses_max_completion_tokens
+from app.services.openai_service import get_llm_client, _uses_max_completion_tokens, deepseek_thinking_kwargs
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -73,6 +73,7 @@ def generate_suggestions(
             messages=messages,
             stream=False,
             **{token_param: 2000},
+            **deepseek_thinking_kwargs(effective_model, provider),
         )
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
@@ -92,6 +93,7 @@ def generate_suggestions(
             messages=messages,
             stream=False,
             **{token_param2: 2000},
+            **deepseek_thinking_kwargs(fallback, provider),
         )
     content = resp.choices[0].message.content or ""
     # Parse: one question per line, strip empty lines, clamp to 3

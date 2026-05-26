@@ -567,6 +567,13 @@ def get_llm_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI
     return client
 
 
+def deepseek_thinking_kwargs(model: str, provider: str = "") -> dict:
+    """Extra kwargs to disable DeepSeek thinking mode (SEED-032 workaround)."""
+    if provider == "deepseek" or model.startswith("deepseek-"):
+        return {"extra_body": {"thinking": {"type": "disabled"}}}
+    return {}
+
+
 def get_embedding_client(user_settings: UserEffectiveSettings | None = None) -> OpenAI:
     if user_settings is not None:
         if user_settings.embedding_api_key:
@@ -898,12 +905,11 @@ def create_adaptive_streaming_chat(
     # is superseded by the defensive handler.
     kwargs["stream_options"] = {"include_usage": True}
 
-    # DeepSeek v4 defaults to thinking mode which requires reasoning_content
-    # round-trip in conversation history. Disable until SEED-032 implements
-    # full reasoning_content storage + replay.
-    if provider == "deepseek" or effective_model.startswith("deepseek-"):
+    # DeepSeek v4 defaults to thinking mode (SEED-032 workaround).
+    ds_kwargs = deepseek_thinking_kwargs(effective_model, provider)
+    if ds_kwargs:
         kwargs.setdefault("extra_body", {})
-        kwargs["extra_body"]["thinking"] = {"type": "disabled"}
+        kwargs["extra_body"].update(ds_kwargs.get("extra_body", {}))
 
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:

@@ -41,7 +41,7 @@ from app.db.runs import insert_run, finalize_run, insert_assistant_message
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
-from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
+from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason, deepseek_thinking_kwargs
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
@@ -1003,6 +1003,7 @@ def generate_thread_title(
             messages=title_messages,
             stream=False,
             **{token_param: 20},
+            **deepseek_thinking_kwargs(model, provider),
         )
         return response.choices[0].message.content.strip() or "New Chat", None
     except openai.NotFoundError:
@@ -1027,6 +1028,7 @@ def generate_thread_title(
             messages=title_messages,
             stream=False,
             **{token_param2: 20},
+            **deepseek_thinking_kwargs(fallback, provider),
         )
         return response.choices[0].message.content.strip() or "New Chat", fallback_info
     except Exception:
