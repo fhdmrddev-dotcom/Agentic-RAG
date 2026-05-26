@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
 status: completed
-stopped_at: Phase 076.2 context gathered
-last_updated: "2026-05-26T09:43:15.939Z"
+stopped_at: Phase 076.2 shipped
+last_updated: "2026-05-26T18:45:00.000Z"
 last_activity: 2026-05-26
 progress:
   total_phases: 35
-  completed_phases: 23
-  total_plans: 75
-  completed_plans: 75
+  completed_phases: 24
+  total_plans: 79
+  completed_plans: 79
   percent: 100
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 076.2 — provider streaming parity + DeepSeek full integration
+**Current focus:** Phase 077 — multi-worker validation harness
 
 ## Current Position
 
-Phase: 076.2
+Phase: 077
 Plan: Not started
-Next action: `/gsd:discuss-phase 076.2`
-Status: Phase 076.1 complete — 076.2 inserted for provider polish
+Next action: `/gsd:discuss-phase 077`
+Status: Phase 076.2 shipped — DeepSeek thinking mode + cross-provider UAT complete
 Last activity: 2026-05-26
 
 ## PRD-reset outputs (committed)
@@ -133,6 +133,17 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
 ## Recent Completed Phases
+
+### Phase 076.2: Provider Streaming Parity + DeepSeek Full Integration (Complete 2026-05-26)
+
+- 4/4 plans shipped + 2 UAT fixes; SEED-032 Gap 1+2 CLOSED; 4 bugs documented (BUG-260526-01..04)
+- **DeepSeek thinking mode:** thinking.type="enabled" + reasoning_effort="high"; reasoning_content round-trip in agent loop (accumulate, reset between iterations, include in in-memory message); reasoning_delta SSE events; MessageResponse reasoning_content field; 9 unit tests
+- **Frontend Thinking block:** collapsible reasoning content in RunCard (Radix Collapsible, collapsed by default, monospace font, scrollable); reasoning_delta pipeline through types/api.ts/StreamsProvider
+- **Google Skills (BUG-260524-01):** confirmed behavioral — Gemini receives skill tool declarations but doesn't invoke; debug logging added at DEBUG level
+- **Kimi UAT fixes:** base URL api.moonshot.cn→api.moonshot.ai (domain changed); sub-agent moonshot-v1-8k→kimi-k2.6 (8K overflow)
+- **UAT:** DeepSeek DS-1..5 PASS (deepseek-v4-pro, 282K in), Kimi KI-1..3 PASS (kimi-k2.6, 957K in), MiniMax/GLM deferred (API keys pending)
+- **Bugs found:** BUG-260526-01 (tool card duplication during streaming, cosmetic), BUG-260526-02 (Kimi thinking leaks into content, medium), BUG-260526-03 (finalOutputFiles SSE-only, medium), BUG-260526-04 (timer disappears mid-cycle on temp-id remount, minor)
+- Code review: 0 blockers, 2 warnings (WR-01 thinking mode allowlist, WR-02 onReasoningDelta optional)
 
 ### Phase 076.1: Provider Integration + UX Status Fidelity (Complete 2026-05-26)
 
