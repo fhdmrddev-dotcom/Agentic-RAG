@@ -4,9 +4,9 @@ title: Google provider doesn't load Skills into the tool surface
 reported: 2026-05-24
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/skills, backend/providers/google, frontend/chat]
-folded_into: null
+folded_into: 076.2
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
