@@ -1,7 +1,8 @@
 """
-Phase 076.2 Plan 01 Task 1 (RED): Failing tests for DeepSeek thinking mode.
+Phase 076.2 Plan 01: Unit tests for DeepSeek thinking mode.
 Covers D-02 (thinking enable), D-03 (reasoning_content round-trip),
-Pitfall 1 (accumulator reset), and MessageResponse exposure.
+D-04 (reasoning_effort), Pitfall 1 (accumulator reset), and
+MessageResponse API exposure.
 """
 import pytest
 import inspect
@@ -9,6 +10,11 @@ import inspect
 
 class TestDeepSeekThinkingEnable:
     """D-02: openai_service sends thinking.type='enabled' for DeepSeek."""
+
+    def test_deepseek_provider_registered(self):
+        """DeepSeek is a registered provider in _PROVIDER_BASE_URLS."""
+        from app.config import _PROVIDER_BASE_URLS
+        assert "deepseek" in _PROVIDER_BASE_URLS
 
     def test_thinking_config_is_enabled_not_disabled(self):
         """Source must contain 'type': 'enabled' and NOT 'type': 'disabled'."""
