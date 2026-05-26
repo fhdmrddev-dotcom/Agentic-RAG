@@ -474,7 +474,7 @@ export async function subscribeToRun(
           // (including the new D-075-13 recently_active + runs_status
           // discriminator fields) is passed through verbatim as the
           // parsed.error string so the consumer can inspect it.
-          callbacks.onTerminal("error", parsed.error as string | undefined)
+          callbacks.onTerminal("error", (parsed.error ?? parsed.message) as string | undefined)
           return
         } else if (t === "timed_out") {
           // Phase 066 D-066-06: distinct system-timeout terminal sentinel —

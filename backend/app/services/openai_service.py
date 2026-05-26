@@ -898,6 +898,13 @@ def create_adaptive_streaming_chat(
     # is superseded by the defensive handler.
     kwargs["stream_options"] = {"include_usage": True}
 
+    # DeepSeek v4 defaults to thinking mode which requires reasoning_content
+    # round-trip in conversation history. Disable until SEED-032 implements
+    # full reasoning_content storage + replay.
+    if provider == "deepseek" or effective_model.startswith("deepseek-"):
+        kwargs.setdefault("extra_body", {})
+        kwargs["extra_body"]["enable_thinking"] = False
+
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
             # Native mode: pass tools via API parameter
