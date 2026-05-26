@@ -8,7 +8,7 @@
 
 Five backend code-quality improvements shipped as a single phase: (1) `GET /admin/backpressure` JSON endpoint for the v3.1 dashboard primitive, (2) Supabase singleton `aclose()` on FastAPI lifespan shutdown, (3) context-window protected-only overrun hardening, (4) concurrent-upload dedup race closure via partial unique index + atomic CAS, (5) title-generation failure logging.
 
-No frontend work. No new SSE events. No schema changes beyond migration 043 (partial unique index).
+No frontend work. No new SSE events. Migration 043 (partial unique index) already applied; migration 051 (NULL-safe COALESCE addendum to 043) ships with this phase to close the root-level upload dedup gap.
 
 </domain>
 
