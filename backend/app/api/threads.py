@@ -1033,7 +1033,11 @@ def generate_thread_title(
             **{token_param2: 20},
         )
         return response.choices[0].message.content.strip() or "New Chat", fallback_info
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "title_generation_failed: %s", e,
+            exc_info=True,
+        )
         return first_user_message[:40].strip() or "New Chat", None
 
 

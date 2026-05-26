@@ -623,6 +623,17 @@ class Settings(BaseSettings):
     postgres_pool_min: int = 2
     postgres_pool_max: int = 10
 
+    # Backpressure admin endpoint (Phase 078 — D-078-07 WORKER-LIFT-04)
+    # Comma-separated Supabase Auth user IDs allowed to call GET /admin/backpressure.
+    # Fail-closed in production (ENVIRONMENT=production): 403 when unset/empty.
+    # Fail-open in dev (default): no restriction so testing works without config.
+    backpressure_admin_user_ids: str = ""
+
+    # Deployment environment — used by backpressure auth gating and test guards.
+    # Values: "production" | "prod" → fail-closed for admin endpoints.
+    # Default: "" (dev/local) → fail-open.
+    environment: str = ""
+
     # Phase 066 D-066-01: the legacy 120s total-deadline asyncio.timeout
     # wrapper at threads.py:855 has been DELETED. The agent loop now has no
     # hard total cap (matches Claude/ChatGPT UX where complex tool-calling
