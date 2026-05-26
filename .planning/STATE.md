@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: Phase 079 planned — 2 plans in 2 waves, verification PASSED
-stopped_at: Phase 079 planned
-last_updated: "2026-05-26T21:20:50.222Z"
+status: Phase 079 Plan 01 shipped — D-PRD-12 ADR + migration 052 + config flip + PID write
+stopped_at: Completed 079-01-PLAN.md
+last_updated: "2026-05-26T21:52:56.481Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 35
   completed_phases: 26
-  total_plans: 81
-  completed_plans: 85
+  total_plans: 83
+  completed_plans: 86
   percent: 100
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope b
 ## Current Position
 
 Phase: 079
-Plan: 0/2 complete
-Next action: `/gsd:execute-phase 079`
-Status: Phase 079 planned — 2 plans in 2 waves, verification PASSED
+Plan: 1/2 complete
+Next action: `/gsd:execute-phase 079` (Plan 02 — live verification)
+Status: Phase 079 Plan 01 shipped — D-PRD-12 ADR + migration 052 + config flip + PID write
 Last activity: 2026-05-27
 
 ## PRD-reset outputs (committed)
@@ -277,6 +277,7 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.7 P03 | ~3h (across continuation agents: T1+T2 initial, T3+T4 continuation #1, T5 continuation #2) | 5 tasks | 11 files (7 created: 1 SUMMARY + 6 Playwright specs; 4 modified: ToolCallPanel.tsx + RunCard.tsx + VALIDATION.md + CLAUDE.md) |
 | Phase 076 P01 | 5min | 1 task | 1 file |
 | Phase 076 P02 | ~15min (split across executor + checkpoint) | 3 tasks | 4 files |
+| Phase 079 P01 | 4min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -405,6 +406,7 @@ Recent decisions affecting v2.5 work:
 - Phase 075.7-03 Focus Mode + 4-axis UAT shipped (commits 5199412 + ce07a57 + ffc77d5 + db0b6f4 + final docs commit). T1: ToolCallPanel ToolResultBlock renders `<div data-testid="tool-result-summary">→ {summarizeToolCall(tc)}</div>` on collapsed past tools (R-4; UI-SPEC §7.5 styling — ml-8 + border-t border-border/50 + font-mono text-xs text-muted-foreground; literal U+2192 prefix). T2: RunCard auto-collapse useEffect with wasStreamingRef one-shot guard (RESEARCH §4.4); lazy useState initializer covers DB-loaded historical (RESEARCH §5.4); collapsed-row `<button type="button">` JSX with statusGlyph/statusWord helpers matching MessageItem banner copy; handleHeaderClick early-returns when runStatus === 'streaming' (D-08); tabIndex mirrors gate for keyboard parity. R-7 holds (grep @keyframes RunCard.tsx = 0). T3: 6 Playwright specs at frontend/tests/e2e/scenario-{07..12}.spec.ts (CONTEXT correction #4) covering 3 of 4 UAT axes automated; scenario-09 4-sub-test for-loop for cross-provider axis with Anthropic DOM-order preservation gate (RESEARCH §6 protecting BUG-260514-02 re-litigation). T4: long-message manual Chrome MCP UAT auto-approved per AUTO_MODE; surfaced to operator via VALIDATION.md 6-step checklist for /gsd:verify-work 075.7. T5: CLAUDE.md hot-file ledger 4 frontend rows flipped to `satisfied (075.7 — 2026-05-24)` (ToolCallPanel.tsx + MessageItem.tsx [NEW row added per planner brief] + StreamsProvider.tsx + useMessages.ts); 2 backend rows (threads.py + anthropic_service.py) UNCHANGED (out of 075.7 scope). G-1 + G-5 guardrails CLOSED on the chat surface.
 
 - Phase 076 Plan 02: D-04 ADJUST path taken — post-071.3 corpus (camelot + pymupdf_full + legacy) shifted avg_similarity distribution lower (median 0.4861); old 0.55/0.40 produced 14%/54%/32% buckets; new 0.54/0.38 restores ~30%/45%/25% D-04 target. knowledge_health.py aligned per D-07. RAG-RECAL-01 CLOSED.
+- D-PRD-12 ADR authored (Phase 079): multi-worker enabled, WORKER_COUNT=2 default, D-v2.5-02 formally superseded
 
 ### Pending Todos
 
@@ -444,8 +446,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 079 context gathered
+Last session: 2026-05-26T21:52:56.472Z
+Stopped at: Completed 079-01-PLAN.md
 
 ### Next session: pending USER actions
 
