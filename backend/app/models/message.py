@@ -42,3 +42,6 @@ class MessageResponse(BaseModel):
     # per-LLM-call asyncio.timeout fires. NEVER written by runs.py:cancel_run
     # (partition guard per D-066-05).
     run_status: Literal["streaming", "completed", "failed", "cancelled", "timed_out"] | None = None
+    # Phase 076.2 D-01: DeepSeek thinking mode reasoning_content. Nullable --
+    # only present on assistant messages from thinking-enabled providers.
+    reasoning_content: str | None = None
