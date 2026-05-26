@@ -110,6 +110,7 @@ async def insert_assistant_message(
     confidence_level: str | None = None,
     confidence_avg_similarity: float | None = None,
     confidence_disclaimer: str | None = None,
+    reasoning_content: str | None = None,
 ) -> UUID:
     """Insert an assistant message row (Phase 073 - replaces threads.py:1310 aexec).
 
@@ -128,9 +129,10 @@ async def insert_assistant_message(
         INSERT INTO messages (
             thread_id, user_id, role, content,
             tool_calls, source_refs,
-            confidence_level, confidence_avg_similarity, confidence_disclaimer
+            confidence_level, confidence_avg_similarity, confidence_disclaimer,
+            reasoning_content
         )
-        VALUES ($1, $2, 'assistant', $3, $4, $5, $6, $7, $8)
+        VALUES ($1, $2, 'assistant', $3, $4, $5, $6, $7, $8, $9)
         RETURNING id
         """,
         thread_id,
@@ -141,4 +143,5 @@ async def insert_assistant_message(
         confidence_level,
         confidence_avg_similarity,
         confidence_disclaimer,
+        reasoning_content,
     )

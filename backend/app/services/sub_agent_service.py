@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Generator
 from langsmith import traceable
 
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
-from app.services.openai_service import get_llm_client, _uses_max_completion_tokens, _MODEL_OUTPUT_DEFAULTS, _PROVIDER_DEFAULT_MAX_TOKENS, _FALLBACK_MAX_TOKENS, deepseek_thinking_kwargs
+from app.services.openai_service import get_llm_client, _uses_max_completion_tokens, _MODEL_OUTPUT_DEFAULTS, _PROVIDER_DEFAULT_MAX_TOKENS, _FALLBACK_MAX_TOKENS
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -123,7 +123,6 @@ def run_sub_agent(
             messages=messages,
             stream=True,
             **{token_param: resolved_tokens},
-            **deepseek_thinking_kwargs(effective_model, provider),
         )
         for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
@@ -146,7 +145,6 @@ def run_sub_agent(
             messages=messages,
             stream=True,
             **{token_param2: resolved_tokens},
-            **deepseek_thinking_kwargs(fallback, provider),
         )
         for chunk in stream2:
             if chunk.choices and chunk.choices[0].delta.content:

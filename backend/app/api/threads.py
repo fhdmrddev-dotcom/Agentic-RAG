@@ -41,7 +41,7 @@ from app.db.runs import insert_run, finalize_run, insert_assistant_message
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
-from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason, deepseek_thinking_kwargs
+from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
@@ -1003,7 +1003,6 @@ def generate_thread_title(
             messages=title_messages,
             stream=False,
             **{token_param: 30},
-            **deepseek_thinking_kwargs(model, provider),
         )
         raw_title = (response.choices[0].message.content or "").strip()
         # Guard against models returning refusals or markdown instead of a title
@@ -1032,7 +1031,6 @@ def generate_thread_title(
             messages=title_messages,
             stream=False,
             **{token_param2: 20},
-            **deepseek_thinking_kwargs(fallback, provider),
         )
         return response.choices[0].message.content.strip() or "New Chat", fallback_info
     except Exception:
@@ -1150,13 +1148,25 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
                     })
                 # 3. Assistant text response (only if content is non-empty)
                 if msg.get("content"):
-                    messages.append({"role": "assistant", "content": msg["content"]})
+                    messages.append({
+                        "role": "assistant",
+                        "content": msg["content"],
+                        **({"reasoning_content": msg["reasoning_content"]} if msg.get("reasoning_content") else {}),
+                    })
             else:
                 # Old message without tool_call_id — emit as plain assistant message
-                messages.append({"role": msg["role"], "content": msg.get("content") or ""})
+                messages.append({
+                    "role": msg["role"],
+                    "content": msg.get("content") or "",
+                    **({"reasoning_content": msg["reasoning_content"]} if msg.get("reasoning_content") else {}),
+                })
         else:
             # User messages, plain assistant messages, or messages with null/empty tool_calls
-            messages.append({"role": msg["role"], "content": msg.get("content") or ""})
+            messages.append({
+                "role": msg["role"],
+                "content": msg.get("content") or "",
+                **({"reasoning_content": msg["reasoning_content"]} if msg["role"] == "assistant" and msg.get("reasoning_content") else {}),
+            })
     return messages
 
 
@@ -1447,7 +1457,7 @@ async def send_message(
             # Load full message history (includes just-inserted user message)
             history_resp = await aexec(
                 supabase.table("messages")
-                .select("role, content, tool_calls")
+                .select("role, content, tool_calls, reasoning_content")
                 .eq("thread_id", thread_id)
                 .eq("user_id", current_user["id"])
                 .order("created_at")
@@ -1564,6 +1574,7 @@ async def send_message(
             )
 
             full_content = ""
+            full_reasoning_content = ""
             persisted_tool_calls: list[dict] = []
             # Plan 075.4-03 D-075.4-E1 — closure-local per-run system warning
             # accumulator. Each entry: {kind: "context_truncated" |
@@ -1651,6 +1662,7 @@ async def send_message(
                         confidence_level=row.get("confidence_level"),
                         confidence_avg_similarity=row.get("confidence_avg_similarity"),
                         confidence_disclaimer=row.get("confidence_disclaimer"),
+                        reasoning_content=_strip_nul(full_reasoning_content) or None,
                     )
                     _cached_id = str(_inserted_id) if _inserted_id else None
                 except Exception as e:
@@ -2198,6 +2210,11 @@ async def send_message(
                                     if delta.content:
                                         full_content += delta.content
                                         await _emit(redis, run_id, 'delta', content=delta.content)
+
+                                    # DeepSeek thinking mode: accumulate reasoning_content
+                                    _rc = getattr(delta, 'reasoning_content', None)
+                                    if _rc:
+                                        full_reasoning_content += _rc
 
                                     if delta.tool_calls:
                                         for tc in delta.tool_calls:
