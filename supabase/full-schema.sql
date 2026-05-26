@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict P8GgrV0kBJe94gDaHvqUPmxoep76wVtzf6dDcCSFxb0nd8ENAolv97qKxSjyFtz
+\restrict uzD4pZz0qqhqvyslu0h2KrJgpJG6gGlH3UGZM3iiqrl3A5owzTyF3h6PvmMCvOl
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -478,8 +478,16 @@ CREATE TABLE public.runs (
     input_tokens integer,
     output_tokens integer,
     error text,
+    spawned_by_worker text,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
+
+
+--
+-- Name: COLUMN runs.spawned_by_worker; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.spawned_by_worker IS 'OS PID of the uvicorn worker that INSERTed this run. Populated at INSERT time (Phase 079). NULL for pre-079 runs.';
 
 
 --
@@ -1626,5 +1634,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict P8GgrV0kBJe94gDaHvqUPmxoep76wVtzf6dDcCSFxb0nd8ENAolv97qKxSjyFtz
+\unrestrict uzD4pZz0qqhqvyslu0h2KrJgpJG6gGlH3UGZM3iiqrl3A5owzTyF3h6PvmMCvOl
 
