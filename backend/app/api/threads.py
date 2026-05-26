@@ -2211,10 +2211,11 @@ async def send_message(
                                         full_content += delta.content
                                         await _emit(redis, run_id, 'delta', content=delta.content)
 
-                                    # DeepSeek thinking mode: accumulate reasoning_content
+                                    # DeepSeek thinking mode: accumulate reasoning_content + emit SSE
                                     _rc = getattr(delta, 'reasoning_content', None)
                                     if _rc:
                                         full_reasoning_content += _rc
+                                        await _emit(redis, run_id, 'reasoning_delta', content=_rc)
 
                                     if delta.tool_calls:
                                         for tc in delta.tool_calls:
@@ -2509,7 +2510,23 @@ async def send_message(
                             }
                             for tc in tool_calls
                         ],
+                        # Phase 076.2 D-03: narration text before tool calls
+                        **({"content": full_content} if full_content else {}),
+                        # Phase 076.2 D-03: DeepSeek thinking mode requires reasoning_content
+                        # round-trip on tool-call turns. Without this, the second LLM call
+                        # fails with 400 "reasoning_content must be passed back to the API".
+                        # Anti-pattern: do NOT include for non-tool-call turns (ignored by
+                        # DeepSeek, but unnecessary). Do NOT include for non-DeepSeek providers
+                        # (harmless — the conditional spread prevents empty key).
+                        **({"reasoning_content": full_reasoning_content} if full_reasoning_content else {}),
                     })
+
+                    # Phase 076.2 Pitfall 1: reset accumulators after consuming them.
+                    # Without this, iteration 2's reasoning would carry iteration 1's
+                    # content concatenated. Same pattern as full_content resets at lines
+                    # 2339 and 2447.
+                    full_content = ""
+                    full_reasoning_content = ""
 
                     # Phase 067.4 (D-067.4-R5-01 amended — Plan 03 Rule 3 deviation):
                     # introduced enumerate(tool_calls) so tool_index is in scope inside

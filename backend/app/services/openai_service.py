@@ -898,13 +898,16 @@ def create_adaptive_streaming_chat(
     # is superseded by the defensive handler.
     kwargs["stream_options"] = {"include_usage": True}
 
-    # DeepSeek v4 thinking mode requires reasoning_content round-trip in the
-    # agent loop's in-memory message chain (not just DB storage). Full support
-    # deferred to SEED-032 dedicated phase. Disable thinking for now so
-    # multi-tool runs don't fail on the second LLM call.
+    # Phase 076.2 D-02: Enable DeepSeek V4 thinking mode. reasoning_content
+    # round-trip is handled in threads.py agent loop (076.2 Plan 01 Task 1).
+    # reasoning_effort="high" is DeepSeek's default (D-04); "max" available
+    # but not enabled this phase.
     if provider == "deepseek" or effective_model.startswith("deepseek-"):
         kwargs.setdefault("extra_body", {})
-        kwargs["extra_body"]["thinking"] = {"type": "disabled"}
+        kwargs["extra_body"]["thinking"] = {
+            "type": "enabled",
+            "reasoning_effort": "high",
+        }
 
     if tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
