@@ -307,7 +307,7 @@ async def _fire_single_run(
         timeout=30.0,
     )
     if resp.status_code != 201:
-        return {"index": index, "status_code": resp.status_code, "run_id": None, "ok": False}
+        return {"index": index, "status_code": resp.status_code, "run_id": None, "ok": False, "body": resp.text[:500]}
 
     data = resp.json()
     run_id = data.get("run_id")

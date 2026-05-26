@@ -44,6 +44,7 @@ def _mock_stream():
         chunk.choices[0].delta = MagicMock()
         chunk.choices[0].delta.content = f"tok{i} "
         chunk.choices[0].delta.tool_calls = None
+        chunk.choices[0].delta.reasoning_content = None
         chunk.usage = None
         yield chunk
 
@@ -54,6 +55,7 @@ def _mock_stream():
     done.choices[0].delta = MagicMock()
     done.choices[0].delta.content = None
     done.choices[0].delta.tool_calls = None
+    done.choices[0].delta.reasoning_content = None
     done.usage = MagicMock(prompt_tokens=10, completion_tokens=5)
     yield done
 
