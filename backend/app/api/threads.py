@@ -1295,6 +1295,7 @@ async def send_message(
             status="streaming",
             model=_resolved_model,
             provider=_resolved_provider,
+            spawned_by_worker=str(os.getpid()),
         )
 
         # ZADD sorted-set indexes (REDIS-SETUP.md key conventions). Score is
