@@ -117,18 +117,10 @@ def multi_worker_server():
     port = _find_free_port()
     backend_dir = str(Path(__file__).resolve().parents[2])  # backend/
 
-    # Explicitly forward settings loaded from .env by pydantic-settings.
-    # os.environ may NOT have these (they're in .env, not system env).
-    # Without them, the subprocess's pydantic-settings must find and parse
-    # .env itself, which can fail depending on CWD resolution and platform.
-    from app.config import settings as _s
     env = {
         **os.environ,
         "MOCK_LLM_MODE": "1",
         "SANDBOX_ENABLED": "false",
-        "SUPABASE_URL": _s.supabase_url,
-        "SUPABASE_SERVICE_ROLE_KEY": _s.supabase_service_role_key,
-        "REDIS_URL": _s.redis_url,
     }
 
     # Write stderr to a temp file to avoid pipe buffer deadlock.
@@ -391,7 +383,7 @@ async def test_50_run_load(multi_worker_server, test_data):
             stderr_path = multi_worker_server.get("stderr_path")
             if stderr_path and os.path.exists(stderr_path):
                 with open(stderr_path, "rb") as f:
-                    stderr_tail = f.read().decode(errors="replace")[-3000:]
+                    stderr_tail = f.read().decode(errors="replace")[-5000:]
             pytest.fail(
                 f"Preflight single-request failed: status={r.status_code} "
                 f"body={r.text[:500]}\n"

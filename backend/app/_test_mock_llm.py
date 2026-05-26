@@ -1,23 +1,23 @@
-"""Env-var-gated mock LLM module for multi-worker integration tests (Phase 077).
+"""Env-var-gated mock module for multi-worker integration tests (Phase 077).
 
-This module is loaded at import time when ``MOCK_LLM_MODE=1`` is set in the
-environment. It replaces ``create_adaptive_streaming_chat`` with a deterministic
-fake stream and bypasses auth with a fixed test user so that subprocess-based
-harness requests authenticate without a real Supabase token.
+Loaded at import time when ``MOCK_LLM_MODE=1``. Replaces three external
+dependencies so the subprocess harness is fully self-contained:
+
+1. **LLM** — ``create_adaptive_streaming_chat`` → deterministic 5-chunk stream
+2. **Auth** — ``get_current_user`` → fixed test user (no Supabase Auth token)
+3. **Supabase PostgREST** — ``get_supabase`` → in-memory mock client
+   (eliminates HTTP calls to local/cloud PostgREST; asyncpg + Redis stay real)
 
 Design decisions:
 - D-077-01: Subprocess injection via env var (cannot monkey-patch across
   process boundaries).
-- D-077-02: Full LLM mock, zero API cost. Deterministic ~5 chunk stream +
-  stop with usage. Millisecond-per-run execution.
-
-The fixed test user UUID is NOT a real user -- it exists only in the mock
-context and is safe to hardcode because the production safety gate in
-``main.py`` prevents ``MOCK_LLM_MODE=1`` from ever activating in production.
+- D-077-02: Full mock, zero API cost, zero network dependencies beyond
+  Redis and Postgres (asyncpg). Millisecond-per-run execution.
 """
 from __future__ import annotations
 
 import logging
+import uuid as _uuid_mod
 from unittest.mock import MagicMock
 
 from app.services.openai_service import CallingMode
@@ -69,33 +69,115 @@ def mock_create_adaptive_streaming_chat(**kwargs):
     return (iter(_mock_stream()), CallingMode.NATIVE)
 
 
+class _MockResponse:
+    """Mimics ``postgrest`` response with ``.data`` and ``.count``."""
+    def __init__(self, data):
+        self.data = data
+        self.count = None
+
+
+class _MockQueryBuilder:
+    """Fluent builder that absorbs ``.select().eq().single()`` chains."""
+    def __init__(self, table_name):
+        self._table = table_name
+        self._op = None
+        self._payload = None
+
+    def select(self, *_a, **_kw):
+        self._op = "select"
+        return self
+
+    def insert(self, data):
+        self._op = "insert"
+        self._payload = data
+        return self
+
+    def update(self, data):
+        self._op = "update"
+        self._payload = data
+        return self
+
+    def delete(self):
+        self._op = "delete"
+        return self
+
+    def eq(self, *_a, **_kw):
+        return self
+
+    def neq(self, *_a, **_kw):
+        return self
+
+    def order(self, *_a, **_kw):
+        return self
+
+    def limit(self, *_a, **_kw):
+        return self
+
+    def single(self):
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def execute(self):
+        if self._op == "insert":
+            row = dict(self._payload or {})
+            row.setdefault("id", str(_uuid_mod.uuid4()))
+            return _MockResponse([row])
+        if self._op == "select":
+            if self._table == "threads":
+                return _MockResponse({"id": "mock", "title": "Test Thread"})
+            return _MockResponse([])
+        return _MockResponse(None)
+
+
+class _MockSupabase:
+    """Minimal Supabase client mock — no network calls."""
+
+    def table(self, name: str) -> _MockQueryBuilder:
+        return _MockQueryBuilder(name)
+
+    @property
+    def storage(self):
+        m = MagicMock()
+        m.from_.return_value.upload.return_value = None
+        return m
+
+    @property
+    def auth(self):
+        m = MagicMock()
+        m.get_user.return_value = MagicMock(user=None)
+        return m
+
+
 def install_mock():
-    """Patch the real LLM entry point and bypass auth.
+    """Patch LLM, auth, and Supabase client for subprocess testing.
 
     Called once per worker at import time (from ``main.py`` when
     ``MOCK_LLM_MODE=1``).
 
-    1. Replaces ``app.api.threads.create_adaptive_streaming_chat`` with the
-       deterministic fake so no LLM API calls are made.
-    2. Overrides FastAPI's ``get_current_user`` dependency to return a fixed
-       test user, avoiding the need for real Supabase auth tokens in the
-       subprocess harness.
+    1. LLM → deterministic fake stream (no API calls)
+    2. Auth → fixed test user (no Supabase Auth token needed)
+    3. Supabase → in-memory mock (no PostgREST HTTP calls)
+
+    Redis and asyncpg stay REAL — they're the actual multi-worker
+    contracts being validated.
     """
     # 1. Patch the LLM entry point on the threads module
     import app.api.threads as threads_mod
     threads_mod.create_adaptive_streaming_chat = mock_create_adaptive_streaming_chat
     logger.info("Patched create_adaptive_streaming_chat with deterministic mock")
 
-    # 2. Override auth dependency to return fixed test user
+    # 2. Override auth + supabase dependencies
     from app.main import app
-    from app.dependencies import get_current_user
+    from app.dependencies import get_current_user, get_supabase
 
     async def _mock_get_current_user():
         return _MOCK_USER
 
     app.dependency_overrides[get_current_user] = _mock_get_current_user
+    app.dependency_overrides[get_supabase] = _MockSupabase
     logger.info(
-        "Auth bypassed -- returning fixed test user %s (%s)",
+        "Auth + Supabase bypassed -- test user %s, mock PostgREST",
         _MOCK_USER["id"],
-        _MOCK_USER["email"],
     )
