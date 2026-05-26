@@ -97,7 +97,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // Phase 076.1-04: Cumulative file count from completed tool call results.
   // Parses tc.result JSON for output_files arrays across all tool calls.
   const fileCount = (message.tool_calls ?? []).reduce((sum, tc) => {
-    if ((tc.status === "done" || tc.status === "running") && tc.result) {
+    if (tc.status === "done" && tc.result) {
       try {
         const parsed = JSON.parse(tc.result)
         if (parsed.output_files) return sum + parsed.output_files.length

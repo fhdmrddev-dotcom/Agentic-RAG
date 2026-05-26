@@ -994,18 +994,22 @@ def generate_thread_title(
         title_messages = [
             {
                 "role": "system",
-                "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
+                "content": "You are a title generator. Output ONLY a 4-6 word title summarizing the user's message. No explanation, no refusal, no markdown, no quotes. Just the title words.",
             },
-            {"role": "user", "content": first_user_message[:500]},
+            {"role": "user", "content": f"Generate a title for this message: {first_user_message[:200]}"},
         ]
         response = client.chat.completions.create(
             model=model,
             messages=title_messages,
             stream=False,
-            **{token_param: 20},
+            **{token_param: 30},
             **deepseek_thinking_kwargs(model, provider),
         )
-        return response.choices[0].message.content.strip() or "New Chat", None
+        raw_title = (response.choices[0].message.content or "").strip()
+        # Guard against models returning refusals or markdown instead of a title
+        if len(raw_title) > 60 or raw_title.startswith(("I ", "I'", "**", "Sorry", "As ")):
+            return first_user_message[:40].strip() or "New Chat", None
+        return raw_title or "New Chat", None
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
         fallback = (

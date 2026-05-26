@@ -427,14 +427,14 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 // T-076.1-06 mitigation: single 250ms setInterval with clearInterval on unmount.
 function StickyTimerBar({ message }: { message: Message }) {
   const toolCalls = message.tool_calls ?? []
-  const completedCount = toolCalls.filter(tc => tc.status === "completed" || tc.status === "done").length
+  const completedCount = toolCalls.filter(tc => tc.status === "done").length
   const activeTool = toolCalls.find(tc => tc.status === "preparing" || tc.status === "running")
   const stepNumber = completedCount + (activeTool ? 1 : 0)
 
   // Cumulative file count across all completed tool calls (SPEC Req 8).
   // Count output_files from tc.result JSON parsing.
   const fileCount = toolCalls.reduce((sum, tc) => {
-    if ((tc.status === "completed" || tc.status === "done") && tc.result) {
+    if (tc.status === "done" && tc.result) {
       try {
         const parsed = JSON.parse(tc.result)
         if (parsed.output_files) return sum + parsed.output_files.length
