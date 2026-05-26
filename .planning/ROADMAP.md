@@ -198,7 +198,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] **Phase 076.1: Provider Integration + UX Status Fidelity** (INSERTED 2026-05-25, shipped 2026-05-26) — 4 plans + 11 post-UAT fixes. **UX shipped:** auto-scroll to active tool panel, "Generating code"/"Executing code" labels, sticky timer bar, elapsed counter (no more "queued"), failure reason badges, two-pass text dedup, multi-batch tool panels render real-time (iteration-aware dedup fix). **Providers shipped:** DeepSeek/Moonshot/MiniMax/Zhipu direct integration, Settings UI 9 providers, OpenRouter relabeled experimental, single-source KNOWN_PROVIDERS. **DeepSeek:** working with thinking disabled (SEED-032 tracks full thinking mode + real-time UI parity). Migration 050 (reasoning_content column). Code review 4/4 warnings closed.
 - [x] **Phase 076.2: Provider Streaming Parity + Full Integration** (INSERTED 2026-05-26, shipped 2026-05-26) — 4 plans + 2 UAT fixes. **DeepSeek shipped:** thinking mode enabled (reasoning_effort="high"), reasoning_content round-trip in agent loop (SEED-032 Gap 1+2 CLOSED), reasoning_delta SSE, collapsible Thinking block in RunCard, 9 unit tests. **Frontend:** reasoning_delta pipeline (types + api.ts + StreamsProvider + RunCard). **Google:** BUG-260524-01 confirmed behavioral (Gemini receives skills but doesn't invoke); debug logging added. **Kimi fixes:** base URL api.moonshot.cn→api.moonshot.ai, sub-agent moonshot-v1-8k→kimi-k2.6. **UAT:** DeepSeek DS-1..5 PASS, Kimi KI-1..3 PASS, MiniMax/GLM deferred (API keys pending). 4 bugs documented (BUG-260526-01..04). Code review 0 blockers / 2 warnings.
 - [x] **Phase 077: Multi-Worker Validation Harness** — 50-parallel-run synthetic load; cross-worker cancel via Redis zombie-heal path; Docker container re-attach sandbox stickiness; per-worker Redis singleton verified idempotent. (3 plans, complete 2026-05-27)
-- [ ] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun branch + concurrent-upload dedup race partial-unique-index migration 045 + title-gen `logger.warning` log. (3 plans)
+- [x] **Phase 078: Backpressure JSON Primitive + Code-Quality Bundle** — `GET /admin/backpressure` JSON endpoint (gated on `BACKPRESSURE_ADMIN_USER_IDS` env var allow-list) + Supabase aclose lifespan hook + context-window protected-only overrun progressive trim + concurrent-upload dedup race NULL-safe unique index migration 051 + title-gen `logger.warning` log. (3/3 plans, shipped 2026-05-27)
 
 **Wave 3 — Release-Gating**
 
@@ -880,9 +880,9 @@ Plans:
   5. Title-gen failures in `generate_thread_title` (`threads.py:259-292`) emit `logger.warning` with exception detail before returning the fallback; log-capture unit test asserts the warning fires.
 
 **Plans:**
-- [ ] 078-01-PLAN.md — Config fields + Supabase aclose + title-gen warning (Wave 1)
-- [ ] 078-02-PLAN.md — Context-window protected overrun + dedup CAS + migration 051 (Wave 1)
-- [ ] 078-03-PLAN.md — GET /admin/backpressure endpoint + tests (Wave 2; depends on 078-01)
+- [x] 078-01-PLAN.md — Config fields + Supabase aclose + title-gen warning (Wave 1) — shipped 2026-05-27
+- [x] 078-02-PLAN.md — Context-window protected overrun + dedup CAS + migration 051 (Wave 1) — shipped 2026-05-27
+- [x] 078-03-PLAN.md — GET /admin/backpressure endpoint + tests (Wave 2; depends on 078-01) — shipped 2026-05-27
 
 ### Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable
 **Goal**: A new D-PRD-12 ADR explicitly supersedes the single-worker rule, `CLAUDE.md` reflects the lift, and dev + prod uvicorn configs run `--workers 2` cleanly.
