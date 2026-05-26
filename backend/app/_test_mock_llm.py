@@ -77,11 +77,24 @@ class _MockResponse:
 
 
 class _MockQueryBuilder:
-    """Fluent builder that absorbs ``.select().eq().single()`` chains."""
+    """Fluent builder that absorbs any supabase-py query chain.
+
+    Uses ``__getattr__`` to handle all methods (eq, or_, neq, order, limit,
+    ilike, contains, etc.) without listing them explicitly. Only ``insert``,
+    ``update``, and ``execute`` have special behavior.
+    """
     def __init__(self, table_name):
         self._table = table_name
         self._op = None
         self._payload = None
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+
+        def _chain(*_a, **_kw):
+            return self
+        return _chain
 
     def select(self, *_a, **_kw):
         self._op = "select"
@@ -95,28 +108,6 @@ class _MockQueryBuilder:
     def update(self, data):
         self._op = "update"
         self._payload = data
-        return self
-
-    def delete(self):
-        self._op = "delete"
-        return self
-
-    def eq(self, *_a, **_kw):
-        return self
-
-    def neq(self, *_a, **_kw):
-        return self
-
-    def order(self, *_a, **_kw):
-        return self
-
-    def limit(self, *_a, **_kw):
-        return self
-
-    def single(self):
-        return self
-
-    def maybe_single(self):
         return self
 
     def execute(self):
