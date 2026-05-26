@@ -913,6 +913,30 @@ class TestReextractDocument:
 
 # ── ingest_document full_markdown storage ──────────────────────────────────────
 
+class TestUploadDedup409:
+    """Phase 078 CQ-DEDUP-01: concurrent upload duplicate returns 409 (D-078-04)."""
+
+    def test_409_on_unique_violation(self, client, auth_headers, mock_builder):
+        """When INSERT raises unique violation (23505), upload handler returns 409."""
+        # Side effects for the execute chain:
+        # 1. dedup SELECT — returns empty (fast-path doesn't catch it, simulating race)
+        # 2. version SELECT — returns empty
+        # 3. INSERT .execute() — raises unique violation (23505)
+        mock_builder.execute.side_effect = [
+            _make_result([]),   # dedup check — no existing
+            _make_result([]),   # version check — no existing
+            Exception('{"code": "23505", "message": "duplicate key value violates unique constraint"}'),
+        ]
+
+        response = client.post(
+            "/documents/upload",
+            headers=auth_headers,
+            files={"file": ("dup.txt", b"x", "text/plain")},
+        )
+        assert response.status_code == 409
+        assert "already exists" in response.json()["detail"].lower()
+
+
 class TestFullMarkdown:
     def test_ingest_stores_full_markdown(self, mock_builder):
         """ingest_document stores full_markdown in the completion update."""
