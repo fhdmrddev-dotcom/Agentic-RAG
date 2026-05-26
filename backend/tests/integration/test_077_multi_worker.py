@@ -377,6 +377,29 @@ async def test_50_run_load(multi_worker_server, test_data):
     base_url = multi_worker_server["base_url"]
     thread_id = str(test_data["thread_id"])
 
+    # Preflight: single request to validate the subprocess handles real
+    # Supabase + Redis calls before scaling to 50 concurrent runs.
+    async with httpx.AsyncClient(base_url=base_url) as preflight:
+        r = await preflight.post(
+            f"/threads/{thread_id}/messages",
+            json={"content": "preflight check"},
+            timeout=30.0,
+        )
+        if r.status_code != 201:
+            # Dump stderr to see the server-side error
+            stderr_tail = ""
+            stderr_path = multi_worker_server.get("stderr_path")
+            if stderr_path and os.path.exists(stderr_path):
+                with open(stderr_path, "rb") as f:
+                    stderr_tail = f.read().decode(errors="replace")[-3000:]
+            pytest.fail(
+                f"Preflight single-request failed: status={r.status_code} "
+                f"body={r.text[:500]}\n"
+                f"--- Server stderr ---\n{stderr_tail}"
+            )
+    # Brief settle after preflight
+    await asyncio.sleep(1.0)
+
     TOTAL_RUNS = 50
     WAVE_SIZE = 5
     all_results = []
