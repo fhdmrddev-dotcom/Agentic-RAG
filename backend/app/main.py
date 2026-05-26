@@ -119,6 +119,15 @@ async def lifespan(app_instance):
     except Exception:
         logger.exception("pg pool close failed at shutdown")
 
+    # Phase 078 (CQ-SUPA-01, D-078-09): close the Supabase singleton client.
+    # Runs AFTER asyncpg pool close (step 3), BEFORE sandbox close (step 4).
+    try:
+        from app.dependencies import _supabase
+        if _supabase is not None:
+            await _supabase.aclose()
+    except Exception:
+        logger.exception("Supabase aclose failed at shutdown")
+
     # Shutdown: close all open sandbox sessions to free Docker containers
     if settings.sandbox_enabled:
         from app.services.sandbox_service import sandbox_manager
