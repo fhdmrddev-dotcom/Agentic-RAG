@@ -21,31 +21,104 @@ class SandboxSessionManager:
     """Manages InteractiveSandboxSession instances keyed by thread_id."""
 
     def get_or_create(self, thread_id: str) -> object:
-        """Return existing session or create a new one for this thread."""
+        """Return existing session or create a new one for this thread.
+
+        When the in-memory ``_sessions`` dict has no entry for ``thread_id``
+        (e.g. after a worker bounce in multi-worker mode), the method checks
+        Docker for an existing running container named ``sandbox-{thread_id[:12]}``
+        and re-attaches to it (D-077-05). This preserves pip installs, generated
+        files, and interpreter state across worker bounces. The external API is
+        unchanged per D-077-06.
+        """
         from llm_sandbox import InteractiveSandboxSession  # lazy import
 
         # Evict expired sessions (lazy TTL check)
         self._evict_expired()
 
         if thread_id not in _sessions:
-            # Phase 075.1 Plan 04 (B-260519-08) — opt-in custom sandbox image.
-            # Set SANDBOX_IMAGE env var (e.g. agentic-rag-sandbox:075.1) to use
-            # the project-specific image built from backend/Dockerfile.sandbox
-            # with python-pptx / matplotlib / numpy / pandas pre-installed.
-            # When unset (local dev that hasn't built the image), falls back
-            # to llm_sandbox's default Python image. Build with:
-            #   docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:075.1 backend/
             session_kwargs: dict = {"lang": "python", "verbose": False}
             custom_image = os.environ.get("SANDBOX_IMAGE")
             if custom_image:
                 session_kwargs["image"] = custom_image
-                logger.info("Sandbox session using custom image %s for thread %s", custom_image, thread_id)
+                logger.info(
+                    "Sandbox session using custom image %s for thread %s",
+                    custom_image, thread_id,
+                )
+
+            container_id = self._find_existing_container(thread_id)
+            if container_id:
+                session_kwargs["container_id"] = container_id
+                logger.info(
+                    "Re-attaching to existing container %s for thread %s",
+                    container_id[:12], thread_id,
+                )
+            else:
+                session_kwargs["runtime_configs"] = {
+                    "name": f"sandbox-{thread_id[:12]}",
+                    "labels": {"agentic_rag_thread_id": thread_id},
+                }
+
             session = InteractiveSandboxSession(**session_kwargs)
-            session.open()
+            try:
+                session.open()
+            except Exception as e:
+                if "409" in str(e) or "Conflict" in str(e):
+                    logger.info(
+                        "Container name conflict for thread %s -- re-looking up",
+                        thread_id,
+                    )
+                    container_id = self._find_existing_container(thread_id)
+                    if container_id:
+                        session_kwargs["container_id"] = container_id
+                        session_kwargs.pop("runtime_configs", None)
+                        session = InteractiveSandboxSession(**session_kwargs)
+                        session.open()
+                    else:
+                        raise
+                else:
+                    raise
             _sessions[thread_id] = session
             logger.info("Sandbox session opened for thread %s", thread_id)
         _last_used[thread_id] = time.time()
         return _sessions[thread_id]
+
+    def _find_existing_container(self, thread_id: str) -> str | None:
+        """Look up a running sandbox container by name convention (D-077-05).
+
+        Container names follow the pattern ``sandbox-{thread_id[:12]}``.
+        Returns the full container ID if found and running, None otherwise.
+        Falls through to fresh creation on any Docker error (D-077-04).
+        """
+        try:
+            import docker
+            from docker.errors import NotFound
+        except ImportError:
+            logger.warning("Docker SDK not installed -- skipping container re-attach")
+            return None
+
+        try:
+            client = docker.from_env()
+            container = client.containers.get(f"sandbox-{thread_id[:12]}")
+            if container.status == "running":
+                logger.info(
+                    "Found existing container %s for thread %s",
+                    container.short_id, thread_id,
+                )
+                return container.id
+            # Container exists but stopped -- D-077-05 says create fresh
+            logger.info(
+                "Container sandbox-%s exists but status=%s -- creating fresh",
+                thread_id[:12], container.status,
+            )
+            return None
+        except NotFound:
+            return None
+        except Exception as e:
+            logger.warning(
+                "Docker container lookup failed for thread %s: %s",
+                thread_id, e,
+            )
+            return None
 
     def close_session(self, thread_id: str) -> None:
         """Close and remove session for thread_id. No-op if not found."""

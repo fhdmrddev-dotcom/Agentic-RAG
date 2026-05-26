@@ -195,3 +195,22 @@ if os.getenv("ENABLE_TEST_FIXTURES", "0") == "1":
         "ENABLE_TEST_FIXTURES=1 — /__test__/inject-failed-run endpoint is "
         "MOUNTED. This MUST NOT happen in production (Phase 063 T-063-05-01)."
     )
+
+# Phase 077 — env-var-gated mock LLM for multi-worker integration tests.
+# Mirrors the ENABLE_TEST_FIXTURES pattern (Phase 063 T-063-05-01).
+# When MOCK_LLM_MODE=1, the app replaces create_adaptive_streaming_chat
+# with a deterministic fake and bypasses auth with a fixed test user.
+# Zero API cost, millisecond-per-run execution (D-077-02).
+if os.getenv("MOCK_LLM_MODE", "0") == "1":
+    if os.getenv("ENVIRONMENT", "").lower() in ("production", "prod"):
+        raise RuntimeError(
+            "MOCK_LLM_MODE=1 in production environment -- refusing to start. "
+            "This env var is for local multi-worker harness use only "
+            "(Phase 077 D-077-02)."
+        )
+    from app._test_mock_llm import install_mock  # noqa: E402
+    install_mock()
+    logger.warning(
+        "MOCK_LLM_MODE=1 -- LLM calls return deterministic fakes, auth bypassed. "
+        "This MUST NOT happen in production (Phase 077 D-077-02)."
+    )
