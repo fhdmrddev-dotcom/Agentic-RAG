@@ -22,9 +22,8 @@
 **Phase numbering basis:** Continues from v2.5's last phase 067.5 → v2.6 starts at Phase **068** and runs through Phase **082** (16 phases, ~40 plans total — includes mid-milestone amendment Phase 068.5). Matches PRD §12 phase outline verbatim except for Phase 068.5, added 2026-05-13 to absorb BUG-260513-01 (chat-surface persistent rendering); PRD v2.6 §4 amendment recommended at user's discretion.
 
 **Migration range reserved:** `039 – 049` (per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`).
-- Used: `039` (071), `040` (071), `041` (071), `042` (071), `043` (078), `044` (072)
-- Conditional: `045` (079, on Q-v2.6-02 outcome)
-- Buffer: `046 – 049` (unanticipated phase-level discoveries)
+- Used: `039` (071), `040` (071), `041` (071), `042` (071), `043` (078), `044` (072), `045` (071.2), `046` (071.3), `047` (071.3), `048` (075.3), `049` (075.10), `050` (076.1), `051` (078), `052` (079)
+- Overflow: `050 – 052` exceeded reserved range; absorbed by mid-milestone insert phases
 
 **Pre-execution decisions:** Six PRD §13 questions (Q-v2.6-01..06) routed to per-phase `/gsd:discuss-phase` — **not blocking the roadmap**. See PRD §13 + `REQUIREMENTS.md` Pre-execution Decisions table for owning-phase mapping.
 
@@ -202,7 +201,10 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 3 — Release-Gating**
 
-- [ ] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` "Single uvicorn worker" rule to "Multi-worker — see D-PRD-12"; enable `--workers 2` in dev + prod uvicorn config. Optional migration 045 (`runs.spawned_by_worker`) conditional on Q-v2.6-02 outcome. (2 plans)
+- [ ] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` single-worker rule to multi-worker reference; enable `--workers 2` via `WORKER_COUNT` env var; migration 052 (`runs.spawned_by_worker`). (2 plans)
+Plans:
+- [ ] 079-01-PLAN.md — D-PRD-12 ADR + docs + migration 052 + code + env config (Wave 1; autonomous)
+- [ ] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
 - [ ] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1 plan)
 - [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
 
@@ -891,9 +893,9 @@ Plans:
 **Requirements**: WORKER-LIFT-03, WORKER-LIFT-01 (full enablement)
 **Success Criteria** (what must be TRUE):
   1. `D-PRD-12` ADR authored in `.planning/prd-reset/DECISIONS.md` (and reflected in `PROJECT.md` Key Decisions table): names which singletons MUST stay per-worker (`RUN_TASKS`, sandbox sessions, settings TTL cache) vs which are Redis-backed; explicitly supersedes D-v2.5-02.
-  2. `CLAUDE.md` "Single uvicorn worker" rule (currently in the Rules section) is replaced by "Multi-worker enabled — see D-PRD-12 for the audit checklist". `backend/CLAUDE.md` mirrors the change.
+  2. `CLAUDE.md` "Single uvicorn worker" rule (currently in the Rules section) is replaced by "Multi-worker enabled — see D-PRD-12 for the audit checklist". No `backend/CLAUDE.md` needed (per D-19).
   3. Dev `uvicorn` invocation uses `--workers 2` (env-overridable via `WORKER_COUNT`); prod systemd / Docker config matches. A two-tab live test verifies multi-worker behavior end-to-end without manual intervention.
-  4. Optional migration 045 (`runs.spawned_by_worker text`) ships conditional on Q-v2.6-02 atomic-rollout outcome — debug-only column for post-mortem if a run's lifecycle splits across workers unexpectedly.
+  4. Migration 052 (`runs.spawned_by_worker text`) ships — debug-only column recording the OS PID of the uvicorn worker that INSERTed each run. Populated at INSERT time for new runs; NULL for historical.
   5. Q-v2.6-05 (D-PRD-12 ADR wording) is locked before this phase ships.
 
 ### Phase 080: VPS Runbook + Deployment Guide Correction
