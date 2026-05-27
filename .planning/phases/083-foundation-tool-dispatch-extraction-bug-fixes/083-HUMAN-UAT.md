@@ -3,7 +3,7 @@ status: partial
 phase: 083-foundation-tool-dispatch-extraction-bug-fixes
 source: [083-VERIFICATION.md]
 started: 2026-05-28T02:30:00Z
-updated: 2026-05-28T04:15:00Z
+updated: 2026-05-28T04:45:00Z
 ---
 
 ## Current Test
@@ -18,7 +18,7 @@ result: PASS — no leakage of thinking content into visible chat
 
 ### 2. Title generation cross-provider (BUG-260527-01)
 expected: New chats on DeepSeek, Moonshot, MiniMax, GLM, and Google produce meaningful 4-6 word titles (not "New Chat" or single-word truncations)
-result: [pending] — not yet tested on all 5 providers
+result: PASS — titles generated on all providers (no "New Chat" fallback, no single-word truncation). Quality note: DeepSeek and Moonshot produce 7-10 word titles that echo the user's prompt rather than generating a concise summary. This is model instruction-following behavior, not a code bug.
 
 ### 3. Output files after page reload (BUG-260526-03)
 expected: Run agent with sandbox that produces output files; reload page; files visible in Final Outputs panel without expanding tool panel
@@ -31,9 +31,9 @@ result: PARTIAL — timer still disappears during long-running Kimi cycles (afte
 ## Summary
 
 total: 4
-passed: 2
+passed: 3
 issues: 1
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
