@@ -209,6 +209,12 @@ Plans:
 - [x] **Phase 081: SEED-010 OpenRouter UAT** — 4/4 OpenRouter synthetic-timeout UAT runs GREEN; Kimi-k2.5 and MiniMax-m2.7 verified; BUG-260526-02 not observed on OpenRouter route; closes 067.2 Rows 11-12 carry-forward. (1/1 plans, shipped 2026-05-27)
 Plans:
 - [x] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
+- [ ] **Phase 081.1: Settings Architecture Unification** (INSERTED 2026-05-27) — Eliminate settings_override.json; migrate 36 keys to app_settings DB + model_capabilities_overrides table; 30s TTL hot-reload cache; 4-tier model capability resolution (DB > env CSV > static dict > default). Foundation for v3.1 admin shell. (4 plans)
+Plans:
+- [ ] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
+- [ ] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
+- [ ] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
+- [ ] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
 
 **Wave 4 — Verify**
 
@@ -938,11 +944,12 @@ Plans:
   4. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV path stays as a fallback (deployment bootstrap) but DB row takes precedence when both exist. Documented in `backend/.env.example` as "operator bootstrap only; prefer admin UI in v3.1+."
   5. Verifier integration test asserts: (a) no code path reads from `settings_override.json` after migration, (b) all values previously in the JSON resolve cleanly from DB through the new cache, (c) hot-reload observed — write to `app_settings`, next read within 30s reflects change.
 
-**Plans:**
-- 01 — `app_settings` schema delta + migration 048 (new JSONB columns: `title_drafting_config`, `sub_agent_config`; new columns for the per-aspect ops knobs); `model_capabilities_overrides` table scaffold (v3.1 will add UI later); hot-reload TTL cache extended to cover new keys.
-- 02 — One-shot migration runner: detect `settings_override.json`, parse, write to `app_settings` rows, rename file to `.migrated`. Idempotent on re-run (no-op if no JSON file present).
-- 03 — Code-side consumer migration: every `_OVERRIDE_FILE` reader in `backend/app/` rewired to read from the new DB-backed cache; `MODEL_CAPABILITIES` registry merged with `model_capabilities_overrides` at resolution time; `get_per_call_timeout` precedence updated (DB > env CSV > static dict).
-- 04 — Integration tests + verifier: (a) clean-install path (no JSON file) reads defaults from DB, (b) upgrade path (with JSON file) migrates cleanly, (c) hot-reload contract (write → read within 30s), (d) no code references `_OVERRIDE_FILE` or `settings_override.json` after migration.
+**Plans:** 4 plans
+Plans:
+- [ ] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
+- [ ] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
+- [ ] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
+- [ ] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
 
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
 **Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.

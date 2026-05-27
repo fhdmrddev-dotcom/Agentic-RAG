@@ -59,6 +59,11 @@
 - [x] **TOKEN-COL-01
 **: `runs.input_tokens` and `runs.output_tokens` are populated for every completed LLM call (read from response `usage`). Backfill: existing NULL rows stay NULL — forward-fill only. NULL writes after this ship become a dashboard warning. No caps or limits introduced. Used by v3.1 admin observability + v3.4 spend-cap pre-flight. *(Plan 03 ships the SDK-capture surface — `stream_options=include_usage` + Anthropic usage event yields + 4 accumulator unit tests; Plan 04 wires the finalize-path writes.)*
 
+### Theme G -- Settings Architecture Unification
+
+- [ ] **SETTINGS-UNIFY-01**: `settings_override.json` eliminated; all 34+ keys migrated to DB tables with one-shot migration on first startup. Migration runner in FastAPI lifespan reads JSON, writes to `app_settings` DB table, renames file to `.migrated`. Idempotent on re-run. Multi-worker safe via `INSERT ... ON CONFLICT DO NOTHING`. No code path reads from JSON after migration.
+- [ ] **SETTINGS-UNIFY-02**: `model_capabilities_overrides` table enables runtime model registration with hot-reload 30s TTL cache. 4-tier resolution: DB row > `LLM_CALL_TIMEOUT_OVERRIDES` env CSV > static `MODEL_CAPABILITIES` dict > safe defaults. DB-registered models appear in model picker under their provider's section. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV preserved as operator bootstrap fallback.
+
 ## Future Requirements (deferred)
 
 Owned by later milestones per `.planning/PRDs/v2.6.md` §11 + locked roadmap (`memory: project_v3_roadmap_locked.md`).
@@ -158,9 +163,12 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Complete |
 
+| SETTINGS-UNIFY-01 | 081.1 — Settings Architecture Unification | Pending |
+| SETTINGS-UNIFY-02 | 081.1 — Settings Architecture Unification | Pending |
+
 **Coverage:**
-- v2.6 requirements: 22 total
-- Mapped to phases: 22 / 22 ✓
+- v2.6 requirements: 24 total
+- Mapped to phases: 24 / 24 ✓
 - Unmapped: 0
 - Orphaned phases (no REQ-ID owner): 0 — Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 (added 2026-05-13 to absorb BUG-260513-01); Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting milestone-close verification
 
