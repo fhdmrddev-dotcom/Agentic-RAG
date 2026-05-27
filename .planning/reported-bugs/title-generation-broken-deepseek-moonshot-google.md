@@ -4,9 +4,9 @@ title: Title generation fails on DeepSeek/Moonshot, partial on Google (few lette
 reported: 2026-05-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/streaming, backend/providers]
-folded_into: null
+folded_into: "083"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

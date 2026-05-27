@@ -4,9 +4,9 @@ title: Sticky timer bar disappears mid-cycle on temp-id to DB-id remount
 reported: 2026-05-26
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/streaming]
-folded_into: null
+folded_into: "083"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
