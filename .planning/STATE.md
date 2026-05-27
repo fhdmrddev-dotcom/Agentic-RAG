@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: executing
-stopped_at: Completed 082-02-PLAN.md
-last_updated: "2026-05-27T14:15:00Z"
-last_activity: 2026-05-27 -- Phase 082 Plan 02 complete (milestone-close verification gate PASSED)
+status: shipped
+stopped_at: Milestone v2.6 shipped
+last_updated: "2026-05-27T18:00:00Z"
+last_activity: 2026-05-27 -- v2.6 milestone shipped (35 phases, 91 plans, 846 commits)
 progress:
   total_phases: 35
-  completed_phases: 31
-  total_plans: 93
-  completed_plans: 93
+  completed_phases: 35
+  total_plans: 91
+  completed_plans: 91
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 082 complete -- v2.6 milestone-close verification gate PASSED
+**Current focus:** v2.6 milestone SHIPPED — planning next milestone (v2.7)
 
 ## Current Position
 
-Phase: 082 — COMPLETE
-Plan: 2 of 2 (both complete)
-Next action: `/gsd:complete-milestone v2.6`
-Status: Phase 082 complete -- all 5 SCs GREEN, 24/24 REQ-IDs Validated
-Last activity: 2026-05-27 -- Phase 082 Plan 02 finalized (5/5 SCs GREEN)
+Phase: v2.6 milestone SHIPPED
+Plan: All 91 plans complete across 35 phases
+Next action: `/gsd:new-milestone v2.7`
+Status: v2.6 shipped 2026-05-27 — 35 phases, 91 plans, 846 commits, 24/24 REQ-IDs Validated
+Last activity: 2026-05-27 -- v2.6 milestone archived and tagged
 
 ## PRD-reset outputs (committed)
 
@@ -131,6 +131,78 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 - SEED-007 — App-level Streams Provider
 
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
+
+### v2.6 Deferred Items (2026-05-27)
+
+Items acknowledged and deferred at v2.6 milestone close. Each item was reviewed against the ROADMAP closure narratives; none contradict the closure annotations or block milestone completion. 40 items total.
+
+#### UAT status fields not flipped after cross-phase closure (15)
+
+These phases closed via documented cross-phase chains or project-level approval. The HUMAN-UAT.md frontmatter `status` fields were not updated when downstream phases closed the gate-blocking rows. All 15 show `0 pending scenarios` — no actionable UAT work remaining.
+
+| Phase | UAT file | Recorded status | Reality |
+|-------|----------|-----------------|---------|
+| 068 | 068-HUMAN-UAT.md | partial | Closed; StreamsProvider lift verified |
+| 068.5 | 068.5-HUMAN-UAT.md | partial | Closed; BUG-260513-01 folded→closed |
+| 071 | 071-VERIFICATION.md | partial | Closed; SC#1 accept-degraded via 071.1 |
+| 071.1 | 071.1-HUMAN-UAT.md | partial | Closed; accept-degraded disposition |
+| 071.2 | 071.2-HUMAN-UAT.md | partial | Closed; env-blocked items resolved by 071.3 |
+| 075 | 075-HUMAN-UAT.md | partial | Closed; cross-provider UAT done via 075.1 |
+| 075.1 | 075.1-HUMAN-UAT.md | partial | Closed; deferred items shipped in 075.2 |
+| 075.2 | 075.2-HUMAN-UAT.md | partial | Closed; BUG-260522-02 deferred cosmetic |
+| 075.6 | 075.6-HUMAN-UAT.md | partial | Closed; completed in 075.7 |
+| 075.7 | 075.7-HUMAN-UAT.md | partial | Closed; all UAT axes covered |
+| 075.8 | 075.8-HUMAN-UAT.md | partial | Closed; G-4 lived-experience verified |
+| 075.9 | 075.9-HUMAN-UAT.md | partial | Closed; fidelity handoff verified |
+| 076.1 | 076.1-HUMAN-UAT.md | partial | Closed; provider integration verified |
+| 076.2 | 076.2-HUMAN-UAT.md | partial | Closed; MiniMax/GLM UAT deferred (API keys) |
+| 082 | 082-HUMAN-UAT.md | partial | Closed; 5/5 SCs GREEN at milestone close |
+
+#### Verification gaps (10)
+
+All ten are `human_needed`-status or `gaps_found` verifications on phases that closed with project-level approval. None blocked phase closure.
+
+| Phase | File | Note |
+|-------|------|------|
+| 069 | 069-VERIFICATION.md | PdfExtractor scaffold; closed with project approval |
+| 070 | 070-VERIFICATION.md | Docling httpx spike; closed with project approval |
+| 071.3 | 071.3-VERIFICATION.md | Docling demotion; SC#6 operator override |
+| 071.4 | 071.4-VERIFICATION.md | Post-071.3 polish; closed with project approval |
+| 073 | 073-VERIFICATION.md | asyncpg pool; closed with project approval |
+| 074 | 074-VERIFICATION.md | SEED-009/011; closed with D-074-01/02-DEFER |
+| 075.3 | 075.3-VERIFICATION.md | Defensive chunk handler; closed with project approval |
+| 075.4 | 075.4-VERIFICATION.md | Cross-provider cleanup; scenario-06 RED by design |
+| 075.10 | 075.10-VERIFICATION.md | Fine-grained args progress; closed with project approval |
+| 077 | 077-VERIFICATION.md | Multi-worker harness; closed with project approval |
+
+#### Quick tasks — historical micro-tickets predating GSD (11)
+
+Carried forward from v2.5. Pre-date the GSD planning workflow. Most are `unknown` status. NOT in v2.6 scope; re-triage at next milestone planning if any still reproduce.
+
+- 260322-26g — improve tool-call display for ls/tree/grep
+- 260328-v6n — investigate duplicate folder behavior
+- 260328-wqj — folder-scoped chat returning results bug
+- 260328-x6n — folder not created when pressing (`completed` per tracker)
+- 260404-vel — streaming cursor bug + meaningful indicator
+- 260405-rgy — folder public visibility files
+- 260405-s1e — hide toggle-global from non-owners
+- 260407-vqw — context window management review
+- 260411-wj5 — skill file upload bug
+- 260412-dqu — four issues in skills API
+- 260412-jnc — import skill 202 BackgroundTask
+
+#### Dormant seeds — intentional future work (4)
+
+Explicitly future-looking ideas from earlier milestones. Surface when their `trigger_when` conditions fire.
+
+- SEED-002 — Skill Studio Milestone Preparation
+- SEED-003 — Deployment Flexibility & Install/Config UX
+- SEED-004 — Org / Department / Role Multi-Tenancy
+- SEED-005 — Document Management Capabilities (M-Files-aligned subset)
+
+#### Phase 082.5 — deferred to v2.7
+
+Phase 082.5 (Error Handler Foundation — SEED-026 urgent slice) was scoped but not started during v2.6. Deferred to v2.7 as a foundational phase for the admin shell milestone.
 
 ## Recent Completed Phases
 
