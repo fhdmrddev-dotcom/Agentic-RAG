@@ -60,6 +60,119 @@ if settings.langsmith_api_key:
     os.environ["LANGSMITH_API_KEY"] = settings.langsmith_api_key
 
 
+# Phase 081.1 Plan 02 — key routing constants for one-shot settings migration.
+# Column names are code constants (never from user input) — SQL injection safe.
+_DIRECT_COLUMNS: set[str] = {
+    "llm_provider", "llm_model", "embedding_model", "embedding_base_url",
+    "embedding_dimensions", "rerank_enabled", "rerank_provider", "rerank_model",
+    "rerank_top_n", "retrieval_top_k", "retrieval_match_threshold",
+    "hybrid_search_enabled", "hybrid_candidate_count", "vector_search_weight",
+    "keyword_search_weight", "rrf_k", "web_search_max_results",
+    "web_search_enabled", "sandbox_enabled", "context_window_max_tokens",
+    "sub_agent_max_output_tokens", "sub_agent_model", "llm_max_output_tokens",
+    "openrouter_tool_strategy", "ollama_base_url",
+}
+
+_PROVIDER_MODEL_KEYS: set[str] = {
+    "openai_models", "anthropic_models", "google_models",
+    "openrouter_models", "ollama_models", "deepseek_models",
+    "moonshot_models", "minimax_models", "zhipu_models",
+}
+
+
+async def _migrate_settings_override() -> None:
+    """One-shot migration: settings_override.json -> app_settings DB table.
+
+    Phase 081.1 D-01..D-05. Runs in lifespan after asyncpg pool init.
+    Multi-worker safe via UPDATE ... WHERE id='global' (D-02).
+    Idempotent: no-op if JSON file absent (D-05).
+    Fail-safe: on any DB error, leaves file untouched for fallback (D-03).
+    On success: renames file to .migrated (D-04).
+    """
+    import json as _json
+
+    override_file = Path(__file__).resolve().parent.parent / "settings_override.json"
+    if not override_file.exists():
+        return  # D-05: idempotent no-op
+
+    # Read and parse JSON — fail-safe (D-03): leave file untouched on error
+    try:
+        raw = override_file.read_text(encoding="utf-8")
+        data: dict = _json.loads(raw)
+    except (OSError, _json.JSONDecodeError) as e:
+        logger.error("settings migration: cannot read/parse JSON: %s", e)
+        return
+
+    if not isinstance(data, dict) or not data:
+        logger.warning("settings migration: empty or non-dict JSON — skipping")
+        return
+
+    # Categorize keys
+    direct_updates: dict[str, object] = {}
+    api_key_updates: dict[str, object] = {}
+    provider_model_lists: dict[str, list[str]] = {}
+    skipped_keys: list[str] = []
+
+    for key, value in data.items():
+        if key in _DIRECT_COLUMNS:
+            direct_updates[key] = value
+        elif key in _PROVIDER_MODEL_KEYS:
+            provider = key.replace("_models", "")
+            models = [m.strip() for m in str(value).split(",") if m.strip()]
+            provider_model_lists[provider] = models
+        elif key.endswith("_api_key"):
+            api_key_updates[key] = value  # D-19: keys stay in app_settings DB
+        else:
+            skipped_keys.append(key)
+
+    if skipped_keys:
+        logger.warning("settings migration: skipping unknown keys: %s", skipped_keys)
+
+    # Merge all into one update dict
+    all_updates: dict[str, object] = {}
+    all_updates.update(direct_updates)
+    all_updates.update(api_key_updates)
+    if provider_model_lists:
+        all_updates["provider_model_lists"] = _json.dumps(provider_model_lists)
+
+    if not all_updates:
+        logger.info("settings migration: no routable keys found — skipping DB write")
+        return
+
+    # Build parameterized UPDATE query
+    # Column names are from code constants (_DIRECT_COLUMNS etc.), not user input
+    set_clauses = []
+    values = []
+    for i, (col, val) in enumerate(all_updates.items(), start=1):
+        set_clauses.append(f"{col} = ${i}")
+        values.append(val)
+    set_clauses.append(f"updated_at = now()")
+    query = f"UPDATE app_settings SET {', '.join(set_clauses)} WHERE id = 'global'"
+
+    # Execute via asyncpg pool — fail-safe (D-03)
+    from app.dependencies import get_pg_pool
+    try:
+        pool = await get_pg_pool()
+        await pool.execute(query, *values)
+    except Exception as e:
+        logger.error("settings migration: DB write failed: %s", e)
+        return  # D-03: leave file untouched for fallback
+
+    # Success — rename file to .migrated (D-04)
+    # Multi-worker race safe: FileNotFoundError means another worker already renamed
+    migrated_count = len(direct_updates) + len(api_key_updates) + (1 if provider_model_lists else 0)
+    try:
+        override_file.rename(override_file.with_suffix(".json.migrated"))
+    except FileNotFoundError:
+        pass  # Another worker already renamed — safe
+
+    # T-081.1-04: never log API key values, only key names and counts
+    logger.info(
+        "Migrated %d keys from settings_override.json (%d direct, %d api_keys, %d provider_model sets)",
+        len(data), len(direct_updates), len(api_key_updates), len(provider_model_lists),
+    )
+
+
 @asynccontextmanager
 async def lifespan(app_instance):
     # Startup: bump AnyIO default thread limiter so SSE-path .execute()
@@ -79,6 +192,14 @@ async def lifespan(app_instance):
         logger.info("Redis ping ok")
     except Exception as e:
         logger.warning("Redis unreachable (run-backed streaming will fail): %s", type(e).__name__)
+
+    # Phase 081.1 D-01: one-shot settings migration (after asyncpg pool init)
+    from app.dependencies import get_pg_pool
+    try:
+        await get_pg_pool()  # ensure pool exists before migration
+        await _migrate_settings_override()
+    except Exception as e:
+        logger.error("Settings migration failed (app continues with file fallback): %s", e)
 
     yield
 
