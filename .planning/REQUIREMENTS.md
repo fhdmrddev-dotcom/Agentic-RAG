@@ -69,34 +69,34 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | — | Pending |
-| FOUND-02 | — | Pending |
-| WS-01 | — | Pending |
-| WS-02 | — | Pending |
-| WS-03 | — | Pending |
-| WS-04 | — | Pending |
-| WS-05 | — | Pending |
-| WS-06 | — | Pending |
-| WS-07 | — | Pending |
-| TOOL-01 | — | Pending |
-| TOOL-02 | — | Pending |
-| TOOL-03 | — | Pending |
-| TOOL-04 | — | Pending |
-| PANEL-01 | — | Pending |
-| PANEL-02 | — | Pending |
-| PANEL-03 | — | Pending |
-| PANEL-04 | — | Pending |
-| PANEL-05 | — | Pending |
-| PANEL-06 | — | Pending |
-| PANEL-07 | — | Pending |
-| A11Y-01 | — | Pending |
-| A11Y-02 | — | Pending |
+| FOUND-01 | Phase 083 | Pending |
+| FOUND-02 | Phase 083 | Pending |
+| WS-01 | Phase 084 | Pending |
+| WS-02 | Phase 084 | Pending |
+| WS-03 | Phase 084 | Pending |
+| WS-04 | Phase 084 | Pending |
+| WS-05 | Phase 084 | Pending |
+| WS-06 | Phase 084 | Pending |
+| WS-07 | Phase 084 | Pending |
+| TOOL-01 | Phase 085 | Pending |
+| TOOL-02 | Phase 085 | Pending |
+| TOOL-03 | Phase 085 | Pending |
+| TOOL-04 | Phase 085 | Pending |
+| PANEL-01 | Phase 087 | Pending |
+| PANEL-02 | Phase 087 | Pending |
+| PANEL-03 | Phase 087 | Pending |
+| PANEL-04 | Phase 087 | Pending |
+| PANEL-05 | Phase 086 | Pending |
+| PANEL-06 | Phase 086 | Pending |
+| PANEL-07 | Phase 087 | Pending |
+| A11Y-01 | Phase 088 | Pending |
+| A11Y-02 | Phase 088 | Pending |
 
 **Coverage:**
 - v2.7 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 ⚠️ (awaiting roadmap creation)
+- Mapped to phases: 22/22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-05-27*
-*Last updated: 2026-05-27 after initial definition*
+*Last updated: 2026-05-28 after roadmap creation — all 22 requirements mapped to phases 083-088*
