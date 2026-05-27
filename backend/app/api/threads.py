@@ -976,6 +976,7 @@ _SINGLE_MODEL_PROVIDERS = frozenset({"deepseek", "moonshot", "minimax", "zhipu",
 def generate_thread_title(
     first_user_message: str,
     user_settings=None,
+    chat_model: str = "",
 ) -> tuple[str, dict | None]:
     """Call LLM to produce a short thread title from the first user message.
 
@@ -986,12 +987,12 @@ def generate_thread_title(
         provider = user_settings.active_provider if user_settings else ""
 
         if provider in _SINGLE_MODEL_PROVIDERS:
-            # Single-model providers: use the provider's known model name first,
-            # then fall back to user's main model. user_settings.llm_model may
-            # still contain a model from a previously-active provider (e.g. gpt-4.1
-            # when the user switched to DeepSeek).
+            # Single-model providers: use the chat_model the frontend sent
+            # (always correct for the active provider), then provider default,
+            # then user_settings.llm_model as last resort.
             model = (
-                _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+                chat_model
+                or _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
                 or (user_settings.llm_model if user_settings else settings.llm_model)
             )
         else:
@@ -1371,6 +1372,7 @@ async def send_message(
                 generate_thread_title,
                 body.content,
                 _user_settings,
+                body.model or "",
             )
             # Ordering invariant (preserved from the original :2398-2408 block):
             # fallback_model emit fires BEFORE title emit when title_fallback is
