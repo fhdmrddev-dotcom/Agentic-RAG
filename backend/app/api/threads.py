@@ -986,9 +986,14 @@ def generate_thread_title(
         provider = user_settings.active_provider if user_settings else ""
 
         if provider in _SINGLE_MODEL_PROVIDERS:
-            # Single-model providers: use the user's main model directly.
-            # No sub-agent model routing -- these providers have one tier.
-            model = user_settings.llm_model if user_settings else settings.llm_model
+            # Single-model providers: use the provider's known model name first,
+            # then fall back to user's main model. user_settings.llm_model may
+            # still contain a model from a previously-active provider (e.g. gpt-4.1
+            # when the user switched to DeepSeek).
+            model = (
+                _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+                or (user_settings.llm_model if user_settings else settings.llm_model)
+            )
         else:
             # Multi-model providers: try sub-agent override, then provider default, then fallback.
             override = (
