@@ -337,7 +337,17 @@ def _build_providers(row: dict) -> list[LLMProvider]:
     ollama_base = str(_val(row, "ollama_base_url", "ollama_base_url", "http://localhost:11434")).rstrip("/")
 
     # D-17: provider_model_lists JSONB column stores {"openai": [...], "anthropic": [...]}
-    db_model_lists: dict[str, list[str]] = row.get("provider_model_lists") or {}
+    # Defensive: the migration runner json.dumps() before asyncpg's JSONB codec,
+    # causing double-serialization (stored as a JSON string literal in JSONB).
+    # Handle both dict and str gracefully.
+    _raw_pml = row.get("provider_model_lists") or {}
+    if isinstance(_raw_pml, str):
+        import json as _json
+        try:
+            _raw_pml = _json.loads(_raw_pml)
+        except (ValueError, TypeError):
+            _raw_pml = {}
+    db_model_lists: dict[str, list[str]] = _raw_pml if isinstance(_raw_pml, dict) else {}
 
     providers: list[LLMProvider] = []
     for pid, meta in KNOWN_PROVIDERS.items():
