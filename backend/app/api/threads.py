@@ -1,6 +1,4 @@
 import asyncio
-import base64
-import io
 import json
 import logging
 import os
@@ -45,19 +43,15 @@ from app.services.openai_service import create_adaptive_streaming_chat, get_llm_
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
 from app.services.tool_parser import parse_structured_tool_calls, ToolCall
+from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 
 # Sandbox import — always available at module scope so per-request paths
 # (e.g. line ~1328 where get_or_create runs without re-importing) cannot
 # NameError when sandbox_enabled is False at startup but enabled per-user
 # via user_settings.sandbox_enabled (see WR-03 review fix). The module
 # itself has no side effects, so unconditional import is safe.
-from app.services.sandbox_service import sandbox_manager, harvest_output_files  # noqa: E402
+from app.services.sandbox_service import sandbox_manager  # noqa: E402
 from app.services.context_window import trim_messages_to_fit, estimate_messages_tokens, resolve_context_budget
-from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
-from app.services.web_search_service import web_search
-from app.services.sql_service import query_documents
-from app.services.sub_agent_service import run_sub_agent
-from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 
 router = APIRouter(prefix="/threads", tags=["threads"])
 logger = logging.getLogger(__name__)
@@ -2532,791 +2526,49 @@ async def send_message(
                     full_content = ""
                     full_reasoning_content = ""
 
-                    # Phase 067.4 (D-067.4-R5-01 amended — Plan 03 Rule 3 deviation):
-                    # introduced enumerate(tool_calls) so tool_index is in scope inside
-                    # the per-tool body (specifically the sandbox_queue drain loop's
-                    # heartbeat emit at the `code_executing` SSE event below). Plan
-                    # 03 PATTERNS.md asserted tool_index was already in scope; static
-                    # audit at execution time showed it was not — surfaced as Rule 3
-                    # deviation in 067.4-03-SUMMARY.md.
+                    # Phase 083 D-01: construct ToolContext once per iteration.
+                    # All tool-specific logic delegates through dispatch_tool().
+                    tool_ctx = ToolContext(
+                        redis=redis,
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        supabase=supabase,
+                        pool=pool,
+                        user_settings=user_settings,
+                        current_user=current_user,
+                        folder_subtree_ids=folder_subtree_ids,
+                        scoped_folder_path=scoped_folder_path,
+                        emit=_emit,
+                        spawn=_spawn,
+                        model=body.model or settings.llm_model,
+                        previous_files_in_run=_previous_files_in_run,
+                        iteration=iteration,
+                    )
+
                     for tool_index, tc in enumerate(tool_calls):
                         tool_name = tc["name"]
                         sub_agent_record: dict | None = None
-                        llm_tool_content: str | None = None  # overridden per-tool to strip URLs from LLM context
+                        llm_tool_content: str | None = None
                         try:
                             args = json.loads(tc["arguments"])
                             await _emit(redis, run_id, 'tool_start', name=tool_name, args=args)
-                            if tool_name == "ls":
-                                path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                                result = await ls_path(path, current_user["id"], supabase)
-                                tool_result = json.dumps(result)
-                            elif tool_name == "tree":
-                                path = args.get("path") or (scoped_folder_path if scoped_folder_path else "/")
-                                result = await tree_path(path, args.get("depth"), current_user["id"], supabase)
-                                tool_result = json.dumps(result)
-                            elif tool_name == "grep":
-                                path = args.get("path") or scoped_folder_path
-                                result = await grep_path(args.get("pattern", ""), path, current_user["id"], supabase)
-                                tool_result = json.dumps(result)
-                            elif tool_name == "glob":
-                                result = await glob_path(args.get("pattern", ""), current_user["id"], supabase)
-                                # Scope glob results to folder subtree if thread is folder-scoped
-                                if folder_subtree_ids is not None and "matches" in result:
-                                    result["matches"] = [
-                                        m for m in result["matches"]
-                                        if m.get("folder_id") in folder_subtree_ids
-                                    ]
-                                    result["total"] = len(result["matches"])
-                                tool_result = json.dumps(result)
-                            elif tool_name == "read_document":
-                                result = await read_path(
-                                    args["document_id"],
-                                    current_user["id"],
-                                    supabase,
-                                    args.get("start_line"),
-                                    args.get("end_line"),
-                                )
-                                tool_result = json.dumps(result)
-                            elif tool_name == "search_documents":
-                                metadata_filter = args.get("metadata_filter") or None
-                                results, avg_sim = await search_documents(
-                                    args["query"], current_user["id"], supabase,
-                                    metadata_filter=metadata_filter,
-                                    user_settings=user_settings,
-                                    folder_ids=folder_subtree_ids,
-                                )
-                                tool_result = json.dumps(results) if results else "No relevant documents found."
-                                # Accumulate full citation objects for citations event (D-04, D-14)
-                                if results and isinstance(results, list):
-                                    for hit in results:
-                                        doc_id = hit.get("document_id") or hit.get("id")
-                                        filename = hit.get("filename") or hit.get("document_name")
-                                        if doc_id and filename:
-                                            source_refs.append({"document_id": doc_id, "filename": filename})
-                                            retrieved_citations.append({
-                                                "document_id": doc_id,
-                                                "filename": filename,
-                                                "chunk_index": hit.get("chunk_index"),
-                                                "passage": hit.get("content"),  # Full text for persistence
-                                                "similarity": hit.get("similarity"),
-                                                "is_full_doc": False,
-                                                "version_number": hit.get("version_number", 1),
-                                            })
-                                    if avg_sim > 0.0:
-                                        similarity_scores.append(avg_sim)
-                                # Audit: fire-and-forget inside async generator (AUDIT-02)
-                                _audit_doc_ids = list({
-                                    h.get("document_id") or h.get("id")
-                                    for h in (results or [])
-                                    if h.get("document_id") or h.get("id")
-                                })
-                                _spawn(write_audit_entry(
-                                    user_id=current_user["id"],
-                                    action_type="search.query",
-                                    metadata={"query_text": args["query"], "document_ids": _audit_doc_ids},
-                                    supabase=supabase,
-                                ))
-                            elif tool_name == "query_documents":
-                                tool_result = await query_documents(args["query"], current_user["id"], supabase, folder_ids=folder_subtree_ids)
-                            elif tool_name == "web_search":
-                                tool_result = web_search(args["query"], settings.tavily_api_key, settings.web_search_max_results)
-                            elif tool_name == "analyze_document":
-                                doc_id = await resolve_document_id(args["filename"], current_user["id"], supabase)
-                                if not doc_id:
-                                    tool_result = f"Document '{args['filename']}' not found."
-                                else:
-                                    doc = await fetch_full_document(doc_id, current_user["id"], supabase)
-                                    if not doc:
-                                        tool_result = f"Could not retrieve content for '{args['filename']}'."
-                                    else:
-                                        # Track this document as a source reference
-                                        source_refs.append({"document_id": doc_id, "filename": doc["filename"]})
-                                        retrieved_citations.append({
-                                            "document_id": doc_id,
-                                            "filename": doc["filename"],
-                                            "chunk_index": None,
-                                            "passage": None,
-                                            "similarity": None,
-                                            "is_full_doc": True,
-                                            "version_number": doc.get("version_number", 1),
-                                        })
-                                        await _emit(redis, run_id, 'sub_agent_start', filename=doc['filename'], task=args['task'])
-                                        sub_agent_content = ""
-                                        # Phase 075.1 Plan 04 (B-260519-05) — capture the effective
-                                        # model resolved by sub_agent_service so we can surface it
-                                        # in persisted_tool_calls (spread below) and in the
-                                        # frontend tool-card. Mirrors sub_agent_service.run_sub_agent's
-                                        # resolution rules (user override > env override > provider default).
-                                        _sub_agent_effective_model = (
-                                            (user_settings.sub_agent_model if user_settings else "")
-                                            or settings.sub_agent_model
-                                            or _SUB_AGENT_MODEL_DEFAULTS.get(
-                                                getattr(user_settings, "active_provider", "") or "",
-                                                "",
-                                            )
-                                            or (user_settings.llm_model if user_settings else "")
-                                            or body.model
-                                            or settings.llm_model
-                                        )
-                                        try:
-                                            for text_chunk in run_sub_agent(doc["content"], doc["filename"], args["task"], model=body.model, user_settings=user_settings):
-                                                # Detect fallback sentinel emitted by sub_agent_service
-                                                if text_chunk.startswith('{"__type": "fallback_model"'):
-                                                    try:
-                                                        sentinel = json.loads(text_chunk)
-                                                        await _emit(redis, run_id, 'fallback_model', original_model=sentinel['original_model'], fallback_model=sentinel['fallback_model'])
-                                                        # The fallback model actually ran the request — update
-                                                        # the effective model so the persisted payload reflects
-                                                        # what produced the content.
-                                                        _sub_agent_effective_model = sentinel.get('fallback_model', _sub_agent_effective_model)
-                                                    except (json.JSONDecodeError, KeyError):
-                                                        pass
-                                                    continue
-                                                sub_agent_content += text_chunk
-                                                await _emit(redis, run_id, 'sub_agent_delta', content=text_chunk)
-                                        except Exception as sa_err:
-                                            logger.error("Sub-agent failed: %s", sa_err)
-                                            if not sub_agent_content:
-                                                sub_agent_content = f"Sub-agent analysis failed: {sa_err}"
-                                        await _emit(redis, run_id, 'sub_agent_done')
-                                        tool_result = sub_agent_content
-                                        sub_agent_record = {
-                                            "filename": doc["filename"],
-                                            "task": args["task"],
-                                            "content": sub_agent_content,
-                                            "effective_model": _sub_agent_effective_model,
-                                        }
-                            elif tool_name == "load_skill":
-                                skill_name = args.get("skill_name", "")
-                                # Emit skill_activated SSE event immediately (SKIL-12)
-                                await _emit(redis, run_id, 'skill_activated', skill_name=skill_name)
-                                # Resolve skill — prefer user-owned over global when names conflict
-                                _skill_resp = await aexec(
-                                    supabase.table("skills")
-                                    .select("id, name, description, instructions, user_id")
-                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                    .eq("name", skill_name)
-                                    .eq("is_enabled", True)
-                                    .order("is_global")
-                                )
-                                skill_row = _skill_resp.data
-                                if not skill_row:
-                                    tool_result = json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."})
-                                else:
-                                    row = skill_row[0] if isinstance(skill_row, list) else skill_row
-                                    # Phase 067.1 Plan 04: follow-up emit with skill description as
-                                    # upcoming-context hint. Fires AFTER the DB query (so we have the
-                                    # description) and BEFORE the audit/files fetch (so the SSE arrives
-                                    # promptly). Guard on truthy description per Pitfall 4 — empty/null
-                                    # skip avoids "Loading skill 'docx' — " trailing-em-dash render bug.
-                                    # V7 mitigation: emit ONLY skill_name + description; NEVER
-                                    # instructions (skill instructions can be arbitrarily long user
-                                    # content — out of scope for SSE hint).
-                                    if row.get("description"):
-                                        await _emit(
-                                            redis,
-                                            run_id,
-                                            'skill_loaded',
-                                            skill_name=skill_name,
-                                            description=row["description"],
-                                        )
-                                    _spawn(write_audit_entry(
-                                        user_id=current_user["id"],
-                                        action_type="skill.load",
-                                        metadata={"skill_id": row["id"], "skill_name": row["name"]},
-                                        supabase=supabase,
-                                    ))
-                                    # Fetch attached filenames (FILE-04)
-                                    _files_resp = await aexec(
-                                        supabase.table("skill_files")
-                                        .select("filename")
-                                        .eq("skill_id", row["id"])
-                                        .order("filename")
-                                    )
-                                    files_data = _files_resp.data or []
-                                    file_names = [f["filename"] for f in files_data]
-                                    tool_result = json.dumps({
-                                        "name": row["name"],
-                                        "instructions": row["instructions"],
-                                        "files": file_names,
-                                    })
-                            elif tool_name == "save_skill":
-                                name = args.get("name", "").strip()
-                                description = args.get("description", "")
-                                instructions = args.get("instructions", "")
-                                if not name:
-                                    tool_result = json.dumps({"error": "Skill name is required."})
-                                else:
-                                    # Check if user already owns a skill with this name
-                                    existing_resp = await aexec(
-                                        supabase.table("skills")
-                                        .select("id")
-                                        .eq("user_id", current_user["id"])
-                                        .eq("name", name)
-                                        .limit(1)
-                                    )
-                                    existing = existing_resp.data[0] if existing_resp.data else None
-                                    if existing:
-                                        row = existing
-                                        await aexec(
-                                            supabase.table("skills").update({
-                                                "description": description,
-                                                "instructions": instructions,
-                                            }).eq("id", row["id"]).eq("user_id", current_user["id"])
-                                        )
-                                        tool_result = json.dumps({"status": "updated", "name": name})
-                                    else:
-                                        await aexec(
-                                            supabase.table("skills").insert({
-                                                "user_id": current_user["id"],
-                                                "name": name,
-                                                "description": description,
-                                                "instructions": instructions,
-                                            })
-                                        )
-                                        tool_result = json.dumps({"status": "created", "name": name})
-                            elif tool_name == "read_skill_file":
-                                skill_name = args.get("skill_name", "")
-                                filename = args.get("filename", "")
-                                # Resolve skill to get owner's user_id for storage path
-                                _sr_resp = await aexec(
-                                    supabase.table("skills")
-                                    .select("id, user_id")
-                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                    .eq("name", skill_name)
-                                    .maybe_single()
-                                )
-                                skill_row = _sr_resp.data if _sr_resp is not None else None
-                                if not skill_row:
-                                    # Retry with normalized name for agent display-name mismatches
-                                    _sr_norm = skill_name.lower().replace(" ", "-")
-                                    if _sr_norm != skill_name:
-                                        _sr_resp2 = await aexec(
-                                            supabase.table("skills")
-                                            .select("id, user_id")
-                                            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                            .eq("name", _sr_norm)
-                                            .maybe_single()
-                                        )
-                                        skill_row = _sr_resp2.data if _sr_resp2 is not None else None
-                                if not skill_row:
-                                    tool_result = json.dumps({"error": f"Skill '{skill_name}' not found."})
-                                else:
-                                    row = skill_row[0] if isinstance(skill_row, list) else skill_row
-                                    storage_path = f"{row['user_id']}/{row['id']}/{filename}"
-                                    try:
-                                        raw_bytes = supabase.storage.from_("skill-files").download(storage_path)
-                                        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-                                        if ext == "docx":
-                                            import docx as _docx  # python-docx
-                                            doc = _docx.Document(io.BytesIO(raw_bytes))
-                                            tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-                                        elif ext == "xlsx":
-                                            import openpyxl as _openpyxl
-                                            wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
-                                            rows = []
-                                            for sheet in wb.worksheets:
-                                                for row in sheet.iter_rows(values_only=True):
-                                                    line = "\t".join(str(c) if c is not None else "" for c in row)
-                                                    if line.strip():
-                                                        rows.append(line)
-                                            tool_result = "\n".join(rows)
-                                        elif ext == "pptx":
-                                            from pptx import Presentation as _Presentation  # python-pptx
-                                            prs = _Presentation(io.BytesIO(raw_bytes))
-                                            slides = []
-                                            for slide in prs.slides:
-                                                for shape in slide.shapes:
-                                                    if hasattr(shape, "text") and shape.text.strip():
-                                                        slides.append(shape.text)
-                                            tool_result = "\n".join(slides)
-                                        elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
-                                            tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
-                                        else:
-                                            # Unrecognized or binary type
-                                            tool_result = json.dumps({
-                                                "error": f"File '{filename}' is a binary file that cannot be read as text. "
-                                                         "Upload a text-based version instead."
-                                            })
-                                    except Exception as e:
-                                        tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
-                            elif tool_name == "execute_code":
-                                code = args.get("code", "")
-                                libraries = args.get("libraries") or []
-                                # Emit start event (SAND-04)
-                                await _emit(redis, run_id, 'code_execution_start', code_preview=code[:200])
+                            # Phase 083 D-01/D-03: single dispatch_tool() call replaces
+                            # the ~780 LOC elif chain (G-5 mandated extraction).
+                            tool_ctx.tool_index = tool_index
+                            _tool_result = await dispatch_tool(tool_name, args, tool_ctx)
+                            tool_result = _tool_result.result
+                            llm_tool_content = _tool_result.llm_content
+                            sub_agent_record = _tool_result.sub_agent_record
 
-                                try:
-                                    session = sandbox_manager.get_or_create(thread_id)
-                                    loop = asyncio.get_running_loop()  # WR-04: get_event_loop deprecated in 3.10+
-                                    # Inner sandbox-event queue (separate from the outer producer
-                                    # XADD path used for SSE). Renamed from `queue` (D-059-Rule1 fix
-                                    # — historical from 059's asyncio.Queue producer; preserved as
-                                    # an in-process bridge between the blocking sandbox executor
-                                    # callbacks and the async producer in 061).
-                                    sandbox_queue: asyncio.Queue = asyncio.Queue()
+                            # Accumulate side effects from dispatcher
+                            if _tool_result.source_refs:
+                                source_refs.extend(_tool_result.source_refs)
+                            if _tool_result.citations:
+                                retrieved_citations.extend(_tool_result.citations)
+                            if _tool_result.similarity_score is not None:
+                                similarity_scores.append(_tool_result.similarity_score)
 
-                                    # Phase 075 D-075-05/06: callbacks now carry captured_at for
-                                    # monotonic-timestamp assertion in SC #2 + reset the silent-
-                                    # window heartbeat clock (D-075-08). Item type renamed from
-                                    # 'code_stdout' → 'stdout_chunk' because the drain consumer
-                                    # (Task 3) line-buffers chunks and emits one 'code_stdout'
-                                    # SSE event per complete line.
-                                    def on_stdout(chunk: str):
-                                        loop.call_soon_threadsafe(
-                                            sandbox_queue.put_nowait,
-                                            {"type": "stdout_chunk", "content": chunk, "captured_at": time_mod.time()}
-                                        )
-
-                                    def on_stderr(chunk: str):
-                                        loop.call_soon_threadsafe(
-                                            sandbox_queue.put_nowait,
-                                            {"type": "stderr_chunk", "content": chunk, "captured_at": time_mod.time()}
-                                        )
-
-                                    # Ensure /sandbox/output exists via shell (reliable across container
-                                    # environments) and chdir so relative writes land there
-                                    try:
-                                        session.execute_command("mkdir -p /sandbox/output")
-                                    except Exception:
-                                        pass
-
-                                    # Inject skill files into sandbox by embedding bytes as base64
-                                    # in a preamble that runs before user code. More reliable than
-                                    # copy_to_runtime which can fail silently on Windows Docker setups.
-                                    skill_files_req = args.get("skill_files") or []
-                                    file_preamble = ""
-                                    for sf in skill_files_req:
-                                        sf_skill_name = sf.get("skill_name", "")
-                                        sf_filename = sf.get("filename", "")
-                                        if not sf_skill_name or not sf_filename:
-                                            continue
-                                        _sf_resp = await aexec(
-                                            supabase.table("skills")
-                                            .select("id, user_id")
-                                            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                            .eq("name", sf_skill_name)
-                                            .maybe_single()
-                                        )
-                                        sf_skill = _sf_resp.data if _sf_resp is not None else None
-                                        if not sf_skill:
-                                            # Retry with normalized name: agent often uses display name
-                                            # ("Weekly Report Writer") instead of stored slug ("weekly-report-writer")
-                                            _sf_norm = sf_skill_name.lower().replace(" ", "-")
-                                            if _sf_norm != sf_skill_name:
-                                                _sf_resp2 = await aexec(
-                                                    supabase.table("skills")
-                                                    .select("id, user_id")
-                                                    .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
-                                                    .eq("name", _sf_norm)
-                                                    .maybe_single()
-                                                )
-                                                sf_skill = _sf_resp2.data if _sf_resp2 is not None else None
-                                        if not sf_skill:
-                                            logger.warning("Skill file injection: skill '%s' not found", sf_skill_name)
-                                            continue
-                                        sf_row = sf_skill[0] if isinstance(sf_skill, list) else sf_skill
-                                        sf_storage_path = f"{sf_row['user_id']}/{sf_row['id']}/{sf_filename}"
-                                        try:
-                                            sf_bytes = supabase.storage.from_("skill-files").download(sf_storage_path)
-                                            b64 = base64.b64encode(sf_bytes).decode("ascii")
-                                            safe_name = sf_filename.replace("'", "\\'")
-                                            file_preamble += (
-                                                f"import base64 as _b64, os as _os\n"
-                                                f"_os.makedirs('/sandbox', exist_ok=True)\n"
-                                                f"with open('/sandbox/{safe_name}', 'wb') as _f:\n"
-                                                f"    _f.write(_b64.b64decode('{b64}'))\n"
-                                                f"print('Injected skill file: {safe_name}')\n"
-                                            )
-                                        except Exception as sf_err:
-                                            logger.warning("Failed to inject skill file %s/%s: %s", sf_skill_name, sf_filename, sf_err)
-
-                                    wrapped_code = "import os; os.chdir('/sandbox/output')\n" + file_preamble + code
-
-                                    # Phase 075 D-075-05: write user code to a uniquely-named file
-                                    # inside the container so `python -u {file}` can stream stdout
-                                    # line-by-line. session.copy_to_runtime is preferred over the
-                                    # heredoc fallback (multi-line user code with arbitrary
-                                    # quoting hazards). Marker filename uses uuid4 to avoid
-                                    # collisions across concurrent tool calls on the same session.
-                                    import tempfile as _tempfile_local
-                                    import os as _os_local
-                                    code_file = f"/tmp/run-{_uuid_mod.uuid4().hex}.py"
-                                    with _tempfile_local.NamedTemporaryFile(
-                                        mode="w", encoding="utf-8", suffix=".py", delete=False
-                                    ) as _tmp_fp:
-                                        _tmp_fp.write(wrapped_code)
-                                        _local_tmp_path = _tmp_fp.name
-                                    try:
-                                        session.copy_to_runtime(_local_tmp_path, code_file)
-                                    finally:
-                                        try:
-                                            _os_local.unlink(_local_tmp_path)
-                                        except OSError:
-                                            pass
-
-                                    # Phase 075 D-075-05: libraries install hoisted out of
-                                    # session.run() (which we no longer call). session.install()
-                                    # uses the same pip-cache + pip-executable path the run()
-                                    # call used internally. Empty list is a no-op.
-                                    if libraries:
-                                        try:
-                                            session.install(libraries=libraries)
-                                        except Exception as _install_err:
-                                            logger.warning(
-                                                "sandbox library install failed thread=%s err=%s",
-                                                thread_id, type(_install_err).__name__,
-                                            )
-
-                                    start_time = time_mod.time()
-
-                                    def _run_sync():
-                                        # Phase 075 D-075-05: bypass InteractiveSandboxSession.run()
-                                        # — its on_stdout/on_stderr params are unused (verified in
-                                        # ~/site-packages/llm_sandbox/interactive.py lines 234-235).
-                                        # Use the streaming execute_command path with `python -u`
-                                        # to force unbuffered stdout (RESEARCH Pitfall 1). The
-                                        # high-level wrapper at llm_sandbox/docker.py:43-60 flips
-                                        # exec_run(stream=True, demux=True) and dispatches each
-                                        # decoded chunk to on_stdout/on_stderr via
-                                        # mixins._process_stream_output.
-                                        exec_result = session.execute_command(
-                                            f"python -u {code_file}",
-                                            on_stdout=on_stdout,
-                                            on_stderr=on_stderr,
-                                        )
-                                        loop.call_soon_threadsafe(
-                                            sandbox_queue.put_nowait,
-                                            {"type": "_done", "result": exec_result, "captured_at": time_mod.time()}
-                                        )
-                                        return exec_result
-
-                                    fut = loop.run_in_executor(None, _run_sync)
-
-                                    # Drain sandbox_queue, forwarding SSE events out via _emit XADD
-                                    # (SAND-05 + Phase 061 D-061-10). Emit keepalives every 10 s
-                                    # when sandbox produces no output to prevent SSE connection
-                                    # timeouts on long executions.
-                                    #
-                                    # Phase 067.4 (D-067.4-R5-01 amended): emit code_executing
-                                    # heartbeat every ~1 s during sandbox execution. Reuses the
-                                    # existing wait_for drain loop with a tighter inner cycle.
-                                    # `start_time` was captured at line 2086. The pre-existing
-                                    # 10 s keepalive cadence (D-061-10 SSE-timeout protection) is
-                                    # preserved by tracking `_heartbeat_last`.
-                                    # Phase 075 D-075-06 + D-075-08: line-buffered per-line emit
-                                    # + silent-window heartbeat. Docker streams stdout as bytes
-                                    # chunks (not always per-line); the accumulator splits each
-                                    # chunk on '\n', emits one code_stdout SSE event per complete
-                                    # line, and retains the trailing partial for the next chunk.
-                                    # On _done we flush any trailing partial BEFORE breaking so no
-                                    # line is dropped. The heartbeat fires only during silent
-                                    # windows (≥1s with no stdout/stderr); _last_output_at is
-                                    # reset ONLY by stdout_chunk/stderr_chunk handlers (Pitfall 7
-                                    # — never by the heartbeat itself, otherwise silent workloads
-                                    # would emit one heartbeat at +1s then go dead).
-                                    # Phase 075.1 Plan 02 Task 2: line-buffer state hoisted into
-                                    # a dict that flows through the pure drain_step helper at
-                                    # module scope. Equivalent state shape to the prior
-                                    # `_stdout_partial` / `_stderr_partial` locals — refactor
-                                    # is mechanical, not behavioural.
-                                    _drain_state: dict = {"stdout_partial": "", "stderr_partial": ""}
-                                    # Counters used by the post-completion safety-net at the
-                                    # _done branch (Plan 02 Task 2): if the mid-flight per-line
-                                    # emit path produced ZERO lines but exec_result.stdout has
-                                    # content, emit one consolidated code_stdout so output is
-                                    # never silently lost (defense-in-depth against future
-                                    # regressions in the streaming line-buffer path).
-                                    _emitted_stdout_line_count = 0
-                                    _emitted_stderr_line_count = 0
-                                    _last_output_at = time_mod.time()
-                                    _heartbeat_last = time_mod.time()  # 10s keepalive cadence — preserved from D-061-10
-                                    _HEARTBEAT_INTERVAL_S = 1.0
-                                    while True:
-                                        try:
-                                            item = await asyncio.wait_for(sandbox_queue.get(), timeout=_HEARTBEAT_INTERVAL_S)
-                                        except asyncio.TimeoutError:
-                                            now = time_mod.time()
-                                            # D-075-08: heartbeat ONLY during silent windows (≥1s
-                                            # with no stdout/stderr). Pitfall 7: do NOT reset
-                                            # _last_output_at here — only stdout/stderr chunks
-                                            # reset it. SC #4 invariant: silent time.sleep(5)
-                                            # cell emits ≥4 code_executing events; chatty cell
-                                            # emits 0 because every chunk resets the clock.
-                                            if now - _last_output_at >= _HEARTBEAT_INTERVAL_S:
-                                                elapsed = now - start_time
-                                                await _emit(redis, run_id, 'code_executing',
-                                                            tool_index=tool_index, elapsed_seconds=round(elapsed, 1))
-                                            # Preserve 10s keepalive cadence (D-061-10) unchanged.
-                                            if now - _heartbeat_last >= 10.0:
-                                                await _emit(redis, run_id, 'keepalive')
-                                                _heartbeat_last = now
-                                            continue
-
-                                        if item["type"] == "_done":
-                                            # D-075-07: flush trailing partial lines BEFORE break
-                                            # so monotonic captured_at holds and no line is dropped.
-                                            if _drain_state["stdout_partial"]:
-                                                await _emit(redis, run_id, "code_stdout",
-                                                            content=_drain_state["stdout_partial"],
-                                                            captured_at=time_mod.time())
-                                                _emitted_stdout_line_count += 1
-                                                _drain_state["stdout_partial"] = ""
-                                            if _drain_state["stderr_partial"]:
-                                                await _emit(redis, run_id, "code_stderr",
-                                                            content=_drain_state["stderr_partial"],
-                                                            captured_at=time_mod.time())
-                                                _emitted_stderr_line_count += 1
-                                                _drain_state["stderr_partial"] = ""
-                                            # Phase 075.1 Plan 02 Task 2 — post-completion
-                                            # safety-net (per 075-CROSS-PROVIDER-UAT.md Plan 02
-                                            # scope). If the mid-flight emit produced ZERO lines
-                                            # but the final exec_result has stdout content, emit
-                                            # ONE consolidated code_stdout so output isn't
-                                            # silently lost. Guards against future regressions
-                                            # in the streaming line-buffer path. Same for stderr.
-                                            # Fires BEFORE break so the terminal frame still
-                                            # ships AFTER the safety-net emit (consumer ordering
-                                            # invariant preserved).
-                                            _exec_result = item.get("result")
-                                            if _exec_result is not None:
-                                                _final_stdout = (getattr(_exec_result, "stdout", "") or "").strip()
-                                                _final_stderr = (getattr(_exec_result, "stderr", "") or "").strip()
-                                                if _emitted_stdout_line_count == 0 and _final_stdout:
-                                                    await _emit(redis, run_id, "code_stdout",
-                                                                content=_final_stdout,
-                                                                captured_at=time_mod.time())
-                                                if _emitted_stderr_line_count == 0 and _final_stderr:
-                                                    await _emit(redis, run_id, "code_stderr",
-                                                                content=_final_stderr,
-                                                                captured_at=time_mod.time())
-                                            break
-
-                                        if item["type"] in ("stdout_chunk", "stderr_chunk"):
-                                            # Reset silent-window heartbeat clock on any output
-                                            # (D-075-08 / Pitfall 7 — only stdout/stderr chunks
-                                            # reset it).
-                                            _last_output_at = item["captured_at"]
-                                            # Pure helper extracts the line-buffer math into
-                                            # module scope so it's exercised by
-                                            # tests/unit/test_075_1_drain_step.py without Docker.
-                                            emit_calls, _drain_state = drain_step(item, _drain_state)
-                                            for evt_type, content, captured_at in emit_calls:
-                                                await _emit(redis, run_id, evt_type,
-                                                            content=content, captured_at=captured_at)
-                                                if evt_type == "code_stdout":
-                                                    _emitted_stdout_line_count += 1
-                                                else:
-                                                    _emitted_stderr_line_count += 1
-                                        else:
-                                            # Safety net: any other item type flows through the
-                                            # generic emit (none today; future-proof).
-                                            await _emit(redis, run_id, item['type'], **{k: v for k, v in item.items() if k != 'type'})
-
-                                    exec_result = await fut
-                                    end_time = time_mod.time()
-                                    duration_ms = int((end_time - start_time) * 1000)
-
-                                    # Phase 075 D-075-07: post-completion stdout/stderr emit DELETED —
-                                    # mid-flight per-line emit (Tasks 2-3) owns every line; this block
-                                    # would double-emit on the SSE wire. The exec_result.stdout / .stderr
-                                    # attrs are STILL read below for backend-side error-marker detection;
-                                    # only the SSE wire writes are removed.
-
-                                    # Derive actual exit code — InteractiveSandboxSession may
-                                    # return 0 even when Python raises an exception.
-                                    # Check exec_result.exit_code first; if it's 0/None,
-                                    # scan stdout for Python error signatures.
-                                    actual_exit_code = getattr(exec_result, "exit_code", None) or 0
-                                    if actual_exit_code == 0:
-                                        stdout_text = exec_result.stdout or ""
-                                        _error_markers = (
-                                            "Traceback (most recent call last)",
-                                            "Error:",
-                                            "Exception:",
-                                            "ModuleNotFoundError",
-                                            "ImportError",
-                                            "SyntaxError",
-                                            "NameError",
-                                            "TypeError",
-                                            "ValueError",
-                                            "RuntimeError",
-                                            "AttributeError",
-                                            "KeyError",
-                                            "IndexError",
-                                        )
-                                        if any(m in stdout_text for m in _error_markers):
-                                            actual_exit_code = 1
-
-                                    # Log execution to DB (SAND-09)
-                                    exec_row = await aexec(
-                                        supabase.table("code_executions").insert({
-                                            "thread_id": thread_id,
-                                            "user_id": current_user["id"],
-                                            "code": code,
-                                            "exit_code": actual_exit_code,
-                                            "duration_ms": duration_ms,
-                                        })
-                                    )
-                                    execution_id = exec_row.data[0]["id"] if exec_row.data else None
-
-                                    # Harvest output files from container (SAND-07, SAND-08)
-                                    # Phase 075.1 Plan 02 Task 1 — D-v2.5-01 fix
-                                    # (075-CROSS-PROVIDER-UAT.md headline finding):
-                                    # harvest_output_files performs synchronous blocking I/O
-                                    # (Supabase Storage uploads, sandbox_files INSERTs, local
-                                    # file reads) directly on the async event loop. Pre-fix,
-                                    # this starved the SSE keepalive after the cell completed,
-                                    # tearing down the stream before the terminal frame
-                                    # shipped — producing the universal "stuck on Running
-                                    # code until F5" symptom across all three providers
-                                    # (OpenAI, Anthropic, OpenRouter). run_in_threadpool
-                                    # offloads to anyio's worker pool so the loop stays
-                                    # responsive. See CLAUDE.md Rules + D-v2.5-01.
-                                    output_file_list: list[dict] = []
-                                    if execution_id and actual_exit_code == 0:
-                                        # Plan 075.4-03 D-075.4-D1/D2 — content-hash dedup
-                                        # signature. harvest_output_files now returns:
-                                        #   delta: this cell's NEW/changed files (with
-                                        #     optional `supersedes` key)
-                                        #   current: dict[content_hash, meta] for THIS
-                                        #     iteration's files only — caller MERGES into the
-                                        #     cumulative _previous_files_in_run so prior
-                                        #     iterations' files survive across the loop.
-                                        # See sandbox_service.harvest_output_files docstring
-                                        # for the full contract.
-                                        delta_files, _iter_files = await run_in_threadpool(
-                                            harvest_output_files,
-                                            session, execution_id, current_user["id"], supabase,
-                                            _previous_files_in_run,
-                                            iteration,
-                                        )
-                                        _previous_files_in_run.update(_iter_files)
-                                        output_file_list = delta_files
-
-                                    # Emit completion event (SAND-06) with file list
-                                    await _emit(redis, run_id, 'code_execution_complete', exit_code=actual_exit_code, duration_ms=duration_ms, execution_id=execution_id, output_files=output_file_list)
-
-                                    exec_status = "completed" if actual_exit_code == 0 else "error"
-                                    tool_result = json.dumps({
-                                        "status": exec_status,
-                                        "exit_code": actual_exit_code,
-                                        "duration_ms": duration_ms,
-                                        "execution_id": execution_id,
-                                        "output_files": output_file_list,
-                                        "stdout": exec_result.stdout or "",
-                                        "stderr": exec_result.stderr or "",
-                                    })
-                                    # Strip signed URLs from LLM context — frontend shows download cards
-                                    llm_tool_content = json.dumps({
-                                        "status": exec_status,
-                                        "exit_code": actual_exit_code,
-                                        "duration_ms": duration_ms,
-                                        "output_files": [{"filename": f["filename"], "size": f["size"]} for f in output_file_list],
-                                        "stdout": exec_result.stdout or "",
-                                        "stderr": exec_result.stderr or "",
-                                    })
-                                    _spawn(write_audit_entry(
-                                        user_id=current_user["id"],
-                                        action_type="code.execute",
-                                        metadata={"thread_id": thread_id, "language": args.get("language", "python")},
-                                        supabase=supabase,
-                                    ))
-                                except Exception as exec_err:
-                                    logger.error("execute_code failed: %s", exec_err)
-                                    await _emit(redis, run_id, 'code_execution_complete', exit_code=1, error=str(exec_err), duration_ms=0, output_files=[])
-                                    tool_result = json.dumps({"status": "error", "error": str(exec_err)})
-                            elif tool_name == "remember":
-                                # Phase 33 MEM-01: store user preference/fact across threads
-                                # D-01 upsert, D-02 case-insensitive, D-16 non-blocking, D-17 silent fail
-                                key = (args.get("key", "") or "").strip().lower()
-                                value = args.get("value", "") or ""
-
-                                if not key:
-                                    # Pitfall 3: empty key must not reach DB
-                                    tool_result = json.dumps({"error": "key cannot be empty"})
-                                else:
-                                    tool_result = json.dumps({"status": "remembered", "key": key})
-
-                                    async def _write_memory(
-                                        _key: str = key,
-                                        _value: str = value,
-                                        _uid: str = current_user["id"],
-                                    ) -> None:
-                                        try:
-                                            await aexec(
-                                                supabase.table("user_memory").upsert(
-                                                    {
-                                                        "user_id": _uid,
-                                                        "key": _key,
-                                                        "value": _value,
-                                                    },
-                                                    on_conflict="user_id,key",
-                                                )
-                                            )
-                                        except Exception as exc:
-                                            logger.warning(
-                                                "memory.remember write failed [user=%s key=%s]: %s",
-                                                _uid, _key, exc,
-                                            )
-
-                                    _spawn(_write_memory())
-                                    _spawn(write_audit_entry(
-                                        user_id=current_user["id"],
-                                        action_type="memory.remember",
-                                        metadata={"key": key, "value": value, "action": "upsert"},
-                                        supabase=supabase,
-                                    ))
-
-                            elif tool_name == "recall":
-                                # Phase 33 MEM-01: retrieve stored memory entries
-                                # D-09 (all), D-10 (specific), D-11 (not found), D-12 (empty)
-                                key = (args.get("key", "") or "").strip().lower()
-
-                                if key:
-                                    resp = await aexec(
-                                        supabase.table("user_memory")
-                                        .select("value")
-                                        .eq("user_id", current_user["id"])
-                                        .eq("key", key)
-                                        .maybe_single()
-                                    )
-                                    row = resp.data if resp else None
-                                    # Pitfall 5: maybe_single() mock compatibility
-                                    if isinstance(row, list):
-                                        row = row[0] if row else None
-                                    if row:
-                                        tool_result = row["value"]
-                                    else:
-                                        tool_result = f"No memory entry found for key: {key}"
-                                else:
-                                    _rows_resp = await aexec(
-                                        supabase.table("user_memory")
-                                        .select("key, value")
-                                        .eq("user_id", current_user["id"])
-                                        .order("updated_at", desc=True)
-                                    )
-                                    rows = _rows_resp.data or []
-                                    if rows:
-                                        tool_result = "\n".join(
-                                            f"- {r['key']}: {r['value']}" for r in rows
-                                        )
-                                    else:
-                                        tool_result = "No memories stored yet."
-
-                                _spawn(write_audit_entry(
-                                    user_id=current_user["id"],
-                                    action_type="memory.recall",
-                                    metadata={"key": key or None},
-                                    supabase=supabase,
-                                ))
-                            elif tool_name == "query_tables":
-                                # MODAL-03 Phase 36: query structured table data from documents
-                                from app.services.multimodal_service import handle_query_tables  # noqa: PLC0415
-                                tool_result = await handle_query_tables(args, current_user["id"], supabase)
-                            else:
-                                tool_result = f"Unknown tool: {tool_name}"
                         except json.JSONDecodeError:
                             tool_result = "Error parsing tool arguments"
                             args = {}
@@ -3329,15 +2581,7 @@ async def send_message(
 
                         await _emit(redis, run_id, 'tool_end', name=tool_name, result=tool_result[:2000])
 
-                        # GEN-03: Store full tool result — no character cap.
-                        # trim_messages_to_fit() drops OLDER messages when context budget is exceeded.
-                        # IMPORTANT: use a separate local — `full_content` is the assistant's
-                        # accumulated text response that gets persisted to messages.assistant.content.
-                        # Reusing it as a temp for the tool payload corrupted the persisted message
-                        # with the entire tool_result JSON (e.g., a full document dump). The bug was
-                        # latent pre-061 because the producer was cancelled on disconnect before
-                        # persist; 061's D-v2.5-08 contract inversion runs persist via the shielded
-                        # finalizer regardless of disconnect, surfacing the leak.
+                        # GEN-03: Store full tool result -- no character cap.
                         _tool_message_content = llm_tool_content if llm_tool_content is not None else tool_result
                         messages.append({
                             "role": "tool",
@@ -3345,9 +2589,8 @@ async def send_message(
                             "content": _tool_message_content,
                         })
 
-                        # Persist tool call — for execute_code rebuild from tool_result
+                        # Persist tool call -- for execute_code rebuild from tool_result
                         # so output_files (with signed URLs) are never lost by string truncation.
-                        # Stdout/stderr are truncated since they're not needed for reload.
                         if tool_name == "execute_code":
                             try:
                                 _r = json.loads(tool_result)
@@ -3371,19 +2614,7 @@ async def send_message(
                             "result": persisted_result,
                             "status": "done",
                             **({"sub_agent": sub_agent_record} if sub_agent_record else {}),
-                            # Phase 075.1 Plan 04 (B-260519-05) — surface the resolved
-                            # sub-agent model id in the tool_call_result payload so the
-                            # frontend tool-card can render "Sub-agent: {model_id}" and
-                            # the user sees the silent downgrade transparency.
                             **({"sub_agent_model": sub_agent_record.get("effective_model", "")} if sub_agent_record else {}),
-                            # Plan 075.4-02 D-075.4-C1 — persist google's thought_signature
-                            # in the messages.tool_calls jsonb column when present. The
-                            # _on_chunk_openai capture above populates tc["thought_signature"]
-                            # only when active_provider_name == "google" AND the chunk
-                            # carried a non-empty signature, so this conditional spread is
-                            # naturally provider-gated. Phase 073 closure-local model:
-                            # per-run, dies with run, no schema change (messages.tool_calls
-                            # is jsonb — verified Phase 073 + Phase 067.4).
                             **({"thought_signature": tc.get("thought_signature")} if tc.get("thought_signature") else {}),
                         })
                     # Continue to next iteration to let LLM respond with tool results in context

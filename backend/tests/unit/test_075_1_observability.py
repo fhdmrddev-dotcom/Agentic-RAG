@@ -223,26 +223,35 @@ def test_persisted_tool_calls_carry_sub_agent_model_when_sub_agent_record_presen
     surfaces the model id to the frontend.
 
     This test exercises the construction-site convention: reading the
-    threads.py source for the sub_agent_record assignment + the
-    persisted_tool_calls.append site, asserting both halves of the contract."""
-    from pathlib import Path
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
-    text = src.read_text(encoding="utf-8")
+    tool_dispatcher.py source for the sub_agent_record assignment + the
+    threads.py persisted_tool_calls.append site, asserting both halves of
+    the contract.
 
-    # Construction site must include effective_model
+    Phase 083: sub_agent_record construction moved from threads.py to
+    tool_dispatcher.py during the G-5 mandated extraction."""
+    from pathlib import Path
+
+    # Phase 083: sub_agent_record construction is now in tool_dispatcher.py
+    dispatcher_src = Path(__file__).parent.parent.parent / "app" / "services" / "tool_dispatcher.py"
+    dispatcher_text = dispatcher_src.read_text(encoding="utf-8")
+
+    threads_src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    threads_text = threads_src.read_text(encoding="utf-8")
+
+    # Construction site must include effective_model (now in tool_dispatcher.py)
     assert re.search(
         r'sub_agent_record\s*=\s*\{[^}]*"effective_model"\s*:',
-        text,
+        dispatcher_text,
         re.DOTALL,
     ), (
         "sub_agent_record dict must include 'effective_model' key so the "
         "spread in persisted_tool_calls.append can read it (B-260519-05 backend payload)."
     )
 
-    # persisted_tool_calls.append must spread sub_agent_model from the record
+    # persisted_tool_calls.append must spread sub_agent_model from the record (still in threads.py)
     assert re.search(
         r'sub_agent_model.*sub_agent_record\.get\("effective_model"',
-        text,
+        threads_text,
     ), (
         "persisted_tool_calls.append must spread sub_agent_model from "
         "sub_agent_record.get('effective_model', ...) (B-260519-05 frontend metadata)."
