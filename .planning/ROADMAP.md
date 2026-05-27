@@ -148,11 +148,13 @@ Plans:
   3. `workspace_list` shows all files in the thread workspace; `workspace_delete` removes a file permanently; both reflect immediately in subsequent calls
   4. Every `workspace_write` auto-creates a new version row, and `workspace_diff` returns a structured diff between any two versions of the same file
   5. Files below the configurable size threshold are stored inline in Postgres; files above are uploaded to Supabase Storage -- the agent and user see no difference in behavior regardless of storage backend
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 084-01: TBD
-- [ ] 084-02: TBD
+- [ ] 084-01-PLAN.md -- Database migration: workspace tables, RLS policies, storage bucket (WS-01, WS-05, WS-06)
+- [ ] 084-02-PLAN.md -- DB layer, Pydantic models, workspace service with hybrid storage and versioning (WS-01, WS-02, WS-03, WS-04, WS-05)
+- [ ] 084-03-PLAN.md -- Tool handlers in tool_dispatcher + tool schemas in openai_service + SSE events (WS-01, WS-02, WS-03, WS-04, WS-07)
+- [ ] 084-04-PLAN.md -- REST API endpoints for workspace file browsing, content, versions, and diff (WS-02, WS-03, WS-04, WS-06)
 
 ### Phase 085: New LLM Tools
 **Goal**: The agent can manage a todo list, spawn sub-agents for delegated work, and pause to ask the user a question -- all operating safely across multiple workers
@@ -226,7 +228,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 3/3 | Complete    | 2026-05-27 |
-| 084. Workspace Filesystem Backend | 0/TBD | Not started | - |
+| 084. Workspace Filesystem Backend | 0/4 | Not started | - |
 | 085. New LLM Tools | 0/TBD | Not started | - |
 | 086. StreamsProvider Extension + Panel Hooks | 0/TBD | Not started | - |
 | 087. Panel UI | 0/TBD | Not started | - |
