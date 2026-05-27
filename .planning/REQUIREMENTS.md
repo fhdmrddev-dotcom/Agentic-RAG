@@ -61,8 +61,8 @@
 
 ### Theme G -- Settings Architecture Unification
 
-- [ ] **SETTINGS-UNIFY-01**: `settings_override.json` eliminated; all 34+ keys migrated to DB tables with one-shot migration on first startup. Migration runner in FastAPI lifespan reads JSON, writes to `app_settings` DB table, renames file to `.migrated`. Idempotent on re-run. Multi-worker safe via `INSERT ... ON CONFLICT DO NOTHING`. No code path reads from JSON after migration.
-- [ ] **SETTINGS-UNIFY-02**: `model_capabilities_overrides` table enables runtime model registration with hot-reload 30s TTL cache. 4-tier resolution: DB row > `LLM_CALL_TIMEOUT_OVERRIDES` env CSV > static `MODEL_CAPABILITIES` dict > safe defaults. DB-registered models appear in model picker under their provider's section. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV preserved as operator bootstrap fallback.
+- [x] **SETTINGS-UNIFY-01**: `settings_override.json` eliminated; all 34+ keys migrated to DB tables with one-shot migration on first startup. Migration runner in FastAPI lifespan reads JSON, writes to `app_settings` DB table, renames file to `.migrated`. Idempotent on re-run. Multi-worker safe via `INSERT ... ON CONFLICT DO NOTHING`. No code path reads from JSON after migration.
+- [x] **SETTINGS-UNIFY-02**: `model_capabilities_overrides` table enables runtime model registration with hot-reload 30s TTL cache. 4-tier resolution: DB row > `LLM_CALL_TIMEOUT_OVERRIDES` env CSV > static `MODEL_CAPABILITIES` dict > safe defaults. DB-registered models appear in model picker under their provider's section. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV preserved as operator bootstrap fallback.
 
 ## Future Requirements (deferred)
 
@@ -163,8 +163,8 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
 | TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Complete |
 
-| SETTINGS-UNIFY-01 | 081.1 — Settings Architecture Unification | Pending |
-| SETTINGS-UNIFY-02 | 081.1 — Settings Architecture Unification | Pending |
+| SETTINGS-UNIFY-01 | 081.1 — Settings Architecture Unification | Complete |
+| SETTINGS-UNIFY-02 | 081.1 — Settings Architecture Unification | Complete |
 
 **Coverage:**
 - v2.6 requirements: 24 total

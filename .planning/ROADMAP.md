@@ -211,10 +211,10 @@ Plans:
 - [x] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
 - [ ] **Phase 081.1: Settings Architecture Unification** (INSERTED 2026-05-27) — Eliminate settings_override.json; migrate 36 keys to app_settings DB + model_capabilities_overrides table; 30s TTL hot-reload cache; 4-tier model capability resolution (DB > env CSV > static dict > default). Foundation for v3.1 admin shell. (4 plans)
 Plans:
-- [ ] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
-- [ ] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
-- [ ] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
-- [ ] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
+- [x] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
+- [x] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
+- [x] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
+- [x] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
 
 **Wave 4 — Verify**
 
@@ -944,7 +944,7 @@ Plans:
   4. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV path stays as a fallback (deployment bootstrap) but DB row takes precedence when both exist. Documented in `backend/.env.example` as "operator bootstrap only; prefer admin UI in v3.1+."
   5. Verifier integration test asserts: (a) no code path reads from `settings_override.json` after migration, (b) all values previously in the JSON resolve cleanly from DB through the new cache, (c) hot-reload observed — write to `app_settings`, next read within 30s reflects change.
 
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 Plans:
 - [ ] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
 - [ ] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
