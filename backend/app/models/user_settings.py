@@ -453,6 +453,138 @@ def tool_args_progress_emit_boundary_bytes() -> int:
     return int(value)
 
 
+# ── Async DB-backed settings cache (Phase 081.1 D-06/D-07/D-08) ─────────
+# Parallel to the file-based _override_cache above.  These functions use the
+# Phase 073 asyncpg pool for reads and support a 30s in-process TTL cache
+# per worker (D-06).  Existing _load_override() / save_override() are
+# UNTOUCHED — they continue to work until Plan 03 flips the switch.
+
+_settings_cache: dict[str, Any] | None = None
+_settings_cache_time: float = 0.0
+_SETTINGS_CACHE_TTL: float = 30.0
+
+
+async def _load_settings_from_db() -> dict[str, Any]:
+    """Return the global app_settings row as a dict, with 30s TTL cache.
+
+    On cache hit (within TTL): returns cached dict without DB I/O.
+    On cache miss: fetches via asyncpg pool, updates cache + timestamp.
+    """
+    global _settings_cache, _settings_cache_time
+    now = _time.time()
+    if _settings_cache is not None and (now - _settings_cache_time) < _SETTINGS_CACHE_TTL:
+        return _settings_cache
+
+    try:
+        from app.dependencies import get_pg_pool  # lazy import — avoid circular
+        pool = await get_pg_pool()
+        row = await pool.fetchrow(
+            "SELECT * FROM app_settings WHERE id = 'global'"
+        )
+        _settings_cache = dict(row) if row else {}
+    except Exception:
+        logger.warning(
+            "_load_settings_from_db: DB read failed; returning stale/empty cache",
+            exc_info=True,
+        )
+        if _settings_cache is None:
+            _settings_cache = {}
+    _settings_cache_time = _time.time()
+    return _settings_cache
+
+
+def invalidate_settings_cache() -> None:
+    """Zero out settings cache timestamp so next read hits DB (D-07)."""
+    global _settings_cache_time
+    _settings_cache_time = 0.0
+
+
+async def save_app_settings(updates: dict[str, Any]) -> None:
+    """Write settings to app_settings DB row via asyncpg.
+
+    Ports the _is_valid_api_key sentinel guard from save_override (D-14).
+    Calls invalidate_settings_cache() on success (D-07).
+    """
+    # Filter out sentinel / invalid API key values (D-14, T-081.1-02)
+    clean: dict[str, Any] = {}
+    for k, v in updates.items():
+        if v == KEY_PLACEHOLDER:
+            continue
+        if k.endswith("_api_key") and v is not None and not _is_valid_api_key(k, str(v)):
+            logger.warning(
+                "save_app_settings: rejected api_key write — sentinel/invalid for key=%s",
+                k,
+            )
+            continue
+        if v is None:
+            continue  # skip None values — don't write NULLs for missing keys
+        clean[k] = v
+
+    if not clean:
+        return
+
+    # Build parameterized UPDATE — column names from code constants, values via $N
+    cols = list(clean.keys())
+    vals = list(clean.values())
+    set_clause = ", ".join(f"{col} = ${i+1}" for i, col in enumerate(cols))
+    vals.append("global")  # WHERE id = $N
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        await pool.execute(
+            f"UPDATE app_settings SET {set_clause}, updated_at = now() "
+            f"WHERE id = ${len(vals)}",
+            *vals,
+        )
+        invalidate_settings_cache()
+    except Exception:
+        logger.warning(
+            "save_app_settings: DB write failed; settings not persisted",
+            exc_info=True,
+        )
+
+
+# ── Model capabilities overrides cache (Phase 081.1 D-09/D-10) ──────────
+
+_model_overrides_cache: dict[str, dict] = {}
+_model_overrides_cache_time: float = 0.0
+
+
+async def _load_model_overrides() -> dict[str, dict]:
+    """Return enabled model_capabilities_overrides rows as {model_id: row_dict}.
+
+    Same 30s TTL cache pattern as _load_settings_from_db (D-06).
+    """
+    global _model_overrides_cache, _model_overrides_cache_time
+    now = _time.time()
+    if _model_overrides_cache and (now - _model_overrides_cache_time) < _SETTINGS_CACHE_TTL:
+        return _model_overrides_cache
+
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        rows = await pool.fetch(
+            "SELECT * FROM model_capabilities_overrides WHERE enabled = true"
+        )
+        _model_overrides_cache = {r["model_id"]: dict(r) for r in rows}
+    except Exception:
+        logger.warning(
+            "_load_model_overrides: DB read failed; returning stale/empty cache",
+            exc_info=True,
+        )
+        if not _model_overrides_cache:
+            _model_overrides_cache = {}
+    _model_overrides_cache_time = _time.time()
+    return _model_overrides_cache
+
+
+def invalidate_model_overrides_cache() -> None:
+    """Zero out model overrides cache timestamp (D-07 pattern)."""
+    global _model_overrides_cache_time
+    _model_overrides_cache_time = 0.0
+
+
 def resolve_sub_agent_model(s: "UserEffectiveSettings") -> str:
     """Return the model that would actually be used for sub-agent calls right now.
 
