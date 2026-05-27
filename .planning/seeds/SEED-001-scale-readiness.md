@@ -7,7 +7,11 @@ trigger_when:
   - Concurrent-user load reported by >10 simultaneous active users in production
   - Latency or queueing complaints from users (P95 response time degradation, "spinner stuck" reports)
   - Backend logs show AnyIO threadpool saturation (queueing at the limiter)
-status: planted
+status: partial-consumed
+consumed_by:
+  - Phase 073 (asyncpg hot-path integration)
+  - Phase 079 (multi-worker enable + D-PRD-12 ADR)
+partial_note: "CONCUR-03 asyncpg migration partly addressed by Phase 073; multi-worker production deployment addressed by Phase 079 + D-PRD-12. Remaining scope: full load testing under concurrent users, AnyIO threadpool ceiling audit under production traffic. Retain as planted with narrowed scope for v2.7+ trigger."
 ---
 
 # SEED-001: Scale Readiness — multi-user concurrent load

@@ -2,7 +2,7 @@
 phase: 082-cross-cutting-verification-extraction-telemetry
 verified: "2026-05-27T12:05:00Z"
 status: partial
-score: "3/5 success criteria verified (SC#1, SC#2, SC#4); SC#3 + SC#5 pending Plan 02"
+score: "4/5 success criteria verified (SC#1, SC#2, SC#4, SC#5 GREEN); SC#3 lived-experience pending"
 ---
 
 # Phase 082: Cross-cutting Verification Report
@@ -64,7 +64,34 @@ tests/integration/test_058_concurrency.py::test_cross_tab_unblocked_during_sse P
 
 ## SC#3 -- 067.5 Regression Verification (Thread-Switch Stress)
 
-**Status: Pending** -- Plan 02 lived-experience UAT (user-driven Chrome MCP). Per D-05, SC#3 requires real browser interaction with human judgment for the 5-cycle thread-switch stress test.
+### SC#3a -- Automated: Branch D-3 Vitest Regression Suite
+
+**Method:** `npx vitest run src/__tests__/providers/streamsProvider_067_5_regression.test.tsx --reporter=verbose`
+
+**Test Suite:** Phase 075.4 D-075.4-A3 -- per-thread streaming preserves cross-thread bucket
+
+```
+ RUN  v4.1.0 C:/Vibe Apps/Agentic RAG/frontend
+
+ OK  src/__tests__/providers/streamsProvider_067_5_regression.test.tsx
+   Phase 075.4 D-075.4-A3 -- per-thread streaming preserves cross-thread bucket
+     Test 1 -- Thread A streaming: useStreamingForThread('thread-a') === true (067.5 baseline)  21ms
+     Test 2 -- Branch D-3 guard preserves Thread A bucket on cross-thread switch + clearThreadBucket fire  31ms
+     Test 3 -- Multi-thread parallel: streamingThreads Set holds both; clearThreadBucket leaves it untouched  5ms
+     Test 4 -- Branch D-3 predicate is unchanged (predicate-grep verified externally)  0ms
+     Test 5 (075.6) -- clearThreadBucket is NEVER called during a 075.6 streaming run with tool_args_progress events (Landmine L6)  10ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  16:05:50
+   Duration  2.14s (transform 132ms, setup 245ms, import 238ms, tests 70ms, environment 1.42s)
+```
+
+**SC#3a Verdict: GREEN** -- All 5 Branch D-3 regression tests PASS. Guard predicate preserved verbatim through the full v2.6 phase chain (068 StreamsProvider lift, 075.4 per-thread state, 075.6 streaming UX, 075.7 refactor).
+
+### SC#3b -- Lived-experience: Chrome MCP Thread-Switch UAT
+
+**Status: PENDING** -- User-driven 5-cycle thread-switch stress test per D-04 protocol. Awaiting Task 2 checkpoint execution.
 
 ---
 
@@ -112,7 +139,64 @@ tests/integration/test_058_concurrency.py::test_cross_tab_unblocked_during_sse P
 
 ## SC#5 -- Milestone-Close Audit (REQ-ID Traceability)
 
-**Status: Pending** -- Plan 02 milestone-close audit with REQ-ID x Phase x Status table and seed disposition.
+**Method:** Cross-referenced each REQ-ID against its owning phase's VERIFICATION.md, SUMMARY.md files, STATE.md Recent Completed Phases section, and REQUIREMENTS.md traceability table. Some phases show "Pending" or "Not started" in the stale ROADMAP progress table but actually shipped -- STATE.md and the existence of SUMMARY.md files are the authoritative evidence.
+
+### REQ-ID Audit Table (24 v2.6 Requirements)
+
+| # | REQ-ID | Theme | Owning Phase | Phase Status | Evidence Source | Audit Status |
+|---|--------|-------|-------------|-------------|-----------------|--------------|
+| 1 | RAG-DOCLING-01 | A | 071 + 082 SC#1 | Shipped | 082-VERIFICATION.md SC#1: PDF 48t/67i, DOCX 39t/58i -- within 20% band | **Validated** |
+| 2 | RAG-DOCLING-02 | A | 070 | Shipped | 070 discuss-phase resolved Q-v2.6-01; httpx>=0.28 + supabase>=2.29 pinned | **Validated** |
+| 3 | RAG-MM-LIFT-01 | A | 072 | Shipped | 072-VERIFICATION: multimodal ceilings in app_settings (migration 044); 58/58 refill on thesis DOCX | **Validated** |
+| 4 | RAG-MM-LIFT-02 | A | 072 | Shipped | 072 Plans 01-05: zip_xpath_docx engine, wp:anchor + related_parts walk; 58 floating images extracted | **Validated** |
+| 5 | RAG-RECAL-01 | A | 076 | Shipped | STATE.md: 076 Complete 2026-05-25; 0.55/0.40 -> 0.54/0.38; RAG-RECAL-01 CLOSED per D-04 ADJUST | **Validated** |
+| 6 | WORKER-LIFT-01 | B | 077 (validated) + 079 (enabled) | Both shipped | 077-VERIFICATION.md: 4/4 must-haves; 079: WORKER_COUNT=2 live, 2 PIDs confirmed | **Validated** |
+| 7 | WORKER-LIFT-02 | B | 073 | Shipped | 073-VERIFICATION.md: 5/5 SCs; asyncpg hot-path flips; 082 SC#2 re-confirms CONCUR-01 green | **Validated** |
+| 8 | WORKER-LIFT-03 | B | 079 | Shipped | STATE.md: 079 Complete 2026-05-27; D-PRD-12 ADR authored; CLAUDE.md rule updated | **Validated** |
+| 9 | WORKER-LIFT-04 | B | 078 | Shipped | 078-03-SUMMARY.md: GET /admin/backpressure endpoint with 4 bottleneck signals; auth-gated | **Validated** |
+| 10 | STREAMS-PROVIDER-01 | C | 068 | Shipped | 068-VERIFICATION.md: status=passed, 4/4 must-haves; StreamsProvider Context owns subscriptions | **Validated** |
+| 11 | CHAT-RESILIENCE-01 | C | 068.5 | Shipped | 068.5-VERIFICATION.md: status=passed; BUG-260513-01 closed; last-known-good + in-flight pulse | **Validated** |
+| 12 | POLISH-SEED-008-01 | D | 075 | Shipped | 075-01-SUMMARY.md: GET /threads/{id}/snapshot endpoint shipped; thread-switch latency reduced | **Validated** |
+| 13 | POLISH-SEED-008-02 | D | 075 | Shipped | 075-02-SUMMARY.md: line-by-line stdout streaming; code_stdout SSE events confirmed | **Validated** |
+| 14 | POLISH-SEED-009-01 | D | 074 | Shipped | REQUIREMENTS.md: checked [x]; MODEL_CAPABILITIES.max_output_tokens populated | **Validated** |
+| 15 | POLISH-SEED-010-01 | D | 081 | Shipped | STATE.md: 081 Complete 2026-05-27; 4/4 synthetic-timeout UAT GREEN on Kimi + MiniMax | **Validated** |
+| 16 | POLISH-SEED-011-01 | D | 074 | Shipped | REQUIREMENTS.md: checked [x]; loop-binding bug structurally closed via conftest hoist | **Validated** |
+| 17 | POLISH-TOOL-PROG-01 | D | 075 | Shipped | 075-03-SUMMARY.md: tool_args_progress SSE for non-execute_code tools; 6 integration tests GREEN | **Validated** |
+| 18 | CQ-SUPA-01 | E | 078 | Shipped | 078-01-SUMMARY.md: Supabase singleton aclose() in lifespan shutdown | **Validated** |
+| 19 | CQ-CTX-01 | E | 078 | Shipped | 078-02-SUMMARY.md: Protected-only overrun handling; ConversationTooLongError | **Validated** |
+| 20 | CQ-DEDUP-01 | E | 078 | Shipped | 078-02-SUMMARY.md: Concurrent upload dedup via partial unique index + atomic CAS | **Validated** |
+| 21 | CQ-TITLE-01 | E | 078 | Shipped | 078-01-SUMMARY.md: Title-generation failure logging with exc_info | **Validated** |
+| 22 | TOKEN-COL-01 | F | 073 | Shipped | 073-VERIFICATION.md: 5/5 SCs; input_tokens/output_tokens populated; 082 SC#2 re-confirms | **Validated** |
+| 23 | SETTINGS-UNIFY-01 | G | 081.1 | Shipped | 081.1 UAT 6/6 PASS; settings_override.json eliminated; migration runner in lifespan | **Validated** |
+| 24 | SETTINGS-UNIFY-02 | G | 081.1 | Shipped | 081.1 UAT 6/6 PASS; model_capabilities_overrides table; 4-tier resolution; hot-reload cache | **Validated** |
+
+### SC#5 Audit Summary
+
+- **24/24 REQ-IDs: Validated** -- All owning phases have shipped and evidence exists for each requirement
+- **0 Pending** -- No requirements remain unaddressed
+- **0 Partial** -- No requirements partially met
+
+**SC#5 Verdict: GREEN** -- All 24 v2.6 REQ-IDs audited with Validated status. Every owning phase has shipped with verification evidence.
+
+---
+
+## Seed Disposition (per D-07)
+
+7 seeds dispositioned as part of the v2.6 milestone-close audit:
+
+| Seed | Title | Disposition | Consuming Phase(s) |
+|------|-------|-------------|-------------------|
+| SEED-001 | Scale Readiness | **partial-consumed** | 073 (asyncpg), 079 (multi-worker) |
+| SEED-006 | Multimodal Extraction Quality | **closed** | 071/071.1/071.2/071.3/072 |
+| SEED-007 | App-level Streams Provider | **closed** | 068 |
+| SEED-008 | Streaming UX Polish | **closed** | 075/075.1 |
+| SEED-009 | claude-haiku max_tokens cap | **closed** | 074 |
+| SEED-010 | OpenRouter synthetic-timeout protocol | **closed** | 081 |
+| SEED-011 | test_059 fixture teardown | **closed** | 074 |
+
+**SEED-001 remains planted** with narrowed scope -- full load testing under concurrent users and AnyIO threadpool ceiling audit under production traffic remain for v2.7+. CONCUR-03 asyncpg migration partly addressed by Phase 073; multi-worker deployment addressed by Phase 079 + D-PRD-12.
+
+**6 seeds fully closed** -- each consumed by at least one v2.6 phase with verification evidence in the owning phase's VERIFICATION.md or SUMMARY.md.
 
 ---
 
@@ -122,11 +206,11 @@ tests/integration/test_058_concurrency.py::test_cross_tab_unblocked_during_sse P
 |----|-------------|---------|----------|
 | SC#1 | Extraction counts within 20% band | **GREEN** | PDF: 48t/67i/508c; DOCX: 39t/58i/460c -- all within D-03 bands |
 | SC#2 | CONCUR-01 pytest green | **GREEN** | 1 passed in 0.32s |
-| SC#3 | 067.5 thread-switch stress | **PENDING** | Plan 02 (user-driven) |
+| SC#3 | 067.5 thread-switch stress | **GREEN (automated)** / **PENDING (lived-experience)** | 5/5 vitest PASS; Chrome MCP 5-cycle UAT pending Task 2 |
 | SC#4 | Telemetry populated | **GREEN** | 2 rows from today's re-extraction, engine + duration non-NULL |
-| SC#5 | Milestone-close audit | **PENDING** | Plan 02 |
+| SC#5 | Milestone-close audit | **GREEN** | 24/24 REQ-IDs Validated; 7 seeds dispositioned (6 closed, 1 partial) |
 
-**Overall: 3/5 VERIFIED -- SC#1, SC#2, SC#4 all GREEN. SC#3 + SC#5 pending Plan 02.**
+**Overall: 4/5 VERIFIED -- SC#1, SC#2, SC#4, SC#5 all GREEN. SC#3 automated GREEN, lived-experience pending Task 2.**
 
 ---
 

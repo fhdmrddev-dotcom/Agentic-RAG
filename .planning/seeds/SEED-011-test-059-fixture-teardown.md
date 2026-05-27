@@ -2,7 +2,9 @@
 seed_id: SEED-011
 title: test_059_disconnect.py::test_normal_stream_unchanged — Event-loop-closed during fixture teardown
 created: 2026-05-09
-status: planted
+status: closed
+closed: 2026-05-27
+closed_by: 082-cross-cutting-verification-extraction-telemetry
 priority: medium
 re_open_triggers:
   - Next test-infra phase touching `backend/tests/integration/test_059_disconnect.py` or its fixtures
@@ -15,6 +17,7 @@ relates_to:
   - Phase 062 plan 02 deviation pattern (`_reset_redis_singleton` autouse fixture analog at `tests/integration/test_062_stream_replay.py:36-51`)
   - Phase 063 plan 1 verbatim copy of `_reset_redis_singleton` at `tests/integration/test_063_post_then_subscribe.py:45-62`
   - Phase 065 Plan 03 SUMMARY — verified pre-existing on `fa1e327` base via git-stash round-trip
+closure_note: "Fully consumed by Phase 074. test_059_disconnect.py 3/3 PASS without RuntimeError. POLISH-SEED-011-01 Validated."
 ---
 
 # SEED-011: test_059 fixture teardown loop-binding bug

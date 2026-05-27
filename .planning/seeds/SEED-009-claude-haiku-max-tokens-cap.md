@@ -2,7 +2,9 @@
 seed_id: SEED-009
 title: claude-haiku-4-5 max_tokens default exceeds 64K model cap
 created: 2026-05-09
-status: planted
+status: closed
+closed: 2026-05-27
+closed_by: 082-cross-cutting-verification-extraction-telemetry
 priority: medium
 re_open_triggers:
   - Any user report of BadRequestError on Anthropic models
@@ -13,6 +15,7 @@ relates_to:
   - Phase 067.5 Plan 02 closing UAT — Cycle 5 surfaced the bug live (run_id `8ca784f2-1e5e-4918-9784-c79cadee145f`, thread `6e2913b7-6d93-49ae-aa02-c65c843c7970`)
   - D-063-04 Resume path — worked cleanly when this error surfaced (user clicked Resume → new run `53ee4e5a-692a-4c0d-bfe9-874248da6d31` succeeded)
   - MODEL_CAPABILITIES registry pattern (already used for `provider`, `supports_tools`, `default_temperature`, etc. in `backend/app/config.py`)
+closure_note: "Fully consumed by Phase 074. MODEL_CAPABILITIES.max_output_tokens populated for all Anthropic models. POLISH-SEED-009-01 Validated."
 ---
 
 # SEED-009: claude-haiku-4-5 max_tokens default exceeds 64K model cap
