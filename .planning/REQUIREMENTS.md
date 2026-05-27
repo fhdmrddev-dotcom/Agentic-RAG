@@ -13,7 +13,7 @@
 
 ### Theme A — RAG Quality Lift
 
-- [ ] **RAG-DOCLING-01
+- [x] **RAG-DOCLING-01
 **: A user-uploaded PDF and the same source's DOCX produce comparable table + image counts (within 20% delta) when re-ingested under the new extractor. Docling primary path used by default; `PdfExtractor` abstraction allows per-document fallback to PyMuPDF without flipping the global default. _(Plan 02 lands the extractor wire-in + telemetry writes; Plan 04 lands the binding live-UAT 20%-delta gate)_
 - [x] **RAG-DOCLING-02**: The httpx<0.28 vs supabase 2.10 conflict has a chosen resolution path (per Q-v2.6-01) and is verified in CI: `pytest backend/tests/integration/test_pdf_extractor_*.py` green on the chosen resolution.
 - [x] **RAG-MM-LIFT-01**: `multimodal_service._MAX_VISION_CALLS` and `_MAX_B64_BYTES` are admin-tunable via `app_settings`; default raised to a value that covers ≥80% of figures on a 4 MB academic PDF. Empty-vision-description rows persisted (with `description=''`) instead of dropped, so re-runs can fill in.
@@ -28,12 +28,12 @@
 **: `asyncpg` connection pool replaces sync `supabase-py` calls inside the streaming endpoint (`agent_runner` Postgres reads/writes in `threads.py`) and inside `_drain_stream_with_close_on_cancel`'s persistence finalize path. CONCUR-01 binding pytest gate (`backend/tests/integration/test_058_concurrency.py`) stays green.
 - [x] **WORKER-LIFT-03
 **: A new ADR (`D-PRD-12`) explicitly supersedes `D-v2.5-02`; `CLAUDE.md`'s "Single uvicorn worker" rule is updated to "Multi-worker — see D-PRD-12 for the audit checklist".
-- [ ] **WORKER-LIFT-04**: `GET /admin/backpressure` returns the documented JSON shape, gated on the existing operator role check (when none exists yet, scoped to a hard-coded admin user list via env var until v3.1 ships RBAC).
+- [x] **WORKER-LIFT-04**: `GET /admin/backpressure` returns the documented JSON shape, gated on the existing operator role check (when none exists yet, scoped to a hard-coded admin user list via env var until v3.1 ships RBAC).
 
 ### Theme C — Streams Provider Pre-emptive Lift + Chat-Surface Resilience
 
-- [ ] **STREAMS-PROVIDER-01**: A `<StreamsProvider>` Context owns all run-stream subscriptions; `useMessages` reads from it via `useStreamsContext()`; a second concurrent stream surface (mocked eval pane) renders without state collision. The Phase 067.5 Branch D-3 streaming-bucket guard at `frontend/src/hooks/useMessages.ts:572-590` is preserved verbatim; existing chat regression tests (063 / 063.1 / 067.x) stay green.
-- [ ] **CHAT-RESILIENCE-01**: The chat surface paints last-known-good messages immediately on thread switch / page navigation / page refresh (no blank window). `GET /threads/{id}/messages` reconciles in the background without clobbering streaming buckets (Phase 067.5 Branch D-3 guard respected). Assistant turns whose `runs.status` is `running` or `queued` render with a visible in-flight pulse / animated brand mark until terminal SSE arrives. Fetch failures surface an inline retry over cached content instead of blanking the message list. Closes BUG-260513-01.
+- [x] **STREAMS-PROVIDER-01**: A `<StreamsProvider>` Context owns all run-stream subscriptions; `useMessages` reads from it via `useStreamsContext()`; a second concurrent stream surface (mocked eval pane) renders without state collision. The Phase 067.5 Branch D-3 streaming-bucket guard at `frontend/src/hooks/useMessages.ts:572-590` is preserved verbatim; existing chat regression tests (063 / 063.1 / 067.x) stay green.
+- [x] **CHAT-RESILIENCE-01**: The chat surface paints last-known-good messages immediately on thread switch / page navigation / page refresh (no blank window). `GET /threads/{id}/messages` reconciles in the background without clobbering streaming buckets (Phase 067.5 Branch D-3 guard respected). Assistant turns whose `runs.status` is `running` or `queued` render with a visible in-flight pulse / animated brand mark until terminal SSE arrives. Fetch failures surface an inline retry over cached content instead of blanking the message list. Closes BUG-260513-01.
 
 ### Theme D — Polish Carry-forwards
 
@@ -49,10 +49,10 @@
 
 ### Theme E — Opportunistic Code-Quality (Cluster G)
 
-- [ ] **CQ-SUPA-01**: Supabase client `aclose()` runs on FastAPI shutdown without `RuntimeWarning`; verified in `pytest backend/tests/unit/test_lifespan.py`.
-- [ ] **CQ-CTX-01**: When protected-only messages exceed `max_tokens`, `trim_messages_to_fit` either trims oldest-protected progressively OR raises `ConversationTooLongError` (decision routed to phase-level discuss). No silent overrun.
-- [ ] **CQ-DEDUP-01**: Concurrent same-file uploads produce exactly one `documents` row + one set of `document_chunks` (race closed by partial unique index + atomic transition).
-- [ ] **CQ-TITLE-01**: Title-generation failures emit a `logger.warning` with the exception detail; fallback behavior preserved.
+- [x] **CQ-SUPA-01**: Supabase client `aclose()` runs on FastAPI shutdown without `RuntimeWarning`; verified in `pytest backend/tests/unit/test_lifespan.py`.
+- [x] **CQ-CTX-01**: When protected-only messages exceed `max_tokens`, `trim_messages_to_fit` either trims oldest-protected progressively OR raises `ConversationTooLongError` (decision routed to phase-level discuss). No silent overrun.
+- [x] **CQ-DEDUP-01**: Concurrent same-file uploads produce exactly one `documents` row + one set of `document_chunks` (race closed by partial unique index + atomic transition).
+- [x] **CQ-TITLE-01**: Title-generation failures emit a `logger.warning` with the exception detail; fallback behavior preserved.
 
 ### Theme F — Token Telemetry
 
@@ -145,22 +145,22 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | RAG-MM-LIFT-01 | 072 — Multimodal Lift + DOCX Completeness | Complete |
 | RAG-MM-LIFT-02 | 072 — Multimodal Lift + DOCX Completeness | Complete |
 | RAG-RECAL-01 | 076 — Confidence Recalibration | Complete (2026-05-25) |
-| WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Pending |
+| WORKER-LIFT-01 | 077 — Multi-Worker Validation Harness (full enable at 079) | Complete (2026-05-27) |
 | WORKER-LIFT-02 | 073 — asyncpg Pool Integration | Complete |
-| WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Pending |
-| WORKER-LIFT-04 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
-| STREAMS-PROVIDER-01 | 068 — `<StreamsProvider>` Context Lift | Pending |
-| CHAT-RESILIENCE-01 | 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | Pending |
-| POLISH-SEED-008-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
-| POLISH-SEED-008-02 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
+| WORKER-LIFT-03 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | Complete (2026-05-27) |
+| WORKER-LIFT-04 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Complete (2026-05-27) |
+| STREAMS-PROVIDER-01 | 068 — `<StreamsProvider>` Context Lift | Complete (2026-05-13) |
+| CHAT-RESILIENCE-01 | 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | Complete (2026-05-14) |
+| POLISH-SEED-008-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Complete (2026-05-18) |
+| POLISH-SEED-008-02 | 075 — SEED-008 + tool_args_progress Polish Bundle | Complete (2026-05-18) |
 | POLISH-SEED-009-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Complete |
 | POLISH-SEED-010-01 | 081 — SEED-010 OpenRouter UAT | Complete |
 | POLISH-SEED-011-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Complete |
-| POLISH-TOOL-PROG-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
-| CQ-SUPA-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
-| CQ-CTX-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
-| CQ-DEDUP-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
-| CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |
+| POLISH-TOOL-PROG-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Complete (2026-05-18) |
+| CQ-SUPA-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Complete (2026-05-27) |
+| CQ-CTX-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Complete (2026-05-27) |
+| CQ-DEDUP-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Complete (2026-05-27) |
+| CQ-TITLE-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Complete (2026-05-27) |
 | TOKEN-COL-01 | 073 — asyncpg Pool Integration (see ROADMAP F-1 routing note) | Complete |
 
 | SETTINGS-UNIFY-01 | 081.1 — Settings Architecture Unification | Complete |
@@ -179,4 +179,4 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 
 ---
 *Requirements defined: 2026-05-12 from `.planning/PRDs/v2.6.md` §4 (Active section)*
-*Last updated: 2026-05-12 — traceability filled in by gsd-roadmapper after ROADMAP.md generation*
+*Last updated: 2026-05-27 — all 24 REQ-IDs marked Complete after Phase 082 milestone-close verification (SC#5 24/24 Validated)*

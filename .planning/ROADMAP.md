@@ -218,7 +218,7 @@ Plans:
 
 **Wave 4 — Verify**
 
-- [ ] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — Validate final default-set output (post-071.3: camelot + pymupdf_full + legacy + `none` equations) against the user's reference PDF + DOCX baseline (ground truth: 35 tables / 59 figures on user thesis). Verify `--workers 2` doesn't regress the CONCUR-01 binding gate (`backend/tests/integration/test_058_concurrency.py`). Verify SEED-007 lift didn't regress 067.5 cycles (Chrome MCP + Playwright e2e against 063 / 063.1 / 067.x specs). (2 plans)
+- [x] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — 5/5 SCs GREEN: extraction counts within 20% band (SC#1), CONCUR-01 pytest green (SC#2), 067.5 Branch D-3 vitest 5/5 + Chrome MCP 5/5 lived-experience PASS (SC#3), telemetry populated (SC#4), 24/24 REQ-IDs Validated + 7 seeds dispositioned (SC#5). v2.6 milestone-close verification gate PASSED. (2 plans, shipped 2026-05-27)
 - [ ] **Phase 082.5: Error Handler Foundation** — Urgent slice of SEED-026: global FastAPI exception handler + structured `ErrorResponse{code, user_message, admin_message, trace_id, timestamp, run_id, thread_id}` model + `logging.basicConfig` (closes D-074-01-DEFER-1) + new `app_errors` audit table + frontend `ApiError` typed parsing. Stops backend SDK internals from leaking to users; gives admins a `trace_id` to correlate user reports with server-side state before any production-shape rollout. Frontend toast lib + admin error inspector deferred to v2.7 (SEED-026 pillars 4-5). (2 plans)
 
 Full details below in **Phase Details**.
@@ -1038,11 +1038,11 @@ v2.6's outputs unblock downstream milestone PRDs as follows:
 
 ## Coverage Summary
 
-- **v2.6 Active requirements:** 22 (per REQUIREMENTS.md; PRD §4 holds the original 21 — see note below)
-- **Mapped to phases:** 22 / 22 ✓
+- **v2.6 Active requirements:** 24 (per REQUIREMENTS.md; PRD §4 holds the original 21 — CHAT-RESILIENCE-01 added 2026-05-13, SETTINGS-UNIFY-01/02 added 2026-05-27)
+- **Mapped to phases:** 24 / 24 ✓
 - **Orphaned requirements:** 0
-- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 added 2026-05-13; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all four are intentional non-REQ-bearing phases with explicit roles)
-- **PRD amendment status:** `.planning/PRDs/v2.6.md` §4 still lists 21 Active REQs (matches signoff 2026-05-12). REQUIREMENTS.md and ROADMAP carry the 22nd REQ (CHAT-RESILIENCE-01) for Phase 068.5. User decision on whether to amend the locked PRD pending.
+- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 added 2026-05-13; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all five are intentional non-REQ-bearing phases with explicit roles)
+- **All 24 requirements Complete** -- verified by Phase 082 SC#5 milestone-close audit (24/24 Validated, 2026-05-27)
 
 See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 
@@ -1062,16 +1062,28 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
 | 073 — asyncpg Pool Integration | 4/4 | Complete    | 2026-05-17 |
 | 074 — SEED-009 + SEED-011 Polish Bundle | 2/2 | Complete    | 2026-05-18 |
-| 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
+| 075 — SEED-008 + tool_args_progress Polish Bundle | 3/3 | Complete    | 2026-05-18 |
+| 075.1 — Cross-Provider Streaming Stability | 4/4 | Complete    | 2026-05-21 |
+| 075.2 — ToolCallPanel Dedup + Final Outputs | 2/2 | Complete    | 2026-05-22 |
+| 075.3 — Defensive Chunk Handler + Google Token | 2/2 | Complete    | 2026-05-22 |
+| 075.6 — Live Streaming UX + Cross-Provider Parity | 3/3 | Complete    | 2026-05-23 |
+| 075.7 — Live-Execution UX Refactor | 3/3 | Complete    | 2026-05-24 |
+| 075.8 — Live-Execution Visual Polish | 1/1 | Complete    | 2026-05-24 |
+| 075.9 — Live-Execution Fidelity Handoff | 1/1 | Complete    | 2026-05-24 |
+| 075.10 — Fine-Grained tool_args_progress | 1/1 | Complete    | 2026-05-24 |
+| 075.11 — Agent Timeout Audit + Unification | 0/0 | Closed-by-quickfix | 2026-05-25 |
 | 076 — Confidence Recalibration | 2/2 | Complete    | 2026-05-25 |
-| 077 — Multi-Worker Validation Harness | 3/3 | Complete | 2026-05-27 |
-| 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
-| 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 1/2 | In progress | — |
+| 076.1 — Provider Integration + UX Status Fidelity | 4/4 | Complete    | 2026-05-26 |
+| 076.2 — Provider Streaming Parity + Full Integration | 4/4 | Complete    | 2026-05-26 |
+| 077 — Multi-Worker Validation Harness | 3/3 | Complete    | 2026-05-27 |
+| 078 — Backpressure JSON + Code-Quality Bundle | 3/3 | Complete    | 2026-05-27 |
+| 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 2/2 | Complete    | 2026-05-27 |
 | 080 — VPS Runbook + Deployment Guide Correction | 1/1 | Complete    | 2026-05-26 |
 | 081 — SEED-010 OpenRouter UAT | 1/1 | Complete    | 2026-05-27 |
-| 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
+| 081.1 — Settings Architecture Unification | 4/4 | Complete    | 2026-05-27 |
+| 082 — Cross-cutting Verification + Extraction Telemetry | 2/2 | Complete    | 2026-05-27 |
 | 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
-| **Total (v2.6)** | **4/42** | **In progress** | **—** |
+| **Total (v2.6)** | **91/93** | **In progress** | **—** |
 
 ### Phase 83: 075.9
 

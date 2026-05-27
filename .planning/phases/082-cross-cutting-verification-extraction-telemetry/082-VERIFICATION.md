@@ -1,8 +1,8 @@
 ---
 phase: 082-cross-cutting-verification-extraction-telemetry
-verified: "2026-05-27T12:05:00Z"
-status: partial
-score: "4/5 success criteria verified (SC#1, SC#2, SC#4, SC#5 GREEN); SC#3 lived-experience pending"
+verified: "2026-05-27T14:11:00Z"
+status: passed
+score: "5/5 success criteria verified"
 ---
 
 # Phase 082: Cross-cutting Verification Report
@@ -91,7 +91,13 @@ tests/integration/test_058_concurrency.py::test_cross_tab_unblocked_during_sse P
 
 ### SC#3b -- Lived-experience: Chrome MCP Thread-Switch UAT
 
-**Status: PENDING** -- User-driven 5-cycle thread-switch stress test per D-04 protocol. Awaiting Task 2 checkpoint execution.
+**Status: PASS** -- User confirmed 5/5 cycles GREEN on 2026-05-27.
+
+**Protocol:** 5 consecutive thread-switch cycles per D-04 (start stream on Thread A, switch to Thread B mid-stream, switch back to Thread A, verify messages visible immediately without F5).
+
+**Result:** All 5 cycles passed. No empty-thread-until-refresh repro under multi-worker (`WORKER_COUNT=2`) v2.6 stack. Messages appeared instantly on every switch-back; no blank flash; Thread A streaming content preserved across switches.
+
+**SC#3b Verdict: GREEN** -- Lived-experience UAT confirms Branch D-3 guard holds under production conditions.
 
 ---
 
@@ -206,11 +212,11 @@ tests/integration/test_058_concurrency.py::test_cross_tab_unblocked_during_sse P
 |----|-------------|---------|----------|
 | SC#1 | Extraction counts within 20% band | **GREEN** | PDF: 48t/67i/508c; DOCX: 39t/58i/460c -- all within D-03 bands |
 | SC#2 | CONCUR-01 pytest green | **GREEN** | 1 passed in 0.32s |
-| SC#3 | 067.5 thread-switch stress | **GREEN (automated)** / **PENDING (lived-experience)** | 5/5 vitest PASS; Chrome MCP 5-cycle UAT pending Task 2 |
+| SC#3 | 067.5 thread-switch stress | **GREEN** | 5/5 vitest PASS; Chrome MCP 5/5 lived-experience cycles PASS |
 | SC#4 | Telemetry populated | **GREEN** | 2 rows from today's re-extraction, engine + duration non-NULL |
 | SC#5 | Milestone-close audit | **GREEN** | 24/24 REQ-IDs Validated; 7 seeds dispositioned (6 closed, 1 partial) |
 
-**Overall: 4/5 VERIFIED -- SC#1, SC#2, SC#4, SC#5 all GREEN. SC#3 automated GREEN, lived-experience pending Task 2.**
+**Overall: 5/5 VERIFIED -- SC#1, SC#2, SC#3, SC#4, SC#5 all GREEN. v2.6 milestone-close verification gate PASSED.**
 
 ---
 
