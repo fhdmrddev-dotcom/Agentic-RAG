@@ -207,6 +207,8 @@ Plans:
 - [x] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
 - [x] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1/1 plans, shipped 2026-05-27)
 - [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
+Plans:
+- [ ] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
 
 **Wave 4 — Verify**
 
