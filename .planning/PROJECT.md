@@ -29,10 +29,21 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 
 **Seeds consumed:** SEED-006/007/008/009/010/011 closed; SEED-001 partial-consumed (load testing + threadpool audit remain for v2.7+).
 
+## Current Milestone: v2.7 Agent Workspace & Panel
+
+**Goal:** Ship a per-thread workspace filesystem and right-side panel that gives the agent a persistent scratchpad, todo management, sub-agent spawning, and user-input pausing — the "Claude.ai artifacts" moment for a self-hosted, multi-provider agent platform.
+
+**Target features:**
+- Per-thread workspace filesystem (agent writes/reads files, auto-versioned, hybrid inline/Storage)
+- 3 new LLM tools: `write_todos` (todo list), `task` (sub-agent spawning), `ask_user` (pause for input)
+- Right-side panel UI (~30% width, collapsible): todos, workspace file browser, pending user input
+- Accessibility (WCAG 2.1 AA) for all new panel surfaces
+- Close 4 open bugs carried from v2.6
+
 ## Current State
 
 **Shipped:** v2.6 (Foundation: RAG Quality + Multi-Worker + Polish) — 2026-05-27 (35 phases, 91 plans, 846 commits, ~183K LOC delta)
-**Active:** Planning next milestone (v2.7)
+**Active:** v2.7 Agent Workspace & Panel — defining requirements
 **Phase 069 complete (2026-05-14):** PdfExtractor abstraction scaffold shipped — `PdfExtractor` ABC + `LegacyExtractor` (today's pypdf + pdfplumber + python-docx pipeline rewrapped) + `get_extractor(mime)` dispatcher live in `backend/app/services/extraction_service.py`; `documents.py` upload + re-ingest paths routed through the seam; binding golden-fixture gate live (synthetic PDF + DOCX). Zero observable behavior change confirmed via golden gate; Q-v2.6-06 closed via D-PRD-07 appendix (PyMuPDF AGPL-3.0 fallback license posture locked). Phase 071 will plug Docling primary + PyMuPDF (subprocess-fenced) fallback behind the same dispatcher.
 **Phase 071.1 complete-partial (2026-05-15):** Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback. Plan 01 shipped clean (4 commits): `/reextract` async handler now wraps 6 sync supabase calls in `run_in_threadpool` (D-v2.5-01 compliance), `asyncio.wait_for(timeout=EXTRACTOR_DOCLING_TIMEOUT_S + 10)` wraps the Docling extract step as Layer 2 wall-clock fail-safe, and PyMuPDF auto-fallback fires on Docling timeout only (narrow override of D-071-11). Three new env knobs (`EXTRACTOR_DOCLING_TIMEOUT_S` / `_DISABLE_TABLE_STRUCTURE` / `_IMAGES_SCALE`). 8 new tests + reset_docling_singleton fixture. Plan 02 live UAT against thesis pair: 4-min Docling stall **structurally eliminated** (thesis PDF that previously stalled indefinitely now completes in 125s; backend `/health` stayed responsive at 1-2s during in-flight extract vs frozen previously). The 20% binding gate per D-071.1-06 stays RED at 89.7% tables / 100% images delta — but the root cause has shifted from "Docling stalls" to "PDF and DOCX extraction quality differ structurally" (deeper PDF-vs-DOCX semantic gap, NOT a Plan 01 regression). User-decided disposition 2026-05-15: ACCEPT-DEGRADED, escalate the delta gap to Phase 071.2 (proposed) — PDF-side extraction quality (TableFormer A/B with `DISABLE_TABLE_STRUCTURE=1`, persisted-vs-telemetry accounting reconciliation, possible SEED-006 multimodal-quality promotion).
 **Phase 071.2 complete (2026-05-15):** Ingestion plumbing + per-aspect extraction dispatcher. 5/5 plans shipped; 8/10 success criteria code-verified; 2 env-blocked (D-071.2-12 quality floor on the thesis PDF + PDF Form-XObject image lift) parked in `071.2-HUMAN-UAT.md` because **both Docling AND the PyMuPDF subprocess fallback crash on the thesis PDF in WSL** (Docling timeout 136s, PyMuPDF subprocess `MemoryError`). Code deliverables: (a) `/upload` returns 201 in ~1s via `_upload_pipeline` BackgroundTask helper (extract+chunk+multimodal moved off the request path); (b) all 6 `/upload` + 3 `/reingest` Supabase calls wrapped in `run_in_threadpool` (closes D-v2.5-01 on the last two foreground-extract routes); (c) chunker reads Docling's `full_markdown` instead of `export_to_text()` (closes the 95%-chunks-drop) + `do_formula_enrichment=True` for LaTeX equations; (d) `multimodal_service.extract_and_store_tables/_images` widened with `extracted_doc` kwarg precedence (closes the telemetry-vs-storage mismatch); (e) `/reextract` returns 404 (not 500) on `is_latest=False`; (f) **per-aspect extraction dispatcher** at `backend/app/services/extractors/aspects/{text,tables,images_pdf,images_docx,equations}.py` + `extract_composable(raw, mime, engines)` composer + `app_settings.extraction.*` columns (migration 045) + `?engines=` per-call hint on `/upload` and `/reextract` + backward-compat shim for legacy `get_extractor(engine=...)`; (g) `zip_xpath_docx` engine verbatim-ports Docling's `MsWordDocumentBackend` XPath (closes Phase 072 RAG-MM-LIFT-02 at the unit-test level); (h) SEED-017 (PyMuPDF4LLM AGPL), SEED-018 (Marker GPL), SEED-019 (PyMuPDF subprocess OOM + non-Docling engine evaluation) all planted. **User-decided pivot 2026-05-15** (see [[feedback-docling-skepticism]]): Docling repeatedly broke fast/light extraction without delivering on table/image recall. The per-aspect dispatcher is now the architectural deliverable — Docling stays available as an opt-in engine, but Phase 071.3 will diagnose the PyMuPDF subprocess OOM and benchmark non-Docling table/image engines (PyMuPDF in-process, Camelot, Tabula, PyMuPDF4LLM, Marker), then ship migration 046 flipping defaults to the benchmark winner. The "Docling-first" thesis from the v2.6 PRD is formally retired in favor of "swap-by-default optionality."
@@ -164,42 +175,35 @@ The agent acts as an AI colleague — it knows your knowledge base, can run code
 - ✓ STREAM-04-correctness-round3 closed: Empty-thread-until-refresh reconcile fix — v2.5 Phase 067.5 (shipped 2026-05-09; Branch D-3 `clearMessages` guard, 5/5 lived-experience cycles GREEN)
 - ✓ TEST-DEBT-059 closed: Skills test infrastructure repaired — v2.5 Phase 065 (shipped 2026-05-09; combined skills test run 26/26 pass)
 
-### Active (v2.6 — Foundation: RAG Quality + Multi-Worker + Polish)
+### Validated (v2.6 — Foundation: RAG Quality + Multi-Worker + Polish)
 
-21 Active REQ-IDs scoped in `.planning/PRDs/v2.6.md` §4. Materialized in `.planning/REQUIREMENTS.md` and mapped to phases in `.planning/ROADMAP.md`.
+24 REQ-IDs Validated across 35 phases (068–082). Full details in `.planning/PRDs/v2.6.md` §4.
 
-**Theme A — RAG Quality Lift**
-- [ ] RAG-DOCLING-01: Docling primary path produces comparable PDF↔DOCX table/image counts (≤20% delta on reference thesis)
-- [ ] RAG-DOCLING-02: httpx<0.28 vs supabase 2.10 conflict resolved per Q-v2.6-01; CI green
-- [ ] RAG-MM-LIFT-01: `_MAX_VISION_CALLS` / `_MAX_B64_BYTES` lifted to `app_settings`; ≥80% figure coverage on 4 MB reference PDF; empty-description rows persisted
-- [ ] RAG-MM-LIFT-02: DOCX extraction reaches floating shapes + headers/footers via `doc.part.related_parts` walk
-- [ ] RAG-RECAL-01: Confidence thresholds recalibrated per Q-v2.6-03; distributions documented in PROJECT.md
+- ✓ RAG-DOCLING-01: Docling formally retired; per-aspect dispatcher with camelot tables (53.5x recall) — Phases 069–071.4
+- ✓ RAG-DOCLING-02: httpx conflict resolved via supabase-py 2.29.x upgrade — Phase 070
+- ✓ RAG-MM-LIFT-01: Vision call limits lifted to app_settings; 100% figure refill on thesis DOCX — Phase 072
+- ✓ RAG-MM-LIFT-02: DOCX floating shapes + headers/footers via related_parts walk — Phase 072
+- ✓ RAG-RECAL-01: Confidence thresholds recalibrated 0.55/0.40 → 0.54/0.38 — Phase 076
+- ✓ WORKER-LIFT-01: uvicorn --workers 2 validated (50-run harness) — Phase 077/079
+- ✓ WORKER-LIFT-02: asyncpg pool in streaming hot paths — Phase 073
+- ✓ WORKER-LIFT-03: D-PRD-12 ADR supersedes D-v2.5-02 — Phase 079
+- ✓ WORKER-LIFT-04: GET /admin/backpressure endpoint — Phase 077
+- ✓ STREAMS-PROVIDER-01: StreamsProvider Context lift + two-pane renders — Phase 068
+- ✓ POLISH-SEED-008-01: Thread-switch snapshot endpoint — Phase 075
+- ✓ POLISH-SEED-008-02: Sandbox stdout line-by-line SSE — Phase 075
+- ✓ POLISH-SEED-009-01: claude-haiku max_tokens clamp — Phase 074
+- ✓ POLISH-SEED-010-01: OpenRouter synthetic-timeout protocol — Phase 081
+- ✓ POLISH-SEED-011-01: test_059 fixture teardown — Phase 074
+- ✓ POLISH-TOOL-PROG-01: tool_args_progress SSE for large args — Phase 075.10
+- ✓ CQ-SUPA-01: Supabase singleton aclose() on shutdown — Phase 078
+- ✓ CQ-CTX-01: Protected-only overrun handling — Phase 078
+- ✓ CQ-DEDUP-01: Concurrent upload dedup — Phase 078
+- ✓ CQ-TITLE-01: Title-generation fallback — Phase 078
+- ✓ TOKEN-COL-01: runs.input_tokens/output_tokens forward-fill — Phase 073
 
-**Theme B — Multi-Worker Readiness**
-- [ ] WORKER-LIFT-01: `uvicorn --workers 2` runs cleanly — run-tracking + sandbox stickiness + per-worker Redis singleton all verified
-- [ ] WORKER-LIFT-02: `asyncpg` pool replaces sync `supabase-py` in streaming endpoint + finalize path; CONCUR-01 stays green
-- [ ] WORKER-LIFT-03: D-PRD-12 ADR supersedes D-v2.5-02; `CLAUDE.md` rule updated
-- [ ] WORKER-LIFT-04: `GET /admin/backpressure` returns documented JSON shape, gated on env-var allow-list
+### Active (v2.7 — Agent Workspace & Panel)
 
-**Theme C — Streams Provider Lift**
-- [ ] STREAMS-PROVIDER-01: `<StreamsProvider>` Context owns all run-stream subscriptions; two-pane mock renders without state collision; Branch D-3 guard preserved; 067.5 regression specs green
-
-**Theme D — Polish Carry-forwards**
-- [ ] POLISH-SEED-008-01: Thread-switch perceived latency reduced ≥50% via new `GET /threads/{id}/snapshot`
-- [ ] POLISH-SEED-008-02: Sandbox stdout emits ≥3 distinct `code_stdout` SSE events over ≥1s for the `range(5)+sleep(1)` reference loop
-- [x] POLISH-SEED-009-01: `claude-haiku-4-5-20251001` no longer 400s on `max_tokens > 64000`; `MODEL_CAPABILITIES.max_output_tokens` populated for all listed models — Validated in Phase 074
-- [ ] POLISH-SEED-010-01: OpenRouter Kimi-k2.5 + MiniMax-m2.7 produce clean `runs.status='timed_out'` under synthetic-timeout overrides
-- [x] POLISH-SEED-011-01: `pytest test_059_disconnect.py -q` is 3/3 PASS — no "Event loop is closed" — Validated in Phase 074 (loop-binding bug structurally closed via conftest hoist; 3/3 PASS blocked by separate pre-existing Phase 073 FK seeding gap, tracked as D-074-02-DEFER-1)
-- [ ] POLISH-TOOL-PROG-01: Non-execute_code tools emit `tool_args_progress` SSE events when arg JSON exceeds 5 KB
-
-**Theme E — Code-Quality (Cluster G)**
-- [ ] CQ-SUPA-01: Supabase singleton `aclose()` on FastAPI shutdown — no RuntimeWarning
-- [ ] CQ-CTX-01: Protected-only overrun trims oldest-protected or raises `ConversationTooLongError` — no silent overrun
-- [ ] CQ-DEDUP-01: Concurrent same-file uploads produce exactly one `documents` row + one chunk set (partial unique index + atomic CAS)
-- [ ] CQ-TITLE-01: Title-generation failures emit `logger.warning`; fallback preserved
-
-**Theme F — Token Telemetry**
-- [ ] TOKEN-COL-01: `runs.input_tokens` / `runs.output_tokens` populated from LLM `usage` for every completed call; forward-fill only; NULL writes become dashboard warning
+*Requirements to be defined below via scoping workflow.*
 
 ### Out of Scope
 

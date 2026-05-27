@@ -1,33 +1,34 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.6
-milestone_name: Milestone Context
-status: shipped
-stopped_at: Milestone v2.6 shipped
-last_updated: "2026-05-27T18:00:00Z"
-last_activity: 2026-05-27 -- v2.6 milestone shipped (35 phases, 91 plans, 846 commits)
+milestone: v2.7
+milestone_name: Agent Workspace & Panel
+status: requirements
+stopped_at: null
+last_updated: "2026-05-27T20:00:00Z"
+last_activity: 2026-05-27 -- Milestone v2.7 started
 progress:
-  total_phases: 35
-  completed_phases: 35
-  total_plans: 91
-  completed_plans: 91
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
+See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted 2026-05-12, scoped to Themes A+C+D+H for v2.7)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.6 milestone SHIPPED — planning next milestone (v2.7)
+**Current focus:** v2.7 Agent Workspace & Panel — defining requirements
 
 ## Current Position
 
-Phase: v2.6 milestone SHIPPED
-Plan: All 91 plans complete across 35 phases
-Next action: `/gsd:new-milestone v2.7`
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-05-27 — Milestone v2.7 started
 Status: v2.6 shipped 2026-05-27 — 35 phases, 91 plans, 846 commits, 24/24 REQ-IDs Validated
 Last activity: 2026-05-27 -- v2.6 milestone archived and tagged
 
