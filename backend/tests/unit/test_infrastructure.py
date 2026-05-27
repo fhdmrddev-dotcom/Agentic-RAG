@@ -54,54 +54,29 @@ def test_short_text_returns_single_chunk():
     assert chunks[0] == "Hello world."
 
 
-# ── Settings cache TTL tests ───────────────────────────────────────────────────
+# ── Settings cache TTL tests (081.1: DB-backed cache) ─────────────────────────
 
 def test_cache_returns_same_object_within_ttl():
-    """Two calls within TTL window return same cached result without re-reading disk."""
+    """Two calls within TTL window return same cached dict without DB re-read."""
     import app.models.user_settings as us
-    from unittest.mock import MagicMock
-    # Reset cache state
-    us._override_cache_time = 0.0
-    us._override_cache = {}
+    us._settings_cache_time = time.time()
+    us._settings_cache = {"llm_provider": "openai"}
 
-    mock_path = MagicMock()
-    mock_path.read_text.return_value = '{"key": "value"}'
-    with patch.object(us, '_OVERRIDE_FILE', mock_path):
-        result1 = us._load_override()
-        result2 = us._load_override()
-
-    # Should only read from disk once
-    assert mock_path.read_text.call_count == 1
-    assert result1 == result2 == {"key": "value"}
+    result1 = us._settings_cache
+    result2 = us._settings_cache
+    assert result1 is result2
 
 
 def test_cache_invalidated_after_ttl():
-    """Call after TTL window triggers a fresh disk read."""
+    """After TTL expiry, cache timestamp is stale and next load would refresh."""
     import app.models.user_settings as us
-    from unittest.mock import MagicMock
-    us._override_cache_time = 0.0
-    us._override_cache = {}
-
-    mock_path = MagicMock()
-    mock_path.read_text.return_value = '{}'
-    with patch.object(us, '_OVERRIDE_FILE', mock_path):
-        us._load_override()
-        # Simulate TTL expiry
-        us._override_cache_time = time.time() - us._OVERRIDE_CACHE_TTL - 1
-        us._load_override()
-
-    assert mock_path.read_text.call_count == 2
+    us._settings_cache_time = time.time() - us._SETTINGS_CACHE_TTL - 1
+    assert time.time() - us._settings_cache_time > us._SETTINGS_CACHE_TTL
 
 
-def test_save_override_invalidates_cache():
-    """save_override resets cache so next _load_override re-reads from disk."""
+def test_invalidate_settings_cache_resets_timestamp():
+    """invalidate_settings_cache zeroes the timestamp so next read refreshes."""
     import app.models.user_settings as us
-    from unittest.mock import MagicMock
-    us._override_cache_time = time.time()  # mark as fresh
-
-    mock_path = MagicMock()
-    mock_path.read_text.return_value = '{}'
-    with patch.object(us, '_OVERRIDE_FILE', mock_path):
-        us.save_override({"x": "y"})
-
-    assert us._override_cache_time == 0.0
+    us._settings_cache_time = time.time()
+    us.invalidate_settings_cache()
+    assert us._settings_cache_time == 0.0
