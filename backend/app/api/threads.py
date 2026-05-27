@@ -40,7 +40,7 @@ from app.dependencies import get_pg_pool
 from app.db.runs import insert_run, finalize_run, insert_assistant_message
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
-from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google  # Phase 075.5 D-075.5-01 — native Google Gen AI SDK path
@@ -1260,7 +1260,7 @@ async def send_message(
         # Explicit override already applied to _user_settings.active_provider above.
         _resolved_provider = _user_settings.active_provider
     else:
-        _capability = get_model_capability(_resolved_model) or {}
+        _capability = await get_model_capability_async(_resolved_model) or {}
         _capability_provider = _capability.get("provider", "unknown")
         # Phase 075.3 D-075.3-08: only override the active provider when the
         # registry has a verified entry. After 075.3 get_model_capability no
@@ -1841,13 +1841,12 @@ async def send_message(
                             if active_provider_name == "anthropic":
                                 # --- Anthropic native SDK path (GEN-02) ---
                                 from app.services.openai_service import _resolve_max_tokens
-                                from app.config import get_per_call_timeout  # Phase 066 D-066-03
                                 _ant_max_tokens = _resolve_max_tokens(None, user_settings)
                                 _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
                                 _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
-                                # Phase 066 D-066-03: resolve per-LLM-call deadline before stream
+                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution (DB > env > static > default)
                                 _model_id = body.model or user_settings.llm_model
-                                per_call_budget = get_per_call_timeout(_model_id, settings)
+                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
                                 # Phase 066 D-066-07: capture for outer-except error format
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
@@ -1975,12 +1974,12 @@ async def send_message(
                                 # through openai-python (which silently dropped it through
                                 # Google's OpenAI-compat endpoint).
                                 from app.services.openai_service import _resolve_max_tokens
-                                from app.config import get_per_call_timeout  # Phase 066 D-066-03
                                 _g_max_tokens = _resolve_max_tokens(None, user_settings)
                                 _g_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
                                 _g_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution
                                 _model_id = body.model or user_settings.llm_model
-                                per_call_budget = get_per_call_timeout(_model_id, settings)
+                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
                                 _last_per_call_budget = per_call_budget
@@ -2155,9 +2154,9 @@ async def send_message(
                                 # timer + close-then-raise. Resolve budget before each
                                 # iteration so per-iteration reset is honored
                                 # (asyncio.timeout creates a fresh deadline per `async with`).
-                                from app.config import get_per_call_timeout  # local import — same module imported in Anthropic path above
+                                # Phase 066 D-066-03 + 081.1: 4-tier async resolution
                                 _model_id = body.model or user_settings.llm_model
-                                per_call_budget = get_per_call_timeout(_model_id, settings)
+                                per_call_budget = await get_per_call_timeout_async(_model_id, settings)
                                 # Phase 066 D-066-07: capture for outer-except error format
                                 _last_iteration = iteration
                                 _last_model_id = _model_id
@@ -2171,7 +2170,7 @@ async def send_message(
                                 # for provider gating (mirrors the
                                 # ``get_model_capability(_resolved_model).get("provider", "unknown")``
                                 # pattern at line ~1160).
-                                _active_cap = get_model_capability(_model_id) or {}
+                                _active_cap = await get_model_capability_async(_model_id) or {}
                                 active_provider_name = (_active_cap.get("provider") or "unknown").lower()
 
                                 # Phase 067.1 Plan 01 Track A: drain-into-queue.
