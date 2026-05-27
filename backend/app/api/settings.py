@@ -7,7 +7,8 @@ from app.dependencies import get_current_user, get_supabase
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
     load_app_settings,
-    save_override,
+    load_app_settings_async,
+    save_app_settings,
     resolve_sub_agent_model,
 )
 from app.services.audit_service import write_audit_entry
@@ -119,9 +120,9 @@ class SettingsUpdate(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _build_response(s=None) -> FullSettingsResponse:
+async def _build_response(s=None) -> FullSettingsResponse:
     if s is None:
-        s = load_app_settings()
+        s = await load_app_settings_async()
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -182,7 +183,7 @@ def _build_response(s=None) -> FullSettingsResponse:
 
 @router.get("", response_model=FullSettingsResponse)
 async def get_settings(current_user: dict = Depends(get_current_user)):
-    return _build_response()
+    return await _build_response()
 
 
 @router.put("", response_model=FullSettingsResponse)
@@ -199,17 +200,21 @@ async def update_settings(
     if body.llm_model is not None:
         updates["llm_model"] = body.llm_model
 
+    # D-17: Store provider model lists as JSONB dict instead of individual CSV keys
+    provider_model_lists: dict[str, list[str]] = {}
     for p in body.providers:
-        updates[f"{p.id}_api_key"] = p.api_key  # save_override handles "***" skip
+        updates[f"{p.id}_api_key"] = p.api_key  # save_app_settings handles "***" skip
         if p.models:
-            updates[f"{p.id}_models"] = ",".join(p.models)
+            provider_model_lists[p.id] = p.models  # list, not CSV
         if p.id == "ollama" and p.base_url:
-            # Strip /v1 suffix — _build_providers appends it at load time.
-            # Without this, each save round-trips http://host/v1 → stored as-is → /v1/v1 next load.
+            # Strip /v1 suffix -- _build_providers appends it at load time.
+            # Without this, each save round-trips http://host/v1 -> stored as-is -> /v1/v1 next load.
             raw = p.base_url.rstrip("/")
             if raw.endswith("/v1"):
                 raw = raw[:-3]
             updates["ollama_base_url"] = raw
+    if provider_model_lists:
+        updates["provider_model_lists"] = provider_model_lists  # JSONB column
 
     if body.embedding_model is not None:
         updates["embedding_model"] = body.embedding_model
@@ -264,7 +269,7 @@ async def update_settings(
 
     # MDL-01: Validate sub_agent_model against active provider's model list
     if body.sub_agent_model:
-        current_settings = load_app_settings()
+        current_settings = await load_app_settings_async()
         pending_provider = (
             getattr(body, "active_provider", None)
             or current_settings.active_provider
@@ -279,7 +284,7 @@ async def update_settings(
                 detail=f"Model '{body.sub_agent_model}' is not available for provider '{pending_provider}'.",
             )
 
-    save_override(updates)
+    await save_app_settings(updates)
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
         write_audit_entry,
@@ -288,13 +293,13 @@ async def update_settings(
         metadata={"new_settings": sanitized},
         supabase=supabase,
     )
-    return _build_response()
+    return await _build_response()
 
 
 @router.get("/providers")
 async def get_providers(current_user: dict = Depends(get_current_user)):
     """Lightweight endpoint for the chat UI provider selector."""
-    s = load_app_settings()
+    s = await load_app_settings_async()
     configured = [
         {"id": p.id, "name": p.name, "models": p.models, "is_active": p.is_active}
         for p in s.providers
