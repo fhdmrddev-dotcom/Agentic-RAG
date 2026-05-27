@@ -95,4 +95,4 @@ LLM_CALL_TIMEOUT_OVERRIDES=minimax/minimax-m2.5:free=900,moonshotai/kimi-k2.5=90
 ## Post-UAT Cleanup
 
 - [x] `backend/.env` restored to original `LLM_CALL_TIMEOUT_OVERRIDES` value (see top of this file)
-- [ ] Operator has restarted uvicorn after restore
+- [x] Operator has restarted uvicorn after restore
