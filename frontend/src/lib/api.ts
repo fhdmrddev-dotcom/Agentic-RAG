@@ -94,6 +94,29 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
       disclaimer: confidence_disclaimer ?? null,
     }
   }
+  // BUG-260526-03 (D-05): reconstruct finalOutputFiles from persisted tool_calls
+  // so reloaded messages display output file download links in the Final Outputs panel.
+  // The persisted execute_code result contains output_files with {filename, url}.
+  if (mapped.tool_calls?.length) {
+    const outputFiles: { filename: string; url?: string }[] = []
+    for (const tc of mapped.tool_calls) {
+      if (tc.name === "execute_code" && tc.result) {
+        try {
+          const r = typeof tc.result === "string" ? JSON.parse(tc.result) : tc.result
+          if (Array.isArray(r.output_files)) {
+            for (const f of r.output_files) {
+              if (f.filename) {
+                outputFiles.push({ filename: f.filename, url: f.url })
+              }
+            }
+          }
+        } catch { /* ignore parse errors on non-JSON results */ }
+      }
+    }
+    if (outputFiles.length > 0) {
+      mapped.finalOutputFiles = outputFiles
+    }
+  }
   return mapped
 }
 
