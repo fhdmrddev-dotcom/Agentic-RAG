@@ -42,7 +42,7 @@
 - [x] **POLISH-SEED-008-02
 **: Sandbox `for i in range(5): print(i); time.sleep(1)` produces ≥3 distinct `code_stdout` SSE events across ≥1 second elapsed.
 - [x] **POLISH-SEED-009-01**: `claude-haiku-4-5-20251001` runs no longer 400 with `max_tokens > 64000`. `MODEL_CAPABILITIES.max_output_tokens` populated for all currently-listed Anthropic models.
-- [ ] **POLISH-SEED-010-01**: `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10` produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter-routed models.
+- [x] **POLISH-SEED-010-01**: `LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10` produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter-routed models.
 - [x] **POLISH-SEED-011-01**: `pytest backend/tests/integration/test_059_disconnect.py -q` is 3/3 PASS without `RuntimeError: Event loop is closed`.
 - [x] **POLISH-TOOL-PROG-01
 **: Tools other than `execute_code` emit `tool_args_progress` SSE events when their argument JSON exceeds 5 KB during streaming.
@@ -149,7 +149,7 @@ Each requirement maps to exactly one phase. See ROADMAP.md Phase Details + FLAGS
 | POLISH-SEED-008-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
 | POLISH-SEED-008-02 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
 | POLISH-SEED-009-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Complete |
-| POLISH-SEED-010-01 | 081 — SEED-010 OpenRouter UAT | Pending |
+| POLISH-SEED-010-01 | 081 — SEED-010 OpenRouter UAT | Complete |
 | POLISH-SEED-011-01 | 074 — SEED-009 + SEED-011 Polish Bundle | Complete |
 | POLISH-TOOL-PROG-01 | 075 — SEED-008 + tool_args_progress Polish Bundle | Pending |
 | CQ-SUPA-01 | 078 — Backpressure JSON Primitive + Code-Quality Bundle | Pending |

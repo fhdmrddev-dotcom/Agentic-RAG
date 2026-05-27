@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: planning
-stopped_at: Phase 081 context gathered
-last_updated: "2026-05-27T05:19:40.203Z"
-last_activity: 2026-05-26
+status: executing
+stopped_at: Phase 081 complete
+last_updated: "2026-05-27T12:00:00.000Z"
+last_activity: 2026-05-27
 progress:
   total_phases: 35
-  completed_phases: 28
-  total_plans: 84
-  completed_plans: 88
+  completed_phases: 29
+  total_plans: 85
+  completed_plans: 89
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 080
+**Current focus:** Phase 081.1 — Settings Architecture Unification
 
 ## Current Position
 
-Phase: 081
+Phase: 081.1
 Plan: Not started
-Next action: `/gsd:discuss-phase 080`
-Status: Ready to plan
-Last activity: 2026-05-26
+Next action: `/gsd:discuss-phase 081.1`
+Status: Ready to discuss
+Last activity: 2026-05-27
 
 ## PRD-reset outputs (committed)
 
@@ -133,6 +133,15 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
 ## Recent Completed Phases
+
+### Phase 081: SEED-010 OpenRouter UAT (Complete 2026-05-27)
+
+- 1/1 plans shipped; 4/4 synthetic-timeout UAT runs GREEN on OpenRouter-routed models
+- **Kimi-k2.5:** Run 1 (simple chat, iter 2) + Run 2 (tool-calling, iter 4) — clean `timed_out` status, correct error format, frontend timeout UX works, title generated
+- **MiniMax-m2.7:** Run 3 (simple chat, iter 1) + Run 4 (tool-calling, iter 0) — clean `timed_out` status, correct error format, frontend timeout UX works, title generated
+- **BUG-260526-02:** Kimi thinking text leakage NOT observed on OpenRouter route — bug scoped to direct Moonshot API only
+- Closes POLISH-SEED-010-01 and 067.2 Rows 11-12 carry-forward
+- .env temporary override applied then restored; no code changes
 
 ### Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable (Complete 2026-05-27)
 
@@ -546,4 +555,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 080 (VPS Runbook + Deployment Guide Correction) — 1 plans — 2026-05-26T23:16:24.256Z
+**Planned Phase:** 081 (SEED-010 OpenRouter UAT) — 1 plans — 2026-05-27T05:40:11.095Z

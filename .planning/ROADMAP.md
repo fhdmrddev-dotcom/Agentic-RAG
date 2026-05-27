@@ -206,9 +206,9 @@ Plans:
 - [x] 079-01-PLAN.md — D-PRD-12 ADR + docs + migration 052 + code + env config (Wave 1; autonomous)
 - [x] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
 - [x] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1/1 plans, shipped 2026-05-27)
-- [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
+- [x] **Phase 081: SEED-010 OpenRouter UAT** — 4/4 OpenRouter synthetic-timeout UAT runs GREEN; Kimi-k2.5 and MiniMax-m2.7 verified; BUG-260526-02 not observed on OpenRouter route; closes 067.2 Rows 11-12 carry-forward. (1/1 plans, shipped 2026-05-27)
 Plans:
-- [ ] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
+- [x] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
 
 **Wave 4 — Verify**
 
@@ -1058,7 +1058,7 @@ See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 | 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
 | 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 1/2 | In progress | — |
 | 080 — VPS Runbook + Deployment Guide Correction | 1/1 | Complete    | 2026-05-26 |
-| 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
+| 081 — SEED-010 OpenRouter UAT | 1/1 | Complete    | 2026-05-27 |
 | 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
 | 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
 | **Total (v2.6)** | **4/42** | **In progress** | **—** |
