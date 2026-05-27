@@ -713,7 +713,7 @@ export function SettingsPage() {
           <div>
             <h1 className="text-2xl font-headline font-bold text-foreground">Settings</h1>
             <p className="text-muted-foreground mt-1 text-sm">
-              Changes are saved to <code className="text-xs bg-muted/50 px-1.5 py-0.5 rounded font-mono ghost-border">settings_override.json</code> and take effect immediately.
+              Changes take effect immediately.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
