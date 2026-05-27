@@ -953,15 +953,18 @@ Plans:
 
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
 **Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
-**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1, Phase 082.5
-**Plans**: 2
-**Requirements**: (cross-cutting verification — all 21 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
+**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1 (Phase 082.5 decoupled per D-01)
+**Plans:** 2/2 plans complete
+Plans:
+- [ ] 082-01-PLAN.md — Automated verification: extraction re-extract SC#1 + CONCUR-01 pytest SC#2 + telemetry SC#4 (Wave 1; autonomous)
+- [ ] 082-02-PLAN.md — Lived-experience UAT SC#3 + milestone-close REQ-ID audit SC#5 + seed disposition (Wave 2; autonomous: false)
+**Requirements**: (cross-cutting verification — all 24 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
 **Success Criteria** (what must be TRUE):
   1. Re-extraction with the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations) against the user's reference PDF + DOCX pair holds table + image counts within 20% delta of the 071.3 Plan 05 UAT baseline (re-running the RAG-DOCLING-01 acceptance under the full v2.6 stack with multi-worker + StreamsProvider live).
   2. `pytest backend/tests/integration/test_058_concurrency.py` (CONCUR-01 binding gate) green under `--workers 2`; no regression vs single-worker baseline.
   3. Phase 067.5 Branch D-3 `clearMessages` guard regression test green; 5/5 lived-experience cycles on Chrome MCP show no empty-thread-until-refresh repro post-StreamsProvider lift.
   4. `pdf_extraction_runs` telemetry table populated for every document re-ingested during the verification pass; admin can query per-document extractor lineage + durations (per-aspect composer signature `composable[<text>/<tables>/<images>/<equations>]` per 071.3).
-  5. Milestone-close audit confirms all 21 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
+  5. Milestone-close audit confirms all 24 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
 
 ### Phase 082.5: Error Handler Foundation (SEED-026 urgent slice)
 **Goal**: User-visible error messages stop leaking backend SDK internals, every `logger.error/info/warning` call surfaces to a single configured sink, and every error response carries a `trace_id` that links the client report to a server-side record. Closes D-074-01-DEFER-1 in the same patch.
