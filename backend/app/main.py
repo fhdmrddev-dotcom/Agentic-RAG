@@ -79,6 +79,15 @@ _PROVIDER_MODEL_KEYS: set[str] = {
     "moonshot_models", "minimax_models", "zhipu_models",
 }
 
+# CR-01 fix: allowset for API key column names prevents SQL injection
+# from crafted JSON keys like "x; DROP TABLE --_api_key"
+_API_KEY_COLUMNS: set[str] = {
+    "openai_api_key", "anthropic_api_key", "google_api_key",
+    "openrouter_api_key", "ollama_api_key", "deepseek_api_key",
+    "moonshot_api_key", "minimax_api_key", "zhipu_api_key",
+    "embedding_api_key", "rerank_api_key", "tavily_api_key",
+}
+
 
 async def _migrate_settings_override() -> None:
     """One-shot migration: settings_override.json -> app_settings DB table.
@@ -120,7 +129,7 @@ async def _migrate_settings_override() -> None:
             provider = key.replace("_models", "")
             models = [m.strip() for m in str(value).split(",") if m.strip()]
             provider_model_lists[provider] = models
-        elif key.endswith("_api_key"):
+        elif key.endswith("_api_key") and key in _API_KEY_COLUMNS:
             api_key_updates[key] = value  # D-19: keys stay in app_settings DB
         else:
             skipped_keys.append(key)
