@@ -1,564 +1,637 @@
-# Architecture Research
+# Architecture: Agent Workspace & Panel Integration
 
-**Domain:** Agentic RAG — v2.0 Agent Skills & Code Execution Sandbox
-**Researched:** 2026-03-29
-**Confidence:** HIGH (based on direct source code inspection of the existing codebase)
-
----
-
-## Standard Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         React Frontend                              │
-│  ┌──────────┐  ┌─────────────┐  ┌────────────┐  ┌──────────────┐  │
-│  │   Chat   │  │  Documents  │  │   Skills   │  │ Code Output  │  │
-│  │   Tab    │  │     Tab     │  │    Tab     │  │    Panel     │  │
-│  └────┬─────┘  └──────┬──────┘  └─────┬──────┘  └──────┬───────┘  │
-└───────┼───────────────┼───────────────┼────────────────┼───────────┘
-        │ SSE stream    │ REST          │ REST           │ SSE events
-┌───────▼───────────────▼───────────────▼────────────────▼───────────┐
-│                         FastAPI Backend                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
-│  │ /threads │  │/documents│  │ /skills  │  │ /sandbox         │   │
-│  │ (SSE +   │  │(REST)    │  │(REST)    │  │(signed URLs)     │   │
-│  │  CRUD)   │  │          │  │          │  │                  │   │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────────┬─────────┘   │
-│       │             │             │                  │             │
-│  ┌────▼─────────────▼─────────────▼──────────────────▼──────────┐  │
-│  │                    openai_service.py                          │  │
-│  │  get_tools() / get_explorer_tools() → dispatch loop          │  │
-│  │  NEW: skills tools + execute_code injected here              │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│  ┌───────────────┐  ┌───────────────┐  ┌───────────────────────┐   │
-│  │ sandbox/      │  │ skill_store/  │  │  open_standard/       │   │
-│  │ session_mgr   │  │ (CRUD + files)│  │  (ZIP parse/generate) │   │
-│  │ (lifespan)    │  │               │  │                       │   │
-│  └───────┬───────┘  └───────────────┘  └───────────────────────┘   │
-│          │ Docker SDK                                               │
-│  ┌───────▼────────────────────────────────────────────────────┐    │
-│  │           llm-sandbox Docker session pool                   │    │
-│  │           (keyed by thread_id, TTL 30 min)                  │    │
-│  └────────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────────┘
-        │                          │
-┌───────▼──────────────┐  ┌────────▼──────────────────────────────────┐
-│   Supabase Postgres  │  │         Supabase Storage                  │
-│   skills             │  │  documents/   (existing)                  │
-│   skill_files        │  │  skill-files/ (new, private)              │
-│   code_executions    │  │  sandbox-outputs/ (new, private)          │
-│   sandbox_files      │  │                                           │
-│   (existing tables)  │  └───────────────────────────────────────────┘
-└──────────────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | Status |
-|-----------|----------------|--------|
-| `threads.py` router | SSE chat loop, tool dispatch, message persistence | MODIFIED |
-| `openai_service.py` | Tool definitions, `get_tools()`, `create_streaming_chat()` | MODIFIED |
-| `skills.py` router | CRUD for skills + building-block file uploads | NEW |
-| `sandbox.py` router | Signed URL endpoint, execution file listing | NEW |
-| `sandbox/session_manager.py` | Docker session pool keyed by thread_id, TTL, cleanup | NEW |
-| `skills/open_standard.py` | ZIP parse/generate, SKILL.md frontmatter, file categorization | NEW |
-| `skills`, `skill_files` tables | Skill metadata + file metadata (RLS enforced) | NEW |
-| `code_executions`, `sandbox_files` tables | Execution audit log + generated file metadata | NEW |
-| `skill-files` storage bucket | Private storage for building-block files | NEW |
-| `sandbox-outputs` storage bucket | Private storage for sandbox-generated files | NEW |
+**Project:** Agentic RAG v2.7
+**Researched:** 2026-05-27
+**Confidence:** HIGH (all integration points verified against live source files)
 
 ---
 
-## Integration Points
+## 1. Executive Summary
 
-### 1. Tool Dispatch Loop (threads.py — MODIFIED)
+v2.7 adds three surfaces to the existing architecture: (1) a per-thread workspace filesystem backed by a new `workspace_files` table + Supabase Storage hybrid, (2) three new LLM tools (`write_todos`, `task`, `ask_user`) with a `todos` table and a new `ask_user_response` endpoint, and (3) a right-side panel UI consuming the same `<StreamsProvider>` Context via event-type demultiplexing. The harness engine (state machine) and plugin contract are also scoped in the PRD but are architecturally independent modules that extend the same integration seams.
 
-The `event_stream()` function in `send_message` is the central integration point for all new LLM-facing behavior. The existing pattern is a `for iteration in range(max_iterations)` loop that calls `create_streaming_chat()`, streams chunks, buffers tool calls, and dispatches them in a giant `if/elif` chain.
+The critical architectural insight: **v2.6 already built the substrate v2.7 needs.** The `<StreamsProvider>` Context was explicitly designed as a multi-consumer surface (SEED-007). New SSE event types ride existing `run:{run_id}` Redis Streams via the same `_emit()` XADD path. The panel is a second consumer of the same EventSource, not a new subscription. No new Redis key patterns. No new background processes.
 
-**What changes:**
-- Add `load_skill`, `save_skill`, `read_skill_file`, and (conditionally) `execute_code` to the `elif` dispatch chain
-- `execute_code` must be an `async` dispatch path — the current dispatch loop is synchronous inside an `async def`. The sandbox session manager will be async; `execute_code` will need `await` calls or a `asyncio.run_coroutine_threadsafe` bridge. The cleanest approach is converting the `for chunk in stream` loop to `async for` and making the tool dispatch `await`-able.
-- New SSE event types emitted from within the dispatch: `skill_activated`, `code_execution_start`, `code_stdout`, `code_stderr`, `code_execution_complete`, `code_execution_error`
-- `execute_code` SSE events stream stdout/stderr lines in real time, interleaved with the existing `tool_start`/`tool_end` events
+The riskiest integration point is `backend/app/api/threads.py` (the ~3500 LOC god file), which already has 9+ phases on it and G-5 fires. The `ask_user` tool requires the first-ever **pause/resume mechanism** inside `agent_runner` -- a fundamentally new control flow pattern. Everything else is extension of existing patterns.
 
-**Existing tool_calls pattern preserved:** `persisted_tool_calls.append({...})` already trims results to 2000 chars before storing in `messages.tool_calls` JSONB. Adding `result` and `tool_call_id` fields to this dict (for Persistent Tool Memory) does not require any schema change.
+---
 
-### 2. System Prompt Injection (threads.py — MODIFIED)
+## 2. Integration Map: New vs Modified Components
 
-The active system prompt (`SYSTEM_PROMPT` or `EXPLORER_SYSTEM_PROMPT`) is built at request time, then augmented with folder scope context. Skills add a third augmentation layer: the **skill catalog**.
+### 2.1 New Backend Modules (create from scratch)
 
-**Injection order:**
+| Module | Purpose | Depends On |
+|--------|---------|------------|
+| `backend/app/services/workspace_service.py` | CRUD for workspace_files + versions; hybrid storage (inline bytea vs Storage bucket); diff generation via `difflib` | `get_pg_pool`, `get_supabase` (Storage bucket) |
+| `backend/app/services/harness_engine.py` | State machine: phase registry, transition logic, validator dispatch, tool-whitelist enforcement, audit emit | `get_pg_pool`, `_emit()` |
+| `backend/app/services/todo_service.py` | `write_todos` persistence layer; full-state-replace semantics on `todos` table | `get_pg_pool` |
+| `backend/app/services/workspace_file_loader.py` | Hybrid storage adapter: transparent read from `content_inline` bytea or `content_storage_url` signed-URL | `get_supabase` (Storage) |
+| `backend/app/services/tool_dispatcher.py` | Extracted tool dispatch -- moves the ~800 LOC `elif tool_name ==` chain out of `agent_runner`. Required by G-5. | All tool services, `_emit()` |
+| `backend/plugins/registries.py` | TOOL_PLUGIN_REGISTRY, PANEL_RENDERER_PLUGIN_REGISTRY, PHASE_TYPE_REGISTRY, FILE_PREVIEW_REGISTRY, DATA_SOURCE_REGISTRY, SECRETS_ADAPTER_REGISTRY | None |
+| `backend/plugins/manifest_schema.json` | JSON-Schema for plugin manifests; validated on install and at lifespan startup | None |
+| `frontend/src/components/panel/WorkspacePanel.tsx` | Right-side panel root: collapsible, 4 sections, responsive bottom-sheet on mobile | `useStreamsStore` |
+| `frontend/src/components/panel/TodoSection.tsx` | Todo list display with nesting (parent_id indentation) | `useTodos` hook |
+| `frontend/src/components/panel/WorkspaceFileBrowser.tsx` | File browser for workspace_files; click to preview/diff | `useWorkspaceFiles` hook |
+| `frontend/src/components/panel/WorkflowIndicator.tsx` | Phase indicator for harness mode (hidden in Deep Mode) | `useWorkflow` hook |
+| `frontend/src/components/panel/AskUserPrompt.tsx` | Actionable prompt with choice buttons + free-text; submits to POST endpoint | `useAskUserPrompt` hook |
+| `frontend/src/components/panel/DiffViewer.tsx` | File version diff display using `delta_from_prev` or fetch-both | api.ts workspace endpoints |
+| `frontend/src/hooks/useTodos.ts` | Per-thread todo state from `<StreamsProvider>` Context + reconcile fetch | `useStreamsStore` |
+| `frontend/src/hooks/useWorkspaceFiles.ts` | Per-thread workspace file list from Context + reconcile fetch | `useStreamsStore` |
+| `frontend/src/hooks/useWorkflow.ts` | Per-thread workflow run state from Context + reconcile fetch | `useStreamsStore` |
+| `frontend/src/hooks/useAskUserPrompt.ts` | Per-thread pending ask_user prompt from Context | `useStreamsStore` |
+
+### 2.2 Modified Backend Files (extend existing)
+
+| File | Current LOC | What Changes | Risk |
+|------|-------------|--------------|------|
+| `backend/app/api/threads.py` | ~3500 | (1) Tool dispatch chain extracted to `tool_dispatcher.py` (G-5 mandated refactor). (2) `ask_user` pause/resume: new `asyncio.Event` wait inside tool execution round. (3) Harness mode: pre-check `threads.active_workflow_run_id` before tool dispatch to enforce `workflow_phases.available_tools` whitelist. (4) `_emit()` calls for new SSE event types. (5) New `ASK_USER_EVENTS` module-level registry (same pattern as `RUN_TASKS` at line 92). | **CRITICAL** -- G-5 fires (9+ phases). The `ask_user` pause mechanism is a fundamentally new control flow. Tool dispatch extraction MUST happen first. |
+| `backend/app/services/openai_service.py` | ~570 | (1) Register 8 new tool definitions (workspace_write/read/list/diff/delete + write_todos + task + ask_user). (2) Plugin tool merge: `get_tools()` gains a `+ plugin_tools` extension point. | **MODERATE** -- `get_tools()` at line 514 is a simple list append; adding 8 more dicts is mechanical. |
+| `backend/app/services/sub_agent_service.py` | ~150 | `run_sub_agent` generalized as the implementation backing the `task` tool. Existing function signature preserved as backward-compat alias. New parameters: `model_override`, `system_prompt_override`, `tools` (subset), `max_steps`. Each `task` invocation creates its own `run:{sub_run_id}` Redis Stream. | **MODERATE** -- existing sub-agent pattern is proven; generalization adds kwargs without breaking callers. |
+| `backend/app/main.py` | ~100 | Lifespan extended: `PLUGINS_BOOTSTRAP` env var parsing + `plugin_registry` upsert at startup. | **LOW** |
+| `backend/app/models/thread.py` | ~30 | Add `deep_mode_metadata: dict | None` and `active_workflow_run_id: str | None` fields. | **LOW** |
+| `frontend/src/lib/api.ts` | ~540 | (1) New `StreamCallbacks` fields: `onTodoUpdated`, `onWorkspaceFileWritten`, `onWorkspaceFileDeleted`, `onWorkflowPhaseStart`, `onWorkflowTransition`, `onAskUserPrompt`, `onAskUserResponse`, etc. (2) New API functions: `getWorkspaceFiles()`, `getWorkspaceFileDiff()`, `getWorkflowState()`, `postAskUserResponse()`, `getTodos()`. (3) `subscribeToRun` parser gains ~12 new `else if` arms for the new event types. | **MODERATE** -- follows established pattern. |
+| `frontend/src/stores/streamsStore.ts` | ~130 | Add panel-related state: `todosByThread: Map<string, Todo[]>`, `workspaceFilesByThread: Map<string, WorkspaceFile[]>`, `workflowStateByThread: Map<string, WorkflowState>`, `askUserPromptByThread: Map<string, AskUserPrompt | null>`. | **MODERATE** -- follows the per-thread Map pattern from Phase 075.4 (D-075.4-A1). |
+| `frontend/src/providers/StreamsProvider.tsx` | ~1600 | (1) `makeStreamCallbacks` factory gains callback implementations for all new event types. (2) Reconcile function extended to fetch workspace/todo/workflow state on mount. | **MODERATE** -- additive callbacks following the exact pattern of existing 20+ callbacks. |
+| `frontend/src/components/layout/ChatLayout.tsx` | ~200 | Layout: `<main>` wrapper for chat view splits into chat (~70%) + `<WorkspacePanel>` (~30%, conditionally rendered). Panel toggle button in header. | **MODERATE** -- layout reflow needs responsive breakpoint care. |
+
+### 2.3 New Database Tables (11 migrations, range 125-135)
+
+| Table | Key Columns | RLS Pattern | Notes |
+|-------|-------------|-------------|-------|
+| `workspace_files` | `id, thread_id, path, content_inline, content_storage_url, size_bytes, mime_type, created_by` | Via FK chain: `auth.uid() = (SELECT user_id FROM threads WHERE id = thread_id)` | UNIQUE on `(thread_id, path)`. Hybrid storage: inline bytea <= 256KB, bucket for larger. |
+| `workspace_file_versions` | `id, workspace_file_id, version, content_inline, content_storage_url, delta_from_prev` | Inherits via workspace_file_id FK | Auto-version on every write. `delta_from_prev` is jsonb structured diff (null for v1). |
+| `workflow_definitions` | `id, slug, version, phases (jsonb), entry_phase, published_at` | Owner private + org-shared | Immutable-on-publish (DB trigger). Semver mirrors D-PRD-13 skill versioning. |
+| `workflow_runs` | `id, workflow_definition_id, thread_id, run_id, current_phase_id, status` | Via thread FK | Piggybacks on existing `runs` table + Redis Stream. |
+| `workflow_phases` | `id, workflow_run_id, phase_index, phase_slug, phase_type, status, available_tools[]` | Via workflow_run FK | `available_tools text[]` is the canonical whitelist the dispatcher reads. |
+| `todos` | `id, thread_id, todo_id, content, status, parent_id` | Via thread FK | UNIQUE on `(thread_id, todo_id)`. Full state replace on each `write_todos` call. |
+| `plugin_registry` | `id, slug, version, manifest (jsonb), installed_by, enabled` | super_admin writes; operators read | D-PRD-14 permission tier. JSON-Schema validated on install. |
+| `plugin_extension_points` | `id, plugin_id, extension_type, config, priority, enabled` | Via plugin FK | 6 extension types. Priority for deterministic ordering. |
+| `harness_audit` | `id, workflow_run_id, phase_slug, event_type, details, created_at` | Via workflow_run FK | INSERT-only. Records phase transitions + gate checks + tool refusals. |
+
+Modified tables:
+- `threads` -- add `deep_mode_metadata jsonb`, `active_workflow_run_id uuid FK` (migration 133)
+- `skills` -- add `harness_required` key to `skill_modes jsonb` (migration 134)
+
+### 2.4 New API Routes
+
+| Route | Method | Purpose | Auth |
+|-------|--------|---------|------|
+| `/threads/{thread_id}/workspace/files` | GET | List workspace files for thread | JWT (owner via thread RLS) |
+| `/threads/{thread_id}/workspace/files/{file_id}/versions` | GET | List versions for a file | JWT |
+| `/threads/{thread_id}/workspace/files/{file_id}/diff` | GET | Diff between two versions (`?from=N&to=M`) | JWT |
+| `/threads/{thread_id}/workflow` | GET | Current workflow run state | JWT |
+| `/threads/{thread_id}/workflow/cancel` | POST | Cancel active workflow | JWT |
+| `/threads/{thread_id}/todos` | GET | Current todo list for thread | JWT |
+| `/runs/{run_id}/ask_user_response` | POST | User response to active `ask_user_prompt` | JWT |
+| `/admin/plugins` | GET | List installed plugins | JWT (operator+) |
+| `/admin/plugins` | POST | Install plugin | JWT (super_admin only) |
+| `/admin/plugins/{plugin_id}` | PATCH | Enable/disable plugin | JWT (super_admin only) |
+| `/admin/plugins/{plugin_id}` | DELETE | Uninstall plugin | JWT (super_admin only) |
+
+### 2.5 New SSE Event Types (all ride existing `run:{run_id}` Stream)
+
+| Event Type | Theme | Payload | Consumer |
+|------------|-------|---------|----------|
+| `workspace_file_written` | A | `{path, version, size_bytes, mime_type}` | Panel file browser |
+| `workspace_file_deleted` | A | `{path}` | Panel file browser |
+| `todo_updated` | C | `{todos: Todo[]}` | Panel todo section |
+| `ask_user_prompt` | C | `{prompt, options?, timeout_seconds?}` | Panel ask-user section |
+| `ask_user_response` | C | `{response_text, choice_index?}` | Panel (dismisses prompt) |
+| `workflow_phase_start` | B | `{phase_slug, phase_type, index, available_tools}` | Panel workflow indicator |
+| `workflow_phase_progress` | B | `{phase_slug, detail}` | Panel workflow indicator |
+| `workflow_phase_gate_check` | B | `{phase_slug, validator_results}` | Panel workflow indicator |
+| `workflow_phase_end` | B | `{phase_slug, status, output_summary}` | Panel workflow indicator |
+| `workflow_transition` | B | `{from_phase, to_phase}` | Panel workflow indicator |
+| `workflow_run_complete` | B | `{status, final_artifact_path}` | Panel workflow indicator |
+
+---
+
+## 3. Data Flow Diagrams
+
+### 3.1 Workspace Write Flow
+
 ```
-base system prompt
-  + folder scope note (if thread is folder-scoped)
-  + skill catalog table (if user has enabled skills)
+User prompt: "Write a plan"
+    |
+    v
+agent_runner (threads.py:1381) -- LLM returns tool_call: workspace_write("/plan.md", "...")
+    |
+    v
+Tool dispatch (tool_dispatcher.py) -- dispatch_tool("workspace_write", args, ctx)
+    |
+    v
+workspace_service.write_file(thread_id, path, content)
+    |-- content <= 256KB? --> INSERT/UPSERT workspace_files (content_inline = bytea)
+    |-- content > 256KB?  --> Upload to workspace-files bucket
+    |                         INSERT/UPSERT workspace_files (content_storage_url)
+    |
+    v
+workspace_service.create_version(file_id, version_n, content, delta)
+    |-- delta_from_prev = difflib.unified_diff(prev_content, new_content)
+    |
+    v
+_emit(redis, run_id, 'workspace_file_written', path="/plan.md", version=2, ...)
+    |
+    v
+Redis Stream run:{run_id} -- XADD
+    |
+    v
+GET /runs/{run_id}/stream?since=N -- SSE consumer reads XREAD
+    |
+    v
+subscribeToRun parser (api.ts:393) -- else if (t === "workspace_file_written")
+    |
+    v
+callbacks.onWorkspaceFileWritten(path, version, ...) -- in makeStreamCallbacks
+    |
+    v
+streamsStore.workspaceFilesByThread.set(threadId, updatedFiles) -- Zustand update
+    |
+    v
+<WorkspaceFileBrowser> re-renders with new file entry
 ```
 
-The skill catalog is a lightweight markdown table:
+### 3.2 ask_user Pause/Resume Flow (New Control Flow Pattern)
 
 ```
-## Your Available Skills
-
-| Skill | What it does |
-|-------|--------------|
-| analyzing-sales-data | Analyzes sales data and generates visual reports... |
-| legal-review | Reviews contracts for standard risk clauses... |
-
-Load a skill when the user's request matches its description. Use `load_skill` with the skill name.
+agent_runner iteration N -- LLM returns tool_call: ask_user("Which folder?", ["A","B"])
+    |
+    v
+Tool dispatch -- elif tool_name == "ask_user":
+    |
+    v
+_emit(redis, run_id, 'ask_user_prompt', prompt="Which folder?", options=["A","B"])
+    |
+    v
+Redis pub/sub SUBSCRIBE on channel ask_user:{run_id}
+    |                        (producer task suspended; run status = "awaiting_user")
+    |
+    v [Panel renders prompt with choice buttons]
+    |
+User clicks "A" in AskUserPrompt panel section
+    |
+    v
+POST /runs/{run_id}/ask_user_response {response_text: "A", choice_index: 0}
+    |
+    v
+Endpoint does PUBLISH to Redis channel ask_user:{run_id}
+    |
+    v
+Producer's SUBSCRIBE receives message -- agent_runner RESUMES
+    |
+    v
+tool_result = json.dumps({"response_text": "A", "choice_index": 0})
+    |
+    v
+messages.append({"role": "tool", "content": tool_result, ...})
+    |
+    v
+Next iteration continues normally
 ```
 
-This is fetched once per request (not cached) from the `skills` table filtered by `enabled = true AND (user_id = current_user_id OR user_id IS NULL)`. The query is cheap: only `name` and `description` columns, no instruction bodies.
+**Multi-worker safety:** The `ask_user` pause uses Redis pub/sub (not `asyncio.Event`) because with `WORKER_COUNT=2`, the POST endpoint may land on a different worker than the one hosting the producer task. Redis pub/sub is the lightest cross-worker signaling primitive -- one SUBSCRIBE + one PUBLISH per `ask_user` invocation.
 
-### 3. `get_tools()` / Tool Registration (openai_service.py — MODIFIED)
+### 3.3 Right-Side Panel as Second Stream Consumer
 
-Current shape:
+```
+                    <StreamsProvider>
+                         |
+            +-----------+-----------+
+            |                       |
+     Chat surface (70%)     Panel surface (30%)
+            |                       |
+    useThreadMessages()     useTodos(threadId)
+                            useWorkspaceFiles(threadId)
+                            useWorkflow(threadId)
+                            useAskUserPrompt(threadId)
+            |                       |
+     [existing hooks]        [new hooks -- same store]
+            |                       |
+   reads bucketsBySurface   reads todosByThread,
+   Map<"chat", Map<tid,     workspaceFilesByThread,
+   Message[]>>              workflowStateByThread, etc.
+
+Both read from the SAME Zustand store (streamsStore.ts).
+Both receive updates from the SAME EventSource (one per run).
+The StreamsProvider's makeStreamCallbacks factory routes
+events by type to the correct store fields.
+No new subscriptions. No new EventSource connections.
+```
+
+**Why this works:** The existing `subscribeToRun` function in `api.ts` already ignores unknown event types (they fall through the `else if` chain silently). Adding new `else if` arms for workspace/todo/workflow/ask_user events is purely additive. The `StreamsProvider` already manages one SSE connection per active run; panel events piggyback on the same connection.
+
+### 3.4 Harness Engine Tool-Whitelist Enforcement
+
+```
+agent_runner iteration -- about to dispatch tool_name = "execute_code"
+    |
+    v
+Pre-check: threads.active_workflow_run_id IS NOT NULL?
+    |-- NO  --> Deep Mode: dispatch tool normally (existing behavior)
+    |-- YES --> Harness Mode:
+                    |
+                    v
+                Read cached whitelist for current phase
+                (in-memory cache per run_id; refreshed on phase transition)
+                    |
+                    v
+                "execute_code" in available_tools?
+                    |-- YES --> dispatch normally
+                    |-- NO  --> tool_result = {"error": "tool_not_available_in_phase",
+                                              "phase": "research", "allowed": [...]}
+                                _emit(redis, run_id, 'tool_refused', ...)
+                                harness_audit INSERT
+```
+
+---
+
+## 4. Component Boundary Definitions
+
+### 4.1 Backend Boundaries
+
+```
+backend/
+  app/
+    api/
+      threads.py              -- MODIFIED: agent_runner calls tool_dispatcher; ask_user
+                                  pause via Redis pub/sub; harness pre-check delegate
+      workspace.py             -- NEW: REST endpoints for workspace files/versions/diff
+      workflow.py              -- NEW: REST endpoints for workflow state + cancel
+      admin_plugins.py         -- NEW: REST endpoints for plugin CRUD
+      runs.py                  -- MODIFIED (minimal): ask_user_response POST endpoint
+    services/
+      tool_dispatcher.py             -- NEW: extracted tool dispatch from threads.py
+      workspace_service.py           -- NEW: workspace CRUD + hybrid storage + versioning
+      workspace_file_loader.py       -- NEW: transparent read from inline or bucket
+      harness_engine.py              -- NEW: state machine + phase registry + validators
+      todo_service.py                -- NEW: todos table CRUD
+      openai_service.py              -- MODIFIED: register 8 new tools + plugin tool merge
+      sub_agent_service.py           -- MODIFIED: generalize run_sub_agent for task tool
+    db/
+      runs.py                  -- EXISTING (no change)
+      workspace.py             -- NEW: asyncpg helpers for workspace tables
+      workflow.py              -- NEW: asyncpg helpers for workflow tables
+      todos.py                 -- NEW: asyncpg helpers for todos table
+    models/
+      thread.py                -- MODIFIED: add deep_mode_metadata + active_workflow_run_id
+      workspace.py             -- NEW: Pydantic models for workspace files/versions
+      workflow.py              -- NEW: Pydantic models for workflow definitions/runs/phases
+      todo.py                  -- NEW: Pydantic model for Todo
+      plugin.py                -- NEW: Pydantic models for plugin manifest/registry
+  plugins/
+    manifest_schema.json       -- NEW: JSON-Schema for plugin manifests
+    registries.py              -- NEW: 6 extension-type registries
+```
+
+### 4.2 Frontend Boundaries
+
+```
+frontend/src/
+  components/
+    panel/
+      WorkspacePanel.tsx              -- NEW: root panel component (collapsible, 4 sections)
+      TodoSection.tsx                 -- NEW: todo list with nesting
+      WorkspaceFileBrowser.tsx        -- NEW: file tree + click-to-preview
+      WorkflowIndicator.tsx           -- NEW: phase progress indicator
+      AskUserPrompt.tsx               -- NEW: actionable prompt UI
+      DiffViewer.tsx                  -- NEW: file version diff display
+    layout/
+      ChatLayout.tsx                  -- MODIFIED: split main area into chat + panel
+  hooks/
+    useTodos.ts                       -- NEW: per-thread todos from store
+    useWorkspaceFiles.ts              -- NEW: per-thread workspace files from store
+    useWorkflow.ts                    -- NEW: per-thread workflow state from store
+    useAskUserPrompt.ts               -- NEW: per-thread pending prompt from store
+  stores/
+    streamsStore.ts                   -- MODIFIED: add panel-related per-thread Maps
+  providers/
+    StreamsProvider.tsx               -- MODIFIED: add callbacks for new event types
+  lib/
+    api.ts                            -- MODIFIED: new StreamCallbacks + parser arms + API fns
+  types/
+    index.ts                          -- MODIFIED: add Todo, WorkspaceFile, WorkflowState types
+```
+
+---
+
+## 5. Patterns to Follow
+
+### 5.1 SSE Event Emission (proven pattern -- follow exactly)
+
+Every new event type uses the existing `_emit()` at threads.py:115:
+
 ```python
-def get_tools() -> list[dict]:
-    tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL,
-             GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]
-    if settings.web_search_enabled:
-        tools.append(WEB_SEARCH_TOOL)
-    return tools
+await _emit(redis, run_id, 'workspace_file_written',
+            path="/plan.md", version=2, size_bytes=1234, mime_type="text/markdown")
 ```
 
-New shape adds three always-present skill tools and one flag-gated sandbox tool:
+This XADD to `run:{run_id}` is consumed by `GET /runs/{run_id}/stream?since=N`. The frontend's `subscribeToRun` parser adds new `else if` arms. Zero new infrastructure.
+
+### 5.2 Per-Thread State in Zustand Store (proven pattern from Phase 075.4)
+
+Phase 075.4 (D-075.4-A1) established the pattern of replacing global booleans with per-thread Maps/Sets in `streamsStore.ts`. All new panel state follows this:
+
+```typescript
+// In streamsStore.ts
+todosByThread: Map<string, Todo[]>
+workspaceFilesByThread: Map<string, WorkspaceFile[]>
+workflowStateByThread: Map<string, WorkflowState | null>
+askUserPromptByThread: Map<string, AskUserPrompt | null>
+```
+
+### 5.3 Hybrid Storage (proven pattern from Phase 067.4 sandbox-outputs)
+
+The `workspace-files` Supabase Storage bucket mirrors `sandbox-outputs` bucket at `backend/app/api/sandbox_outputs.py:48-67`:
 
 ```python
-def get_tools() -> list[dict]:
-    tools = [...existing..., LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL]
-    if settings.web_search_enabled:
-        tools.append(WEB_SEARCH_TOOL)
-    if settings.sandbox_enabled:
-        tools.append(EXECUTE_CODE_TOOL)
-    return tools
+# Write: threshold-gated
+if len(content) <= settings.workspace_inline_threshold_bytes:
+    # UPSERT workspace_files SET content_inline = $content, content_storage_url = NULL
+else:
+    path = f"{thread_id}/{file_id}/v{version}.bin"
+    supabase.storage.from_("workspace-files").upload(path, content)
+    signed_url = supabase.storage.from_("workspace-files").create_signed_url(path, 3600)
+    # UPSERT workspace_files SET content_storage_url = $signed_url, content_inline = NULL
+
+# Read: transparent via workspace_file_loader
+async def load_file_content(file_row) -> bytes:
+    if file_row["content_inline"]:
+        return file_row["content_inline"]
+    else:
+        return await fetch_from_storage(file_row["content_storage_url"])
 ```
 
-`get_explorer_tools()` does NOT get skill tools (explorer mode is KB-navigation-only) and does NOT get `execute_code`. This preserves the clean tool separation between modes.
+### 5.4 Tool Registration (proven pattern -- follow exactly)
 
-### 4. Persistent Tool Memory (threads.py — MODIFIED)
-
-**Current history loading** (line 248–254 in threads.py):
-```python
-history_resp = (
-    supabase.table("messages")
-    .select("role, content")
-    ...
-)
-messages: list[dict] = [{"role": "system", "content": active_system_prompt}]
-for msg in history_resp.data:
-    messages.append({"role": msg["role"], "content": msg["content"]})
-```
-
-This reconstructs only `role` and `content`, discarding all tool call history.
-
-**Modified history loading:** Fetch `role, content, tool_calls` from messages. For each assistant message that has `tool_calls`, reconstruct three message objects in sequence:
-
-```
-1. {"role": "assistant", "tool_calls": [{id, type, function: {name, arguments}}]}
-2. {"role": "tool", "tool_call_id": ..., "content": result_string}  -- one per tool call
-3. {"role": "assistant", "content": full_content}  -- the text response that followed
-```
-
-This matches the OpenAI API's expected multi-turn tool call message structure. The `tool_call_id` must be stored when persisting (add to `persisted_tool_calls` dict entries alongside existing fields). The `arguments` must also be preserved (already stored in `args`).
-
-**No schema change required:** `tool_calls` is already JSONB. The existing `persisted_tool_calls.append({name, args, result, status})` just needs `tool_call_id` added:
+New tool dicts follow the exact shape of existing tools in `openai_service.py`:
 
 ```python
-persisted_tool_calls.append({
-    "tool_call_id": tc["id"],  # ADD THIS
-    "name": tool_name,
-    "args": args,
-    "result": tool_result[:2000],
-    "status": "done",
-})
+WORKSPACE_WRITE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_write",
+        "description": "Write or update a file in the thread's workspace filesystem.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "File path starting with /"},
+                "content": {"type": "string", "description": "File content to write"},
+            },
+            "required": ["path", "content"],
+        },
+    },
+}
 ```
 
-### 5. FastAPI Application Lifespan (main.py — MODIFIED)
+Added to `get_tools()` unconditionally (workspace tools are always available in both modes).
 
-The Docker session manager must start and stop with the application. Currently `main.py` has no lifespan handler. A lifespan context manager must be added:
+### 5.5 Reconcile-on-Mount (D-v2.5-03 rule)
 
-```python
-from contextlib import asynccontextmanager
+All new panel hooks fetch state on mount, not only from SSE events:
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await session_manager.start()  # starts TTL cleanup background task
-    yield
-    await session_manager.stop()   # closes all open Docker sessions
-
-app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
+```typescript
+export const useTodos = (threadId: string | null) => {
+  const todos = useStreamsStore((s) =>
+    threadId ? s.todosByThread.get(threadId) ?? [] : []
+  )
+  useEffect(() => {
+    if (!threadId) return
+    getTodos(threadId).then((fetched) => {
+      useStreamsStore.setState((s) => {
+        const next = new Map(s.todosByThread)
+        next.set(threadId, fetched)
+        return { todosByThread: next }
+      })
+    })
+  }, [threadId])
+  return todos
+}
 ```
 
-The session manager also needs to hook into thread deletion: when `DELETE /threads/{thread_id}` runs, it must call `session_manager.close_session(thread_id)` if a session exists.
+### 5.6 asyncpg for Hot Paths, aexec for Cold Paths (D-073-04)
 
-### 6. Config (config.py — MODIFIED)
-
-One new setting added to `Settings`:
-
-```python
-sandbox_enabled: bool = False
-```
-
-Pattern is identical to `web_search_enabled` — a boolean env var with `false` default. No breaking changes to existing config.
-
-### 7. New FastAPI Routers (main.py — MODIFIED)
-
-Two new routers registered in `main.py`:
-
-```python
-from app.api import skills, sandbox
-
-app.include_router(skills.router)    # prefix="/skills"
-app.include_router(sandbox.router)   # prefix="/sandbox"
-```
-
-### 8. Supabase Storage Buckets (new)
-
-Two new private buckets required — created via migration or Supabase dashboard:
-
-| Bucket | Path pattern | Access |
-|--------|-------------|--------|
-| `skill-files` | `{user_id}/{skill_id}/{filename}` | Private, signed URLs |
-| `sandbox-outputs` | `{user_id}/{thread_id}/{execution_id}/{filename}` | Private, signed URLs |
-
-The existing `documents` bucket uses `supabase.storage.from_("documents").remove([doc["file_path"]])` — the new buckets follow the same access pattern. RLS is enforced at the application layer (backend verifies ownership before generating signed URLs), consistent with how the existing documents bucket works.
+New workspace/todo writes that happen inside the agent loop (hot path) use the asyncpg pool via new `backend/app/db/workspace.py` helpers. REST endpoint reads (cold path) can use `aexec` with supabase-py.
 
 ---
 
-## New Components — Detailed
+## 6. Anti-Patterns to Avoid
 
-### `backend/app/api/skills.py` (NEW)
+### 6.1 DO NOT add more tool branches to threads.py inline
 
-Standard REST router following the `folders.py` pattern:
-- Dependency injection: `get_current_user`, `get_supabase`
-- Ownership checks identical to folder ownership: `eq("user_id", current_user["id"])`
-- Global skills: `user_id IS NULL` — readable by all authenticated users, not writable
-- `PATCH /{id}/share` toggles `user_id` between `current_user["id"]` and `NULL` (mirrors `toggle-global` in folders.py)
-- File upload endpoints call `supabase.storage.from_("skill-files").upload(path, data)`
-- Export calls the open standard utility module, returns a `StreamingResponse` with `application/zip`
-- Import parses uploaded ZIP via the open standard utility module, creates skills in batch
+The tool dispatch chain at threads.py:2548+ is already ~800 LOC of `elif tool_name == "..."` branches. Adding 8 more tools inline would push it past 1000 LOC. **Extract tool dispatch to a separate module** before adding new tools. This is the G-5 refactor that `threads.py` (9+ phases) owes before more feature work.
 
-### `backend/app/sandbox/session_manager.py` (NEW)
+### 6.2 DO NOT create a separate EventSource for panel events
 
-Manages `llm-sandbox` Docker sessions keyed by `thread_id`:
+The panel MUST consume from the same `subscribeToRun` SSE connection as chat. Creating a second EventSource per run would double the browser's SSE connection count, create event ordering drift, and violate PANEL-STREAMS-01.
 
-```
-SessionManager
-  sessions: dict[thread_id → SandboxSession]
-  TTL: 30 min (configurable)
+### 6.3 DO NOT use asyncio.Event for ask_user cross-worker signaling
 
-  async start()     → starts background cleanup task (every 60s)
-  async stop()      → closes all sessions, cancels cleanup task
-  async get_or_create(thread_id) → SandboxSession
-  async close_session(thread_id) → None
-  async _cleanup()  → evict sessions past TTL
-```
+`asyncio.Event` is process-local. With `WORKER_COUNT=2`, the POST endpoint may land on a different worker than the producer. Use Redis pub/sub (`SUBSCRIBE`/`PUBLISH` on channel `ask_user:{run_id}`) for cross-worker safety.
 
-The `execute_code` tool handler calls `session_manager.get_or_create(thread_id)` then streams stdout/stderr via async generator, emitting SSE events. The `code_executions` record is written to Supabase after execution completes. Generated files in `/sandbox/output/` are uploaded to `sandbox-outputs` storage bucket and their metadata inserted into `sandbox_files`.
+### 6.4 DO NOT store workflow phase state in-memory only
 
-### `backend/app/skills/open_standard.py` (NEW)
+Harness phases MUST persist to Postgres (`workflow_phases` table). With multi-worker uvicorn, in-memory state is process-local and lost on restart. Required by HARNESS-RUN-01 and Q-v2.7-04.
 
-Pure utility module with no I/O side effects — takes data in, returns data out:
+### 6.5 DO NOT add harness whitelist checks inline in the tool dispatch chain
+
+The whitelist enforcement should be a single pre-dispatch gate in `tool_dispatcher.py`, not duplicated inside each tool branch. The dispatcher checks once before routing to the tool handler.
+
+### 6.6 DO NOT poll for workspace file changes in the panel
+
+The panel receives workspace file updates via SSE events (`workspace_file_written`/`workspace_file_deleted`). On mount it does a single reconcile fetch (D-v2.5-03 rule). It MUST NOT poll the REST endpoint on an interval.
+
+---
+
+## 7. The ask_user Pause/Resume Mechanism (Deep Dive)
+
+This is the most architecturally novel addition. The existing `agent_runner` has no concept of "pause" -- it runs tool calls synchronously within the iteration loop and only stops on `break` (natural completion) or exception.
+
+### 7.1 Recommended Design: Redis Pub/Sub
 
 ```python
-def parse_skill_zip(zip_bytes: bytes) -> list[ParsedSkill]:
-    """Parse ZIP → list of {name, description, instructions, license,
-       compatibility, metadata, files: list[{filename, category, content}]}"""
+# Inside tool_dispatcher.py, when tool_name == "ask_user":
+async def handle_ask_user(args, ctx):
+    prompt = args["prompt"]
+    options = args.get("options")
+    timeout = args.get("timeout_seconds", 3600)
 
-def generate_skill_zip(skill: dict, files: list[dict]) -> bytes:
-    """Skill dict + file list → ZIP bytes with SKILL.md + categorized subdirs"""
+    # 1. Emit SSE event so panel renders the prompt
+    await _emit(ctx.redis, ctx.run_id, 'ask_user_prompt',
+                prompt=prompt, options=options, timeout_seconds=timeout)
 
-def categorize_file(filename: str, mime_type: str) -> str:
-    """Returns 'scripts', 'references', or 'assets'"""
+    # 2. Update run status
+    await ctx.pool.execute(
+        "UPDATE runs SET status = 'awaiting_user' WHERE run_id = $1", ctx.run_id)
+
+    # 3. Subscribe to Redis channel for the response
+    pubsub = ctx.redis.pubsub()
+    await pubsub.subscribe(f"ask_user:{ctx.run_id}")
+    try:
+        response = None
+        async with asyncio.timeout(timeout):
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    response = json.loads(message["data"])
+                    break
+    except asyncio.TimeoutError:
+        response = {"error": "User did not respond within timeout"}
+    finally:
+        await pubsub.unsubscribe(f"ask_user:{ctx.run_id}")
+        await ctx.pool.execute(
+            "UPDATE runs SET status = 'streaming' WHERE run_id = $1", ctx.run_id)
+
+    # 4. Emit response event so panel can dismiss the prompt
+    await _emit(ctx.redis, ctx.run_id, 'ask_user_response', **response)
+
+    return json.dumps(response)
 ```
 
-No database access, no HTTP calls. Tested independently. Called by `skills.py` router endpoints.
-
----
-
-## Data Flow
-
-### New Skill Loading Flow (per chat turn)
-
-```
-POST /threads/{id}/messages
-    ↓
-event_stream() builds messages list
-    ↓
-Fetch enabled skills → build catalog markdown
-    ↓
-Inject catalog into system prompt
-    ↓
-LLM call → LLM calls load_skill("analyzing-sales-data")
-    ↓
-dispatch: fetch skill instructions + file list from skills/skill_files tables
-    ↓
-yield SSE: skill_activated
-    ↓
-append tool result to messages
-    ↓
-LLM continues with full skill instructions in context
-    ↓
-persist tool call in tool_calls JSONB
-```
-
-### Code Execution Flow (per execute_code tool call)
-
-```
-LLM calls execute_code({code, libraries, output_files})
-    ↓
-dispatch: session_manager.get_or_create(thread_id)
-    ↓
-yield SSE: code_execution_start
-    ↓
-session.run(code, libraries) → async stdout/stderr stream
-    ↓
-yield SSE: code_stdout / code_stderr (per line, real-time)
-    ↓
-upload generated files → sandbox-outputs bucket
-    ↓
-insert code_executions + sandbox_files rows
-    ↓
-yield SSE: code_execution_complete {exit_code, files: [{filename, url}]}
-    ↓
-tool_result = summary string with exit code + file count
-    ↓
-append to messages, persist in tool_calls JSONB
-```
-
-### Persistent Tool Memory — History Reconstruction
-
-```
-New turn arrives → load messages from DB (role, content, tool_calls)
-    ↓
-For each message row:
-  if role="assistant" and tool_calls is not null:
-    emit {role: "assistant", tool_calls: [...reconstructed...]}
-    for each tc in tool_calls:
-      emit {role: "tool", tool_call_id: tc.tool_call_id, content: tc.result}
-    emit {role: "assistant", content: row.content}  [if content non-empty]
-  else:
-    emit {role: msg.role, content: msg.content}
-    ↓
-LLM receives full multi-turn tool call history
-```
-
----
-
-## Recommended Project Structure Changes
-
-```
-backend/app/
-├── api/
-│   ├── threads.py          # MODIFIED — new tool dispatch + history reconstruction
-│   ├── folders.py          # unchanged
-│   ├── documents.py        # unchanged
-│   ├── kb.py               # unchanged
-│   ├── settings.py         # unchanged
-│   ├── skills.py           # NEW — skill CRUD, file upload, import/export
-│   └── sandbox.py          # NEW — signed URL, execution file listing
-├── sandbox/
-│   ├── __init__.py
-│   └── session_manager.py  # NEW — Docker session pool, TTL, lifespan hooks
-├── skills/
-│   ├── __init__.py
-│   └── open_standard.py    # NEW — ZIP parse/generate, SKILL.md parsing
-├── services/
-│   └── openai_service.py   # MODIFIED — 3 new tool defs, get_tools() additions
-├── config.py               # MODIFIED — sandbox_enabled flag
-└── main.py                 # MODIFIED — lifespan handler, 2 new router registrations
-```
-
----
-
-## Build Order (Dependency Graph)
-
-The features have a clear dependency chain. Build in this order:
-
-### Phase 1: Persistent Tool Memory
-**Why first:** Zero new dependencies. Touches only `threads.py` and `openai_service.py`. Validates that tool call round-trips work end-to-end before adding new tools. If history reconstruction breaks existing chat, it's isolated before adding sandbox complexity.
-
-**New:** None
-**Modified:** `threads.py` (history loading + persist `tool_call_id`), no schema change
-
-### Phase 2: Agent Skills Core (DB + API)
-**Why second:** Skills API has no dependency on sandbox. Establishes the new router pattern, storage bucket, RLS policy, and ownership model that skill files inherit.
-
-**New:** `skills` table + RLS, `skill-files` storage bucket, `backend/app/api/skills.py`, `backend/app/skills/open_standard.py`
-**Modified:** `main.py` (register router)
-
-### Phase 3: Skills LLM Integration
-**Why third:** Depends on Skills Core being queryable. Adds the catalog injection and tool dispatch without any Docker dependency.
-
-**New:** `LOAD_SKILL_TOOL`, `SAVE_SKILL_TOOL`, `READ_SKILL_FILE_TOOL` definitions in `openai_service.py`
-**Modified:** `get_tools()` in `openai_service.py`, `event_stream()` in `threads.py` (catalog injection + dispatch branches), `config.py` (no new settings — skills are always on)
-
-### Phase 4: Skills Open Standard (Import/Export)
-**Why fourth:** Pure utility layer. Depends on `skills.py` router endpoints existing to wire import/export to. The `open_standard.py` module is side-effect-free and can be developed in parallel, but the endpoints need the router to exist.
-
-**New:** Import/export endpoints in `skills.py`, Bulk import logic
-**Modified:** `open_standard.py` (already created in Phase 2 as stub)
-
-### Phase 5: Code Execution Sandbox
-**Why last:** Depends on lifespan pattern, Docker infrastructure, new SSE event types, new tables. Highest risk feature. Isolating it last means all other features are fully functional before introducing Docker complexity.
-
-**New:** `code_executions` + `sandbox_files` tables + RLS, `sandbox-outputs` bucket, `backend/app/sandbox/session_manager.py`, `backend/app/api/sandbox.py`, `EXECUTE_CODE_TOOL` definition, custom Docker image (`Dockerfile.sandbox`)
-**Modified:** `main.py` (lifespan handler + sandbox router), `config.py` (`sandbox_enabled` flag), `threads.py` (execute_code dispatch branch + new SSE events), `delete_thread` endpoint (close sandbox session on delete)
-
----
-
-## Architectural Patterns
-
-### Pattern 1: Tool-as-Dispatch-Branch
-
-**What:** Every LLM tool is handled as an `elif` branch inside `event_stream()`. The tool name string from the LLM is the dispatch key. Tool implementations are either inline (simple) or call out to service functions (complex).
-
-**When to use:** Always — this is the existing pattern. New tools must follow it.
-
-**Trade-offs:** Single large function, but the linear structure makes the control flow easy to read and debug. Refactoring to a `tool_registry: dict[str, Callable]` is possible later but is not needed now.
-
-**New tool additions follow this exact shape:**
 ```python
-elif tool_name == "load_skill":
-    skill_id = args["skill_name"]
-    result = load_skill_instructions(skill_id, current_user["id"], supabase)
-    yield f"data: {json.dumps({'type': 'skill_activated', 'name': skill_id})}\n\n"
-    tool_result = json.dumps(result)
+# In runs.py or a new ask_user.py router:
+@router.post("/runs/{run_id}/ask_user_response")
+async def ask_user_response(run_id: UUID, body: AskUserResponseBody, redis=Depends(get_redis)):
+    # Verify the run exists and is in 'awaiting_user' status
+    # ...
+    payload = {"response_text": body.response_text, "choice_index": body.choice_index}
+    await redis.publish(f"ask_user:{run_id}", json.dumps(payload))
+    return {"ok": True}
 ```
 
-### Pattern 2: Feature-Flag Gating via Settings
+### 7.2 Why Redis Pub/Sub Over Alternatives
 
-**What:** Settings (`config.py`) uses `pydantic-settings` with `bool` fields defaulting to `False`. The tool is appended to `get_tools()` only when the flag is `True`.
+| Approach | Cross-Worker Safe | Latency | Complexity | Verdict |
+|----------|-------------------|---------|------------|---------|
+| `asyncio.Event` | NO | ~0ms | Low | Fails with WORKER_COUNT=2 |
+| Redis pub/sub | YES | ~1ms | Low | **Recommended** |
+| Postgres row + polling | YES | 100-500ms | Medium | Wasteful CPU |
+| Redis Stream (existing) | YES | ~1ms | Medium | Overengineered for 1 message |
+| Sticky sessions | YES | ~0ms | High | Requires LB config |
 
-**When to use:** Any feature that requires external infrastructure (Docker for sandbox, Tavily for web search) or that adds cost/risk when enabled.
-
-**Sandbox follows web_search pattern exactly:**
-```python
-@property
-def web_search_enabled(self) -> bool:
-    return bool(self.tavily_api_key)
-
-# New:
-sandbox_enabled: bool = False
-```
-
-### Pattern 3: Ownership Model (Global/Private)
-
-**What:** `user_id = NULL` means global (visible to all, writable by no one except seeded data). `user_id = current_user.id` means private. Toggle-global flips `user_id` between the two states.
-
-**When to use:** Skills follow the same model as folders and documents. The `share` endpoint sets `user_id = NULL`; unsharing sets it back to the caller's ID. RLS policy: `SELECT WHERE user_id = auth.uid() OR user_id IS NULL`.
-
-**Pattern is identical to `toggle-global` in `folders.py`** — no new concepts needed.
-
-### Pattern 4: SSE Event Envelope
-
-**What:** Every SSE event is `data: {JSON}\n\n` where the JSON has a `type` field. Frontend routes on `type`.
-
-**Existing types:** `delta`, `tool_start`, `tool_end`, `sub_agent_start`, `sub_agent_delta`, `sub_agent_done`, `title`, `error`
-
-**New types to add:**
-- `skill_activated` — `{type, name}` — skill loaded by LLM
-- `code_execution_start` — `{type, execution_id}`
-- `code_stdout` — `{type, line}`
-- `code_stderr` — `{type, line}`
-- `code_execution_complete` — `{type, exit_code, duration_ms, files: [{filename, url, size}]}`
-- `code_execution_error` — `{type, message}`
+Redis pub/sub is the lightest option: 1 SUBSCRIBE, 1 PUBLISH, then the channel is gone. The existing `redis.asyncio` client already supports pub/sub. No new infrastructure.
 
 ---
 
-## Anti-Patterns to Avoid
+## 8. threads.py God-File Extraction Strategy
 
-### Anti-Pattern 1: Injecting Full Skill Instructions into System Prompt
+The PRD section 9 row 5 claims: "v2.7 adds phase-dispatcher pre-check logic to `threads.py:1059` -- adds ~30 LOC, NOT a major compound." This is optimistic. The real additions are:
 
-**What people do:** Dump all skill instructions for all enabled skills into the system prompt on every request.
+- 8 new tool branches in the dispatch chain (~200 LOC)
+- ask_user pause/resume mechanism (~50 LOC)
+- Harness whitelist pre-check per tool call (~30 LOC)
+- Harness phase transition calls (~40 LOC)
 
-**Why it's wrong:** Skills are designed for progressive disclosure. Even 10 skills with moderate instructions will consume 5-15k tokens every request, inflating cost significantly. The catalog/load pattern is specifically designed to avoid this.
+**Recommended extraction (must happen BEFORE any feature work):**
 
-**Do this instead:** Inject only `name` + `description` (the catalog table) into the system prompt. Full instructions load only when `load_skill` is called.
+1. **Extract tool dispatch** -- move the ~800 LOC `elif tool_name ==` chain (threads.py:2548-3360) to `backend/app/services/tool_dispatcher.py`. Define a `ToolContext` dataclass carrying `redis`, `run_id`, `thread_id`, `supabase`, `pool`, `user_settings`, `current_user`, `folder_subtree_ids`, `scoped_folder_path`. The `agent_runner` calls `result = await dispatch_tool(tool_name, args, tool_ctx)` where `dispatch_tool` routes to per-tool handler functions.
 
-### Anti-Pattern 2: Synchronous Docker Calls Inside the SSE Generator
+2. **Extract ask_user registry** -- the `ASK_USER_EVENTS` dict (if using in-memory fallback) or the Redis pub/sub pattern goes into `tool_dispatcher.py` alongside the `ask_user` handler.
 
-**What people do:** Call `session.run(code)` synchronously inside the async `event_stream()` generator, blocking the event loop while Docker executes.
+3. **Keep agent_runner in threads.py** -- the iteration loop, LLM streaming, context window management, and finalization logic stay. The refactor extracts dispatch, not the loop.
 
-**Why it's wrong:** Blocks FastAPI's async event loop. All other requests stall while code executes. SSE events stop flowing until execution completes (no real-time output).
+4. **Harness whitelist enforcement** -- a single gate function `check_tool_allowed(run_id, tool_name) -> bool` in `harness_engine.py`, called by `tool_dispatcher.py` before routing to the handler.
 
-**Do this instead:** Make `execute_code` dispatch use `await` with an async Docker session API, or run in a thread pool via `asyncio.run_in_executor`. Stream stdout/stderr lines as they arrive via `async for line in session.stream()`.
-
-### Anti-Pattern 3: Storing Full Tool Results Without Size Cap
-
-**What people do:** Store the complete `tool_result` string in the `tool_calls` JSONB column for history reconstruction.
-
-**Why it's wrong:** Search results, file trees, and grep output can be tens of kilobytes. Storing full results for every tool call in every assistant message will bloat the database quickly.
-
-**Do this instead:** The existing code already trims to `result[:2000]`. Keep this cap. The LLM still has the full result in-context during the current turn; the persisted result is for reconstruction, not for full replay.
-
-### Anti-Pattern 4: One Docker Container Per Request
-
-**What people do:** Spin up a fresh Docker container for each `execute_code` call.
-
-**Why it's wrong:** Container startup takes 2-5 seconds per call, destroying interactivity. Variables and installed packages don't persist across calls in the same conversation.
-
-**Do this instead:** The session manager maintains one container per thread_id, reusing it for the conversation lifetime. Container startup cost is paid once per thread, not per tool call.
-
-### Anti-Pattern 5: Explorer Mode Gets Skill or Sandbox Tools
-
-**What people do:** Add new tools to `get_tools()` and forget to check that `get_explorer_tools()` is separately maintained.
-
-**Why it's wrong:** Explorer mode is intentionally KB-navigation-only. Injecting `load_skill` or `execute_code` breaks the focused behavior contract.
-
-**Do this instead:** Skills tools and execute_code belong only in `get_tools()`. `get_explorer_tools()` returns its own static list and must not be changed.
+This directly addresses G-5 (refactor between feature waves) on the hot-file ledger for `threads.py`.
 
 ---
 
-## Integration Points Summary
+## 9. Suggested Build Order
 
-### What is NEW (net-new files and tables)
+Based on dependency analysis and risk ordering:
 
-| Artifact | Type | Purpose |
-|----------|------|---------|
-| `backend/app/api/skills.py` | Router | Skill CRUD, file management, import/export |
-| `backend/app/api/sandbox.py` | Router | Signed download URLs, execution file listing |
-| `backend/app/sandbox/session_manager.py` | Service | Docker session pool with TTL and lifespan |
-| `backend/app/skills/open_standard.py` | Utility | ZIP parse/generate, SKILL.md parsing |
-| `skills` table | DB | Skill metadata, global/private ownership |
-| `skill_files` table | DB | Building-block file metadata |
-| `code_executions` table | DB | Execution audit log |
-| `sandbox_files` table | DB | Generated file metadata |
-| `skill-files` bucket | Storage | Building-block file storage |
-| `sandbox-outputs` bucket | Storage | Sandbox-generated file storage |
-| `LOAD_SKILL_TOOL` | Tool def | LLM tool definition |
-| `SAVE_SKILL_TOOL` | Tool def | LLM tool definition |
-| `READ_SKILL_FILE_TOOL` | Tool def | LLM tool definition |
-| `EXECUTE_CODE_TOOL` | Tool def | LLM tool definition (sandbox-gated) |
-| `Dockerfile.sandbox` | Docker | Custom Python image with pre-installed libs |
+### Wave 0 -- Foundation (no feature dependencies)
 
-### What is MODIFIED (existing files changed)
+| Phase | Goal | Approx Plans | Risk |
+|-------|------|-------------|------|
+| Schema migrations (125-135) | All 11 migrations + RLS + indexes + Storage bucket | 3 | LOW |
+| threads.py tool-dispatch extraction | G-5 mandated. Extract tool dispatch chain to `tool_dispatcher.py`. | 3-4 | MODERATE (large refactor, must preserve all existing behavior) |
 
-| File | What Changes |
-|------|-------------|
-| `backend/app/main.py` | Add lifespan handler, register `/skills` and `/sandbox` routers |
-| `backend/app/config.py` | Add `sandbox_enabled: bool = False` |
-| `backend/app/services/openai_service.py` | Add 4 new tool defs, extend `get_tools()` |
-| `backend/app/api/threads.py` | History reconstruction (Persistent Tool Memory), skill catalog injection, 4 new `elif` dispatch branches, new SSE event types, `tool_call_id` in persisted tool calls, session cleanup on thread delete |
+### Wave 1 -- Backend Workspace + Tools (after Wave 0)
 
-### What is UNCHANGED
+| Phase | Goal | Approx Plans | Risk |
+|-------|------|-------------|------|
+| Workspace filesystem backend | `workspace_service.py`, `workspace_file_loader.py`, 5 workspace tools, workspace REST endpoints, SSE events | 3 | MODERATE |
+| Three new LLM tools | `todo_service.py`, `task` generalization, `ask_user` pause/resume (Redis pub/sub) | 4 | HIGH (ask_user is novel) |
 
-All existing routers (`folders.py`, `documents.py`, `kb.py`, `settings.py`), all existing services (`retrieval_service.py`, `embedding_service.py`, `rerank_service.py`, `web_search_service.py`, `sql_service.py`, `sub_agent_service.py`), all existing tables, the `documents` storage bucket, and the frontend's existing Chat and Documents tabs are entirely unchanged.
+### Wave 2 -- Frontend Panel (after Wave 1 backend events exist)
+
+| Phase | Goal | Approx Plans | Risk |
+|-------|------|-------------|------|
+| StreamsProvider extension + hooks | New event types in api.ts parser + StreamCallbacks. Panel state in streamsStore.ts. 4 new hooks. | 3 | MODERATE |
+| Panel UI scaffold | WorkspacePanel + ChatLayout split. 4 sections. Responsive. | 5 | MODERATE |
+| Diff viewer + file preview | DiffViewer.tsx, default text/markdown preview, file_preview extension point. | 3 | LOW |
+
+### Wave 3 -- Harness + Plugin (parallelizable with Wave 2)
+
+| Phase | Goal | Approx Plans | Risk |
+|-------|------|-------------|------|
+| Harness engine | harness_engine.py, 5 phase types, validators, tool-whitelist enforcement | 5 | HIGH (complex state machine) |
+| Plugin contract | Manifest schema, 6 registries, loader, /admin/plugins endpoints | 5 | MODERATE |
+| Dual-mode UX | Deep/Harness toggle, skill_modes.harness_required, panel auto-open | 3 | MODERATE |
+
+### Wave 4 -- Reference + Verification
+
+| Phase | Goal | Approx Plans | Risk |
+|-------|------|-------------|------|
+| Reference plugin (PPTX preview) | Validates contract end-to-end | 2 | LOW |
+| Seed workflows | 2-3 example workflow_definitions | 2 | LOW |
+| Cross-cutting verification | E2E flows, accessibility, cross-PRD edits | 3 | LOW |
+
+### Build Order Rationale
+
+- **Tool dispatch extraction FIRST** because every subsequent phase adds to threads.py. Doing it after features ship means a painful rebase.
+- **Workspace before panel** because the panel needs backend events to render. The panel is purely a consumer.
+- **ask_user is the highest-risk tool** because it introduces a pause/resume control flow. Ship it WITH the other tools so the tool dispatcher contract is settled.
+- **Harness after workspace/tools** because the harness extends the tool dispatcher (whitelist enforcement). Building the dispatcher extraction + basic tools first means the harness has clean hooks to plug into.
+- **Plugin contract parallelizes with Wave 2** (panel) since it's primarily backend registry + API work with no frontend dependency until the reference plugin.
 
 ---
 
-## Sources
+## 10. Scalability Considerations
 
-- Direct source inspection: `backend/app/api/threads.py` (tool dispatch loop, SSE pattern, message persistence)
-- Direct source inspection: `backend/app/services/openai_service.py` (tool definitions, get_tools pattern, feature-flag pattern)
-- Direct source inspection: `backend/app/api/folders.py` (ownership model, global/private toggle pattern)
-- Direct source inspection: `backend/app/config.py` (Settings class, web_search_enabled pattern)
-- Direct source inspection: `backend/app/main.py` (router registration, no existing lifespan)
-- PRD: `PRD-Skills-Sandbox.md` (feature specifications, SSE event types, storage bucket paths)
-- Project context: `.planning/PROJECT.md` (existing schema, agent modes, Key Decisions)
+| Concern | Current Scale | v2.7 Impact | Mitigation |
+|---------|---------------|-------------|------------|
+| workspace_files rows | 0 | ~20 files/thread x 100 threads = 2K rows | Index on thread_id. Trivial. |
+| workspace_file_versions | 0 | ~50 writes/thread x 100 threads = 5K rows/month | No cleanup policy in v2.7. Deferred to v3.4 TTL. Monitor row count. |
+| Storage bucket objects | sandbox-outputs only | workspace-files bucket adds ~10 large files/thread | Supabase Storage scales independently. Signed-URL expiry = 1hr. |
+| SSE events per run | ~50-500 | +5-20 workspace/todo/workflow events per run | MAXLEN~10000 on XADD handles this. |
+| Tool dispatch latency | ~1ms | +1 Postgres round-trip for harness whitelist | Cache whitelist in-memory per run_id; refresh on phase transition. |
+| ask_user pause duration | N/A | Producer task suspended 0-3600s | Redis SUBSCRIBE is zero-CPU. Concern: run_id held in RUN_TASKS during pause -- cleanup if abandoned. |
+| Plugin enumeration | N/A | 1 query per get_tools() call at ~10 plugins | In-memory cache per worker with 60s TTL. |
+| llm_batch_agents fan-out | N/A | N parallel sub-agents per phase | `max_parallel_agents` config (default 5). At 50 concurrent workflow runs x 5 = 250 sub-runs within AnyIO ceiling (200 per worker x 2 workers). |
 
 ---
-*Architecture research for: v2.0 Agent Skills & Code Execution Sandbox*
-*Researched: 2026-03-29*
+
+## 11. Risk Assessment
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| threads.py G-5 compounding (9+ phases) | **CRITICAL** | Extract tool dispatch BEFORE adding tools. This research doc explicitly recommends it as Phase 0 work. |
+| ask_user multi-worker race condition | **HIGH** | Redis pub/sub channel per run_id. Test with WORKER_COUNT=2. |
+| Harness state machine complexity | **HIGH** | 5 phase types is ambitious. Ship `llm_single` + `llm_agent` + `llm_human_input` first; `programmatic` + `llm_batch_agents` in a follow-up phase. |
+| Panel re-render storms from high-frequency SSE events | **MODERATE** | Throttle store updates for workspace events (same `makeThrottle` pattern from StreamsProvider line 80). |
+| ChatLayout responsive breakpoints | **MODERATE** | Panel width must not crush chat below readable width. Test at 768px, 1024px, 1440px. Mobile = bottom-sheet, not side panel. G-2 sketch-before-plan fires. |
+| Branch D-3 clearMessages guard regression | **MODERATE** | Panel is a SECOND consumer, not a modification to chat's read path. Vitest unit must verify guard survives. |
+| Workspace file versioning unbounded growth | **LOW (deferred)** | No TTL in v2.7. Document for v3.4. Monitor via admin query. |
+| Plugin manifest validation crash at startup | **LOW** | Per-plugin try/except in lifespan bootstrap. Failed plugins logged + skipped. |
+
+---
+
+## 12. Sources
+
+**Live source files verified (2026-05-27):**
+- `backend/app/api/threads.py` -- `_emit()` at line 115, `agent_runner` at line 1381, tool dispatch at line 2548, `RUN_TASKS` registry at line 92, `TERMINAL_TYPES` at line 100
+- `backend/app/services/openai_service.py` -- `get_tools()` at line 514, tool dict shapes at lines 16-52
+- `backend/app/services/sub_agent_service.py` -- `run_sub_agent` at line 20
+- `backend/app/api/sandbox_outputs.py` -- Storage bucket pattern at line 48-67
+- `backend/app/db/runs.py` -- asyncpg helper pattern
+- `frontend/src/App.tsx` -- `<StreamsProvider>` wrap at line 30
+- `frontend/src/providers/StreamsProvider.tsx` -- 1600 LOC, named hooks at line 1540+
+- `frontend/src/stores/streamsStore.ts` -- per-thread Maps at line 47-79, StreamsState interface at line 43
+- `frontend/src/lib/api.ts` -- `StreamCallbacks` at line 186, `subscribeToRun` parser at line 380+, ~30 existing event type arms
+- `frontend/src/components/layout/ChatLayout.tsx` -- current layout at line 184-196 (single `<main>` element)
+
+**PRD:**
+- `.planning/PRDs/v2.7.md` -- Themes A-H, 11 migrations (125-135), 11 phases, ~38 plans, section 5 (Architecture) + section 6 (Compatibility)
+
+**Project context:**
+- `.planning/PROJECT.md` -- Current schema (lines 232-246), agent modes (lines 248-250), key decisions, hot-file ledger in CLAUDE.md
