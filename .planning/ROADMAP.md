@@ -111,7 +111,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Milestone Goal:** Ship a per-thread workspace filesystem and right-side panel that gives the agent a persistent scratchpad, todo management, sub-agent spawning, and user-input pausing.
 
-- [ ] **Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes** - G-5 mandated refactor of threads.py tool dispatch + close 4 open v2.6 bugs
+- [x] **Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes** - G-5 mandated refactor of threads.py tool dispatch + close 4 open v2.6 bugs
 - [ ] **Phase 084: Workspace Filesystem Backend** - Per-thread workspace with hybrid storage, versioning, diffing, and SSE events
 - [ ] **Phase 085: New LLM Tools** - write_todos, task (sub-agent), and ask_user (human-in-the-loop pause/resume)
 - [ ] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks
@@ -134,9 +134,9 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 **Research flag**: Skip research-phase -- ARCHITECTURE.md Section 8 provides the extraction strategy; bugs have known root causes from v2.6 triage
 
 Plans:
-- [ ] 083-01-PLAN.md -- Extract tool dispatch chain to tool_dispatcher.py with registry pattern (FOUND-01)
-- [ ] 083-02-PLAN.md -- Frontend bug fixes: output files after reload + timer key stability (FOUND-02)
-- [ ] 083-03-PLAN.md -- Backend bug fixes: Kimi thinking filter + title gen cross-provider fix (FOUND-02)
+- [x] 083-01-PLAN.md -- Extract tool dispatch chain to tool_dispatcher.py with registry pattern (FOUND-01)
+- [x] 083-02-PLAN.md -- Frontend bug fixes: output files after reload + timer key stability (FOUND-02)
+- [x] 083-03-PLAN.md -- Backend bug fixes: Kimi thinking filter + title gen cross-provider fix (FOUND-02)
 
 ### Phase 084: Workspace Filesystem Backend
 **Goal**: The agent can write, read, list, delete, version, and diff files in a per-thread workspace that persists across turns, thread reloads, and browser sessions
@@ -225,7 +225,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 0/3 | Planning complete | - |
+| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 3/3 | All plans complete | ~35min |
 | 084. Workspace Filesystem Backend | 0/TBD | Not started | - |
 | 085. New LLM Tools | 0/TBD | Not started | - |
 | 086. StreamsProvider Extension + Panel Hooks | 0/TBD | Not started | - |

@@ -8,7 +8,8 @@
 ### Foundation
 
 - [ ] **FOUND-01**: Tool dispatch chain extracted from threads.py into a dedicated module with registry-pattern dispatch — all existing 16 tools migrated with zero behavior change
-- [ ] **FOUND-02**: 4 open bugs closed: final-output-files-not-persisted (BUG-260526-03), kimi-thinking-leaks-into-content (BUG-260526-02), timer-disappears-mid-cycle (BUG-260526-04), title-generation-broken-deepseek-moonshot-google (BUG-260527-01)
+- [x] **FOUND-02
+**: 4 open bugs closed: final-output-files-not-persisted (BUG-260526-03), kimi-thinking-leaks-into-content (BUG-260526-02), timer-disappears-mid-cycle (BUG-260526-04), title-generation-broken-deepseek-moonshot-google (BUG-260527-01)
 
 ### Workspace Filesystem
 
