@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uzD4pZz0qqhqvyslu0h2KrJgpJG6gGlH3UGZM3iiqrl3A5owzTyF3h6PvmMCvOl
+\restrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -257,6 +257,21 @@ CREATE TABLE public.app_settings (
     extraction_equation_engine text DEFAULT 'none'::text,
     extraction_per_call_hints_enabled boolean DEFAULT true,
     chat_tool_args_progress_emit_boundary_bytes integer DEFAULT 256 NOT NULL,
+    llm_provider text DEFAULT ''::text,
+    llm_model text DEFAULT 'gpt-4o'::text,
+    web_search_max_results integer DEFAULT 5,
+    web_search_enabled boolean DEFAULT false,
+    sandbox_enabled boolean DEFAULT true,
+    context_window_max_tokens integer DEFAULT 200000,
+    sub_agent_max_output_tokens integer DEFAULT 32768,
+    sub_agent_model text DEFAULT ''::text,
+    llm_max_output_tokens integer DEFAULT 32768,
+    openrouter_tool_strategy text DEFAULT 'quality'::text,
+    ollama_base_url text DEFAULT 'http://localhost:11434'::text,
+    provider_model_lists jsonb DEFAULT '{}'::jsonb,
+    title_drafting_config jsonb DEFAULT '{"max_length": 60, "max_tokens": 30}'::jsonb,
+    sub_agent_config jsonb DEFAULT '{"max_output_tokens": 32768}'::jsonb,
+    token_capture_enabled boolean DEFAULT true,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -428,6 +443,23 @@ CREATE TABLE public.messages (
 );
 
 ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
+
+
+--
+-- Name: model_capabilities_overrides; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.model_capabilities_overrides (
+    model_id text NOT NULL,
+    provider text NOT NULL,
+    llm_call_timeout_seconds integer,
+    context_window_tokens integer,
+    max_output_tokens integer,
+    native_tools boolean,
+    enabled boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -664,6 +696,14 @@ ALTER TABLE ONLY public.message_feedback
 
 ALTER TABLE ONLY public.messages
     ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: model_capabilities_overrides model_capabilities_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.model_capabilities_overrides
+    ADD CONSTRAINT model_capabilities_overrides_pkey PRIMARY KEY (model_id);
 
 
 --
@@ -1569,6 +1609,19 @@ ALTER TABLE public.message_feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: model_capabilities_overrides; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.model_capabilities_overrides ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: model_capabilities_overrides model_overrides_read_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY model_overrides_read_all ON public.model_capabilities_overrides FOR SELECT TO authenticated USING (true);
+
+
+--
 -- Name: pdf_extraction_runs; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1634,5 +1687,5 @@ ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uzD4pZz0qqhqvyslu0h2KrJgpJG6gGlH3UGZM3iiqrl3A5owzTyF3h6PvmMCvOl
+\unrestrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
 
