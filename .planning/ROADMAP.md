@@ -130,12 +130,13 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
   3. Kimi/Moonshot thinking content no longer leaks into visible chat messages (BUG-260526-02 closed)
   4. Sandbox output files generated during an agent run appear in the Final Outputs panel without requiring page refresh (BUG-260526-03 closed)
   5. Timer stays visible throughout the entire agent run cycle and title generation works on DeepSeek/Moonshot/Google models (BUG-260526-04 + BUG-260527-01 closed)
-**Plans**: TBD
+**Plans**: 3 plans
 **Research flag**: Skip research-phase -- ARCHITECTURE.md Section 8 provides the extraction strategy; bugs have known root causes from v2.6 triage
 
 Plans:
-- [ ] 083-01: TBD
-- [ ] 083-02: TBD
+- [ ] 083-01-PLAN.md -- Extract tool dispatch chain to tool_dispatcher.py with registry pattern (FOUND-01)
+- [ ] 083-02-PLAN.md -- Frontend bug fixes: output files after reload + timer key stability (FOUND-02)
+- [ ] 083-03-PLAN.md -- Backend bug fixes: Kimi thinking filter + title gen cross-provider fix (FOUND-02)
 
 ### Phase 084: Workspace Filesystem Backend
 **Goal**: The agent can write, read, list, delete, version, and diff files in a per-thread workspace that persists across turns, thread reloads, and browser sessions
@@ -224,7 +225,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 0/TBD | Not started | - |
+| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 0/3 | Planning complete | - |
 | 084. Workspace Filesystem Backend | 0/TBD | Not started | - |
 | 085. New LLM Tools | 0/TBD | Not started | - |
 | 086. StreamsProvider Extension + Panel Hooks | 0/TBD | Not started | - |
