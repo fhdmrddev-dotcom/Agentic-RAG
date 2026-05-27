@@ -1039,6 +1039,107 @@ Specifically:
 
 ---
 
+## D-PRD-12 — Multi-worker enablement: D-v2.5-02 formally superseded
+
+**Status:** ACCEPTED 2026-05-27
+**Decision-makers:** User (fhdmrd@gmail.com) + Phase 077 validation evidence
+**Supersedes:** D-v2.5-02 (single uvicorn worker discipline) — constraint is NOW LIFTED; D-PRD-08 scheduled the lift, this ADR executes it
+
+### Context
+
+D-v2.5-02 (locked 2026-05-02) mandated single uvicorn worker because `--workers N`
+masked concurrency bugs and broke in-memory state. D-PRD-08 (locked 2026-05-10)
+scheduled the lift for v2.6 after asyncpg integration and multi-worker validation.
+
+Phase 073 shipped asyncpg pool integration (replacing sync supabase-py in hot paths).
+Phase 077 proved multi-worker safety under synthetic load:
+- 50-parallel-run load completed without data corruption (test_077_multi_worker.py)
+- Cross-worker cancel via zombie-heal path verified (test_077_cross_cancel.py)
+- Sandbox Docker container re-attach verified (test_077_sandbox_reattach.py)
+- Per-worker Redis/asyncpg/Supabase singletons verified idempotent
+
+Phase 078 shipped `GET /admin/backpressure` providing per-worker run count observability.
+
+All preconditions for lifting D-v2.5-02 are met.
+
+### Decision
+
+Enable `--workers 2` as the project default via `WORKER_COUNT` env var. The single-worker
+constraint is formally retired.
+
+**Default:** `WORKER_COUNT=2` (validated by Phase 077 harness).
+
+**Singleton Audit Table:**
+
+| Singleton | Location | Per-Worker Safe? | Mechanism | Phase 077 Test |
+|-----------|----------|-----------------|-----------|----------------|
+| `_redis` | `dependencies.py` | Yes | Lazy init post-fork; each worker gets own connection | `test_077_multi_worker.py` (singleton_no_crosstalk) |
+| `_pg_pool` | `dependencies.py` | Yes | Lazy init post-fork; asyncpg pool per worker (min=2/max=10) | `test_077_multi_worker.py` (50-run load) |
+| `_supabase` | `dependencies.py` | Yes | Lazy init post-fork; used only for non-hot-path reads | `test_077_multi_worker.py` (50-run load) |
+| `RUN_TASKS` | `threads.py:92` | Yes | Per-process dict; cross-worker cancel via Redis zombie-heal | `test_077_cross_cancel.py` |
+| `_sessions` | `sandbox_service.py` | Yes | Per-process dict; re-attach via Docker container name convention | `test_077_sandbox_reattach.py` |
+| `_BACKGROUND_TASKS` | `threads.py` | Yes | Per-process set; tasks scoped to spawning worker | `test_077_multi_worker.py` |
+| Settings TTL cache | `config.py` | Yes | Per-process cache; TTL refresh per worker independently | Implicit (no shared state) |
+| LangSmith client | `langsmith_utils.py` | Yes | Stateless HTTP client; thread-safe by design | Implicit (no shared state) |
+
+**Scaling Triggers:**
+
+When `GET /admin/backpressure` shows `anyio_threadpool_depth` sustained above 70% of
+pool size across both workers for >5 minutes, consider scaling to `WORKER_COUNT=4`.
+Monitor via the `per_worker_run_count` field to verify load distribution.
+
+Uvicorn convention is `2 * CPU` workers; for this app, start conservative (2) and scale
+based on observed backpressure, not CPU count.
+
+**Re-trigger Clause (revert conditions):**
+
+- **Immediate revert** (`WORKER_COUNT=1`): Any data-corrupting regression — duplicate
+  runs in DB, garbled tool output, cross-user data leak, or sandbox attaching to wrong
+  thread's container. Set `WORKER_COUNT=1` in `.env` and restart; no code change needed.
+- **Diagnostic-first:** Non-user-visible issues (e.g., Redis key leak, elevated memory,
+  log noise) — investigate root cause before reverting. The single-worker fallback is
+  always available as an env var flip.
+
+### Consequences
+
+**Positive:**
+- Production concurrency ceiling raised from ~200 (single AnyIO threadpool) to ~400 (2 workers)
+- Unblocks v3.3 (public API) and v3.4 (automations) safely per D-PRD-08
+- Closes the runbook contradiction (RECOVERED_VPS_Deployment_Guide.md `--workers 2`)
+- `runs.spawned_by_worker` column enables post-mortem correlation of run ↔ worker PID
+
+**Negative / trade-offs accepted:**
+- Memory footprint doubles (2 Python processes instead of 1); acceptable for production deployments
+- Code comments referencing D-v2.5-02 single-worker assumption become stale (addressed by grep + update in this phase)
+- Any new module-level mutable singleton must be audited against this table before shipping
+
+**Architectural implications:**
+- New module-level singletons MUST be added to the audit table above before merging
+- `WORKER_COUNT` is the sole control surface; no gunicorn/circus/supervisor needed
+- Phase 080 updates prod deployment docs (systemd unit, Docker CMD) to read `WORKER_COUNT`
+
+### Alternatives considered + why rejected
+
+- **Skip the ADR, just flip the env var:** rejected — the constraint was a deliberate
+  architectural decision (D-v2.5-02); its removal deserves equal formality so future
+  maintainers understand the preconditions and revert path
+- **Scale to WORKER_COUNT=4 immediately:** rejected — 2 is validated; 4 is speculative
+  without production telemetry. Conservative start per scaling triggers above.
+- **Use gunicorn instead of uvicorn multi-worker:** rejected — uvicorn's `--workers N`
+  pre-fork model is sufficient; gunicorn adds dependency + config complexity without
+  benefit at this scale
+
+### Sources
+
+- `.planning/phases/077-multi-worker-validation-harness/077-VERIFICATION.md` — 4/4 truths
+- `backend/tests/integration/test_077_multi_worker.py` — 50-run synthetic load
+- `backend/tests/integration/test_077_cross_cancel.py` — cross-worker cancel
+- `backend/tests/integration/test_077_sandbox_reattach.py` — Docker re-attach
+- `.planning/phases/078-backpressure-json-primitive-code-quality-bundle/078-CONTEXT.md` — backpressure endpoint
+- Phase 073 (asyncpg pool integration, TOKEN-COL-01)
+
+---
+
 ## D-PRD-13 — Skill Versioning: semver + immutable-on-publish
 
 **Status:** ACCEPTED 2026-05-12 (locked by Plan 09 cross-PRD consistency pass)

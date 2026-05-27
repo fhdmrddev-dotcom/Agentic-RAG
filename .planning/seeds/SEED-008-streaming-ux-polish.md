@@ -2,7 +2,9 @@
 seed_id: SEED-008
 title: Streaming UX polish — thread-switch latency + line-by-line stdout streaming
 created: 2026-05-09
-status: planted
+status: closed
+closed: 2026-05-27
+closed_by: 082-cross-cutting-verification-extraction-telemetry
 priority: medium
 re_open_triggers:
   - User complains about "delays" or "lag" when navigating between chat threads in any future UAT cycle
@@ -13,6 +15,7 @@ relates_to:
   - Phase 067.4 closing UAT (2026-05-09) — user identified both gaps during Row 11 testing
   - SEED-001 scale-readiness (multi-user perf is the upstream constraint)
   - useMessages.ts:384-450 (ref-mirror sites flagged in Phase 067.4 RESEARCH.md)
+closure_note: "Fully consumed by Phase 075 (thread-switch latency via /snapshot endpoint) + Phase 075.1 (line-by-line stdout streaming fix). POLISH-SEED-008-01 and POLISH-SEED-008-02 both Validated."
 ---
 
 # Streaming UX polish — two gaps surfaced during Phase 067.4 closing UAT

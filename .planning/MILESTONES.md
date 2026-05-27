@@ -1,5 +1,33 @@
 # Milestones
 
+## v2.6 Foundation: RAG Quality + Multi-Worker + Polish (Shipped: 2026-05-27)
+
+**Phases completed:** 35 phases (068–082 including inserts), 91 plans complete
+**Timeline:** 2026-05-12 → 2026-05-27 (16 days, 846 commits)
+**Files changed:** 771 source files (+183K lines)
+
+**Key accomplishments:**
+
+1. Per-aspect extraction dispatcher with swappable engines — `extract_composable()` routes text/tables/images/equations through independent registries; camelot tables (53.5x recall vs pdfplumber), pymupdf_full images, legacy text. Docling formally retired after 4 phases of diminishing returns; `PdfExtractor` ABC + per-call `?engines=` hints on `/upload` and `/reextract`. Migrations 039–047.
+2. Multi-worker uvicorn enabled (`WORKER_COUNT=2`) — D-PRD-12 ADR supersedes D-v2.5-02; 50-parallel-run validation harness (Phase 077); cross-worker cancel via Redis zombie-heal; sandbox re-attach; per-worker Redis singleton idempotent. `runs.spawned_by_worker` debug column (migration 052).
+3. StreamsProvider context lift — `useMessages` reduced from 1229 LOC to <100 LOC; Zustand store + `<StreamsProvider>` Context owns all run-stream subscriptions; Phase 067.5 Branch D-3 guard preserved verbatim; mocked second surface renders without state collision.
+4. 9 LLM providers integrated — OpenAI, Anthropic (native SDK), Google, DeepSeek (thinking mode), Kimi/Moonshot, MiniMax, GLM/Zhipu, OpenRouter (generic fallback), Ollama. Per-provider base URLs, API keys, sub-agent defaults, timeout profiles. DeepSeek reasoning_content round-trip + collapsible Thinking block.
+5. Live-execution UX refactor — RunCard per assistant turn (sticky header + timer + counter + fold-to-summary), Editor-Inset tool-call panel with per-tool inner-body components (execute_code editor + STDOUT/STDERR + file preview; search_documents ranked rows; read_file metadata), Focus Mode composition (past tools fold to result-summary, active step keeps full editor).
+6. Settings architecture unification — `settings_override.json` eliminated; 36 keys migrated to `app_settings` DB table; `model_capabilities_overrides` table for runtime model registration; 30s TTL hot-reload cache; 4-tier resolution (DB > env CSV > static dict > default). Migration 053.
+7. asyncpg pool in hot paths — 3 surgical flips in `threads.py` (runs INSERT, messages INSERT, runs UPDATE finalize); `runs.input_tokens`/`runs.output_tokens` forward-filled from LLM `usage` (TOKEN-COL-01). Two-gate strategy: test_058 (mock) + test_073 (real asyncpg).
+8. Confidence recalibration on post-071.3 defaults — N=121 queries; thresholds 0.55/0.40 → 0.54/0.38; bucket balance restored to D-04 targets (30.6%/45.5%/24.0%).
+9. Cross-cutting verification gate — 5/5 SCs GREEN, 24/24 REQ-IDs Validated, 7 seeds dispositioned (6 closed, 1 partial-consumed).
+
+**Architectural decisions locked:**
+- D-PRD-12: Multi-worker enablement — D-v2.5-02 formally superseded; WORKER_COUNT=2 default; revert via env var flip
+- D-v2.6-01: supabase-py 2.10 → 2.29.x upgrade (httpx conflict resolved)
+- D-v2.6-04: Opt-in re-extraction via `POST /documents/{id}/reextract`
+- D-v2.6-05 (D-PRD-15): Docling demotion + camelot default + PyMuPDF in-process; v2.6 PRD "Docling-first" thesis retired
+
+**Known deferred items at close:** 40 acknowledged (15 UAT status fields not flipped — cosmetic; 10 verification gaps with project-level approval; 11 quick tasks predating GSD; 4 dormant seeds — SEED-002/003/004/005). Phase 082.5 (Error Handler Foundation) deferred to v2.7. See STATE.md `## Deferred Items` for the full inventory.
+
+---
+
 ## v2.5 Deployment Strategy (Shipped: 2026-05-09)
 
 **Phases completed:** 15 phases shipped + 1 deferred (064), 64/64 plans complete

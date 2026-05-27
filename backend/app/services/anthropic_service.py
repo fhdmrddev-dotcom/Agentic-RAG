@@ -197,7 +197,7 @@ def stream_anthropic(
     # STRUCTURED mode bypasses this generator entirely.
     _tool_args_emit_boundary: dict[int, int] = {}
     # Phase 075.10: read the boundary ONCE per stream invocation. The
-    # file-backed override has a 5s TTL cache (see _load_override), but a
+    # DB-backed cache has a 30s TTL (Phase 081.1), but a
     # per-event read still bloats the hot loop unnecessarily — boundary value
     # is invariant within a single LLM call. Defensive helper returns the
     # pre-075.10 hardcoded 5120 if the settings read fails for any reason.

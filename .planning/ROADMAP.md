@@ -9,7 +9,7 @@
 - ✅ **v2.3 Memory, Multimodal & Experience** — Phases 33–43 (shipped 2026-04-19)
 - ✅ **v2.4 Stability, Polish & UX Fixes** — Phases 44–57 (shipped 2026-04-30)
 - ✅ **v2.5 Deployment Strategy** — Phases 058–067.5 (shipped 2026-05-09)
-- 🔄 **v2.6 Foundation: RAG Quality + Multi-Worker + Polish** — Phases 068–082 (in progress, started 2026-05-12)
+- ✅ **v2.6 Foundation: RAG Quality + Multi-Worker + Polish** — Phases 068–082 (shipped 2026-05-27)
 
 ---
 
@@ -22,9 +22,8 @@
 **Phase numbering basis:** Continues from v2.5's last phase 067.5 → v2.6 starts at Phase **068** and runs through Phase **082** (16 phases, ~40 plans total — includes mid-milestone amendment Phase 068.5). Matches PRD §12 phase outline verbatim except for Phase 068.5, added 2026-05-13 to absorb BUG-260513-01 (chat-surface persistent rendering); PRD v2.6 §4 amendment recommended at user's discretion.
 
 **Migration range reserved:** `039 – 049` (per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`).
-- Used: `039` (071), `040` (071), `041` (071), `042` (071), `043` (078), `044` (072)
-- Conditional: `045` (079, on Q-v2.6-02 outcome)
-- Buffer: `046 – 049` (unanticipated phase-level discoveries)
+- Used: `039` (071), `040` (071), `041` (071), `042` (071), `043` (078), `044` (072), `045` (071.2), `046` (071.3), `047` (071.3), `048` (075.3), `049` (075.10), `050` (076.1), `051` (078), `052` (079)
+- Overflow: `050 – 052` exceeded reserved range; absorbed by mid-milestone insert phases
 
 **Pre-execution decisions:** Six PRD §13 questions (Q-v2.6-01..06) routed to per-phase `/gsd:discuss-phase` — **not blocking the roadmap**. See PRD §13 + `REQUIREMENTS.md` Pre-execution Decisions table for owning-phase mapping.
 
@@ -162,8 +161,8 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 </details>
 
-<details open>
-<summary>🔄 v2.6 Foundation: RAG Quality + Multi-Worker + Polish (Phases 068–082) — IN PROGRESS, started 2026-05-12</summary>
+<details>
+<summary>✅ v2.6 Foundation: RAG Quality + Multi-Worker + Polish (Phases 068–082) — SHIPPED 2026-05-27</summary>
 
 **Wave 0 — Foundational** (no inter-wave dependencies; can start in parallel)
 
@@ -202,13 +201,24 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 **Wave 3 — Release-Gating**
 
-- [ ] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` "Single uvicorn worker" rule to "Multi-worker — see D-PRD-12"; enable `--workers 2` in dev + prod uvicorn config. Optional migration 045 (`runs.spawned_by_worker`) conditional on Q-v2.6-02 outcome. (2 plans)
-- [ ] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1 plan)
-- [ ] **Phase 081: SEED-010 OpenRouter UAT** — UAT-only ~30 min: env edit (`LLM_CALL_TIMEOUT_OVERRIDES=moonshotai/kimi-k2.5=10,minimax/minimax-m2.7=10`) + uvicorn restart + 4 runs against Kimi-k2.5 + MiniMax-m2.7; ports Phase 067.2 Rows 11-12 scoreboard. (1 plan)
+- [x] **Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable** — Author the D-PRD-12 ADR; update `CLAUDE.md` single-worker rule to multi-worker reference; enable `--workers 2` via `WORKER_COUNT` env var; migration 052 (`runs.spawned_by_worker`). (2/2 plans, shipped 2026-05-27)
+Plans:
+- [x] 079-01-PLAN.md — D-PRD-12 ADR + docs + migration 052 + code + env config (Wave 1; autonomous)
+- [x] 079-02-PLAN.md — Migration apply + full-schema regen + live multi-worker verification (Wave 2; autonomous: false)
+- [x] **Phase 080: VPS Runbook + Deployment Guide Correction** — Update `RECOVERED_VPS_Deployment_Guide.md` to `--workers N` + Redis container deployment section + struck manual postgrest-py patch (auto-applied since v2.5 Phase 058 D-058-05). Update `RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` for Redis omission only. (1/1 plans, shipped 2026-05-27)
+- [x] **Phase 081: SEED-010 OpenRouter UAT** — 4/4 OpenRouter synthetic-timeout UAT runs GREEN; Kimi-k2.5 and MiniMax-m2.7 verified; BUG-260526-02 not observed on OpenRouter route; closes 067.2 Rows 11-12 carry-forward. (1/1 plans, shipped 2026-05-27)
+Plans:
+- [x] 081-01-PLAN.md — Synthetic-timeout UAT: .env override + 4 runs (2 Kimi + 2 MiniMax) + 3-layer verify + .env restore (Wave 1; autonomous: false)
+- [ ] **Phase 081.1: Settings Architecture Unification** (INSERTED 2026-05-27) — Eliminate settings_override.json; migrate 36 keys to app_settings DB + model_capabilities_overrides table; 30s TTL hot-reload cache; 4-tier model capability resolution (DB > env CSV > static dict > default). Foundation for v3.1 admin shell. (4 plans)
+Plans:
+- [x] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
+- [x] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
+- [x] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
+- [x] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
 
 **Wave 4 — Verify**
 
-- [ ] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — Validate final default-set output (post-071.3: camelot + pymupdf_full + legacy + `none` equations) against the user's reference PDF + DOCX baseline (ground truth: 35 tables / 59 figures on user thesis). Verify `--workers 2` doesn't regress the CONCUR-01 binding gate (`backend/tests/integration/test_058_concurrency.py`). Verify SEED-007 lift didn't regress 067.5 cycles (Chrome MCP + Playwright e2e against 063 / 063.1 / 067.x specs). (2 plans)
+- [x] **Phase 082: Cross-cutting Verification + Extraction Telemetry** — 5/5 SCs GREEN: extraction counts within 20% band (SC#1), CONCUR-01 pytest green (SC#2), 067.5 Branch D-3 vitest 5/5 + Chrome MCP 5/5 lived-experience PASS (SC#3), telemetry populated (SC#4), 24/24 REQ-IDs Validated + 7 seeds dispositioned (SC#5). v2.6 milestone-close verification gate PASSED. (2 plans, shipped 2026-05-27)
 - [ ] **Phase 082.5: Error Handler Foundation** — Urgent slice of SEED-026: global FastAPI exception handler + structured `ErrorResponse{code, user_message, admin_message, trace_id, timestamp, run_id, thread_id}` model + `logging.basicConfig` (closes D-074-01-DEFER-1) + new `app_errors` audit table + frontend `ApiError` typed parsing. Stops backend SDK internals from leaking to users; gives admins a `trace_id` to correlate user reports with server-side state before any production-shape rollout. Frontend toast lib + admin error inspector deferred to v2.7 (SEED-026 pillars 4-5). (2 plans)
 
 Full details below in **Phase Details**.
@@ -891,9 +901,9 @@ Plans:
 **Requirements**: WORKER-LIFT-03, WORKER-LIFT-01 (full enablement)
 **Success Criteria** (what must be TRUE):
   1. `D-PRD-12` ADR authored in `.planning/prd-reset/DECISIONS.md` (and reflected in `PROJECT.md` Key Decisions table): names which singletons MUST stay per-worker (`RUN_TASKS`, sandbox sessions, settings TTL cache) vs which are Redis-backed; explicitly supersedes D-v2.5-02.
-  2. `CLAUDE.md` "Single uvicorn worker" rule (currently in the Rules section) is replaced by "Multi-worker enabled — see D-PRD-12 for the audit checklist". `backend/CLAUDE.md` mirrors the change.
+  2. `CLAUDE.md` "Single uvicorn worker" rule (currently in the Rules section) is replaced by "Multi-worker enabled — see D-PRD-12 for the audit checklist". No `backend/CLAUDE.md` needed (per D-19).
   3. Dev `uvicorn` invocation uses `--workers 2` (env-overridable via `WORKER_COUNT`); prod systemd / Docker config matches. A two-tab live test verifies multi-worker behavior end-to-end without manual intervention.
-  4. Optional migration 045 (`runs.spawned_by_worker text`) ships conditional on Q-v2.6-02 atomic-rollout outcome — debug-only column for post-mortem if a run's lifecycle splits across workers unexpectedly.
+  4. Migration 052 (`runs.spawned_by_worker text`) ships — debug-only column recording the OS PID of the uvicorn worker that INSERTed each run. Populated at INSERT time for new runs; NULL for historical.
   5. Q-v2.6-05 (D-PRD-12 ADR wording) is locked before this phase ships.
 
 ### Phase 080: VPS Runbook + Deployment Guide Correction
@@ -906,6 +916,10 @@ Plans:
   2. `.planning/research/recovered/RECOVERED_Deploy_Hostinger_Supabase_Cloud.md` updated: Redis container section added (matching the VPS guide); existing `--workers N` line preserved.
   3. Both docs show the pgbouncer transaction-mode pool sizing curve as a tuning reference for asyncpg under multi-worker.
   4. Doc audit at milestone close confirms no stale "single worker" references remain in the planning tree.
+
+**Plans:** 1/1 plans complete
+Plans:
+- [x] 080-01-PLAN.md — VPS guide update (6 content blocks) + Hostinger guide update (4 content blocks) + stale-reference grep audit (Wave 1; autonomous)
 
 ### Phase 081: SEED-010 OpenRouter UAT
 **Goal**: A ~30-minute UAT pass confirms the synthetic-timeout protocol produces clean `runs.status='timed_out'` (NOT `GeneratorExit`) on both OpenRouter Kimi-k2.5 and MiniMax-m2.7 routes.
@@ -930,23 +944,27 @@ Plans:
   4. `LLM_CALL_TIMEOUT_OVERRIDES` env CSV path stays as a fallback (deployment bootstrap) but DB row takes precedence when both exist. Documented in `backend/.env.example` as "operator bootstrap only; prefer admin UI in v3.1+."
   5. Verifier integration test asserts: (a) no code path reads from `settings_override.json` after migration, (b) all values previously in the JSON resolve cleanly from DB through the new cache, (c) hot-reload observed — write to `app_settings`, next read within 30s reflects change.
 
-**Plans:**
-- 01 — `app_settings` schema delta + migration 048 (new JSONB columns: `title_drafting_config`, `sub_agent_config`; new columns for the per-aspect ops knobs); `model_capabilities_overrides` table scaffold (v3.1 will add UI later); hot-reload TTL cache extended to cover new keys.
-- 02 — One-shot migration runner: detect `settings_override.json`, parse, write to `app_settings` rows, rename file to `.migrated`. Idempotent on re-run (no-op if no JSON file present).
-- 03 — Code-side consumer migration: every `_OVERRIDE_FILE` reader in `backend/app/` rewired to read from the new DB-backed cache; `MODEL_CAPABILITIES` registry merged with `model_capabilities_overrides` at resolution time; `get_per_call_timeout` precedence updated (DB > env CSV > static dict).
-- 04 — Integration tests + verifier: (a) clean-install path (no JSON file) reads defaults from DB, (b) upgrade path (with JSON file) migrates cleanly, (c) hot-reload contract (write → read within 30s), (d) no code references `_OVERRIDE_FILE` or `settings_override.json` after migration.
+**Plans:** 4/4 plans complete
+Plans:
+- [ ] 081.1-01-PLAN.md — Migration 053 SQL + async DB cache functions + unit tests (Wave 1; autonomous)
+- [ ] 081.1-02-PLAN.md — Migration apply checkpoint + migration runner in lifespan + frontend subtitle (Wave 2; autonomous: false)
+- [ ] 081.1-03-PLAN.md — Consumer rewire: user_settings.py DB-backed + settings.py async API + config.py 4-tier (Wave 3; autonomous)
+- [ ] 081.1-04-PLAN.md — Integration tests + human verification (Wave 4; autonomous: false)
 
 ### Phase 082: Cross-cutting Verification + Extraction Telemetry
 **Goal**: All three v2.6 workstreams are proven not to regress each other — final default-set output (post-071.3) matches reference, multi-worker doesn't break CONCUR-01, and StreamsProvider doesn't regress the 067.5 empty-thread-until-refresh fix.
-**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1, Phase 082.5
-**Plans**: 2
-**Requirements**: (cross-cutting verification — all 21 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
+**Depends on**: Phase 076, Phase 080, Phase 081, Phase 081.1 (Phase 082.5 decoupled per D-01)
+**Plans:** 2/2 plans complete
+Plans:
+- [ ] 082-01-PLAN.md — Automated verification: extraction re-extract SC#1 + CONCUR-01 pytest SC#2 + telemetry SC#4 (Wave 1; autonomous)
+- [ ] 082-02-PLAN.md — Lived-experience UAT SC#3 + milestone-close REQ-ID audit SC#5 + seed disposition (Wave 2; autonomous: false)
+**Requirements**: (cross-cutting verification — all 24 v2.6 REQ-IDs validated through their phase tests; this phase is the orchestration gate)
 **Success Criteria** (what must be TRUE):
   1. Re-extraction with the post-071.3 default-set (camelot tables + pymupdf_full images + legacy text + `none` equations) against the user's reference PDF + DOCX pair holds table + image counts within 20% delta of the 071.3 Plan 05 UAT baseline (re-running the RAG-DOCLING-01 acceptance under the full v2.6 stack with multi-worker + StreamsProvider live).
   2. `pytest backend/tests/integration/test_058_concurrency.py` (CONCUR-01 binding gate) green under `--workers 2`; no regression vs single-worker baseline.
   3. Phase 067.5 Branch D-3 `clearMessages` guard regression test green; 5/5 lived-experience cycles on Chrome MCP show no empty-thread-until-refresh repro post-StreamsProvider lift.
   4. `pdf_extraction_runs` telemetry table populated for every document re-ingested during the verification pass; admin can query per-document extractor lineage + durations (per-aspect composer signature `composable[<text>/<tables>/<images>/<equations>]` per 071.3).
-  5. Milestone-close audit confirms all 21 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
+  5. Milestone-close audit confirms all 24 v2.6 REQ-IDs are GREEN; carry-forward seeds (SEED-001 partial downgrade; SEED-006/007/008/009/010/011 fully consumed) recorded in `seeds/` directory.
 
 ### Phase 082.5: Error Handler Foundation (SEED-026 urgent slice)
 **Goal**: User-visible error messages stop leaking backend SDK internals, every `logger.error/info/warning` call surfaces to a single configured sink, and every error response carries a `trace_id` that links the client report to a server-side record. Closes D-074-01-DEFER-1 in the same patch.
@@ -1020,51 +1038,16 @@ v2.6's outputs unblock downstream milestone PRDs as follows:
 
 ## Coverage Summary
 
-- **v2.6 Active requirements:** 22 (per REQUIREMENTS.md; PRD §4 holds the original 21 — see note below)
-- **Mapped to phases:** 22 / 22 ✓
+- **v2.6 Active requirements:** 24 (per REQUIREMENTS.md; PRD §4 holds the original 21 — CHAT-RESILIENCE-01 added 2026-05-13, SETTINGS-UNIFY-01/02 added 2026-05-27)
+- **Mapped to phases:** 24 / 24 ✓
 - **Orphaned requirements:** 0
-- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 added 2026-05-13; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all four are intentional non-REQ-bearing phases with explicit roles)
-- **PRD amendment status:** `.planning/PRDs/v2.6.md` §4 still lists 21 Active REQs (matches signoff 2026-05-12). REQUIREMENTS.md and ROADMAP carry the 22nd REQ (CHAT-RESILIENCE-01) for Phase 068.5. User decision on whether to amend the locked PRD pending.
+- **Phases with no REQ-ID owner:** 0 (Phase 068 owns STREAMS-PROVIDER-01; Phase 068.5 owns CHAT-RESILIENCE-01 added 2026-05-13; Phase 069 is structural prep verified by RAG-DOCLING-01 at Phase 071; Phase 080 is documentation-only support for WORKER-LIFT-01/03; Phase 082 is cross-cutting verification; all five are intentional non-REQ-bearing phases with explicit roles)
+- **All 24 requirements Complete** -- verified by Phase 082 SC#5 milestone-close audit (24/24 Validated, 2026-05-27)
 
 See REQUIREMENTS.md Traceability table for the per-REQ-ID mapping.
 
 ---
 
-## Progress Table
-
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 068 — StreamsProvider Context Lift | 4/4 | Complete    | 2026-05-13 |
-| 068.5 — Chat-Surface Persistent Rendering + In-Flight Pulse | 2/2 | Complete    | 2026-05-14 |
-| 069 — PdfExtractor Abstraction Scaffold | 2/2 | Complete    | 2026-05-13 |
-| 070 — Docling httpx Spike | 2/2 | Complete    | 2026-05-14 |
-| 071 — Docling Primary Path | 4/4 | Complete    | 2026-05-14 |
-| 071.1 — Docling SC#1 retry — threadpool, timeouts, PyMuPDF fallback | 2/2 | Complete-partial | 2026-05-15 |
-| 071.2 — Ingestion Plumbing + Docling Quality Diagnostics | 5/5 | Complete    | 2026-05-15 |
-| 072 — Multimodal Lift + DOCX Completeness | 5/5 | Complete    | 2026-05-17 |
-| 073 — asyncpg Pool Integration | 4/4 | Complete    | 2026-05-17 |
-| 074 — SEED-009 + SEED-011 Polish Bundle | 2/2 | Complete    | 2026-05-18 |
-| 075 — SEED-008 + tool_args_progress Polish Bundle | 0/3 | Not started | — |
-| 076 — Confidence Recalibration | 2/2 | Complete    | 2026-05-25 |
-| 077 — Multi-Worker Validation Harness | 3/3 | Complete | 2026-05-27 |
-| 078 — Backpressure JSON + Code-Quality Bundle | 0/3 | Not started | — |
-| 079 — D-v2.5-02 Supersession + Multi-Worker Enable | 0/2 | Not started | — |
-| 080 — VPS Runbook + Deployment Guide Correction | 0/1 | Not started | — |
-| 081 — SEED-010 OpenRouter UAT | 0/1 | Not started | — |
-| 082 — Cross-cutting Verification + Extraction Telemetry | 0/2 | Not started | — |
-| 082.5 — Error Handler Foundation (SEED-026 urgent slice) | 0/2 | Not started | — |
-| **Total (v2.6)** | **4/42** | **In progress** | **—** |
-
-### Phase 83: 075.9
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 82
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd-plan-phase 83 to break down)
-
 ---
 
-*Roadmap authored 2026-05-12 from `.planning/PRDs/v2.6.md` §12 (canonical phase outline) + REQUIREMENTS.md (21 Active REQ-IDs). Continues phase numbering from v2.5's last phase 067.5.*
+*Roadmap authored 2026-05-12 from `.planning/PRDs/v2.6.md` §12 (canonical phase outline) + REQUIREMENTS.md (21 Active REQ-IDs). Continues phase numbering from v2.5's last phase 067.5. Milestone shipped 2026-05-27 — 35 phases, 91 plans, 846 commits, 24/24 REQ-IDs Validated.*

@@ -263,7 +263,7 @@ This is the most important flow in the codebase. The core decoupling pattern: **
 
 **FastAPI app**:
 - Location: `backend/app/main.py`
-- Triggers: `uvicorn app.main:app --reload` (dev) — single worker only (D-v2.5-02).
+- Triggers: `uvicorn app.main:app --reload` (dev) or `--workers ${WORKER_COUNT}` (prod, default 2 per D-PRD-12).
 - Responsibilities: postgrest 204-error patch (line 22), LangSmith env config (line 47), CORS, lifespan (Redis ping, AnyIO thread tokens, RUN_TASKS shutdown cancel, sandbox close-all), router mounting.
 
 **React app**:
@@ -283,8 +283,8 @@ This is the most important flow in the codebase. The core decoupling pattern: **
 
 ## Architectural Constraints
 
-- **Threading:** Single-process, single-uvicorn-worker (D-v2.5-02). Concurrency comes from asyncio. Blocking I/O (supabase-py `.execute()`, sandbox Docker calls, sync provider streams, sync SQL) is offloaded via `run_in_threadpool` / `aexec` / `_drain_stream_with_close_on_cancel`. AnyIO default thread limiter is bumped to `settings.anyio_thread_tokens` at startup so the SSE-path `aexec` calls don't queue at the 40-token default (D-058-07).
-- **Global state (in-process):** `_supabase` singleton (`dependencies.py:10`); `_redis` singleton (`dependencies.py:20`); `RUN_TASKS: dict[UUID, Task]` (`threads.py:80`); `_BACKGROUND_TASKS: set[Task]` (`threads.py:60`); `sandbox_manager` (lazy import in `services/sandbox_service.py`); module-level `_TTL_CACHE` for settings file (5s) in `models/user_settings.py`. **All require single-worker discipline.**
+- **Threading:** Multi-worker uvicorn (D-PRD-12 supersedes D-v2.5-02; `WORKER_COUNT=2` default since Phase 079). Concurrency comes from asyncio. Blocking I/O (supabase-py `.execute()`, sandbox Docker calls, sync provider streams, sync SQL) is offloaded via `run_in_threadpool` / `aexec` / `_drain_stream_with_close_on_cancel`. AnyIO default thread limiter is bumped to `settings.anyio_thread_tokens` at startup so the SSE-path `aexec` calls don't queue at the 40-token default (D-058-07).
+- **Global state (in-process):** `_supabase` singleton (`dependencies.py:10`); `_redis` singleton (`dependencies.py:20`); `RUN_TASKS: dict[UUID, Task]` (`threads.py:80`); `_BACKGROUND_TASKS: set[Task]` (`threads.py:60`); `sandbox_manager` (lazy import in `services/sandbox_service.py`); module-level `_TTL_CACHE` for settings file (5s) in `models/user_settings.py`. **Per-worker singletons — each worker maintains its own copies; no cross-worker state sharing (D-PRD-12 singleton audit table).**
 - **Stateless chat completions:** No provider-side thread state (CLAUDE.md). Full message history rebuilt from `messages` table per request and trimmed to fit per-provider context budget in `services/context_window.py`.
 - **Run history persistence (D-v2.5-11):** Run lifecycle metadata persists in `public.runs` Postgres table with full RLS; Redis Stream is the ephemeral event buffer (TTL ~10 min). Active-runs API reads from Postgres; replay-and-tail reads from Redis.
 - **Redis is best-effort except for the durable cancel:** Postgres `runs.status` is the source of truth; Redis ops in `cancel_run` zombie-heal each have their own try/except so DELETE returns 204 even if every Redis op fails (D-062-13).

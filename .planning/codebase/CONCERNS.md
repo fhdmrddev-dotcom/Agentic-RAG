@@ -201,9 +201,9 @@ The `execute_code` path in `backend/app/api/threads.py` runs user-provided Pytho
 
 **Files:** `backend/app/services/sandbox_service.py:15-16`
 
-**Status:** Currently moot because **D-v2.5-02 mandates single-worker uvicorn**. Becomes a blocker the moment scale-readiness work (SEED-001) introduces multi-worker.
+**Status:** Active concern under multi-worker (D-PRD-12 superseded D-v2.5-02 in Phase 079; `WORKER_COUNT=2` is now the default). Each worker maintains its own `_sessions` dict. Sandbox sessions are per-thread and sticky to the worker that created them via `runs.spawned_by_worker` (migration 052). The current pattern works because sandbox sessions are tied to specific runs, and runs don't migrate between workers.
 
-**Fix approach:** Move session state to Redis or document the constraint as a hard requirement until SEED-001 lands asyncpg + multi-worker.
+**Fix approach:** If sandbox session sharing across workers becomes necessary (e.g., for horizontal scaling beyond a single host), move session state to Redis. For current `WORKER_COUNT=2` the per-worker dict is acceptable.
 
 ---
 

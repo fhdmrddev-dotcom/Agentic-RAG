@@ -1,8 +1,7 @@
 # Restart the local backend uvicorn process (Windows PowerShell).
 #
-# Phase 075.4 Plan 05 -- FORWARD-REF #2: update for `--workers N` when Phase 079
-# enables multi-worker readiness (D-PRD-12 supersedes D-v2.5-02). Currently
-# assumes single-worker per CLAUDE.md project rule.
+# Phase 079: Multi-worker enabled (D-PRD-12). WORKER_COUNT=2 default;
+# --reload for dev (single-process).
 #
 # Phase 075.5 hardening history:
 #   v1 (2026-05-23): matched python.exe + pythonw.exe by Name AND uvicorn
@@ -92,12 +91,29 @@ if (-not (Test-Path $Python)) {
     exit 1
 }
 
-Start-Process -FilePath $Python `
-    -ArgumentList "-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info" `
-    -WorkingDirectory $BackendDir `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $OutLog `
-    -RedirectStandardError  $ErrLog
+$WorkerCount = if ($env:WORKER_COUNT) { [int]$env:WORKER_COUNT } else { 2 }
 
-Write-Host "Backend relaunched headless. Tail logs:"
+# T-079-01: clamp to sane range to prevent accidental fork-bomb
+if ($WorkerCount -lt 1) { $WorkerCount = 1 }
+if ($WorkerCount -gt 16) { $WorkerCount = 16 }
+
+# --reload is incompatible with --workers > 1 in uvicorn.
+# Dev mode (--reload) always runs single-process; multi-worker is for production.
+if ($WorkerCount -gt 1) {
+    Start-Process -FilePath $Python `
+        -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", $WorkerCount, "--log-level", "info" `
+        -WorkingDirectory $BackendDir `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $OutLog `
+        -RedirectStandardError  $ErrLog
+} else {
+    Start-Process -FilePath $Python `
+        -ArgumentList "-m", "uvicorn", "app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info" `
+        -WorkingDirectory $BackendDir `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $OutLog `
+        -RedirectStandardError  $ErrLog
+}
+
+Write-Host ("Backend relaunched headless (workers={0}). Tail logs:" -f $WorkerCount)
 Write-Host "  Get-Content -Path '$OutLog' -Wait -Tail 30"

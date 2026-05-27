@@ -459,6 +459,87 @@ def _parse_llm_call_timeout_overrides(raw: str) -> dict[str, int]:
     return out
 
 
+# ── Phase 081.1: Async 4-tier resolution (DB > env CSV > static > default) ──
+
+async def get_per_call_timeout_async(
+    model_id: str, settings_obj: "Settings | None" = None
+) -> int:
+    """Async counterpart of :func:`get_per_call_timeout` with DB tier (D-11/D-12).
+
+    Resolution precedence:
+      1. DB ``model_capabilities_overrides`` row ``llm_call_timeout_seconds``
+      2. Env ``LLM_CALL_TIMEOUT_OVERRIDES`` CSV (same as sync tier 1)
+      3. Static ``MODEL_CAPABILITIES`` dict (same as sync tier 2)
+      4. ``DEFAULT_LLM_CALL_TIMEOUT_SECONDS`` (300s)
+    """
+    # Tier 1 — DB overrides
+    from app.models.user_settings import _load_model_overrides  # lazy import
+    try:
+        db_overrides = await _load_model_overrides()
+        db_cap = db_overrides.get(model_id)
+        if db_cap is not None:
+            db_timeout = db_cap.get("llm_call_timeout_seconds")
+            if db_timeout is not None:
+                return int(db_timeout)
+    except Exception:
+        logger.warning(
+            "get_per_call_timeout_async: DB tier failed for model_id=%s; falling through",
+            model_id,
+            exc_info=True,
+        )
+
+    # Tier 2 — Env CSV override
+    if settings_obj is not None:
+        overrides = _parse_llm_call_timeout_overrides(
+            settings_obj.llm_call_timeout_overrides
+        )
+        if model_id in overrides:
+            return overrides[model_id]
+
+    # Tier 3 — Static MODEL_CAPABILITIES dict
+    cap = MODEL_CAPABILITIES.get(model_id, {})
+    if "llm_call_timeout_seconds" in cap:
+        return cap["llm_call_timeout_seconds"]  # type: ignore[typeddict-item]
+
+    # Tier 4 — Default
+    return DEFAULT_LLM_CALL_TIMEOUT_SECONDS
+
+
+async def get_model_capability_async(model_id: str) -> "ModelCapability":
+    """Async counterpart of :func:`get_model_capability` with DB tier.
+
+    Checks ``model_capabilities_overrides`` first; if a row exists for
+    ``model_id``, merges its fields onto the static-dict defaults. Falls
+    through to the sync :func:`get_model_capability` for non-overridden models.
+    """
+    from app.models.user_settings import _load_model_overrides  # lazy import
+    try:
+        db_overrides = await _load_model_overrides()
+        db_row = db_overrides.get(model_id)
+        if db_row is not None:
+            # Start from static defaults (if any), then overlay DB values
+            base = dict(MODEL_CAPABILITIES.get(model_id, {}))
+            if not base:
+                base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
+            # Overlay non-None DB fields
+            for field in ("llm_call_timeout_seconds", "context_window_tokens",
+                          "max_output_tokens", "native_tools"):
+                db_val = db_row.get(field)
+                if db_val is not None:
+                    base[field] = db_val
+            base["provider"] = db_row.get("provider", base.get("provider", "unknown"))
+            base["capability_source"] = "db_override"
+            return base  # type: ignore[return-value]
+    except Exception:
+        logger.warning(
+            "get_model_capability_async: DB tier failed for model_id=%s; falling through",
+            model_id,
+            exc_info=True,
+        )
+
+    return get_model_capability(model_id)
+
+
 # Sub-agent model defaults: cheapest stable model per provider.
 # Intentionally lives here (not in sub_agent_service) to avoid circular imports
 # when user_settings.py needs to resolve the model without importing sub_agent_service.

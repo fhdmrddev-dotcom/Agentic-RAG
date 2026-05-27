@@ -1,10 +1,13 @@
 ---
 id: SEED-006
-status: dormant
+status: closed
+closed: 2026-05-27
+closed_by: 082-cross-cutting-verification-extraction-telemetry
 planted: 2026-05-02
 planted_during: v2.5 (Phase 061 in progress — Run-Backed Streaming Backend)
 trigger_when: planning any milestone scoped to "RAG quality" / "ingestion" / "multimodal" / "knowledge base" / v2.6 / v3.0 — or any milestone that touches `backend/app/services/multimodal_service.py`, the document ingestion pipeline, or RAG retrieval quality
 scope: Medium
+closure_note: "Fully consumed by Phases 071/071.1/071.2/071.3/072. Storage-layer bottleneck (_MAX_VISION_CALLS) resolved via app_settings admin-tunable ceilings (migration 044). Per-aspect extraction dispatcher ships swappable engines. Thesis pair extraction counts validated at 082 SC#1."
 ---
 
 # SEED-006: Multimodal Extraction Quality (Phase 35/36 Follow-up)

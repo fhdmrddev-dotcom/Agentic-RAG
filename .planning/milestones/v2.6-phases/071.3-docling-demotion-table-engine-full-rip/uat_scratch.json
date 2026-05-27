@@ -1,0 +1,30 @@
+{
+  "thesis": {
+    "document_id": "171fb532-26ae-4d30-84a4-fde5c1959515",
+    "filename": "Fahed Mrad Chapters 1 to 4.pdf",
+    "extractor": "composable[legacy/camelot/pymupdf_full/none]",
+    "status": "completed",
+    "document_tables_count": 214,
+    "document_images_count": 20,
+    "document_chunks_count": 461
+  },
+  "friendly_real": {
+    "document_id": "9c77bd7b-4002-4a91-ba63-62f010052eca",
+    "filename": "friendly_real.pdf",
+    "extractor": "composable[legacy/camelot/pymupdf_full/none]",
+    "status": "completed",
+    "document_tables_count": 15,
+    "document_images_count": 1,
+    "document_chunks_count": 65
+  },
+  "docx_sibling": {
+    "fixture_name": "reference.docx",
+    "document_id": "5d06405e-3d9b-48ce-946e-0fe121484232",
+    "filename": "reference.docx",
+    "extractor": "composable[legacy/camelot/zip_xpath/none]",
+    "status": "completed",
+    "document_tables_count": 1,
+    "document_images_count": 1,
+    "document_chunks_count": 2
+  }
+}

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.6
 milestone_name: Milestone Context
-status: completed
-stopped_at: Phase 078 context gathered
-last_updated: "2026-05-26T20:11:52.358Z"
-last_activity: 2026-05-27
+status: shipped
+stopped_at: Milestone v2.6 shipped
+last_updated: "2026-05-27T18:00:00Z"
+last_activity: 2026-05-27 -- v2.6 milestone shipped (35 phases, 91 plans, 846 commits)
 progress:
   total_phases: 35
-  completed_phases: 25
-  total_plans: 81
-  completed_plans: 82
+  completed_phases: 35
+  total_plans: 91
+  completed_plans: 91
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-12) + .planning/PRDs/v2.6.md (scope brief, locked 2026-05-10, signoff 2026-05-12) + .planning/prd-reset/DECISIONS.md (D-PRD-01..15 locked)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 078 — backpressure JSON primitive + code-quality bundle
+**Current focus:** v2.6 milestone SHIPPED — planning next milestone (v2.7)
 
 ## Current Position
 
-Phase: 078
-Plan: 3/3 complete
-Next action: `/gsd:verify-work 078`
-Status: Phase 078 executed — 3/3 plans shipped, 38 tests green, code review 0 blockers / 2 warnings / 3 info
-Last activity: 2026-05-27
+Phase: v2.6 milestone SHIPPED
+Plan: All 91 plans complete across 35 phases
+Next action: `/gsd:new-milestone v2.7`
+Status: v2.6 shipped 2026-05-27 — 35 phases, 91 plans, 846 commits, 24/24 REQ-IDs Validated
+Last activity: 2026-05-27 -- v2.6 milestone archived and tagged
 
 ## PRD-reset outputs (committed)
 
@@ -132,7 +132,110 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 
 (SEED-008–014 also exist as `planted` status; not flagged by audit because audit only counts strictly `dormant`. All carry-forwards captured.)
 
+### v2.6 Deferred Items (2026-05-27)
+
+Items acknowledged and deferred at v2.6 milestone close. Each item was reviewed against the ROADMAP closure narratives; none contradict the closure annotations or block milestone completion. 40 items total.
+
+#### UAT status fields not flipped after cross-phase closure (15)
+
+These phases closed via documented cross-phase chains or project-level approval. The HUMAN-UAT.md frontmatter `status` fields were not updated when downstream phases closed the gate-blocking rows. All 15 show `0 pending scenarios` — no actionable UAT work remaining.
+
+| Phase | UAT file | Recorded status | Reality |
+|-------|----------|-----------------|---------|
+| 068 | 068-HUMAN-UAT.md | partial | Closed; StreamsProvider lift verified |
+| 068.5 | 068.5-HUMAN-UAT.md | partial | Closed; BUG-260513-01 folded→closed |
+| 071 | 071-VERIFICATION.md | partial | Closed; SC#1 accept-degraded via 071.1 |
+| 071.1 | 071.1-HUMAN-UAT.md | partial | Closed; accept-degraded disposition |
+| 071.2 | 071.2-HUMAN-UAT.md | partial | Closed; env-blocked items resolved by 071.3 |
+| 075 | 075-HUMAN-UAT.md | partial | Closed; cross-provider UAT done via 075.1 |
+| 075.1 | 075.1-HUMAN-UAT.md | partial | Closed; deferred items shipped in 075.2 |
+| 075.2 | 075.2-HUMAN-UAT.md | partial | Closed; BUG-260522-02 deferred cosmetic |
+| 075.6 | 075.6-HUMAN-UAT.md | partial | Closed; completed in 075.7 |
+| 075.7 | 075.7-HUMAN-UAT.md | partial | Closed; all UAT axes covered |
+| 075.8 | 075.8-HUMAN-UAT.md | partial | Closed; G-4 lived-experience verified |
+| 075.9 | 075.9-HUMAN-UAT.md | partial | Closed; fidelity handoff verified |
+| 076.1 | 076.1-HUMAN-UAT.md | partial | Closed; provider integration verified |
+| 076.2 | 076.2-HUMAN-UAT.md | partial | Closed; MiniMax/GLM UAT deferred (API keys) |
+| 082 | 082-HUMAN-UAT.md | partial | Closed; 5/5 SCs GREEN at milestone close |
+
+#### Verification gaps (10)
+
+All ten are `human_needed`-status or `gaps_found` verifications on phases that closed with project-level approval. None blocked phase closure.
+
+| Phase | File | Note |
+|-------|------|------|
+| 069 | 069-VERIFICATION.md | PdfExtractor scaffold; closed with project approval |
+| 070 | 070-VERIFICATION.md | Docling httpx spike; closed with project approval |
+| 071.3 | 071.3-VERIFICATION.md | Docling demotion; SC#6 operator override |
+| 071.4 | 071.4-VERIFICATION.md | Post-071.3 polish; closed with project approval |
+| 073 | 073-VERIFICATION.md | asyncpg pool; closed with project approval |
+| 074 | 074-VERIFICATION.md | SEED-009/011; closed with D-074-01/02-DEFER |
+| 075.3 | 075.3-VERIFICATION.md | Defensive chunk handler; closed with project approval |
+| 075.4 | 075.4-VERIFICATION.md | Cross-provider cleanup; scenario-06 RED by design |
+| 075.10 | 075.10-VERIFICATION.md | Fine-grained args progress; closed with project approval |
+| 077 | 077-VERIFICATION.md | Multi-worker harness; closed with project approval |
+
+#### Quick tasks — historical micro-tickets predating GSD (11)
+
+Carried forward from v2.5. Pre-date the GSD planning workflow. Most are `unknown` status. NOT in v2.6 scope; re-triage at next milestone planning if any still reproduce.
+
+- 260322-26g — improve tool-call display for ls/tree/grep
+- 260328-v6n — investigate duplicate folder behavior
+- 260328-wqj — folder-scoped chat returning results bug
+- 260328-x6n — folder not created when pressing (`completed` per tracker)
+- 260404-vel — streaming cursor bug + meaningful indicator
+- 260405-rgy — folder public visibility files
+- 260405-s1e — hide toggle-global from non-owners
+- 260407-vqw — context window management review
+- 260411-wj5 — skill file upload bug
+- 260412-dqu — four issues in skills API
+- 260412-jnc — import skill 202 BackgroundTask
+
+#### Dormant seeds — intentional future work (4)
+
+Explicitly future-looking ideas from earlier milestones. Surface when their `trigger_when` conditions fire.
+
+- SEED-002 — Skill Studio Milestone Preparation
+- SEED-003 — Deployment Flexibility & Install/Config UX
+- SEED-004 — Org / Department / Role Multi-Tenancy
+- SEED-005 — Document Management Capabilities (M-Files-aligned subset)
+
+#### Phase 082.5 — deferred to v2.7
+
+Phase 082.5 (Error Handler Foundation — SEED-026 urgent slice) was scoped but not started during v2.6. Deferred to v2.7 as a foundational phase for the admin shell milestone.
+
 ## Recent Completed Phases
+
+### Phase 082: Cross-cutting Verification + Extraction Telemetry (Complete 2026-05-27)
+
+- 2/2 plans shipped; v2.6 milestone-close verification gate PASSED with 5/5 SCs GREEN
+- **SC#1 GREEN:** Extraction counts within 20% band (PDF 48t/67i/508c, DOCX 39t/58i/460c)
+- **SC#2 GREEN:** CONCUR-01 pytest passes in 0.32s
+- **SC#3 GREEN:** Branch D-3 vitest 5/5 + Chrome MCP 5/5 lived-experience thread-switch PASS
+- **SC#4 GREEN:** pdf_extraction_runs telemetry populated for both documents
+- **SC#5 GREEN:** 24/24 REQ-IDs Validated; 7 seeds dispositioned (6 closed, 1 partial-consumed)
+- REQUIREMENTS.md fully reconciled: all 24 checkboxes marked [x]
+- ROADMAP progress table reconciled: 30+ phases now show accurate completion status
+- Seeds closed: SEED-006/007/008/009/010/011; SEED-001 partial-consumed (load testing + threadpool audit remain for v2.7+)
+
+### Phase 081: SEED-010 OpenRouter UAT (Complete 2026-05-27)
+
+- 1/1 plans shipped; 4/4 synthetic-timeout UAT runs GREEN on OpenRouter-routed models
+- **Kimi-k2.5:** Run 1 (simple chat, iter 2) + Run 2 (tool-calling, iter 4) — clean `timed_out` status, correct error format, frontend timeout UX works, title generated
+- **MiniMax-m2.7:** Run 3 (simple chat, iter 1) + Run 4 (tool-calling, iter 0) — clean `timed_out` status, correct error format, frontend timeout UX works, title generated
+- **BUG-260526-02:** Kimi thinking text leakage NOT observed on OpenRouter route — bug scoped to direct Moonshot API only
+- Closes POLISH-SEED-010-01 and 067.2 Rows 11-12 carry-forward
+- .env temporary override applied then restored; no code changes
+
+### Phase 079: D-v2.5-02 Supersession + Multi-Worker Enable (Complete 2026-05-27)
+
+- 2/2 plans shipped; D-v2.5-02 formally superseded by D-PRD-12 ADR; WORKER_COUNT=2 default enabled
+- **D-PRD-12 ADR:** singleton audit table (8 entries), scaling triggers (backpressure-based), re-trigger clause (immediate revert for data corruption, diagnostic-first for non-user-visible); authored in DECISIONS.md between D-PRD-11 and D-PRD-13
+- **Migration 052:** `runs.spawned_by_worker` nullable TEXT column; `insert_run` writes `os.getpid()` at INSERT time
+- **Config flip:** CLAUDE.md single-worker rule replaced with multi-worker D-PRD-12 reference; `.env.example` has `WORKER_COUNT=2`; `restart-backend.ps1` reads WORKER_COUNT with --reload/--workers conditional + 1-16 clamp
+- **Live verification:** 2 workers started (PIDs 65248 + 63464), two-tab smoke test passed, spawned_by_worker populated with distinct PIDs on new runs
+- Code review: 0 critical / 2 warnings (WR-01 TryParse guard, WR-02 dev-default consideration)
+- Requirements closed: WORKER-LIFT-01, WORKER-LIFT-03
 
 ### Phase 076.2: Provider Streaming Parity + DeepSeek Full Integration (Complete 2026-05-26)
 
@@ -277,6 +380,9 @@ These are explicitly future-looking ideas, planted in earlier milestones and con
 | Phase 075.7 P03 | ~3h (across continuation agents: T1+T2 initial, T3+T4 continuation #1, T5 continuation #2) | 5 tasks | 11 files (7 created: 1 SUMMARY + 6 Playwright specs; 4 modified: ToolCallPanel.tsx + RunCard.tsx + VALIDATION.md + CLAUDE.md) |
 | Phase 076 P01 | 5min | 1 task | 1 file |
 | Phase 076 P02 | ~15min (split across executor + checkpoint) | 3 tasks | 4 files |
+| Phase 079 P01 | 4min | 2 tasks | 8 files |
+| Phase 080 P01 | 7 | 3 tasks | 4 files |
+| Phase 082 P01 | 8min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -405,6 +511,9 @@ Recent decisions affecting v2.5 work:
 - Phase 075.7-03 Focus Mode + 4-axis UAT shipped (commits 5199412 + ce07a57 + ffc77d5 + db0b6f4 + final docs commit). T1: ToolCallPanel ToolResultBlock renders `<div data-testid="tool-result-summary">→ {summarizeToolCall(tc)}</div>` on collapsed past tools (R-4; UI-SPEC §7.5 styling — ml-8 + border-t border-border/50 + font-mono text-xs text-muted-foreground; literal U+2192 prefix). T2: RunCard auto-collapse useEffect with wasStreamingRef one-shot guard (RESEARCH §4.4); lazy useState initializer covers DB-loaded historical (RESEARCH §5.4); collapsed-row `<button type="button">` JSX with statusGlyph/statusWord helpers matching MessageItem banner copy; handleHeaderClick early-returns when runStatus === 'streaming' (D-08); tabIndex mirrors gate for keyboard parity. R-7 holds (grep @keyframes RunCard.tsx = 0). T3: 6 Playwright specs at frontend/tests/e2e/scenario-{07..12}.spec.ts (CONTEXT correction #4) covering 3 of 4 UAT axes automated; scenario-09 4-sub-test for-loop for cross-provider axis with Anthropic DOM-order preservation gate (RESEARCH §6 protecting BUG-260514-02 re-litigation). T4: long-message manual Chrome MCP UAT auto-approved per AUTO_MODE; surfaced to operator via VALIDATION.md 6-step checklist for /gsd:verify-work 075.7. T5: CLAUDE.md hot-file ledger 4 frontend rows flipped to `satisfied (075.7 — 2026-05-24)` (ToolCallPanel.tsx + MessageItem.tsx [NEW row added per planner brief] + StreamsProvider.tsx + useMessages.ts); 2 backend rows (threads.py + anthropic_service.py) UNCHANGED (out of 075.7 scope). G-1 + G-5 guardrails CLOSED on the chat surface.
 
 - Phase 076 Plan 02: D-04 ADJUST path taken — post-071.3 corpus (camelot + pymupdf_full + legacy) shifted avg_similarity distribution lower (median 0.4861); old 0.55/0.40 produced 14%/54%/32% buckets; new 0.54/0.38 restores ~30%/45%/25% D-04 target. knowledge_health.py aligned per D-07. RAG-RECAL-01 CLOSED.
+- D-PRD-12 ADR authored (Phase 079): multi-worker enabled, WORKER_COUNT=2 default, D-v2.5-02 formally superseded
+- Both deployment guides updated with Redis (3 options), EnvironmentFile+WORKER_COUNT systemd, asyncpg pool tuning; prescriptive single-worker refs fixed in ARCHITECTURE.md/CONCERNS.md
+- SC#1/SC#2/SC#4 all GREEN under full v2.6 stack; PDF doc ID updated from stale 551f03f9 to current 517a2827
 
 ### Pending Todos
 
@@ -444,8 +553,8 @@ Items acknowledged at v2.4 milestone close (2026-04-30) — 19 items:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 078 context gathered
+Last session: 2026-05-27T12:04:25.047Z
+Stopped at: Completed 082-01-PLAN.md
 
 ### Next session: pending USER actions
 
@@ -532,4 +641,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 078 (Backpressure JSON Primitive + Code-Quality Bundle) — 3 plans — 2026-05-26T20:11:52.348Z
+**Planned Phase:** 082 (Cross-cutting Verification + Extraction Telemetry) — 2 plans — 2026-05-27T11:52:54.262Z

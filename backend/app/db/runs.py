@@ -32,6 +32,7 @@ async def insert_run(
     status: str,
     model: str,
     provider: str,
+    spawned_by_worker: str | None = None,
 ) -> None:
     """Insert a new runs row at request entry (Phase 073 - replaces threads.py:974 aexec).
 
@@ -41,11 +42,12 @@ async def insert_run(
       - provider: NOT NULL (Pitfall 6 - _resolved_provider must always be set)
       - started_at: DEFAULT now() - omitted here so Postgres fills it
       - input_tokens / output_tokens / completed_at / message_id / error: left NULL until finalize
+      - spawned_by_worker: nullable TEXT, OS PID of the worker that created the run (Phase 079 / D-PRD-12)
     """
     await pool.execute(
         """
-        INSERT INTO runs (run_id, thread_id, user_id, status, model, provider)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO runs (run_id, thread_id, user_id, status, model, provider, spawned_by_worker)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         """,
         run_id,
         thread_id,
@@ -53,6 +55,7 @@ async def insert_run(
         status,
         model,
         provider,
+        spawned_by_worker,
     )
 
 
