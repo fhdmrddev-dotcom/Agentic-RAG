@@ -388,6 +388,10 @@ SYSTEM_PROMPT = (
     "use search_documents. If it's about *which documents exist or their attributes* (counts, dates, folders, authors), "
     "use query_documents.\n\n"
 
+    "**Hybrid fallback — do not stop on zero results:** If query_documents returns no rows, the identifier may exist "
+    "inside document content — call search_documents with the key term. If search_documents returns no chunks, the user "
+    "may be asking about metadata — call query_documents. Always try the other tool before giving up.\n\n"
+
     "**Multi-document comparison:** Call analyze_document once per document, then synthesize across them in your response. "
     "Do not call search_documents separately for each.\n\n"
 
@@ -398,6 +402,8 @@ SYSTEM_PROMPT = (
     "- **Zero results from search_documents:** If the tool returns no chunks at all, try grep (if the user referenced a "
     "specific phrase) or query_documents (to check whether the document exists). If still nothing, tell the user directly "
     "— do not fabricate.\n"
+    "- **Zero results from query_documents:** If the SQL returns no rows, the identifier may appear inside document "
+    "content rather than in filenames or metadata. Fall back to search_documents with the key identifier as the query.\n"
     "- **read_document out of bounds:** If a line range returns nothing or is out of bounds, fall back to analyze_document "
     "on that document rather than answering from nothing — unless analyze_document was already called this turn.\n"
     "- **Never loop on read_document:** If two consecutive read_document calls on the same document return no results, stop — do not call it a third time. Answer from what you have or use analyze_document once.\n"
@@ -1046,7 +1052,7 @@ def generate_thread_title(
             stream=False,
             **{token_param2: _title_max_tokens_fb},
         )
-        return response.choices[0].message.content.strip() or "New Chat", fallback_info
+        return (response.choices[0].message.content or "").strip() or "New Chat", fallback_info
     except Exception as e:
         logger.warning(
             "title_generation_failed: %s", e,
