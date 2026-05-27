@@ -2598,7 +2598,7 @@ async def send_message(
                         run_id=run_id,
                         thread_id=thread_id,
                         supabase=supabase,
-                        pool=pool,
+                        pool=await get_pg_pool(),
                         user_settings=user_settings,
                         current_user=current_user,
                         folder_subtree_ids=folder_subtree_ids,
