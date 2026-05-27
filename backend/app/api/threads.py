@@ -2106,6 +2106,7 @@ async def send_message(
 
                                 tool_calls_buffer: dict = {}
                                 finish_reason: str | None = None
+                                _in_think_block: bool = False  # BUG-260526-02: Kimi/Moonshot <think> tag state machine
                                 _announced_tools: set[int] = set()
                                 # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary
                                 # counter for tool_args_progress emits. Resets alongside
@@ -2180,7 +2181,7 @@ async def send_message(
                                 # consumed by the outer agent_runner's
                                 # `except asyncio.TimeoutError` formatter.
                                 async def _on_chunk_openai(chunk):
-                                    nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total
+                                    nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total, _in_think_block
                                     # Phase 075.3 D-075.3-03 + D-075.3-04: defensive provider-aware
                                     # accumulator. Google emits ``usage`` on EVERY chunk alongside
                                     # ``delta.content`` / ``delta.tool_calls`` (per quick-task
@@ -2206,8 +2207,46 @@ async def send_message(
                                         finish_reason = normalize_finish_reason(choice.finish_reason)
 
                                     if delta.content:
-                                        full_content += delta.content
-                                        await _emit(redis, run_id, 'delta', content=delta.content)
+                                        _content = delta.content
+                                        # BUG-260526-02 (D-06): Kimi/Moonshot thinking content filter.
+                                        # Kimi wraps chain-of-thought reasoning inside <think>...</think>
+                                        # tags in delta.content (unlike DeepSeek which uses a separate
+                                        # reasoning_content field). Strip thinking tags from visible
+                                        # content and route to reasoning_content instead.
+                                        # DeepSeek included for defense-in-depth (some models via
+                                        # OpenRouter may also use <think> tags in content).
+                                        if active_provider_name in ("moonshot", "deepseek"):
+                                            _visible = ""
+                                            _reasoning = ""
+                                            _remaining = _content
+                                            while _remaining:
+                                                if _in_think_block:
+                                                    end_idx = _remaining.find("</think>")
+                                                    if end_idx != -1:
+                                                        _reasoning += _remaining[:end_idx]
+                                                        _remaining = _remaining[end_idx + len("</think>"):]
+                                                        _in_think_block = False
+                                                    else:
+                                                        _reasoning += _remaining
+                                                        _remaining = ""
+                                                else:
+                                                    start_idx = _remaining.find("<think>")
+                                                    if start_idx != -1:
+                                                        _visible += _remaining[:start_idx]
+                                                        _remaining = _remaining[start_idx + len("<think>"):]
+                                                        _in_think_block = True
+                                                    else:
+                                                        _visible += _remaining
+                                                        _remaining = ""
+                                            if _reasoning:
+                                                full_reasoning_content += _reasoning
+                                                await _emit(redis, run_id, 'reasoning_delta', content=_reasoning)
+                                            if _visible:
+                                                full_content += _visible
+                                                await _emit(redis, run_id, 'delta', content=_visible)
+                                        else:
+                                            full_content += _content
+                                            await _emit(redis, run_id, 'delta', content=_content)
 
                                     # DeepSeek thinking mode: accumulate reasoning_content + emit SSE
                                     _rc = getattr(delta, 'reasoning_content', None)
