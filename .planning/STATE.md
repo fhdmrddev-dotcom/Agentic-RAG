@@ -4,12 +4,12 @@ milestone: v2.6
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 082 context gathered
-last_updated: "2026-05-27T11:40:30.088Z"
+last_updated: "2026-05-27T11:52:54.271Z"
 last_activity: 2026-05-27
 progress:
   total_phases: 35
   completed_phases: 30
-  total_plans: 89
+  total_plans: 91
   completed_plans: 93
   percent: 100
 ---
@@ -555,4 +555,4 @@ Skip this if the repo stays private and the key is rotated — rotation alone cl
 
 **Earlier queued phase (Gap-006 escalation):** "Adaptive Run Timeouts & Lifecycle States" — phase number TBD by orchestrator (likely 064 or later; distinct from Phase 064 Validation Harness). Full details in `.planning/phases/063.1-frontend-stream-decoupling-gap-closure/063.1-HUMAN-UAT.md → ## Gaps → Gap-006`. NOT 067.4 scope.
 
-**Planned Phase:** 081.1 (settings-architecture-unification) — 4 plans — 2026-05-27T09:14:44.521Z
+**Planned Phase:** 082 (Cross-cutting Verification + Extraction Telemetry) — 2 plans — 2026-05-27T11:52:54.262Z
