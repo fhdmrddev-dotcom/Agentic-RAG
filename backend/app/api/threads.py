@@ -960,6 +960,13 @@ async def delete_thread(
     )
 
 
+# BUG-260527-01 (D-08): Single-model providers have one tier — no cheaper
+# sub-agent model exists, so title generation uses the user's main model.
+# Multi-model providers (openai, anthropic, google, openrouter) can route
+# to a cheaper model via _SUB_AGENT_MODEL_DEFAULTS.
+_SINGLE_MODEL_PROVIDERS = frozenset({"deepseek", "moonshot", "minimax", "zhipu", "ollama"})
+
+
 def generate_thread_title(
     first_user_message: str,
     user_settings=None,
@@ -970,20 +977,29 @@ def generate_thread_title(
     """
     try:
         client = get_llm_client(user_settings)
-        # Use cheapest model per provider — same resolution as sub_agent_service/suggestion_service.
-        # Avoids burning the main (expensive) model on a 20-token title call.
-        override = (
-            (user_settings.sub_agent_model if user_settings else "")
-            or settings.sub_agent_model
-        )
-        if override:
-            model = override
+        provider = user_settings.active_provider if user_settings else ""
+
+        if provider in _SINGLE_MODEL_PROVIDERS:
+            # Single-model providers: use the user's main model directly.
+            # No sub-agent model routing -- these providers have one tier.
+            model = user_settings.llm_model if user_settings else settings.llm_model
         else:
-            provider = user_settings.active_provider if user_settings else ""
-            model = (
-                _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
-                or (user_settings.llm_model if user_settings else settings.llm_model)
+            # Multi-model providers: try sub-agent override, then provider default, then fallback.
+            override = (
+                (user_settings.sub_agent_model if user_settings else "")
+                or settings.sub_agent_model
             )
+            if override:
+                model = override
+            else:
+                model = (
+                    _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
+                    or (user_settings.llm_model if user_settings else settings.llm_model)
+                )
+
+        # Google models need more token budget for 4-6 word titles.
+        # Other providers work fine at 30.
+        _title_max_tokens = 60 if provider == "google" else 30
         token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
         title_messages = [
             {
@@ -996,7 +1012,7 @@ def generate_thread_title(
             model=model,
             messages=title_messages,
             stream=False,
-            **{token_param: 30},
+            **{token_param: _title_max_tokens},
         )
         raw_title = (response.choices[0].message.content or "").strip()
         # Guard against models returning refusals or markdown instead of a title
@@ -1005,6 +1021,9 @@ def generate_thread_title(
         return raw_title or "New Chat", None
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
+        if provider in _SINGLE_MODEL_PROVIDERS:
+            # Single-model provider and the model 404'd -- no fallback available
+            return first_user_message[:40].strip() or "New Chat", None
         fallback = (
             _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
             or (user_settings.llm_model if user_settings else settings.llm_model)
@@ -1012,6 +1031,7 @@ def generate_thread_title(
         if not fallback or fallback == model:
             return first_user_message[:40].strip() or "New Chat", None
         fallback_info = {"original_model": model, "fallback_model": fallback}
+        _title_max_tokens_fb = 60 if provider == "google" else 30
         token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
         title_messages = [
             {
@@ -1024,7 +1044,7 @@ def generate_thread_title(
             model=fallback,
             messages=title_messages,
             stream=False,
-            **{token_param2: 20},
+            **{token_param2: _title_max_tokens_fb},
         )
         return response.choices[0].message.content.strip() or "New Chat", fallback_info
     except Exception as e:
