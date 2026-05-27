@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Completed 083-03-PLAN.md
 last_updated: "2026-05-28T21:22:24Z"
 last_activity: 2026-05-28 -- Phase 083 Plan 03 complete (Kimi thinking filter + title gen fix)
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 33
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 1 of 6 (Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes)
-Plan: 3 of 3 in current phase
-Status: All plans complete -- ready for verification
-Last activity: 2026-05-28 -- Phase 083 Plan 03 complete (Kimi thinking filter + title gen fix)
+Phase: 084 of 6 (workspace filesystem backend)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-27
 
 Progress: [==========] 100%
 
@@ -36,7 +36,7 @@ Progress: [==========] 100%
 
 **Velocity:**
 
-- Total plans completed: 3 (v2.7)
+- Total plans completed: 6 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -44,7 +44,7 @@ Progress: [==========] 100%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 083 | 3/3 | ~35min | ~12min |
+| 083 | 3 | - | - |
 
 **Recent Trend:**
 

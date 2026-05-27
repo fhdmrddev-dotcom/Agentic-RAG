@@ -225,7 +225,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 3/3 | All plans complete | ~35min |
+| 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 3/3 | Complete    | 2026-05-27 |
 | 084. Workspace Filesystem Backend | 0/TBD | Not started | - |
 | 085. New LLM Tools | 0/TBD | Not started | - |
 | 086. StreamsProvider Extension + Panel Hooks | 0/TBD | Not started | - |

@@ -7,7 +7,7 @@
 
 ### Foundation
 
-- [ ] **FOUND-01**: Tool dispatch chain extracted from threads.py into a dedicated module with registry-pattern dispatch — all existing 16 tools migrated with zero behavior change
+- [x] **FOUND-01**: Tool dispatch chain extracted from threads.py into a dedicated module with registry-pattern dispatch — all existing 16 tools migrated with zero behavior change
 - [x] **FOUND-02
 **: 4 open bugs closed: final-output-files-not-persisted (BUG-260526-03), kimi-thinking-leaks-into-content (BUG-260526-02), timer-disappears-mid-cycle (BUG-260526-04), title-generation-broken-deepseek-moonshot-google (BUG-260527-01)
 
@@ -70,8 +70,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 083 | Pending |
-| FOUND-02 | Phase 083 | Pending |
+| FOUND-01 | Phase 083 | Complete |
+| FOUND-02 | Phase 083 | Complete |
 | WS-01 | Phase 084 | Pending |
 | WS-02 | Phase 084 | Pending |
 | WS-03 | Phase 084 | Pending |
