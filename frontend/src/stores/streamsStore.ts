@@ -36,7 +36,7 @@
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
 import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem } from "@/types"
-import { readSnapshotSyncOrEmpty } from "@/lib/streamsCache"
+import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
 
@@ -191,17 +191,19 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   // Type: subscriptionsByThread: Map<string, Set<string>>
   subscriptionsByThread: new Map<string, Set<string>>(),
   // Phase 086 Plan 01 (D-086-03): panel per-thread Map defaults. todos + tasks
-  // hydrate from localStorage on first paint (Task 3 wires the cache reads
-  // here); pendingAsks + workspaceFiles start EMPTY (ephemeral / large-blob).
+  // hydrate from localStorage SYNCHRONOUSLY on first paint (same Pitfall 1/8
+  // discipline as bucketsBySurface above — read inside the factory, not a
+  // useEffect, so first paint sees cached content). pendingAsks +
+  // workspaceFiles start EMPTY (ephemeral / large-blob — not persisted).
   // Type-annotation comment above each per D-075.4-A1 convention.
   // Type: todosByThread: Map<string, Todo[]>
-  todosByThread: new Map<string, Todo[]>(),
+  todosByThread: readTodosSyncOrEmpty(),
   // Type: workspaceFilesByThread: Map<string, WorkspaceFile[]>
   workspaceFilesByThread: new Map<string, WorkspaceFile[]>(),
   // Type: pendingAsksByThread: Map<string, PendingAsk[]>
   pendingAsksByThread: new Map<string, PendingAsk[]>(),
   // Type: tasksByThread: Map<string, TaskRunIndexItem[]>
-  tasksByThread: new Map<string, TaskRunIndexItem[]>(),
+  tasksByThread: readTasksSyncOrEmpty(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},

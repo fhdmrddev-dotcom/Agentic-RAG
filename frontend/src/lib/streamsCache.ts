@@ -23,7 +23,7 @@
  *
  * Canonical reference: 068.5-RESEARCH.md §Code Examples lines 607-703.
  */
-import type { Message } from "@/types"
+import type { Message, Todo, TaskRunIndexItem } from "@/types"
 import type { SurfaceId } from "@/stores/streamsStore"
 
 /**
@@ -38,7 +38,13 @@ import type { SurfaceId } from "@/stores/streamsStore"
 export const STREAMS_CACHE_KEY_PREFIX = "agentic-rag.streams.v1" as const
 /** @deprecated B-01: legacy non-partitioned key. Cleared at module load. */
 export const STREAMS_CACHE_KEY = "agentic-rag.streams.v1" as const
-export const STREAMS_CACHE_VERSION = 1 as const
+// Phase 086 Plan 01 (D-086-04): single minor bump 1 -> 2 to admit the two new
+// persisted slots (todosByThread + tasksByThread). The read-path version guard
+// drops ALL v1 keys on first read (closes failure mode #8 for the bump) — this
+// also invalidates the chat-bucket cache, so users see a one-time cold reload of
+// recent-thread chat scrollback (accepted; source-of-truth is the DB). Do NOT
+// add separate version slots — one version covers the whole serialized shape.
+export const STREAMS_CACHE_VERSION = 2 as const
 /**
  * Per-surface LRU cap. Rescoped 2026-05-14 (Phase 068.5 follow-up) from 10 → 3:
  * the cache's load-bearing value is two threads (current-viewing + active-streaming)
@@ -118,6 +124,13 @@ interface SerializedThreadEntry {
 interface SerializedSnapshot {
   version: number
   surfaces: Record<SurfaceId, Record<string, SerializedThreadEntry>>
+  // Phase 086 Plan 01 (D-086-03): ONLY todos + tasks are persisted. pendingAsks
+  // are ephemeral (a stale prompt restored on F5 would be misleading) and
+  // workspaceFiles are large blobs (quota risk) — neither is cached. Both slots
+  // are OPTIONAL so a v2 snapshot written before any panel data exists still
+  // round-trips, and the read path tolerates their absence.
+  todosByThread?: Record<string, Todo[]>
+  tasksByThread?: Record<string, TaskRunIndexItem[]>
 }
 
 /**
@@ -166,6 +179,69 @@ export function readSnapshotSyncOrEmpty(): Map<SurfaceId, Map<string, Message[]>
 }
 
 /**
+ * Phase 086 Plan 01: read the persisted parsed v2 snapshot for the current
+ * user, applying the SAME version-guard + user-scoped key discipline as
+ * readSnapshotSyncOrEmpty. Returns null on any failure / version drift / no
+ * session — callers then return an empty Map. Private helper so the two panel
+ * readers below don't each re-parse + re-guard.
+ */
+function readSnapshotParsedOrNull(): SerializedSnapshot | null {
+  try {
+    const userId = getCurrentUserIdSync()
+    if (!userId) return null
+    const key = streamsCacheKey(userId)
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SerializedSnapshot
+    if (!parsed || typeof parsed !== "object" || parsed.version !== STREAMS_CACHE_VERSION) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Phase 086 Plan 01 (D-086-03): synchronous first-paint hydration of the
+ * per-thread todo lists. Mirrors readSnapshotSyncOrEmpty's discipline (never
+ * throws; version-guarded; user-scoped). Object -> Map rebuild keyed by
+ * threadId. Called inside the Zustand store factory so the FIRST paint of any
+ * panel subscriber sees cached todos.
+ */
+export function readTodosSyncOrEmpty(): Map<string, Todo[]> {
+  try {
+    const parsed = readSnapshotParsedOrNull()
+    if (!parsed) return new Map()
+    const out = new Map<string, Todo[]>()
+    for (const [tid, todos] of Object.entries(parsed.todosByThread ?? {})) {
+      if (Array.isArray(todos)) out.set(tid, todos)
+    }
+    return out
+  } catch {
+    return new Map()
+  }
+}
+
+/**
+ * Phase 086 Plan 01 (D-086-03): synchronous first-paint hydration of the
+ * per-thread sub-agent task run index. Same discipline as readTodosSyncOrEmpty.
+ */
+export function readTasksSyncOrEmpty(): Map<string, TaskRunIndexItem[]> {
+  try {
+    const parsed = readSnapshotParsedOrNull()
+    if (!parsed) return new Map()
+    const out = new Map<string, TaskRunIndexItem[]>()
+    for (const [tid, tasks] of Object.entries(parsed.tasksByThread ?? {})) {
+      if (Array.isArray(tasks)) out.set(tid, tasks)
+    }
+    return out
+  } catch {
+    return new Map()
+  }
+}
+
+/**
  * Trailing-edge write target. Serializes the bucketsBySurface Map to localStorage
  * under a single packed key, applies per-surface LRU cap, and falls back to
  * evict-half-and-retry on QuotaExceededError.
@@ -178,11 +254,19 @@ export function readSnapshotSyncOrEmpty(): Map<SurfaceId, Map<string, Message[]>
  * scope persistence to (streaming + currently-viewing) threads only. Predicate
  * returns true for threads worth persisting, false to skip. When omitted, all
  * threads in the in-memory bucket are persisted (legacy behavior, used by tests).
+ *
+ * Phase 086 Plan 01 (D-086-03): two OPTIONAL trailing params let the provider
+ * also persist the per-thread todo + task Maps in the same packed write. Both
+ * are serialized as plain Object records (Map -> Record). pendingAsks +
+ * workspaceFiles are intentionally NOT accepted here (ephemeral / large-blob).
+ * Omitting both keeps the legacy chat-only write behavior (used by existing tests).
  */
 export function writeSnapshotToLocalStorage(
   buckets: Map<SurfaceId, Map<string, Message[]>>,
   now: number = Date.now(),
   keepPredicate?: (surfaceId: SurfaceId, threadId: string) => boolean,
+  todosByThread?: Map<string, Todo[]>,
+  tasksByThread?: Map<string, TaskRunIndexItem[]>,
 ): void {
   // B-01: user-scoped key. No session → skip the write entirely (the
   // in-memory bucket still holds the data; cache hydrate on next mount only
@@ -252,6 +336,20 @@ export function writeSnapshotToLocalStorage(
       }
     }
     snapshot.surfaces[surface] = surfaceEntry
+  }
+  // Phase 086 Plan 01 (D-086-03): serialize the optional panel Maps as plain
+  // Object records. Only written when the provider supplies them; absent slots
+  // simply round-trip as undefined. No LRU/eviction applied — the per-thread
+  // todo/task lists are small and bounded by the chat-bucket LRU upstream.
+  if (todosByThread) {
+    const todosRecord: Record<string, Todo[]> = {}
+    for (const [tid, todos] of todosByThread) todosRecord[tid] = todos
+    snapshot.todosByThread = todosRecord
+  }
+  if (tasksByThread) {
+    const tasksRecord: Record<string, TaskRunIndexItem[]> = {}
+    for (const [tid, tasks] of tasksByThread) tasksRecord[tid] = tasks
+    snapshot.tasksByThread = tasksRecord
   }
   evictPerSurfaceIfOver(snapshot, STREAMS_CACHE_MAX_THREADS_PER_SURFACE)
   try {
