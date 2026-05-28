@@ -83,6 +83,7 @@ import {
   useTasks,
 } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
+import { readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 const THREAD_A = "thread-A"
 const THREAD_B = "thread-B"
@@ -383,5 +384,75 @@ describe("Phase 086 panel — hooks reconcile + abort + error isolation", () => 
     const { result } = renderHook(({ threadId }) => useTasks(threadId), withProvider(THREAD_A))
     await waitFor(() => expect(result.current.data).toHaveLength(1))
     expect(result.current.data[0].sub_run_id).toBe("s1")
+  })
+})
+
+// WR-04 (260529-0sc): end-to-end write-path regression. Proves the panel
+// todo/task Maps actually reach the localStorage snapshot via the throttled
+// write in StreamsProvider useEffect #4. This is RED against the pre-fix code
+// (writeNow omitted the 4th/5th args + the subscription watched bucketsBySurface
+// only, so panel-Map mutations never triggered a write) and GREEN after the fix.
+describe("Phase 086 panel — WR-04 localStorage write-path persistence", () => {
+  it("persists todosByThread/tasksByThread to the snapshot so readback is non-empty", () => {
+    // getCurrentUserIdSync scans localStorage for an `sb-*-auth-token` whose JSON
+    // has `.user.id`. The supabase mock is NOT sufficient — writeSnapshotToLocalStorage
+    // reads localStorage directly. Seed AFTER beforeEach's localStorage.clear().
+    localStorage.setItem(
+      "sb-test-auth-token",
+      JSON.stringify({ user: { id: "user-1" } }),
+    )
+
+    // Fake timers make the 500ms throttle deterministic; scoped to this test only.
+    vi.useFakeTimers()
+    try {
+      // Mounting registers the 11 real action bodies AND useEffect #4's subscription.
+      const { unmount } = renderHook(() => useTodos(null), {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <StreamsProvider>{children}</StreamsProvider>
+        ),
+      })
+
+      // setViewingThread is the sole writer of activeThreadIdRef.current — without
+      // it writeNow early-returns on `!streamingTid && !activeTid`. (getSnapshot/
+      // getMessages/getActiveRuns are stubbed by the top-of-file mock.)
+      act(() => {
+        useStreamsStore.getState().actions.setViewingThread(THREAD_A)
+      })
+
+      const todo: Todo = {
+        id: "t1",
+        content: "persist me",
+        status: "pending",
+        parent_id: null,
+        order_index: 0,
+      }
+      const task: TaskRunIndexItem = {
+        sub_run_id: "s1",
+        parent_run_id: "r1",
+        status: "completed",
+        model: "gpt",
+        provider: "openai",
+      }
+      act(() => {
+        useStreamsStore.getState().actions.replaceTodosForThread(THREAD_A, [todo])
+        useStreamsStore.getState().actions.replaceTasksForThread(THREAD_A, [task])
+      })
+
+      // Flush the 500ms throttle via the live subscription path.
+      act(() => {
+        vi.advanceTimersByTime(600)
+      })
+
+      const persistedTodos = readTodosSyncOrEmpty()
+      const persistedTasks = readTasksSyncOrEmpty()
+      expect(persistedTodos.get(THREAD_A)).toHaveLength(1)
+      expect(persistedTodos.get(THREAD_A)?.[0].id).toBe("t1")
+      expect(persistedTasks.get(THREAD_A)).toHaveLength(1)
+      expect(persistedTasks.get(THREAD_A)?.[0].sub_run_id).toBe("s1")
+
+      unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
