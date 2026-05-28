@@ -1786,6 +1786,14 @@ async def send_message(
                 # B-260519-11 + BUG-260514-01 (per-run cumulative state).
                 _previous_files_in_run: dict[str, dict] = {}
 
+                # Phase 085 D-085-15 — per-run task() concurrency semaphore.
+                # Initialized ONCE per top-level run (outside the iteration loop) so
+                # all _handle_task spawns in this run share the same gate. Bound to
+                # settings.task_per_run_concurrency (default 3). Sub-agents inherit
+                # this same semaphore via task_service so a runaway sub-agent + parent
+                # combo can't dodge the per-run cap.
+                _per_run_task_semaphore = asyncio.Semaphore(settings.task_per_run_concurrency)
+
                 for iteration in range(max_iterations):
                     # D-04 (Phase 56): emit iteration_start at the top of every iteration.
                     # Frontend uses this to increment the "Step N" counter (D-03).
@@ -2615,6 +2623,19 @@ async def send_message(
                         model=body.model or settings.llm_model,
                         previous_files_in_run=_previous_files_in_run,
                         iteration=iteration,
+                        # Phase 085 additions —
+                        # parent_run_id is None at the top-level run; task_service
+                        # overrides it inside sub-agent ToolContexts so _handle_task
+                        # can short-circuit the 1-level nesting cap (D-085-12).
+                        # available_tools is the tool-NAME list exposed to the LLM
+                        # this iteration — _handle_task uses it for sub-agent toolset
+                        # subset validation (D-085-09).
+                        parent_run_id=None,
+                        per_run_task_semaphore=_per_run_task_semaphore,
+                        available_tools=[
+                            t["function"]["name"]
+                            for t in (active_tools or get_tools(user_settings))
+                        ],
                     )
 
                     for tool_index, tc in enumerate(tool_calls):
@@ -2628,6 +2649,10 @@ async def send_message(
                             # Phase 083 D-01/D-03: single dispatch_tool() call replaces
                             # the ~780 LOC elif chain (G-5 mandated extraction).
                             tool_ctx.tool_index = tool_index
+                            # Phase 085 D-085-01 — populate per-tool-call id so ask_user
+                            # can derive its Redis pub/sub channel name and so any
+                            # future per-tool-call ctx state has a stable identifier.
+                            tool_ctx.tool_call_id = tc.get("id", "")
                             _tool_result = await dispatch_tool(tool_name, args, tool_ctx)
                             tool_result = _tool_result.result
                             llm_tool_content = _tool_result.llm_content

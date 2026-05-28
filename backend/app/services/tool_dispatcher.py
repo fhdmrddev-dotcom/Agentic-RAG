@@ -74,6 +74,19 @@ class ToolContext:
     previous_files_in_run: dict | None = None  # sandbox output file tracking across execute_code calls
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
+    # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
+    # parent_run_id: non-null inside a sub-agent's ToolContext — _handle_task short-circuits
+    #   to enforce the 1-level nesting cap (D-085-12).
+    # per_run_task_semaphore: in-process asyncio.Semaphore initialized once per top-level
+    #   run in agent_runner; gates the number of simultaneous task() spawns (D-085-15).
+    # available_tools: list of tool-name strings exposed to the parent agent — used by
+    #   _handle_task to enforce the sub-agent toolset-subset rule (D-085-09).
+    # tool_call_id: LLM-supplied id for the current tool call; populated per-dispatch by
+    #   agent_runner (mirrors tool_index). Used by ask_user channel naming (D-085-01).
+    parent_run_id: "UUID | None" = None
+    per_run_task_semaphore: Any = None  # asyncio.Semaphore | None — keep Any to avoid module-level asyncio import surface
+    available_tools: list[str] = field(default_factory=list)
+    tool_call_id: str = ""
 
 
 @dataclass
@@ -1006,6 +1019,180 @@ async def _handle_workspace_diff(args: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(result=json.dumps({"error": str(e)}))
 
 
+# ---------------------------------------------------------------------------
+# Phase 085 — sub-agent toolset constants (D-085-09)
+# ---------------------------------------------------------------------------
+
+# Default sub-agent toolset when the parent agent calls task() without a `tools`
+# arg — the read-only KB + workspace surface. NB the intersection with the
+# parent's available_tools is what actually gets passed to the sub-agent: this
+# frozenset is the upper bound, not the floor.
+_SUB_AGENT_DEFAULT_READ_ONLY: frozenset[str] = frozenset({
+    "search_documents", "query_documents", "read_document",
+    "web_search", "ls", "tree", "grep", "glob",
+    "analyze_document", "query_tables",
+    "workspace_read", "workspace_list",
+})
+
+# Tools the LLM is NEVER allowed to grant to a sub-agent. task() itself is the
+# nesting-cap belt; ask_user inside a sub-agent has no UI surface (sub-agents
+# don't own a panel slot); write_todos is the parent's UI hook, not the
+# sub-agent's. Defense-in-depth: also enforced in run_task_sub_agent's
+# sub_ctx.available_tools (which dispatch_tool reads on every call).
+_SUB_AGENT_EXCLUDED: frozenset[str] = frozenset({"task", "ask_user", "write_todos"})
+
+
+async def _handle_task(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 085 D-085-08..16 — task() spawns a sub-agent.
+
+    Gate sequence (each gate returns a friendly LLM-readable error on refusal):
+      1. parent_run_id != None — 1-level nesting cap (D-085-12).
+      2. description empty/missing.
+      3. requested tools (if any) violate the subset rule or include
+         task/ask_user/write_todos (D-085-09).
+      4. max_steps non-integer.
+      5. per-run concurrency cap saturated (D-085-15, in-process Semaphore).
+      6. global concurrency cap saturated (D-085-15, Redis Lua counter).
+
+    On success: spawn run_task_sub_agent, await summary, return
+    ToolResult(result=<summary>). Per D-085-13 the LLM sees ONLY the summary
+    text — the full sub-agent transcript lives on run:{sub_run_id} for the
+    Phase 086 demuxer to surface.
+
+    Concurrency invariant: both slots (per-run + global) are released in a
+    finally block. If global acquire fails AFTER per-run was acquired, we
+    release per-run before returning the refusal — otherwise a single
+    blocked spawn would permanently consume one of the 3 per-run slots.
+    """
+    # Gate 1: nesting cap (D-085-12) — HARD GATE, runs first to short-circuit
+    # before any other work happens.
+    if ctx.parent_run_id is not None:
+        return ToolResult(
+            result="task() unavailable inside a sub-agent — 1-level nesting cap"
+        )
+
+    description = (args.get("description") or "").strip()
+    if not description:
+        return ToolResult(result="task() requires a non-empty description argument")
+
+    instructions = args.get("instructions")
+    requested_tools = args.get("tools")
+    max_steps_arg = args.get("max_steps")
+
+    # Gate 2: toolset subset validation (D-085-09)
+    available = set(ctx.available_tools or [])
+    if requested_tools is None:
+        # No tools arg — use the default read-only set, intersected with
+        # what the parent actually has available (sanitizes case where the
+        # parent's toolset is itself restricted, e.g. explorer mode).
+        sub_tools = sorted(available & _SUB_AGENT_DEFAULT_READ_ONLY)
+    else:
+        invalid = [
+            t for t in requested_tools
+            if t not in available or t in _SUB_AGENT_EXCLUDED
+        ]
+        if invalid:
+            return ToolResult(
+                result=(
+                    f"task() refused: tools {invalid} not available to sub-agent "
+                    "(must be subset of parent's available_tools, excluding "
+                    "task/ask_user/write_todos)"
+                )
+            )
+        sub_tools = [t for t in requested_tools if t not in _SUB_AGENT_EXCLUDED]
+
+    if not sub_tools:
+        return ToolResult(
+            result="task() refused: no usable tools after subset filter"
+        )
+
+    # Gate 3: max_steps clamping (D-085-10)
+    if max_steps_arg is None:
+        max_steps = 5  # default-when-omitted per D-085-10
+    else:
+        try:
+            max_steps = max(1, min(int(max_steps_arg), settings.task_max_steps))
+        except (TypeError, ValueError):
+            return ToolResult(
+                result="task() max_steps must be a positive integer"
+            )
+
+    # Gate 4: per-run concurrency cap (D-085-15) — non-blocking try-acquire.
+    # asyncio.Semaphore exposes `.locked()` which returns True iff the internal
+    # counter has reached zero (no slots free). `locked()` is synchronous and
+    # the subsequent `acquire()` won't yield to the event loop when a slot IS
+    # available — so the check + acquire pair is atomic within a single
+    # coroutine step. asyncio.wait_for(timeout=0) is NOT a viable alternative
+    # because it cancels the acquire coroutine before it gets to run at all
+    # (verified in Python 3.12). The locked-then-acquire idiom is the
+    # canonical non-blocking try-acquire for asyncio.Semaphore.
+    sem = ctx.per_run_task_semaphore
+    if sem is None:
+        return ToolResult(
+            result="task() unavailable: per-run semaphore not initialized"
+        )
+    if sem.locked():
+        return ToolResult(result="task() per-run concurrency limit reached")
+    # Guaranteed immediate acquire (value > 0); no yield point between
+    # locked() and acquire() in single-threaded asyncio.
+    await sem.acquire()
+
+    # Gate 5: global concurrency cap (D-085-15)
+    # Lazy import to keep the dispatcher module load-cheap and avoid the
+    # task_service ↔ tool_dispatcher load-time cycle (task_service imports
+    # ToolContext + dispatch_tool from this module).
+    from app.services.task_service import (  # noqa: PLC0415
+        acquire_global_task_slot,
+        release_global_task_slot,
+        run_task_sub_agent,
+    )
+
+    global_acquired = await acquire_global_task_slot(
+        ctx.redis, settings.task_global_concurrency,
+    )
+    if not global_acquired:
+        # Release per-run slot we acquired above — otherwise the LLM's failed
+        # task() call would permanently consume one of the 3 per-run slots.
+        try:
+            sem.release()
+        except (ValueError, RuntimeError):
+            logger.exception(
+                "per-run semaphore release failed on global-cap refusal"
+            )
+        return ToolResult(
+            result=(
+                f"task() concurrency limit reached — global cap of "
+                f"{settings.task_global_concurrency} active sub-agents"
+            )
+        )
+
+    # Both slots acquired — spawn the sub-agent. finally block guarantees
+    # release of BOTH no matter how the spawn ends (success, exception,
+    # cancellation).
+    try:
+        result = await run_task_sub_agent(
+            parent_ctx=ctx,
+            description=description,
+            instructions=instructions,
+            allowed_tools=sub_tools,
+            max_steps=max_steps,
+        )
+    finally:
+        try:
+            sem.release()
+        except (ValueError, RuntimeError):
+            logger.exception("per-run semaphore release failed in spawn finally")
+        try:
+            await release_global_task_slot(ctx.redis)
+        except Exception:  # noqa: BLE001
+            logger.exception("global task slot release failed in spawn finally")
+
+    # D-085-13 — return only the sub-agent's final summary text to the LLM.
+    # Full transcript is reachable via the sub_run_id we emitted on the
+    # parent stream (Phase 086 panel will drill into it).
+    return ToolResult(result=result.get("summary") or "")
+
+
 async def _handle_write_todos(args: dict, ctx: ToolContext) -> ToolResult:
     """Phase 085 D-085-17..21 — write_todos handler.
 
@@ -1086,8 +1273,9 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "workspace_list": _handle_workspace_list,
     "workspace_delete": _handle_workspace_delete,
     "workspace_diff": _handle_workspace_diff,
-    # Phase 085 — D-085 new tools (write_todos = Plan 01; task + ask_user = Plans 02/03)
+    # Phase 085 — D-085 new tools (write_todos = Plan 01; task = Plan 02; ask_user = Plan 03)
     "write_todos": _handle_write_todos,
+    "task": _handle_task,
 }
 
 

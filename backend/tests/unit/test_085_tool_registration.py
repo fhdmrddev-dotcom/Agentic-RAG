@@ -171,3 +171,27 @@ async def test_happy_path_result_contains_accepted_and_version():
     assert isinstance(result, ToolResult)
     parsed = json.loads(result.result)
     assert parsed == {"accepted": 0, "version": 9999}
+
+
+# ---------------------------------------------------------------------------
+# Phase 085 Plan 02 — ToolContext extension
+# ---------------------------------------------------------------------------
+
+def test_tool_context_default_new_fields():
+    """Plan 02 Task 2: ToolContext exposes 4 new fields with safe defaults.
+
+    Constructing a ToolContext with ONLY the pre-Plan-02 required args must
+    succeed AND auto-populate parent_run_id=None, per_run_task_semaphore=None,
+    available_tools=[], tool_call_id="". This is the regression guard for the
+    existing 22 handlers (they don't pass these new kwargs).
+    """
+    ctx = ToolContext(
+        redis=None, run_id=None, thread_id="t", supabase=None, pool=None,
+        user_settings=None, current_user={"id": "u"},
+        folder_subtree_ids=None, scoped_folder_path=None,
+        emit=AsyncMock(), spawn=lambda c: None,
+    )
+    assert ctx.parent_run_id is None
+    assert ctx.per_run_task_semaphore is None
+    assert ctx.available_tools == []
+    assert ctx.tool_call_id == ""
