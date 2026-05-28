@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: planning
+status: executing
 stopped_at: Phase 085 context gathered
-last_updated: "2026-05-28T11:29:12.006Z"
-last_activity: 2026-05-28
+last_updated: "2026-05-28T11:38:18.470Z"
+last_activity: 2026-05-28 -- Phase 085 execution started
 progress:
   total_phases: 6
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted 2026-05-12, scoped to Themes A+C+D+H for v2.7)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 084 — workspace-filesystem-backend
+**Current focus:** Phase 085 — new-llm-tools
 
 ## Current Position
 
-Phase: 085
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-28
+Phase: 085 (new-llm-tools) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 085
+Last activity: 2026-05-28 -- Phase 085 execution started
 
 Progress: [██████████] 100%
 
