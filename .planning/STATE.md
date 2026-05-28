@@ -4,14 +4,14 @@ milestone: v2.7
 milestone_name: Milestone Context
 status: planning
 stopped_at: Phase 085 context gathered
-last_updated: "2026-05-28T10:35:25.803Z"
+last_updated: "2026-05-28T11:29:12.006Z"
 last_activity: 2026-05-28
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 8
+  total_plans: 12
   completed_plans: 8
-  percent: 100
+  percent: 67
 ---
 
 # Project State
@@ -96,3 +96,5 @@ Items carried forward from v2.6 milestone close:
 Last session: --stopped-at
 Stopped at: Phase 085 context gathered
 Resume file: --resume-file
+
+**Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z

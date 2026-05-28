@@ -166,12 +166,14 @@ Plans:
   2. Agent calls `task` to spawn a sub-agent that completes work and returns a summary -- sub-agents cannot spawn their own sub-agents (1-level nesting cap enforced) and respect per-run and global concurrency limits
   3. Agent calls `ask_user`, the agent loop pauses, user sees the prompt and submits a response, and the agent resumes with the user's answer in `tool_result` -- all within a single unbroken conversation flow
   4. `ask_user` works correctly when the POST response lands on a different worker than the paused agent loop (cross-worker coordination via Redis pub/sub), and gracefully expires with a timeout message if the user does not respond within the configurable timeout
-**Plans**: TBD
+**Plans**: 4 plans (2 waves — Plans 01+02 parallel; Plans 03+04 depend on Wave 1)
 **Research flag**: Phase research recommended for `ask_user` -- Redis pub/sub integration with `_shielded_finalize` cleanup, edge cases (cancelled run while SUBSCRIBE active, uvicorn shutdown during pause, timeout race with stop button)
 
 Plans:
-- [ ] 085-01: TBD
-- [ ] 085-02: TBD
+- [ ] 085-01-todos-PLAN.md — Migration 055 (todos table + runs.parent_run_id + messages.tool_calls.kind doc-comment) + todos_service + _handle_write_todos (TOOL-01)
+- [ ] 085-02-task-service-PLAN.md — task_service.py sub-agent loop + sub_agent_models helper + ToolContext extensions + concurrency caps + _handle_task (TOOL-02)
+- [ ] 085-03-ask-user-PLAN.md — ask_user_service Redis pub/sub + _handle_ask_user + POST /runs/{rid}/ask_user_response + cancel sentinel + uvicorn lifespan shutdown broadcast (TOOL-03, TOOL-04)
+- [ ] 085-04-rest-tools-uat-PLAN.md — panel.py 3 GET endpoints + 3 new tool JSON schemas in get_tools() + SC#10 4-axis UAT execution (TOOL-01..TOOL-04)
 
 ### Phase 086: StreamsProvider Extension + Panel Hooks
 **Goal**: The frontend streaming infrastructure routes all new SSE event types to dedicated panel state stores, and per-thread hooks provide reactive data for panel UI components
