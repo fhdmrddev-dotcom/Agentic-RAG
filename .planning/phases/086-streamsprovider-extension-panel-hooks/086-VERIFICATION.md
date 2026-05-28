@@ -1,8 +1,9 @@
 ---
 phase: 086-streamsprovider-extension-panel-hooks
 verified: 2026-05-29T00:00:00Z
-status: gaps_found
-score: 2/3 must-haves verified
+status: passed
+re_verified: 2026-05-29T20:55:00Z
+score: 3/3 must-haves verified (WR-04 closed + live-verified post-verification — see Resolution Addendum)
 overrides_applied: 0
 gaps:
   - truth: "todosByThread and tasksByThread hydrate from localStorage on first paint; pendingAsks and workspaceFiles do not"
@@ -159,5 +160,35 @@ The core goal ("streaming infrastructure routes SSE events to dedicated panel st
 
 ---
 
-_Verified: 2026-05-29T00:00:00Z_
-_Verifier: Claude (gsd-verifier)_
+## Resolution Addendum (2026-05-29, post-UAT)
+
+The single blocking gap (WR-04) has been **closed and live-verified**, flipping this report
+from `gaps_found` (2/3) to `passed` (3/3).
+
+**WR-04 fix:** quick task `260529-0sc` (commits `874021c` fix + `62c1cf0` regression test +
+`44e09ac` docs). `StreamsProvider.tsx` useEffect #4 now (a) passes `state.todosByThread` /
+`state.tasksByThread` to `writeSnapshotToLocalStorage`, and (b) subscribes via a tuple selector
+`[bucketsBySurface, todosByThread, tasksByThread]` with a module-scope `persistTriggerEqual`
+equalityFn so panel-Map mutations fire the throttled write. A regression test proves the
+end-to-end persist (RED-verified pre-fix). `tsc --noEmit` clean; panelHooks.test.tsx 13/13 GREEN.
+
+**Live UAT (Chrome DevTools MCP, see `086-UAT.md`):**
+- SC#3 first-paint hydration (WR-04): VERIFIED — after a write_todos run, the live snapshot
+  `agentic-rag.streams.v1.<userId>` holds `version:2` + `todosByThread[tid]` with real todos;
+  data SURVIVES a hard reload (ignoreCache). Confirmed on 4 provider threads.
+- Human item #1 (cross-provider SSE routing): VERIFIED across 6 providers (OpenAI, Anthropic,
+  Google, OpenRouter, DeepSeek, Moonshot). 4 fully exercised todo_updated -> store -> persist with
+  zero chat re-render and zero console errors. Google + OpenRouter could not invoke write_todos
+  due to MODEL tool-calling behavior (gemini narrates / empty-response; llama loops with empty
+  args) — NOT a 086 routing defect; routing is provider-agnostic shared code.
+- Human item #3 (long-message axis): VERIFIED — 14.8 KB single prompt on a long multi-turn
+  thread; write_todos routed + persisted, no stream drop, no console errors.
+
+**Deferred (not a defect):** Human item #2 (rapid thread-switch reconcile-abort) is BLOCKED on
+Phase 087 — `usePanelReconcile` only fires when a component mounts the named hooks, and no
+consumer ships until the panel UI. Live thread-switch currently issues only GET /snapshot (no
+panel reconcile GETs, confirmed via Chrome MCP). The abort + no-cross-thread-write invariant is
+unit-tested (FC#5, GREEN). Re-run this live test during Phase 087 verification.
+
+_Verified: 2026-05-29T00:00:00Z; re-verified post-UAT 2026-05-29_
+_Verifier: Claude (gsd-verifier) / UAT driver: Claude (gsd-verify-work via Chrome DevTools MCP)_
