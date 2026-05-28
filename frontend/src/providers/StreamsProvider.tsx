@@ -60,6 +60,10 @@ import type {
   OutputFile,
   SourceReference,
   Citation,
+  Todo,
+  WorkspaceFile,
+  PendingAsk,
+  TaskRunIndexItem,
 } from "@/types"
 import {
   getMessages,
@@ -68,9 +72,14 @@ import {
   getActiveRuns,
   getSnapshot,
   cancelRun,
+  getThreadTodos,
+  getThreadWorkspaceFiles,
+  getThreadPendingAsks,
+  getThreadTasks,
   type StreamCallbacks,
   type ThreadSnapshot,
 } from "@/lib/api"
+import { usePanelReconcile } from "@/hooks/usePanelReconcile"
 import {
   useStreamsStore,
   type SurfaceId,
@@ -84,6 +93,15 @@ import { makeToolKey } from "@/lib/toolKey"
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
 // selector result is shallow-equal across stores.
 const EMPTY_ARRAY: Message[] = []
+
+// Phase 086 Plan 02 (D-086-05) — module-level EMPTY constants for the 4 panel
+// hooks. Same rationale as EMPTY_ARRAY: a per-thread Map miss (or null threadId)
+// returns the SAME stable reference, so useSyncExternalStore skips re-render and
+// PANEL-06 (panel events never re-render chat) holds structurally.
+const EMPTY_TODOS: Todo[] = []
+const EMPTY_FILES: WorkspaceFile[] = []
+const EMPTY_ASKS: PendingAsk[] = []
+const EMPTY_TASKS: TaskRunIndexItem[] = []
 
 /**
  * Phase 075.1 Plan 01: widened from the Phase 075 buffer_expired-only filter
@@ -631,6 +649,44 @@ export function makeStreamCallbacks(opts: {
         })
       }, 4000)
     },
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 086 Plan 02 (PATTERNS §6 / PANEL-06) — 7 panel default handlers.
+    // Unlike every handler above (which writes to the chat-message bucket via
+    // `setMessages`), these write to the dedicated per-thread panel Maps via the
+    // store actions, so live SSE panel events update the 4 Maps WITHOUT touching
+    // bucketsBySurface (chat selectors never re-render). Each closes over the
+    // factory's `threadId` (L-068-04) — both call sites already pass it in opts,
+    // so there is NO call-site signature change. The getState().actions
+    // indirection mirrors setMessagesForBucketBound (StreamsProvider.tsx:709-712).
+    // ────────────────────────────────────────────────────────────────────────
+    onTodoUpdated: (todos) =>
+      useStreamsStore.getState().actions.replaceTodosForThread(threadId, todos),
+    onWorkspaceFileWritten: (file) =>
+      useStreamsStore.getState().actions.setWorkspaceFileForThread(threadId, file),
+    onWorkspaceFileDeleted: (path) =>
+      useStreamsStore.getState().actions.removeWorkspaceFileForThread(threadId, path),
+    onAskUserPrompt: (ask) =>
+      useStreamsStore.getState().actions.addPendingAskForThread(threadId, ask),
+    onAskUserResponse: (toolCallId) =>
+      useStreamsStore.getState().actions.removePendingAskForThread(threadId, toolCallId),
+    onTaskStart: (subRunId, description, tools, maxSteps) =>
+      useStreamsStore.getState().actions.setTaskForThread(threadId, {
+        sub_run_id: subRunId,
+        // parent_run_id is not carried on the SSE bookend; the GET reconcile
+        // (panel.py:156) is the authoritative source. Seed empty so the wire
+        // type is satisfied; reconcile overwrites with the canonical row.
+        parent_run_id: "",
+        status: "running",
+        model: "",
+        provider: "",
+        description,
+        tools,
+        max_steps: maxSteps,
+      }),
+    onTaskDone: (subRunId, status, summary) =>
+      useStreamsStore
+        .getState()
+        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
   }
 }
 
@@ -1445,6 +1501,125 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             })
           }
         },
+
+        // ────────────────────────────────────────────────────────────────────
+        // Phase 086 Plan 02 (PATTERNS §2 / PANEL-06) — 11 panel action bodies.
+        // Every body uses the immutable `new Map(prev)` clone-then-set discipline
+        // (analog: setMessagesForBucket @717-731, delete-key @1386-1392) so the
+        // outer Map ref always changes and subscribeWithSelector selectors stay
+        // stable — chat-message selectors (which read bucketsBySurface) NEVER
+        // re-render when a panel Map mutates. Identity keys per the backend wire
+        // shapes: Todo by `id` (full-replace), WorkspaceFile by `path`, PendingAsk
+        // by `tool_call_id`, TaskRunIndexItem by `sub_run_id`.
+        // ────────────────────────────────────────────────────────────────────
+
+        // --- todos: full-state-replace (todo_updated SSE / GET reconcile) ---
+        replaceTodosForThread: (threadId, todos) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.todosByThread)
+            next.set(threadId, todos)
+            return { todosByThread: next }
+          }),
+        // setTodosForThread mirrors replace (the SSE `todos` array is the full
+        // canonical list — there is no per-todo delta to merge).
+        setTodosForThread: (threadId, todos) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.todosByThread)
+            next.set(threadId, todos)
+            return { todosByThread: next }
+          }),
+
+        // --- workspace files: keyed-by-`path` upsert / remove / full-replace ---
+        setWorkspaceFileForThread: (threadId, file) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            const prev = next.get(threadId) ?? EMPTY_FILES
+            const idx = prev.findIndex((f) => f.path === file.path)
+            const updated =
+              idx === -1
+                ? [...prev, file]
+                : prev.map((f, i) => (i === idx ? file : f))
+            next.set(threadId, updated)
+            return { workspaceFilesByThread: next }
+          }),
+        removeWorkspaceFileForThread: (threadId, path) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            const prev = next.get(threadId) ?? EMPTY_FILES
+            next.set(
+              threadId,
+              prev.filter((f) => f.path !== path),
+            )
+            return { workspaceFilesByThread: next }
+          }),
+        replaceWorkspaceFilesForThread: (threadId, files) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            next.set(threadId, files)
+            return { workspaceFilesByThread: next }
+          }),
+
+        // --- pending asks: keyed-by-`tool_call_id` add / remove / full-replace ---
+        addPendingAskForThread: (threadId, ask) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            const prev = next.get(threadId) ?? EMPTY_ASKS
+            // Idempotent on replay: drop any existing ask with the same
+            // tool_call_id before appending the fresh one.
+            const deduped = prev.filter((a) => a.tool_call_id !== ask.tool_call_id)
+            next.set(threadId, [...deduped, ask])
+            return { pendingAsksByThread: next }
+          }),
+        removePendingAskForThread: (threadId, toolCallId) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            const prev = next.get(threadId) ?? EMPTY_ASKS
+            next.set(
+              threadId,
+              prev.filter((a) => a.tool_call_id !== toolCallId),
+            )
+            return { pendingAsksByThread: next }
+          }),
+        replacePendingAsksForThread: (threadId, asks) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            next.set(threadId, asks)
+            return { pendingAsksByThread: next }
+          }),
+
+        // --- tasks: keyed-by-`sub_run_id` upsert / status-update / full-replace ---
+        setTaskForThread: (threadId, task) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            const prev = next.get(threadId) ?? EMPTY_TASKS
+            const idx = prev.findIndex((t) => t.sub_run_id === task.sub_run_id)
+            const updated =
+              idx === -1
+                ? [...prev, task]
+                : // Merge so an upsert from the SSE bookend doesn't clobber
+                  // fields the GET reconcile already populated.
+                  prev.map((t, i) => (i === idx ? { ...t, ...task } : t))
+            next.set(threadId, updated)
+            return { tasksByThread: next }
+          }),
+        updateTaskStatusForThread: (threadId, subRunId, status, summary) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            const prev = next.get(threadId) ?? EMPTY_TASKS
+            next.set(
+              threadId,
+              prev.map((t) =>
+                t.sub_run_id === subRunId ? { ...t, status, summary } : t,
+              ),
+            )
+            return { tasksByThread: next }
+          }),
+        replaceTasksForThread: (threadId, tasks) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            next.set(threadId, tasks)
+            return { tasksByThread: next }
+          }),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
