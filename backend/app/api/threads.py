@@ -777,11 +777,18 @@ async def get_snapshot(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     # Step 2: messages SELECT + D-075-03 helper merge.
+    # BUG-260528-01: exclude role='system' rows (system_warning banners
+    # persisted since migration 048 / Plan 075.4-03). MessageResponse.role is
+    # Literal["user","assistant"], so serializing a system row raises
+    # ResponseValidationError → 500 and the thread never loads. These rows are
+    # an internal/forward-ref hook (Phase 082.5 error sink) with no frontend
+    # renderer yet; the live SSE event was already the user-visible signal.
     msgs_resp = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
+        .neq("role", "system")
         .order("created_at")
     )
     messages = msgs_resp.data or []
@@ -1084,12 +1091,17 @@ async def get_messages(
     if not thread.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
-    # 1. Fetch messages — UNCHANGED from the pre-063.1 implementation.
+    # 1. Fetch messages.
+    # BUG-260528-01: exclude role='system' rows (system_warning banners,
+    # migration 048 / Plan 075.4-03) — MessageResponse.role only allows
+    # 'user'/'assistant', so a system row 500s this endpoint via
+    # ResponseValidationError. Mirror of the filter in get_snapshot.
     msgs_resp = await aexec(
         supabase.table("messages")
         .select("*")
         .eq("thread_id", thread_id)
         .eq("user_id", current_user["id"])
+        .neq("role", "system")
         .order("created_at")
     )
     messages = msgs_resp.data or []
