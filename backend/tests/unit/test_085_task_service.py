@@ -124,6 +124,106 @@ def test_resolve_empty_llm_models_list_lets_override_pass_through():
 
 
 # ---------------------------------------------------------------------------
+# Plan 05 BUG-260528-01 — hardened validation on the default (override=None) path
+# ---------------------------------------------------------------------------
+#
+# Pre-Plan-05, the safety net at sub_agent_models.py:58 only fired when
+# override_model was truthy. The production call site at task_service.py:229
+# passes override_model=None per D-085-11, so the safety net was dormant
+# in production. These four tests pin the hardened-validation behavior
+# that Plan 05 introduces.
+
+
+def test_resolve_falls_back_when_user_settings_llm_model_is_cross_provider():
+    """Plan 05 / BUG-260528-01 root case: active_provider switched to anthropic
+    but user_settings.llm_model is still 'gpt-4.1' (stale-cross-provider).
+
+    The default (override_model=None) path MUST detect the mismatch via the
+    new always-on validation and return _SUB_AGENT_MODEL_DEFAULTS['anthropic']
+    instead of leaking 'gpt-4.1' through to the Anthropic client.
+    """
+    from app.config import _SUB_AGENT_MODEL_DEFAULTS
+    from app.services.sub_agent_models import resolve_sub_agent_model_safely
+
+    us = _StubUserSettings(
+        active_provider="anthropic",
+        llm_model="gpt-4.1",  # stale-cross-provider
+        llm_models="claude-haiku-4-5-20251001,claude-sonnet-4-5-20251022",
+    )
+    result = resolve_sub_agent_model_safely(us, override_model=None)
+
+    # Must NOT leak gpt-4.1 through to the Anthropic API endpoint.
+    assert result != "gpt-4.1"
+    # Must return the canonical Anthropic sub-agent default.
+    assert result == _SUB_AGENT_MODEL_DEFAULTS["anthropic"]
+    assert result == "claude-haiku-4-5-20251001"
+
+
+def test_resolve_returns_candidate_when_provider_default_is_empty():
+    """Plan 05: flexible providers (openrouter, ollama) have intentionally
+    empty _SUB_AGENT_MODEL_DEFAULTS entries.
+
+    When the candidate is not in their llm_models list, the helper should
+    return the candidate as-is (best-effort) with a WARNING log — those
+    providers route flexibly and we don't have a safe forced default.
+    """
+    from app.services.sub_agent_models import resolve_sub_agent_model_safely
+
+    us = _StubUserSettings(
+        active_provider="openrouter",
+        llm_model="gpt-4.1",  # candidate not in OpenRouter's list
+        llm_models="deepseek/deepseek-r1,anthropic/claude-3.5-sonnet",
+    )
+    result = resolve_sub_agent_model_safely(us, override_model=None)
+
+    # Flexible provider path — the candidate is preserved best-effort.
+    # The downstream OpenRouter call may fail or route via the model id;
+    # either way, the helper does not silently substitute.
+    assert result == "gpt-4.1"
+
+
+def test_resolve_short_circuits_when_candidate_in_active_list():
+    """Plan 05: the happy path is unchanged.
+
+    If the candidate is already a member of the active provider's
+    llm_models list, the helper returns it as-is with no warning and no
+    fallback.
+    """
+    from app.services.sub_agent_models import resolve_sub_agent_model_safely
+
+    us = _StubUserSettings(
+        active_provider="openai",
+        llm_model="gpt-5.4-mini",  # in list
+        llm_models="gpt-4.1,gpt-5.4-mini,gpt-5.4",
+    )
+    result = resolve_sub_agent_model_safely(us, override_model=None)
+    assert result == "gpt-5.4-mini"
+
+
+def test_resolve_with_empty_active_models_list_skips_validation():
+    """Plan 05: if the user's llm_models is empty, there's nothing to
+    validate against, so the helper returns the candidate without engaging
+    the new safety net.
+
+    This preserves the pre-Plan-05 behavior for users who haven't yet
+    populated their provider's model list (fresh installs / partial settings
+    rows).
+    """
+    from app.services.sub_agent_models import resolve_sub_agent_model_safely
+
+    us = _StubUserSettings(
+        active_provider="anthropic",
+        llm_model="gpt-4.1",  # would normally be cross-provider
+        llm_models="",  # empty — no list to validate against
+    )
+    result = resolve_sub_agent_model_safely(us, override_model=None)
+    # Without an llm_models list, validation is skipped — return candidate
+    # as-is. Documents the trade-off: we trust the caller when we have
+    # no list to compare against.
+    assert result == "gpt-4.1"
+
+
+# ---------------------------------------------------------------------------
 # Settings tests (Test 4)
 # ---------------------------------------------------------------------------
 
