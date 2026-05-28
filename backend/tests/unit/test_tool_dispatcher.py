@@ -17,7 +17,7 @@ from app.services.tool_dispatcher import (
 )
 
 
-# All 16 tools that must be registered
+# All 21 tools that must be registered (16 base + 5 workspace tools from Phase 084)
 EXPECTED_TOOLS = [
     "ls",
     "tree",
@@ -35,12 +35,18 @@ EXPECTED_TOOLS = [
     "remember",
     "recall",
     "query_tables",
+    # Phase 084: Workspace tools
+    "workspace_write",
+    "workspace_read",
+    "workspace_list",
+    "workspace_delete",
+    "workspace_diff",
 ]
 
 
-def test_registry_has_exactly_16_entries():
-    """_TOOL_REGISTRY must contain exactly 16 tool handlers."""
-    assert len(_TOOL_REGISTRY) == 16
+def test_registry_has_exactly_21_entries():
+    """_TOOL_REGISTRY must contain exactly 21 tool handlers (16 base + 5 workspace)."""
+    assert len(_TOOL_REGISTRY) == 21
 
 
 def test_registry_contains_all_expected_tools():
