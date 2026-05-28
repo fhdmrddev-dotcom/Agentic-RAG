@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: planning
+status: executing
 stopped_at: Phase 086 context gathered
-last_updated: "2026-05-28T18:07:29.005Z"
-last_activity: 2026-05-28
+last_updated: "2026-05-28T19:33:00.752Z"
+last_activity: 2026-05-28 -- Phase 086 planning complete
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 13
+  total_plans: 15
   completed_plans: 13
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 Phase: 086
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-05-28
+Status: Ready to execute
+Last activity: 2026-05-28 -- Phase 086 planning complete
 
 Progress: [██████████] 100%
 
@@ -76,6 +76,15 @@ None yet.
 - Phase 085 `ask_user` tool has the highest implementation risk in the milestone -- Redis pub/sub cleanup path needs explicit decision records during planning
 - Phase 087 Panel UI requires sketch approval (G-2) before planning can begin
 - Tool count budget: 16 existing + ~8 new = ~24 total; Google warns >20; consolidation into fewer tools with action parameters recommended during Phase 084/085 planning
+
+### Phase 086 surface note — BUG-260528-01 fix (2026-05-28, commit 7d2b3d2)
+
+Surfaced for Phase 086 (streamsprovider-extension-panel-hooks), which touches the same snapshot/reconcile/message-list surface:
+
+- **What was fixed:** `GET /threads/{id}/snapshot` and `/messages` now filter `role='system'` rows (`.neq("role","system")`). Phase 085's `ask_user` tool persists prompt/response as durable `role='system'` rows (migration 048), but `MessageResponse.role` is `Literal["user","assistant"]` — serializing a system row raised `ResponseValidationError` → **500, thread won't load**. Regression guard added in `test_075_snapshot.py`.
+- **Constraint for 086:** any reconcile/snapshot/message-list change MUST preserve this filter, or threads with ask_user history 500 on load again. The `panel.py` `/pending` query (raw asyncpg, scans system rows directly) is the separate path and is unaffected.
+- **OPEN FOLLOW-UP for 086 to decide:** answered ask_user Q&A turns are NOT rendered in reloaded conversation history (no frontend renderer for `tool_calls[].kind='ask_user_*'`; `/pending` only surfaces *unanswered* prompts). If reloaded ask_user history should be visible to the user, Phase 086 owns building that renderer (+ widening the wire model) rather than filtering. See `.planning/reported-bugs/snapshot-500-on-system-role-askuser-rows.md`.
+- Also cleaned 2026-05-28: 7 ask_user test-fixture threads purged from dev DB; 8 stale git worktrees pruned.
 
 ## Deferred Items
 

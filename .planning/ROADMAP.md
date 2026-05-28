@@ -23,6 +23,7 @@
 **Phase numbering basis:** Continues from v2.6's last phase 082 (plus deferred 082.5). v2.7 starts at Phase **083** and runs through Phase **088** (6 phases). Migration range reserved: `053-070` (per `.planning/prd-reset/MIGRATION-RESERVATIONS.md`).
 
 **Critical constraints from research:**
+
 - threads.py tool-dispatch extraction (G-5 mandated) MUST precede any new tool additions
 - Panel events must route to SEPARATE Zustand keys, NOT through chat `bucketsBySurface`
 - `ask_user` needs Redis pub/sub for cross-worker safety (`asyncio.Event` fails with `WORKER_COUNT=2`)
@@ -32,6 +33,7 @@
 - G-2 fires for Panel UI phase (sketch-before-plan)
 
 **Build order rationale:**
+
 - Tool-dispatch extraction first: not optional or deferrable -- conflicts with every subsequent tool addition if done later; G-5 mandated (threads.py at 3,843 LOC with 9+ phases)
 - Workspace backend before panel: panel is a pure consumer; building UI before events exist means building against mocks
 - Three new tools after workspace: workspace tools establish the dispatcher pattern; `ask_user` isolated for focused testing
@@ -121,36 +123,44 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 ## Phase Details
 
 ### Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes
+
 **Goal**: The codebase is structurally ready for new tool additions, and 4 lingering v2.6 bugs no longer affect users
 **Depends on**: Nothing (first phase of v2.7)
 **Requirements**: FOUND-01, FOUND-02
 **Success Criteria** (what must be TRUE):
+
   1. All 16 existing tools dispatch through a new `tool_dispatcher.py` registry-pattern module -- `threads.py` no longer contains tool-specific handling logic (G-5 satisfied)
   2. Existing agent behavior is byte-identical before and after extraction -- all existing tests pass without modification
   3. Kimi/Moonshot thinking content no longer leaks into visible chat messages (BUG-260526-02 closed)
   4. Sandbox output files generated during an agent run appear in the Final Outputs panel without requiring page refresh (BUG-260526-03 closed)
   5. Timer stays visible throughout the entire agent run cycle and title generation works on DeepSeek/Moonshot/Google models (BUG-260526-04 + BUG-260527-01 closed)
+
 **Plans**: 3 plans
 **Research flag**: Skip research-phase -- ARCHITECTURE.md Section 8 provides the extraction strategy; bugs have known root causes from v2.6 triage
 
 Plans:
+
 - [x] 083-01-PLAN.md -- Extract tool dispatch chain to tool_dispatcher.py with registry pattern (FOUND-01)
 - [x] 083-02-PLAN.md -- Frontend bug fixes: output files after reload + timer key stability (FOUND-02)
 - [x] 083-03-PLAN.md -- Backend bug fixes: Kimi thinking filter + title gen cross-provider fix (FOUND-02)
 
 ### Phase 084: Workspace Filesystem Backend
+
 **Goal**: The agent can write, read, list, delete, version, and diff files in a per-thread workspace that persists across turns, thread reloads, and browser sessions
 **Depends on**: Phase 083 (tool dispatcher must exist for new tool registration)
 **Requirements**: WS-01, WS-02, WS-03, WS-04, WS-05, WS-06, WS-07
 **Success Criteria** (what must be TRUE):
+
   1. Agent writes a file via `workspace_write`, and the file content survives thread reload and browser refresh -- user sees the same content after navigating away and back
   2. Agent reads a workspace file via `workspace_read` with content capped at a configurable max chars (default ~8K) -- large files return a truncation notice, not the full content
   3. `workspace_list` shows all files in the thread workspace; `workspace_delete` removes a file permanently; both reflect immediately in subsequent calls
   4. Every `workspace_write` auto-creates a new version row, and `workspace_diff` returns a structured diff between any two versions of the same file
   5. Files below the configurable size threshold are stored inline in Postgres; files above are uploaded to Supabase Storage -- the agent and user see no difference in behavior regardless of storage backend
+
 **Plans**: 5 plans (1 gap-closure plan added after human UAT 2026-05-28)
 
 Plans:
+
 - [x] 084-01-PLAN.md -- Database migration: workspace tables, RLS policies, storage bucket (WS-01, WS-05, WS-06)
 - [x] 084-02-PLAN.md -- DB layer, Pydantic models, workspace service with hybrid storage and versioning (WS-01, WS-02, WS-03, WS-04, WS-05)
 - [x] 084-03-PLAN.md -- Tool handlers in tool_dispatcher + tool schemas in openai_service + SSE events (WS-01, WS-02, WS-03, WS-04, WS-07)
@@ -158,18 +168,22 @@ Plans:
 - [x] 084-05-PLAN.md -- Gap closure: Google schema sanitizer + workspace_list-empty + REST /content empty-body (WS-02, WS-03, WS-04, WS-06, WS-07)
 
 ### Phase 085: New LLM Tools
+
 **Goal**: The agent can manage a todo list, spawn sub-agents for delegated work, and pause to ask the user a question -- all operating safely across multiple workers
 **Depends on**: Phase 084 (workspace tools establish the tool_dispatcher pattern; ask_user needs Redis infrastructure proven by WS-07 SSE events)
 **Requirements**: TOOL-01, TOOL-02, TOOL-03, TOOL-04
 **Success Criteria** (what must be TRUE):
+
   1. Agent calls `write_todos` and the todo list persists per-thread -- reloading the thread shows the same todos with correct status indicators (pending, in-progress, completed)
   2. Agent calls `task` to spawn a sub-agent that completes work and returns a summary -- sub-agents cannot spawn their own sub-agents (1-level nesting cap enforced) and respect per-run and global concurrency limits
   3. Agent calls `ask_user`, the agent loop pauses, user sees the prompt and submits a response, and the agent resumes with the user's answer in `tool_result` -- all within a single unbroken conversation flow
   4. `ask_user` works correctly when the POST response lands on a different worker than the paused agent loop (cross-worker coordination via Redis pub/sub), and gracefully expires with a timeout message if the user does not respond within the configurable timeout
+
 **Plans**: 4 plans (2 waves — Plans 01+02 parallel; Plans 03+04 depend on Wave 1)
 **Research flag**: Phase research recommended for `ask_user` -- Redis pub/sub integration with `_shielded_finalize` cleanup, edge cases (cancelled run while SUBSCRIBE active, uvicorn shutdown during pause, timeout race with stop button)
 
 Plans:
+
 - [x] 085-01-todos-PLAN.md — Migration 055 (todos table + runs.parent_run_id + messages.tool_calls.kind doc-comment) + todos_service + _handle_write_todos (TOOL-01)
 - [x] 085-02-task-service-PLAN.md — task_service.py sub-agent loop + sub_agent_models helper + ToolContext extensions + concurrency caps + _handle_task (TOOL-02)
 - [x] 085-03-ask-user-PLAN.md — ask_user_service Redis pub/sub + _handle_ask_user + POST /runs/{rid}/ask_user_response + cancel sentinel + uvicorn lifespan shutdown broadcast (TOOL-03, TOOL-04)
@@ -177,50 +191,66 @@ Plans:
 - [x] 085-05-sub-agent-cross-provider-fix-PLAN.md — Gap closure for BUG-260528-01: harden resolve_sub_agent_model_safely on Auto (cheapest) default path + cross-provider integration test (7 providers) + extend UAT with DeepSeek + Moonshot task rows (TOOL-02)
 
 ### Phase 086: StreamsProvider Extension + Panel Hooks
+
 **Goal**: The frontend streaming infrastructure routes all new SSE event types to dedicated panel state stores, and per-thread hooks provide reactive data for panel UI components
 **Depends on**: Phase 085 (all backend tools and SSE event types must be finalized before frontend wiring)
 **Requirements**: PANEL-05, PANEL-06
 **Success Criteria** (what must be TRUE):
+
   1. Panel subscribes to the same EventSource as chat via StreamsProvider Context -- no duplicate SSE connections created when the panel is open
   2. Workspace file events, todo updates, ask_user prompts, and task progress events each route to separate Zustand keys -- a `workspace_file_written` event causes zero re-renders in the chat message list
   3. Per-thread hooks (`useTodos`, `useWorkspaceFiles`, `useAskUserPrompt`) provide reactive state that reconciles on thread-switch via fetch (D-v2.5-03 pattern)
+
 **Plans**: TBD
 **Research flag**: Skip research-phase -- purely additive extension of existing StreamsProvider pattern; ARCHITECTURE.md Section 3.3 diagrams the demux pattern
 
 Plans:
+**Wave 1**
+
 - [ ] 086-01: TBD
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 086-02: TBD
 
 ### Phase 087: Panel UI
+
 **Goal**: Users see a right-side panel that shows the agent's workspace files, todo list, pending questions, and file version diffs -- making the agent's work visible and interactive
 **Depends on**: Phase 086 (panel hooks must provide reactive data before building UI)
 **Requirements**: PANEL-01, PANEL-02, PANEL-03, PANEL-04, PANEL-07
 **Success Criteria** (what must be TRUE):
+
   1. A collapsible right-side panel (~30% width) appears next to chat, togglable via button and keyboard shortcut -- on mobile (<768px) it renders as a bottom-sheet overlay instead
   2. Todos section renders the live todo list with status indicators (pending, in-progress, completed) and updates in real-time as the agent calls `write_todos` -- no page refresh needed
   3. Workspace file browser lists all thread files with click-to-preview for text, markdown, and code files -- previews reuse existing MarkdownRenderer and syntax highlighting
   4. Pending user input section renders `ask_user` prompts with optional choice buttons and free-text field -- submitting a response resumes the agent within the same panel view
   5. Diff viewer renders pre-computed version deltas with syntax highlighting -- user can select any two versions of a file to compare
+
 **Plans**: TBD
 **UI hint**: yes
 **Research flag**: G-2 MANDATORY -- sketch-before-plan. Panel layout, responsive breakpoints (375px, 768px, 1024px, 1440px), bottom-sheet mobile behavior must have operator-approved mockup before planning begins.
 
 Plans:
+
 - [ ] 087-01: TBD
 - [ ] 087-02: TBD
 
 ### Phase 088: Cross-Cutting Verification + Accessibility
+
 **Goal**: All new v2.7 capabilities are verified across providers, and all panel surfaces meet accessibility standards
 **Depends on**: Phase 087 (all features must be built before cross-cutting verification)
 **Requirements**: A11Y-01, A11Y-02
 **Success Criteria** (what must be TRUE):
+
   1. 4-axis UAT matrix complete: all new SSE event types verified across OpenAI, Anthropic, Google, and OpenRouter with multi-tool, parallel-thread, and long-message scenarios (SC#10 MANDATORY)
   2. All panel surfaces pass WCAG 2.1 AA -- keyboard navigation through todos, file browser, and ask_user prompt; ARIA labels on all interactive elements; minimum 4.5:1 contrast ratio; visible focus indicators
   3. File browser and todo list are fully navigable via keyboard alone -- Tab/Shift-Tab moves focus, Enter/Space activates items, Escape closes previews, no mouse-only interaction paths
   4. E2E workspace flow verified: agent writes file, user sees it in panel, agent updates file, user views diff, agent asks user a question, user responds, agent resumes -- all without page refresh, across at least 2 providers
+
 **Plans**: TBD
 
 Plans:
+
 - [ ] 088-01: TBD
 - [ ] 088-02: TBD
 
