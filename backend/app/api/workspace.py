@@ -1,0 +1,294 @@
+"""REST API endpoints for workspace file management (Phase 084, D-08).
+
+Cold-path reads for the panel UI (Phase 087) and dev testing via curl.
+All queries go through supabase-py with RLS enforcement (FK-chain policies
+on workspace_files ensure users can only access files in their own threads).
+"""
+from __future__ import annotations
+
+import base64
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from starlette.concurrency import run_in_threadpool
+from supabase import Client
+
+from app.dependencies import get_current_user, get_supabase
+from app.utils.db import aexec
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/threads/{thread_id}/workspace",
+    tags=["workspace"],
+)
+
+
+async def _verify_thread_ownership(
+    thread_id: str,
+    current_user: dict,
+    supabase: Client,
+) -> None:
+    """Verify the authenticated user owns this thread. Raises 404 on failure.
+
+    Uses 404 not 403 to prevent existence-leak (D-062-12 convention).
+    """
+    resp = await aexec(
+        supabase.table("threads")
+        .select("id")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = resp.data if resp is not None else None
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Thread not found",
+        )
+
+
+def _decode_inline_content(value) -> str:
+    """Decode the bytea content_inline field returned by supabase-py.
+
+    supabase-py returns bytea columns as base64-encoded strings (or bytes already).
+    Returns '' if decoding fails.
+    """
+    if value is None:
+        return ""
+    try:
+        if isinstance(value, (bytes, bytearray)):
+            return bytes(value).decode("utf-8", errors="replace")
+        if isinstance(value, str):
+            return base64.b64decode(value).decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+    return ""
+
+
+@router.get("/files")
+async def list_workspace_files(
+    thread_id: str,
+    prefix: str | None = Query(None, description="Path prefix filter"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """List workspace files for a thread (D-08, WS-03).
+
+    RLS ensures only the thread owner can see files. Returns metadata list
+    sorted by path. Optional prefix filter narrows results.
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+
+    query = (
+        supabase.table("workspace_files")
+        .select("id, path, size_bytes, mime_type, created_at, updated_at")
+        .eq("thread_id", thread_id)
+        .order("path")
+    )
+    if prefix:
+        query = query.like("path", f"{prefix}%")
+    resp = await aexec(query)
+    return resp.data or []
+
+
+@router.get("/files/{file_id}/content")
+async def get_workspace_file_content(
+    thread_id: str,
+    file_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Get workspace file content (D-08).
+
+    For inline files: returns content directly as JSON with text field.
+    For bucket files: returns a signed URL (60s TTL) for download.
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+
+    resp = await aexec(
+        supabase.table("workspace_files")
+        .select("id, path, size_bytes, mime_type, content_inline, content_storage_path")
+        .eq("id", file_id)
+        .eq("thread_id", thread_id)
+        .maybe_single()
+    )
+    row = resp.data if resp is not None else None
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    if row.get("content_inline") is not None:
+        content_text = _decode_inline_content(row["content_inline"])
+        return {
+            "id": row["id"],
+            "path": row["path"],
+            "size_bytes": row["size_bytes"],
+            "mime_type": row["mime_type"],
+            "storage_type": "inline",
+            "content": content_text,
+        }
+
+    storage_path = row.get("content_storage_path")
+    if not storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File content not available",
+        )
+
+    try:
+        signed = await run_in_threadpool(
+            supabase.storage.from_("workspace-files").create_signed_url,
+            storage_path,
+            60,
+        )
+        url = None
+        if isinstance(signed, dict):
+            url = (
+                signed.get("signedURL")
+                or signed.get("signed_url")
+                or signed.get("signedUrl")
+            )
+            if not url and isinstance(signed.get("data"), dict):
+                url = signed["data"].get("signedUrl")
+    except Exception as e:
+        logger.error(f"Failed to create signed URL for workspace file: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate download URL",
+        )
+
+    return {
+        "id": row["id"],
+        "path": row["path"],
+        "size_bytes": row["size_bytes"],
+        "mime_type": row["mime_type"],
+        "storage_type": "bucket",
+        "signed_url": url,
+    }
+
+
+@router.get("/files/{file_id}/versions")
+async def list_workspace_file_versions(
+    thread_id: str,
+    file_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """List all versions of a workspace file (D-08, WS-04).
+
+    Returns version metadata sorted by version descending (newest first).
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+
+    file_resp = await aexec(
+        supabase.table("workspace_files")
+        .select("id")
+        .eq("id", file_id)
+        .eq("thread_id", thread_id)
+        .maybe_single()
+    )
+    file_row = file_resp.data if file_resp is not None else None
+    if not file_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    resp = await aexec(
+        supabase.table("workspace_file_versions")
+        .select("id, version, size_bytes, created_at")
+        .eq("workspace_file_id", file_id)
+        .order("version", desc=True)
+    )
+    return resp.data or []
+
+
+@router.get("/files/{file_id}/diff")
+async def get_workspace_file_diff(
+    thread_id: str,
+    file_id: str,
+    from_version: int = Query(..., alias="from", description="Version to diff from"),
+    to_version: int = Query(..., alias="to", description="Version to diff to"),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Get diff between two versions of a workspace file (D-08, WS-04).
+
+    Returns structured unified diff. For sequential versions, uses the
+    pre-computed delta_from_prev when available.
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+
+    file_resp = await aexec(
+        supabase.table("workspace_files")
+        .select("id, path, thread_id")
+        .eq("id", file_id)
+        .eq("thread_id", thread_id)
+        .maybe_single()
+    )
+    file_row = file_resp.data if file_resp is not None else None
+    if not file_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found",
+        )
+
+    if to_version == from_version + 1:
+        ver_resp = await aexec(
+            supabase.table("workspace_file_versions")
+            .select("delta_from_prev")
+            .eq("workspace_file_id", file_id)
+            .eq("version", to_version)
+            .maybe_single()
+        )
+        ver_row = ver_resp.data if ver_resp is not None else None
+        if ver_row and ver_row.get("delta_from_prev"):
+            delta = ver_row["delta_from_prev"]
+            return {
+                "path": file_row["path"],
+                "from_version": from_version,
+                "to_version": to_version,
+                "delta": delta,
+                "stats": delta.get("stats", {}),
+            }
+
+    from_resp = await aexec(
+        supabase.table("workspace_file_versions")
+        .select("content_inline, content_storage_path")
+        .eq("workspace_file_id", file_id)
+        .eq("version", from_version)
+        .maybe_single()
+    )
+    to_resp = await aexec(
+        supabase.table("workspace_file_versions")
+        .select("content_inline, content_storage_path")
+        .eq("workspace_file_id", file_id)
+        .eq("version", to_version)
+        .maybe_single()
+    )
+
+    from_row = from_resp.data if from_resp is not None else None
+    to_row = to_resp.data if to_resp is not None else None
+
+    if not from_row or not to_row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Version {from_version if not from_row else to_version} not found",
+        )
+
+    from app.services.workspace_service import compute_diff
+
+    old_text = _decode_inline_content(from_row.get("content_inline"))
+    new_text = _decode_inline_content(to_row.get("content_inline"))
+    delta = compute_diff(old_text, new_text, f"v{from_version}", f"v{to_version}")
+
+    return {
+        "path": file_row["path"],
+        "from_version": from_version,
+        "to_version": to_version,
+        "delta": delta,
+        "stats": delta["stats"],
+    }
