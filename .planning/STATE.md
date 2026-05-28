@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: executing
+status: ready_to_plan
 stopped_at: Phase 085 context gathered
 last_updated: "2026-05-28T11:38:18.470Z"
 last_activity: 2026-05-28 -- Phase 085 execution started
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
   completed_plans: 8
-  percent: 67
+  percent: 50
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 085 (new-llm-tools) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 085
-Last activity: 2026-05-28 -- Phase 085 execution started
+Phase: 086
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-05-28
 
 Progress: [██████████] 100%
 
@@ -36,7 +36,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 15 (v2.7)
+- Total plans completed: 20 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -46,6 +46,7 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 083 | 3 | - | - |
 | 084 | 5 | - | - |
+| 085 | 5 | - | - |
 
 **Recent Trend:**
 

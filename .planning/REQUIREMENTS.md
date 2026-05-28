@@ -23,10 +23,10 @@
 
 ### New LLM Tools
 
-- [ ] **TOOL-01**: `write_todos` tool persists a todo list per thread; emits SSE event on update; panel renders the change without re-fetch
-- [ ] **TOOL-02**: `task` tool spawns a sub-agent with constrained tool list, single-level nesting cap, and configurable concurrency limits (per-run and global)
-- [ ] **TOOL-03**: `ask_user` tool pauses the agent loop, emits a prompt via SSE, user responds via the panel, and the agent resumes with the response in tool_result
-- [ ] **TOOL-04**: `ask_user` operates safely across multiple workers (cross-worker coordination) with configurable timeout and graceful expiry when the user doesn't respond
+- [x] **TOOL-01**: `write_todos` tool persists a todo list per thread; emits SSE event on update; panel renders the change without re-fetch
+- [x] **TOOL-02**: `task` tool spawns a sub-agent with constrained tool list, single-level nesting cap, and configurable concurrency limits (per-run and global)
+- [x] **TOOL-03**: `ask_user` tool pauses the agent loop, emits a prompt via SSE, user responds via the panel, and the agent resumes with the response in tool_result
+- [x] **TOOL-04**: `ask_user` operates safely across multiple workers (cross-worker coordination) with configurable timeout and graceful expiry when the user doesn't respond
 
 ### Panel UI
 
@@ -79,10 +79,10 @@
 | WS-05 | Phase 084 | Complete |
 | WS-06 | Phase 084 | Complete |
 | WS-07 | Phase 084 | Complete |
-| TOOL-01 | Phase 085 | Pending |
-| TOOL-02 | Phase 085 | Pending |
-| TOOL-03 | Phase 085 | Pending |
-| TOOL-04 | Phase 085 | Pending |
+| TOOL-01 | Phase 085 | Complete |
+| TOOL-02 | Phase 085 | Complete |
+| TOOL-03 | Phase 085 | Complete |
+| TOOL-04 | Phase 085 | Complete |
 | PANEL-01 | Phase 087 | Pending |
 | PANEL-02 | Phase 087 | Pending |
 | PANEL-03 | Phase 087 | Pending |
