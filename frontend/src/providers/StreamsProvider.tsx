@@ -103,6 +103,18 @@ const EMPTY_FILES: WorkspaceFile[] = []
 const EMPTY_ASKS: PendingAsk[] = []
 const EMPTY_TASKS: TaskRunIndexItem[] = []
 
+// WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
+// todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
+// all three watched refs are unchanged, so a reference change in bucketsBySurface
+// OR todosByThread OR tasksByThread fires the throttled write. PANEL-06 isolation
+// is preserved: these are the *persistence trigger* refs only — the chat MessageList
+// selectors still read bucketsBySurface exclusively and a panel-Map mutation never
+// touches the chat bucket reference (see test FC#1).
+const persistTriggerEqual = (
+  a: readonly [unknown, unknown, unknown],
+  b: readonly [unknown, unknown, unknown],
+): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2]
+
 /**
  * Phase 075.1 Plan 01: widened from the Phase 075 buffer_expired-only filter
  * (was `_isTransientBufferExpired`). A "transient stream end" is any SSE
@@ -1679,23 +1691,35 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       // meaningful to cache yet. The hydrate path at mount still works because
       // it reads the existing snapshot before any write fires.
       if (!streamingTid && !activeTid) return
-      writeSnapshotToLocalStorage(state.bucketsBySurface, Date.now(), (_surface, tid) =>
-        tid === streamingTid || tid === activeTid,
+      writeSnapshotToLocalStorage(
+        state.bucketsBySurface,
+        Date.now(),
+        (_surface, tid) => tid === streamingTid || tid === activeTid,
+        state.todosByThread,
+        state.tasksByThread,
       )
     }
     const throttledWrite = makeThrottle(writeNow, 500)
     throttledWriteRef.current = throttledWrite
-    // B-02 fix: selector-bound subscription — only fires when bucketsBySurface
-    // reference changes, NOT on every reconcileErrors / streamingThreads /
+    // B-02 fix: selector-bound subscription — only fires when one of the watched
+    // references changes, NOT on every reconcileErrors / streamingThreads /
     // subscriptionsByThread / loadingThreads / viewedThreadId / fallbackNotices
     // setState. Avoids wasted serialization on bookkeeping state.
     // (Plan 075.4-01 D-075.4-A1: comment updated for per-thread field names.)
+    // WR-04 fix (260529-0sc): the trigger set now includes todosByThread +
+    // tasksByThread so panel-Map mutations also fire the throttled persist (the
+    // write-path that hydrates readTodosSyncOrEmpty/readTasksSyncOrEmpty on F5).
+    // PANEL-06 chat-isolation is unaffected: these Maps are part of the *write
+    // trigger* only — the chat MessageList selectors still read bucketsBySurface
+    // exclusively, and a panel-Map mutation never changes the chat bucket ref.
     // Requires `subscribeWithSelector` middleware in the store factory.
     const unsubscribe = useStreamsStore.subscribe(
-      (state) => state.bucketsBySurface,
+      (state) =>
+        [state.bucketsBySurface, state.todosByThread, state.tasksByThread] as const,
       () => {
         throttledWrite(useStreamsStore.getState())
       },
+      { equalityFn: persistTriggerEqual },
     )
     return () => {
       throttledWrite.flush()
