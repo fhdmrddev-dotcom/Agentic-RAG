@@ -49,3 +49,43 @@ _None — all three sketches included._
 ## Skill Output
 
 The validated decisions are packaged at `./.claude/skills/sketch-findings-agentic-rag/` with two reference files (`live-run-container.md`, `tool-call-panel.md`), the winning theme file, and all three sketches' source HTML preserved. The skill auto-loads when any chat-surface component is being built or refactored.
+
+---
+
+# Session 2 — Workspace Panel (Phase 087)
+
+**Date:** 2026-05-29
+**Sketches processed:** 4 (004–007 — all included)
+**Design areas:** Panel Shell & Navigation · File Browser & Diff Viewer · Pending Question (ask_user) · Chat ↔ Panel Seam
+**Skill output:** appended to `./.claude/skills/sketch-findings-agentic-rag/` (now 6 reference files across both design areas)
+
+## Included Sketches
+
+| # | Name | Winner | Design Area / Reference |
+|---|------|--------|-------------------------|
+| 004 | panel-shell | B — Stacked accordion | Panel Shell & Navigation → `references/panel-shell.md` |
+| 005 | file-and-diff | A — Full-replace drill-in + in-column unified diff (C folded in) | File Browser & Diff Viewer → `references/file-browser-and-diff.md` |
+| 006 | pending-question | C — Dual-surface (calm pin + chat cue) | Pending Question → `references/pending-question.md` |
+| 007 | chat-panel-seam | C — Live-pointer / reload-resolved | Chat ↔ Panel Seam → `references/chat-panel-seam.md` |
+
+## Excluded Sketches
+
+_None — all four panel sketches included in full._
+
+## Design Direction
+
+**Calm instrument, extended to a second column.** The workspace panel makes the agent's work visible and interactive without breaking the restraint of the live-execution surface. It pushes/splits the chat rather than overlaying it; it stays quiet and empty in the common case; it gets structurally loud only when the agent is actually blocked on the human. Same Aether Deep Midnight tokens, same motion vocabulary, same color language (amber = needs-you/paused, green = done/answered/added, red = removed/base, primary = live/pointer).
+
+## Key Decisions
+
+1. **Panel shell = push/split, stacked accordion.** Three-column CSS grid (`52px` nav · `1fr` chat · `30%` panel), animated; never an overlay. Four collapsible sections (Todos · Files · Pending-Q · Versions) in one scroll; pending `ask_user` pins sticky at top. Empty panel short-circuits to one calm state (no empty-section tax). Collapse → rail with count badges, or fully away; mobile (<768px) → bottom-sheet. Toggle `⌘.`/`Ctrl+.`. *(Sketch 004 winner B)*
+
+2. **Files & diff = full-replace drill-in + in-column unified diff.** Tap a file → full-height preview (reuse MarkdownRenderer + syntax highlight; mandatory graceful too-large/no-preview fallback); `‹ Files` back. Versions → in-column unified `+/−` diff; opt-in `⤢` wide overlay for gnarly diffs, never auto-widen. Red-base / green-target version picker. *(Sketch 005 winner A, C folded in)*
+
+3. **ask_user = dual-surface, calm-loud.** Calm pinned card in the panel (choice chips + always-present free-text) + a pointer cue in the chat run-card. The block is made unmissable structurally — paused amber run-card, locked composer, pulsing toggle dot — not by hijacking the screen. Submit resumes in place; graceful timeout, never a silent hang. *(Sketch 006 winner C)*
+
+4. **Chat↔panel seam = panel-now / chat-happened.** Panel reconciles to current state on reload (no history replay); chat is the durable record. Live → quiet one-line pointers for the 3 panel-owned tools; reload → transcript resolves to self-contained cards — **answered Q&A renders, closing the documented `ask_user` reload gap** — files→chips, todos→final note. Single source of truth. *(Sketch 007 winner C)*
+
+## Downstream
+
+These findings are the design substrate for **Phase 087 (Panel UI)** — the G-2 sketch acceptance bar is met. Next on the 087 path: `/gsd:ui-phase 087` (turns these into the UI-SPEC design contract), then `/gsd:discuss-phase 087`, then `/gsd:plan-phase 087`. The skill now auto-loads during build for panel and chat-surface work.

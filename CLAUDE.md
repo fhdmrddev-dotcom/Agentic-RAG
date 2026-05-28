@@ -121,7 +121,7 @@ When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files
 
 ## Project skills
 
-- **Sketch findings for Agentic RAG** (design decisions, CSS patterns, visual direction for the live-execution UX — run-card frame, tool-call panel shape, long-run composition) → `Skill("sketch-findings-agentic-rag")`. Auto-load when building or refactoring ToolCallPanel, StreamsProvider, MessageItem, useMessages, or any chat-surface component touching the agent's mid-execution moment.
+- **Sketch findings for Agentic RAG** (design decisions, CSS patterns, visual direction for the live-execution UX — run-card frame, tool-call panel shape, long-run composition — AND the Phase 087 workspace panel — panel shell/collapse/mobile, file+diff viewer, ask_user interrupt, chat↔panel seam) → `Skill("sketch-findings-agentic-rag")`. Auto-load when building or refactoring ToolCallPanel, StreamsProvider, MessageItem, useMessages, the workspace panel, or any chat-surface component touching the agent's mid-execution moment.
 
 ## graphify
 

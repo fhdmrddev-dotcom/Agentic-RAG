@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 004 — Panel Shell</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────── App split frame ───────────────────────── */
+.app {
+  display: grid;
+  grid-template-columns: 52px 1fr var(--panel-w, 30%);
+  height: 100vh;
+  overflow: hidden;
+  transition: grid-template-columns var(--dur-slow) var(--ease-out);
+}
+.app.panel-collapsed { --panel-w: 0px; }
+.app.panel-rail      { --panel-w: 48px; }
+
+/* nav rail (left) */
+.nav-rail {
+  background: var(--color-bg-elev1);
+  border-right: 1px solid var(--color-border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--space-3) 0; gap: var(--space-2);
+}
+.nav-rail .logo {
+  width: 30px; height: 30px; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+  display: grid; place-items: center; font-weight: 800; color: #fff; font-size: 15px;
+  margin-bottom: var(--space-3);
+}
+.nav-rail .nav-ico {
+  width: 34px; height: 34px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; color: var(--color-text-dim);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+}
+.nav-rail .nav-ico:hover { background: var(--color-accent); color: var(--color-text); }
+.nav-rail .nav-ico.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+/* chat column (middle) */
+.chat { display: flex; flex-direction: column; min-width: 0; background: var(--color-bg); }
+.chat-head {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: hsl(220 40% 5% / 0.6);
+}
+.chat-head .title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.model-pill {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted);
+  background: var(--color-muted); border: 1px solid var(--color-border);
+  padding: 3px 8px; border-radius: var(--radius-full); white-space: nowrap;
+}
+.panel-toggle {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--color-muted); border: 1px solid var(--color-border);
+  color: var(--color-text-muted); padding: 6px 10px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: var(--text-xs); font-family: var(--font-mono);
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.panel-toggle:hover { color: var(--color-text); border-color: var(--color-primary-glow); }
+.panel-toggle .kbd { opacity: 0.6; border: 1px solid var(--color-border); border-radius: 3px; padding: 0 4px; }
+.panel-toggle .dot {
+  position: absolute; top: -4px; right: -4px; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--color-warning);
+  box-shadow: 0 0 0 2px var(--color-bg); display: none;
+  animation: pulseGlow 1.6s ease-in-out infinite;
+}
+.app[data-state="live"] .panel-toggle .dot,
+.app.panel-collapsed[data-has-ask="1"] .panel-toggle .dot { display: block; }
+
+.chat-scroll { flex: 1; overflow-y: auto; padding: var(--space-5) var(--space-5) var(--space-4); }
+.chat-scroll { display: flex; flex-direction: column; gap: var(--space-5); }
+.msg { display: flex; gap: var(--space-3); max-width: 760px; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+.msg .avatar { flex: none; width: 28px; height: 28px; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 13px; }
+.msg.user .avatar { background: var(--color-accent); }
+.msg.bot .avatar { background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+.msg .body { font-size: var(--text-base); color: var(--color-text); }
+.msg .body .who { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: 2px; font-family: var(--font-mono); }
+
+/* run-card (established design language) */
+.run-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; max-width: 760px; }
+.run-card.active { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+.run-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.run-head .bot { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); }
+.app[data-state="live"] .run-head .bot { animation: brandPulse 1.5s ease-in-out infinite; }
+.run-head .lbl { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+.run-head .timer { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-primary); }
+.run-head .counter { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+.run-body { padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: 6px; }
+.run-step { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); color: var(--color-text-muted); font-family: var(--font-mono); }
+.run-step .ico { width: 16px; text-align: center; }
+.run-step.done { color: var(--color-text-dim); }
+.run-step.active { color: var(--color-text); }
+.run-card .progress-bar { margin: 0; }
+.app:not([data-state="live"]) .run-card.active { border-color: var(--color-border); box-shadow: none; }
+.app:not([data-state="live"]) .run-card.active .progress-bar { display: none; }
+
+.composer { border-top: 1px solid var(--color-border-soft); padding: var(--space-3) var(--space-5); }
+.composer .box { display: flex; align-items: center; gap: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); color: var(--color-text-dim); font-size: var(--text-sm); }
+.composer .send { margin-left: auto; background: var(--color-primary-dim); color: var(--color-primary); border-radius: var(--radius-sm); padding: 4px 10px; font-size: var(--text-xs); }
+
+/* ───────────────────────── Panel (right) ───────────────────────── */
+.panel { background: var(--color-bg-elev1); border-left: 1px solid var(--color-border); display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.app.panel-collapsed .panel { opacity: 0; pointer-events: none; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.panel-head .ptitle { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .pclose { margin-left: auto; color: var(--color-text-dim); cursor: pointer; background: none; border: none; font-size: 16px; }
+.panel-head .pclose:hover { color: var(--color-text); }
+
+/* rail (collapsed-but-present) */
+.rail { display: none; flex-direction: column; align-items: center; padding: var(--space-3) 0; gap: var(--space-3); height: 100%; }
+.app.panel-rail .panel { opacity: 1; pointer-events: auto; }
+.app.panel-rail .panel-inner { display: none; }
+.app.panel-rail .rail { display: flex; }
+.rail .rail-ico { position: relative; width: 30px; height: 30px; border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--color-text-dim); cursor: pointer; }
+.rail .rail-ico:hover { background: var(--color-accent); color: var(--color-text); }
+.rail .rail-ico .badge { position: absolute; top: -2px; right: -2px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: var(--color-primary); color: #06061a; font-size: 9px; font-weight: 700; display: grid; place-items: center; font-family: var(--font-mono); }
+.rail .rail-ico .badge.warn { background: var(--color-warning); }
+
+.panel-inner { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* section primitives (shared by all variants) */
+.sec-head { display: flex; align-items: center; gap: 8px; padding: var(--space-3) var(--space-4); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); cursor: pointer; user-select: none; }
+.sec-head .chev { transition: transform var(--dur-fast) var(--ease-out); font-size: 10px; }
+.sec-head.collapsed .chev { transform: rotate(-90deg); }
+.sec-head .count { margin-left: auto; font-family: var(--font-mono); color: var(--color-text-muted); text-transform: none; }
+.sec-head .count.warn { color: var(--color-warning); }
+.sec-body { padding: 0 var(--space-3) var(--space-3); display: flex; flex-direction: column; gap: 6px; }
+.sec-head.collapsed + .sec-body { display: none; }
+
+.todo { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: var(--radius-sm); font-size: var(--text-sm); background: var(--color-surface); border: 1px solid var(--color-border-soft); }
+.todo .tick { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--color-text-dim); flex: none; display: grid; place-items: center; font-size: 10px; }
+.todo.done { color: var(--color-text-dim); }
+.todo.done .tick { background: var(--color-success); border-color: var(--color-success); color: #06061a; }
+.todo.done .label { text-decoration: line-through; }
+.todo.doing .tick { border-color: var(--color-primary); border-right-color: transparent; animation: spin 0.9s linear infinite; }
+.todo.doing { border-color: var(--color-primary-glow); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.todo .label { flex: 1; min-width: 0; }
+
+.file { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer; transition: background var(--dur-fast); }
+.file:hover { background: var(--color-accent); }
+.file .fico { color: var(--color-text-dim); }
+.file .fname { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file .meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+.file.flash { animation: fileFlash 1.4s var(--ease-out); }
+@keyframes fileFlash { 0% { background: var(--color-success-dim); } 100% { background: transparent; } }
+
+.ask-card { background: var(--color-warning-dim); border: 1px solid var(--color-warning); border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.ask-card .qlbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-warning); font-family: var(--font-mono); display: flex; align-items: center; gap: 6px; }
+.ask-card .qlbl .pip { width: 6px; height: 6px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.4s ease-in-out infinite; }
+.ask-card .qtext { font-size: var(--text-sm); color: var(--color-text); }
+.ask-card .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.ask-card .opt { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 5px 10px; font-size: var(--text-xs); cursor: pointer; transition: all var(--dur-fast); }
+.ask-card .opt:hover { border-color: var(--color-warning); color: var(--color-warning); }
+
+/* empty / loading / error states */
+.empty { text-align: center; color: var(--color-text-dim); font-size: var(--text-xs); padding: var(--space-4) var(--space-3); line-height: 1.5; }
+.skel { height: 30px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-muted) 50%, var(--color-surface) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.errrow { font-size: var(--text-xs); color: var(--color-danger); background: var(--color-danger-dim); border: 1px solid var(--color-danger); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; align-items: center; gap: 8px; }
+.errrow .retry { margin-left: auto; color: var(--color-text); border: 1px solid var(--color-border); border-radius: 4px; padding: 2px 8px; cursor: pointer; background: var(--color-surface); }
+
+/* empty whole-panel state */
+.panel-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-6); text-align: center; color: var(--color-text-dim); }
+.panel-empty .big { font-size: 26px; opacity: 0.5; }
+.panel-empty .hint { font-size: var(--text-xs); line-height: 1.6; max-width: 220px; }
+
+/* ── Variant A: tabs ── */
+.tabs { display: flex; gap: 2px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-soft); }
+.tabs .tab { position: relative; flex: 1; text-align: center; padding: 7px 4px; font-size: var(--text-xs); border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer; transition: all var(--dur-fast); font-family: var(--font-mono); }
+.tabs .tab:hover { background: var(--color-accent); color: var(--color-text); }
+.tabs .tab.active { background: var(--color-primary-dim); color: var(--color-primary); }
+.tabs .tab .tb { position: absolute; top: 3px; right: 6px; min-width: 13px; height: 13px; border-radius: 7px; font-size: 8px; font-weight: 700; display: none; place-items: center; background: var(--color-primary); color: #06061a; }
+.tabs .tab .tb.warn { background: var(--color-warning); }
+.tab-pane { flex: 1; overflow-y: auto; }
+
+/* scrollable section host */
+.sections { flex: 1; overflow-y: auto; }
+
+/* ── Variant C: hybrid status rail ── */
+.statusrail { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.statusrail .chip { flex: 1; background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm); padding: 8px; text-align: center; cursor: pointer; transition: all var(--dur-fast); }
+.statusrail .chip:hover { border-color: var(--color-primary-glow); }
+.statusrail .chip.active { border-color: var(--color-primary); background: var(--color-primary-dim); }
+.statusrail .chip.alert { border-color: var(--color-warning); }
+.statusrail .chip .n { font-family: var(--font-mono); font-size: var(--text-md); color: var(--color-text); display: block; }
+.statusrail .chip .k { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-dim); }
+.statusrail .chip.alert .n { color: var(--color-warning); }
+.hybrid-detail { flex: 1; overflow-y: auto; padding-top: var(--space-2); }
+
+/* mobile bottom sheet (forced via viewport button) */
+.app.mobile { grid-template-columns: 1fr; position: relative; }
+.app.mobile .nav-rail { display: none; }
+.app.mobile .panel {
+  position: absolute; left: 0; right: 0; bottom: 0; top: auto;
+  height: 70vh; border-left: none; border-top: 1px solid var(--color-border);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0; box-shadow: var(--shadow-lg);
+  z-index: 50; transform: translateY(0); transition: transform var(--dur-slow) var(--ease-out);
+}
+.app.mobile.panel-collapsed .panel, .app.mobile.panel-rail .panel { transform: translateY(100%); opacity: 1; pointer-events: none; }
+.app.mobile.panel-rail .rail { display: none; }
+.app.mobile .sheet-grip { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--color-text-dim); margin: 8px auto 0; }
+.sheet-grip { display: none; }
+
+/* viewport framing */
+.vp-frame { display: contents; }
+body.vp-tablet .app, body.vp-phone .app { margin: 0 auto; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+body.vp-tablet .app { max-width: 768px; }
+body.vp-phone .app { max-width: 390px; }
+
+/* state cycler strip */
+.state-strip { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: hsl(220 40% 5% / 0.92); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 200; backdrop-filter: blur(14px); }
+.state-strip .lbl { font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }
+.state-strip .sbtn { background: transparent; color: var(--color-text-muted); border: 1px solid transparent; border-radius: var(--radius-sm); padding: 5px 10px; font-size: var(--text-xs); cursor: pointer; font-family: var(--font-mono); }
+.state-strip .sbtn:hover { background: var(--color-accent); color: var(--color-text); }
+.state-strip .sbtn.active { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+.state-strip .vpbtns { margin-left: auto; display: flex; gap: 4px; }
+.state-note { padding: 6px 16px; font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface); border-bottom: 1px solid var(--color-border-soft); font-style: italic; }
+.frame { height: calc(100vh - 88px); }
+</style>
+</head>
+<body>
+
+<!-- variant nav -->
+<div class="variant-nav">
+  <span class="label">Sketch 004 · Panel Shell</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Tabs</button>
+  <button class="variant-tab active" onclick="showVariant('b', event)">B: Stacked <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Hybrid Rail</button>
+</div>
+
+<!-- state cycler -->
+<div class="state-strip">
+  <span class="lbl">State</span>
+  <button class="sbtn" data-s="empty" onclick="setState('empty', event)">Empty</button>
+  <button class="sbtn" data-s="loading" onclick="setState('loading', event)">Loading</button>
+  <button class="sbtn" data-s="error" onclick="setState('error', event)">Error</button>
+  <button class="sbtn active" data-s="populated" onclick="setState('populated', event)">Populated</button>
+  <button class="sbtn" data-s="live" onclick="setState('live', event)">● Live composite</button>
+  <span class="vpbtns">
+    <button class="sbtn" onclick="setVp('full', event)">Desktop</button>
+    <button class="sbtn" onclick="setVp('tablet', event)">768</button>
+    <button class="sbtn" onclick="setVp('phone', event)">390</button>
+  </span>
+</div>
+<div class="state-note" id="state-note"></div>
+
+<div class="frame">
+  <div class="app" id="app" data-state="populated" data-has-ask="0">
+    <!-- nav rail -->
+    <div class="nav-rail">
+      <div class="logo">Æ</div>
+      <div class="nav-ico active" title="Chat">💬</div>
+      <div class="nav-ico" title="Library">📚</div>
+      <div class="nav-ico" title="Skills">✦</div>
+      <div class="nav-ico" title="Settings" style="margin-top:auto">⚙</div>
+    </div>
+
+    <!-- chat -->
+    <div class="chat">
+      <div class="chat-head">
+        <span class="title">Q3 revenue analysis — YoY breakdown</span>
+        <span class="model-pill">claude-opus-4-8</span>
+        <button class="panel-toggle" onclick="togglePanel()">
+          <span class="dot"></span>
+          Panel <span class="kbd">⌘.</span>
+        </button>
+      </div>
+      <div class="chat-scroll">
+        <div class="msg user">
+          <div class="avatar">🧑</div>
+          <div class="body"><div class="who">you</div>Pull Q3 numbers from the finance deck, compute YoY by segment, and save a summary I can share.</div>
+        </div>
+        <div class="msg bot">
+          <div class="avatar">Æ</div>
+          <div class="body" style="flex:1">
+            <div class="who">agent</div>
+            <div style="margin-bottom:10px">On it — reading the deck and breaking down each segment.</div>
+            <div class="run-card active" id="runcard">
+              <div class="run-head">
+                <span class="bot"></span>
+                <span class="lbl" id="run-lbl">Working · 3 tools</span>
+                <span class="counter" id="run-counter">3 steps</span>
+                <span class="timer" id="run-timer">0:34</span>
+              </div>
+              <div class="progress-bar"></div>
+              <div class="run-body">
+                <div class="run-step done"><span class="ico">✓</span> read_document · finance_q3.pdf <span style="margin-left:auto;color:var(--color-text-dim)">→ 48 pages</span></div>
+                <div class="run-step done"><span class="ico">✓</span> execute_code · compute YoY <span style="margin-left:auto;color:var(--color-text-dim)">→ yoy_q3 = 30.87%</span></div>
+                <div class="run-step active"><span class="ico">◆</span> workspace_write · summary.md <span style="margin-left:auto">writing…</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="box"><span id="composer-text">Reply to the agent…</span><span class="send">Send</span></div>
+      </div>
+    </div>
+
+    <!-- panel -->
+    <div class="panel" id="panel">
+      <!-- collapsed rail -->
+      <div class="rail">
+        <div class="rail-ico" title="Expand panel" onclick="expandPanel()">»</div>
+        <div class="rail-ico" title="Todos" onclick="expandPanel()"><span>☑</span><span class="badge" id="rail-todo">2/3</span></div>
+        <div class="rail-ico" title="Files" onclick="expandPanel()"><span>🗀</span><span class="badge" id="rail-file">4</span></div>
+        <div class="rail-ico" title="Pending question" onclick="expandPanel()"><span>?</span><span class="badge warn" id="rail-ask" style="display:none">1</span></div>
+      </div>
+
+      <div class="panel-inner" id="panel-inner">
+        <div class="panel-head">
+          <span class="sheet-grip"></span>
+          <span class="ptitle">Workspace</span>
+          <button class="pclose" onclick="collapsePanel()" title="Collapse (⌘.)">›</button>
+        </div>
+        <!-- variant content host -->
+        <div id="variant-host" style="flex:1;min-height:0;display:flex;flex-direction:column;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- sketch toolbar -->
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setState('live',event)">▶ Live</button>
+</div>
+
+<script>
+// ───────── shared data model ─────────
+const DATA = {
+  todos: [
+    { content: "Read finance_q3.pdf", status: "completed" },
+    { content: "Compute YoY by segment", status: "completed" },
+    { content: "Write shareable summary.md", status: "in-progress" },
+  ],
+  files: [
+    { path: "summary.md", size: "2.1 KB", v: 3, ico: "📄" },
+    { path: "yoy_by_segment.csv", size: "840 B", v: 1, ico: "▦" },
+    { path: "chart_q3.png", size: "61 KB", v: 1, ico: "🖼" },
+    { path: "notes.txt", size: "320 B", v: 2, ico: "🗒" },
+  ],
+  ask: { prompt: "summary.md already exists. Overwrite it or save as summary_v2.md?", options: ["Overwrite", "Save as v2", "Cancel"] },
+};
+
+let VARIANT = "b";
+let STATE = "populated";   // empty | loading | error | populated | live
+let VP = "full";
+
+const NOTES = {
+  empty:     "EMPTY — the common case. A plain Q&A chat with no workspace activity. Watch how each variant avoids stealing 30% for nothing (auto-rail).",
+  loading:   "LOADING — thread just switched; hooks are reconciling via fetch (isLoading=true). Skeletons, not a blank panel.",
+  error:     "ERROR — a hook's fetch failed (error≠null). Per-section error rows with retry; the rest of the panel still works.",
+  populated: "POPULATED (resting) — work is done, agent idle. Can you scan todos/files at a glance without it feeling busy?",
+  live:      "LIVE COMPOSITE — 30s into a run: todo in-progress + a file just written (flash) + a question pending, chat narrowed beside it. THE stress test. Can you tell what to read?",
+};
+
+function hasAsk() { return STATE === "live"; }
+function isEmpty() { return STATE === "empty"; }
+
+// ───────── renderers ─────────
+function todoRows() {
+  if (STATE === "loading") return `<div class="skel"></div><div class="skel"></div><div class="skel"></div>`;
+  if (STATE === "error") return `<div class="errrow">⚠ Couldn't load todos <button class="retry" onclick="setState('populated',event)">Retry</button></div>`;
+  if (isEmpty()) return `<div class="empty">No todos yet.<br>They appear when the agent plans multi-step work.</div>`;
+  return DATA.todos.map((t,i) => {
+    const doing = STATE === "live" && t.status === "in-progress";
+    const cls = t.status === "completed" ? "done" : (doing ? "doing" : "");
+    const tick = t.status === "completed" ? "✓" : (doing ? "" : "");
+    return `<div class="todo ${cls}"><span class="tick">${tick}</span><span class="label">${t.content}</span></div>`;
+  }).join("");
+}
+function fileRows() {
+  if (STATE === "loading") return `<div class="skel"></div><div class="skel"></div>`;
+  if (STATE === "error") return `<div class="errrow">⚠ Couldn't load files <button class="retry" onclick="setState('populated',event)">Retry</button></div>`;
+  if (isEmpty()) return `<div class="empty">No files yet.<br>The agent's workspace is empty.</div>`;
+  return DATA.files.map((f,i) => {
+    const flash = (STATE === "live" && f.path === "summary.md") ? "flash" : "";
+    return `<div class="file ${flash}"><span class="fico">${f.ico}</span><span class="fname">${f.path}</span><span class="meta">v${f.v} · ${f.size}</span></div>`;
+  }).join("");
+}
+function askBlock() {
+  if (!hasAsk()) return "";
+  return `<div class="ask-card">
+    <div class="qlbl"><span class="pip"></span>Agent needs you</div>
+    <div class="qtext">${DATA.ask.prompt}</div>
+    <div class="opts">${DATA.ask.options.map(o=>`<span class="opt">${o}</span>`).join("")}</div>
+  </div>`;
+}
+
+const counts = () => ({
+  todoDone: DATA.todos.filter(t=>t.status==="completed").length,
+  todoTotal: DATA.todos.length,
+  files: DATA.files.length,
+  ask: hasAsk() ? 1 : 0,
+});
+
+function section(id, title, count, body, opts={}) {
+  const warn = opts.warn ? "warn" : "";
+  const collapsed = opts.collapsed ? "collapsed" : "";
+  const cnt = count === null ? "" : `<span class="count ${warn}">${count}</span>`;
+  return `<div class="sec">
+    <div class="sec-head ${collapsed}" onclick="this.classList.toggle('collapsed')"><span class="chev">▾</span>${title}${cnt}</div>
+    <div class="sec-body">${body}</div>
+  </div>`;
+}
+
+// whole-panel empty short-circuit (auto-rail decision shown as a banner choice)
+function panelEmptyState() {
+  return `<div class="panel-empty">
+    <div class="big">🗀</div>
+    <div class="hint"><b>Nothing here yet.</b><br>This panel fills in when the agent makes todos, writes files, or needs your input.</div>
+    <button class="sbtn active" style="font-family:var(--font-mono)" onclick="collapsePanel()">Collapse to rail ↦</button>
+  </div>`;
+}
+
+function renderVariant() {
+  const host = document.getElementById("variant-host");
+  const c = counts();
+
+  // EMPTY: every variant short-circuits to the same calm empty state (auto-rail rule)
+  if (isEmpty()) { host.innerHTML = panelEmptyState(); return; }
+
+  if (VARIANT === "a") {
+    // tabs
+    const tabs = [
+      { k: "todos", lbl: "Todos", b: c.todoDone+"/"+c.todoTotal },
+      { k: "files", lbl: "Files", b: c.files },
+      { k: "ask", lbl: "Ask", b: c.ask, warn: true },
+    ];
+    const active = (hasAsk() ? "ask" : (window._tabA || "todos"));
+    window._tabA = active;
+    const bar = `<div class="tabs">${tabs.map(t=>{
+      const badge = t.b ? `<span class="tb ${t.warn?'warn':''}" style="display:grid">${t.b}</span>` : "";
+      return `<div class="tab ${active===t.k?'active':''}" onclick="window._tabA='${t.k}';renderVariant()">${t.lbl}${badge}</div>`;
+    }).join("")}</div>`;
+    let pane = "";
+    if (active === "todos") pane = `<div class="sec-body" style="padding-top:12px">${todoRows()}</div>`;
+    if (active === "files") pane = `<div class="sec-body" style="padding-top:12px">${fileRows()}</div>`;
+    if (active === "ask") pane = `<div class="sec-body" style="padding-top:12px">${hasAsk()?askBlock():'<div class="empty">No pending questions.</div>'}</div>`;
+    host.innerHTML = bar + `<div class="tab-pane">${pane}</div>`;
+  }
+
+  if (VARIANT === "b") {
+    // stacked accordion — everything in one scroll
+    const ask = hasAsk() ? section("ask", "⚠ PENDING QUESTION", "1", askBlock(), {warn:true}) : "";
+    const sections = ask
+      + section("todos", "TODOS", c.todoDone+"/"+c.todoTotal, todoRows())
+      + section("files", "FILES", c.files, fileRows())
+      + section("versions", "VERSIONS", "summary.md · v3", `<div class="empty">Select two versions to compare (sketch 005).</div>`, {collapsed:true});
+    host.innerHTML = `<div class="sections">${sections}</div>`;
+  }
+
+  if (VARIANT === "c") {
+    // hybrid: always-visible status rail + one detail section
+    const active = hasAsk() ? "ask" : (window._chipC || "todos");
+    window._chipC = active;
+    const rail = `<div class="statusrail">
+      <div class="chip ${active==='todos'?'active':''}" onclick="window._chipC='todos';renderVariant()"><span class="n">${c.todoDone}/${c.todoTotal}</span><span class="k">Todos</span></div>
+      <div class="chip ${active==='files'?'active':''}" onclick="window._chipC='files';renderVariant()"><span class="n">${c.files}</span><span class="k">Files</span></div>
+      <div class="chip ${hasAsk()?'alert':''} ${active==='ask'?'active':''}" onclick="window._chipC='ask';renderVariant()"><span class="n">${c.ask}</span><span class="k">Ask</span></div>
+    </div>`;
+    let detail = "";
+    if (active === "todos") detail = `<div class="sec-body">${todoRows()}</div>`;
+    if (active === "files") detail = `<div class="sec-body">${fileRows()}</div>`;
+    if (active === "ask") detail = `<div class="sec-body">${hasAsk()?askBlock():'<div class="empty">No pending questions.</div>'}</div>`;
+    host.innerHTML = rail + `<div class="hybrid-detail">${detail}</div>`;
+  }
+
+  // sync rail badges + ask dot
+  const app = document.getElementById("app");
+  app.setAttribute("data-has-ask", hasAsk() ? "1" : "0");
+  document.getElementById("rail-todo").textContent = c.todoDone+"/"+c.todoTotal;
+  document.getElementById("rail-file").textContent = c.files;
+  document.getElementById("rail-ask").style.display = hasAsk() ? "grid" : "none";
+}
+
+// ───────── controls ─────────
+function showVariant(v, e) {
+  VARIANT = v;
+  document.querySelectorAll(".variant-nav .variant-tab").forEach(t=>t.classList.remove("active"));
+  e.target.classList.add("active");
+  renderVariant();
+}
+function setState(s, e) {
+  STATE = s;
+  document.querySelectorAll(".state-strip .sbtn[data-s]").forEach(b=>b.classList.toggle("active", b.dataset.s===s));
+  document.getElementById("app").setAttribute("data-state", s);
+  document.getElementById("state-note").textContent = NOTES[s];
+  // live composite forces the panel open (ask demands attention)
+  if (s === "live") expandPanel();
+  // empty -> the auto-rail decision: keep open but show empty state (user can collapse)
+  renderVariant();
+}
+function setVp(v, e) {
+  VP = v;
+  document.body.classList.remove("vp-tablet","vp-phone");
+  const app = document.getElementById("app");
+  app.classList.remove("mobile");
+  if (v === "tablet") { document.body.classList.add("vp-tablet"); }
+  if (v === "phone")  { document.body.classList.add("vp-phone"); app.classList.add("mobile"); }
+  document.querySelectorAll(".vpbtns .sbtn").forEach(b=>b.classList.remove("active"));
+  if (e) e.target.classList.add("active");
+}
+function togglePanel() {
+  const app = document.getElementById("app");
+  if (app.classList.contains("panel-collapsed") || app.classList.contains("panel-rail")) expandPanel();
+  else collapsePanel();
+}
+function collapsePanel() {
+  const app = document.getElementById("app");
+  // collapse to rail on desktop (keeps badges visible); full hide on mobile
+  if (app.classList.contains("mobile")) { app.classList.add("panel-collapsed"); app.classList.remove("panel-rail"); }
+  else { app.classList.add("panel-rail"); app.classList.remove("panel-collapsed"); }
+}
+function expandPanel() {
+  const app = document.getElementById("app");
+  app.classList.remove("panel-collapsed","panel-rail");
+}
+// keyboard shortcut ⌘. / Ctrl+.
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === ".") { e.preventDefault(); togglePanel(); }
+});
+
+// init
+setState("populated");
+renderVariant();
+</script>
+</body>
+</html>
