@@ -17,9 +17,9 @@ from app.services.tool_dispatcher import (
 )
 
 
-# All 23 tools registered after Phase 085 Plan 02
-# (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from Plan 02).
-# Plan 03 adds `ask_user` to reach the phase-end 24-tool gate.
+# All 24 tools registered after Phase 085 Plan 03 — phase-end gate.
+# (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
+# Plan 02 + ask_user from Plan 03 = 24.)
 EXPECTED_TOOLS = [
     "ls",
     "tree",
@@ -43,19 +43,20 @@ EXPECTED_TOOLS = [
     "workspace_list",
     "workspace_delete",
     "workspace_diff",
-    # Phase 085 Plan 01: write_todos; Plan 02: task (Plan 03 adds ask_user)
+    # Phase 085 Plan 01: write_todos; Plan 02: task; Plan 03: ask_user (phase-end 24)
     "write_todos",
     "task",
+    "ask_user",
 ]
 
 
-def test_registry_has_exactly_23_entries():
-    """_TOOL_REGISTRY must contain exactly 23 tool handlers after Phase 085 Plan 02.
+def test_registry_has_exactly_24_entries():
+    """_TOOL_REGISTRY must contain exactly 24 tool handlers after Phase 085 Plan 03.
 
     (16 base + 5 workspace from Phase 084 + write_todos from Plan 01 + task from
-    Plan 02). Plan 03 will raise this to 24.
+    Plan 02 + ask_user from Plan 03). Phase-end gate.
     """
-    assert len(_TOOL_REGISTRY) == 23
+    assert len(_TOOL_REGISTRY) == 24
 
 
 def test_registry_contains_all_expected_tools():
