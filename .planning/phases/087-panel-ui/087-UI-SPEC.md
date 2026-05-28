@@ -75,21 +75,25 @@ The sketch CSS uses `--color-*` / `--text-*` / `--space-*` names. These are sket
 
 ## Spacing Scale
 
-4px grid `[theme]` (`--space-1`..`--space-16`). Matches the 8-point system (4 is the base unit). Declared values used by panel surfaces:
+4px grid `[theme]` (`--space-1`..`--space-16`). Matches the 8-point system (4 is the base unit). **The declared spacing-token scale contains ONLY multiples of 4.** Values used by panel surfaces:
 
 | Token | Value | Usage in this phase |
 |-------|-------|---------------------|
 | space-1 | 4px | diff sign-gutter inner gap, file-row icon gap fine-tune |
-| space-2 | 8px | compact element gaps (chips, file rows, choice-chip stack), section-body row gap (`6px` exception below) |
+| space-2 | 8px | compact element gaps (chips, file rows, choice-chip stack), section-body row gap floor |
 | space-3 | 12px | section-head padding (`12px 16px`), card padding, ask-card internal gap |
 | space-4 | 16px | default section padding, panel-head padding |
 | space-6 | 24px | empty-state padding, rail vertical padding rhythm |
 | space-8 | 32px | major panel breaks |
 
-**Exceptions (declared, sketch-sourced):**
-- `6px` row gap inside `.sec-body` and choice-chip / version-pill stacks `[shell][ask][files]` — sub-grid micro-rhythm, intentional and below the 8px floor.
-- `.diff .sign { width: 16px }` fixed gutter `[files]` — load-bearing for diff legibility, not a spacing token.
-- Touch targets: file rows, choice chips, version pills, rail icons MUST be **≥ 44px** tall on mobile (<768px) even though visual padding is tighter on desktop — accessibility floor for Phase 088 (A11Y).
+**Layout widths (not spacing tokens):**
+- `.diff .sign { width: 16px }` fixed gutter `[files]` — load-bearing layout width for diff legibility, not part of the spacing-token scale.
+
+**Touch-target floor (accessibility, not a spacing token):**
+- File rows, choice chips, version pills, rail icons MUST be **≥ 44px** tall on mobile (<768px) even though visual padding is tighter on desktop — accessibility floor for Phase 088 (A11Y).
+
+> **Component-local implementation note (NOT part of the spacing-token scale):**
+> `micro-row-gap: gap: 0.375rem` (6px) — applied to the vertical list rhythm inside `.sec-body`, the choice-chip stack, and the version-pill stack only. This is a component-local list-density value, sketch-sourced `[shell]`/`[ask]`/`[files]` (the validated density we must preserve); it is intentionally below the 8px token floor and is deliberately kept **outside** the spacing-token contract. Do NOT add it to the scale and do NOT round it to 8px.
 
 ---
 
@@ -102,9 +106,9 @@ Sketch `--text-*` scale `[theme]` maps to rem sizes. The panel uses a tight 4-ro
 | Section label | 0.72rem (`text-xs`, ~11.5px) | 400, `uppercase`, `letter-spacing 0.07em` | 1.4 | Inter | `.sec-head`, `.qlbl`, `.sc-head`, version "Compare" label |
 | Body | 0.9rem (`text-base`, ~14.4px) | 400 | 1.5 | Inter | `.qtext` question text, empty-state, answered rows |
 | List / control | 0.82rem (`text-sm`, ~13px) | 400 (600 on selected) | 1.5 | Inter | file rows, choice chips, submit button label, todo text |
-| Mono / identifiers | 0.72rem (`text-xs`) | 400 (700 on rail badge) | 1.6 (diff) | JetBrains Mono | filenames, file meta, version pills, diff lines, count badges, pointers, countdown clock |
+| Mono / identifiers | 0.72rem (`text-xs`) | 400 (600 on rail badge) | 1.6 (diff) | JetBrains Mono | filenames, file meta, version pills, diff lines, count badges, pointers, countdown clock |
 
-**Weights: exactly two — 400 (regular) and 600 (semibold).** Rail count badge uses 700 `[shell]` — declared exception (single use, 9px mono badge). No other weights.
+**Weight contract: exactly two — 400 (regular) and 600 (semibold). No other weights anywhere in the panel, including the rail count badge (600 / `font-semibold`).**
 
 **Line heights:** body/controls 1.5; section labels 1.4 (tight uppercase); diff 1.6 (`.diff { line-height: 1.6 }` `[files]` — legibility of `+/−` lines); empty-state hint 1.6 `[shell]`.
 
@@ -169,7 +173,7 @@ New components (prefer NEW files over re-touching G-5 hot files `ToolCallPanel/M
 | Component | Responsibility | Consumes | Sketch |
 |-----------|----------------|----------|--------|
 | `WorkspacePanel` | Outer aside + grid-column state machine (open/rail/hidden/mobile-sheet), header, `⌘.` handler, empty short-circuit | `useViewingThread`, all panel hooks | `[shell]` |
-| `PanelRail` | 52px collapsed strip with count badges (+ amber warn badge) | counts from hooks | `[shell]` D4 |
+| `PanelRail` | 52px collapsed strip with count badges (+ amber warn badge); each rail icon button is a real `<button>` carrying an `aria-label` that includes its live count (see Accessibility Contract) | counts from hooks | `[shell]` D4 |
 | `PanelSection` | Generic collapsible `.sec-head`+`.sec-body` primitive (chevron, count, collapsed state) | — | `[shell]` D2 |
 | `TodosSection` | Live todo list, status indicators (pending/in-progress/completed), `checkPop` on complete | `useTodos` | PANEL-02 |
 | `FilesSection` | File list rows (icon, mono name, meta `size · vN`), `fileFlash` on fresh write, click → drill-in | `useWorkspaceFiles` | `[files]` D1/D2 |
@@ -192,7 +196,7 @@ New components (prefer NEW files over re-touching G-5 hot files `ToolCallPanel/M
 
 **Versions / Diff `[files]`:** pills default · `.a` red base/before · `.b` green target/after · `Compare v2↔v3` one-click latest-two default · `+N/−M` summary · in-column unified diff (sign gutter fixed 16px, `.diff` scrolls-x rather than wraps) · `⤢` opt-in overlay (panel never auto-widens).
 
-**Pending ask `[ask]`:** pending (amber, pip `dotBounce`, countdown clock) · submit disabled until pick-or-type (D3) · choice chips optional, free-text always present · answered (green `.answered`, records "You answered **X**", run un-pauses, composer unlocks — D4) · expired (calm grey `.expired`, "No response within 5:00 — agent stopped" — never a crash/hang — D5). Parallel asks stack.
+**Pending ask `[ask]`:** pending (amber, pip `dotBounce`, countdown clock) · `Send Answer` submit disabled until pick-or-type (D3) · choice chips optional, free-text always present · answered (green `.answered`, records "You answered **X**", run un-pauses, composer unlocks — D4) · expired (calm grey `.expired`, "No response within 5:00 — agent stopped" — never a crash/hang — D5). Parallel asks stack.
 
 **Chat seam `[seam]`:** live → quiet one-line pointer only (no full card — avoids tall-transcript fatigue) · reloaded → compact self-contained card (Q&A / file chip / todo note) · no raw-JSON leak ever · single source of truth (live state in panel, history in transcript — never the same data rendered richly in both).
 
@@ -219,13 +223,14 @@ Mobile bottom-sheet must never trap the user — grip dismisses back to chat; th
 |---------|----------|
 | Panel landmark | `<aside role="complementary" aria-label="Agent workspace">`; sections use `role="region"` + `aria-labelledby` on each `.sec-head` |
 | Accordion a11y | `.sec-head` is a `<button>` with `aria-expanded`; Enter/Space toggle; chevron decorative (`aria-hidden`) |
+| Rail icon buttons | In the collapsed 52px rail, EVERY icon button MUST be a real `<button>` carrying an `aria-label` that includes its live count: Todos → `aria-label="Todos — 2 of 3 done"`; Files → `aria-label="Files — 4"`; pending-Q → `aria-label="Pending question — needs your answer"`. The visual count/warn badge is **decorative** (`aria-hidden="true"`) because the `aria-label` already carries the count — the screen reader must never double-announce. Labels update live as counts change. |
 | File list | `role="listbox"`/`option` or arrow-key roving tabindex; Enter/Space opens preview; Tab/Shift-Tab traverses; **no mouse-only path** (A11Y-02) |
 | Preview | `Escape` closes drill-in back to list (mirror the `‹ Files` button); focus returns to the originating file row |
 | Version picker | pills keyboard-operable; selected base/target announced (not color-only — add text/aria, e.g. `aria-label="base version 2"` / `"target version 3"`) since red/green alone fails color-blind users |
 | Diff | container `role="region" aria-label="Diff v2 to v3"`; `+/−` conveyed via the sign-gutter text (not color alone) |
 | `⤢` overlay | shadcn `dialog` → focus trap + `Escape` close + focus restore on close (Radix gives this free) |
-| ask_user form | label associated with input; choice chips are real `<button role="radio">` in a `radiogroup`; submit `aria-disabled` until valid; on answer, move focus + announce "Answered, agent resumed" via `aria-live="polite"` |
-| Pending-Q signalling | the pending state must be conveyed non-visually — `aria-live="assertive"` region announces "Agent needs your input"; rail warn badge + toggle dot have text alternatives |
+| ask_user form | label associated with input; choice chips are real `<button role="radio">` in a `radiogroup`; submit (`Send Answer`) `aria-disabled` until valid; on answer, move focus + announce "Answered, agent resumed" via `aria-live="polite"` |
+| Pending-Q signalling | the pending state must be conveyed non-visually — `aria-live="assertive"` region announces "Agent needs your input"; rail warn badge + toggle dot have text alternatives (rail warn badge label per Rail icon buttons row above) |
 | Focus ring | visible focus indicator on ALL interactive elements (use `--ring` primary; never `outline:none` without replacement) |
 | Contrast | all text ≥ 4.5:1 (see Color section at-risk pairs) |
 | Motion | respect `prefers-reduced-motion` for `dotBounce`/`fileFlash`/`progressShimmer`/grid transition (Phase 088 will check) |
@@ -237,7 +242,7 @@ Mobile bottom-sheet must never trap the user — grip dismisses back to chat; th
 | Element | Copy | Source |
 |---------|------|--------|
 | Panel title | `Workspace` | `[shell]` |
-| Primary CTA (ask_user submit) | `Send` (disabled until pick-or-type) | `[ask]` |
+| Primary CTA (ask_user submit) | `Send Answer` (disabled until pick-or-type) | `[ask]` |
 | ask_user label | `Needs you` (with countdown `m:ss`) | `[ask]` |
 | ask_user free-text placeholder | `Type an answer…` | `[ask]` |
 | ask_user "or" divider | `or` (uppercase, between chips and free-text) | `[ask]` |
