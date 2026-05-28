@@ -1720,6 +1720,95 @@ export const useThreadMessages = (
     threadId ? state.bucketsBySurface.get(surfaceId)?.get(threadId) ?? EMPTY_ARRAY : EMPTY_ARRAY,
   )
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 086 Plan 02 (D-086-02 / D-086-09 / D-086-10 / PANEL-05 / PANEL-06) —
+// the 4 agent-panel hooks Phase 087 imports. Each is a thin wrapper: a null-safe
+// store selector (returns the matching module-level EMPTY constant on a Map miss
+// or null threadId, so `data` is NEVER undefined and the empty ref is stable for
+// PANEL-06) + usePanelReconcile for the thread-switch reconcile / isLoading /
+// composite-error plumbing. The raw useStreamsStore is NEVER exported (D-086-02):
+// these named hooks are the only consumer surface.
+//
+// Return contract (D-086-10): { data: T[]; isLoading; error; reconcile }.
+// ─────────────────────────────────────────────────────────────────────────────
+export function useTodos(threadId: string | null): {
+  data: Todo[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.todosByThread.get(threadId) ?? EMPTY_TODOS) : EMPTY_TODOS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceTodosForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<Todo>({
+    threadId,
+    hookId: "todos",
+    fetcher: getThreadTodos,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+export function useWorkspaceFiles(threadId: string | null): {
+  data: WorkspaceFile[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceWorkspaceFilesForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<WorkspaceFile>({
+    threadId,
+    hookId: "files",
+    fetcher: getThreadWorkspaceFiles,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+// useAskUserPrompt surfaces a PendingAsk[] — parallel asks are possible
+// (D-085-06), so reconcile REPLACES the inner Map atomically (D-086-08).
+export function useAskUserPrompt(threadId: string | null): {
+  data: PendingAsk[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.pendingAsksByThread.get(threadId) ?? EMPTY_ASKS) : EMPTY_ASKS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replacePendingAsksForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<PendingAsk>({
+    threadId,
+    hookId: "asks",
+    fetcher: getThreadPendingAsks,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+export function useTasks(threadId: string | null): {
+  data: TaskRunIndexItem[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.tasksByThread.get(threadId) ?? EMPTY_TASKS) : EMPTY_TASKS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceTasksForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<TaskRunIndexItem>({
+    threadId,
+    hookId: "tasks",
+    fetcher: getThreadTasks,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
 export const useViewingThread = (): string | null =>
   useStreamsStore((state) => state.viewedThreadId)
 
