@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
+\restrict qbp8uNgNfzraFQBr9fMnEnZ6oGlSYcNawuc8VlMhmqGQZOisgZqn0wtAw6I4Hhc
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -611,6 +611,42 @@ CREATE TABLE public.user_settings (
 
 
 --
+-- Name: workspace_file_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_file_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    workspace_file_id uuid NOT NULL,
+    version integer NOT NULL,
+    content_inline bytea,
+    content_storage_path text,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    delta_from_prev jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: workspace_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_files (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    path text NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    mime_type text DEFAULT 'application/octet-stream'::text NOT NULL,
+    content_inline bytea,
+    content_storage_path text,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
+    CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
+);
+
+
+--
 -- Name: app_settings app_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -787,6 +823,38 @@ ALTER TABLE ONLY public.user_settings
 
 
 --
+-- Name: workspace_file_versions workspace_file_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_file_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_files workspace_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_files workspace_files_thread_path_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_thread_path_unique UNIQUE (thread_id, path);
+
+
+--
+-- Name: workspace_file_versions workspace_versions_file_version_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_versions_file_version_unique UNIQUE (workspace_file_id, version);
+
+
+--
 -- Name: audit_log_user_created_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -910,6 +978,20 @@ CREATE INDEX idx_runs_active ON public.runs USING btree (user_id, thread_id, sta
 --
 
 CREATE INDEX idx_runs_history ON public.runs USING btree (user_id, thread_id, started_at DESC);
+
+
+--
+-- Name: idx_workspace_files_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_thread ON public.workspace_files USING btree (thread_id);
+
+
+--
+-- Name: idx_workspace_versions_file; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_versions_file ON public.workspace_file_versions USING btree (workspace_file_id, version DESC);
 
 
 --
@@ -1249,6 +1331,22 @@ ALTER TABLE ONLY public.threads
 
 ALTER TABLE ONLY public.user_memory
     ADD CONSTRAINT user_memory_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_file_versions workspace_file_versions_workspace_file_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_file_versions_workspace_file_id_fkey FOREIGN KEY (workspace_file_id) REFERENCES public.workspace_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_files workspace_files_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
 
 
 --
@@ -1684,8 +1782,76 @@ ALTER TABLE public.threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: workspace_file_versions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workspace_file_versions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workspace_files; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workspace_files workspace_files_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_file_versions workspace_versions_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
+  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+
+
+--
+-- Name: workspace_file_versions workspace_versions_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
+  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
+\unrestrict qbp8uNgNfzraFQBr9fMnEnZ6oGlSYcNawuc8VlMhmqGQZOisgZqn0wtAw6I4Hhc
 
