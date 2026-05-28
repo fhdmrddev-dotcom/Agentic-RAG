@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 Phase: 086 (streamsprovider-extension-panel-hooks) — EXECUTING
 Plan: 1 of 2
 Status: Executing Phase 086
-Last activity: 2026-05-28 -- Phase 086 execution started
+Last activity: 2026-05-28 -- Completed quick task 260529-0sc: Fix Phase 086 WR-04 (persist panel todo/task Maps to localStorage)
 
 Progress: [██████████] 100%
 
@@ -85,6 +85,12 @@ Surfaced for Phase 086 (streamsprovider-extension-panel-hooks), which touches th
 - **Constraint for 086:** any reconcile/snapshot/message-list change MUST preserve this filter, or threads with ask_user history 500 on load again. The `panel.py` `/pending` query (raw asyncpg, scans system rows directly) is the separate path and is unaffected.
 - **OPEN FOLLOW-UP for 086 to decide:** answered ask_user Q&A turns are NOT rendered in reloaded conversation history (no frontend renderer for `tool_calls[].kind='ask_user_*'`; `/pending` only surfaces *unanswered* prompts). If reloaded ask_user history should be visible to the user, Phase 086 owns building that renderer (+ widening the wire model) rather than filtering. See `.planning/reported-bugs/snapshot-500-on-system-role-askuser-rows.md`.
 - Also cleaned 2026-05-28: 7 ask_user test-fixture threads purged from dev DB; 8 stale git worktrees pruned.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260529-0sc | Fix Phase 086 WR-04: persist panel todo/task Maps to localStorage write-path (closes the sole blocking gap from 086-VERIFICATION.md) | 2026-05-28 | 62c1cf0 | [260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t](./quick/260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t/) |
 
 ## Deferred Items
 
