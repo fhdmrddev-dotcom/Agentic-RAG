@@ -625,6 +625,116 @@ WORKSPACE_DIFF_TOOL = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Phase 085 — 3 new tools (D-085-25: 24-tool toolbox)
+# Descriptions lead with "Use when:" + "Do not use for:" per D-085-25 to mitigate
+# the 24-tool selection-accuracy concern across Google + DeepSeek/Moonshot.
+# Copy-verbatim from 085-RESEARCH.md §E (lines 767-862).
+# ---------------------------------------------------------------------------
+
+# Phase 085 D-085-17..22 — write_todos tool schema
+WRITE_TODOS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "write_todos",
+        "description": (
+            "Replace the thread's todo list with a new list. "
+            "Use when: you need to break a complex multi-step task into trackable items the user can see, "
+            "or when updating the status of in-flight work. "
+            "Do not use for: short single-step answers, scratch notes, or per-message reminders. "
+            "Semantics: full-state-replace — every call OVERWRITES the entire todo list. "
+            "Include all current todos (both new and existing) in every call, not just the changes. "
+            "Status values: pending | in_progress | completed."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "todos": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "description": "Stable client-supplied identifier (e.g. 't1', 't2'). Reuse the same id when updating status of an existing todo."},
+                            "content": {"type": "string", "description": "What needs to be done. One sentence."},
+                            "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
+                            "parent_id": {"type": ["string", "null"], "description": "Optional id of a parent todo for nesting. Omit or null for top-level items."},
+                            "order_index": {"type": "integer", "description": "Display order within the list. 0-indexed."},
+                        },
+                        "required": ["id", "content", "status", "parent_id", "order_index"],
+                    },
+                },
+            },
+            "required": ["todos"],
+        },
+    },
+}
+
+
+# Phase 085 D-085-08..16 — task sub-agent tool schema
+TASK_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "task",
+        "description": (
+            "Spawn a focused sub-agent to perform a delegated piece of work and return a summary. "
+            "Use when: the work has a clear bounded objective that benefits from its own short context "
+            "(e.g. 'find all mentions of X across these documents and summarize') and would otherwise pollute "
+            "the main conversation. "
+            "Do not use for: simple lookups (use search_documents directly), or for tasks that need "
+            "to ask the user a question (sub-agents cannot call ask_user). "
+            "Sub-agents cannot call task(), ask_user(), or write_todos(). "
+            "Max sub-agent steps clamped server-side; long-running work should still be broken into multiple task() calls."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "description": "Required. What the sub-agent should accomplish, in one or two sentences."},
+                "instructions": {"type": ["string", "null"], "description": "Optional task-specific guidance APPENDED to the server's base sub-agent prompt."},
+                "tools": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Optional. Restrict the sub-agent's toolset to these tool names (must be a subset of your own tools). Omit/null = use a safe read-only default set.",
+                },
+                "max_steps": {"type": ["integer", "null"], "description": "Optional. Maximum sub-agent iterations. Server clamps to a hard maximum."},
+            },
+            "required": ["description", "instructions", "tools", "max_steps"],
+        },
+    },
+}
+
+
+# Phase 085 D-085-01..07 — ask_user pause/resume tool schema
+ASK_USER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ask_user",
+        "description": (
+            "Pause and ask the user a question. The agent waits for the user's response (up to a timeout) "
+            "before continuing. "
+            "Use when: you have a true blocker that requires a decision only the user can make "
+            "(e.g. 'which of these 3 files should I overwrite?'), or when proceeding without confirmation "
+            "would risk destructive action. "
+            "Do not use for: clarification questions you can answer yourself, or as a substitute for "
+            "writing final assistant content (just respond normally instead). "
+            "Always pass a clear, specific prompt — never ask 'are you sure?' without context."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "Required. The question to show the user. Be specific."},
+                "options": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Optional. Multiple-choice options. If provided, panel renders as buttons; user can still type free-text.",
+                },
+                "timeout_seconds": {"type": ["integer", "null"], "description": "Optional. Maximum seconds to wait. Server clamps."},
+            },
+            "required": ["prompt", "options", "timeout_seconds"],
+        },
+    },
+}
+
+
 EXPLORER_SYSTEM_PROMPT = (
     "You are a Knowledge Base Explorer. Navigate the user's document library using the fewest tool calls needed.\n\n"
     "## CRITICAL: Stop when you have the answer\n"
@@ -655,7 +765,9 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
              REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
              WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
-             WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL]
+             WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
+             # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
+             WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
     if web_enabled:
