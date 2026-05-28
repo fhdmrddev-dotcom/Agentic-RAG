@@ -74,6 +74,19 @@ class ToolContext:
     previous_files_in_run: dict | None = None  # sandbox output file tracking across execute_code calls
     tool_index: int = 0  # current index in the tool_calls list (used by execute_code heartbeat)
     iteration: int = 0  # current agent loop iteration (used by harvest_output_files)
+    # Phase 085 — D-085-09 / D-085-12 / D-085-15 / D-085-01
+    # parent_run_id: non-null inside a sub-agent's ToolContext — _handle_task short-circuits
+    #   to enforce the 1-level nesting cap (D-085-12).
+    # per_run_task_semaphore: in-process asyncio.Semaphore initialized once per top-level
+    #   run in agent_runner; gates the number of simultaneous task() spawns (D-085-15).
+    # available_tools: list of tool-name strings exposed to the parent agent — used by
+    #   _handle_task to enforce the sub-agent toolset-subset rule (D-085-09).
+    # tool_call_id: LLM-supplied id for the current tool call; populated per-dispatch by
+    #   agent_runner (mirrors tool_index). Used by ask_user channel naming (D-085-01).
+    parent_run_id: "UUID | None" = None
+    per_run_task_semaphore: Any = None  # asyncio.Semaphore | None — keep Any to avoid module-level asyncio import surface
+    available_tools: list[str] = field(default_factory=list)
+    tool_call_id: str = ""
 
 
 @dataclass
