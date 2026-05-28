@@ -243,3 +243,80 @@ export interface SkillFile {
   mime_type: string
   created_at: string
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 086 Plan 01 — agent-panel wire-mirror interfaces.
+//
+// These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there
+// is no client-side reshape — the backend already reshapes where needed (e.g.
+// panel.py:67 maps todo_id -> id before serializing). The exact field names are
+// VERIFIED against the emit sites + GET reshapes (086-01-PLAN <interfaces>):
+//   GET /threads/{tid}/todos            (panel.py:67)
+//   GET /threads/{tid}/workspace/files  (workspace.py:99)
+//   GET /threads/{tid}/ask_user/pending (panel.py:103)
+//   GET /threads/{tid}/tasks            (panel.py:156)
+// plus the 6 SSE event payloads from Phases 084/085.
+//
+// Rendering is Phase 087 — these types only back the data-plumbing layer
+// (store Maps + SSE dispatch + GET helpers + cache) shipped in Plan 086-01.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /threads/{tid}/todos (panel.py:67 reshapes todo_id -> id) +
+ *  SSE todo_updated (tool_dispatcher.py:1239) — the SSE `todos` array is the
+ *  FULL canonical list (full-state-replace, not a delta). Identity key: `id`. */
+export interface Todo {
+  id: string
+  content: string
+  status: string
+  parent_id: string | null
+  order_index: number
+  created_at?: string
+  updated_at?: string
+}
+
+/** GET /threads/{tid}/workspace/files (workspace.py:99) +
+ *  SSE workspace_file_written (tool_dispatcher.py:892, FLAT payload — no nested
+ *  `file`, no `id`; carries path/version/size_bytes/mime_type). The store keys
+ *  workspace files by `path` (SSE has no `id`), so `id` is optional here. */
+export interface WorkspaceFile {
+  id?: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  version?: number
+  created_at?: string
+  updated_at?: string
+}
+
+/** GET /threads/{tid}/ask_user/pending (panel.py:103) +
+ *  SSE ask_user_prompt (tool_dispatcher.py:1357, FLAT payload — no
+ *  message_id/run_id/created_at; those exist only on the GET). Identity key:
+ *  `tool_call_id` (NOT `ask_id`). */
+export interface PendingAsk {
+  tool_call_id: string
+  prompt: string
+  options: string[]
+  timeout_seconds: number
+  message_id?: string
+  run_id?: string
+  created_at?: string
+}
+
+/** GET /threads/{tid}/tasks (panel.py:156) + SSE sub_agent_start/done TASK
+ *  variant (task_service.py:264/428 — both carry `sub_run_id`, the discriminator
+ *  vs the legacy analyze_document sub_agent_* path which has none). The optional
+ *  description/tools/max_steps/summary fields are populated from the sub_agent
+ *  SSE bookends. Identity key: `sub_run_id`. */
+export interface TaskRunIndexItem {
+  sub_run_id: string
+  parent_run_id: string
+  status: string
+  model: string
+  provider: string
+  started_at?: string
+  completed_at?: string
+  description?: string
+  tools?: string[]
+  max_steps?: number
+  summary?: string
+}
