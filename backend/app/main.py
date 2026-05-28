@@ -321,7 +321,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -336,6 +336,7 @@ app.include_router(feedback.router)
 app.include_router(sandbox_outputs.router)
 app.include_router(workspace.router)
 app.include_router(admin.router)
+app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
