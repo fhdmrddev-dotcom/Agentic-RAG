@@ -98,3 +98,103 @@ async def get_thread_todos(
         }
         for r in rows
     ]
+
+
+@router.get("/ask_user/pending")
+async def get_pending_ask_user(
+    thread_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 085 D-085-23 — ask_user_prompt rows without a matching ask_user_response.
+
+    Uses asyncpg directly for the jsonb ``@>`` containment scan + ``NOT EXISTS``
+    subquery (supabase-py doesn't natively express these). Per RESEARCH §D.4.
+
+    RLS is enforced via the thread-ownership gate (the supabase-py SELECT in
+    ``_verify_thread_ownership`` runs under the service-role chain that respects
+    the threads-table RLS policies). The subsequent asyncpg query filters by
+    thread_id explicitly — combining the ownership gate with the explicit
+    thread_id filter closes the cross-user disclosure threat (T-085-T19).
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+    pool = await get_pg_pool()
+    rows = await pool.fetch(
+        """
+        SELECT m.id, m.tool_calls, m.created_at
+        FROM messages m
+        WHERE m.thread_id = $1
+          AND m.role = 'system'
+          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND NOT EXISTS (
+            SELECT 1 FROM messages r
+            WHERE r.thread_id = m.thread_id
+              AND r.role = 'system'
+              AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+              AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+          )
+        ORDER BY m.created_at ASC
+        """,
+        UUID(thread_id),
+    )
+    result = []
+    for r in rows:
+        tcs = r["tool_calls"] or []
+        payload = tcs[0] if tcs else {}
+        result.append({
+            "message_id": str(r["id"]),
+            "tool_call_id": payload.get("tool_call_id"),
+            "prompt": payload.get("prompt"),
+            "options": payload.get("options"),
+            "timeout_seconds": payload.get("timeout_seconds"),
+            "run_id": payload.get("run_id"),
+            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+        })
+    return result
+
+
+@router.get("/tasks")
+async def get_thread_tasks(
+    thread_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Phase 085 D-085-23 — sub-agent run index for Phase 087 drill-down.
+
+    Returns runs whose ``parent_run_id`` is a run owned by the current user in
+    this thread. Per RESEARCH §D.5. Frontend joins with ``sub_agent_start`` SSE
+    payload for description/tools/max_steps (those live in messages.tool_calls
+    on the parent's stream).
+
+    The subquery ``parent_run_id IN (SELECT run_id FROM runs WHERE thread_id =
+    $1 AND user_id = $2)`` is the cross-thread + cross-user gate — sub-agents
+    only show up for parents the caller owns in this thread (T-085-T19,
+    FC#9).
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)
+    pool = await get_pg_pool()
+    rows = await pool.fetch(
+        """
+        SELECT r.run_id AS sub_run_id, r.started_at, r.completed_at,
+               r.status, r.model, r.provider, r.parent_run_id
+        FROM runs r
+        WHERE r.parent_run_id IN (
+          SELECT run_id FROM runs
+          WHERE thread_id = $1 AND user_id = $2
+        )
+        ORDER BY r.started_at DESC
+        """,
+        UUID(thread_id), UUID(current_user["id"]),
+    )
+    return [
+        {
+            "sub_run_id": str(r["sub_run_id"]),
+            "parent_run_id": str(r["parent_run_id"]) if r["parent_run_id"] else None,
+            "status": r["status"],
+            "model": r["model"],
+            "provider": r["provider"],
+            "started_at": r["started_at"].isoformat() if r["started_at"] else None,
+            "completed_at": r["completed_at"].isoformat() if r["completed_at"] else None,
+        }
+        for r in rows
+    ]
