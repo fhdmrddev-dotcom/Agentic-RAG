@@ -788,6 +788,16 @@ class Settings(BaseSettings):
     # Range: 4096–65536. Set SUB_AGENT_MAX_OUTPUT_TOKENS=<n> in .env to override globally.
     # Overridable per-user via Settings UI slider.
 
+    # Phase 085 — ask_user / task knobs (D-085-03, D-085-10, D-085-15)
+    # ask_user_max_timeout_seconds: 30-min hard cap; default per-call is 300s.
+    # task_max_steps: clamp for sub-agent iteration cap; default per-call is 5.
+    # task_per_run_concurrency: asyncio.Semaphore size per top-level run (in-process).
+    # task_global_concurrency: Redis tasks:global:active counter cap (cross-worker).
+    ask_user_max_timeout_seconds: int = 1800
+    task_max_steps: int = 10
+    task_per_run_concurrency: int = 3
+    task_global_concurrency: int = 20
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"
