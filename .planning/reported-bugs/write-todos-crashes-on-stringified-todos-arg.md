@@ -103,7 +103,7 @@ Fixed and verified. Commits on `v2.5-dev`:
 
 **Verification:** new test is GREEN (3 passed). RED-proof against pre-fix code: 3 failed with `AttributeError: 'str' object has no attribute 'get'` at `tool_dispatcher.py:1212` (the exact crash). Existing suites unaffected: `test_tool_dispatcher.py` + `test_085_todos_service.py` = 22 passed.
 
-**Optional final confirmation (belt-and-suspenders):** re-run the original prompt on free OpenRouter `llama-3.3-70b` in the live app (requires the backend to have reloaded this change) — expect either a successful list or a clean self-correcting error, no 14× crash loop. Closure here is on the strength of the RED→GREEN regression test, which reproduces the exact failure.
+**Live confirmation (DONE, 2026-05-28):** operator re-ran the original prompt on free OpenRouter `llama-3.3-70b` after the backend picked up the fix — **succeeded** (no 14× crash loop). Closure is now confirmed by BOTH the RED→GREEN regression test AND a live weak-model run.
 
 ## Reference / evidence links
 

@@ -25,9 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 086 (streamsprovider-extension-panel-hooks) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 086
+Phase: 087 (panel-ui) — NOT STARTED (next)
+Plan: 0 of TBD
+Status: Phase 086 COMPLETE (verified passed 3/3, 2026-05-29). Next: Phase 087 Panel UI — G-2 gate fires (UX phase) → start with /gsd:sketch 087, NOT discuss-phase.
+Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim).
 Last activity: 2026-05-28 -- Completed quick task 260529-1wb: Fix BUG-260529-01 (write_todos crash on stringified todos arg). Phase 086 UAT passed (4/5, 1 blocked on 087); verification flipped to passed 3/3.
 
 Progress: [██████████] 100%
