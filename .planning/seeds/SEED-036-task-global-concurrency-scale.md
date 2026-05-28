@@ -4,14 +4,16 @@ title: task() Global Concurrency Cap — Per-User Quota at Multi-Tenant Scale
 status: planted
 planted: 2026-05-28
 planted_by: orchestrator (post-execute-phase 085)
-trigger_when: App approaches multi-tenant deployment (≥10 concurrent active users) OR a single user observably starves others by spinning up sub-agents OR org-level multi-tenancy ([[project_org_level_deferred.md]]) lands and needs fair-share scheduling
+trigger_when: App approaches multi-tenant deployment (≥10 concurrent active users) OR a single user observably starves others by spinning up sub-agents OR org-level multi-tenancy ([[project_org_level_deferred.md]]) lands and needs fair-share scheduling OR ops needs to tune the cap at runtime without a backend restart
 priority: medium
-tags: [scale, multi-tenancy, sub-agent, concurrency, redis, fair-share]
+tags: [scale, multi-tenancy, sub-agent, concurrency, redis, fair-share, admin-tier, runtime-config]
 related_memories:
   - project_target_scale.md
   - project_org_level_deferred.md
+  - project_settings_design_guidance.md
 related_decisions: [D-085-22 (per-run + global concurrency caps), D-PRD-12 (multi-worker uvicorn default)]
 related_phases: [085 (Plan 02 task_service)]
+related_seeds: [SEED-002 (skill studio milestone — admin-tier global library), SEED-004 (org multi-tenancy — natural home for per-org admin), SEED-005 (document management — bulk admin operations)]
 ---
 
 # SEED-036: task() Global Concurrency Cap — Per-User Quota at Multi-Tenant Scale
@@ -93,3 +95,38 @@ Strictly fairer than fixed caps but introduces queuing latency and complexity. L
 - The per-run `asyncio.Semaphore(3)` cap is fine and doesn't need per-user scoping (it's already scoped to a single agent loop). Only the global Redis cap needs the fair-share treatment.
 - The Lua INCR pattern in `acquire_global_task_slot` is the right substrate for Options A and B — just needs the script extended to check multiple counters.
 - The cap-reached UX gap (silent failure) is a separate concern worth surfacing in the panel UI once Phase 087 ships — surface "you've hit your sub-agent limit, X others active" rather than just bouncing the tool call.
+
+## Admin-tier runtime control (cross-cutting sub-consideration)
+
+Today the cap lives in `backend/app/config.py` as `task_global_concurrency: int = 20` — an **env-var-only knob**, tunable only via `.env` / restart. This **violates the CLAUDE.md project rule** that "Settings live in `user_settings` / `app_settings` and the Settings UI; env vars are for secrets and infra only." Phase 085 shipped it as env to keep scope tight, but the rule applies and the destination is `app_settings`.
+
+**Why runtime control matters operationally:**
+- Ops scenario: real traffic hits the 20 cap at peak. Today you edit `.env`, restart uvicorn (downtime), and wait — no live response possible.
+- Tuning loop: A/B'ing `15 vs 30 vs 60` over a week requires N restarts. Hostile UX.
+- Multi-tenant scaling: per-org or per-user caps NEED runtime mutability (operator can't restart the app every time a paying customer's quota changes).
+- The current env-var shape silently fails the CLAUDE.md compliance audit.
+
+**Blocker — there's no admin tier today.**
+
+The existing Settings UI surface is per-user (everyone sees the same form, mutations write to `user_settings`). A concurrency cap is intrinsically an admin/ops concern — one global value, operators only. To expose it correctly the app needs admin-tier infrastructure that doesn't exist yet:
+
+| Path | Schema impact | UI impact | Operator readiness | Notes |
+|------|--------------|-----------|---------------------|-------|
+| **A — Admin role on `users` table** | Add `is_admin: bool` column (~1 line migration) + RLS read-gate on `app_settings` rows | New "Admin" Settings tab visible only when `currentUser.is_admin=true` | Clean long-term shape | Requires role bootstrap (how does the first admin get created?) |
+| **B — Separate `/admin` route** | Same as A (need a role check somewhere) + new auth-gate | Whole new page surface; can grow to host other admin concerns (user list, telemetry, kill-switch) | Bigger UX scaffolding | Better for "admin sees a different app, not just an extra tab" |
+| **C — Hardcoded operator email** | Zero — a single env var `OPERATOR_EMAIL=fhdmrd@gmail.com` gates the admin UI render | Single "Admin" Settings tab gated on `currentUser.email === settings.operator_email` | Cheapest interim | Ugly long-term but unblocks runtime control NOW; replace once role schema lands |
+| **D — `app_settings` table + CLI tool** | Add `app_settings(key, value, updated_at)` table | None — operator runs `python -m app.cli set task_global_concurrency 50` to mutate | No UI needed | Skips the admin-UI problem entirely; works today; loses live-tune-from-browser convenience |
+
+Pairs naturally with [[SEED-004 org-multi-tenancy]] — when orgs land, paths A or B become natural homes for per-org admin controls. Path C is what most production apps do as a stopgap (works today, replace later).
+
+**How this sub-consideration changes Options A/B/C above:**
+
+The 3 quota designs (per-user cap, per-org cap, token-bucket) each need runtime tunability of their respective parameters. So whatever admin-tier path lands first, the quota config goes there:
+
+- Option A (per-user + global): `app_settings.task_per_user_concurrency` + `app_settings.task_global_concurrency`, admin-tier-gated UI
+- Option B (per-org + per-user + global): `org_settings.task_per_org_concurrency` + reuse from A
+- Option C (token-bucket): `app_settings.task_bucket_refill_rate` + `app_settings.task_bucket_capacity` + `app_settings.task_bucket_max_wait_ms`
+
+**Recommendation when SEED-036 is promoted:** scope an admin-tier UI substrate (path C "hardcoded operator email" as the interim, path A "is_admin column" as the durable target) AS PART OF the same phase. Don't ship runtime-tunable quotas through a non-admin Settings tab — exposing global system caps to every user is a vulnerability.
+
+**Related SEEDs that benefit from the same admin-tier scaffolding:** SEED-004 (org multi-tenancy), SEED-005 (document management capabilities — bulk admin operations), SEED-002 (skill studio — admin-tier global skill library). When the admin tab lands once, all four benefit.
