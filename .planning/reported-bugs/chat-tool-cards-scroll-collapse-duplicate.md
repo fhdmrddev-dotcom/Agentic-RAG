@@ -42,6 +42,16 @@ Hypotheses, not findings — to be confirmed:
 2. **Expanded-by-default:** tool-body components (`tool-bodies/*`, esp. the read/summarize/analyze paths) and `ToolCallPanel` default to an open/expanded state with no collapse-on-complete. Likely a missing `defaultCollapsed` / fold-to-summary on terminal, inconsistent with the Focus-Mode direction.
 3. **Read/summarize duplication:** could be the same `tool_call_id`-instability described in BUG-260521-01 surfacing on the sub-agent (`task` / analyze_document) SSE path, OR a separate double-render where both the sub-agent bookend events and the inner tool events render a card. Trace `sub_agent_*` SSE events through StreamsProvider → MessageItem for the read/summarize sub-agents specifically.
 
+## Design goal for the fix (operator intent, 2026-05-29)
+
+The fix is not just bug-squashing — the operator wants a **design unification of the chat tool-call surface**:
+
+- **Consistency:** every tool card (search, read, execute_code, sub-agents like read/summarize, web_search, etc.) shares ONE consistent visual frame and behavior — no per-tool ad-hoc layouts that look and act differently.
+- **Details on demand:** the user must still be able to drill into full details (output, source, args) — collapsed/summarized by default, expandable when wanted. Do not hide information; re-rank it.
+- **Friendly + professional:** the resting state reads calm and polished (closer to the Claude.ai analysis-tool / Cursor agent feel), not a raw streamed dump.
+
+This is a G-2 (sketch-before-plan) candidate when scoped — it's a UX redesign of a hot surface. It should reuse the established `sketch-findings-agentic-rag` direction (Focus Mode: past steps fold to result-summary; one consistent outer frame, per-tool inner body) rather than start from scratch. **Acceptance bar:** during a long multi-tool run, the conversation stays readable, every tool card looks like it belongs to the same system, and the user can expand any card for full detail without the chat scrolling away from them.
+
 ## Surface classification
 
 `Agentic-RAG` — frontend chat-surface render/scroll bugs in this app. Routing candidate for the GSD bug cross-check at discuss-phase / new-milestone.
