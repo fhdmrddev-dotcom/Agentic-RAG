@@ -49,19 +49,48 @@ async def _verify_thread_ownership(
 
 
 def _decode_inline_content(value) -> str:
-    """Decode the bytea content_inline field returned by supabase-py.
+    """Decode workspace_files.content_inline (bytea) into a UTF-8 string.
 
-    supabase-py returns bytea columns as base64-encoded strings (or bytes already).
-    Returns '' if decoding fails.
+    Handles every wire shape we've observed from supabase-py / asyncpg
+    across the Phase 084 UAT:
+
+    * bytes / bytearray / memoryview: direct UTF-8 decode.
+    * str starting with ``\\x`` (PostgreSQL bytea hex literal): hex decode.
+      This is the actual shape supabase-py returns in the v2.x client
+      used by Phase 084 -- confirmed by runtime probe 2026-05-28
+      (``content_inline_repr: '\\x68656c6c6f20776f726c64'`` for 'hello world').
+    * dict ``{"type": "Buffer", "data": [int, ...]}``: some supabase-py
+      builds wrap bytea this way. Defensive fallback for client drift.
+    * str (base64-encoded): fall back to base64 decode for older
+      client versions / direct JSON embedding.
+    * None: returns "".
+
+    Any decode failure returns "" but emits a warning log so future
+    encoding drift is observable in the backend logs.
     """
     if value is None:
         return ""
     try:
-        if isinstance(value, (bytes, bytearray)):
+        if isinstance(value, (bytes, bytearray, memoryview)):
             return bytes(value).decode("utf-8", errors="replace")
+        if isinstance(value, dict):
+            data = value.get("data")
+            if isinstance(data, list):
+                return bytes(data).decode("utf-8", errors="replace")
         if isinstance(value, str):
+            # PostgreSQL hex-bytea literal: \xDEADBEEF (the shape supabase-py
+            # v2.x actually returns -- confirmed by runtime probe 2026-05-28).
+            if value.startswith(r"\x"):
+                return bytes.fromhex(value[2:]).decode("utf-8", errors="replace")
+            # Fallback: base64 (older supabase-py / direct json embedding).
             return base64.b64decode(value).decode("utf-8", errors="replace")
-    except Exception:
+    except Exception as e:
+        logger.warning(
+            "_decode_inline_content failed for type=%s len=%s: %s",
+            type(value).__name__,
+            (len(value) if hasattr(value, "__len__") else "n/a"),
+            e,
+        )
         return ""
     return ""
 
