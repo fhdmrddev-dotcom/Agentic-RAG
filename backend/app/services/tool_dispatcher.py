@@ -1246,6 +1246,194 @@ async def _handle_write_todos(args: dict, ctx: ToolContext) -> ToolResult:
     }))
 
 
+async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 085 D-085-01..07 — ask_user pause/resume via Redis pub/sub.
+
+    Blocks the agent loop on a Redis SUBSCRIBE until either the user POSTs a
+    response (PUBLISH wakes us), the Stop button is hit (PUBLISH cancel
+    sentinel), uvicorn shuts down (PUBLISH shutdown sentinel), or the
+    configured timeout fires. Returns a normal ``ToolResult`` so the existing
+    agent_runner loop continues — no run-state machinery.
+
+    ORDER IS LOAD-BEARING (RESEARCH §A.3 — PUBLISH-before-SUBSCRIBE race
+    mitigation):
+      1. pubsub.subscribe(channel)              # SUBSCRIBE first — Redis acks
+      2. SADD ask_user:channels:{run_id}        # advertise to cancel/shutdown sweeps
+      3. messages row insert (kind='ask_user_prompt')   # durable for reload (D-085-05)
+      4. emit ask_user_prompt SSE event         # frontend now knows to ask the user
+      5. block on get_message                   # NOW we can safely wait
+
+    Steps 1-2 register the subscriber BEFORE the user has any way to know there
+    is a question pending. A fast user response can't PUBLISH before step 4,
+    by which point the subscription is already alive.
+
+    This handler does NOT use ``ask_user_service.subscribe_for_response`` for
+    the full flow because the SSE emit + messages row insert must happen
+    BETWEEN the SADD and the block-on-message — see the ordering invariant
+    above. ``ask_user_service`` exports the helper for tests and for the
+    cancel + shutdown paths that don't need the persistence step.
+
+    Wake payload kinds (RESEARCH §A wire format):
+      - {"kind": "response", "response_text": str, "choice_index": int|null}
+      - {"kind": "cancel"}    — Stop button or zombie heal
+      - {"kind": "shutdown"}  — uvicorn lifespan shutdown
+
+    Empty prompt is a tool error (RESEARCH §A.8 discretion resolution — less
+    surprising than rendering "(no prompt)" in the panel).
+    """
+    prompt = (args.get("prompt") or "").strip()
+    if not prompt:
+        return ToolResult(result="ask_user requires a non-empty prompt")
+
+    # Per-call timeout override; server clamps to settings.ask_user_max_timeout_seconds
+    # (default 1800s = 30min). Default when omitted is 300s (D-085-03).
+    timeout_arg = args.get("timeout_seconds")
+    if timeout_arg is None:
+        timeout_seconds = 300
+    else:
+        try:
+            timeout_seconds = max(
+                1, min(int(timeout_arg), settings.ask_user_max_timeout_seconds)
+            )
+        except (TypeError, ValueError):
+            return ToolResult(
+                result="ask_user timeout_seconds must be a positive integer"
+            )
+
+    options = args.get("options")
+
+    # tool_call_id is the LLM-supplied id for the current tool call; populated
+    # per-dispatch by agent_runner. Without it, we can't name the channel.
+    tool_call_id = ctx.tool_call_id or ""
+    if not tool_call_id:
+        return ToolResult(
+            result=(
+                "ask_user requires a tool_call_id (internal: "
+                "ToolContext.tool_call_id was empty)"
+            )
+        )
+
+    run_id = ctx.run_id
+    channel = f"ask_user:{run_id}:{tool_call_id}"
+    channels_set_key = f"ask_user:channels:{run_id}"
+
+    pubsub = ctx.redis.pubsub()
+
+    try:
+        # ── Step 1: SUBSCRIBE first ───────────────────────────────────────
+        await pubsub.subscribe(channel)
+        # ── Step 2: advertise to cancel + shutdown sweep paths ────────────
+        await ctx.redis.sadd(channels_set_key, channel)
+        await ctx.redis.expire(channels_set_key, 3600)  # safety TTL
+
+        # ── Step 3: persist messages row with kind='ask_user_prompt' ──────
+        # D-085-05 — durable for reload survival (RESEARCH §A.7). Wrapped in
+        # try/except: if the insert fails (Postgres hiccup, etc.) we still
+        # let the handler proceed so the user can answer — the missing row
+        # only affects the GET /pending replay surface, not the live flow.
+        try:
+            await aexec(
+                ctx.supabase.table("messages").insert({
+                    "thread_id": ctx.thread_id,
+                    "user_id": ctx.current_user["id"],
+                    "role": "system",
+                    "content": prompt,
+                    "tool_calls": [{
+                        "kind": "ask_user_prompt",
+                        "tool_call_id": tool_call_id,
+                        "prompt": prompt,
+                        "options": options,
+                        "timeout_seconds": timeout_seconds,
+                        "run_id": str(run_id),
+                    }],
+                })
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user: messages row insert failed for run %s tcid %s",
+                run_id, tool_call_id,
+            )
+
+        # ── Step 4: emit ask_user_prompt SSE event ────────────────────────
+        try:
+            await ctx.emit(
+                ctx.redis, run_id, 'ask_user_prompt',
+                tool_call_id=tool_call_id,
+                prompt=prompt,
+                options=options,
+                timeout_seconds=timeout_seconds,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user: SSE emit failed for run %s tcid %s",
+                run_id, tool_call_id,
+            )
+
+        # ── Step 5: block on get_message ──────────────────────────────────
+        async def _wait():
+            while True:
+                msg = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=1.0,                      # Pitfall 1 — never 0
+                )
+                if msg is not None and msg.get("type") == "message":
+                    try:
+                        return json.loads(msg["data"])
+                    except (TypeError, ValueError):
+                        logger.warning(
+                            "ask_user: unparseable PUBLISH payload on %s", channel
+                        )
+                        return None
+
+        try:
+            payload = await asyncio.wait_for(_wait(), timeout=timeout_seconds)
+        except asyncio.TimeoutError:
+            return ToolResult(
+                result=f"ask_user timed out — no response received within {timeout_seconds}s"
+            )
+
+        if not payload:
+            return ToolResult(
+                result="ask_user received unparseable payload — treating as timeout"
+            )
+
+        kind = payload.get("kind")
+        if kind == "response":
+            return ToolResult(result=payload.get("response_text") or "")
+        elif kind == "cancel":
+            return ToolResult(result="ask_user cancelled by user stop")
+        elif kind == "shutdown":
+            return ToolResult(result="ask_user interrupted by server shutdown")
+        else:
+            return ToolResult(
+                result=f"ask_user received unknown payload kind: {kind!r}"
+            )
+    finally:
+        # Cleanup discipline — Pitfall 3 + R2 (Redis SUBSCRIBE client leaks).
+        # Each step in its own try/except so a single failure doesn't mask
+        # the others. SREM keeps the channels:set honest (only LIVE
+        # subscribers should be there); the safety TTL above is the
+        # eventual-consistency safety net.
+        try:
+            await pubsub.unsubscribe(channel)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user: unsubscribe failed for %s", channel
+            )
+        try:
+            await asyncio.wait_for(pubsub.aclose(), timeout=2.0)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user: pubsub.aclose failed for %s", channel
+            )
+        try:
+            await ctx.redis.srem(channels_set_key, channel)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "ask_user: SREM failed for %s", channels_set_key
+            )
+
+
 # ---------------------------------------------------------------------------
 # Registry + dispatch entry point
 # ---------------------------------------------------------------------------
@@ -1276,6 +1464,7 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     # Phase 085 — D-085 new tools (write_todos = Plan 01; task = Plan 02; ask_user = Plan 03)
     "write_todos": _handle_write_todos,
     "task": _handle_task,
+    "ask_user": _handle_ask_user,
 }
 
 

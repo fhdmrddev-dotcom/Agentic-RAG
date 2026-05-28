@@ -40,6 +40,7 @@ from uuid import UUID
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sse_starlette import EventSourceResponse
 from supabase import Client
 # Phase 067 D-067-04: alias TimeoutError as RedisTimeoutError to differentiate
@@ -456,6 +457,138 @@ async def stream_run(
 
 
 # ───────────────────────────────────────────────────────────────────────
+# Phase 085 D-085-02 — POST /runs/{rid}/ask_user_response
+# ───────────────────────────────────────────────────────────────────────
+# User submits an answer to a paused ask_user prompt. Order is load-bearing
+# (RESEARCH §A.7 durability path):
+#
+#   1. Ownership SELECT (404 not 403 on cross-user — D-062-12)
+#   2. Persist messages row with kind='ask_user_response' (DURABLE — survives
+#      the PUBLISH-with-no-subscriber case)
+#   3. Emit ask_user_response SSE event (for live UI sync; non-fatal on failure)
+#   4. PUBLISH to ask_user:{rid}:{tcid} (wakes the paused SUBSCRIBE if alive)
+#
+# Returns 200 once the persist succeeds. PUBLISH failure (no subscriber) is
+# logged, not raised — the messages row is the durable record; if the
+# SUBSCRIBE is dead (worker restarted, etc.), the run is already terminal
+# and the user gets a "response was recorded" ack regardless.
+#
+# Threats mitigated:
+#   T-085-T12 (Spoofing — user Y answers user X's prompt): ownership SELECT
+#             on runs by (run_id, user_id) — 404 on miss.
+#   T-085-T13 (Tampering — replay after run finalized): runs.status checked
+#             via the same ownership SELECT; if the row isn't visible to this
+#             user the response is rejected at the ownership gate.
+# ───────────────────────────────────────────────────────────────────────
+
+
+class AskUserResponseBody(BaseModel):
+    """Phase 085 D-085-02 — POST body for /runs/{rid}/ask_user_response.
+
+    tool_call_id pairs the response with the originating prompt's
+    messages.tool_calls[0].tool_call_id field (and Redis channel name).
+    """
+    tool_call_id: str
+    response_text: str
+    choice_index: "int | None" = None
+
+
+@router.post("/{run_id}/ask_user_response", status_code=200)
+async def submit_ask_user_response(
+    run_id: UUID,
+    body: AskUserResponseBody,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Submit a user response to a paused ask_user prompt (D-085-02).
+
+    Persist FIRST (durability), then PUBLISH (live wake). Returns 200 once
+    the persist succeeds; PUBLISH failure is logged but not raised.
+    """
+    # ── Step 1: ownership check (T-085-T12 / T-085-T13 / D-062-12) ──
+    # maybe_single() returns None on no-row instead of raising APIError.
+    # 404 (NOT 403) on missing row — never leak existence to other users.
+    row_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, thread_id, status")
+        .eq("run_id", str(run_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = row_resp.data if row_resp is not None else None
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Run not found",
+        )
+
+    # ── Step 2: persist messages row FIRST (durability — RESEARCH §A.7) ──
+    # If this fails, return 500 — the agent loop has no live SUBSCRIBE we
+    # could wake instead, and we don't want to silently drop the response.
+    try:
+        await aexec(
+            supabase.table("messages").insert({
+                "thread_id": row["thread_id"],
+                "user_id": current_user["id"],
+                "role": "system",
+                "content": body.response_text,
+                "tool_calls": [{
+                    "kind": "ask_user_response",
+                    "tool_call_id": body.tool_call_id,
+                    "response_text": body.response_text,
+                    "choice_index": body.choice_index,
+                }],
+            })
+        )
+    except Exception:
+        logger.exception(
+            "ask_user_response: messages insert failed for run %s tcid %s",
+            run_id, body.tool_call_id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist response",
+        )
+
+    # ── Step 3: emit ask_user_response SSE for live UI sync ──
+    # Lazy import to avoid the module-load-time cycle between runs.py and
+    # threads.py (threads.py already imports from this module's siblings).
+    try:
+        from app.api.threads import _emit  # noqa: PLC0415
+        await _emit(
+            redis, run_id, 'ask_user_response',
+            tool_call_id=body.tool_call_id,
+            response_text=body.response_text,
+            choice_index=body.choice_index,
+        )
+    except Exception:
+        logger.exception(
+            "ask_user_response: SSE emit failed for run %s tcid %s",
+            run_id, body.tool_call_id,
+        )
+
+    # ── Step 4: PUBLISH — wakes the paused SUBSCRIBE if it's alive ──
+    # PUBLISH failure (no subscriber, worker dead, etc.) is logged but NOT
+    # raised. The persist succeeded — the response is durable. Returning
+    # non-200 here would mislead the user into thinking their answer wasn't
+    # recorded.
+    try:
+        from app.services.ask_user_service import publish_response  # noqa: PLC0415
+        await publish_response(
+            redis, run_id, body.tool_call_id,
+            body.response_text, body.choice_index,
+        )
+    except Exception:
+        logger.exception(
+            "ask_user_response: publish failed for run %s tcid %s",
+            run_id, body.tool_call_id,
+        )
+
+    return {"status": "ok"}
+
+
+# ───────────────────────────────────────────────────────────────────────
 # DELETE /runs/{run_id}  — cancel verb (D-062-08/09/10/11/12/13).
 # Idempotent across all three sub-paths:
 #   - happy:      in-flight run (RUN_TASKS contains task) → task.cancel() → 204
@@ -525,6 +658,25 @@ async def cancel_run(
     # ASYNCHRONOUSLY. DELETE does NOT await the task — return 204 immediately.
     task = RUN_TASKS.get(run_id)
     if task is not None and not task.done():
+        # Phase 085 D-085-04 — PUBLISH cancel sentinel BEFORE task.cancel() so
+        # any paused _handle_ask_user wakes and returns a normal ToolResult
+        # ("ask_user cancelled by user stop") BEFORE CancelledError propagates
+        # (RESEARCH §A.5 PUBLISH-first ordering). Without this ordering, the
+        # CancelledError lands inside pubsub.get_message's wait loop, the
+        # handler returns normally to its finally, the agent loop is still
+        # mid-iteration but the run terminates without a kind='ask_user_
+        # response' companion row — GET /threads/{tid}/ask_user/pending would
+        # then return that prompt forever.
+        #
+        # Best-effort — never block the cancel verb on Redis failure (the
+        # same discipline as the zombie-heal Redis ops below).
+        try:
+            from app.services.ask_user_service import publish_cancel_sentinel  # noqa: PLC0415
+            await publish_cancel_sentinel(redis, run_id)
+        except Exception:
+            logger.exception(
+                "ask_user cancel sentinel broadcast failed for run %s", run_id
+            )
         task.cancel()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
