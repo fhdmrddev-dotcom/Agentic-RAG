@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict qbp8uNgNfzraFQBr9fMnEnZ6oGlSYcNawuc8VlMhmqGQZOisgZqn0wtAw6I4Hhc
+\restrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -446,6 +446,13 @@ ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
 
 
 --
+-- Name: COLUMN messages.tool_calls; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.messages.tool_calls IS 'JSONB array. For role=system rows, first element may carry a "kind" discriminator: context_truncated | iteration_cap_dropped_tool_calls (Phase 075.4) | ask_user_prompt | ask_user_response (Phase 085).';
+
+
+--
 -- Name: model_capabilities_overrides; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -511,6 +518,7 @@ CREATE TABLE public.runs (
     output_tokens integer,
     error text,
     spawned_by_worker text,
+    parent_run_id uuid,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
@@ -581,6 +589,24 @@ CREATE TABLE public.threads (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     folder_id uuid
+);
+
+
+--
+-- Name: todos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.todos (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    todo_id text NOT NULL,
+    content text NOT NULL,
+    status text NOT NULL,
+    parent_id text,
+    order_index integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT todos_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text])))
 );
 
 
@@ -799,6 +825,22 @@ ALTER TABLE ONLY public.threads
 
 
 --
+-- Name: todos todos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: todos todos_thread_todo_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_thread_todo_unique UNIQUE (thread_id, todo_id);
+
+
+--
 -- Name: user_memory user_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -978,6 +1020,20 @@ CREATE INDEX idx_runs_active ON public.runs USING btree (user_id, thread_id, sta
 --
 
 CREATE INDEX idx_runs_history ON public.runs USING btree (user_id, thread_id, started_at DESC);
+
+
+--
+-- Name: idx_runs_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (parent_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_todos_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_index);
 
 
 --
@@ -1254,6 +1310,14 @@ ALTER TABLE ONLY public.runs
 
 
 --
+-- Name: runs runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.runs(run_id) ON DELETE SET NULL;
+
+
+--
 -- Name: runs runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1323,6 +1387,14 @@ ALTER TABLE ONLY public.threads
 
 ALTER TABLE ONLY public.threads
     ADD CONSTRAINT threads_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: todos todos_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
 
 
 --
@@ -1776,6 +1848,48 @@ ALTER TABLE public.skills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.threads ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: todos; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: todos todos_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
 -- Name: user_memory; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -1853,5 +1967,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qbp8uNgNfzraFQBr9fMnEnZ6oGlSYcNawuc8VlMhmqGQZOisgZqn0wtAw6I4Hhc
+\unrestrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
 
