@@ -59,18 +59,32 @@ fix: |
 ### 4. Cross-provider agent UAT (OpenRouter)
 expected: Same 6-call sequence succeeds on an OpenRouter model (e.g. kimi 2.6 or free-tier)
 result: issue
-severity_revised_2026-05-28: minor (was: blocker)
-revision_reason: |
-  After running Tests 15 (deepseek) and 16 (moonshot), the workspace_list-returns-empty
-  symptom did NOT reproduce on either native provider with the same write+list pattern.
-  Combined with OpenAI Test 1 and Anthropic Test 2 both passing the full 6-prompt cycle
-  cleanly, this confirms the bug is OpenRouter-specific (likely llama-3.3-70b weak
-  tool-call adherence), NOT a universal backend defect.
-  Per the project convention ([[feedback-openrouter-is-experimental]]), OpenRouter
-  is experimental-only and lower priority than native-integrated providers. Blocker
-  status downgraded to minor / informational. Fix is no longer a phase-blocker.
-  The original root_cause/fix block below is preserved for reference but Task 2 in
-  084-05-PLAN.md should be DEMOTED to defense-in-depth logging only (not a required fix).
+severity_final_2026-05-28: minor (fix is cheap + native-safe + worth shipping)
+investigation_evidence_2026-05-28: |
+  Reproduced in fresh thread 5aa25f1d-9fdb-41b6-b1d5-b30d8552f081 on llama-3.3-70b.
+  Instrumented `_handle_workspace_list` and captured runtime args:
+    args={'prefix': 'null'} prefix='null' type=str thread_id=5aa25f1d...
+    files_count=0
+  Llama-3.3 emits "prefix": "null" as a JSON STRING (not JSON null). The dispatcher's
+  `if prefix:` truthy-checks the 4-char string "null" and runs the prefix branch:
+  `WHERE path LIKE 'null%'` → 0 rows → "Workspace is empty."
+  All native providers emit proper JSON null → unaffected.
+  Same model also stringifies integer optionals (`"start_line": "1"`) on workspace_read --
+  evidenced in the earlier OpenRouter Test 4 read step.
+real_root_cause: |
+  Dispatcher trusts JSON type fidelity but weak models (Llama-3.3 on OpenRouter)
+  stringify null and integer values. The bug is on the BACKEND side: tools should
+  defensively normalize the well-known string forms ("null", "None", "") to None
+  for optional params, and coerce string integers to int when an int is expected.
+real_fix: |
+  In backend/app/services/tool_dispatcher.py, normalize optional args at dispatcher
+  entry for the 3 workspace tools with optional params:
+  - workspace_list.prefix: if prefix in ("null", "None", ""), set to None
+  - workspace_read.start_line, end_line: same null-string normalization + str→int coerce
+  - workspace_diff.from_version, to_version: same null-string normalization + str→int coerce
+  ~10 lines total. Native-safe (no impact on properly-typed args). Additive defensive
+  coding. Worth shipping per [[feedback-openrouter-is-experimental]] -- "experimental
+  means not prioritized, NOT ignore; fix when native-safe and low-risk."
 reported: |
   Tested 2026-05-28 via Chrome MCP on meta-llama/llama-3.3-70b-instruct in
   thread 606f0e00-6344-48ef-b818-d166e60ec68b.
@@ -158,9 +172,32 @@ reported: |
   ALL THREE return 200 with storage_type:"inline" but content:"" (empty string)
   for 11-byte "hello world" files. Bug is UNIVERSAL across all native providers --
   it's not provider-specific; it's a real REST endpoint defect.
-  Raw bodies (all 3 threads): {"size_bytes":11, "storage_type":"inline", "content":""}
 severity: blocker
-severity_confirmed_universal_2026-05-28: true
+investigation_evidence_2026-05-28: |
+  asyncpg direct probe against the DB confirms content_inline IS persisted correctly:
+    inline_size: 11 for all 4 recent threads (OpenRouter, deepseek, moonshot, OpenRouter-2).
+    has_inline: True
+  So write is fine -- the defect is in the REST read path.
+  supabase-py probe revealed the actual encoding:
+    content_inline_type: str
+    content_inline_repr: '\\x68656c6c6f20776f726c64'
+    content_inline_len: 24
+  supabase-py returns bytea as a STRING in PostgreSQL hex-escape format
+  (`\x` prefix + hex pairs). The current decoder _decode_inline_content tries
+  base64.b64decode() on this string, which fails (backslash and 'x' aren't valid
+  base64), the exception is swallowed, and "" is returned.
+real_root_cause: |
+  backend/app/api/workspace.py:51-66 _decode_inline_content handles bytes
+  and base64-strings but does NOT handle the `\x...` hex-bytea format that
+  supabase-py actually returns. Confirmed by side-by-side asyncpg (bytes) vs
+  supabase-py (`\x...` string) probe.
+real_fix: |
+  Add a hex-bytea branch to _decode_inline_content:
+    if isinstance(value, str) and value.startswith(r"\x"):
+      return bytes.fromhex(value[2:]).decode("utf-8", errors="replace")
+  Verified locally: bytes.fromhex('68656c6c6f20776f726c64').decode('utf-8') == 'hello world'.
+  ~3-line fix in api/workspace.py. Same fix applies to the diff endpoint at lines
+  284-285 which also calls _decode_inline_content.
 root_cause: |
   backend/app/api/workspace.py:51-66 `_decode_inline_content` returns "" when:
   (a) value is None (content_inline NULL in DB), OR
