@@ -12,7 +12,7 @@ trigger_when: >
   new-milestone planning as a candidate REQ (v2.8 = agent harness + plugins per the v2.7 PRD
   split) if the architecture/implementation is bigger than 088 can absorb.
 priority: high
-tags: [system-prompt, tool-use, cross-provider, provider-compat, model-onboarding, agent-quality, competitive-advantage, RAG]
+tags: [system-prompt, tool-use, cross-provider, provider-compat, model-onboarding, agent-quality, competitive-advantage, provider-docs-first, evidence-based, RAG]
 related_seeds: [SEED-028, SEED-031, SEED-032, SEED-009, SEED-010, SEED-035]
 related_bugs: [BUG-260529-01]
 ---
@@ -104,6 +104,27 @@ single shared prompt is tuned for the strongest models and under-serves weaker/n
   full capability," not "wired up and hoped for."
 - Pairs with `SEED-035` (tool-count/toolbox budget — Google warns >20 tools; weak models also
   degrade with large toolboxes) and `SEED-032` (deepseek reasoning-content round-trip).
+
+## Provider-docs-first rule (applies WHENEVER any provider is touched)
+
+This is the operating principle behind every approach above, and a standing rule beyond this
+seed: **whenever work touches a provider, research that provider's OWN official documentation
+first, then cross-check it against our application's actual behavior with comparative analysis
+and real evidence.**
+
+- Each provider has its own published guidance on **prompt engineering, orchestration, context
+  management, skill use, and tool calls / tool use** (e.g. Anthropic tool-use + prompt
+  guidelines, OpenAI function-calling + prompting guides, Google Gemini function-calling +
+  thinking docs, DeepSeek/Moonshot/GLM API references). These do NOT transfer 1:1 — what's
+  optimal for one provider can underperform or break another.
+- Always pull the **canonical provider docs** (WebSearch/WebFetch/context7) for the specific
+  capability being changed, then **compare against our measured reality** — DB/Supabase, backend
+  logs, LangSmith traces, and live cross-provider UAT (Chrome MCP). Decisions are grounded in
+  *provider docs + our own evidence*, never assumption.
+- Concrete precedent this run: BUG-260529-01 (arg-shape variance) and gemini-2.5-flash's
+  no-tool-call were caught by evidence (DB + logs + live UAT), not guesswork — that's the bar.
+- Composes with project memory: investigate-with-tools-first, research-landscape-completeness,
+  cross-provider-always-top-of-mind, multi-provider-behavior-variance.
 
 ## Why it matters
 
