@@ -828,6 +828,40 @@ async def _handle_query_tables(args: dict, ctx: ToolContext) -> ToolResult:
 # Workspace tool handlers (Phase 084)
 # ---------------------------------------------------------------------------
 
+# -- Phase 084 Plan 05: weak-model defensive normalization --------------
+# Some weak OpenRouter models (e.g. llama-3.3-70b-instruct) stringify
+# JSON null and integer values for optional tool args, e.g.
+#   {"prefix": "null"}  or  {"start_line": "1"}
+# The 5 native providers (OpenAI/Anthropic/Google/deepseek/moonshot) emit
+# proper JSON types so these normalizers are no-ops for them. Additive
+# defensive coding -- cannot regress any native provider's code path.
+_NULL_STRINGS = frozenset({"null", "None", ""})
+
+
+def _normalize_optional(value):
+    """Treat string ``null``/``None``/`` `` as Python None. Pass through everything else."""
+    if isinstance(value, str) and value in _NULL_STRINGS:
+        return None
+    return value
+
+
+def _normalize_optional_int(value):
+    """Normalize null-strings to None and coerce string integers to int.
+    Returns None for None / null-strings / un-coercible values.
+    Pass-through for genuine ints."""
+    value = _normalize_optional(value)
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except (ValueError, AttributeError):
+            return None
+    return None
+
+
 async def _handle_workspace_write(args: dict, ctx: ToolContext) -> ToolResult:
     """Write or update a file in the thread workspace (D-13, WS-01)."""
     path = args.get("path", "")
@@ -865,8 +899,11 @@ async def _handle_workspace_write(args: dict, ctx: ToolContext) -> ToolResult:
 async def _handle_workspace_read(args: dict, ctx: ToolContext) -> ToolResult:
     """Read a file from the thread workspace (D-13, WS-02)."""
     path = args.get("path", "")
-    start_line = args.get("start_line")
-    end_line = args.get("end_line")
+    # Phase 084 Plan 05: weak OpenRouter models stringify integer optionals
+    # (`"start_line": "1"` and `"end_line": "null"`); normalize defensively.
+    # No-op for the 5 native providers which emit proper int/None.
+    start_line = _normalize_optional_int(args.get("start_line"))
+    end_line = _normalize_optional_int(args.get("end_line"))
     try:
         result = await ws_read_file(
             ctx.pool, ctx.supabase,
@@ -897,7 +934,12 @@ async def _handle_workspace_read(args: dict, ctx: ToolContext) -> ToolResult:
 
 async def _handle_workspace_list(args: dict, ctx: ToolContext) -> ToolResult:
     """List files in the thread workspace (D-13, WS-03)."""
-    prefix = args.get("prefix")
+    # Phase 084 Plan 05: weak OpenRouter models emit `"prefix": "null"` as a
+    # JSON STRING; the previous `if prefix:` truthy-check ran the prefix
+    # branch with literal "null" → `WHERE path LIKE 'null%'` → 0 rows →
+    # "Workspace is empty." Normalize so the string "null"/"None"/"" all
+    # collapse to None. No-op for properly-typed args from native providers.
+    prefix = _normalize_optional(args.get("prefix"))
     try:
         files = await ws_list_files(
             ctx.pool,
@@ -940,8 +982,9 @@ async def _handle_workspace_delete(args: dict, ctx: ToolContext) -> ToolResult:
 async def _handle_workspace_diff(args: dict, ctx: ToolContext) -> ToolResult:
     """Show diff between two versions of a workspace file (D-13, WS-04)."""
     path = args.get("path", "")
-    from_version = args.get("from_version")
-    to_version = args.get("to_version")
+    # Phase 084 Plan 05: same weak-model defensive coercion as workspace_read.
+    from_version = _normalize_optional_int(args.get("from_version"))
+    to_version = _normalize_optional_int(args.get("to_version"))
     try:
         result = await ws_get_diff(
             ctx.pool, ctx.supabase,

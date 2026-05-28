@@ -156,3 +156,125 @@ async def test_dispatch_routes_to_correct_handler():
     finally:
         if original is not None:
             _TOOL_REGISTRY["ls"] = original
+
+
+# -- Phase 084 Plan 05: weak-model dispatcher normalization --------------
+# Pins the defensive str-`null`/str-int normalization for the 3 workspace
+# tools (list/read/diff) with optional params. Weak OpenRouter models
+# (e.g. llama-3.3-70b) stringify JSON null and integer values; native
+# providers emit proper JSON types so the normalizer is a no-op for them.
+
+
+def test_normalize_optional_treats_null_string_as_none() -> None:
+    from app.services.tool_dispatcher import _normalize_optional
+    assert _normalize_optional("null") is None
+    assert _normalize_optional("None") is None
+    assert _normalize_optional("") is None
+
+
+def test_normalize_optional_passes_through_real_values() -> None:
+    from app.services.tool_dispatcher import _normalize_optional
+    assert _normalize_optional("docs/") == "docs/"
+    assert _normalize_optional(None) is None
+    assert _normalize_optional(42) == 42
+
+
+def test_normalize_optional_int_coerces_string_integers() -> None:
+    from app.services.tool_dispatcher import _normalize_optional_int
+    assert _normalize_optional_int("1") == 1
+    assert _normalize_optional_int("  42  ") == 42
+    assert _normalize_optional_int(7) == 7
+
+
+def test_normalize_optional_int_null_strings_become_none() -> None:
+    from app.services.tool_dispatcher import _normalize_optional_int
+    assert _normalize_optional_int("null") is None
+    assert _normalize_optional_int("None") is None
+    assert _normalize_optional_int("") is None
+    assert _normalize_optional_int(None) is None
+
+
+def test_normalize_optional_int_uncoercible_becomes_none() -> None:
+    """Defensive: weird strings shouldn't raise -- the downstream code
+    handles None gracefully and treats it as 'no optional given'."""
+    from app.services.tool_dispatcher import _normalize_optional_int
+    assert _normalize_optional_int("not-a-number") is None
+    assert _normalize_optional_int([]) is None
+
+
+@pytest.mark.asyncio
+async def test_workspace_list_normalizes_str_null_prefix() -> None:
+    """Handler-level integration: workspace_list with ``{"prefix": "null"}``
+    (weak-model emit) must call list_files_in_thread with prefix=None, NOT
+    the literal 4-char string "null" that would WHERE LIKE 'null%' to 0 rows.
+
+    This reproduces the exact OpenRouter llama-3.3-70b defect from
+    084-HUMAN-UAT Test 4 (thread 5aa25f1d) where a freshly-written file
+    was hidden from the agent by a stringified-null prefix bug."""
+    from unittest.mock import patch
+    from uuid import UUID
+    from app.services.tool_dispatcher import _handle_workspace_list, ToolContext
+
+    captured: dict = {}
+
+    async def _fake_list(pool, *, thread_id, prefix=None):
+        captured["prefix"] = prefix
+        captured["thread_id"] = thread_id
+        # Return one row so we exercise the formatted-output branch too.
+        return [{"path": "/test.md", "size_bytes": 11, "mime_type": "text/markdown"}]
+
+    fake_thread_id = "00000000-0000-0000-0000-000000000001"
+    ctx = ToolContext(
+        redis=None, run_id=None, thread_id=fake_thread_id,
+        supabase=None, pool="fake_pool", user_settings=None,
+        current_user={"id": "u"}, folder_subtree_ids=None,
+        scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
+    )
+    with patch(
+        "app.services.tool_dispatcher.ws_list_files",
+        side_effect=_fake_list,
+    ):
+        result = await _handle_workspace_list({"prefix": "null"}, ctx)
+
+    assert captured["prefix"] is None, (
+        f"prefix should be normalized to None, got {captured['prefix']!r}"
+    )
+    assert captured["thread_id"] == UUID(fake_thread_id)
+    assert "/test.md" in result.result
+    assert "Workspace is empty" not in result.result
+
+
+@pytest.mark.asyncio
+async def test_workspace_read_coerces_str_int_line_args() -> None:
+    """Handler-level integration: workspace_read with stringified ints
+    (`{"start_line": "1", "end_line": "5"}`, the exact shape llama-3.3
+    emitted in 084-HUMAN-UAT Test 4) must pass int values downstream."""
+    from unittest.mock import patch
+    from app.services.tool_dispatcher import _handle_workspace_read, ToolContext
+
+    captured: dict = {}
+
+    async def _fake_read(pool, supabase, *, thread_id, path, start_line, end_line):
+        captured["start_line"] = start_line
+        captured["end_line"] = end_line
+        return {"content": "hello world", "is_binary": False, "is_truncated": False}
+
+    ctx = ToolContext(
+        redis=None, run_id=None, thread_id="00000000-0000-0000-0000-000000000001",
+        supabase=None, pool="fake_pool", user_settings=None,
+        current_user={"id": "u"}, folder_subtree_ids=None,
+        scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
+    )
+    with patch(
+        "app.services.tool_dispatcher.ws_read_file",
+        side_effect=_fake_read,
+    ):
+        result = await _handle_workspace_read(
+            {"path": "/test.md", "start_line": "1", "end_line": "5"}, ctx,
+        )
+
+    assert captured["start_line"] == 1
+    assert captured["end_line"] == 5
+    assert isinstance(captured["start_line"], int)
+    assert isinstance(captured["end_line"], int)
+    assert result.result == "hello world"
