@@ -59,6 +59,18 @@ fix: |
 ### 4. Cross-provider agent UAT (OpenRouter)
 expected: Same 6-call sequence succeeds on an OpenRouter model (e.g. kimi 2.6 or free-tier)
 result: issue
+severity_revised_2026-05-28: minor (was: blocker)
+revision_reason: |
+  After running Tests 15 (deepseek) and 16 (moonshot), the workspace_list-returns-empty
+  symptom did NOT reproduce on either native provider with the same write+list pattern.
+  Combined with OpenAI Test 1 and Anthropic Test 2 both passing the full 6-prompt cycle
+  cleanly, this confirms the bug is OpenRouter-specific (likely llama-3.3-70b weak
+  tool-call adherence), NOT a universal backend defect.
+  Per the project convention ([[feedback-openrouter-is-experimental]]), OpenRouter
+  is experimental-only and lower priority than native-integrated providers. Blocker
+  status downgraded to minor / informational. Fix is no longer a phase-blocker.
+  The original root_cause/fix block below is preserved for reference but Task 2 in
+  084-05-PLAN.md should be DEMOTED to defense-in-depth logging only (not a required fix).
 reported: |
   Tested 2026-05-28 via Chrome MCP on meta-llama/llama-3.3-70b-instruct in
   thread 606f0e00-6344-48ef-b818-d166e60ec68b.
@@ -142,10 +154,13 @@ notes: |
 expected: GET /threads/{id}/workspace/files/{file_id}/content for a < 256KB file returns `storage_type: "inline"` and `content` field with text
 result: issue
 reported: |
-  Tested 2026-05-28 via Chrome fetch. GET returned 200 with storage_type:"inline"
-  but content:"" (empty string) for an 11-byte file ("hello world").
-  Raw body: {"id":"...","path":"/test.md","size_bytes":11,"mime_type":"text/markdown","storage_type":"inline","content":""}
+  Tested 2026-05-28 via Chrome fetch on 3 separate threads (OpenRouter, deepseek, moonshot).
+  ALL THREE return 200 with storage_type:"inline" but content:"" (empty string)
+  for 11-byte "hello world" files. Bug is UNIVERSAL across all native providers --
+  it's not provider-specific; it's a real REST endpoint defect.
+  Raw bodies (all 3 threads): {"size_bytes":11, "storage_type":"inline", "content":""}
 severity: blocker
+severity_confirmed_universal_2026-05-28: true
 root_cause: |
   backend/app/api/workspace.py:51-66 `_decode_inline_content` returns "" when:
   (a) value is None (content_inline NULL in DB), OR
@@ -189,14 +204,37 @@ expected: After 100 files in a thread, 101st workspace_write returns the warning
 result: skipped
 reason: "Heavy setup (101 writes); deferred. Code path verified in Plan 02 (PASS row in VERIFICATION); functional UAT can wait until Test 1-4 + 9 blockers are fixed."
 
+### 15. Cross-provider agent UAT (deepseek) [ADDED 2026-05-28]
+expected: workspace_write + workspace_list succeed on deepseek (native-integrated provider, missed in first UAT pass)
+result: pass
+notes: |
+  Tested 2026-05-28 via Chrome MCP on deepseek-v4-flash.
+  Combined prompt: "Write a file at /test.md with content 'hello world', then list my workspace files"
+  Result: "Run · 2 tools · ✓ done" in 5.8s. Agent confirmed "Wrote /test.md (version 1, 11 bytes) ✓. Listed workspace -- there's 1 file: /test.md -- 11 bytes, text/markdown".
+  Native deepseek path through openai-compatible adapter works cleanly. workspace_list correctly returned the row -- this DISPROVES the universal-backend hypothesis for Blocker 2 (see Test 4).
+  Read/write-v2/diff/delete prompts were not separately exercised; sub-segment confidence inherits from passing OpenAI + Anthropic single-turn pattern (same dispatcher).
+
+### 16. Cross-provider agent UAT (moonshot) [ADDED 2026-05-28]
+expected: workspace_write + workspace_list succeed on moonshot (native-integrated provider, missed in first UAT pass)
+result: pass
+notes: |
+  Tested 2026-05-28 via Chrome MCP on kimi-k2.6 (moonshot).
+  Same combined prompt as Test 15.
+  Result: "Run · 2 tools · ✓ done" in 24.0s. Agent confirmed "Done. I've written /test.md ... (11 bytes). Your workspace currently contains: /test.md (11 bytes, text/markdown)".
+  Slower than deepseek (24s vs 5.8s) but tool calls are correct.
+  Native moonshot path through openai-compatible adapter works cleanly.
+
 ## Summary
 
-total: 14
-passed: 4
+total: 16
+passed: 6
 issues: 3
 pending: 0
 skipped: 7
 blocked: 0
+
+revisions:
+- 2026-05-28: Tests 15 (deepseek) + 16 (moonshot) added retroactively; both PASS. Test 4 (OpenRouter) severity downgraded from blocker to minor after native-provider cycles confirmed list-empty is OpenRouter-specific not universal. Test 9 (REST /content) confirmed UNIVERSAL across 3 threads, severity stays blocker.
 
 ## Gaps
 
