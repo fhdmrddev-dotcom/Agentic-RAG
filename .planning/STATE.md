@@ -4,14 +4,14 @@ milestone: v2.7
 milestone_name: Milestone Context
 status: executing
 stopped_at: Phase 086 context gathered
-last_updated: "2026-05-28T19:33:00.752Z"
-last_activity: 2026-05-28 -- Phase 086 planning complete
+last_updated: "2026-05-28T19:45:12.965Z"
+last_activity: 2026-05-28 -- Phase 086 execution started
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 15
   completed_plans: 13
-  percent: 50
+  percent: 87
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted 2026-05-12, scoped to Themes A+C+D+H for v2.7)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 085 — new-llm-tools
+**Current focus:** Phase 086 — streamsprovider-extension-panel-hooks
 
 ## Current Position
 
-Phase: 086
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-05-28 -- Phase 086 planning complete
+Phase: 086 (streamsprovider-extension-panel-hooks) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 086
+Last activity: 2026-05-28 -- Phase 086 execution started
 
 Progress: [██████████] 100%
 

@@ -35,8 +35,8 @@
  */
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
-import type { Message } from "@/types"
-import { readSnapshotSyncOrEmpty } from "@/lib/streamsCache"
+import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem } from "@/types"
+import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
 
@@ -77,6 +77,29 @@ export interface StreamsState {
    *  runIds currently bound for that thread; an empty inner Set is GC'd via
    *  delete-the-key on removal. */
   subscriptionsByThread: Map<string, Set<string>>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 086 Plan 01 (PANEL-05 / PANEL-06) — agent-panel per-thread Maps.
+  // The 6 new SSE events (Phases 084/085) demux into these 4 dedicated Maps so
+  // panel events NEVER mutate bucketsBySurface (chat message selectors never
+  // re-render — PANEL-06). Each mirrors the bucketsBySurface per-thread shape:
+  // Map<threadId, T[]>. Strictly additive (D-086-18) — no existing field above
+  // is altered. Identity keys per the backend wire shapes: Todo by `id`,
+  // WorkspaceFile by `path`, PendingAsk by `tool_call_id`, TaskRunIndexItem by
+  // `sub_run_id`. todosByThread + tasksByThread hydrate from localStorage on
+  // first paint (Task 3 wiring); pendingAsksByThread + workspaceFilesByThread
+  // start EMPTY (ephemeral / large-blob — D-086-03).
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Per-thread todo lists (full-state-replace on todo_updated SSE). */
+  todosByThread: Map<string, Todo[]>
+  /** Per-thread workspace file index (keyed-by-path mutation on
+   *  workspace_file_written / workspace_file_deleted SSE). */
+  workspaceFilesByThread: Map<string, WorkspaceFile[]>
+  /** Per-thread pending ask_user prompts (keyed-by-tool_call_id add/remove on
+   *  ask_user_prompt / ask_user_response SSE). Never persisted. */
+  pendingAsksByThread: Map<string, PendingAsk[]>
+  /** Per-thread sub-agent task run index (keyed-by-sub_run_id upsert/status on
+   *  the TASK-variant sub_agent_start / sub_agent_done SSE). */
+  tasksByThread: Map<string, TaskRunIndexItem[]>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -100,6 +123,40 @@ export interface StreamsState {
     stopStream: () => Promise<void>
     resumeFromFailed: (failedMessage: Message) => Promise<void>
     loadMessages: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 086 Plan 01 (PANEL-05 / PANEL-06) — 11 additive panel actions.
+    // Each mutates ONLY its dedicated per-thread Map via an immutable
+    // `new Map(prev)` replace so chat-message selectors never re-render
+    // (PANEL-06). Bodies are seeded as synchronous no-op stubs below and the
+    // provider overwrites them in a mount-time useEffect (Plan 086-02).
+    // ──────────────────────────────────────────────────────────────────────────
+    /** Full-state-replace of a thread's todo list (todo_updated SSE / GET). */
+    setTodosForThread: (threadId: string, todos: Todo[]) => void
+    /** Alias for full-state-replace (reconcile path). */
+    replaceTodosForThread: (threadId: string, todos: Todo[]) => void
+    /** Upsert a single workspace file by path (workspace_file_written SSE). */
+    setWorkspaceFileForThread: (threadId: string, file: WorkspaceFile) => void
+    /** Remove a workspace file by path (workspace_file_deleted SSE). */
+    removeWorkspaceFileForThread: (threadId: string, path: string) => void
+    /** Full-state-replace of a thread's workspace file index (GET reconcile). */
+    replaceWorkspaceFilesForThread: (threadId: string, files: WorkspaceFile[]) => void
+    /** Add a pending ask by tool_call_id (ask_user_prompt SSE). */
+    addPendingAskForThread: (threadId: string, ask: PendingAsk) => void
+    /** Remove a pending ask by tool_call_id (ask_user_response SSE). */
+    removePendingAskForThread: (threadId: string, toolCallId: string) => void
+    /** Full-state-replace of a thread's pending asks (GET reconcile). */
+    replacePendingAsksForThread: (threadId: string, asks: PendingAsk[]) => void
+    /** Upsert a task run by sub_run_id (sub_agent_start TASK variant). */
+    setTaskForThread: (threadId: string, task: TaskRunIndexItem) => void
+    /** Update a task's status/summary by sub_run_id (sub_agent_done TASK variant). */
+    updateTaskStatusForThread: (
+      threadId: string,
+      subRunId: string,
+      status: string,
+      summary: string,
+    ) => void
+    /** Full-state-replace of a thread's task run index (GET reconcile). */
+    replaceTasksForThread: (threadId: string, tasks: TaskRunIndexItem[]) => void
   }
 }
 
@@ -133,6 +190,20 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   loadingThreads: new Set<string>(),
   // Type: subscriptionsByThread: Map<string, Set<string>>
   subscriptionsByThread: new Map<string, Set<string>>(),
+  // Phase 086 Plan 01 (D-086-03): panel per-thread Map defaults. todos + tasks
+  // hydrate from localStorage SYNCHRONOUSLY on first paint (same Pitfall 1/8
+  // discipline as bucketsBySurface above — read inside the factory, not a
+  // useEffect, so first paint sees cached content). pendingAsks +
+  // workspaceFiles start EMPTY (ephemeral / large-blob — not persisted).
+  // Type-annotation comment above each per D-075.4-A1 convention.
+  // Type: todosByThread: Map<string, Todo[]>
+  todosByThread: readTodosSyncOrEmpty(),
+  // Type: workspaceFilesByThread: Map<string, WorkspaceFile[]>
+  workspaceFilesByThread: new Map<string, WorkspaceFile[]>(),
+  // Type: pendingAsksByThread: Map<string, PendingAsk[]>
+  pendingAsksByThread: new Map<string, PendingAsk[]>(),
+  // Type: tasksByThread: Map<string, TaskRunIndexItem[]>
+  tasksByThread: readTasksSyncOrEmpty(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -142,5 +213,20 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     stopStream: notMounted,
     resumeFromFailed: notMounted,
     loadMessages: notMounted,
+    // Phase 086 Plan 01 (PATTERNS §1 Part C / RESEARCH Pitfall 5): synchronous
+    // no-op stubs — NOT notMounted — because panel SSE dispatch can fire these
+    // BEFORE the provider's mount-time useEffect registers real bodies on the
+    // very first render. The provider overwrites all 11 in Plan 086-02.
+    setTodosForThread: () => {},
+    replaceTodosForThread: () => {},
+    setWorkspaceFileForThread: () => {},
+    removeWorkspaceFileForThread: () => {},
+    replaceWorkspaceFilesForThread: () => {},
+    addPendingAskForThread: () => {},
+    removePendingAskForThread: () => {},
+    replacePendingAsksForThread: () => {},
+    setTaskForThread: () => {},
+    updateTaskStatusForThread: () => {},
+    replaceTasksForThread: () => {},
   },
 })))
