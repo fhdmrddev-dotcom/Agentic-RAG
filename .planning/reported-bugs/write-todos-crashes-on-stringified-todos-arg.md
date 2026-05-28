@@ -4,10 +4,10 @@ title: write_todos crashes ('str' object has no attribute 'get') when a model se
 reported: 2026-05-29
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/tools, backend/agent-loop, cross-provider]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: quick-260529-1wb
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -93,6 +93,17 @@ This turns the crash into a friendly, model-readable error (enabling self-correc
 ## Workarounds (prompt-side)
 
 Use a capable model that emits structured tool args (OpenAI, Anthropic, Google **3.x**, DeepSeek, Moonshot, OpenRouter glm/gemma/deepseek-r1). Avoid free/weak OpenRouter models (e.g. free llama-3.3-70b) for tool-calling tasks.
+
+## Resolution (2026-05-28, quick task 260529-1wb)
+
+Fixed and verified. Commits on `v2.5-dev`:
+- `33e2b0a` — `_handle_write_todos`: `json.loads` coercion for a stringified `todos` arg + `isinstance(todos_in, list)` guard + `isinstance(t, dict)` guard as the first per-item check (returns friendly `ToolResult` errors instead of crashing). The coerced list is what flows to `replace_todos` (confirmed at `tool_dispatcher.py:1239`).
+- `1a06ede` — `replace_todos`: defense-in-depth `isinstance(t, dict)` guard (`todos_service.py:62`).
+- `c756522` — regression test `backend/tests/unit/test_write_todos_coercion.py` (3 cases).
+
+**Verification:** new test is GREEN (3 passed). RED-proof against pre-fix code: 3 failed with `AttributeError: 'str' object has no attribute 'get'` at `tool_dispatcher.py:1212` (the exact crash). Existing suites unaffected: `test_tool_dispatcher.py` + `test_085_todos_service.py` = 22 passed.
+
+**Optional final confirmation (belt-and-suspenders):** re-run the original prompt on free OpenRouter `llama-3.3-70b` in the live app (requires the backend to have reloaded this change) — expect either a successful list or a clean self-correcting error, no 14× crash loop. Closure here is on the strength of the RED→GREEN regression test, which reproduces the exact failure.
 
 ## Reference / evidence links
 

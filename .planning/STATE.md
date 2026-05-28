@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 Phase: 086 (streamsprovider-extension-panel-hooks) — EXECUTING
 Plan: 1 of 2
 Status: Executing Phase 086
-Last activity: 2026-05-28 -- Completed quick task 260529-0sc: Fix Phase 086 WR-04 (persist panel todo/task Maps to localStorage)
+Last activity: 2026-05-28 -- Completed quick task 260529-1wb: Fix BUG-260529-01 (write_todos crash on stringified todos arg). Phase 086 UAT passed (4/5, 1 blocked on 087); verification flipped to passed 3/3.
 
 Progress: [██████████] 100%
 
@@ -91,6 +91,7 @@ Surfaced for Phase 086 (streamsprovider-extension-panel-hooks), which touches th
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260529-0sc | Fix Phase 086 WR-04: persist panel todo/task Maps to localStorage write-path (closes the sole blocking gap from 086-VERIFICATION.md) | 2026-05-28 | 62c1cf0 | [260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t](./quick/260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t/) |
+| 260529-1wb | Fix BUG-260529-01: write_todos crashes on stringified `todos` arg — json.loads coercion + isinstance guards so weak/OpenRouter models get a self-correcting error instead of a crash loop (RED→GREEN regression test) | 2026-05-28 | c756522 | [260529-1wb-fix-bug-260529-01-write-todos-crashes-on](./quick/260529-1wb-fix-bug-260529-01-write-todos-crashes-on/) |
 
 ## Deferred Items
 
