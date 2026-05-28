@@ -33,6 +33,7 @@ async def insert_run(
     model: str,
     provider: str,
     spawned_by_worker: str | None = None,
+    parent_run_id: UUID | None = None,
 ) -> None:
     """Insert a new runs row at request entry (Phase 073 - replaces threads.py:974 aexec).
 
@@ -43,11 +44,16 @@ async def insert_run(
       - started_at: DEFAULT now() - omitted here so Postgres fills it
       - input_tokens / output_tokens / completed_at / message_id / error: left NULL until finalize
       - spawned_by_worker: nullable TEXT, OS PID of the worker that created the run (Phase 079 / D-PRD-12)
+      - parent_run_id: nullable UUID FK to runs.run_id (Phase 085 / D-085-14), non-null
+        for sub-agent runs spawned via the ``task`` tool. Column added by migration 055
+        (ON DELETE SET NULL — deleting a parent does NOT cascade to child rows).
+        Default ``None`` preserves backward compat for all existing top-level callers.
     """
     await pool.execute(
         """
-        INSERT INTO runs (run_id, thread_id, user_id, status, model, provider, spawned_by_worker)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO runs (run_id, thread_id, user_id, status, model, provider,
+                          spawned_by_worker, parent_run_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         """,
         run_id,
         thread_id,
@@ -56,6 +62,7 @@ async def insert_run(
         model,
         provider,
         spawned_by_worker,
+        parent_run_id,
     )
 
 

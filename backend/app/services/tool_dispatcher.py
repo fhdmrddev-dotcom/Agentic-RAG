@@ -1006,6 +1006,59 @@ async def _handle_workspace_diff(args: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(result=json.dumps({"error": str(e)}))
 
 
+async def _handle_write_todos(args: dict, ctx: ToolContext) -> ToolResult:
+    """Phase 085 D-085-17..21 — write_todos handler.
+
+    Full-state-replace of the thread's todo list. Validates payload pre-DB
+    (mitigates T-085-T1), calls replace_todos in a single asyncpg transaction
+    (mitigates T-085-T4 race), re-SELECTs the canonical list, emits a
+    ``todo_updated`` SSE event carrying the FULL list (per D-085-21), and
+    returns ``{"accepted": N, "version": <ms>}`` JSON to the LLM.
+
+    Lazy import of replace_todos mirrors the workspace handlers' style.
+    """
+    todos_in = args.get("todos") or []
+
+    # Pre-DB validation — fast-fail with a friendly LLM-readable error before
+    # any pool acquire so a malformed payload never trips the transaction.
+    for t in todos_in:
+        if not t.get("id") or not t.get("content"):
+            return ToolResult(result="write_todos: each todo requires id and content")
+        if t.get("status") not in ("pending", "in_progress", "completed"):
+            return ToolResult(
+                result=f"write_todos: invalid status {t.get('status')!r}; "
+                "must be pending|in_progress|completed"
+            )
+
+    from app.services.todos_service import replace_todos  # noqa: PLC0415
+
+    try:
+        result = await replace_todos(ctx.pool, UUID(ctx.thread_id), todos_in)
+    except Exception as e:  # noqa: BLE001
+        logger.exception(
+            "write_todos: replace_todos failed for thread=%s", ctx.thread_id
+        )
+        return ToolResult(result=json.dumps({"error": f"write_todos failed: {e}"}))
+
+    # Re-SELECT canonical list for the SSE payload (RESEARCH §C.3 — D-085-21)
+    rows = await ctx.pool.fetch(
+        "SELECT todo_id AS id, content, status, parent_id, order_index "
+        "FROM todos WHERE thread_id = $1 ORDER BY order_index, created_at",
+        UUID(ctx.thread_id),
+    )
+    todos_payload = [dict(r) for r in rows]
+
+    await ctx.emit(
+        ctx.redis, ctx.run_id, 'todo_updated',
+        todos=todos_payload,
+    )
+
+    return ToolResult(result=json.dumps({
+        "accepted": result["accepted"],
+        "version": result["version"],
+    }))
+
+
 # ---------------------------------------------------------------------------
 # Registry + dispatch entry point
 # ---------------------------------------------------------------------------
@@ -1033,6 +1086,8 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "workspace_list": _handle_workspace_list,
     "workspace_delete": _handle_workspace_delete,
     "workspace_diff": _handle_workspace_diff,
+    # Phase 085 — D-085 new tools (write_todos = Plan 01; task + ask_user = Plans 02/03)
+    "write_todos": _handle_write_todos,
 }
 
 
