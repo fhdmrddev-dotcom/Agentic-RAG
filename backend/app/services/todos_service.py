@@ -59,6 +59,10 @@ async def replace_todos(
         TodosValidationError: payload validation failed; transaction did NOT run.
     """
     for t in todos:
+        if not isinstance(t, dict):
+            raise TodosValidationError(
+                "each todo must be an object with id, content, status"
+            )
         if not t.get("id") or not t.get("content"):
             raise TodosValidationError("each todo requires id and content")
         if t.get("status") not in _ALLOWED_STATUS:
