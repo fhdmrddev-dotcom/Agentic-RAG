@@ -226,9 +226,14 @@ async def test_finalize_run_called_with_error_status_on_exception():
             max_steps=5,
         )
 
+    # The dict result key uses "error" (the internal phase-085 final_status enum),
+    # but finalize_run must write the runs.status DB enum value — which is "failed"
+    # per the runs CHECK constraint (supabase/full-schema.sql:459-473 — values are
+    # 'streaming'|'completed'|'failed'|'cancelled'|'timed_out', NOT 'error').
+    # Mismatched name was a PLAN.md slip; the schema is authoritative.
     assert result["status"] == "error"
     assert len(finalize_calls) == 1
-    assert finalize_calls[0]["status"] == "error"
+    assert finalize_calls[0]["status"] == "failed"
 
 
 @pytest.mark.asyncio
