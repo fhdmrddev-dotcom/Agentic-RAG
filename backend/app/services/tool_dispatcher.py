@@ -1205,10 +1205,26 @@ async def _handle_write_todos(args: dict, ctx: ToolContext) -> ToolResult:
     Lazy import of replace_todos mirrors the workspace handlers' style.
     """
     todos_in = args.get("todos") or []
+    # BUG-260529-01: some models (e.g. free OpenRouter llama-3.3-70b) serialize the
+    # nested `todos` arg as a JSON string. Coerce + guard so valid stringified
+    # payloads succeed and bad shapes return a self-correcting error (not a crash).
+    if isinstance(todos_in, str):
+        try:
+            todos_in = json.loads(todos_in)
+        except (ValueError, TypeError):
+            return ToolResult(
+                result="write_todos: 'todos' must be a JSON array of objects, not a string"
+            )
+    if not isinstance(todos_in, list):
+        return ToolResult(result="write_todos: 'todos' must be a list of objects")
 
     # Pre-DB validation — fast-fail with a friendly LLM-readable error before
     # any pool acquire so a malformed payload never trips the transaction.
     for t in todos_in:
+        if not isinstance(t, dict):
+            return ToolResult(
+                result="write_todos: each todo must be an object with id, content, status"
+            )
         if not t.get("id") or not t.get("content"):
             return ToolResult(result="write_todos: each todo requires id and content")
         if t.get("status") not in ("pending", "in_progress", "completed"):
