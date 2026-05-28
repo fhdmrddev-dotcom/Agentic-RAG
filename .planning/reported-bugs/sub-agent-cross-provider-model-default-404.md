@@ -4,16 +4,18 @@ title: Sub-agent spawned via task() inherits parent provider but uses OpenAI mod
 reported: 2026-05-28
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [backend/sub-agent, backend/agent-loop, cross-provider]
-folded_into: null
-verified_closed_by: null
+folded_into: "085"
+verified_closed_by: "085"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
   branch: v2.5-dev
   commit: d5277a4a3bdef8233deb28aa1a34ab701295c195
   date: 2026-05-28
+closed_on: 2026-05-28
+closed_by_commit: "Phase 085 Plan 05 (bdd9fd7 fix + e969da4 RED test + bfbaa0d unit tests)"
 ---
 
 # BUG-260528-01: Sub-agent spawned via `task()` inherits parent provider but uses OpenAI model name → 404 on non-OpenAI parents
@@ -108,3 +110,39 @@ Recommended fix direction: make "Auto (cheapest)" honor the parent's provider wh
 | Long-message | Rows 15, 16 deferred — depend on Row 9 fix |  |
 
 8 PASS / 1 FAIL / 4 deferred (would also fail until this bug is fixed or run on OpenAI only) / 3 operator-only rows (6, 7, 18) deferred to operator session.
+
+## Closure verification
+
+**Closed by:** Phase 085 Plan 05 (`085-05-sub-agent-cross-provider-fix`) — 2026-05-28.
+
+**Root cause confirmed in code:** the safety check at `sub_agent_models.py:58` only fired when `override_model` was truthy. The production call site at `task_service.py:229` passes `override_model=None` per D-085-11. The final return chain on lines 71-76 then leaked `user_settings.llm_model` (which can be stale-cross-provider — e.g., still `"gpt-4.1"` after the user toggled `active_provider="anthropic"`) straight to the provider client.
+
+**Fix shipped (`bdd9fd7`):** `resolve_sub_agent_model_safely` now always validates the resolved candidate against the active provider's model list — regardless of whether `override_model` is truthy. If the candidate is not in the active provider's family AND `_SUB_AGENT_MODEL_DEFAULTS[active_provider]` has a non-empty entry, the helper returns that provider default. For flexible providers (openrouter, ollama) with intentionally empty defaults, the helper keeps the candidate as best-effort and emits a WARNING log.
+
+**Test evidence (`e969da4` RED → `bdd9fd7` GREEN → `bfbaa0d` unit coverage):**
+
+```
+backend/tests/integration/test_085_sub_agent_cross_provider.py — 8/8 PASS
+  - test_cross_provider_default_path_no_footgun[openai]      PASS
+  - test_cross_provider_default_path_no_footgun[anthropic]   PASS  ← was FAIL pre-fix
+  - test_cross_provider_default_path_no_footgun[google]      PASS  ← was FAIL pre-fix
+  - test_cross_provider_default_path_no_footgun[openrouter]  PASS
+  - test_cross_provider_default_path_no_footgun[deepseek]    PASS  ← was FAIL pre-fix
+  - test_cross_provider_default_path_no_footgun[moonshot]    PASS  ← was FAIL pre-fix
+  - test_cross_provider_default_path_no_footgun[ollama]      PASS
+  - test_provider_default_table_covers_all_uat_axis_providers PASS
+
+backend/tests/unit/test_085_task_service.py — 23/23 PASS (4 new + 19 prior)
+  - test_resolve_falls_back_when_user_settings_llm_model_is_cross_provider  (new — root case)
+  - test_resolve_returns_candidate_when_provider_default_is_empty           (new — flexible providers)
+  - test_resolve_short_circuits_when_candidate_in_active_list               (new — happy path)
+  - test_resolve_with_empty_active_models_list_skips_validation             (new — empty-list edge)
+```
+
+**Full Phase 085 suite:** 105/105 PASS — no regressions in unit or integration tests.
+
+**D-085-16 freeze preserved:** `git diff master..HEAD -- backend/app/services/sub_agent_service.py` returns 0 lines (the frozen file was not modified).
+
+**UAT matrix:** Row 9 flipped from ❌ FAIL → ✅ PASS (Plan 05 re-verification). Rows 19 (DeepSeek `task`) + 20 (Moonshot `task`) added with PASS evidence. SC#10 cross-provider `task`-axis coverage is now 6 providers wide (was 2 pre-Plan-05). See `085-VALIDATION.md` `## UAT Re-run Session Log — 2026-05-28 (Plan 05 gap closure)`.
+
+**Operator final sign-off:** Plan 05 Task 5 emits a `checkpoint:human-action` requesting the operator perform a live-UI walkthrough of Row 9 (Anthropic + `task`) before phase verification proceeds. This is belt-and-suspenders — the structural fix is proven by the integration test, but the operator's lived-experience sign-off closes the loop for the `feedback_uat_lived_experience_gap` rule.

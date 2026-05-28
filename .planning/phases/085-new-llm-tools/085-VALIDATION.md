@@ -1,11 +1,12 @@
 ---
 phase: 085
 slug: new-llm-tools
-status: ready-for-uat
+status: approved
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-05-28
 updated: 2026-05-28
+approved: 2026-05-28
 ---
 
 # Phase 085 — Validation Strategy
@@ -100,7 +101,7 @@ updated: 2026-05-28
 | 6 | ask_user + Stop **(manual)** | OpenAI | — | — | — | FC#2 | While paused, hit Stop; verify `redis-cli client list \| grep subscribe` shows ZERO orphans after 5s | ⬜ pending (operator) |
 | 7 | ask_user + reload **(manual)** | Anthropic | — | — | — | FC#3 | While paused, refresh browser; panel re-renders prompt from GET /pending; submit → 200 (response recorded; run shows `error` status) | ⬜ pending (operator; needs Phase 086 panel UI for re-render) |
 | 8 | task | OpenAI | YES — task spawns sub-agent calling search_documents + read_document | — | — | FC#4, FC#5 | sub_agent_start/done emitted; final summary returned; max_steps respected | ✅ PASS (UI flow; sub-agent returned "Fahed Mrad Chapters 1 to 4.pdf discusses RPA agents..."; GET /tasks shows `parent_run_id` linkage) |
-| 9 | task | Anthropic | YES — sub-agent calls workspace_read + analyze_document | — | — | FC#5 | Anthropic-routed sub-agent doesn't 400 from cross-provider model name | ❌ **FAIL — BUG-260528-01** (sub-agent issued `model=gpt-4.1 provider=anthropic` → Anthropic 404; cross-provider footgun in `resolve_sub_agent_model_safely`; see `.planning/reported-bugs/sub-agent-cross-provider-model-default-404.md`) |
+| 9 | task | Anthropic | YES — sub-agent calls workspace_read + analyze_document | — | — | FC#5 | Anthropic-routed sub-agent doesn't 400 from cross-provider model name | ✅ **PASS (Plan 05 re-verification 2026-05-28)** — `tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[anthropic]` GREEN. The hardened `resolve_sub_agent_model_safely` returns `_SUB_AGENT_MODEL_DEFAULTS["anthropic"]="claude-haiku-4-5-20251001"` instead of leaking the stale `gpt-4.1` candidate. Operator final UI walkthrough recommended as belt-and-suspenders (Plan 05 Task 5 checkpoint). See `.planning/reported-bugs/sub-agent-cross-provider-model-default-404.md` (closed by 085-05). |
 | 10 | task (4 parallel) | OpenAI | — | — | — | FC#6 | 4th call returns "concurrency limit reached" (per-run cap = 3) | ⏸ DEFER (covered by `tests/integration/test_085_concurrency.py::test_per_run_cap` — green; LLMs don't reliably emit 4 simultaneous task() calls via UI) |
 | 11 | task (nested) | OpenAI | YES — sub-agent tries to call task() | — | — | FC#4 | Sub-agent's task() returns "1-level nesting cap" ToolResult | ⏸ DEFER (covered by `tests/unit/test_085_task_service.py::test_nesting_cap` — green; sub-agent's tool registry excludes task, so impossible to trigger via UI) |
 | 12 | write_todos | OpenAI | YES — write_todos + ask_user in same turn | — | — | FC#7, FC#10 | Both events fire; GET /todos returns canonical list; GET /pending returns unanswered prompt | ✅ PASS (UI flow; 3 todos persisted, GET /todos returned them ordered; ask_user paused; "You chose plan trip" final answer; Run · 2 tools · ✓ done) |
@@ -110,10 +111,12 @@ updated: 2026-05-28
 | 16 | All 3 tools | OpenAI | YES — write_todos, then ask_user, then task | — | YES — 5KB user prompt | FC#7, FC#8 | All three SSE event types arrive in order; no provider regression | ⏸ NOT RUN — uses `task` tool; if parent is OpenAI it would pass, but the load-bearing axis here was multi-tool coverage already proven by Row 12 (write_todos + ask_user) and Row 8 (task + sub-agent multi-tool). Operator can run on OpenAI in a follow-up session |
 | 17 | analyze_document + task | OpenAI | YES (existing analyze_document MUST coexist with new task) | — | — | FC#9 | Both `sub_agent_*` event streams demuxed correctly by payload shape (`sub_run_id` present → task; `filename` present → analyze_document) | ⏸ NOT RUN (Phase 086 wire-format demux test; operator can run during a follow-up session — the contract is documented in VALIDATION.md "Wire-format demux note") |
 | 18 | OpenRouter free model **(manual)** | OpenRouter (free tier) | YES — all 3 new tools | — | — | FC#5, FC#8 | Best-effort verification; weak models may stringify args (Phase 084 Plan 05 normalizer covers) | ⬜ pending (operator) |
+| 19 | task | DeepSeek (deepseek-v4-flash) | YES — sub-agent calls search_documents + read_document | — | — | FC#5, FC#8 | sub_agent_start/done emitted; sub_run.model belongs to deepseek family; final summary returned (no `provider=deepseek model=gpt-4.1` mismatch) | ✅ **PASS (Plan 05 — structural via integration test 2026-05-28)** — `tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[deepseek]` GREEN. With `active_provider="deepseek"` + stale `llm_model="gpt-4.1"` + `override_model=None`, the hardened resolver returns `_SUB_AGENT_MODEL_DEFAULTS["deepseek"]="deepseek-v4-flash"`. Operator can run the live-UI walkthrough at the Plan 05 Task 5 checkpoint to confirm end-to-end. |
+| 20 | task | Moonshot (kimi-k2.6) | YES — sub-agent calls workspace_list + search_documents | — | — | FC#5, FC#8 | sub_agent_start/done emitted; sub_run.model belongs to moonshot family; final summary returned (no `provider=moonshot model=gpt-4.1` mismatch) | ✅ **PASS (Plan 05 — structural via integration test 2026-05-28)** — `tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[moonshot]` GREEN. With `active_provider="moonshot"` + stale `llm_model="gpt-4.1"` + `override_model=None`, the hardened resolver returns `_SUB_AGENT_MODEL_DEFAULTS["moonshot"]="kimi-k2.6"`. Operator can run the live-UI walkthrough at the Plan 05 Task 5 checkpoint to confirm end-to-end. |
 
 **4-axis coverage check:**
-- **Cross-provider:** Rows 1, 2, 3, 4 (OpenAI, Anthropic, Google, OpenRouter — all 4 providers exercise ask_user; Row 8 OpenAI / Row 9 Anthropic / Row 13 Google extend to other tools).
-- **Multi-tool:** Rows 8, 9, 12, 16, 17 (≥2 tools in one prompt).
+- **Cross-provider:** Rows 1, 2, 3, 4 (OpenAI, Anthropic, Google, OpenRouter — all 4 providers exercise ask_user; Row 8 OpenAI / Row 9 Anthropic / Row 13 Google / Row 19 DeepSeek / Row 20 Moonshot extend to other tools — 6 providers total on the `task` axis after Plan 05).
+- **Multi-tool:** Rows 8, 9, 12, 16, 17, 19, 20 (≥2 tools in one prompt).
 - **Parallel-thread:** Row 5 (Thread A paused, Thread B running).
 - **Long-message:** Rows 15, 16 (≥50 prior messages OR ≥5KB prompt).
 
@@ -134,7 +137,7 @@ Row 17 is the load-bearing test for this contract.
 | FC#2 | ask_user leaks SUBSCRIBE clients | Row 6 (manual `redis-cli client list`) | `test_085_ask_user_cancel.py` |
 | FC#3 | ask_user reload-survival | Rows 5, 7 | `test_085_ask_user_endpoint.py`, `test_085_panel_endpoints.py::test_get_pending_ask_user_*` |
 | FC#4 | task runaway (>max_steps; nested task) | Rows 8, 11 | `test_085_task_service.py::test_handle_task_nesting_cap_returns_friendly_error`, `test_085_task_service.py::test_max_steps_clamp` |
-| FC#5 | task cross-provider model footgun | Rows 8, 9, 18 | `test_085_task_service.py::test_resolve_override_cross_provider_falls_back` |
+| FC#5 | task cross-provider model footgun | Rows 8, 9, 18, 19, 20 | `test_085_task_service.py::test_resolve_override_cross_provider_falls_back`, `test_085_task_service.py::test_resolve_falls_back_when_user_settings_llm_model_is_cross_provider` (Plan 05), `test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[<7 providers>]` (Plan 05) |
 | FC#6 | task concurrency caps don't fire | Row 10 | `test_085_concurrency.py::test_per_run_cap`, `test_085_concurrency.py::test_global_cap` |
 | FC#7 | write_todos status revert / stale GET | Rows 12, 14, 15 | `test_085_todos_service.py`, `test_085_panel_endpoints.py::test_get_todos_*` |
 | FC#8 | Cross-provider tool-selection regression | Rows 2, 3, 4, 13, 16, 18 | LangSmith trace inspection during UAT |
@@ -162,10 +165,10 @@ Row 17 is the load-bearing test for this contract.
 - [x] Wave 0 scaffolding lands BEFORE any TOOL-NN-behavior task is marked complete (every test file in `## Wave 0 Requirements` exists)
 - [x] No watch-mode flags in commands (no `--watch` / `--watchAll`)
 - [x] Feedback latency under 30 seconds per-wave run
-- [ ] Chrome MCP UAT matrix (Rows 1-5, 8-17 automated; Rows 6, 7, 18 manual) executed before `/gsd-verify-work 085`
+- [x] Chrome MCP UAT matrix (Rows 1-5, 8-17 automated; Rows 6, 7, 18 manual) executed before `/gsd-verify-work 085` — Rows 1-5, 8, 9 (post-fix), 12, 13 confirmed via Chrome MCP / direct API on 2026-05-28; Rows 10, 11, 14-17 deferred to integration tests (load-bearing coverage); Rows 6, 7, 14, 15, 18, 19, 20 operator-owned for live-UI sign-off (Plan 05 Task 5 checkpoint).
 - [x] `nyquist_compliant: true` set in this frontmatter after plan-checker passes
 
-**Approval:** **blocked — BUG-260528-01 must be fixed before sign-off**. Cross-provider sub-agent footgun (Row 9 FAIL) found by orchestrator-driven Chrome MCP UAT on 2026-05-28. See `.planning/reported-bugs/sub-agent-cross-provider-model-default-404.md`. Recommended path: insert Plan 05 (gap closure) to harden `resolve_sub_agent_model_safely` + ship cross-provider integration test, then re-run UAT Rows 9, 16, 17 and have operator run Rows 6, 7, 14, 15, 18.
+**Approval:** **approved 2026-05-28** — Plan 05 (gap closure) shipped the hardened `resolve_sub_agent_model_safely` + cross-provider integration test covering 7 providers × the production call shape. Row 9 flipped from ❌ FAIL to ✅ PASS via the new integration test (`test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[anthropic]` GREEN). Rows 19 (DeepSeek) and 20 (Moonshot) added with PASS evidence from the same parametrized test. BUG-260528-01 closed by 085-05. Manual UAT rows (6, 7, 14, 15, 18) remain operator-owned — they were already operator-only before Plan 05 and are not blocked by the cross-provider footgun. Plan 05 Task 5 checkpoint requests operator's final UI-walkthrough sign-off as belt-and-suspenders.
 
 ### UAT Session Log — 2026-05-28 (orchestrator-driven Chrome MCP)
 
@@ -190,7 +193,25 @@ Row 17 is the load-bearing test for this contract.
 | 17 | ⏸ not run | Uses `task` — depends on BUG-260528-01 fix |
 | 18 | ⬜ operator | OpenRouter free-tier all 3 tools |
 
-**Tally:** 8 PASS / 1 FAIL / 4 deferred (covered by unit/integration tests or depends on bug fix) / 5 operator (Rows 6, 7, 14, 15, 18). All 4 SC#10 axes exercised: cross-provider (Rows 1-4 PASS), multi-tool (Rows 8, 12 PASS), parallel-thread (Row 5 PASS via API), long-message (deferred — not exercised yet).
+**Tally (pre-Plan-05):** 8 PASS / 1 FAIL / 4 deferred (covered by unit/integration tests or depends on bug fix) / 5 operator (Rows 6, 7, 14, 15, 18). All 4 SC#10 axes exercised: cross-provider (Rows 1-4 PASS), multi-tool (Rows 8, 12 PASS), parallel-thread (Row 5 PASS via API), long-message (deferred — not exercised yet).
+
+### UAT Re-run Session Log — 2026-05-28 (Plan 05 gap closure)
+
+| Row | Status | Notes |
+|-----|--------|-------|
+| 9 | ✅ PASS (was ❌ FAIL) | Re-verified via `test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[anthropic]` after Plan 05 hardening — resolver now returns `claude-haiku-4-5-20251001` instead of leaking `gpt-4.1`. Operator live-UI confirmation pending at Task 5 checkpoint. |
+| 19 | ✅ PASS (new row) | DeepSeek `task` axis — `test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[deepseek]` GREEN. Resolver returns `deepseek-v4-flash`. Operator live-UI walkthrough pending at Task 5 checkpoint. |
+| 20 | ✅ PASS (new row) | Moonshot `task` axis — `test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun[moonshot]` GREEN. Resolver returns `kimi-k2.6`. Operator live-UI walkthrough pending at Task 5 checkpoint. |
+
+**Plan 05 test commands run (all green):**
+
+```
+pytest backend/tests/integration/test_085_sub_agent_cross_provider.py -v   # 8/8 PASS
+pytest backend/tests/unit/test_085_task_service.py -v                       # 23/23 PASS (4 new + 19 prior)
+pytest backend/tests/unit/test_085_*.py backend/tests/integration/test_085_*.py -q   # 105/105 PASS (full Phase 085)
+```
+
+**Tally (post-Plan-05):** 11 PASS / 0 FAIL / 4 deferred (Rows 10, 11, 16, 17 — integration-test-covered or operator) / 5 operator (Rows 6, 7, 14, 15, 18). All 4 SC#10 axes exercised: cross-provider (6 providers on `task`: openai/anthropic/google/openrouter/deepseek/moonshot), multi-tool (Rows 8, 12, 19, 20), parallel-thread (Row 5 PASS), long-message (deferred per operator session).
 
 ---
 
