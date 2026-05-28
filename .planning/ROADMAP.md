@@ -116,7 +116,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] **Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes** - G-5 mandated refactor of threads.py tool dispatch + close 4 open v2.6 bugs
 - [x] **Phase 084: Workspace Filesystem Backend** - Per-thread workspace with hybrid storage, versioning, diffing, and SSE events (gap closure in progress -- Plan 05 closes 3 cross-provider UAT blockers) (completed 2026-05-28)
 - [x] **Phase 085: New LLM Tools** - write_todos, task (sub-agent), and ask_user (human-in-the-loop pause/resume) (completed 2026-05-28)
-- [x] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks (completed 2026-05-28)
+- [ ] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks (gaps_found 2026-05-29 — WR-04 localStorage write-path; awaiting gap closure)
 - [ ] **Phase 087: Panel UI** - Right-side collapsible panel with todos, file browser, ask_user prompt, and diff viewer
 - [ ] **Phase 088: Cross-Cutting Verification + Accessibility** - 4-axis UAT matrix (SC#10), WCAG 2.1 AA audit, E2E validation
 
@@ -264,7 +264,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 083. Foundation -- Tool-Dispatch Extraction + Bug Fixes | 3/3 | Complete    | 2026-05-27 |
 | 084. Workspace Filesystem Backend | 5/5 | Complete    | 2026-05-28 |
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
-| 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete   | 2026-05-28 |
+| 086. StreamsProvider Extension + Panel Hooks | 2/2 | Gaps Found | 2026-05-29 |
 | 087. Panel UI | 0/TBD | Not started | - |
 | 088. Cross-Cutting Verification + Accessibility | 0/TBD | Not started | - |
 
