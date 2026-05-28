@@ -68,8 +68,8 @@ completed: 2026-05-28
 
 - **Duration:** ~20 min
 - **Started:** 2026-05-28T15:40Z
-- **Completed:** 2026-05-28T16:00Z (Tasks 1-3 shipped; Task 4 awaiting human-action checkpoint)
-- **Tasks executed:** 3 of 4 (Task 4 = checkpoint:human-action — operator pastes migration into Supabase SQL editor)
+- **Completed:** 2026-05-28T16:10Z (all 4 tasks shipped)
+- **Tasks executed:** 4 of 4 (Task 4 closed inline by orchestrator after operator confirmed migration apply)
 - **Files modified:** 7
 
 ## Accomplishments
@@ -88,9 +88,9 @@ Each task was committed atomically with --no-verify (parallel worktree mode):
 1. **Task 1: Migration 055 SQL + Wave 0 test scaffolds** — `c291f13` (feat)
 2. **Task 2: todos_service.replace_todos + db.runs.insert_run parent_run_id kwarg + 7 unit tests** — `8c06023` (feat)
 3. **Task 3: _handle_write_todos handler + registry entry + 8 unit tests + Rule 1 fix to existing registry count assertion** — `fff6243` (feat)
-4. **Task 4: Apply migration 055 via Supabase SQL editor + regenerate full-schema.sql** — PENDING (checkpoint:human-action; orchestrator surfaces to operator)
+4. **Task 4: Apply migration 055 via Supabase SQL editor + regenerate full-schema.sql** — `cf585d3` (feat) — operator applied via Studio (validation query returned 1/1/4), orchestrator ran `docker exec pg_dump --schema-only` (worktree's `supabase status` check failed under sub-cwd; bypassed by calling pg_dump directly) and prepended the standard header banner; live DB now matches the committed migration.
 
-Total commits this plan: 3. The fourth (final metadata commit including this SUMMARY) is the orchestrator's, post-merge.
+Total commits this plan: 4 (one per task). The final metadata commit (this SUMMARY) is the orchestrator's, in-worktree.
 
 ## Files Created/Modified
 
@@ -132,32 +132,14 @@ Total commits this plan: 3. The fourth (final metadata commit including this SUM
 
 ## User Setup Required
 
-**Migration 055 must be applied to the local Supabase DB before any code path exercising `write_todos` will succeed.**
-
-Per CLAUDE.md project rule, NEVER `supabase db push` or `supabase db reset`. Apply via SQL editor:
-
-1. Open Supabase Studio SQL editor (URL from `supabase status` — typically `http://127.0.0.1:54323`).
-2. Copy the entire contents of `supabase/migrations/055_todos_table.sql` and paste into the SQL editor.
-3. Click Run. Verify no errors.
-4. Run the validation query inside the SQL editor:
-   ```sql
-   SELECT
-     (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='todos') AS todos_table,
-     (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='runs' AND column_name='parent_run_id') AS parent_run_id_col,
-     (SELECT COUNT(*) FROM pg_policies WHERE schemaname='public' AND tablename='todos') AS rls_policies;
-   ```
-   Expected: `todos_table=1, parent_run_id_col=1, rls_policies=4`.
-5. From repo root, run `bash scripts/regenerate-full-schema.sh` (defaults to live-DB dump, NO `--reset` flag).
-6. Commit BOTH `supabase/migrations/055_todos_table.sql` (already committed in `c291f13`) AND the regenerated `supabase/full-schema.sql`.
-
-The continuation agent (spawned after operator confirms "migration applied") will run step 5 and commit step 6.
+**Migration 055 was applied by operator via Supabase Studio SQL editor on 2026-05-28 — validation query returned `todos_table=1, parent_run_id_col=1, rls_policies=4`.** Live DB and committed migration file are in sync; `supabase/full-schema.sql` regenerated and committed at `cf585d3`. No further setup required.
 
 ## Next Phase Readiness
 
 - **Plan 02 (task-service) is unblocked** for Wave 1 — the `runs.parent_run_id` column is in the migration file (will be live after Task 4 lands), and `insert_run`'s new `parent_run_id` kwarg is ready for sub-agent run creation.
 - **Plans 03 (ask-user) and 04 (REST + tool schemas + UAT)** can read the `messages.tool_calls.kind` doc-comment extension and rely on the `ask_user_prompt | ask_user_response` kind contract being documented in DB metadata.
 - **Phase 086 (StreamsProvider extension)** can subscribe to `todo_updated` events once Phase 085 ships in full — the wire format (`{todos: [{id, content, status, parent_id, order_index}, ...]}`) is stable per D-085-21 from this plan.
-- **One pending block:** Task 4 (migration apply) — surfaced to operator as a checkpoint:human-action. Once "migration applied" is confirmed, the continuation agent regenerates `supabase/full-schema.sql` and the plan closes.
+- **Plan closed.** Migration 055 live in local DB; `supabase/full-schema.sql` regenerated at commit `cf585d3`. Plans 02-04 can now exercise the todos table, `runs.parent_run_id` column, and the documented `messages.tool_calls.kind` values without further DB setup.
 
 ## TDD Gate Compliance
 
@@ -176,11 +158,12 @@ Verified before returning:
 - Commit `c291f13` — present in worktree HEAD log
 - Commit `8c06023` — present in worktree HEAD log
 - Commit `fff6243` — present in worktree HEAD log
+- Commit `cf585d3` — present in worktree HEAD log (full-schema.sql regen post-migration)
+- `supabase/full-schema.sql` contains `CREATE TABLE public.todos`, `runs.parent_run_id` column + `idx_runs_parent` partial index + FK to `runs.run_id`, all 4 todos RLS policies, and the extended `messages.tool_calls` COMMENT
 
 ## Self-Check: PASSED
 
 ---
 *Phase: 085-new-llm-tools*
 *Plan: 01*
-*Completed (Tasks 1-3): 2026-05-28*
-*Task 4 (Migration apply via Supabase SQL editor): PENDING — checkpoint:human-action surfaced to operator*
+*Completed: 2026-05-28*
