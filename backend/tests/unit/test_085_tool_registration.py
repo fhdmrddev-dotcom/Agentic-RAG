@@ -253,18 +253,33 @@ def test_get_tools_includes_phase_085_tools():
     )
 
 
-def test_get_tools_returns_24_tools_with_no_conditional_enabled():
+def test_get_tools_returns_22_tools_with_no_conditional_enabled():
     """Behavior 6: the base toolbox (no web_search / no sandbox) is exactly 19 tools
     (8 KB + 3 skills + 3 memory/sql + 5 workspace = 19) + 3 Phase 085 = 22 minimum.
     Phase-end target is 24 when web_search + sandbox both enabled.
+
+    Pass a duck-typed object with the two conditional flags off, because
+    get_tools(None) falls through to global Settings, which in dev environments
+    typically has TAVILY_API_KEY set (web_search_enabled True) and/or
+    SANDBOX_ENABLED True — so the no-conditional baseline must be asserted via
+    explicit injection, not None.
     """
+    from types import SimpleNamespace
     from app.services.openai_service import get_tools
 
-    # 19 base + 3 phase 085 = 22 with no conditionals
-    base_tools = get_tools(None)
+    eff = SimpleNamespace(web_search_enabled=False, sandbox_enabled=False)
+    base_tools = get_tools(eff)
     assert len(base_tools) == 22, (
         f"Expected exactly 22 tools in base (no web/sandbox); got {len(base_tools)}: "
         f"{[t['function']['name'] for t in base_tools]}"
+    )
+
+    # And both conditionals on → 24 (phase-end target).
+    eff_all = SimpleNamespace(web_search_enabled=True, sandbox_enabled=True)
+    all_tools = get_tools(eff_all)
+    assert len(all_tools) == 24, (
+        f"Expected exactly 24 tools with both conditionals on; got {len(all_tools)}: "
+        f"{[t['function']['name'] for t in all_tools]}"
     )
 
 
