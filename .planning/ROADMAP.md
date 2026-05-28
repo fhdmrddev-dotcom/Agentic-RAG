@@ -174,6 +174,7 @@ Plans:
 - [x] 085-02-task-service-PLAN.md — task_service.py sub-agent loop + sub_agent_models helper + ToolContext extensions + concurrency caps + _handle_task (TOOL-02)
 - [x] 085-03-ask-user-PLAN.md — ask_user_service Redis pub/sub + _handle_ask_user + POST /runs/{rid}/ask_user_response + cancel sentinel + uvicorn lifespan shutdown broadcast (TOOL-03, TOOL-04)
 - [ ] 085-04-rest-tools-uat-PLAN.md — panel.py 3 GET endpoints + 3 new tool JSON schemas in get_tools() + SC#10 4-axis UAT execution (TOOL-01..TOOL-04)
+- [ ] 085-05-sub-agent-cross-provider-fix-PLAN.md — Gap closure for BUG-260528-01: harden resolve_sub_agent_model_safely on Auto (cheapest) default path + cross-provider integration test (7 providers) + extend UAT with DeepSeek + Moonshot task rows (TOOL-02)
 
 ### Phase 086: StreamsProvider Extension + Panel Hooks
 **Goal**: The frontend streaming infrastructure routes all new SSE event types to dedicated panel state stores, and per-thread hooks provide reactive data for panel UI components
