@@ -1,7 +1,7 @@
 ---
 phase: 087
 slug: panel-ui
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "style=default · baseColor=slate · cssVariables=true · icon=lucide (detected from frontend/components.json)"
 created: 2026-05-29
