@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 005 — File &amp; Diff</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+.stage { display: flex; justify-content: center; padding: var(--space-8) var(--space-4); min-height: calc(100vh - 92px); align-items: flex-start; gap: var(--space-6); }
+.ctx-hint { width: 220px; flex: none; font-size: var(--text-xs); color: var(--color-text-dim); line-height: 1.6; padding-top: var(--space-6); }
+.ctx-hint b { color: var(--color-text-muted); }
+
+/* the panel itself, at realistic ~30%-of-1280 width */
+.panel {
+  width: 384px; flex: none; height: 620px;
+  background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); display: flex; flex-direction: column;
+  overflow: hidden; box-shadow: var(--shadow-lg);
+}
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.panel-head .ptitle { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-head .ptitle .crumb { color: var(--color-text-dim); font-family: var(--font-mono); font-weight: 400; }
+
+/* sections (from 004 winner) */
+.sec-head { display: flex; align-items: center; gap: 8px; padding: var(--space-3) var(--space-4); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); cursor: pointer; user-select: none; }
+.sec-head .chev { font-size: 10px; transition: transform var(--dur-fast); }
+.sec-head.collapsed .chev { transform: rotate(-90deg); }
+.sec-head .count { margin-left: auto; font-family: var(--font-mono); color: var(--color-text-muted); text-transform: none; }
+.sec-body { padding: 0 var(--space-3) var(--space-3); }
+.sec-head.collapsed + .sec-body { display: none; }
+
+.body-scroll { flex: 1; overflow-y: auto; }
+
+.file { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border-radius: var(--radius-sm); font-size: var(--text-sm); cursor: pointer; transition: all var(--dur-fast); border: 1px solid transparent; }
+.file:hover { background: var(--color-accent); }
+.file.sel { background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+.file .fico { color: var(--color-text-dim); }
+.file .fname { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file .meta { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+
+/* preview surfaces */
+.preview-head { display: flex; align-items: center; gap: 8px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-soft); background: var(--color-surface); }
+.back { background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 3px 9px; font-size: var(--text-xs); cursor: pointer; font-family: var(--font-mono); }
+.back:hover { color: var(--color-text); }
+.preview-head .pf { flex: 1; font-family: var(--font-mono); font-size: var(--text-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vbtn { background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 3px 8px; font-size: 10px; cursor: pointer; font-family: var(--font-mono); }
+.vbtn:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+.vbtn.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+.md { padding: var(--space-4); font-size: var(--text-sm); line-height: 1.6; }
+.md h1 { font-family: var(--font-headline); font-size: var(--text-lg); margin: 0 0 8px; }
+.md h2 { font-family: var(--font-headline); font-size: var(--text-base); margin: 16px 0 6px; color: var(--color-text); }
+.md p { margin: 0 0 10px; color: var(--color-text-muted); }
+.md ul { margin: 0 0 10px; padding-left: 18px; color: var(--color-text-muted); }
+.md strong { color: var(--color-text); }
+.md table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); margin: 4px 0 12px; }
+.md th, .md td { border: 1px solid var(--color-border-soft); padding: 5px 8px; text-align: left; }
+.md th { background: var(--color-muted); font-family: var(--font-mono); color: var(--color-text-muted); }
+.md td.num { font-family: var(--font-mono); text-align: right; color: var(--color-success); }
+
+/* code with fake shiki highlight */
+.code { padding: var(--space-3) 0; font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.65; overflow-x: auto; }
+.code .ln { display: flex; }
+.code .g { width: 34px; flex: none; text-align: right; padding-right: 10px; color: var(--color-text-dim); user-select: none; }
+.code .c { white-space: pre; }
+.k { color: hsl(258 90% 76%); } .s { color: hsl(142 60% 60%); } .f { color: hsl(38 92% 70%); } .cm { color: var(--color-text-dim); } .n { color: hsl(200 80% 70%); }
+.lang-chip { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); background: var(--color-muted); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 2px 8px; }
+
+.img-prev { padding: var(--space-4); text-align: center; }
+.img-prev .frame { background: linear-gradient(135deg, hsl(220 30% 12%), hsl(258 40% 16%)); border: 1px solid var(--color-border); border-radius: var(--radius-md); height: 200px; display: grid; place-items: center; color: var(--color-text-dim); }
+
+/* version strip + diff */
+.ver-strip { display: flex; gap: 6px; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-border-soft); flex-wrap: wrap; align-items: center; }
+.ver-strip .vlbl { font-size: 10px; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+.vchip { background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 4px 9px; font-size: 11px; font-family: var(--font-mono); cursor: pointer; transition: all var(--dur-fast); }
+.vchip:hover { border-color: var(--color-primary-glow); }
+.vchip.a { border-color: var(--color-danger); color: var(--color-danger); background: var(--color-danger-dim); }
+.vchip.b { border-color: var(--color-success); color: var(--color-success); background: var(--color-success-dim); }
+.diff-meta { padding: 7px 12px; font-size: 11px; font-family: var(--font-mono); color: var(--color-text-muted); border-bottom: 1px solid var(--color-border-soft); display: flex; gap: 10px; align-items: center; }
+.diff-meta .add { color: var(--color-success); } .diff-meta .del { color: var(--color-danger); }
+.diff { font-family: var(--font-mono); font-size: var(--text-xs); line-height: 1.6; overflow-x: auto; padding: 6px 0 16px; }
+.diff .dl { display: flex; padding: 0 6px; white-space: pre; }
+.diff .dl .sign { width: 16px; flex: none; color: var(--color-text-dim); }
+.diff .dl.add { background: var(--color-success-dim); } .diff .dl.add .sign { color: var(--color-success); }
+.diff .dl.del { background: var(--color-danger-dim); } .diff .dl.del .sign { color: var(--color-danger); }
+.diff .dl.ctx { color: var(--color-text-muted); }
+.diff .hunk { color: var(--color-primary); padding: 4px 6px; background: var(--color-primary-dim); }
+
+/* inline-expand (variant B) */
+.expand { background: var(--color-surface); border: 1px solid var(--color-border-soft); border-top: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); max-height: 320px; overflow-y: auto; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+.empty { text-align:center; color: var(--color-text-dim); font-size: var(--text-xs); padding: var(--space-8) var(--space-3); }
+
+.state-strip { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: hsl(220 40% 5% / 0.92); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 200; backdrop-filter: blur(14px); }
+.state-strip .lbl { font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }
+.state-note { padding: 6px 16px; font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface); border-bottom: 1px solid var(--color-border-soft); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 005 · File &amp; Diff</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A: Drill-in <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Inline expand</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Preview drawer <span style="font-size:10px;opacity:0.6">(≡ A)</span></button>
+</div>
+<div class="state-note" id="note">Tap a file to preview. Tap the version pills to compare two versions — a unified inline diff (side-by-side won't fit a 30% column).</div>
+
+<div class="stage">
+  <div class="ctx-hint">
+    <b>Context:</b> this is the <b>Files</b> + <b>Versions</b> area inside the stacked panel (sketch 004 winner).<br><br>
+    The hard constraint: ~384px wide. Click-to-preview must reuse the app's <b>MarkdownRenderer</b> + syntax highlighting (SC#3); the diff must work in one narrow column (SC#5).<br><br>
+    Try: <b>summary.md</b> (markdown) · <b>analysis.py</b> (code) · <b>yoy_by_segment.csv</b> (table) · <b>chart_q3.png</b> (image), then <b>Compare v2 ↔ v3</b> on summary.md.
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="ptitle" id="phead">Workspace <span class="crumb" id="crumb"></span></span>
+    </div>
+    <div class="body-scroll" id="host"></div>
+  </div>
+</div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const FILES = [
+  { path: "summary.md", ico: "📄", size: "2.1 KB", v: 3, type: "md" },
+  { path: "analysis.py", ico: "⌁", size: "1.4 KB", v: 2, type: "code" },
+  { path: "yoy_by_segment.csv", ico: "▦", size: "840 B", v: 1, type: "csv" },
+  { path: "chart_q3.png", ico: "🖼", size: "61 KB", v: 1, type: "img" },
+];
+
+const PREVIEWS = {
+  md: `<div class="md">
+    <h1>Q3 Revenue Summary</h1>
+    <p>Year-over-year growth landed at <strong>30.87%</strong>, led by the Enterprise segment.</p>
+    <h2>By segment</h2>
+    <table><thead><tr><th>Segment</th><th>Q3'24</th><th>Q3'25</th><th>YoY</th></tr></thead>
+    <tbody>
+      <tr><td>Enterprise</td><td class="num">4.2M</td><td class="num">5.9M</td><td class="num">+40.5%</td></tr>
+      <tr><td>Mid-market</td><td class="num">2.1M</td><td class="num">2.6M</td><td class="num">+23.8%</td></tr>
+      <tr><td>SMB</td><td class="num">1.4M</td><td class="num">1.6M</td><td class="num">+14.3%</td></tr>
+    </tbody></table>
+    <h2>Notes</h2>
+    <ul><li>Enterprise renewals drove the lift.</li><li>SMB churn flat vs Q2.</li></ul>
+  </div>`,
+  code: `<div style="display:flex;justify-content:flex-end;padding:6px 12px 0"><span class="lang-chip">python</span></div>
+  <div class="code">
+    <div class="ln"><span class="g">1</span><span class="c"><span class="k">import</span> <span class="n">pandas</span> <span class="k">as</span> <span class="n">pd</span></span></div>
+    <div class="ln"><span class="g">2</span><span class="c"></span></div>
+    <div class="ln"><span class="g">3</span><span class="c"><span class="cm"># compute YoY growth by segment</span></span></div>
+    <div class="ln"><span class="g">4</span><span class="c"><span class="n">df</span> = <span class="n">pd</span>.<span class="f">read_csv</span>(<span class="s">"yoy_by_segment.csv"</span>)</span></div>
+    <div class="ln"><span class="g">5</span><span class="c"><span class="n">df</span>[<span class="s">"yoy"</span>] = (<span class="n">df</span>.q3_25 / <span class="n">df</span>.q3_24 - <span class="n">1</span>)</span></div>
+    <div class="ln"><span class="g">6</span><span class="c"><span class="f">print</span>(<span class="n">df</span>.yoy.<span class="f">mean</span>())  <span class="cm"># 0.3087</span></span></div>
+  </div>`,
+  csv: `<div class="md"><table><thead><tr><th>segment</th><th>q3_24</th><th>q3_25</th></tr></thead>
+    <tbody>
+      <tr><td>enterprise</td><td class="num">4200000</td><td class="num">5900000</td></tr>
+      <tr><td>midmarket</td><td class="num">2100000</td><td class="num">2600000</td></tr>
+      <tr><td>smb</td><td class="num">1400000</td><td class="num">1600000</td></tr>
+    </tbody></table></div>`,
+  img: `<div class="img-prev"><div class="frame">chart_q3.png · 1024×640</div></div>`,
+};
+
+const DIFF = `<div class="diff">
+  <div class="hunk">@@ summary.md  v2 → v3  @@</div>
+  <div class="dl ctx"><span class="sign"> </span># Q3 Revenue Summary</div>
+  <div class="dl ctx"><span class="sign"> </span></div>
+  <div class="dl del"><span class="sign">-</span>YoY growth was about 28%.</div>
+  <div class="dl add"><span class="sign">+</span>Year-over-year growth landed at **30.87%**, led by the Enterprise segment.</div>
+  <div class="dl ctx"><span class="sign"> </span></div>
+  <div class="dl ctx"><span class="sign"> </span>## By segment</div>
+  <div class="dl add"><span class="sign">+</span>| Segment | Q3'24 | Q3'25 | YoY |</div>
+  <div class="dl add"><span class="sign">+</span>| Enterprise | 4.2M | 5.9M | +40.5% |</div>
+</div>`;
+
+let VARIANT = "a";
+let view = { mode: "list", file: null, diff: false }; // mode: list | preview
+
+function fileRow(f, sel) {
+  return `<div class="file ${sel?'sel':''}" onclick="openFile('${f.path}')"><span class="fico">${f.ico}</span><span class="fname">${f.path}</span><span class="meta">v${f.v} · ${f.size}</span></div>`;
+}
+function listHtml() {
+  return `<div class="sec-head"><span class="chev">▾</span>Files<span class="count">${FILES.length}</span></div>
+    <div class="sec-body">${FILES.map(f=>fileRow(f, false)).join("")}</div>`;
+}
+function previewHtml(f, withBack) {
+  const versions = f.v > 1
+    ? `<div class="ver-strip"><span class="vlbl">Versions</span>${Array.from({length:f.v},(_,i)=>`<span class="vchip ${view.diff && (i+1===f.v-1)?'a':''} ${view.diff && (i+1===f.v)?'b':''}" onclick="toggleDiff(${i+1},${f.v})">v${i+1}</span>`).join("")} ${f.v>1?`<span class="vbtn ${view.diff?'on':''}" onclick="quickDiff(${f.v})">⇄ Compare v${f.v-1}↔v${f.v}</span>`:''}</div>`
+    : `<div class="ver-strip"><span class="vlbl">Versions</span><span class="vchip">v1 · only version</span></div>`;
+  const head = `<div class="preview-head">${withBack?`<button class="back" onclick="goList()">‹ Files</button>`:''}<span class="pf">${f.ico} ${f.path}</span></div>`;
+  const content = view.diff
+    ? `<div class="diff-meta"><span class="add">+12</span><span class="del">−3</span><span style="color:var(--color-text-dim)">unified · v${f.v-1} → v${f.v}</span><button class="vbtn" style="margin-left:auto" onclick="expandDiff(event)" title="Open wide over chat">⤢ expand</button></div>${DIFF}`
+    : (PREVIEWS[f.type] || `<div class="empty">No preview for this type.</div>`);
+  return head + versions + content;
+}
+
+function render() {
+  const host = document.getElementById("host");
+  const crumb = document.getElementById("crumb");
+  crumb.textContent = (VARIANT !== "b" && view.mode === "preview") ? "› " + view.file : "";
+
+  if (VARIANT === "a") {
+    // drill-in: list OR full-panel preview
+    host.innerHTML = view.mode === "preview"
+      ? previewHtml(FILES.find(f=>f.path===view.file), true)
+      : listHtml();
+  }
+  if (VARIANT === "b") {
+    // inline expand: list always; selected file expands in place
+    host.innerHTML = `<div class="sec-head"><span class="chev">▾</span>Files<span class="count">${FILES.length}</span></div>
+      <div class="sec-body">` + FILES.map(f => {
+        const sel = view.mode === "preview" && view.file === f.path;
+        return fileRow(f, sel) + (sel ? `<div class="expand">${previewHtml(f, false)}</div>` : "");
+      }).join("") + `</div>`;
+  }
+  if (VARIANT === "c") {
+    // preview drawer: list dims, preview slides over as a sheet within panel
+    if (view.mode === "preview") {
+      host.innerHTML = `<div style="position:relative;height:100%">
+        <div style="opacity:0.25;pointer-events:none">${listHtml()}</div>
+        <div style="position:absolute;inset:0;background:var(--color-bg-elev1);animation:fadeSlideUp var(--dur-base) var(--ease-out)">
+          ${previewHtml(FILES.find(f=>f.path===view.file), true)}
+        </div></div>`;
+    } else host.innerHTML = listHtml();
+  }
+}
+
+function expandDiff(e) {
+  e.stopPropagation();
+  const ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:hsl(216 45% 4% / 0.82);backdrop-filter:blur(6px);z-index:5000;display:grid;place-items:center;animation:fadeSlideUp .2s var(--ease-out)";
+  ov.onclick = () => ov.remove();
+  ov.innerHTML = `<div onclick="event.stopPropagation()" style="width:min(860px,92vw);max-height:84vh;overflow:auto;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg)">
+    <div class="diff-meta" style="position:sticky;top:0;background:var(--color-surface)"><span class="add">+12</span><span class="del">−3</span><span style="color:var(--color-text-dim)">summary.md · unified · v2 → v3 · wide view</span><button class="vbtn" style="margin-left:auto" onclick="this.closest('[style*=fixed]').remove()">✕ close</button></div>
+    ${DIFF}</div>`;
+  document.body.appendChild(ov);
+}
+function openFile(p) { view = { mode: "preview", file: p, diff: false }; render(); }
+function goList() { view = { mode: "list", file: null, diff: false }; render(); }
+function quickDiff(v) { view.diff = !view.diff; render(); }
+function toggleDiff(vi, max) { view.diff = true; render(); }
+
+function showVariant(v, e) {
+  VARIANT = v; view = { mode: "list", file: null, diff: false };
+  document.querySelectorAll(".variant-nav .variant-tab").forEach(t=>t.classList.remove("active"));
+  e.target.classList.add("active");
+  render();
+}
+render();
+</script>
+</body>
+</html>
