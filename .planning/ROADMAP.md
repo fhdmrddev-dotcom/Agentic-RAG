@@ -247,6 +247,8 @@ Plans:
   3. File browser and todo list are fully navigable via keyboard alone -- Tab/Shift-Tab moves focus, Enter/Space activates items, Escape closes previews, no mouse-only interaction paths
   4. E2E workspace flow verified: agent writes file, user sees it in panel, agent updates file, user views diff, agent asks user a question, user responds, agent resumes -- all without page refresh, across at least 2 providers
 
+**Seed to evaluate at discuss-phase**: `SEED-034` (per-provider prompt strategy & new-model compatibility assurance). 088 already runs the 4-axis cross-provider UAT — use it to MEASURE per-provider tool-use reliability with evidence (Phase 086 UAT already showed gemini-2.5-flash failing to invoke write_todos; capable models fine). Then decide: fold a cheap prompt/tool-description tuning slice into 088 (approach A), or carve a dedicated phase / push the architecture (per-provider overlays + eval harness, approach B/D) to v2.8. Do NOT silently skip.
+
 **Plans**: TBD
 
 Plans:
