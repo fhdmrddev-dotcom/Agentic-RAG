@@ -172,7 +172,7 @@ Plans:
 Plans:
 - [x] 085-01-todos-PLAN.md — Migration 055 (todos table + runs.parent_run_id + messages.tool_calls.kind doc-comment) + todos_service + _handle_write_todos (TOOL-01)
 - [x] 085-02-task-service-PLAN.md — task_service.py sub-agent loop + sub_agent_models helper + ToolContext extensions + concurrency caps + _handle_task (TOOL-02)
-- [ ] 085-03-ask-user-PLAN.md — ask_user_service Redis pub/sub + _handle_ask_user + POST /runs/{rid}/ask_user_response + cancel sentinel + uvicorn lifespan shutdown broadcast (TOOL-03, TOOL-04)
+- [x] 085-03-ask-user-PLAN.md — ask_user_service Redis pub/sub + _handle_ask_user + POST /runs/{rid}/ask_user_response + cancel sentinel + uvicorn lifespan shutdown broadcast (TOOL-03, TOOL-04)
 - [ ] 085-04-rest-tools-uat-PLAN.md — panel.py 3 GET endpoints + 3 new tool JSON schemas in get_tools() + SC#10 4-axis UAT execution (TOOL-01..TOOL-04)
 
 ### Phase 086: StreamsProvider Extension + Panel Hooks
