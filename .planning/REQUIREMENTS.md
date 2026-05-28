@@ -13,13 +13,13 @@
 
 ### Workspace Filesystem
 
-- [ ] **WS-01**: Agent can write a file to a per-thread workspace via `workspace_write(path, content)` — file persists across turns and thread reloads
-- [ ] **WS-02**: Agent can read workspace files via `workspace_read(path)` with content capped at configurable max chars and truncation notice for large files
-- [ ] **WS-03**: Agent can list workspace files via `workspace_list(prefix)` and delete via `workspace_delete(path)`
-- [ ] **WS-04**: Every workspace_write auto-creates a new version row; `workspace_diff(path, from_version, to_version)` returns a structured diff
-- [ ] **WS-05**: Files up to a configurable threshold stored inline in Postgres; larger files uploaded to a Supabase Storage bucket — threshold tunable via app_settings
-- [ ] **WS-06**: Workspace files scoped per-thread with unique path constraint and RLS — user cannot read another user's workspace files
-- [ ] **WS-07**: SSE events emitted for workspace file writes and deletes via existing run:{run_id} Redis Stream
+- [x] **WS-01**: Agent can write a file to a per-thread workspace via `workspace_write(path, content)` — file persists across turns and thread reloads
+- [x] **WS-02**: Agent can read workspace files via `workspace_read(path)` with content capped at configurable max chars and truncation notice for large files
+- [x] **WS-03**: Agent can list workspace files via `workspace_list(prefix)` and delete via `workspace_delete(path)`
+- [x] **WS-04**: Every workspace_write auto-creates a new version row; `workspace_diff(path, from_version, to_version)` returns a structured diff
+- [x] **WS-05**: Files up to a configurable threshold stored inline in Postgres; larger files uploaded to a Supabase Storage bucket — threshold tunable via app_settings
+- [x] **WS-06**: Workspace files scoped per-thread with unique path constraint and RLS — user cannot read another user's workspace files
+- [x] **WS-07**: SSE events emitted for workspace file writes and deletes via existing run:{run_id} Redis Stream
 
 ### New LLM Tools
 
@@ -72,13 +72,13 @@
 |-------------|-------|--------|
 | FOUND-01 | Phase 083 | Complete |
 | FOUND-02 | Phase 083 | Complete |
-| WS-01 | Phase 084 | Pending |
-| WS-02 | Phase 084 | Pending |
-| WS-03 | Phase 084 | Pending |
-| WS-04 | Phase 084 | Pending |
-| WS-05 | Phase 084 | Pending |
-| WS-06 | Phase 084 | Pending |
-| WS-07 | Phase 084 | Pending |
+| WS-01 | Phase 084 | Complete |
+| WS-02 | Phase 084 | Complete |
+| WS-03 | Phase 084 | Complete |
+| WS-04 | Phase 084 | Complete |
+| WS-05 | Phase 084 | Complete |
+| WS-06 | Phase 084 | Complete |
+| WS-07 | Phase 084 | Complete |
 | TOOL-01 | Phase 085 | Pending |
 | TOOL-02 | Phase 085 | Pending |
 | TOOL-03 | Phase 085 | Pending |
