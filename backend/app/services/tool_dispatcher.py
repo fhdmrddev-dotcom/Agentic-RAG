@@ -34,6 +34,14 @@ from app.services.audit_service import write_audit_entry
 from app.services.sandbox_service import sandbox_manager, harvest_output_files
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.sql_service import query_documents
+from app.services.workspace_service import (
+    write_file as ws_write_file,
+    read_file as ws_read_file,
+    list_files as ws_list_files,
+    delete_file as ws_delete_file,
+    get_diff as ws_get_diff,
+    WorkspaceError,
+)
 
 if TYPE_CHECKING:
     import asyncpg
@@ -817,6 +825,145 @@ async def _handle_query_tables(args: dict, ctx: ToolContext) -> ToolResult:
 
 
 # ---------------------------------------------------------------------------
+# Workspace tool handlers (Phase 084)
+# ---------------------------------------------------------------------------
+
+async def _handle_workspace_write(args: dict, ctx: ToolContext) -> ToolResult:
+    """Write or update a file in the thread workspace (D-13, WS-01)."""
+    path = args.get("path", "")
+    content_str = args.get("content", "")
+    content = content_str.encode("utf-8")
+    try:
+        result = await ws_write_file(
+            ctx.pool, ctx.supabase,
+            thread_id=UUID(ctx.thread_id),
+            user_id=UUID(ctx.current_user["id"]),
+            path=path,
+            content=content,
+        )
+        await ctx.emit(
+            ctx.redis, ctx.run_id, 'workspace_file_written',
+            path=result["path"],
+            version=result["version"],
+            size_bytes=result["size_bytes"],
+            mime_type=result["mime_type"],
+        )
+        warning = result.get("warning")
+        summary = {
+            "status": "ok",
+            "path": result["path"],
+            "version": result["version"],
+            "size_bytes": result["size_bytes"],
+        }
+        if warning:
+            return ToolResult(result=f"{warning}\n\n{json.dumps(summary)}")
+        return ToolResult(result=json.dumps(summary))
+    except WorkspaceError as e:
+        return ToolResult(result=json.dumps({"error": str(e)}))
+
+
+async def _handle_workspace_read(args: dict, ctx: ToolContext) -> ToolResult:
+    """Read a file from the thread workspace (D-13, WS-02)."""
+    path = args.get("path", "")
+    start_line = args.get("start_line")
+    end_line = args.get("end_line")
+    try:
+        result = await ws_read_file(
+            ctx.pool, ctx.supabase,
+            thread_id=UUID(ctx.thread_id),
+            path=path,
+            start_line=start_line,
+            end_line=end_line,
+        )
+        if result.get("is_binary"):
+            return ToolResult(result=json.dumps({
+                "path": result["path"],
+                "mime_type": result["mime_type"],
+                "size_bytes": result["size_bytes"],
+                "note": result["note"],
+            }))
+
+        output = result.get("content", "")
+        if result.get("is_truncated"):
+            output += (
+                f"\n\n[Truncated at {len(output)} chars. "
+                f"Full file is {result['total_chars']} chars. "
+                "Use start_line/end_line for specific sections.]"
+            )
+        return ToolResult(result=output)
+    except WorkspaceError as e:
+        return ToolResult(result=json.dumps({"error": str(e)}))
+
+
+async def _handle_workspace_list(args: dict, ctx: ToolContext) -> ToolResult:
+    """List files in the thread workspace (D-13, WS-03)."""
+    prefix = args.get("prefix")
+    try:
+        files = await ws_list_files(
+            ctx.pool,
+            thread_id=UUID(ctx.thread_id),
+            prefix=prefix,
+        )
+        if not files:
+            return ToolResult(result="Workspace is empty.")
+        lines = []
+        for f in files:
+            size = f.get("size_bytes", 0)
+            mime = f.get("mime_type", "unknown")
+            lines.append(f"  {f['path']}  ({size:,} bytes, {mime})")
+        header = f"{len(files)} file(s) in workspace"
+        if prefix:
+            header += f" (prefix: {prefix})"
+        return ToolResult(result=f"{header}:\n" + "\n".join(lines))
+    except WorkspaceError as e:
+        return ToolResult(result=json.dumps({"error": str(e)}))
+
+
+async def _handle_workspace_delete(args: dict, ctx: ToolContext) -> ToolResult:
+    """Delete a file from the thread workspace (D-13, WS-03)."""
+    path = args.get("path", "")
+    try:
+        await ws_delete_file(
+            ctx.pool, ctx.supabase,
+            thread_id=UUID(ctx.thread_id),
+            path=path,
+        )
+        await ctx.emit(
+            ctx.redis, ctx.run_id, 'workspace_file_deleted',
+            path=path,
+        )
+        return ToolResult(result=json.dumps({"status": "deleted", "path": path}))
+    except WorkspaceError as e:
+        return ToolResult(result=json.dumps({"error": str(e)}))
+
+
+async def _handle_workspace_diff(args: dict, ctx: ToolContext) -> ToolResult:
+    """Show diff between two versions of a workspace file (D-13, WS-04)."""
+    path = args.get("path", "")
+    from_version = args.get("from_version")
+    to_version = args.get("to_version")
+    try:
+        result = await ws_get_diff(
+            ctx.pool, ctx.supabase,
+            thread_id=UUID(ctx.thread_id),
+            path=path,
+            from_version=from_version,
+            to_version=to_version,
+        )
+        delta = result.get("delta", {})
+        stats = result.get("stats", {})
+        diff_text = delta.get("diff", "")
+        output = f"Diff: {path} v{result['from_version']} -> v{result['to_version']}\n"
+        output += f"+{stats.get('additions', 0)} -{stats.get('deletions', 0)}\n\n"
+        output += diff_text
+        if delta.get("truncated"):
+            output += "\n[Diff truncated -- very large change]"
+        return ToolResult(result=output)
+    except WorkspaceError as e:
+        return ToolResult(result=json.dumps({"error": str(e)}))
+
+
+# ---------------------------------------------------------------------------
 # Registry + dispatch entry point
 # ---------------------------------------------------------------------------
 
@@ -837,6 +984,12 @@ _TOOL_REGISTRY: dict[str, Callable] = {
     "remember": _handle_remember,
     "recall": _handle_recall,
     "query_tables": _handle_query_tables,
+    # Phase 084: Workspace tools
+    "workspace_write": _handle_workspace_write,
+    "workspace_read": _handle_workspace_read,
+    "workspace_list": _handle_workspace_list,
+    "workspace_delete": _handle_workspace_delete,
+    "workspace_diff": _handle_workspace_diff,
 }
 
 
