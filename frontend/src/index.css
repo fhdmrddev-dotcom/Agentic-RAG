@@ -99,6 +99,17 @@
     height: 100vh;
     width: 100%;
   }
+  /* Phase 088-01 (A11Y-01 / D-11, RESEARCH Pattern 6) — global keyboard
+     focus indicator. None existed before this; components relied on scattered
+     per-utility `focus-visible:ring-*` classes. `:where(...)` is ZERO-specificity
+     so any component that sets its OWN focus-visible ring still wins — this is a
+     FLOOR, not an override (no double-rings). `:focus-visible` (not `:focus`)
+     keeps the ring off mouse clicks. Uses the existing --ring token (light
+     239 84% 67% / dark 239 100% 82%) so it harmonizes with the per-utility rings. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
 }
 
 /* ─── Custom Utility Classes ─── */

@@ -179,7 +179,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
               rowRefs.current.set(key, el)
             }}
             role="option"
-            aria-selected={false}
+            aria-selected={isActive}
             tabIndex={isActive ? 0 : -1}
             onClick={() => openFile(file)}
             onFocus={() => setActiveIndex(index)}

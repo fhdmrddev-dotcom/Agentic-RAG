@@ -199,6 +199,15 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
         <div className="flex items-center gap-2.5 border-b border-border/60 px-3 py-1.5 font-mono text-[11px]">
           <span className="text-[hsl(var(--success))]">+{stats.additions}</span>
           <span className="text-[hsl(var(--destructive))]">−{stats.deletions}</span>
+          {/* Phase 088-01 (A11Y-01 / D-12, RESEARCH Pattern 7) — SR announce of
+              the diff line counts. The visible +N/−M spans are color-coded
+              (green/red); this carries the WORDS "added"/"removed" so the count
+              is not conveyed by color alone. `polite` (the diff is user-initiated
+              via the version pills). Text-only, never dangerouslySetInnerHTML
+              (T-088-01-01). */}
+          <span className="sr-only" aria-live="polite">
+            {`${stats.additions} added, ${stats.deletions} removed`}
+          </span>
         </div>
       )}
 

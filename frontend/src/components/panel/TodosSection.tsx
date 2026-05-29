@@ -86,12 +86,27 @@ export function TodosSection() {
 
   const ordered = [...todos].sort((a, b) => a.order_index - b.order_index)
 
+  // Phase 088-01 (A11Y-01 / D-12, RESEARCH Pattern 7) — SR announce of todo
+  // completion progress. `polite` (not assertive): status flips are informational,
+  // and a multi-step run would interrupt the SR mid-read on every todo change if
+  // assertive. The region is visually-hidden (sr-only) and renders text only
+  // (never dangerouslySetInnerHTML — Phase 087 no-raw-HTML invariant, T-088-01-01).
+  const total = ordered.length
+  const doneCount = ordered.filter(
+    (t) => normalizeStatus(t.status) === "completed",
+  ).length
+
   return (
-    <ul className="flex flex-col gap-0.5">
-      {ordered.map((todo) => (
-        <TodoRow key={todo.id} todo={todo} />
-      ))}
-    </ul>
+    <>
+      <span className="sr-only" aria-live="polite">
+        {`${doneCount} of ${total} todos complete`}
+      </span>
+      <ul className="flex flex-col gap-0.5">
+        {ordered.map((todo) => (
+          <TodoRow key={todo.id} todo={todo} />
+        ))}
+      </ul>
+    </>
   )
 }
 
