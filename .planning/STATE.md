@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: paused
-stopped_at: Phase 088 context gathered — SEED-034 conditional-fold + reusable eval script; a11y fix-all-to-AA (panel + seam cards) w/ jest-axe + Chrome MCP Lighthouse; 4-axis UAT + Anthropic+Google E2E; fix-blockers-defer-polish; gemini-3 thought-sig folded_into 088
-last_updated: "2026-05-29T14:53:20.865Z"
-last_activity: 2026-05-29
+status: executing
+stopped_at: Completed 088-01-PLAN.md (a11y remediation + vitest-axe gate)
+last_updated: "2026-05-29T17:36:08.470Z"
+last_activity: 2026-05-29 -- Phase 088 execution started
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  total_plans: 28
+  completed_plans: 24
+  percent: 86
 ---
 
 # Project State
@@ -21,18 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted 2026-05-12, scoped to Themes A+C+D+H for v2.7)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 086 — streamsprovider-extension-panel-hooks
+**Current focus:** Phase 088 — cross-cutting-verification-accessibility
 
 ## Current Position
 
-Phase: 087 (panel-ui) — 8 of 8 plans complete; Wave-2 live gate PASSED, ready for phase verification + completion
-Plan: 087-08 complete (single nav-style toggle consolidation + full live design-contract + cross-provider verification)
-Status: All 8 plans shipped. The full Phase 087 panel was verified LIVE via Chrome MCP — 004-panel-shell (single nav-style in-panel toggle collapse-to-rail, welcome-thread reopen-by-mouse, ⌘., no overflow/flush/stable, mobile sheet), 005-file-and-diff (VERSIONS + unified diff + ⤢ overlay), 006-pending-question (paused/locked/pulse/pinned-card/gated-submit → answer→resume→green + 60s timeout), 007-chat-panel-seam (live pointers + reload-resolved cards, no raw-JSON), PANEL-02 (live todos no-refresh + quiet pointers), and the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message — one UX, four adapters). Two pre-existing bugs the gate surfaced were fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS "0 todos" SeamCard count (9667a816). gap-d (welcome-screen reopen) structurally closed by the rail-always-present consolidation.
-Next: Phase 088 (cross-cutting verification + accessibility). Phase 087 finalized (ROADMAP [x]) — substantive verification already done via the round-3 scenario matrix + crash fix; optionally run /gsd:verify-work 087 if you want the formal conversational-UAT record.
+Phase: 088 (cross-cutting-verification-accessibility) — EXECUTING
+Plan: 2 of 5 (Plan 01 complete)
+Status: Executing Phase 088
+Next: Execute Plan 02 (088-02 — reusable cross-provider eval script `scripts/eval_cross_provider.py`). Plan 01 shipped: vitest-axe gate + global focus ring + 2 aria-live regions + FilesSection aria-selected fix; A11Y-01/02 structurally GREEN (89/89 panel tests, no regression past the 17-failure 086 baseline). NOTE: real-contrast 4.5:1 + lived focus-ring/keyboard walk stay for Plan 05 (Chrome MCP Lighthouse, Pitfall 5).
 Downstream: Phase 088 (E2E reload flow) de-risked — the 007 seam reload (self-contained resolved cards, no raw-JSON) is confirmed.
-Last activity: 2026-05-29
+Last activity: 2026-05-29 -- Completed 088-01 (a11y remediation + vitest-axe gate)
 
-Progress: [██████████] 100% (23/23 plans)
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -55,6 +55,8 @@ Progress: [██████████] 100% (23/23 plans)
 
 - Last 5 plans: (from v2.6 close)
 - Trend: Stable
+
+| Phase 088 P088-01 | 13min | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -94,6 +96,9 @@ Recent decisions affecting current work:
 - (087-06): WorkspacePanel is now CONTROLLED (state/onCycle/onExpand/onHide props); the open/rail/hidden state machine, the ⌘./Ctrl+. listener, and subscribeOpenPanel(expand) lifted UP to ChatLayout so the persistent chat-header toggle + the seam pointer drive the same state (closes gap 3 — hidden panel reopenable by mouse)
 - (087-06): pulsing-amber-dot ask_user-pending indicator on the chat-header toggle computed in ChatLayout via useAskUserPrompt(useViewingThread()) — workspacePending = pending.length>0 && state!=='open'; motion-safe:animate-pulse honors prefers-reduced-motion, no new store (closes gap 4 / PANEL-01)
 - (087-06): DevTwoPaneMock import+mount removed from production App.tsx (file retained for dev); T-087-06-01 info-disclosure mitigated (closes gap 2)
+- (088-01): vitest-axe (NOT jest-axe) wired as the structural-a11y matcher — runner is Vitest 4.1.0; D-13's jest-axe was the wrong binding (RESEARCH correction #2)
+- (088-01): global :focus-visible ring added to index.css @layer base via zero-specificity :where(...) — a floor, not an override (components with their own focus-visible:ring-* still win)
+- (088-01): A11Y-01/02 structurally GREEN + axe-gated on all 8 panel components (89/89), no component restructure needed (no D-09 SEED); contrast/focus-ring real-verification deferred to Plan 05 Chrome MCP Lighthouse (Pitfall 5)
 
 ### Pending Todos
 
@@ -138,8 +143,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 088 context gathered — SEED-034 conditional-fold + reusable eval script; a11y fix-all-to-AA (panel + seam cards) w/ jest-axe + Chrome MCP Lighthouse; 4-axis UAT + Anthropic+Google E2E; fix-blockers-defer-polish; gemini-3 thought-sig folded_into 088
-Resume file: --resume-file
+Last session: 2026-05-29T17:36:08.464Z
+Stopped at: Completed 088-01-PLAN.md (a11y remediation + vitest-axe gate)
+Resume file: None
 
-**Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z
+**Planned Phase:** 088 (cross-cutting-verification-accessibility) — 5 plans — 2026-05-29T17:09:34.911Z

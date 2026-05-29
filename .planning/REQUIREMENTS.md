@@ -40,8 +40,10 @@
 
 ### Accessibility
 
-- [ ] **A11Y-01**: All panel surfaces meet WCAG 2.1 AA — keyboard navigation, ARIA labels, minimum 4.5:1 contrast ratio, visible focus indicators
-- [ ] **A11Y-02**: File browser and todo list fully navigable via keyboard without any mouse-only interaction paths
+- [x] **A11Y-01
+**: All panel surfaces meet WCAG 2.1 AA — keyboard navigation, ARIA labels, minimum 4.5:1 contrast ratio, visible focus indicators
+- [x] **A11Y-02
+**: File browser and todo list fully navigable via keyboard without any mouse-only interaction paths
 
 ## Future Requirements (v2.8 — Harness Engine & Plugin Contract)
 
