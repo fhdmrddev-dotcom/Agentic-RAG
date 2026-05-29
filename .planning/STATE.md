@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 088-01-PLAN.md (a11y remediation + vitest-axe gate)
-last_updated: "2026-05-29T17:36:08.470Z"
-last_activity: 2026-05-29 -- Phase 088 execution started
+stopped_at: Completed 088-02-PLAN.md (cross-provider eval script)
+last_updated: "2026-05-29T17:49:08.036Z"
+last_activity: 2026-05-29
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 28
-  completed_plans: 24
-  percent: 86
+  completed_plans: 25
+  percent: 89
 ---
 
 # Project State
@@ -26,13 +26,13 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 ## Current Position
 
 Phase: 088 (cross-cutting-verification-accessibility) — EXECUTING
-Plan: 2 of 5 (Plan 01 complete)
-Status: Executing Phase 088
-Next: Execute Plan 02 (088-02 — reusable cross-provider eval script `scripts/eval_cross_provider.py`). Plan 01 shipped: vitest-axe gate + global focus ring + 2 aria-live regions + FilesSection aria-selected fix; A11Y-01/02 structurally GREEN (89/89 panel tests, no regression past the 17-failure 086 baseline). NOTE: real-contrast 4.5:1 + lived focus-ring/keyboard walk stay for Plan 05 (Chrome MCP Lighthouse, Pitfall 5).
+Plan: 3 of 5 (Plans 01-02 complete)
+Status: Ready to execute
+Next: Execute Plan 03 (088-03 — deep E2E scenario-13 on Anthropic + Google: write→see→update→diff→ask_user→respond→resume, no refresh; D-17 thought-signature network re-verify). Plan 02 shipped: `scripts/eval_cross_provider.py` (687 lines) — the reusable cross-provider tool-use eval engine modeled on observe-run.py; drives the REAL POST /threads/{id}/messages route w/ per-request provider override (measures the actual active_system_prompt, Pitfall 2); asserts invocation + arg-shape + DB persistence; greppable EVAL_ROW scoreboard for the Plan 04 SEED-034 fold-gate. Localhost-gated, secret-safe, parse-clean; LIVE run deferred to Plans 04/05 (operator backend). Plan 01 shipped: vitest-axe gate + global focus ring + 2 aria-live regions + FilesSection aria-selected fix; A11Y-01/02 structurally GREEN (89/89 panel tests). NOTE: real-contrast 4.5:1 + lived focus-ring/keyboard walk + A11Y-01/02 traceability flip stay for Plan 05 (Chrome MCP Lighthouse, Pitfall 5).
 Downstream: Phase 088 (E2E reload flow) de-risked — the 007 seam reload (self-contained resolved cards, no raw-JSON) is confirmed.
-Last activity: 2026-05-29 -- Completed 088-01 (a11y remediation + vitest-axe gate)
+Last activity: 2026-05-29 -- Completed 088-02 (cross-provider eval script)
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████░] 86%
 - Trend: Stable
 
 | Phase 088 P088-01 | 13min | 3 tasks | 15 files |
+| Phase 088 P088-02 | 6min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Recent decisions affecting current work:
 - (088-01): vitest-axe (NOT jest-axe) wired as the structural-a11y matcher — runner is Vitest 4.1.0; D-13's jest-axe was the wrong binding (RESEARCH correction #2)
 - (088-01): global :focus-visible ring added to index.css @layer base via zero-specificity :where(...) — a floor, not an override (components with their own focus-visible:ring-* still win)
 - (088-01): A11Y-01/02 structurally GREEN + axe-gated on all 8 panel components (89/89), no component restructure needed (no D-09 SEED); contrast/focus-ring real-verification deferred to Plan 05 Chrome MCP Lighthouse (Pitfall 5)
+- (088-02): cross-provider eval script switches provider via the per-request MessageCreate.provider/model override (threads.py:1285), NOT a persistent user_settings UPDATE — measures the REAL active_system_prompt (Pitfall 2) with zero global-state mutation
+- (088-02): scripts/eval_cross_provider.py is the SEED-034 fold-gate evidence source (D-05) — greppable EVAL_ROW/EVAL_SUMMARY scoreboard; Plan 04 re-runs it before/after a text-only prompt change to prove +1 failing model passes / 0 strong regressions. Authored here, run LIVE in Plans 04/05 (operator backend)
 
 ### Pending Todos
 
@@ -143,8 +146,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T17:36:08.464Z
-Stopped at: Completed 088-01-PLAN.md (a11y remediation + vitest-axe gate)
+Last session: 2026-05-29T17:49:08.030Z
+Stopped at: Completed 088-02-PLAN.md (cross-provider eval script)
 Resume file: None
 
 **Planned Phase:** 088 (cross-cutting-verification-accessibility) — 5 plans — 2026-05-29T17:09:34.911Z

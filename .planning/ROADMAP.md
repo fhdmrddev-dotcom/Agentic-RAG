@@ -261,7 +261,7 @@ Plans:
 Plans:
 
 - [x] 088-01-PLAN.md — A11y remediation to WCAG 2.1 AA + vitest-axe regression gate (global :focus-visible, targeted aria-live, FilesSection aria-selected fix, axe on 8 panel tests) (Wave 1) (completed 2026-05-29 — vitest-axe wired; 89/89 panel tests green incl. 17 axe assertions; no regression past 17-failure 086 baseline; A11Y-01/02 structural GREEN; contrast/focus-ring real-verify → Plan 05)
-- [ ] 088-02-PLAN.md — Reusable cross-provider eval script (scripts/eval_cross_provider.py, localhost-gated; asserts tool-invocation + arg-shape + DB persistence across 4 providers)
+- [x] 088-02-PLAN.md — Reusable cross-provider eval script (scripts/eval_cross_provider.py, localhost-gated; asserts tool-invocation + arg-shape + DB persistence across 4 providers) (Wave 1) (completed 2026-05-29 — 687-line engine modeled on observe-run.py; drives REAL POST /threads/{id}/messages w/ per-request provider override; greppable EVAL_ROW scoreboard for Plan 04 fold-gate; parse-clean + no-backend clean-exit + secret-safe; live run deferred to Plans 04/05)
 - [ ] 088-03-PLAN.md — Deep E2E scenario-13 on Anthropic + Google (write->see->update->diff->ask_user->respond->resume, no refresh; D-17 thought-signature network re-verify)
 - [ ] 088-04-PLAN.md — SEED-034 conditional fold (measure->gate->conditional-apply; universal-only text, checkpoint-gated; or route-to-v2.8)
 - [ ] 088-05-PLAN.md — Verification capstone (4-axis UAT scoreboard + Chrome MCP Lighthouse/keyboard walk + lived pass + D-17 bug routing; checkpoint:human-verify)
@@ -278,7 +278,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
 | 087. Panel UI | 8/8 | In progress | - |
-| 088. Cross-Cutting Verification + Accessibility | 1/5 | In progress | - |
+| 088. Cross-Cutting Verification + Accessibility | 2/5 | In progress | - |
 
 ---
 
