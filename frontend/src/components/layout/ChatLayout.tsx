@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
-import { WorkspacePanel } from "@/components/panel/WorkspacePanel"
+import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
+import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
@@ -9,6 +10,7 @@ import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
+import { useAskUserPrompt, useViewingThread } from "@/providers/StreamsProvider"
 import type { ActiveView } from "@/App"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -66,6 +68,47 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
+
+  // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
+  //    split is a single ChatLayout-level CSS grid; WorkspacePanel + the chat-
+  //    header toggle + the seam signal all drive THIS state. ──
+  const [panelState, setPanelState] = useState<PanelState>("open")
+
+  // In-panel header chevron: open → rail → hidden → open.
+  const cycleState = useCallback(() => {
+    setPanelState((s) => (s === "open" ? "rail" : s === "rail" ? "hidden" : "open"))
+  }, [])
+  // Persistent chat-header button + ⌘./Ctrl+.: open ↔ hidden (D6).
+  const toggleWorkspace = useCallback(() => {
+    setPanelState((s) => (s === "hidden" ? "open" : "hidden"))
+  }, [])
+  // Rail icon / seam pointer: → open.
+  const expand = useCallback(() => setPanelState("open"), [])
+  // Mobile sheet X / onOpenChange(false): → hidden.
+  const hidePanel = useCallback(() => setPanelState("hidden"), [])
+
+  // ⌘./Ctrl+. toggles open ↔ hidden (moved up from WorkspacePanel).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") {
+        e.preventDefault()
+        toggleWorkspace()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [toggleWorkspace])
+
+  // Chat-side seam affordances request a panel-open via the module-level signal
+  // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe).
+  useEffect(() => subscribeOpenPanel(expand), [expand])
+
+  // Pending ask_user for the currently-viewed thread → drives the chat-header
+  // pulsing dot when the panel is not open (gap 4 / PANEL-01). Same hook
+  // WorkspacePanel already uses — additive, no new store.
+  const viewingThreadId = useViewingThread()
+  const { data: pendingAsks } = useAskUserPrompt(viewingThreadId)
+  const workspacePending = pendingAsks.length > 0 && panelState !== "open"
 
   return (
     <div className="flex h-screen bg-background">
@@ -182,24 +225,58 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         </div>
       )}
 
-      <main className="flex-1 overflow-hidden">
-        {activeView === "documents" ? (
-          <IngestionPage />
-        ) : activeView === "skills" ? (
-          <SkillsPage onTryInChat={handleTryInChat} />
-        ) : activeView === "settings" ? (
-          <SettingsPage />
-        ) : activeView === "library-health" ? (
-          <KnowledgeHealthPage />
-        ) : (
-          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} prefillMessage={prefillMessage} onClearPrefill={() => onSetPrefillMessage(null)} onOpenDrawer={() => setDrawerOpen(true)} />
-        )}
-      </main>
-
-      {/* Phase 087-02: additive WorkspacePanel sibling — chat view only. The
-          push/split grid lives INSIDE WorkspacePanel (Pitfall 3); the existing
-          flex layout, NavPanel, drawer, and <main> are untouched. */}
-      {activeView === "chat" && <WorkspacePanel selectedThread={selectedThread} />}
+      {activeView === "chat" ? (
+        // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
+        // panel column resolves against the REAL row width (not the panel's own
+        // indefinite flex width), so 1fr + clamp(...) always sums to the row —
+        // zero horizontal overflow in open/rail/hidden, flush-right panel, and
+        // the chat centers within its own 1fr column (no dead band).
+        <div
+          className="grid min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+          style={{
+            gridTemplateColumns:
+              "1fr " +
+              (panelState === "open"
+                ? "clamp(300px,30%,420px)"
+                : panelState === "rail"
+                  ? "52px"
+                  : "0px"),
+          }}
+        >
+          <main className="min-w-0 overflow-hidden">
+            <ChatArea
+              thread={selectedThread}
+              onCreateThread={newThread}
+              onTitleUpdate={handleTitleUpdate}
+              folders={folders}
+              prefillMessage={prefillMessage}
+              onClearPrefill={() => onSetPrefillMessage(null)}
+              onOpenDrawer={() => setDrawerOpen(true)}
+              onToggleWorkspace={toggleWorkspace}
+              workspacePending={workspacePending}
+            />
+          </main>
+          <WorkspacePanel
+            selectedThread={selectedThread}
+            state={panelState}
+            onCycle={cycleState}
+            onExpand={expand}
+            onHide={hidePanel}
+          />
+        </div>
+      ) : (
+        <main className="flex-1 overflow-hidden">
+          {activeView === "documents" ? (
+            <IngestionPage />
+          ) : activeView === "skills" ? (
+            <SkillsPage onTryInChat={handleTryInChat} />
+          ) : activeView === "settings" ? (
+            <SettingsPage />
+          ) : (
+            <KnowledgeHealthPage />
+          )}
+        </main>
+      )}
     </div>
   )
 }
