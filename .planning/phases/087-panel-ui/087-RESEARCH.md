@@ -347,21 +347,24 @@ export async function getWorkspaceFileDiff(
 
 **If a planner needs more certainty on A2:** read `backend/app/api/panel.py` (the `/ask_user/pending` GET) and `ask_user_service.py` to confirm `run_id` is always present on the GET-reconciled `PendingAsk`, and trace whether the SSE `ask_user_prompt` payload can be enriched with `run_id` at emit time.
 
-## Open Questions
+## Open Questions (RESOLVED during planning — 2026-05-29)
 
 1. **Code highlighter: ShikiCode vs the SPEC's literal RSH mention.**
    - What we know: `ShikiCode` is the live highlighter; `react-syntax-highlighter` has 0 imports.
    - What's unclear: whether the UI-SPEC author intended the literal lib or "the app's syntax highlighting."
    - Recommendation: reuse `ShikiCode`; note the substitution in the plan for the UI checker.
+   - **RESOLVED:** ShikiCode adopted (not react-syntax-highlighter) — 087-03 Task 2; acceptance asserts `grep -c "react-syntax-highlighter"` returns 0. SPEC's literal mention treated as non-binding ("the app's syntax highlighting").
 
 2. **ask_user submit run_id source on a pure-SSE prompt.**
    - What we know: `run_id` is GET-only on `PendingAsk`; the route needs it.
    - What's unclear: whether a brand-new SSE prompt (pre-reconcile) carries enough to POST.
    - Recommendation: gate submit on `run_id` presence (trigger a reconcile if missing), and add a UAT row exercising answer-immediately-after-live-prompt.
+   - **RESOLVED:** Submit gated on `run_id != null` + reconcile-if-missing on mount — 087-05 Task 1; `mockPendingAskNoRunId` fixture + no-run_id behavior test (087-01 Task 3). Answer-immediately-after-live-prompt is a cross-provider UAT row in 087-VALIDATION.md.
 
 3. **Sheet primitive: shadcn add vs hand-author.**
    - What we know: `vaul` is not installed; Radix Dialog is.
    - Recommendation: prefer hand-authoring a Dialog `side="bottom"` variant to guarantee no new dep; only `npx shadcn add sheet` if it confirms no vaul pull.
+   - **RESOLVED:** Hand-authored `sheet.tsx` from Radix Dialog `side="bottom"` — 087-01 Task 2; `npx shadcn add sheet` forbidden, acceptance asserts `grep -c "vaul" package.json` returns 0.
 
 ## Environment Availability
 
