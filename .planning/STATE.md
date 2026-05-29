@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 087 Plan 02 complete (all 5 plans done — phase ready for /gsd:verify-work 087)
-last_updated: "2026-05-29T01:50:00.000Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 02 (panel shell + composition capstone, PANEL-01/PANEL-02) executed
+stopped_at: Completed 087-06-PLAN.md (panel layout re-architecture — gaps 1/2/3/4/7 closed); Plan 07 (contrast pass + Chrome MCP re-verify) remaining
+last_updated: "2026-05-29T07:42:47.771Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 06 (panel layout re-architecture, PANEL-01) executed
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 20
-  completed_plans: 20
-  percent: 100
+  completed_phases: 4
+  total_plans: 22
+  completed_plans: 21
+  percent: 95
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 087 (panel-ui) — ALL PLANS COMPLETE (ready for /gsd:verify-work 087)
-Plan: 5 of 5 complete (Wave 0 foundation + Wave 2 file browser + version-diff + pending-ask/seam + Wave 3 panel shell capstone)
-Status: Phase 087 fully composed. 087-02 (panel shell, PANEL-01/PANEL-02) mounts WorkspacePanel additively in ChatLayout, pins PendingAskStack at the top, wires the seam open handlers via a module-level signal, and ships the live TodosSection. Next: /gsd:verify-work 087.
-Carry-forward into 087 verification: (1) re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live now that WorkspacePanel mounts the panel hooks; (2) Chrome MCP lived-experience UAT (087-VALIDATION.md) across 375/768/1024/1440 + all 6 native providers — panel open/rail/hidden + ⌘. toggle, empty short-circuit on a plain Q&A thread, pinned ask_user, seam pointer→panel-open, reloaded answered Q&A in chat (SeamCard, closes the documented ask_user reload gap). Full suite at the documented 17-failure baseline (no panel regressions).
-Last activity: 2026-05-29 -- Phase 087 Plan 02 (panel shell + composition capstone, PANEL-01/PANEL-02) executed
+Phase: 087 (panel-ui) — 6 of 7 plans complete (Plan 07 contrast pass + Chrome MCP re-verify remaining)
+Plan: 087-06 complete (panel layout re-architecture — gap closure for UAT gaps 1/2/3/4/7)
+Status: Plan 06 shipped. ChatLayout now owns an App-level chat|panel CSS grid (1fr | clamp(300-420px)/52px/0) so the panel resolves against the real row width — closes overflow (gap 1), dead band (gap 7), and per-thread position shift; the open/rail/hidden state machine lifted to ChatLayout hosts a persistent always-visible chat-header toggle (gap 3) with a pulsing-amber-dot ask_user-pending indicator (gap 4 / PANEL-01); DevTwoPaneMock import+mount stripped from production App.tsx (gap 2). WorkspacePanel is now controlled (state/onCycle/onExpand/onHide). Next: /gsd:execute-phase 087 Plan 07 (gaps 5/6 contrast + full Chrome MCP re-verify gate), then /gsd:verify-work 087.
+Carry-forward into 087 verification: (1) re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live now that WorkspacePanel mounts the panel hooks; (2) Chrome MCP lived-experience UAT (087-VALIDATION.md) across 375/768/1024/1440 + all 6 native providers — panel open/rail/hidden + ⌘. toggle, persistent header toggle reopening a hidden panel, pulsing dot on pending ask_user while collapsed, empty short-circuit on a plain Q&A thread, pinned ask_user, seam pointer→panel-open, reloaded answered Q&A in chat (SeamCard). Plan 07 owns the consolidated Chrome MCP re-verify gate. Full suite at the documented 17-failure baseline (no panel regressions).
+Last activity: 2026-05-29
 
-Progress: [██████████] 100% (5/5 plans)
+Progress: [█████████░] 95% (21/22 plans)
 
 ## Performance Metrics
 
@@ -89,6 +89,10 @@ Recent decisions affecting current work:
 - (087-02): push/split grid lives INSIDE WorkspacePanel's own aside (Pitfall 3 — live ChatLayout is flex not grid); ChatLayout mount is one additive sibling gated on activeView==='chat' (6 ins / 0 del)
 - (087-02): mobile (<768px) detected via window.innerWidth + resize (not matchMedia — jsdom-safe); body renders inside the Plan-01 Radix-Dialog Sheet
 - (087-02): the fixed-order 'Pending question' slot is satisfied by PendingAskStack PINNED at the very top (087-05 contract), not an extra empty accordion section — avoids the empty-tax the short-circuit forbids
+- (087-06): the chat|panel split is now ONE ChatLayout-level CSS grid (1fr | clamp(300-420px)/52px/0) — Pitfall-3 self-referential aside-grid (where 30% collapsed to its 300px floor) REVERSED in favor of panel-shell.md D1; the panel column resolves against the real row width so 1fr+clamp always sums to the row → zero horizontal overflow + flush-right panel + chat centers in its own 1fr column (closes gaps 1 & 7)
+- (087-06): WorkspacePanel is now CONTROLLED (state/onCycle/onExpand/onHide props); the open/rail/hidden state machine, the ⌘./Ctrl+. listener, and subscribeOpenPanel(expand) lifted UP to ChatLayout so the persistent chat-header toggle + the seam pointer drive the same state (closes gap 3 — hidden panel reopenable by mouse)
+- (087-06): pulsing-amber-dot ask_user-pending indicator on the chat-header toggle computed in ChatLayout via useAskUserPrompt(useViewingThread()) — workspacePending = pending.length>0 && state!=='open'; motion-safe:animate-pulse honors prefers-reduced-motion, no new store (closes gap 4 / PANEL-01)
+- (087-06): DevTwoPaneMock import+mount removed from production App.tsx (file retained for dev); T-087-06-01 info-disclosure mitigated (closes gap 2)
 
 ### Pending Todos
 
