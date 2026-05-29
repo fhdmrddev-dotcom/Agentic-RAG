@@ -115,7 +115,8 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 
 - [x] **Phase 083: Foundation -- Tool-Dispatch Extraction + Bug Fixes** - G-5 mandated refactor of threads.py tool dispatch + close 4 open v2.6 bugs
 - [x] **Phase 084: Workspace Filesystem Backend** - Per-thread workspace with hybrid storage, versioning, diffing, and SSE events (gap closure in progress -- Plan 05 closes 3 cross-provider UAT blockers) (completed 2026-05-28)
-- [x] **Phase 085: New LLM Tools** - write_todos, task (sub-agent), and ask_user (human-in-the-loop pause/resume) (completed 2026-05-28)
+- [x] **Phase 085: New LLM Tools** - write_todos, task (sub-agent), and ask_user (human-in-the-loop pause/resume)
+ (completed 2026-05-28)
 - [x] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks (completed 2026-05-29 — verified passed 3/3; WR-04 closed via quick 260529-0sc; UAT 4/5 across 6 providers; thread-switch reconcile-abort deferred to Phase 087 (no hook consumer until panel UI; unit-tested FC#5); surfaced+closed BUG-260529-01)
 - [x] **Phase 087: Panel UI** - Right-side collapsible panel with todos, file browser, ask_user prompt, and diff viewer (all 5 plans complete 2026-05-29 — pending /gsd:verify-work 087)
 - [ ] **Phase 088: Cross-Cutting Verification + Accessibility** - 4-axis UAT matrix (SC#10), WCAG 2.1 AA audit, E2E validation
@@ -226,7 +227,7 @@ Plans:
   4. Pending user input section renders `ask_user` prompts with optional choice buttons and free-text field -- submitting a response resumes the agent within the same panel view
   5. Diff viewer renders pre-computed version deltas with syntax highlighting -- user can select any two versions of a file to compare
 
-**Plans**: 5 plans
+**Plans**: 7 plans (5 shipped + 2 gap-closure from 087-UAT)
 **UI hint**: yes
 **Research flag**: G-2 MANDATORY -- sketch-before-plan. Panel layout, responsive breakpoints (375px, 768px, 1024px, 1440px), bottom-sheet mobile behavior must have operator-approved mockup before planning begins.
 
@@ -237,6 +238,8 @@ Plans:
 - [x] 087-04-PLAN.md — Versions/Diff: parseUnifiedDiff + VersionDiff + DiffExpandOverlay (PANEL-07) (Wave 2) (completed 2026-05-29)
 - [x] 087-05-PLAN.md — Pending ask + seam: PendingAskCard + SeamPointer/SeamCard/PausedRunCue + additive MessageItem mount (PANEL-04) (Wave 2) (completed 2026-05-29)
 - [x] 087-02-PLAN.md — Shell: WorkspacePanel + Rail/Section/Empty + TodosSection + additive ChatLayout mount (PANEL-01, PANEL-02) (Wave 3) (completed 2026-05-29)
+- [ ] 087-06-PLAN.md — Gap closure: hoist chat|panel split to ChatLayout grid + lift panel state + persistent chat-header toggle w/ pulsing-amber-dot + remove DevTwoPaneMock (gaps 1/2/3/4/7) (Wave 1)
+- [ ] 087-07-PLAN.md — Gap closure: strengthen panel/rail surface contrast both themes (gaps 5/6) + full Chrome MCP re-verify gate (Wave 2)
 
 ### Phase 088: Cross-Cutting Verification + Accessibility
 
