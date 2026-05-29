@@ -47,6 +47,18 @@ Legend: ✅ verified live · ⬜ untested · ⚠️ known gap/design-question ·
 2. **Generated-files / artifacts consistency** — TWO separate file surfaces with different lifecycles: `execute_code` outputs = "Output files" links in chat (sandbox-ephemeral); `workspace_write` = panel FILES (persistent, versioned). Unifying / artifacts concept is a real design decision (ties to the tool-panel-consistency seed).
 3. **Fast-thread-switch stale-id race** (low sev) — rapid thread-switch during run completion fired a versions fetch against a stale thread_id → 404 → "Could not load versions"; self-heals on reload, did not reproduce at human pace. Adjacent to deferred Phase 086 reconcile-abort.
 
+## Extended testing round 2 (2026-05-29) — additional results
+
+| Scenario | Result |
+|----------|--------|
+| PANEL-03 CSV render | ✅ `/people.csv` → proper table (headers name/age/city + 3 data rows), not fallback |
+| Section collapse (accordion) | ✅ each section toggles independently via `aria-expanded` (collapsed Todos, expanded Versions, Files unaffected) |
+| 3-version pills + default diff | ✅ pills v3/v2/v1 render; default v2→v3 diff `+4 −0`; no "could not load" on clean nav |
+| Non-adjacent diff (v1↔v3) | ⬜ inconclusive via automation — programmatic pill click didn't reassign (synthetic-event limit, same as the radio that worked via real click); endpoint supports arbitrary from/to. **Needs a human click to confirm.** |
+| Fast-interaction render glitch | ⚠️ rapid scripted new-chat+send+wait once left the panel at width 0 / no composer; self-healed on reload. Not reproduced at human pace — fragility under automation, low concern. |
+
+**Still untested (low-risk, unit-covered; for a fresh session):** free-text ask_user answer (radio path verified, free-text box renders + same gate); huge-diff truncation; identical/empty diff; large/nested todos; malformed/huge CSV → fallback; image preview (bucket); large-file truncation; Stop-mid-write; tool failure (invalid path); empty search result.
+
 ## Architecture facts (for future work)
 - **Workspace panel = agent scratch** (`workspace_write` → `workspace_files` table, versioned). **Separate** from the user's **KB** (`documents` table, read by `search_documents`).
 - Panel-owned tools (render in panel + quiet chat pointer): `write_todos`, `workspace_write`, `ask_user`. All other tools (search_documents, execute_code, …) render in chat only.
