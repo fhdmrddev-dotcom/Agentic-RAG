@@ -226,14 +226,17 @@ Plans:
   4. Pending user input section renders `ask_user` prompts with optional choice buttons and free-text field -- submitting a response resumes the agent within the same panel view
   5. Diff viewer renders pre-computed version deltas with syntax highlighting -- user can select any two versions of a file to compare
 
-**Plans**: TBD
+**Plans**: 5 plans
 **UI hint**: yes
 **Research flag**: G-2 MANDATORY -- sketch-before-plan. Panel layout, responsive breakpoints (375px, 768px, 1024px, 1440px), bottom-sheet mobile behavior must have operator-approved mockup before planning begins.
 
 Plans:
 
-- [ ] 087-01: TBD
-- [ ] 087-02: TBD
+- [ ] 087-01-PLAN.md — Foundation: api.ts client fns, --warning/dim tokens, Sheet primitive, 7 Wave-0 test stubs + fixtures (Wave 1)
+- [ ] 087-03-PLAN.md — Files: FilesSection + FilePreview + CsvTablePreview (PANEL-03) (Wave 2)
+- [ ] 087-04-PLAN.md — Versions/Diff: parseUnifiedDiff + VersionDiff + DiffExpandOverlay (PANEL-07) (Wave 2)
+- [ ] 087-05-PLAN.md — Pending ask + seam: PendingAskCard + SeamPointer/SeamCard/PausedRunCue + additive MessageItem mount (PANEL-04) (Wave 2)
+- [ ] 087-02-PLAN.md — Shell: WorkspacePanel + Rail/Section/Empty + TodosSection + additive ChatLayout mount (PANEL-01, PANEL-02) (Wave 3)
 
 ### Phase 088: Cross-Cutting Verification + Accessibility
 
