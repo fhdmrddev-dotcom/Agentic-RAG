@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 087 Plan 04 complete
-last_updated: "2026-05-29T01:30:00.000Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 04 (version diff viewer, PANEL-07) executed
+stopped_at: Phase 087 Plan 05 complete
+last_updated: "2026-05-29T01:36:00.000Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 05 (pending-ask answer surface + chat<->panel seam, PANEL-04) executed
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
-  percent: 90
+  completed_plans: 19
+  percent: 95
 ---
 
 # Project State
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 ## Current Position
 
 Phase: 087 (panel-ui) — IN PROGRESS
-Plan: 3 of 5 complete (Wave 0 foundation + Wave 2 file browser + Wave 2 version-diff shipped)
-Status: Ready to execute remaining Wave 2 plan (087-05 pending-ask + seam) and Wave 3 (087-02 panel shell)
-Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview + VersionDiff both use AbortController on (threadId, file.id[, pair]) change — real consumers for that abort path.
-Last activity: 2026-05-29 -- Phase 087 Plan 04 (version diff viewer, PANEL-07) executed
+Plan: 4 of 5 complete (Wave 0 foundation + Wave 2 file browser + version-diff + pending-ask/seam shipped)
+Status: Ready to execute the remaining Wave 3 plan (087-02 panel shell — mounts PendingAskStack + wires the seam open handlers)
+Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview + VersionDiff both use AbortController on (threadId, file.id[, pair]) change — real consumers for that abort path. 087-05 closes the documented ask_user reload gap via SeamCard (the OPEN FOLLOW-UP the Phase 086 surface note flagged) — verify reloaded answered Q&A renders in chat.
+Last activity: 2026-05-29 -- Phase 087 Plan 05 (pending-ask answer surface + chat<->panel seam, PANEL-04) executed
 
-Progress: [██████░░░░] 60% (3/5 plans)
+Progress: [████████░░] 80% (4/5 plans)
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [██████░░░░] 60% (3/5 plans)
 | 083 | 3 | - | - |
 | 084 | 5 | - | - |
 | 085 | 5 | - | - |
+| 087 | 4/5 | - | ~7min (087-05) |
 
 **Recent Trend:**
 
@@ -77,6 +78,12 @@ Recent decisions affecting current work:
 - (087-04): unified-diff parsed CLIENT-SIDE via pure parseUnifiedDiff (no diff lib, SC#3) — backend already emits the difflib string; Unicode minus (U+2212) for del signs per UI-SPEC
 - (087-04): shared DiffLines presentational renderer (5th file beyond the plan's 4) so VersionDiff in-column diff + DiffExpandOverlay wide diff share one render path; ⤢ overlay reuses the SAME parsed payload — no second fetch (D4)
 - (087-04): VersionDiff defaults to latest-two (Compare v{n-1}<->v{n}); red-base/green-target pills carry text+aria (base/target version N), not color-only
+- (087-05): A2/Pitfall-1 resolved concretely — Send Answer gated on (pick OR type) AND run_id!=null; pure-SSE prompt (no run_id) triggers reconcile-if-missing + shows "Preparing…"; NEVER POSTs without a reconciled run_id (would 404)
+- (087-05): answer flow is optimistic-then-reactive — optimistic green .answered on 200, then ask_user_response SSE removes the prompt from the store → card unmounts + run un-pauses (D4)
+- (087-05): seam mode signal reuses per-message runStatus==='streaming' (live=pointer/cue, terminal/rehydrated=card) — no new global state; D-05 single source of truth (live in panel, history in transcript)
+- (087-05): SeamCard closes the documented ask_user reload gap (answered Q&A in chat on reload) — the OPEN FOLLOW-UP the Phase 086 surface note flagged
+- (087-05): seam open handlers (onSeePanel/onOpenPanel) left as optional unwired props — Plan 02 panel shell owns the panel-open action and wires them; renderers degrade to no-op click until then
+- (087-05): MessageItem seam mounts are PURELY additive (102 insertions / 0 deletions); RunCard call shape preserved; BUG-260529-02 surface untouched (G-5)
 
 ### Pending Todos
 
@@ -121,8 +128,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T01:30:00.000Z
-Stopped at: Completed 087-04-PLAN.md (version diff viewer, PANEL-07)
-Resume file: None — ready for remaining 087 plans (087-05 pending-ask + seam, 087-02 panel shell)
+Last session: 2026-05-29T01:36:00.000Z
+Stopped at: Completed 087-05-PLAN.md (pending-ask answer surface + chat<->panel seam, PANEL-04)
+Resume file: None — ready for the remaining 087 plan (087-02 panel shell, Wave 3)
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z
