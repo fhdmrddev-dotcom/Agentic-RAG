@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 087 Plan 05 complete
-last_updated: "2026-05-29T01:36:00.000Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 05 (pending-ask answer surface + chat<->panel seam, PANEL-04) executed
+stopped_at: Phase 087 Plan 02 complete (all 5 plans done — phase ready for /gsd:verify-work 087)
+last_updated: "2026-05-29T01:50:00.000Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 02 (panel shell + composition capstone, PANEL-01/PANEL-02) executed
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 087 (panel-ui) — IN PROGRESS
-Plan: 4 of 5 complete (Wave 0 foundation + Wave 2 file browser + version-diff + pending-ask/seam shipped)
-Status: Ready to execute the remaining Wave 3 plan (087-02 panel shell — mounts PendingAskStack + wires the seam open handlers)
-Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview + VersionDiff both use AbortController on (threadId, file.id[, pair]) change — real consumers for that abort path. 087-05 closes the documented ask_user reload gap via SeamCard (the OPEN FOLLOW-UP the Phase 086 surface note flagged) — verify reloaded answered Q&A renders in chat.
-Last activity: 2026-05-29 -- Phase 087 Plan 05 (pending-ask answer surface + chat<->panel seam, PANEL-04) executed
+Phase: 087 (panel-ui) — ALL PLANS COMPLETE (ready for /gsd:verify-work 087)
+Plan: 5 of 5 complete (Wave 0 foundation + Wave 2 file browser + version-diff + pending-ask/seam + Wave 3 panel shell capstone)
+Status: Phase 087 fully composed. 087-02 (panel shell, PANEL-01/PANEL-02) mounts WorkspacePanel additively in ChatLayout, pins PendingAskStack at the top, wires the seam open handlers via a module-level signal, and ships the live TodosSection. Next: /gsd:verify-work 087.
+Carry-forward into 087 verification: (1) re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live now that WorkspacePanel mounts the panel hooks; (2) Chrome MCP lived-experience UAT (087-VALIDATION.md) across 375/768/1024/1440 + all 6 native providers — panel open/rail/hidden + ⌘. toggle, empty short-circuit on a plain Q&A thread, pinned ask_user, seam pointer→panel-open, reloaded answered Q&A in chat (SeamCard, closes the documented ask_user reload gap). Full suite at the documented 17-failure baseline (no panel regressions).
+Last activity: 2026-05-29 -- Phase 087 Plan 02 (panel shell + composition capstone, PANEL-01/PANEL-02) executed
 
-Progress: [████████░░] 80% (4/5 plans)
+Progress: [██████████] 100% (5/5 plans)
 
 ## Performance Metrics
 
@@ -48,7 +48,7 @@ Progress: [████████░░] 80% (4/5 plans)
 | 083 | 3 | - | - |
 | 084 | 5 | - | - |
 | 085 | 5 | - | - |
-| 087 | 4/5 | - | ~7min (087-05) |
+| 087 | 5/5 | - | ~8min (087-02) |
 
 **Recent Trend:**
 
@@ -84,6 +84,11 @@ Recent decisions affecting current work:
 - (087-05): SeamCard closes the documented ask_user reload gap (answered Q&A in chat on reload) — the OPEN FOLLOW-UP the Phase 086 surface note flagged
 - (087-05): seam open handlers (onSeePanel/onOpenPanel) left as optional unwired props — Plan 02 panel shell owns the panel-open action and wires them; renderers degrade to no-op click until then
 - (087-05): MessageItem seam mounts are PURELY additive (102 insertions / 0 deletions); RunCard call shape preserved; BUG-260529-02 surface untouched (G-5)
+- (087-02): seam open handlers wired via a module-level event bus (panelOpenSignal — subscribeOpenPanel/requestOpenPanel) instead of re-plumbing onSeePanel/onOpenPanel through MessageList→ChatArea; keeps the G-5 MessageItem change to 6 ins / 0 del and carries no thread data (PANEL-06 / T-087-17 safe)
+- (087-02): WorkspacePanel state machine — header button CYCLES open→rail→hidden→open; ⌘./Ctrl+. TOGGLES open↔hidden; rail icon / seam pointer EXPANDS to open
+- (087-02): push/split grid lives INSIDE WorkspacePanel's own aside (Pitfall 3 — live ChatLayout is flex not grid); ChatLayout mount is one additive sibling gated on activeView==='chat' (6 ins / 0 del)
+- (087-02): mobile (<768px) detected via window.innerWidth + resize (not matchMedia — jsdom-safe); body renders inside the Plan-01 Radix-Dialog Sheet
+- (087-02): the fixed-order 'Pending question' slot is satisfied by PendingAskStack PINNED at the very top (087-05 contract), not an extra empty accordion section — avoids the empty-tax the short-circuit forbids
 
 ### Pending Todos
 
@@ -128,8 +133,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T01:36:00.000Z
-Stopped at: Completed 087-05-PLAN.md (pending-ask answer surface + chat<->panel seam, PANEL-04)
-Resume file: None — ready for the remaining 087 plan (087-02 panel shell, Wave 3)
+Last session: 2026-05-29T01:50:00.000Z
+Stopped at: Completed 087-02-PLAN.md (panel shell + composition capstone, PANEL-01/PANEL-02) — all 5 plans of Phase 087 done
+Resume file: None — Phase 087 fully composed; next is /gsd:verify-work 087
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z

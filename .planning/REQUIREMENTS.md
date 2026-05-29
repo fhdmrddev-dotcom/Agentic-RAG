@@ -30,8 +30,8 @@
 
 ### Panel UI
 
-- [ ] **PANEL-01**: Right-side panel (~30% width) next to chat, collapsible via button and keyboard shortcut, renders as bottom-sheet on mobile screens (<768px)
-- [ ] **PANEL-02**: Todos section renders live todo list from write_todos tool with status indicators (pending, in-progress, completed)
+- [x] **PANEL-01**: Right-side panel (~30% width) next to chat, collapsible via button and keyboard shortcut, renders as bottom-sheet on mobile screens (<768px)
+- [x] **PANEL-02**: Todos section renders live todo list from write_todos tool with status indicators (pending, in-progress, completed)
 - [x] **PANEL-03**: Workspace file browser lists files with click-to-preview for text, markdown, and code using existing renderers
 - [x] **PANEL-04**: Pending user input section renders ask_user prompts with optional choice buttons and free-text field
 - [ ] **PANEL-05**: Panel subscribes to the same SSE stream as chat via StreamsProvider Context — single subscription, demultiplexed by event type, no duplicate connections
@@ -83,8 +83,8 @@
 | TOOL-02 | Phase 085 | Complete |
 | TOOL-03 | Phase 085 | Complete |
 | TOOL-04 | Phase 085 | Complete |
-| PANEL-01 | Phase 087 | Pending |
-| PANEL-02 | Phase 087 | Pending |
+| PANEL-01 | Phase 087 | Complete (087-02) |
+| PANEL-02 | Phase 087 | Complete (087-02) |
 | PANEL-03 | Phase 087 | Complete |
 | PANEL-04 | Phase 087 | Complete (087-05) |
 | PANEL-05 | Phase 086 | Pending |
