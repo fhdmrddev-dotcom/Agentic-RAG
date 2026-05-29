@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json as _json
 from uuid import UUID
 
 import asyncpg
@@ -49,7 +48,12 @@ async def insert_version(
     delta_from_prev: dict | None,
 ) -> None:
     """Insert a new version row."""
-    delta_json = _json.dumps(delta_from_prev) if delta_from_prev is not None else None
+    # delta_from_prev is a JSONB column and the asyncpg pool registers a jsonb
+    # codec (encoder=json.dumps — see dependencies._init_pg_connection), so pass
+    # the dict through directly. json.dumps'ing here too double-encodes into a
+    # JSON *string* (jsonb_typeof -> 'string'), which made the /diff endpoint's
+    # delta.get(...) raise on read → HTTP 500 (087-08 UAT finding).
+    delta_json = delta_from_prev
     await pool.execute(
         """
         INSERT INTO workspace_file_versions

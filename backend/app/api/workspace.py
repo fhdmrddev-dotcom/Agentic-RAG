@@ -276,6 +276,14 @@ async def get_workspace_file_diff(
         ver_row = ver_resp.data if ver_resp is not None else None
         if ver_row and ver_row.get("delta_from_prev"):
             delta = ver_row["delta_from_prev"]
+            # Defensive: rows written before the 087-08 double-encoding fix stored
+            # delta_from_prev as a JSON *string* (jsonb_typeof 'string'); PostgREST
+            # returns those as str. Decode so delta.get(...) doesn't 500. Matches the
+            # sibling guard in workspace_service.get_file_diff.
+            if isinstance(delta, str):
+                import json
+
+                delta = json.loads(delta)
             return {
                 "path": file_row["path"],
                 "from_version": from_version,
