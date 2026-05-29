@@ -143,7 +143,7 @@ export function FilePreview({ threadId, file, onBack }: FilePreviewProps) {
           onClick={onBack}
           className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
         >
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />‹ Files
+          <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />Files
         </button>
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
           {file.path}
