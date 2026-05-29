@@ -54,10 +54,26 @@ Legend: ✅ verified live · ⬜ untested · ⚠️ known gap/design-question ·
 | PANEL-03 CSV render | ✅ `/people.csv` → proper table (headers name/age/city + 3 data rows), not fallback |
 | Section collapse (accordion) | ✅ each section toggles independently via `aria-expanded` (collapsed Todos, expanded Versions, Files unaffected) |
 | 3-version pills + default diff | ✅ pills v3/v2/v1 render; default v2→v3 diff `+4 −0`; no "could not load" on clean nav |
-| Non-adjacent diff (v1↔v3) | ⬜ inconclusive via automation — programmatic pill click didn't reassign (synthetic-event limit, same as the radio that worked via real click); endpoint supports arbitrary from/to. **Needs a human click to confirm.** |
+| Non-adjacent diff (v1↔v3) | ✅ VERIFIED round 3 (real Chrome MCP clicks) — see round-3 section. The "didn't reassign" was NOT a synthetic-event limit; it's a **two-click endpoint picker** (`VersionDiff.pickVersion`): 1st click only arms `lastClicked` (no visible change), 2nd click sets the pair. |
 | Fast-interaction render glitch | ⚠️ rapid scripted new-chat+send+wait once left the panel at width 0 / no composer; self-healed on reload. Not reproduced at human pace — fragility under automation, low concern. |
 
-**Still untested (low-risk, unit-covered; for a fresh session):** free-text ask_user answer (radio path verified, free-text box renders + same gate); huge-diff truncation; identical/empty diff; large/nested todos; malformed/huge CSV → fallback; image preview (bucket); large-file truncation; Stop-mid-write; tool failure (invalid path); empty search result.
+## Extended testing round 3 (2026-05-29) — live Chrome MCP + Supabase/API cross-check
+
+Setup: fresh thread "Community Hackathon To-Do List" (`9db1d9c5…`) — one run wrote 12 todos + `/broken.csv` (malformed) + `/dup.md` ×2 (identical content). Server truth cross-checked via the workspace REST API in-browser.
+
+| Scenario | Result |
+|----------|--------|
+| **Non-adjacent diff (v1↔v3)** | ✅ on `/exec-summary.md` (3 ver). Two real clicks (v1 then v3) → pills "base v1 / target v3", summary **+8 −0**, header `--- v1 / +++ v3 / @@ -14,3 +14,11 @@` — matches API truth exactly (adjacent default was +4 −0). **Finding:** the picker is a 2-click model with NO feedback on the 1st click → discoverability gap (record). |
+| **Empty workspace state** | ✅ fresh/new thread panel shows "No workspace activity yet" + helper line. |
+| **Large todo list (12)** | ✅ TODOS "2/12"; all 12 rows render in `order_index` order, correct statuses (2 COMPLETED / 1 IN PROGRESS / 9 PENDING). No truncation/scroll issue. |
+| **Nested/subtask todos** | ⚠️ render is **flat by design** — `TodosSection.tsx` sorts by `order_index` and renders one flat `<li>` per todo; `parent_id` is persisted (`replace_todos`/`todos` table) but **never visualized** (no indentation/tree). Not a bug vs PANEL-02 spec; note as a gap if hierarchy is ever wanted. |
+| **Malformed CSV → fallback** | ✅ `/broken.csv` (61 B; unterminated `"` + ragged 2/4/5-col rows) → drill-in shows **"No preview available · Download"**, no broken/partial table. Parse-failure path (not size). |
+| **Identical / empty diff** | ✅ `/dup.md` v1==v2 (16 B each). API diff = `{additions:0, deletions:0}`, empty string. UI default pair v1↔v2 → summary **+0 −0**, empty diff body. Minor UX: no explicit "No changes" affordance, just +0 −0. **Also confirmed `workspace_write` does NOT dedup identical content — it created v2.** |
+| **Fast-interaction race (gap #3)** | ⚠️ CONFIRMED + self-heals. Rapid scripted (back→select file→expand VERSIONS→read, all instant) left `/dup.md` showing "No preview available" + "Could not load versions" while the **API returned 200 for both content and versions**. Reload + human-pace repeat rendered correctly (markdown + +0 −0 diff). Automation-pace artifact, not a backend fault. Adjacent to deferred Phase 086 reconcile-abort. |
+
+**Still untested (carried to remainder of this session):** free-text ask_user answer + reload mid-pending; huge-diff >500-line truncation; huge CSV (>2000 rows / >256 KB) → "too large"; large-file >8192-char truncation; image preview (bucket — reachability in question, see note); Stop-mid-write; tool failure (invalid path); empty search result.
+
+> **Bulk-content note:** `workspace_files` is populated ONLY by `workspace_write`, which takes a single literal `content` string (text→UTF-8, no append/edit mode). `execute_code` outputs go to sandbox-outputs (chat links), NOT the workspace. So >500-line diffs / >2000-row CSVs must be agent-emitted in one call — impractical/unreliable at that volume. These thresholds are unit-covered; live volume tests are attempted where the agent can plausibly emit the content, else flagged as code-confirmed-only.
 
 ## Architecture facts (for future work)
 - **Workspace panel = agent scratch** (`workspace_write` → `workspace_files` table, versioned). **Separate** from the user's **KB** (`documents` table, read by `search_documents`).
