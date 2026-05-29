@@ -50,7 +50,11 @@ interface PendingAskCardProps {
 type CardState = "pending" | "answered" | "expired"
 
 export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
-  const { tool_call_id, prompt, options, timeout_seconds, run_id } = ask
+  const { tool_call_id, prompt, timeout_seconds, run_id } = ask
+  // ask_user with no choices → backend stores options=null (free-text path).
+  // Normalize to [] so the `.length`/index reads below never throw (a null here
+  // crashed the whole panel — there is no error boundary). See BUG-260529-02.
+  const options = ask.options ?? []
 
   const [choiceIndex, setChoiceIndex] = useState<number | null>(null)
   const [freeText, setFreeText] = useState("")
