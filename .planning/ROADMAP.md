@@ -234,7 +234,7 @@ Plans:
 
 - [x] 087-01-PLAN.md — Foundation: api.ts client fns, --warning/dim tokens, Sheet primitive, 7 Wave-0 test stubs + fixtures (Wave 1) (completed 2026-05-29)
 - [x] 087-03-PLAN.md — Files: FilesSection + FilePreview + CsvTablePreview (PANEL-03) (Wave 2) (completed 2026-05-29)
-- [ ] 087-04-PLAN.md — Versions/Diff: parseUnifiedDiff + VersionDiff + DiffExpandOverlay (PANEL-07) (Wave 2)
+- [x] 087-04-PLAN.md — Versions/Diff: parseUnifiedDiff + VersionDiff + DiffExpandOverlay (PANEL-07) (Wave 2) (completed 2026-05-29)
 - [ ] 087-05-PLAN.md — Pending ask + seam: PendingAskCard + SeamPointer/SeamCard/PausedRunCue + additive MessageItem mount (PANEL-04) (Wave 2)
 - [ ] 087-02-PLAN.md — Shell: WorkspacePanel + Rail/Section/Empty + TodosSection + additive ChatLayout mount (PANEL-01, PANEL-02) (Wave 3)
 
@@ -270,7 +270,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 084. Workspace Filesystem Backend | 5/5 | Complete    | 2026-05-28 |
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
-| 087. Panel UI | 2/5 | In progress | - |
+| 087. Panel UI | 3/5 | In progress | - |
 | 088. Cross-Cutting Verification + Accessibility | 0/TBD | Not started | - |
 
 ---

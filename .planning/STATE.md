@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 087 Plan 03 complete
-last_updated: "2026-05-29T01:17:00.000Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 03 (file browser + preview, PANEL-03) executed
+stopped_at: Phase 087 Plan 04 complete
+last_updated: "2026-05-29T01:30:00.000Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 04 (version diff viewer, PANEL-07) executed
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 17
-  percent: 85
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 ## Current Position
 
 Phase: 087 (panel-ui) — IN PROGRESS
-Plan: 2 of 5 complete (Wave 0 foundation + Wave 2 file browser shipped)
-Status: Ready to execute remaining Wave 2 plans (087-04 version-diff, 087-05 pending-ask + seam) and Wave 3 (087-02 panel shell)
-Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview now uses AbortController on (threadId, file.id) change — a real consumer for that abort path.
-Last activity: 2026-05-29 -- Phase 087 Plan 03 (file browser + preview, PANEL-03) executed
+Plan: 3 of 5 complete (Wave 0 foundation + Wave 2 file browser + Wave 2 version-diff shipped)
+Status: Ready to execute remaining Wave 2 plan (087-05 pending-ask + seam) and Wave 3 (087-02 panel shell)
+Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview + VersionDiff both use AbortController on (threadId, file.id[, pair]) change — real consumers for that abort path.
+Last activity: 2026-05-29 -- Phase 087 Plan 04 (version diff viewer, PANEL-07) executed
 
-Progress: [████░░░░░░] 40% (2/5 plans)
+Progress: [██████░░░░] 60% (3/5 plans)
 
 ## Performance Metrics
 
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 - (087-03): ShikiCode reused for code preview (A1) — UI-SPEC's literal react-syntax-highlighter is superseded; RSH stays unused, no new dep
 - (087-03): CsvTablePreview is a hand-rolled quote-aware splitter (no CSV lib, D-01); malformed/ragged/≥2000-rows/>256KB all short-circuit to the calm fallback before DOM build (T-087-07)
 - (087-03): fileFlash added as an index.css @keyframes + .animate-fileFlash utility (prefers-reduced-motion guarded), mirroring brandPulse/checkPop — no Tailwind config change
+- (087-04): unified-diff parsed CLIENT-SIDE via pure parseUnifiedDiff (no diff lib, SC#3) — backend already emits the difflib string; Unicode minus (U+2212) for del signs per UI-SPEC
+- (087-04): shared DiffLines presentational renderer (5th file beyond the plan's 4) so VersionDiff in-column diff + DiffExpandOverlay wide diff share one render path; ⤢ overlay reuses the SAME parsed payload — no second fetch (D4)
+- (087-04): VersionDiff defaults to latest-two (Compare v{n-1}<->v{n}); red-base/green-target pills carry text+aria (base/target version N), not color-only
 
 ### Pending Todos
 
@@ -118,8 +121,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T01:17:00.000Z
-Stopped at: Completed 087-03-PLAN.md (file browser + preview, PANEL-03)
-Resume file: None — ready for remaining 087 plans (087-04 version-diff, 087-05 pending-ask + seam, 087-02 panel shell)
+Last session: 2026-05-29T01:30:00.000Z
+Stopped at: Completed 087-04-PLAN.md (version diff viewer, PANEL-07)
+Resume file: None — ready for remaining 087 plans (087-05 pending-ask + seam, 087-02 panel shell)
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z

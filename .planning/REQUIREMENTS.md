@@ -36,7 +36,7 @@
 - [ ] **PANEL-04**: Pending user input section renders ask_user prompts with optional choice buttons and free-text field
 - [ ] **PANEL-05**: Panel subscribes to the same SSE stream as chat via StreamsProvider Context — single subscription, demultiplexed by event type, no duplicate connections
 - [ ] **PANEL-06**: Panel events route to separate state stores — no chat message list re-renders triggered by panel updates
-- [ ] **PANEL-07**: Diff viewer for workspace file versions with syntax highlighting, rendering pre-computed version deltas
+- [x] **PANEL-07**: Diff viewer for workspace file versions with syntax highlighting, rendering pre-computed version deltas
 
 ### Accessibility
 
@@ -89,7 +89,7 @@
 | PANEL-04 | Phase 087 | Pending |
 | PANEL-05 | Phase 086 | Pending |
 | PANEL-06 | Phase 086 | Pending |
-| PANEL-07 | Phase 087 | Pending |
+| PANEL-07 | Phase 087 | Complete (087-04) |
 | A11Y-01 | Phase 088 | Pending |
 | A11Y-02 | Phase 088 | Pending |
 
