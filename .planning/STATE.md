@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: executing
-stopped_at: "087-08 COMPLETE — single nav-style in-panel toggle (collapse-to-rail) shipped (c1d446f6); Wave-2 blocking Chrome-MCP gate PASSED for all 4 design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message). Two UAT-found pre-existing bugs fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS '0 todos' SeamCard count (9667a816). Phase 087 FINALIZED 2026-05-29 — scenario-matrix round-3 (Chrome MCP + Supabase/API) verified every remaining panel scenario (non-adjacent/empty/huge-truncated diffs, large todos, malformed-CSV fallback, Stop-mid-write, invalid-path + empty-search surfaces, empty workspace, free-text ask_user); found+fixed BUG-260529-03 (free-text ask_user → null.length blanked the app, commit 0df4b048); planted SEED-037 (office/PDF viewing + working download), SEED-038 (artifacts unification), SEED-039 (panel reliability/polish). Next: Phase 088."
-last_updated: "2026-05-29T09:14:58.699Z"
-last_activity: 2026-05-29 -- Phase 087 FINALIZED: scenario-matrix round-3 verified all panel scenarios; found+fixed BUG-260529-03 (free-text ask_user crash); planted SEED-037/038/039
+status: paused
+stopped_at: Phase 088 context gathered — SEED-034 conditional-fold + reusable eval script; a11y fix-all-to-AA (panel + seam cards) w/ jest-axe + Chrome MCP Lighthouse; 4-axis UAT + Anthropic+Google E2E; fix-blockers-defer-polish; gemini-3 thought-sig folded_into 088
+last_updated: "2026-05-29T14:53:20.865Z"
+last_activity: 2026-05-29
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 23
   completed_plans: 23
   percent: 100
@@ -138,8 +138,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T01:50:00.000Z
-Stopped at: Completed 087-02-PLAN.md (panel shell + composition capstone, PANEL-01/PANEL-02) — all 5 plans of Phase 087 done
-Resume file: None — Phase 087 fully composed; next is /gsd:verify-work 087
+Last session: --stopped-at
+Stopped at: Phase 088 context gathered — SEED-034 conditional-fold + reusable eval script; a11y fix-all-to-AA (panel + seam cards) w/ jest-axe + Chrome MCP Lighthouse; 4-axis UAT + Anthropic+Google E2E; fix-blockers-defer-polish; gemini-3 thought-sig folded_into 088
+Resume file: --resume-file
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z
