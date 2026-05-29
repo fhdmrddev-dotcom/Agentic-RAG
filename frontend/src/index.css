@@ -251,6 +251,28 @@
   animation: toolSlideIn 0.25s ease-out forwards;
 }
 
+/* Phase 087-03 (PANEL-03 / file-browser-and-diff.md): green flash on a
+   freshly-written workspace file row. 1.4s green-success-dim → transparent
+   fade. prefers-reduced-motion disables the animation (UI-SPEC A11Y). */
+@keyframes fileFlash {
+  0% {
+    background-color: hsl(var(--success) / 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-fileFlash {
+  animation: fileFlash 1.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fileFlash {
+    animation: none;
+  }
+}
+
 /* Tool panel progress shimmer bar */
 .tool-progress-bar {
   position: relative;
