@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 087-06-PLAN.md (panel layout re-architecture — gaps 1/2/3/4/7 closed); Plan 07 (contrast pass + Chrome MCP re-verify) remaining
-last_updated: "2026-05-29T07:42:47.771Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 06 (panel layout re-architecture, PANEL-01) executed
+stopped_at: Completed 087-07 (surface contrast + Chrome-MCP layout gate — 004-panel-shell verified); authored gap plan 087-08 (single nav-style toggle consolidation + full live design-contract + cross-provider UAT) — awaiting operator go-ahead to execute
+last_updated: "2026-05-29T08:21:39.408Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 07 finalized at layout gate; gap plan 087-08 authored
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 22
-  completed_plans: 21
-  percent: 95
+  total_plans: 23
+  completed_plans: 22
+  percent: 96
 ---
 
 # Project State
@@ -25,10 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 087 (panel-ui) — 6 of 7 plans complete (Plan 07 contrast pass + Chrome MCP re-verify remaining)
-Plan: 087-06 complete (panel layout re-architecture — gap closure for UAT gaps 1/2/3/4/7)
-Status: Plan 06 shipped. ChatLayout now owns an App-level chat|panel CSS grid (1fr | clamp(300-420px)/52px/0) so the panel resolves against the real row width — closes overflow (gap 1), dead band (gap 7), and per-thread position shift; the open/rail/hidden state machine lifted to ChatLayout hosts a persistent always-visible chat-header toggle (gap 3) with a pulsing-amber-dot ask_user-pending indicator (gap 4 / PANEL-01); DevTwoPaneMock import+mount stripped from production App.tsx (gap 2). WorkspacePanel is now controlled (state/onCycle/onExpand/onHide). Next: /gsd:execute-phase 087 Plan 07 (gaps 5/6 contrast + full Chrome MCP re-verify gate), then /gsd:verify-work 087.
-Carry-forward into 087 verification: (1) re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live now that WorkspacePanel mounts the panel hooks; (2) Chrome MCP lived-experience UAT (087-VALIDATION.md) across 375/768/1024/1440 + all 6 native providers — panel open/rail/hidden + ⌘. toggle, persistent header toggle reopening a hidden panel, pulsing dot on pending ask_user while collapsed, empty short-circuit on a plain Q&A thread, pinned ask_user, seam pointer→panel-open, reloaded answered Q&A in chat (SeamCard). Plan 07 owns the consolidated Chrome MCP re-verify gate. Full suite at the documented 17-failure baseline (no panel regressions).
+Phase: 087 (panel-ui) — 7 of 8 plans complete (087-08 authored, awaiting operator go-ahead to execute)
+Plan: 087-07 complete (surface contrast gaps 5/6 + orchestrator-driven Chrome-MCP gate)
+Status: Plan 06 (layout re-arch) + Plan 07 (contrast tokens) shipped. The 004-panel-shell layout contract was VERIFIED live via Chrome MCP (no overflow, flush-right, stable left edge 1088 across threads, mobile bottom-sheet intact, surface contrast distinct both themes). The Plan 07 gate surfaced one gap-d miss (persistent reopen toggle absent on the empty/welcome screen) and — per operator decision 2026-05-29 — the three feature contracts (005 file/diff, 006 ask_user, 007 seam) + the mandatory cross-provider scoreboard were wrongly deferred and are now PROMOTED into gap plan 087-08, alongside a toggle-consolidation rework. **087-08 directive:** ONE workspace toggle, inside the panel, mirroring NavPanel — collapse-to-rail (drop the fully-hidden state + the redundant chat-header toggle); the always-present rail closes gap-d (reopen-by-mouse on every thread incl. welcome) and hosts the pulsing-amber-dot.
+Next: operator go-ahead → /gsd:execute-phase 087 --gaps-only (runs 087-08): Wave 1 = gsd-executor toggle consolidation (ChatLayout/WorkspacePanel/PanelRail/ChatArea + tests + panel-shell.md contract); Wave 2 = orchestrator-driven blocking Chrome-MCP gate over 004/005/006/007 + PANEL-02 + cross-provider 4-axis scoreboard (seed live runs — no deferrals). Then verify + complete 087.
+Downstream: Phase 088 (E2E reload flow) is load-bearing on the 007 seam — 087-08's seam-reload verification de-risks it.
 Last activity: 2026-05-29
 
 Progress: [█████████░] 95% (21/22 plans)

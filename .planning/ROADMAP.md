@@ -118,7 +118,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
 - [x] **Phase 085: New LLM Tools** - write_todos, task (sub-agent), and ask_user (human-in-the-loop pause/resume)
  (completed 2026-05-28)
 - [x] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks (completed 2026-05-29 — verified passed 3/3; WR-04 closed via quick 260529-0sc; UAT 4/5 across 6 providers; thread-switch reconcile-abort deferred to Phase 087 (no hook consumer until panel UI; unit-tested FC#5); surfaced+closed BUG-260529-01)
-- [x] **Phase 087: Panel UI** - Right-side collapsible panel with todos, file browser, ask_user prompt, and diff viewer (6/7 plans complete 2026-05-29 — Plan 06 panel layout re-architecture shipped, closing UAT gaps 1/2/3/4/7; Plan 07 contrast pass + Chrome MCP re-verify remaining)
+- [ ] **Phase 087: Panel UI** - Right-side collapsible panel with todos, file browser, ask_user prompt, and diff viewer (7/8 plans complete 2026-05-29 — Plans 06 (layout re-arch, gaps 1/2/3/4/7) + 07 (surface contrast gaps 5/6 + Chrome-MCP layout gate) shipped & 004-panel-shell verified; Plan 087-08 pending — consolidate to single nav-style in-panel toggle + full live verification of design contracts 005/006/007 + cross-provider scoreboard)
 - [ ] **Phase 088: Cross-Cutting Verification + Accessibility** - 4-axis UAT matrix (SC#10), WCAG 2.1 AA audit, E2E validation
 
 ## Phase Details
@@ -227,7 +227,7 @@ Plans:
   4. Pending user input section renders `ask_user` prompts with optional choice buttons and free-text field -- submitting a response resumes the agent within the same panel view
   5. Diff viewer renders pre-computed version deltas with syntax highlighting -- user can select any two versions of a file to compare
 
-**Plans**: 7 plans (5 shipped + 2 gap-closure from 087-UAT)
+**Plans**: 8 plans (5 shipped + 3 gap-closure from 087-UAT / 087-07 checkpoint)
 **UI hint**: yes
 **Research flag**: G-2 MANDATORY -- sketch-before-plan. Panel layout, responsive breakpoints (375px, 768px, 1024px, 1440px), bottom-sheet mobile behavior must have operator-approved mockup before planning begins.
 
@@ -239,7 +239,8 @@ Plans:
 - [x] 087-05-PLAN.md — Pending ask + seam: PendingAskCard + SeamPointer/SeamCard/PausedRunCue + additive MessageItem mount (PANEL-04) (Wave 2) (completed 2026-05-29)
 - [x] 087-02-PLAN.md — Shell: WorkspacePanel + Rail/Section/Empty + TodosSection + additive ChatLayout mount (PANEL-01, PANEL-02) (Wave 3) (completed 2026-05-29)
 - [x] 087-06-PLAN.md — Gap closure: hoist chat|panel split to ChatLayout grid + lift panel state + persistent chat-header toggle w/ pulsing-amber-dot + remove DevTwoPaneMock (gaps 1/2/3/4/7) (Wave 1) (completed 2026-05-29)
-- [ ] 087-07-PLAN.md — Gap closure: strengthen panel/rail surface contrast both themes (gaps 5/6) + full Chrome MCP re-verify gate (Wave 2)
+- [x] 087-07-PLAN.md — Gap closure: strengthen panel/rail surface contrast both themes (gaps 5/6) + Chrome-MCP layout gate (004-panel-shell verified; gap-d + 005/006/007 + scoreboard routed to 087-08) (Wave 2) (completed 2026-05-29)
+- [ ] 087-08-PLAN.md — Gap closure: consolidate to a single nav-style in-panel toggle (collapse-to-rail, always-present; drop the chat-header toggle; closes gap-d welcome-screen reopen) + full live Chrome-MCP verification of design contracts 005/006/007 + PANEL-02 + the mandatory cross-provider 4-axis scoreboard (Wave 3)
 
 ### Phase 088: Cross-Cutting Verification + Accessibility
 
@@ -273,7 +274,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 084. Workspace Filesystem Backend | 5/5 | Complete    | 2026-05-28 |
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
-| 087. Panel UI | 6/7 | In progress | - |
+| 087. Panel UI | 7/8 | In progress | - |
 | 088. Cross-Cutting Verification + Accessibility | 0/TBD | Not started | - |
 
 ---

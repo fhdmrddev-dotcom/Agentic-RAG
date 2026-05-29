@@ -88,6 +88,33 @@ created: 2026-05-29
 
 ---
 
+## 087-08 Live UAT — Design Contracts (Wave 2 blocking gate)
+
+> Filled during 087-08 Task 2 (orchestrator-driven Chrome MCP). Status: ⬜ pending · ✅ pass · ❌ fail · ➖ n/a
+> 004-panel-shell layout (overflow/flush/stable/mobile/contrast) already verified ✅ in 087-07; rows below are the toggle rework + the deferred feature contracts.
+
+| Contract | Scenario (seed) | Expected | Status |
+|----------|-----------------|----------|--------|
+| 004 toggle | Single in-panel toggle; collapse open→rail, rail Expand→open BY MOUSE; empty/welcome + content thread; dark+light; ⌘. | One control only (no chat-header toggle); rail always present; reopen-by-mouse on welcome screen; pulsing-dot on rail when ask pending+collapsed | ⬜ |
+| 004 layout no-regress | open + rail @ 1442/1280; 768/1024 floor; mobile <768 sheet | overflow=0, flush-right, stable left edge; sheet dismissable | ⬜ |
+| 005 file+diff | Write /notes.md twice (v1 → v1+line) | Files drill-in; VERSIONS ≥2; unified diff red/green pills + hunks; Compare red-base/green-target; ⤢ overlay opens/closes | ⬜ |
+| 006 ask_user | "use ask_user to ask bullets vs prose" | Paused amber run-card + locked composer + rail pulse + pinned PendingAskCard (gated submit) + chat quiet cue → answer → resume-in-place → composer unlocks → card green | ⬜ |
+| 007 seam | Run panel tools, then reload page | Live: quiet SeamPointer (panel = canonical). Reloaded: self-contained resolved SeamCard, no raw-JSON; panel shows current state only | ⬜ |
+| PANEL-02/06 | Slow multi-tool run | Todos update live no-refresh; chat quiet pointers only (no dup rich cards); no flicker on panel events | ⬜ |
+
+### Cross-Provider Scoreboard execution log (087-08)
+
+| Provider (representative) | Multi-tool | Parallel-thread | Long-message | Panel/seam parity | Status |
+|---------------------------|-----------|-----------------|--------------|-------------------|--------|
+| OpenAI (gpt-5.4) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Anthropic (claude) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| Google (gemini 3.x) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| OpenRouter (experimental) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+
+> Axes per row may be combined into fewer live runs (e.g. one multi-tool prompt on a long thread on a parallel pair) — the bandwidth, not the cell count, is the bar.
+
+---
+
 ## Validation Sign-Off
 
 - [ ] All tasks have `<automated>` verify or Wave 0 dependencies
