@@ -4,11 +4,11 @@ title: Gemini 3 / 3.5 fail with "Function call is missing a thought_signature" o
 reported: 2026-05-23
 surface: Agentic-RAG
 severity: major
-status: reopened
+status: folded
 affected_areas: [backend/streaming, backend/openai-compat, google-genai, chunk-handler, tool-rounds, agent-loop]
-folded_into: "075.4"
+folded_into: "088"
 related_seeds: []
-re_open_trigger: "Phase 075.4 claimed closure 2026-05-23 but operator reproduced the same 400 INVALID_ARGUMENT live after restart. Unit tests covered capture + persist + reload-echo (Tests 1-7) but the live multi-round path appends tool_calls to messages[] at threads.py:2279-2289 without the thought_signature — that fourth stage was missing. Hotfix landed in same phase 2026-05-23: conditional spread on tc.get('thought_signature') at the messages.append() site + new Test 8 (in-flight echo) regression guard."
+re_open_trigger: "Phase 075.4 claimed closure 2026-05-23 but operator reproduced the same 400 INVALID_ARGUMENT live after restart. Unit tests covered capture + persist + reload-echo (Tests 1-7) but the live multi-round path appends tool_calls to messages[] at threads.py:2279-2289 without the thought_signature — that fourth stage was missing. Hotfix landed in same phase 2026-05-23: conditional spread on tc.get('thought_signature') at the messages.append() site + new Test 8 (in-flight echo) regression guard. Re-folded into Phase 088 (2026-05-29 discuss): the cross-provider 4-axis UAT (Google axis) + the Anthropic+Google deep E2E flow re-verify the 075.4 Stage-4 hotfix live; fix-in-088 if it reproduces, else flip to closed as verified."
 reproduces_on:
   branch: v2.5-dev
   commit: 46e8a63

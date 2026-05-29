@@ -8,8 +8,8 @@ status: open
 affected_areas: [frontend/streaming, backend/streaming]
 folded_into: null
 verified_closed_by: null
-related_seeds: []
-re_open_trigger: null
+related_seeds: [SEED-034]
+re_open_trigger: "Reviewed at Phase 088 discuss (2026-05-29): cross-provider display-polish — tool_args_progress task-description extraction is wired for Anthropic but not other providers. OUT of 088 fix-scope (088 = verification + a11y + tool-USE reliability, not tool-panel display polish). 088's cross-provider UAT may observe it; defer to v2.8 (streaming polish, or alongside SEED-034 per-provider work)."
 reproduces_on:
   branch: v2.5-dev
   commit: b660664
