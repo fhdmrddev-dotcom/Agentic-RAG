@@ -54,11 +54,17 @@ baseline; new vitest-axe assertions are GREEN-only.
 > OR be flagged manual-only below. Source map: `088-RESEARCH.md` § Validation Architecture
 > (Success-Criteria → Validation Map table).
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _TBD by planner_ | — | — | A11Y-01 / A11Y-02 | — | — | — | — | — | ⬜ pending |
+| Task ID | Plan | Wave | Requirement / SC | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
+|---------|------|------|------------------|------------|-----------------|-----------|-------------------|-------------|--------|
+| 01 a11y remediation + vitest-axe gate | 01 | 1 | A11Y-01 / A11Y-02 (SC#2/SC#3 structural) | T-088-01-* | Structural a11y: roles/names/labels + global `:focus-visible` ring + 3 `aria-live` regions + `aria-selected` tracks active row; no axe violations | vitest-axe (jsdom) | `cd frontend && npx vitest run src/components/panel/` | ✅ `src/components/panel/__tests__/*.test.tsx` (8 files) | ✅ green (89/89; A11Y-01/02 structurally GREEN — real-contrast/focus deferred to Plan 05 Lighthouse, Pitfall 5) |
+| 02 cross-provider eval script | 02 | 1 | SC#1 / D-02 / D-05 (fold-gate evidence) | T-088-05-02 | Localhost-hard-gated; per-request provider/model override (no global-state mutation); secret-safe greppable `EVAL_ROW`/`EVAL_SUMMARY` | live-route eval (Python) | `python scripts/eval_cross_provider.py` | ✅ `scripts/eval_cross_provider.py` (687 lines) | ✅ green (real-route, secret-safe; ran LIVE in Plan 04 BEFORE/AFTER) |
+| 03 deep-flow E2E backstop | 03 | 1 | SC#4 / D-15 / D-17 | T-088-05-01 | Anthropic+Google deep flow, no-refresh; zero-400 `toEqual([])` thought-signature check (D-17); no cross-thread bleed | Playwright (E2E) | `cd frontend && npm run e2e -- scenario-13` | ✅ `frontend/tests/e2e/scenario-13-workspace-deep-flow.spec.ts` (294 lines) | ⬜ pending live run (Task 2 — Anthropic + Google) |
+| 04 SEED-034 fold-gate decision | 04 | 2 | D-04 / D-05 (fold-gate) | — | Text-only universal directive; condition (a) git-diff-proven string-literal-only, (b) ≥1 failing row improves, (c) zero strong regression | eval BEFORE/AFTER + `git diff` (DONE/FOLDED) | `python scripts/eval_cross_provider.py` (BEFORE/AFTER) + `git diff <before> <after> -- backend/app/api/threads.py backend/app/services/openai_service.py` | ✅ VALIDATION.md § SEED-034 Fold-Gate Decision (filled) | ✅ DONE — **VERDICT: FOLDED** (2f6e2523; see § below, do NOT re-run) |
+| 05 verification capstone (manual/operator) | 05 | 3 | SC#1–SC#4 / A11Y-01/02 / D-17 / G-4 | T-088-05-01..04 | Live 4-axis UAT + Lighthouse (both themes) + keyboard walk + deep-flow lived pass + D-17 route — operator/Chrome-MCP-driven (manual-only) | manual (Chrome MCP) — see Manual-Only table + scoreboard below | _no single automated command — see § 4-Axis Scoreboard + § a11y Manual-Walk Checklist (this file)_ | ✅ this VALIDATION.md (scoreboard + checklist authored Task 1) | ⬜ pending operator (Task 2) |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · DONE = decision/verdict recorded*
+
+> Plan 05 is autonomous: false — its acceptance is the operator/Chrome-MCP LIVE pass (the recognize-failure-here gate, D-14/G-4). It has no single automated command; its evidence lives in the **4-Axis Cross-Provider UAT Scoreboard** + the **a11y Manual-Walk Checklist** + the **SEED-034 Fold-Gate Decision** sections of this file.
 
 ---
 
@@ -92,7 +98,21 @@ baseline; new vitest-axe assertions are GREEN-only.
 > OpenRouter `z-ai/glm-5.1`. Include a clearly-marked `gemini-2.5-flash (known-degraded — not gating)` row for provenance.
 > Axes: cross-provider × multi-tool (≥1 row 2+ tools) × parallel-thread × long-message (manual).
 
-_Scoreboard table authored here during execution — see 088-RESEARCH.md Pattern 2/3 for the format + the SSE-event/tool map._
+> **Bandwidth, not cell count, is the bar** (087-VALIDATION.md:116) — axes 1–3 (cross-provider × multi-tool × parallel-thread) may be combined into fewer live runs; long-message stays **MANUAL per provider**. `deepseek-v4-flash` + `kimi-k2.6` are **additive native-provider coverage beyond the locked-4 floor** (operator-extended, consistent with the 088-04 6×4 eval). The locked-4 recipe FLOOR (OpenAI / Anthropic / Google 3.x / OpenRouter) is fully met; the two native rows only widen the lived-parity check.
+>
+> Cells are EMPTY pending the Task-2 operator/Chrome-MCP LIVE run — do NOT pre-fill from the eval. SSE-event/tool map the matrix must exercise (RESEARCH Pattern 3): `write_todos` (todos table + SeamPointer) · `workspace_write` (workspace_files + SeamPointer) · `ask_user` (PendingAskCard + paused cue, `tool_calls @> '[{"kind":"ask_user_prompt"}]'`) · `task` (sub_agent) · `tool_args_progress`/`tool_start` (Redis run stream). Status legend: ⬜ pending · ✅ PASS · ❌ FAIL · ➖ n/a (covered by another row).
+
+| Provider (representative)        | Multi-tool | Parallel-thread | Long-message | Panel/seam parity | Status |
+|----------------------------------|------------|-----------------|--------------|-------------------|--------|
+| OpenAI (gpt-5.4-mini)            |            |                 |              |                   | ⬜     |
+| Anthropic (claude-haiku-4-5)     |            |                 |              |                   | ⬜     |
+| Google (gemini-3.5-flash)        |            |                 |              |                   | ⬜     |
+| OpenRouter (z-ai/glm-5.1)        |            |                 |              |                   | ⬜     |
+| DeepSeek (deepseek-v4-flash) — *native, additive* |            |                 |              |                   | ⬜     |
+| Moonshot (kimi-k2.6) — *native, additive* |            |                 |              |                   | ⬜     |
+| gemini-2.5-flash (known-degraded — NOT gating, D-03 — provenance only) |            |                 |              |                   | ⬜     |
+
+**Scoreboard result:** _pending Task-2 operator LIVE run — record per-cell evidence (Supabase counts / screenshots / Lighthouse), then the one-line "N providers render panel + chat quiet-pointer seam IDENTICALLY — one UX, N adapters" roll-up here. Mark gemini-2.5 a data point only (D-03), never a gate condition._
 
 ---
 
@@ -253,6 +273,50 @@ All three gate conditions hold on the non-Google gating set:
 The fold STAYS at commit `2f6e2523` (no source re-edit, no revert). The `multi-tool`/`write_todos` reliability lift is real and provider-agnostic (3 of 5 non-Google providers improved on the single strongest baseline failure). The `ask_user` directive was deliberately conservative ("only for a genuine blocker") to avoid over-asking — it held the protected OpenAI/Moonshot ask_user PASSes without regressing them; it did not flip the other three providers (Anthropic/OpenRouter/DeepSeek), which is acceptable: condition-b is satisfied by `multi-tool` alone, and a more aggressive ask_user directive risks the over-triggering the eval cannot measure (kept out of scope intentionally).
 
 **SEED-034 088 measurement loop is CLOSED with a shipped, evidence-backed improvement** (provider-docs-first, D-07: Anthropic "explicit instructions in a user message"; OpenAI/Google "be clear and specific about when to use a function"). The eval script (`scripts/eval_cross_provider.py`) remains the v2.8 harness seed (D-08) for the deferred items (Google secondary-model 404 routing; the per-provider `task`/`ask_user` gaps that a universal text directive did not close — those are candidate v2.8 architecture work, not 088 regressions).
+
+---
+
+## a11y Manual-Walk Checklist (D-13b / D-14 / G-4 — Chrome MCP, both themes — recorded during execution)
+
+> The LIVE half of A11Y-01/02 that jsdom/vitest-axe CANNOT cover (Pitfall 5): REAL rendered contrast + REAL focus rings + the felt keyboard walk. Operator/Chrome-MCP-driven against the authenticated live app (`http://localhost:5173`, login `fhdmrd@gmail.com` / `123456`); backend uvicorn started by the operator in a visible terminal (NOT `run_in_background`). **Populate the panel first** — trigger ONE workspace run that emits `write_todos` + `workspace_write` (two versions, so a diff exists) + `ask_user`, so TODOS / FILES / VERSIONS+diff / a PendingAskCard are all on screen. Status: ⬜ pending · ✅ pass · ❌ fail (→ Task 3 D-16 routing).
+
+### 1. Lighthouse a11y audit — REAL contrast ≥4.5:1 + REAL focus rings (SC#2, A11Y-01, Pitfall 5)
+
+Run the Lighthouse a11y category on the populated panel, **once per theme** (contrast differs per theme; the global `:focus-visible` ring from Plan 01 is the floor):
+
+| Check | Theme | Expected | Result | Evidence |
+|-------|-------|----------|--------|----------|
+| Lighthouse a11y score + color-contrast audit | **Deep Midnight DARK** | No color-contrast violations; all panel text/icons ≥4.5:1 (≥3:1 large) on the dark surface; `:focus-visible` ring visible | ⬜ |  |
+| Lighthouse a11y score + color-contrast audit | **Deep Midnight LIGHT** | No color-contrast violations; all panel text/icons ≥4.5:1 on the light surface; `:focus-visible` ring visible | ⬜ |  |
+| Real focus-ring presence (every interactive element shows the `--ring` outline on `:focus-visible`, not just on mouse) | both | Visible ring on Tab focus; no ring on mouse click (`:focus-visible` not `:focus`) | ⬜ |  |
+
+### 2. Keyboard walk — Tab / Shift-Tab / Enter / Space / Escape, NO mouse-only path (SC#3, A11Y-02, D-14)
+
+Walk the full panel by keyboard only; screenshot each focus state as evidence. Each stop ⬜ pending → ✅/❌:
+
+| Stop | Interaction | Expected (APG contract — RESEARCH Pattern 5) | Result | Focus-state screenshot |
+|------|-------------|----------------------------------------------|--------|------------------------|
+| Section accordions | Tab to a `PanelSection` button, Enter/Space toggles | `aria-expanded` flips; `role=region` body shows/hides; focus ring visible | ⬜ |  |
+| TODOS | Tab through; status announced | Static list (display-only, no keyboard path required); `aria-live` polite announces "N of M todos complete" on change (D-12) | ⬜ |  |
+| FILES | Tab into the `role=listbox`, **Arrow up/down** moves the roving tabindex, **Enter** drills in | Listbox roving tabindex; `aria-selected` tracks the active row (not always-false — Pitfall 6); Enter opens preview | ⬜ |  |
+| File preview | After drill-in, **Escape** closes back to the list, focus restored | FilePreview `window` keydown Escape closes the full-replace preview; focus returns to the originating row/back-button | ⬜ |  |
+| VERSIONS / diff pills | Tab to the base/target `aria-pressed` pills | Pills are buttons with `aria-label` ("base version N"/"target version N") + `aria-pressed`, NOT color-only; Enter/Space toggles compare | ⬜ |  |
+| ask_user | Tab into the `radiogroup`; pick a radio (Arrow or Tab + Space); Tab to the free-text `textarea#ask-{id}-free`; Tab to **Send Answer** | `role=radiogroup`/`role=radio`+`aria-checked`; Send gated until (pick OR type) AND a reconciled `run_id`; Enter/Space submits; resume-in-place | ⬜ |  |
+| No mouse-only path | (whole walk) | Every action above reachable + operable by keyboard alone | ⬜ |  |
+
+### 3. FilePreview + DiffExpandOverlay both-open Escape conflict (RESEARCH Open Q2 / Pitfall, Pattern 5)
+
+> FilePreview uses a `window` keydown Escape with `e.stopPropagation()`; DiffExpandOverlay (Radix Dialog) has its own focus-trap + Escape. Open BOTH (drill into a file preview, then open the ⤢ diff overlay) and confirm Escape closes the **intended top layer** first (the Radix overlay), not the wrong one — FilePreview's `stopPropagation` must not swallow the overlay's Escape.
+
+| Check | Expected | Result | Evidence |
+|-------|----------|--------|----------|
+| Both FilePreview + ⤢ DiffExpandOverlay open, press Escape | Top Radix overlay closes first (focus returns under it); a second Escape closes FilePreview; no layer is orphaned/stuck | ⬜ |  |
+
+### 4. Operator final lived-experience a11y sign-off (G-4 — the recognize-failure-here gate)
+
+> After the systematic walk above, the holistic "I'd recognize failure here" pass — both themes, screen-reader feel, the felt no-mouse experience across the FULL state matrix ([[feedback_exhaustive_ui_state_sweep]]). This is the human gate; vitest-axe + Lighthouse wire format are necessary but not sufficient.
+
+- [ ] Operator lived-experience a11y pass — **both Deep Midnight dark + light**, SR feel, full keyboard operability: **⬜ pending** (sign here with verdict + date)
 
 ---
 
