@@ -95,21 +95,23 @@ created: 2026-05-29
 
 | Contract | Scenario (seed) | Expected | Status |
 |----------|-----------------|----------|--------|
-| 004 toggle | Single in-panel toggle; collapse open→rail, rail Expand→open BY MOUSE; empty/welcome + content thread; dark+light; ⌘. | One control only (no chat-header toggle); rail always present; reopen-by-mouse on welcome screen; pulsing-dot on rail when ask pending+collapsed | ⬜ |
-| 004 layout no-regress | open + rail @ 1442/1280; 768/1024 floor; mobile <768 sheet | overflow=0, flush-right, stable left edge; sheet dismissable | ⬜ |
-| 005 file+diff | Write /notes.md twice (v1 → v1+line) | Files drill-in; VERSIONS ≥2; unified diff red/green pills + hunks; Compare red-base/green-target; ⤢ overlay opens/closes | ⬜ |
-| 006 ask_user | "use ask_user to ask bullets vs prose" | Paused amber run-card + locked composer + rail pulse + pinned PendingAskCard (gated submit) + chat quiet cue → answer → resume-in-place → composer unlocks → card green | ⬜ |
-| 007 seam | Run panel tools, then reload page | Live: quiet SeamPointer (panel = canonical). Reloaded: self-contained resolved SeamCard, no raw-JSON; panel shows current state only | ⬜ |
-| PANEL-02/06 | Slow multi-tool run | Todos update live no-refresh; chat quiet pointers only (no dup rich cards); no flicker on panel events | ⬜ |
+| 004 toggle | Single in-panel toggle; collapse open→rail, rail Expand→open BY MOUSE; empty/welcome + content thread; dark+light; ⌘. | One control only (no chat-header toggle); rail always present; reopen-by-mouse on welcome screen; pulsing-dot on rail when ask pending+collapsed | ✅ PASS — welcome-thread collapse→rail→Expand reopens by mouse; ⌘. open↔rail; 0 chat-header toggles; dark+light |
+| 004 layout no-regress | open + rail @ 1442/1280; 768/1024 floor; mobile <768 sheet | overflow=0, flush-right, stable left edge; sheet dismissable | ✅ PASS — overflow=0 + flush-right in open+rail @ 1442 & 1280; mobile sheet intact (from 087-07) |
+| 005 file+diff | Write /notes.md twice (v1 → v1+line) | Files drill-in; VERSIONS ≥2; unified diff red/green pills + hunks; Compare red-base/green-target; ⤢ overlay opens/closes | ✅ PASS (after diff-500 fix 4d35b0f1) — drill-in preview; VERSIONS v1/v2; Compare v2(green)/v1(red); +2/−1 stats; unified diff; ⤢ overlay opens "Diff v1 to v2" |
+| 006 ask_user | "use ask_user to ask…" (OpenAI) | Paused amber run-card + locked composer + rail pulse + pinned PendingAskCard (gated submit) + chat quiet cue → answer → resume-in-place → composer unlocks → card green | ✅ PASS — paused run-card "Agent is paused" + locked composer + rail amber pulse-dot (rgb 247,178,59) + pinned card (radio+free-text, Send gated→enabled on pick) + chat cue "Answer in panel →"; answered "Question" → resumed in chosen format + "You answered" seam + composer unlocked; 60s graceful timeout → chat+panel both show EXPIRED |
+| 007 seam | Run panel tools, then reload page | Live: quiet SeamPointer (panel = canonical). Reloaded: self-contained resolved SeamCard, no raw-JSON; panel shows current state only | ✅ PASS — live: WORKSPACE_WRITE + ASK_USER quiet pointers ("open panel ↗"). After full reload: ASK_USER seam renders self-contained with "You answered" + timed-out EXPIRED state; rawJsonLeak=false |
+| PANEL-02/06 | Slow multi-tool run | Todos update live no-refresh; chat quiet pointers only (no dup rich cards); no flicker on panel events | ✅ PASS — TODOS populate + flip to COMPLETED live mid-stream (no refresh); FILES live; chat shows quiet "updated todos / wrote X · see panel →" pointers, NOT duplicate rich cards. (WRITE_TODOS SeamCard "0 todos" count bug found + FIXED commit 9667a816 → now "☑ 3 todos · 1 done") |
 
 ### Cross-Provider Scoreboard execution log (087-08)
 
 | Provider (representative) | Multi-tool | Parallel-thread | Long-message | Panel/seam parity | Status |
 |---------------------------|-----------|-----------------|--------------|-------------------|--------|
-| OpenAI (gpt-5.4) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Anthropic (claude) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| Google (gemini 3.x) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
-| OpenRouter (experimental) | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ |
+| OpenAI (gpt-5.4-mini) | ✅ todos+file+ask_user | ✅ (A while B viewed) | ➖ (covered by Anthropic) | ✅ | ✅ PASS |
+| Anthropic (claude-haiku-4-5) | ✅ todos+file | ➖ | ✅ 5604-byte prompt | ✅ | ✅ PASS |
+| Google (gemini-3.5-flash) | ✅ todos+file | ➖ | ➖ | ✅ | ✅ PASS |
+| OpenRouter (z-ai/glm-5.1) | ✅ todos+file | ✅ (carwash ran while Pack-Suit viewed, reconciled on return) | ➖ | ✅ | ✅ PASS |
+
+**Scoreboard result:** 4/4 providers render panel (TODOS live + FILES + VERSIONS/diff) + chat quiet-pointer seam IDENTICALLY — one UX, four adapters confirmed. Multi-tool (write_todos+workspace_write+write_todos) ✅ all providers. Parallel-thread ✅ (no cross-thread bleed; backgrounded run completes + reconciles). Long-message ✅ (5604-byte Anthropic prompt, no drop). The one nit found (WRITE_TODOS SeamCard "0 todos") was FIXED inline (commit 9667a816) and re-verified live.
 
 > Axes per row may be combined into fewer live runs (e.g. one multi-tool prompt on a long thread on a parallel pair) — the bandwidth, not the cell count, is the bar.
 

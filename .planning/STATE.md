@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Completed 087-07 (surface contrast + Chrome-MCP layout gate — 004-panel-shell verified); authored gap plan 087-08 (single nav-style toggle consolidation + full live design-contract + cross-provider UAT) — awaiting operator go-ahead to execute
-last_updated: "2026-05-29T08:21:39.408Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 07 finalized at layout gate; gap plan 087-08 authored
+stopped_at: "087-08 COMPLETE — single nav-style in-panel toggle (collapse-to-rail) shipped (c1d446f6); Wave-2 blocking Chrome-MCP gate PASSED for all 4 design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message). Two UAT-found pre-existing bugs fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS '0 todos' SeamCard count (9667a816). Phase 087 ready for verification + completion."
+last_updated: "2026-05-29T09:14:58.699Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 08 executed; Wave-2 live cross-provider gate PASSED; 2 UAT bugs fixed
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 23
-  completed_plans: 22
-  percent: 96
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 087 (panel-ui) — 7 of 8 plans complete (087-08 authored, awaiting operator go-ahead to execute)
-Plan: 087-07 complete (surface contrast gaps 5/6 + orchestrator-driven Chrome-MCP gate)
-Status: Plan 06 (layout re-arch) + Plan 07 (contrast tokens) shipped. The 004-panel-shell layout contract was VERIFIED live via Chrome MCP (no overflow, flush-right, stable left edge 1088 across threads, mobile bottom-sheet intact, surface contrast distinct both themes). The Plan 07 gate surfaced one gap-d miss (persistent reopen toggle absent on the empty/welcome screen) and — per operator decision 2026-05-29 — the three feature contracts (005 file/diff, 006 ask_user, 007 seam) + the mandatory cross-provider scoreboard were wrongly deferred and are now PROMOTED into gap plan 087-08, alongside a toggle-consolidation rework. **087-08 directive:** ONE workspace toggle, inside the panel, mirroring NavPanel — collapse-to-rail (drop the fully-hidden state + the redundant chat-header toggle); the always-present rail closes gap-d (reopen-by-mouse on every thread incl. welcome) and hosts the pulsing-amber-dot.
-Next: operator go-ahead → /gsd:execute-phase 087 --gaps-only (runs 087-08): Wave 1 = gsd-executor toggle consolidation (ChatLayout/WorkspacePanel/PanelRail/ChatArea + tests + panel-shell.md contract); Wave 2 = orchestrator-driven blocking Chrome-MCP gate over 004/005/006/007 + PANEL-02 + cross-provider 4-axis scoreboard (seed live runs — no deferrals). Then verify + complete 087.
-Downstream: Phase 088 (E2E reload flow) is load-bearing on the 007 seam — 087-08's seam-reload verification de-risks it.
+Phase: 087 (panel-ui) — 8 of 8 plans complete; Wave-2 live gate PASSED, ready for phase verification + completion
+Plan: 087-08 complete (single nav-style toggle consolidation + full live design-contract + cross-provider verification)
+Status: All 8 plans shipped. The full Phase 087 panel was verified LIVE via Chrome MCP — 004-panel-shell (single nav-style in-panel toggle collapse-to-rail, welcome-thread reopen-by-mouse, ⌘., no overflow/flush/stable, mobile sheet), 005-file-and-diff (VERSIONS + unified diff + ⤢ overlay), 006-pending-question (paused/locked/pulse/pinned-card/gated-submit → answer→resume→green + 60s timeout), 007-chat-panel-seam (live pointers + reload-resolved cards, no raw-JSON), PANEL-02 (live todos no-refresh + quiet pointers), and the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message — one UX, four adapters). Two pre-existing bugs the gate surfaced were fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS "0 todos" SeamCard count (9667a816). gap-d (welcome-screen reopen) structurally closed by the rail-always-present consolidation.
+Next: phase verification (gsd-verifier) → mark Phase 087 complete → Phase 088 (cross-cutting verification + accessibility).
+Downstream: Phase 088 (E2E reload flow) de-risked — the 007 seam reload (self-contained resolved cards, no raw-JSON) is confirmed.
 Last activity: 2026-05-29
 
-Progress: [█████████░] 95% (21/22 plans)
+Progress: [██████████] 100% (23/23 plans)
 
 ## Performance Metrics
 

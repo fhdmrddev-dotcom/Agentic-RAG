@@ -240,7 +240,7 @@ Plans:
 - [x] 087-02-PLAN.md — Shell: WorkspacePanel + Rail/Section/Empty + TodosSection + additive ChatLayout mount (PANEL-01, PANEL-02) (Wave 3) (completed 2026-05-29)
 - [x] 087-06-PLAN.md — Gap closure: hoist chat|panel split to ChatLayout grid + lift panel state + persistent chat-header toggle w/ pulsing-amber-dot + remove DevTwoPaneMock (gaps 1/2/3/4/7) (Wave 1) (completed 2026-05-29)
 - [x] 087-07-PLAN.md — Gap closure: strengthen panel/rail surface contrast both themes (gaps 5/6) + Chrome-MCP layout gate (004-panel-shell verified; gap-d + 005/006/007 + scoreboard routed to 087-08) (Wave 2) (completed 2026-05-29)
-- [ ] 087-08-PLAN.md — Gap closure: consolidate to a single nav-style in-panel toggle (collapse-to-rail, always-present; drop the chat-header toggle; closes gap-d welcome-screen reopen) + full live Chrome-MCP verification of design contracts 005/006/007 + PANEL-02 + the mandatory cross-provider 4-axis scoreboard (Wave 3)
+- [x] 087-08-PLAN.md — Gap closure: single nav-style in-panel toggle (collapse-to-rail; chat-header toggle + hidden state removed; gap-d closed) + full live Chrome-MCP verification of 004/005/006/007 + PANEL-02 + cross-provider 4-axis scoreboard; surfaced + fixed diff-500 (4d35b0f1) + WRITE_TODOS count (9667a816) (Wave 3) (completed 2026-05-29)
 
 ### Phase 088: Cross-Cutting Verification + Accessibility
 
@@ -274,7 +274,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 084. Workspace Filesystem Backend | 5/5 | Complete    | 2026-05-28 |
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
-| 087. Panel UI | 7/8 | In progress | - |
+| 087. Panel UI | 8/8 | In progress | - |
 | 088. Cross-Cutting Verification + Accessibility | 0/TBD | Not started | - |
 
 ---
