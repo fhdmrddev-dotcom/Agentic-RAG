@@ -263,7 +263,7 @@ Plans:
 - [x] 088-01-PLAN.md — A11y remediation to WCAG 2.1 AA + vitest-axe regression gate (global :focus-visible, targeted aria-live, FilesSection aria-selected fix, axe on 8 panel tests) (Wave 1) (completed 2026-05-29 — vitest-axe wired; 89/89 panel tests green incl. 17 axe assertions; no regression past 17-failure 086 baseline; A11Y-01/02 structural GREEN; contrast/focus-ring real-verify → Plan 05)
 - [x] 088-02-PLAN.md — Reusable cross-provider eval script (scripts/eval_cross_provider.py, localhost-gated; asserts tool-invocation + arg-shape + DB persistence across 4 providers) (Wave 1) (completed 2026-05-29 — 687-line engine modeled on observe-run.py; drives REAL POST /threads/{id}/messages w/ per-request provider override; greppable EVAL_ROW scoreboard for Plan 04 fold-gate; parse-clean + no-backend clean-exit + secret-safe; live run deferred to Plans 04/05)
 - [x] 088-03-PLAN.md — Deep E2E scenario-13 on Anthropic + Google (write->see->update->diff->ask_user->respond->resume, no refresh; D-17 thought-signature network re-verify) (Wave 1) (completed 2026-05-29 — 294-line provider-parameterized Playwright backstop EXTENDING scenario-02 + the 3 fixtures; asserts the FILES listbox row, the Diff-v region, the PendingAskCard + Send Answer->resume, zero-400 toEqual([]) on both axes (D-17), no page.reload; discovered under both provider blocks + type-clean; LIVE green pass deferred to Plan 05 operator gate)
-- [ ] 088-04-PLAN.md — SEED-034 conditional fold (measure->gate->conditional-apply; universal-only text, checkpoint-gated; or route-to-v2.8)
+- [x] 088-04-PLAN.md — SEED-034 conditional fold (measure->gate->conditional-apply; universal-only text, checkpoint-gated; or route-to-v2.8) (Wave 2) (completed 2026-05-30 — VERDICT: FOLDED; eval extended 4->6 providers; operator chose fold-and-apply at the checkpoint; text-only directive at 2f6e2523 (write_todos multi-step + ask_user confirm-first in SYSTEM_PROMPT + tool descriptions, TASK_TOOL untouched); AFTER 6x4 re-run vs live folded prompt = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (Moonshot task FAIL proven sampling variance, not a regression) + condition-a git-diff-proven text-only; Google 404 confound did not reproduce (bonus, still v2.8-deferred); kept at 65aa79bf)
 - [ ] 088-05-PLAN.md — Verification capstone (4-axis UAT scoreboard + Chrome MCP Lighthouse/keyboard walk + lived pass + D-17 bug routing; checkpoint:human-verify)
 
 ## Progress
@@ -278,7 +278,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
 | 087. Panel UI | 8/8 | In progress | - |
-| 088. Cross-Cutting Verification + Accessibility | 2/5 | In progress | - |
+| 088. Cross-Cutting Verification + Accessibility | 4/5 | In progress | - |
 
 ---
 

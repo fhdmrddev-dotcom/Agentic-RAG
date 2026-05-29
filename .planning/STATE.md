@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: paused
-stopped_at: Phase 088 Wave 1 complete (3/5 — 088-01 a11y+vitest-axe gate, 088-02 cross-provider eval script, 088-03 scenario-13 spec; all committed, full vitest suite within the ~17-failure 086 baseline). PAUSED by operator at the Wave 1→2 boundary. Waves 2-3 are operator-gated. Resume: start backend (uvicorn) + confirm 4 provider keys (OpenAI/Anthropic/Google gemini-3.x/OpenRouter) + Chrome MCP, then /gsd:execute-phase 088 (skips the 3 done plans → picks up 088-04).
-last_updated: "2026-05-29T17:57:26.153Z"
+status: executing
+stopped_at: Completed 088-04-PLAN.md (SEED-034 fold-gate — FOLDED)
+last_updated: "2026-05-29T22:53:55.211Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 28
-  completed_plans: 26
-  percent: 93
+  completed_plans: 27
+  percent: 96
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 088 (cross-cutting-verification-accessibility) — PAUSED (Wave 1 complete)
-Plan: 3 of 5 complete — Wave 1 (088-01, 088-02, 088-03) all shipped + committed; post-wave full suite within the ~17-failure baseline (no regression).
-Status: Paused at the Wave 1→2 boundary by operator. The remaining two plans are operator-gated (live backend + provider keys + Chrome MCP) — not autonomously runnable.
-Next: Resume Waves 2-3 via `/gsd:execute-phase 088` (skips the 3 done plans). BOTH remaining plans need: live backend (operator starts uvicorn — never run_in_background) + 4 provider keys (OpenAI/Anthropic/Google gemini-3.x/OpenRouter) + Chrome MCP (Wave 3). • 088-04 (Wave 2, SEED-034 fold-gate, checkpoint:decision): run `python scripts/eval_cross_provider.py` baseline across 4 providers → operator decides fold a TEXT-ONLY universal directive into threads.py:336 SYSTEM_PROMPT (G-5 hot file) vs route SEED-034 to v2.8 → conditional apply + re-verify (≥1 improvement, ZERO strong-model regression) or record route-to-v2.8. • 088-05 (Wave 3, verification capstone, checkpoint:human-verify): author VALIDATION scoreboard skeleton → operator 4-axis cross-provider UAT + Chrome MCP Lighthouse/keyboard walk (both themes) + scenario-13 live (Anthropic+Google) + deep-flow lived pass + D-17 gemini-3 thought-signature route (close-verified or fix-in-088) → finalize sign-off + nyquist_compliant:true. Wave 1 recap: 088-01 vitest-axe gate + global focus ring + 2 aria-live + FilesSection aria-selected (89/89 panel tests, A11Y-01/02 structurally GREEN); 088-02 `scripts/eval_cross_provider.py` (687 lines, localhost-gated, real-route, secret-safe); 088-03 `scenario-13-workspace-deep-flow.spec.ts` (294 lines, Anthropic+Google, no-refresh, 400-toEqual([]) D-17 check). NOTE: real-contrast 4.5:1 + lived keyboard walk + A11Y-01/02 traceability flip stay for 088-05 (Chrome MCP Lighthouse, Pitfall 5).
+Phase: 088 (cross-cutting-verification-accessibility) — EXECUTING (Wave 2 COMPLETE; Wave 3 remaining)
+Plan: 4 of 5 done — only 088-05 (Wave 3) left
+Status: Ready to execute the Wave 3 capstone
+Next: Run the LAST plan, 088-05 (Wave 3, verification capstone, checkpoint:human-verify) via `/gsd:execute-phase 088` (skips the 4 done plans). Needs: live backend (operator starts uvicorn — never run_in_background) + 4 provider keys (OpenAI/Anthropic/Google gemini-3.x/OpenRouter) + Chrome MCP. 088-05: author VALIDATION scoreboard skeleton → operator 4-axis cross-provider UAT + Chrome MCP Lighthouse/keyboard walk (both themes) + scenario-13 live (Anthropic+Google) + deep-flow lived pass + D-17 gemini-3 thought-signature route (close-verified or fix-in-088) → finalize sign-off + nyquist_compliant:true. Then `/gsd:verify-work 088`. ✅ 088-04 (Wave 2, SEED-034 fold-gate) DONE 2026-05-30 — VERDICT FOLDED: operator chose fold-and-apply at the checkpoint; a TEXT-ONLY universal write_todos + ask_user directive was folded into threads.py:336 SYSTEM_PROMPT + openai_service tool descriptions (2f6e2523, TASK_TOOL untouched, no tool_choice forcing); AFTER 6×4 re-run vs the live folded prompt = condition-b MET (OpenAI/Anthropic/OpenRouter `multi-tool` write_todos FAIL→PASS) + condition-c MET (Moonshot `task` FAIL proven sampling variance — re-confirmed PASS — not a regression) + condition-a git-diff-proven text-only; eval extended 4→6 providers (added native deepseek+moonshot); Google 404 confound did NOT reproduce (bonus, still v2.8-deferred). Wave 1 recap: 088-01 vitest-axe gate + global focus ring + 2 aria-live + FilesSection aria-selected (89/89 panel tests, A11Y-01/02 structurally GREEN); 088-02 `scripts/eval_cross_provider.py` (687 lines, localhost-gated, real-route, secret-safe); 088-03 `scenario-13-workspace-deep-flow.spec.ts` (294 lines, Anthropic+Google, no-refresh, 400-toEqual([]) D-17 check). NOTE: real-contrast 4.5:1 + lived keyboard walk + A11Y-01/02 traceability flip stay for 088-05 (Chrome MCP Lighthouse, Pitfall 5).
 Downstream: Phase 088 (E2E reload flow) de-risked — the 007 seam reload (self-contained resolved cards, no raw-JSON) is confirmed.
 Last activity: 2026-05-29
 
-Progress: [█████████░] 93%
+Progress: [██████████] 96%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 93%
 | Phase 088 P088-01 | 13min | 3 tasks | 15 files |
 | Phase 088 P088-02 | 6min | 2 tasks | 1 files |
 | Phase 088 P088-03 | 3min | 2 tasks | 1 files |
+| Phase 088 P088-04 | 75min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - (088-02): cross-provider eval script switches provider via the per-request MessageCreate.provider/model override (threads.py:1285), NOT a persistent user_settings UPDATE — measures the REAL active_system_prompt (Pitfall 2) with zero global-state mutation
 - (088-02): scripts/eval_cross_provider.py is the SEED-034 fold-gate evidence source (D-05) — greppable EVAL_ROW/EVAL_SUMMARY scoreboard; Plan 04 re-runs it before/after a text-only prompt change to prove +1 failing model passes / 0 strong regressions. Authored here, run LIVE in Plans 04/05 (operator backend)
 - D-088-03: scenario-13 deep-flow E2E uses assert-then-expand to open the default-open panel (never the blind ⌘./Ctrl+. toggle) and selects the diff by aria-label '^=Diff v' to disambiguate from the PanelSection region bodies; built REUSE-AND-EXTEND on scenario-02 + 3 fixtures, parameterized over Anthropic + Google, with zero-400 toEqual([]) on both axes (D-17).
+- (088-04): SEED-034 VERDICT = FOLDED — text-only universal write_todos + ask_user directive kept at 2f6e2523; AFTER 6x4 eval = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (zero fold-attributable regression; Moonshot task FAIL is sampling variance, re-confirmed PASS) + condition-a git-diff-proven text-only (TASK_TOOL untouched, no tool_choice forcing)
+- (088-04): eval PROVIDERS extended 4->6 (operator-approved, additive) — native deepseek + moonshot added as the weak-model fold-gate targets; Google is a constant 404 confound (gate judged on 5 non-Google providers; 404 did not reproduce this run); per-provider task/ask_user gaps + Google secondary-model 404 deferred to v2.8 (eval script is the v2.8 harness seed, D-08)
 
 ### Pending Todos
 
@@ -148,8 +151,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T17:57:26.148Z
-Stopped at: Completed 088-03-PLAN.md (deep E2E scenario-13)
+Last session: 2026-05-29T22:53:44.076Z
+Stopped at: Completed 088-04-PLAN.md (SEED-034 fold-gate — FOLDED)
 Resume file: None
 
 **Planned Phase:** 088 (cross-cutting-verification-accessibility) — 5 plans — 2026-05-29T17:09:34.911Z
