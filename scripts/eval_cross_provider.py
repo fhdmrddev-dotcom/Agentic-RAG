@@ -58,11 +58,20 @@ from pathlib import Path
 # Representative model per provider (D-01 / D-03). Google MUST be 3.x+ (gemini-2.5
 # is known-degraded — narrates a todo list without emitting the tool call — D-03);
 # it is recorded as a data point if an operator passes it, never gated.
+#
+# Operator-approved (2026-05-30): extended 4 -> 6 by appending the two NATIVE
+# weak-model providers the SEED-034 fold-gate is specifically meant to catch
+# (narrate-instead-of-call / answer-from-training). The 4-axis recipe FLOOR
+# (OpenAI/Anthropic/Google/OpenRouter) is still fully met; deepseek + moonshot
+# are a superset that only strengthens the gate's zero-regression condition.
+# Additive only — no assertion/gate/localhost/override/prompt/schema change.
 PROVIDERS: list[tuple[str, str]] = [
     ("openai", "gpt-5.4-mini"),
     ("anthropic", "claude-haiku-4-5"),
     ("google", "gemini-3.5-flash"),   # 3.x+ — NOT gemini-2.5 (D-03)
     ("openrouter", "z-ai/glm-5.1"),
+    ("deepseek", "deepseek-v4-flash"),   # native weak-model — SEED-034 fold-gate target
+    ("moonshot", "kimi-k2.6"),           # native weak-model — SEED-034 fold-gate target
 ]
 
 # Backend base URL — local uvicorn. Overridable via EVAL_BASE_URL for an operator
