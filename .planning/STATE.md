@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
-status: verifying
-stopped_at: Phase 087 context gathered
-last_updated: "2026-05-28T23:39:35.243Z"
-last_activity: "2026-05-28 -- Completed quick task 260529-1wb: Fix BUG-260529-01 (write_todos crash on stringified todos arg). Phase 086 UAT passed (4/5, 1 blocked on 087); verification flipped to passed 3/3."
+status: executing
+stopped_at: Phase 087 Plan 01 complete
+last_updated: "2026-05-29T05:07:00.000Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 01 (Wave 0 foundation) executed
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 15
-  completed_plans: 15
-  percent: 100
+  total_plans: 20
+  completed_plans: 16
+  percent: 80
 ---
 
 # Project State
@@ -25,13 +25,13 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 
 ## Current Position
 
-Phase: 087 (panel-ui) — NOT STARTED (next)
-Plan: 0 of TBD
-Status: Phase 086 COMPLETE (verified passed 3/3, 2026-05-29). Next: Phase 087 Panel UI — G-2 gate fires (UX phase) → start with /gsd:sketch 087, NOT discuss-phase.
+Phase: 087 (panel-ui) — IN PROGRESS
+Plan: 1 of 5 complete (Wave 0 foundation shipped)
+Status: Ready to execute Plan 02 (panel shell — Wave 1)
 Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim).
-Last activity: 2026-05-28 -- Completed quick task 260529-1wb: Fix BUG-260529-01 (write_todos crash on stringified todos arg). Phase 086 UAT passed (4/5, 1 blocked on 087); verification flipped to passed 3/3.
+Last activity: 2026-05-29 -- Phase 087 Plan 01 (Wave 0 foundation) executed
 
-Progress: [██████████] 100%
+Progress: [██░░░░░░░░] 20% (1/5 plans)
 
 ## Performance Metrics
 
@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 - (v2.7 research): ask_user requires Redis pub/sub for cross-worker safety (asyncio.Event fails with WORKER_COUNT=2)
 - (083-03): Kimi thinking filter uses state-machine with _in_think_block; provider-gated on moonshot + deepseek
 - (083-03): _SINGLE_MODEL_PROVIDERS frozenset classifies provider tiers for title gen model routing
+- (087-01): Sheet bottom-sheet hand-authored on installed @radix-ui/react-dialog (side=bottom) — NOT npx shadcn add sheet (avoids vaul); zero new dependency (A3)
+- (087-01): --warning-foreground darkened to deep-midnight ink (240 60% 8%) for ≥4.5:1 on amber bg (UI-SPEC), rather than lightening text
+- (087-01): WorkspaceFileContent is a discriminated union over storage_type (inline|bucket) so Plan 03 preview routing is type-safe
+- (087-01): Wave 0 panel tests are GREEN-only it.todo() contracts (52) mapped to VALIDATION per-req map; each downstream plan flips its own todos to live tests
 
 ### Pending Todos
 
@@ -111,8 +115,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-28T23:39:35.238Z
-Stopped at: Phase 087 context gathered
-Resume file: .planning/phases/087-panel-ui/087-CONTEXT.md
+Last session: 2026-05-29T05:07:00.000Z
+Stopped at: Completed 087-01-PLAN.md (Wave 0 foundation)
+Resume file: None — ready for 087-02-PLAN.md (Wave 1, panel shell)
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z
