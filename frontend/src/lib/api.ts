@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -750,6 +750,91 @@ export async function getThreadTasks(
   const res = await fetch(`${API_BASE}/threads/${threadId}/tasks`, { headers, signal })
   if (!res.ok) throw new Error("Failed to list thread tasks")
   return (await res.json()) as TaskRunIndexItem[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 087 Plan 01 (PANEL-03/04/07): 3 workspace file GET helpers + the
+// ask_user answer POST. Each mirrors the Phase 086 GET helper shape verbatim —
+// getAuthHeaders() + fetch with optional AbortSignal + non-OK throw — and reuses
+// the existing fetch stack (NO new fetch library). The backend already shapes
+// the JSON (workspace.py two-shape content + difflib unified-diff string), so no
+// client mapper is needed; cast the JSON to the typed shape. Routes VERIFIED
+// against workspace.py:124-323 / runs.py:496.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /threads/{tid}/workspace/files/{id}/content (workspace.py:124). Returns
+ *  the two-shape content payload: inline (text) or bucket (signed_url, 60s TTL,
+ *  may be null). FilePreview routes on `storage_type` (D-02). */
+export async function getWorkspaceFileContent(
+  threadId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceFileContent> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/content`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to fetch workspace file content")
+  return (await res.json()) as WorkspaceFileContent
+}
+
+/** GET /threads/{tid}/workspace/files/{id}/versions (workspace.py:202). Returns
+ *  the file's version rows sorted version DESC — feeds the red-base/green-target
+ *  version picker (D-04). */
+export async function getWorkspaceFileVersions(
+  threadId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceVersion[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/versions`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to list workspace file versions")
+  return (await res.json()) as WorkspaceVersion[]
+}
+
+/** GET /threads/{tid}/workspace/files/{id}/diff?from=&to= (workspace.py:238).
+ *  Returns a raw unified-diff STRING in `delta.diff` (parsed client-side by
+ *  VersionDiff — Pattern 2). Backend truncates at 500 diff lines and sets
+ *  `delta.truncated` (Pitfall 4). */
+export async function getWorkspaceFileDiff(
+  threadId: string,
+  fileId: string,
+  from: number,
+  to: number,
+  signal?: AbortSignal,
+): Promise<WorkspaceDiff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/diff?from=${from}&to=${to}`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to fetch diff")
+  return (await res.json()) as WorkspaceDiff
+}
+
+/** POST /runs/{runId}/ask_user_response (runs.py:496). Persist-first-then-publish:
+ *  the backend persists the answer then publishes the resume; the resulting
+ *  `ask_user_response` SSE removes the prompt from the store, reactively clearing
+ *  the card and un-pausing the run (Pattern 3). `runId` comes from
+ *  `PendingAsk.run_id` (GET-only — Pitfall 1 / A2); the submit caller (Plan 05)
+ *  gates on its presence. Throws on non-OK. */
+export async function answerAskUser(
+  runId: string,
+  body: AskUserAnswerBody,
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/runs/${runId}/ask_user_response`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to submit ask_user answer (status ${res.status})`)
 }
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the

@@ -320,3 +320,75 @@ export interface TaskRunIndexItem {
   max_steps?: number
   summary?: string
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 087 Plan 01 — workspace file content / versions / diff wire-mirror
+// interfaces + the ask_user answer POST body.
+//
+// These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there
+// is no client-side reshape. VERIFIED against:
+//   GET  /threads/{tid}/workspace/files/{id}/content  (workspace.py:124-199 — two-shape)
+//   GET  /threads/{tid}/workspace/files/{id}/versions (workspace.py:202-235)
+//   GET  /threads/{tid}/workspace/files/{id}/diff      (workspace.py:238-323 + workspace_service.py:99)
+//   POST /runs/{run_id}/ask_user_response               (runs.py:496)
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /content — inline shape: small text files return their content directly. */
+export interface WorkspaceFileContentInline {
+  id: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  storage_type: "inline"
+  content: string
+}
+
+/** GET /content — bucket shape: binary/large files return a 60s-TTL signed URL
+ *  (best-effort; `signed_url` may be null → calm "no preview · Download"). */
+export interface WorkspaceFileContentBucket {
+  id: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  storage_type: "bucket"
+  signed_url: string | null
+}
+
+/** Discriminated union over `storage_type` — FilePreview routes on it (D-02). */
+export type WorkspaceFileContent =
+  | WorkspaceFileContentInline
+  | WorkspaceFileContentBucket
+
+/** GET /versions — one row per stored version, sorted version DESC. */
+export interface WorkspaceVersion {
+  id: string
+  version: number
+  size_bytes: number
+  created_at: string
+}
+
+/** GET /diff — raw unified-diff STRING in `delta.diff` (NOT pre-parsed hunks);
+ *  VersionDiff parses it client-side (Pattern 2). Backend truncates at 500 diff
+ *  lines and sets `delta.truncated=true` — the UI must surface that (Pitfall 4). */
+export interface WorkspaceDiff {
+  path: string
+  from_version: number
+  to_version: number
+  delta: {
+    format: "unified"
+    diff: string
+    stats: { additions: number; deletions: number }
+    truncated: boolean
+  }
+  stats: { additions: number; deletions: number }
+}
+
+/** POST /runs/{run_id}/ask_user_response body. `choice_index` is the picked
+ *  option index (null for free-text answers); `response_text` always carries the
+ *  resolved answer string. `run_id` for the route comes from PendingAsk.run_id
+ *  (GET-only — see Pitfall 1 / A2). */
+export interface AskUserAnswerBody {
+  tool_call_id: string
+  response_text: string
+  choice_index: number | null
+}
