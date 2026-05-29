@@ -10,7 +10,6 @@ import { KnowledgeHealthPage } from "@/pages/KnowledgeHealthPage"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
-import { useAskUserPrompt, useViewingThread } from "@/providers/StreamsProvider"
 import type { ActiveView } from "@/App"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -70,45 +69,41 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   }, [onSetPrefillMessage, onNavigate])
 
   // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
-  //    split is a single ChatLayout-level CSS grid; WorkspacePanel + the chat-
-  //    header toggle + the seam signal all drive THIS state. ──
+  //    split is a single ChatLayout-level CSS grid; the single in-panel toggle +
+  //    the seam signal drive THIS state.
+  //    Plan 08 (operator directive 2026-05-29): consolidated to a NAV-STYLE
+  //    2-state machine (open ↔ rail), mirroring NavPanel. The "hidden" state and
+  //    the redundant chat-header toggle are gone — the ~52px rail is ALWAYS
+  //    present, so the panel is reopenable by mouse on every thread (incl. the
+  //    empty/welcome screen), and the pulsing-amber-dot has a permanent host on
+  //    the rail's Expand control. ──
   const [panelState, setPanelState] = useState<PanelState>("open")
 
-  // In-panel header chevron: open → rail → hidden → open.
-  const cycleState = useCallback(() => {
-    setPanelState((s) => (s === "open" ? "rail" : s === "rail" ? "hidden" : "open"))
+  // Single in-panel toggle, nav-parity (NavPanel.tsx single button): open ↔ rail.
+  // The open-state collapse control (WorkspacePanel header) and the rail Expand
+  // control (PanelRail) both flip THIS toggle.
+  const togglePanel = useCallback(() => {
+    setPanelState((s) => (s === "open" ? "rail" : "open"))
   }, [])
-  // Persistent chat-header button + ⌘./Ctrl+.: open ↔ hidden (D6).
-  const toggleWorkspace = useCallback(() => {
-    setPanelState((s) => (s === "hidden" ? "open" : "hidden"))
-  }, [])
-  // Rail icon / seam pointer: → open.
+  // Rail Expand control / seam pointer: → open (force-open, never to rail).
   const expand = useCallback(() => setPanelState("open"), [])
-  // Mobile sheet X / onOpenChange(false): → hidden.
-  const hidePanel = useCallback(() => setPanelState("hidden"), [])
 
-  // ⌘./Ctrl+. toggles open ↔ hidden (moved up from WorkspacePanel).
+  // ⌘./Ctrl+. toggles open ↔ rail (D6, now nav-style — no fully-hidden state).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ".") {
         e.preventDefault()
-        toggleWorkspace()
+        togglePanel()
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [toggleWorkspace])
+  }, [togglePanel])
 
   // Chat-side seam affordances request a panel-open via the module-level signal
-  // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe).
+  // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe). A seam
+  // pointer still force-opens the panel.
   useEffect(() => subscribeOpenPanel(expand), [expand])
-
-  // Pending ask_user for the currently-viewed thread → drives the chat-header
-  // pulsing dot when the panel is not open (gap 4 / PANEL-01). Same hook
-  // WorkspacePanel already uses — additive, no new store.
-  const viewingThreadId = useViewingThread()
-  const { data: pendingAsks } = useAskUserPrompt(viewingThreadId)
-  const workspacePending = pendingAsks.length > 0 && panelState !== "open"
 
   return (
     <div className="flex h-screen bg-background">
@@ -229,18 +224,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
         // panel column resolves against the REAL row width (not the panel's own
         // indefinite flex width), so 1fr + clamp(...) always sums to the row —
-        // zero horizontal overflow in open/rail/hidden, flush-right panel, and
-        // the chat centers within its own 1fr column (no dead band).
+        // zero horizontal overflow, flush-right panel, and the chat centers
+        // within its own 1fr column (no dead band).
+        // Phase 087-08: nav-style 2-state track — clamp(...) when open, 52px when
+        // rail. NO 0 column: the rail is always present, so the panel is always
+        // reopenable by mouse (incl. the empty/welcome screen).
         <div
           className="grid min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
           style={{
             gridTemplateColumns:
-              "1fr " +
-              (panelState === "open"
-                ? "clamp(300px,30%,420px)"
-                : panelState === "rail"
-                  ? "52px"
-                  : "0px"),
+              "1fr " + (panelState === "open" ? "clamp(300px,30%,420px)" : "52px"),
           }}
         >
           <main className="min-w-0 overflow-hidden">
@@ -252,16 +245,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
               prefillMessage={prefillMessage}
               onClearPrefill={() => onSetPrefillMessage(null)}
               onOpenDrawer={() => setDrawerOpen(true)}
-              onToggleWorkspace={toggleWorkspace}
-              workspacePending={workspacePending}
             />
           </main>
           <WorkspacePanel
             selectedThread={selectedThread}
             state={panelState}
-            onCycle={cycleState}
+            onToggle={togglePanel}
             onExpand={expand}
-            onHide={hidePanel}
           />
         </div>
       ) : (

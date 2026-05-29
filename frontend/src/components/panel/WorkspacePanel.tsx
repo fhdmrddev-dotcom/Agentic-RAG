@@ -6,18 +6,26 @@
  * the pending ask_user stack to the very top, short-circuits to one calm empty
  * state, and drops to a <768px bottom-sheet.
  *
- * Plan 06 re-architecture: the panel is now CONTROLLED. The open/rail/hidden
- * state machine, the ⌘./Ctrl+. key listener, and the subscribeOpenPanel(expand)
- * effect were LIFTED to ChatLayout (panel-shell.md D1 — the chat|panel split is
- * a single ChatLayout-level CSS grid so the panel column resolves against the
- * real row width). WorkspacePanel no longer owns its own width; it just fills the
- * grid track ChatLayout sizes and reports collapse/expand intent via callbacks.
+ * Plan 06 re-architecture: the panel is now CONTROLLED. The state machine, the
+ * ⌘./Ctrl+. key listener, and the subscribeOpenPanel(expand) effect were LIFTED
+ * to ChatLayout (panel-shell.md D1 — the chat|panel split is a single
+ * ChatLayout-level CSS grid so the panel column resolves against the real row
+ * width). WorkspacePanel no longer owns its own width; it just fills the grid
+ * track ChatLayout sizes and reports collapse/expand intent via callbacks.
+ *
+ * Plan 08 (operator directive 2026-05-29): consolidated to a NAV-STYLE 2-state
+ * machine — `state: "open" | "rail"` (the "hidden" state is gone). The panel has
+ * ONE in-panel toggle that mirrors NavPanel's single button: the open-state
+ * header control collapses → rail; the rail's always-present Expand control
+ * reopens → open. There is no chat-header toggle. The ~52px rail is always
+ * present (reopen-by-mouse on every thread incl. the empty/welcome screen) and
+ * hosts the pulsing-amber-dot pending indicator.
  *
  * Data: useViewingThread() + the four Phase 086 reactive hooks (null-safe; `data`
  * never undefined, empty array is a stable ref — PANEL-06). The panel reconciles
  * to current state with NO page refresh.
  *
- * A11Y: <aside role="complementary" aria-label="Agent workspace">; the chevron
+ * A11Y: <aside role="complementary" aria-label="Agent workspace">; the toggle
  * respects prefers-reduced-motion (the grid transition lives on ChatLayout).
  */
 import { useEffect, useMemo, useState } from "react"
@@ -39,7 +47,7 @@ import { FilesSection } from "./FilesSection"
 import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
 
-export type PanelState = "open" | "rail" | "hidden"
+export type PanelState = "open" | "rail"
 
 const MOBILE_BREAKPOINT = 768
 
@@ -60,20 +68,18 @@ export interface WorkspacePanelProps {
   selectedThread: Thread | null
   /** Controlled panel state — owned by ChatLayout (Plan 06 hoist). */
   state: PanelState
-  /** In-panel header chevron: open → rail → hidden → open. */
-  onCycle: () => void
-  /** Rail icon: → open. */
+  /** Single in-panel toggle (nav-parity): open ↔ rail. The open-state header
+   *  control and the rail Expand control both flip this. */
+  onToggle: () => void
+  /** Rail Expand control / seam pointer: → open (force-open). */
   onExpand: () => void
-  /** Mobile sheet X / onOpenChange(false): → hidden. */
-  onHide: () => void
 }
 
 export function WorkspacePanel({
   selectedThread: _selectedThread,
   state,
-  onCycle,
+  onToggle,
   onExpand,
-  onHide,
 }: WorkspacePanelProps) {
   const threadId = useViewingThread()
   const { data: todos } = useTodos(threadId)
@@ -131,12 +137,15 @@ export function WorkspacePanel({
     </div>
   )
 
+  // Single in-panel toggle, open state (nav-parity with NavPanel's collapse
+  // button): PanelRightClose + "Collapse workspace" → rail. The rail owns the
+  // matching Expand control (PanelRightOpen + "Expand workspace" → open).
   const header = (
     <div className="flex items-center gap-2 border-b border-border px-4 py-3">
       <span className="font-headline text-sm font-semibold text-foreground">Workspace</span>
       <button
         type="button"
-        onClick={onCycle}
+        onClick={onToggle}
         aria-label="Collapse workspace"
         className="ml-auto grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
@@ -145,11 +154,15 @@ export function WorkspacePanel({
     </div>
   )
 
-  // ── Mobile (<768px): bottom-sheet instead of a side column (D5). ──
+  // ── Mobile (<768px): bottom-sheet instead of a side column (D5). The rail is a
+  //    desktop affordance; on phone the 2-state machine maps open → sheet shown,
+  //    rail → sheet dismissed. Dismiss (X / backdrop / onOpenChange(false))
+  //    collapses to rail via onToggle; the seam pointer (onExpand) reopens it.
+  //    Otherwise byte-equivalent to Plan 06's sheet branch. ──
   if (isMobile) {
     return (
       <aside role="complementary" aria-label="Agent workspace">
-        <Sheet open={state !== "hidden"} onOpenChange={(o) => (o ? onExpand() : onHide())}>
+        <Sheet open={state === "open"} onOpenChange={(o) => (o ? onExpand() : onToggle())}>
           <SheetContent side="bottom" className="max-h-[70vh]" hideCloseButton>
             <div className="flex items-center gap-2 px-4 pb-2 pt-1">
               <span className="font-headline text-sm font-semibold text-foreground">
@@ -157,7 +170,7 @@ export function WorkspacePanel({
               </span>
               <button
                 type="button"
-                onClick={onHide}
+                onClick={onToggle}
                 aria-label="Close workspace"
                 className="ml-auto grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
@@ -172,7 +185,9 @@ export function WorkspacePanel({
   }
 
   // ── Desktop: plain panel container that FILLS the grid column ChatLayout sizes.
-  //    No self-referential aside grid — the width animation lives on ChatLayout. ──
+  //    No self-referential aside grid — the width animation lives on ChatLayout.
+  //    Nav-style 2-state: open → header + body; rail → the always-present rail
+  //    (no "hidden" opacity branch). ──
   return (
     <aside
       role="complementary"
@@ -182,7 +197,6 @@ export function WorkspacePanel({
         // so the panel reads as a distinct surface from chat (dark) / page (light)
         // — NOT bg-sidebar/border-border (those stay shared with NavPanel).
         "flex h-screen min-h-0 min-w-0 flex-col overflow-hidden border-l border-[hsl(var(--panel-border))] bg-[hsl(var(--panel-surface))]",
-        state === "hidden" && "pointer-events-none opacity-0",
       )}
     >
       {state === "rail" ? (
@@ -190,14 +204,18 @@ export function WorkspacePanel({
           todos={{ done: todosDone, total: todos.length }}
           filesCount={files.length}
           pendingCount={pendingAsks.length}
+          // Pulsing-amber-dot (PANEL-01): a pending ask_user while collapsed must
+          // never go silent. The rail's always-present Expand control is its
+          // permanent host (moved off the removed chat-header toggle).
+          pending={pendingAsks.length > 0}
           onExpand={onExpand}
         />
-      ) : state === "open" ? (
+      ) : (
         <>
           {header}
           {body}
         </>
-      ) : null}
+      )}
     </aside>
   )
 }

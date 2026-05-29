@@ -10,16 +10,26 @@
  * (UI-SPEC Accessibility Contract / Rail icon buttons). Clicking any icon expands
  * the panel back open.
  *
+ * Plan 08 (operator directive 2026-05-29 — nav-style consolidation): the rail now
+ * leads with an ALWAYS-PRESENT Expand control (PanelRightOpen, "Expand workspace"),
+ * mirroring NavPanel's single collapse/expand button. This is the permanent
+ * reopen-by-mouse host on every thread (incl. the empty/welcome screen, where
+ * todos=0 and files=0 leave no count badges) AND the permanent host for the
+ * pulsing-amber-dot pending indicator (moved off the removed chat-header toggle).
+ *
  * Color language (LOCKED): primary indigo = non-warning count badge; amber
- * (--warning) = pending-question warn badge.
+ * (--warning) = pending-question warn badge / pulse dot.
  */
-import { ListChecks, FileText, MessageCircleQuestion } from "lucide-react"
+import { ListChecks, FileText, MessageCircleQuestion, PanelRightOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface PanelRailProps {
   todos: { done: number; total: number }
   filesCount: number
   pendingCount: number
+  /** True when an ask_user is pending → pulsing-amber-dot on the Expand control
+   *  (PANEL-01). prefers-reduced-motion honored via motion-safe:. */
+  pending?: boolean
   /** Expand the panel back to its open state. */
   onExpand: () => void
 }
@@ -61,9 +71,30 @@ function RailIcon({ Icon, label, badge, warn, onClick }: RailIconProps) {
   )
 }
 
-export function PanelRail({ todos, filesCount, pendingCount, onExpand }: PanelRailProps) {
+export function PanelRail({ todos, filesCount, pendingCount, pending, onExpand }: PanelRailProps) {
   return (
     <div className="flex h-full w-[52px] flex-col items-center gap-3 border-l border-[hsl(var(--panel-border))] py-3">
+      {/* Always-present Expand control (nav-parity with NavPanel's single button).
+          Renders even when todos=0 and files=0 — the rail is never empty/
+          un-actionable. Hosts the pulsing-amber-dot when an ask_user is pending. */}
+      <button
+        type="button"
+        aria-label="Expand workspace"
+        onClick={onExpand}
+        className={cn(
+          "relative grid h-[30px] w-[30px] place-items-center rounded-md text-[hsl(var(--muted-foreground-dim))]",
+          "transition-colors hover:bg-accent hover:text-foreground",
+          "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        )}
+      >
+        <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
+        {pending && (
+          <span
+            aria-hidden="true"
+            className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[hsl(var(--warning))] motion-safe:animate-pulse"
+          />
+        )}
+      </button>
       <RailIcon
         Icon={ListChecks}
         label={`Todos — ${todos.done} of ${todos.total} done`}

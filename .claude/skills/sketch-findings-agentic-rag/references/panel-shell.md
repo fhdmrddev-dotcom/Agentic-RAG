@@ -2,6 +2,8 @@
 
 The right-side workspace panel's outer frame: how it shares the screen with chat, how its four sections stack, how it collapses, and how it behaves on mobile. This is the container that sketches 005/006/007 fill.
 
+> **Superseded (087-08, operator directive 2026-05-29) — collapse model.** The collapse UX is now NAV-STYLE, mirroring the navigation panel (`NavPanel.tsx`): a **2-state machine `open ↔ rail`** driven by a **single in-panel toggle** (open-state header control → rail; rail's always-present Expand control → open). The prior **3-state `open / rail / hidden`** model and the redundant **chat-header "Toggle workspace" button** (added by Plan 06) are **removed**. There is no fully-hidden desktop state: the ~52px rail is always present, so the panel is reopenable BY MOUSE on every thread (including the empty/welcome screen), and the rail's Expand control is the permanent host for the pending-question pulsing-amber-dot. `⌘./Ctrl+.` toggles `open ↔ rail`. See D4 / D6 below (updated) — the CSS/HTML sketch snippets retain the original `panel-collapsed` class for historical sketch fidelity, but the shipped app implements only `open` and `rail`.
+
 ## Design Decisions
 
 ### D1 — Push/split, not overlay (Winner B: Stacked accordion)
@@ -17,13 +19,17 @@ Sections in fixed order: **Todos · Files · Pending question · Versions**. Eac
 A plain Q&A chat has no workspace activity. Instead of surrendering 30% width to four empty sections, the whole panel body short-circuits to one calm `.panel-empty` centered state with a "collapse to rail" affordance. **Never render four empty section headers.**
 
 ### D4 — Collapse leaves a rail, not nothing
-Desktop collapse → a thin `.rail` (vertical icon strip) with **count badges** per section (`Todos 2/3`, `Files 4`), and an amber badge if a question is pending. This is load-bearing: a pending `ask_user` must never go silent just because the panel is collapsed. Full-hide is only for mobile.
+Desktop collapse → a thin `.rail` (vertical icon strip). This is load-bearing: a pending `ask_user` must never go silent just because the panel is collapsed.
+
+**Updated (087-08):** the rail leads with an **always-present Expand control** (`PanelRightOpen`, aria-label "Expand workspace") that renders even when there is zero workspace activity (0 todos / 0 files) — it is the permanent reopen-by-mouse host AND the host for the **pulsing-amber-dot** pending indicator (amber `--warning`, `motion-safe:animate-pulse`). Below it sit the per-section **count-badge** icons (`Todos 2/3`, `Files 4`, amber pending badge) which also expand on click. There is **no fully-hidden desktop state** — the rail is always visible (the 087-08 nav-style consolidation replaced the prior "full-hide is only for mobile" rule). On mobile the panel is a bottom-sheet that dismisses (D5), not a desktop rail.
 
 ### D5 — Mobile (<768px) = bottom-sheet
 At phone width the grid collapses to `1fr` and the panel becomes a bottom-sheet (`transform: translateY(100%)` when hidden, slides up when open, with a `.sheet-grip` handle). It must never occlude the composer and must be dismissable back to chat.
 
-### D6 — Toggle = header button + `⌘.` / `Ctrl+.`
-Keyboard-forward (Raycast instinct). The toggle control shows a pulsing dot when a question is pending and the panel is closed.
+### D6 — Toggle = single in-panel button + `⌘.` / `Ctrl+.`
+Keyboard-forward (Raycast instinct). `⌘./Ctrl+.` toggles the panel.
+
+**Updated (087-08):** there is exactly **ONE** collapse/expand control and it lives **inside the panel**, mirroring `NavPanel`'s single button — it flips icon+label by state: open → `PanelRightClose` "Collapse workspace" (→ rail); rail → `PanelRightOpen` "Expand workspace" (→ open). The prior separate **chat-header "Toggle workspace" button is removed** (zero `[aria-label="Toggle workspace"]` in the app). `⌘./Ctrl+.` now toggles `open ↔ rail`. The pulsing-amber-dot (pending question while collapsed) lives on the rail's Expand control (D4), not on a chat-header button.
 
 ## CSS Patterns
 
@@ -110,7 +116,7 @@ Keyboard-forward (Raycast instinct). The toggle control shows a pulsing dot when
 ## What to Avoid
 - **Two-column overload** — both chat run-card and panel competing as "the live thing." Mitigation: panel-owned tools render as quiet pointers in chat (see `chat-panel-seam.md`), so there's one live canonical surface.
 - **Empty-panel tax** — four empty section headers when there's no workspace activity. Always short-circuit to `.panel-empty`.
-- **Lost signal on collapse** — a question goes pending while collapsed and nothing signals it. The rail badge (`.warn`) + toggle pulse-dot are mandatory.
+- **Lost signal on collapse** — a question goes pending while collapsed and nothing signals it. The rail amber count badge (`.warn`) + the pulsing-amber-dot on the rail's Expand control (087-08) are mandatory.
 - **Laptop squeeze (~1024px)** — at narrow widths the `30%` panel starves the chat run-card so tool output wraps illegibly. Consider clamping `--panel-w` to a `min()` so the chat keeps a readable floor.
 - **Mobile occlusion** — the bottom-sheet covering the composer or trapping the user. `top: 30%` leaves chat + composer reachable; grip must dismiss.
 

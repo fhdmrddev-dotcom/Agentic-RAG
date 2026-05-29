@@ -1,13 +1,16 @@
 /**
  * Phase 087 — WorkspacePanel composition tests (PANEL-01).
  *
- * Plan 06 re-architecture: WorkspacePanel is now CONTROLLED. The open/rail/hidden
- * state machine, the ⌘./Ctrl+. key listener, and the subscribeOpenPanel effect
- * were lifted to ChatLayout. These tests assert the CONTROLLED contract:
- *   - state="open"   → body/header (four sections + pinned PendingAskStack)
- *   - state="rail"   → PanelRail icons, no section bodies
- *   - state="hidden" → opacity-0 + pointer-events-none container, no body/rail
- *   - the in-panel header chevron calls onCycle; a rail icon calls onExpand
+ * Plan 06 re-architecture: WorkspacePanel is CONTROLLED. The state machine, the
+ * ⌘./Ctrl+. key listener, and the subscribeOpenPanel effect live in ChatLayout.
+ *
+ * Plan 08 (operator directive 2026-05-29): consolidated to a NAV-STYLE 2-state
+ * machine — state="open" | "rail" (the "hidden" state is gone). These tests
+ * assert the controlled contract:
+ *   - state="open" → body/header (four sections + pinned PendingAskStack); the
+ *     in-panel header control ("Collapse workspace") calls onToggle (→rail)
+ *   - state="rail" → PanelRail with an ALWAYS-PRESENT "Expand workspace" control
+ *     (rendered even with 0 todos / 0 files) calling onExpand; no section bodies
  *   - the empty short-circuit (ONE PanelEmpty, never four headers)
  *   - the <768px bottom-sheet (Sheet primitive)
  *   - the reactive useViewingThread + four-hook consumption
@@ -76,18 +79,16 @@ function setViewport(width: number) {
 
 interface RenderOpts {
   state?: PanelState
-  onCycle?: () => void
+  onToggle?: () => void
   onExpand?: () => void
-  onHide?: () => void
 }
-function renderPanel({ state = "open", onCycle = vi.fn(), onExpand = vi.fn(), onHide = vi.fn() }: RenderOpts = {}) {
+function renderPanel({ state = "open", onToggle = vi.fn(), onExpand = vi.fn() }: RenderOpts = {}) {
   return render(
     <WorkspacePanel
       selectedThread={thread}
       state={state}
-      onCycle={onCycle}
+      onToggle={onToggle}
       onExpand={onExpand}
-      onHide={onHide}
     />,
   )
 }
@@ -123,24 +124,32 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     ).toBeInTheDocument()
   })
 
-  it("state='hidden' renders an opacity-0 / pointer-events-none container with no body or rail", () => {
-    renderPanel({ state: "hidden" })
-    const panel = screen.getByRole("complementary", { name: /Agent workspace/i })
-    expect(panel.className).toContain("opacity-0")
-    expect(panel.className).toContain("pointer-events-none")
+  it("state='rail' renders an ALWAYS-PRESENT 'Expand workspace' control, even with zero todos and zero files (welcome-screen reopen host — gap-d)", () => {
+    setHooks({ todos: [], files: [], asks: [] })
+    renderPanel({ state: "rail" })
+    // The reopen-by-mouse affordance must exist with no workspace activity.
+    expect(screen.getByRole("button", { name: /expand workspace/i })).toBeInTheDocument()
+    // Count-badge icon buttons render no badge but the Expand control still leads.
     expect(screen.queryByTestId("todos-section")).toBeNull()
-    expect(screen.queryByRole("button", { name: /Todos —/i })).toBeNull()
   })
 
-  it("the in-panel header chevron calls onCycle (open → rail → hidden → open is owned by ChatLayout)", async () => {
-    const onCycle = vi.fn()
+  it("the in-panel header control calls onToggle (open → rail; nav-style toggle owned by ChatLayout)", async () => {
+    const onToggle = vi.fn()
     const user = userEvent.setup()
-    renderPanel({ state: "open", onCycle })
+    renderPanel({ state: "open", onToggle })
     await user.click(screen.getByRole("button", { name: /collapse workspace/i }))
-    expect(onCycle).toHaveBeenCalledTimes(1)
+    expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
-  it("a rail icon click calls onExpand", async () => {
+  it("the rail 'Expand workspace' control calls onExpand (rail → open)", async () => {
+    const onExpand = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "rail", onExpand })
+    await user.click(screen.getByRole("button", { name: /expand workspace/i }))
+    expect(onExpand).toHaveBeenCalledTimes(1)
+  })
+
+  it("a rail count-badge icon click also calls onExpand", async () => {
     const onExpand = vi.fn()
     const user = userEvent.setup()
     renderPanel({ state: "rail", onExpand })
@@ -148,15 +157,21 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(onExpand).toHaveBeenCalledTimes(1)
   })
 
+  it("exposes ONLY the nav-style toggle controls — no 'Toggle workspace' affordance (that chat-header button was removed in 087-08)", () => {
+    // Open state owns "Collapse workspace"; rail owns "Expand workspace". The
+    // ambiguous chat-header "Toggle workspace" control no longer exists anywhere.
+    renderPanel({ state: "open" })
+    expect(screen.getByRole("button", { name: /collapse workspace/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /toggle workspace/i })).toBeNull()
+  })
+
   it("does NOT respond to ⌘./Ctrl+. (listener lifted to ChatLayout)", async () => {
-    const onCycle = vi.fn()
-    const onHide = vi.fn()
+    const onToggle = vi.fn()
     const onExpand = vi.fn()
     const user = userEvent.setup()
-    renderPanel({ state: "open", onCycle, onHide, onExpand })
+    renderPanel({ state: "open", onToggle, onExpand })
     await user.keyboard("{Control>}.{/Control}")
-    expect(onCycle).not.toHaveBeenCalled()
-    expect(onHide).not.toHaveBeenCalled()
+    expect(onToggle).not.toHaveBeenCalled()
     expect(onExpand).not.toHaveBeenCalled()
     expect(screen.getByTestId("todos-section")).toBeInTheDocument()
   })
@@ -185,13 +200,13 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
 
-  it("mobile sheet onOpenChange(false) / X calls onHide", async () => {
+  it("mobile sheet onOpenChange(false) / X calls onToggle (open → rail dismisses the sheet)", async () => {
     setViewport(375)
-    const onHide = vi.fn()
+    const onToggle = vi.fn()
     const user = userEvent.setup()
-    renderPanel({ state: "open", onHide })
+    renderPanel({ state: "open", onToggle })
     await user.click(screen.getByRole("button", { name: /close workspace/i }))
-    expect(onHide).toHaveBeenCalledTimes(1)
+    expect(onToggle).toHaveBeenCalledTimes(1)
   })
 
   it("reads useViewingThread + the four Phase 086 hooks reactively (no page refresh)", () => {

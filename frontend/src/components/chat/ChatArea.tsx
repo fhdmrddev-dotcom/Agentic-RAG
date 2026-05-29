@@ -11,7 +11,7 @@ import {
 } from "@/providers/StreamsProvider"
 import { getProviders } from "@/lib/api"
 import type { Folder, Message, Thread } from "@/types"
-import { Folder as FolderIcon, Loader2, Menu, PanelRightOpen, Sparkles } from "lucide-react"
+import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
 import { toolLabel } from "@/lib/toolMeta"
 
 interface Provider {
@@ -29,14 +29,9 @@ interface Props {
   prefillMessage?: string | null
   onClearPrefill?: () => void
   onOpenDrawer?: () => void
-  /** Plan 06 (gap 3): persistent chat-header workspace toggle — open ↔ hidden. */
-  onToggleWorkspace?: () => void
-  /** Plan 06 (gap 4 / PANEL-01): pulsing amber dot when an ask_user is pending
-   *  and the panel is not open. */
-  workspacePending?: boolean
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onToggleWorkspace, workspacePending }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -362,27 +357,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
             {scopedFolder?.name ?? "Folder"}
           </span>
         )}
-        {/* Plan 06 (gaps 3/4): persistent workspace toggle — always visible on
-            desktop, reopens a hidden panel by mouse (no shortcut / seam needed).
-            ml-auto floats it to the header's right edge regardless of the folder
-            chip. The pulsing amber dot signals a pending ask_user when the panel
-            is not open (prefers-reduced-motion honored via motion-safe:). */}
-        {onToggleWorkspace && (
-          <button
-            type="button"
-            onClick={onToggleWorkspace}
-            aria-label="Toggle workspace"
-            className="relative ml-auto hidden md:grid h-8 w-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shrink-0"
-          >
-            <PanelRightOpen className="h-4 w-4" aria-hidden="true" />
-            {workspacePending && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[hsl(var(--warning))] motion-safe:animate-pulse"
-              />
-            )}
-          </button>
-        )}
+        {/* Phase 087-08 (operator directive 2026-05-29): the chat-header
+            "Toggle workspace" button was REMOVED. The workspace panel now has a
+            single nav-style in-panel toggle (collapse-to-rail); the always-present
+            rail's Expand control is the sole reopen-by-mouse affordance and hosts
+            the pulsing-amber-dot pending indicator. No workspace control lives in
+            the chat header. */}
       </div>
       {fallbackNotice && (
         <div className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1">
