@@ -32,7 +32,7 @@
 
 - [ ] **PANEL-01**: Right-side panel (~30% width) next to chat, collapsible via button and keyboard shortcut, renders as bottom-sheet on mobile screens (<768px)
 - [ ] **PANEL-02**: Todos section renders live todo list from write_todos tool with status indicators (pending, in-progress, completed)
-- [ ] **PANEL-03**: Workspace file browser lists files with click-to-preview for text, markdown, and code using existing renderers
+- [x] **PANEL-03**: Workspace file browser lists files with click-to-preview for text, markdown, and code using existing renderers
 - [ ] **PANEL-04**: Pending user input section renders ask_user prompts with optional choice buttons and free-text field
 - [ ] **PANEL-05**: Panel subscribes to the same SSE stream as chat via StreamsProvider Context — single subscription, demultiplexed by event type, no duplicate connections
 - [ ] **PANEL-06**: Panel events route to separate state stores — no chat message list re-renders triggered by panel updates
@@ -85,7 +85,7 @@
 | TOOL-04 | Phase 085 | Complete |
 | PANEL-01 | Phase 087 | Pending |
 | PANEL-02 | Phase 087 | Pending |
-| PANEL-03 | Phase 087 | Pending |
+| PANEL-03 | Phase 087 | Complete |
 | PANEL-04 | Phase 087 | Pending |
 | PANEL-05 | Phase 086 | Pending |
 | PANEL-06 | Phase 086 | Pending |

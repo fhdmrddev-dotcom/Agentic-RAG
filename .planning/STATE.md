@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: Phase 087 Plan 01 complete
-last_updated: "2026-05-29T05:07:00.000Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 01 (Wave 0 foundation) executed
+stopped_at: Phase 087 Plan 03 complete
+last_updated: "2026-05-29T01:17:00.000Z"
+last_activity: 2026-05-29 -- Phase 087 Plan 03 (file browser + preview, PANEL-03) executed
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 20
-  completed_plans: 16
-  percent: 80
+  completed_plans: 17
+  percent: 85
 ---
 
 # Project State
@@ -26,12 +26,12 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 ## Current Position
 
 Phase: 087 (panel-ui) — IN PROGRESS
-Plan: 1 of 5 complete (Wave 0 foundation shipped)
-Status: Ready to execute Plan 02 (panel shell — Wave 1)
-Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim).
-Last activity: 2026-05-29 -- Phase 087 Plan 01 (Wave 0 foundation) executed
+Plan: 2 of 5 complete (Wave 0 foundation + Wave 2 file browser shipped)
+Status: Ready to execute remaining Wave 2 plans (087-04 version-diff, 087-05 pending-ask + seam) and Wave 3 (087-02 panel shell)
+Carry-forward into 087 verification: re-run the deferred 086 UAT item (rapid thread-switch reconcile-abort) live once the panel hooks are mounted (unit-tested FC#5 in the interim). FilePreview now uses AbortController on (threadId, file.id) change — a real consumer for that abort path.
+Last activity: 2026-05-29 -- Phase 087 Plan 03 (file browser + preview, PANEL-03) executed
 
-Progress: [██░░░░░░░░] 20% (1/5 plans)
+Progress: [████░░░░░░] 40% (2/5 plans)
 
 ## Performance Metrics
 
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - (087-01): --warning-foreground darkened to deep-midnight ink (240 60% 8%) for ≥4.5:1 on amber bg (UI-SPEC), rather than lightening text
 - (087-01): WorkspaceFileContent is a discriminated union over storage_type (inline|bucket) so Plan 03 preview routing is type-safe
 - (087-01): Wave 0 panel tests are GREEN-only it.todo() contracts (52) mapped to VALIDATION per-req map; each downstream plan flips its own todos to live tests
+- (087-03): ShikiCode reused for code preview (A1) — UI-SPEC's literal react-syntax-highlighter is superseded; RSH stays unused, no new dep
+- (087-03): CsvTablePreview is a hand-rolled quote-aware splitter (no CSV lib, D-01); malformed/ragged/≥2000-rows/>256KB all short-circuit to the calm fallback before DOM build (T-087-07)
+- (087-03): fileFlash added as an index.css @keyframes + .animate-fileFlash utility (prefers-reduced-motion guarded), mirroring brandPulse/checkPop — no Tailwind config change
 
 ### Pending Todos
 
@@ -115,8 +118,8 @@ Items carried forward from v2.6 milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-29T05:07:00.000Z
-Stopped at: Completed 087-01-PLAN.md (Wave 0 foundation)
-Resume file: None — ready for 087-02-PLAN.md (Wave 1, panel shell)
+Last session: 2026-05-29T01:17:00.000Z
+Stopped at: Completed 087-03-PLAN.md (file browser + preview, PANEL-03)
+Resume file: None — ready for remaining 087 plans (087-04 version-diff, 087-05 pending-ask + seam, 087-02 panel shell)
 
 **Planned Phase:** 085 (new-llm-tools) — 4 plans — 2026-05-28T11:29:12.000Z
