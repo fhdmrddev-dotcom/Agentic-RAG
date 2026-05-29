@@ -638,10 +638,14 @@ WRITE_TODOS_TOOL = {
     "function": {
         "name": "write_todos",
         "description": (
-            "Replace the thread's todo list with a new list. "
+            "Record or update the task list for a multi-step request so it appears in the user's workspace panel. "
+            "Call this WHENEVER the user asks you to plan, track, or work through several steps — call it at the "
+            "START of multi-step work and again to flip a todo's status as you complete each step. "
             "Use when: you need to break a complex multi-step task into trackable items the user can see, "
             "or when updating the status of in-flight work. "
             "Do not use for: short single-step answers, scratch notes, or per-message reminders. "
+            "Do NOT just narrate the steps in text — a narrated list the user cannot see is not tracking; "
+            "this tool persists a real, user-visible list. "
             "Semantics: full-state-replace — every call OVERWRITES the entire todo list. "
             "Include all current todos (both new and existing) in every call, not just the changes. "
             "Status values: pending | in_progress | completed."
@@ -712,10 +716,13 @@ ASK_USER_TOOL = {
             "Pause and ask the user a question. The agent waits for the user's response (up to a timeout) "
             "before continuing. "
             "Use when: you have a true blocker that requires a decision only the user can make "
-            "(e.g. 'which of these 3 files should I overwrite?'), or when proceeding without confirmation "
-            "would risk destructive action. "
+            "(e.g. 'which of these 3 files should I overwrite?'), when you need information only the user has, "
+            "or when proceeding without confirmation would risk an ambiguous or destructive action. "
+            "When the user explicitly asks you to confirm before acting, CALL this tool — do not just narrate "
+            "the question in prose and assume an answer. "
             "Do not use for: clarification questions you can answer yourself, or as a substitute for "
-            "writing final assistant content (just respond normally instead). "
+            "writing final assistant content (just respond normally instead). Only call it for a genuine "
+            "blocker; when the intent is clear and safe, proceed without asking. "
             "Always pass a clear, specific prompt — never ask 'are you sure?' without context."
         ),
         "parameters": {

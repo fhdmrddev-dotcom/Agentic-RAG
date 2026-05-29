@@ -148,7 +148,32 @@ Candidate directive(s) → exact failing capability they target:
 
 > Alternative (route-to-v2.8) remains EQUALLY VALID per D-08 (the eval script is the v2.8 harness seed) if the operator judges shared-`threads.py`-hot-file regression risk too high at milestone close. **This is the operator's binding decision at the Task-2 checkpoint — no change has been applied to `threads.py`/`openai_service.py`.**
 
-_AFTER table + final verdict: recorded in Task 3, post-checkpoint, only on the `fold-and-apply` branch._
+### Operator decision at Task-2 checkpoint (2026-05-30): **fold-and-apply** (binding)
+
+Operator confirmed fold-and-apply. Folded candidates (the task/sub-agent target was **explicitly SKIPPED** — direct search is acceptable behavior, and forcing sub-agents is out of universal-text-only scope and risks over-spawning):
+- **multi-tool → Candidate B (write_todos-for-multistep)** — the headline fold target (write_todos skipped 5/6 providers; only DeepSeek passed).
+- **ask_user → Candidate A (system-prompt directive) + Candidate C (tool-description strengthening)** — the ask_user confirm-first skip (4/6 providers; OpenAI + Moonshot passed).
+
+### condition-a (text-only) — FOLD APPLIED (pending re-verify)
+
+**Status: FOLD APPLIED (pending re-verify).** The universal-only text directives were applied TEXT-ONLY. `git diff` of `backend/app/api/threads.py` + `backend/app/services/openai_service.py` is confined exclusively to string-literal content — **0 non-string-literal lines changed** (no argument schema, no `get_tools()` control flow, no `*_service.py` adapter logic, no per-provider branch, no `MODEL_CAPABILITIES`, no agent loop, no `tool_choice` forcing). Both files byte-compile cleanly (`python -m py_compile` → OK).
+
+Where each candidate landed (file + section):
+
+| Candidate | File | Section / symbol | What changed (string content only) |
+|-----------|------|------------------|------------------------------------|
+| **B** (write_todos multi-step) | `backend/app/api/threads.py` | `SYSTEM_PROMPT` (:336) → `## Multi-step intent` | +1 bullet inside the prompt string: "When you are working through multiple steps or a task list, ALWAYS call write_todos … a narrated list they cannot see is not tracking." |
+| **A** (ask_user, conservative) | `backend/app/api/threads.py` | `SYSTEM_PROMPT` (:336) → `## Multi-step intent` EXCEPTIONS block | +1 directive inside the prompt string: "when you need information only the user has, or must confirm an ambiguous or destructive action … call the ask_user tool rather than guessing or narrating the question in prose. Only do this for a genuine blocker." (Kept CONSERVATIVE to avoid over-asking — the eval cannot catch over-triggering.) |
+| **C** (tool-description strengthening) | `backend/app/services/openai_service.py` | `WRITE_TODOS_TOOL["function"]["description"]` (~:640) + `ASK_USER_TOOL["function"]["description"]` (~:711) | write_todos: leads with "Record or update the task list … so it appears in the user's workspace panel. Call this WHENEVER … Do NOT just narrate." ask_user: adds "when you need information only the user has … When the user explicitly asks you to confirm before acting, CALL this tool … Only call it for a genuine blocker; when the intent is clear and safe, proceed without asking." |
+
+**Diff shape (condition-a proof — no secrets):**
+- `backend/app/api/threads.py`: **+11 / −2** lines (`git diff --numstat`). Two hunks, BOTH inside the `SYSTEM_PROMPT = ( … )` string-concatenation tuple. The 2 "deletions" are the two `"…\n\n"` literal lines whose `\n\n` terminator relocated to the new last string line (pure string-content reshaping).
+- `backend/app/services/openai_service.py`: **+11 / −4** lines. Two hunks, BOTH inside the `"description": ( … )` string value of `WRITE_TODOS_TOOL` and `ASK_USER_TOOL`. The 4 "deletions" are original description-string lines rewritten/extended — the adjacent `"parameters": { … }` schema blocks are UNCHANGED in both.
+- **Total: +22 insertions / −6 deletions across 2 files; 0 lines outside a string literal.** `TASK_TOOL` UNCHANGED (skipped per operator decision).
+
+> **PENDING:** operator must restart the backend so the new `SYSTEM_PROMPT` + tool descriptions go live; a separate continuation then re-runs the exact 6×4 eval to evaluate condition-b (≥1 previously-failing row now passes) and condition-c (zero regression of the DeepSeek multi-tool PASS + OpenAI/Moonshot ask_user PASS cells), records the AFTER table, and renders the final FOLDED / REVERT verdict.
+
+_AFTER table + final verdict: recorded in the post-restart Task-3 re-verify continuation, only on the `fold-and-apply` branch._
 
 ---
 
