@@ -31,7 +31,7 @@ Legend: ✅ verified live · ⬜ untested · ⚠️ known gap/design-question ·
 
 ## Untested (recommended next, by risk)
 
-> **✅ ALL ROWS BELOW RESOLVED in "Extended testing round 3" (2026-05-29) — see the round-3 sections lower in this doc.** Kept here for provenance. Net new this round: 1 crash bug found + fixed (free-text ask_user → BUG-260529-02), 2 minor findings (failed-write seam mislabel, ask_user countdown resets on reload), 1 reinforced gap (#3 fast-interaction race). Remaining "untested" items (huge CSV, large-file, bucket image) are architecturally unreachable via agent tools — documented, not deferred.
+> **✅ ALL ROWS BELOW RESOLVED in "Extended testing round 3" (2026-05-29) — see the round-3 sections lower in this doc.** Kept here for provenance. Net new this round: 1 crash bug found + fixed (free-text ask_user → BUG-260529-03), 2 minor findings (failed-write seam mislabel, ask_user countdown resets on reload), 1 reinforced gap (#3 fast-interaction race). Remaining "untested" items (huge CSV, large-file, bucket image) are architecturally unreachable via agent tools — documented, not deferred.
 
 | Scenario | Why it matters |
 |----------|----------------|
@@ -77,7 +77,7 @@ Setup: fresh thread "Community Hackathon To-Do List" (`9db1d9c5…`) — one run
 
 | Scenario | Result |
 |----------|--------|
-| **Free-text ask_user** (no options) | 🐛→🔧 **Found a crash, fixed it.** A no-options ask is stored as `options:null`; `PendingAskCard` did `options.length` → `null.length` TypeError → **whole app blanked** (no error boundary). Fixed with a null-guard (`options = ask.options ?? []`), filed **BUG-260529-02** (commit `0df4b048`). Post-fix VERIFIED: amber card renders 0 radios + free-text box; answer "Code & Coffee Hack Night" → agent **resumed** (`Run · 1 tool · ✓ done`); seam card shows "You answered …". |
+| **Free-text ask_user** (no options) | 🐛→🔧 **Found a crash, fixed it.** A no-options ask is stored as `options:null`; `PendingAskCard` did `options.length` → `null.length` TypeError → **whole app blanked** (no error boundary). Fixed with a null-guard (`options = ask.options ?? []`), filed **BUG-260529-03** (commit `0df4b048`). Post-fix VERIFIED: amber card renders 0 radios + free-text box; answer "Code & Coffee Hack Night" → agent **resumed** (`Run · 1 tool · ✓ done`); seam card shows "You answered …". |
 | **Reload mid-pending (ask_user)** | ✅ reloaded with a pending free-text ask → card restored from `GET /ask_user/pending` (prompt + countdown + free-text box). Minor: the countdown re-inits from `timeout_seconds` on mount, so the displayed clock **resets on reload** (cosmetic — real expiry is server-side). |
 | **Tool failure — invalid path** | ✅ `workspace_write` to `../../../etc/passwd` → tool-result card **"Path must start with /"**, run "✓ done", no crash, file NOT added to panel. ⚠️ **Minor:** chat seam still shows a quiet pointer **"wrote ../../../etc/passwd · see panel →"** for a write that *failed* (seam keys off the tool call, not the result → dead panel link). |
 | **Empty search result** | ✅ `search_documents` for a nonsense term → DONE (3.1s), **no sources pill**, agent answers "search returned no relevant documents". No crash, no error card. |
