@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 import type { Todo, WorkspaceFile, PendingAsk } from "@/types"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
@@ -215,5 +216,28 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(useTodos).toHaveBeenCalledWith("thread-1")
     expect(useWorkspaceFiles).toHaveBeenCalledWith("thread-1")
     expect(useAskUserPrompt).toHaveBeenCalledWith("thread-1")
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate on the panel
+  // composition: the role=complementary landmark + section accordion buttons in
+  // the populated open state, AND the empty short-circuit (single PanelEmpty).
+  // Section bodies are mocked to sentinels here (their own a11y is gated in their
+  // own files). axe = STRUCTURE only (Pitfall 5 — contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (open, populated — landmark + section accordion)", async () => {
+    setHooks({ asks: [mockPendingAskWithRunId] })
+    const { container } = renderPanel({ state: "open" })
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (open, empty short-circuit — single PanelEmpty)", async () => {
+    setHooks({ todos: [], files: [], asks: [] })
+    const { container } = renderPanel({ state: "open" })
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (rail state — count-badge rail + Expand control)", async () => {
+    setHooks({ asks: [mockPendingAskWithRunId] })
+    const { container } = renderPanel({ state: "rail" })
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

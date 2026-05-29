@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { axe } from "vitest-axe"
 import type { Todo } from "@/types"
 import { mockTodos } from "./fixtures"
 
@@ -87,5 +88,16 @@ describe("TodosSection (PANEL-02) — live todo list with status", () => {
     setTodos([])
     render(<TodosSection />)
     expect(screen.queryByRole("listitem")).toBeNull()
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate. Asserts no axe
+  // violations across the populated state (mixed done/in_progress/pending, so the
+  // <ul>/<li> list + the new aria-live region render). NOTE (Pitfall 5): axe under
+  // jsdom proves STRUCTURE (roles/names/labels) only, NOT 4.5:1 contrast — contrast
+  // is the Chrome MCP Lighthouse job in Plan 05.
+  it("has no axe violations (populated state — mixed statuses + aria-live region)", async () => {
+    setTodos(mockTodos)
+    const { container } = render(<TodosSection />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

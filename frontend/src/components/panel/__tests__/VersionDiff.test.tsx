@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, within, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 import {
   mockDiffNonTruncated,
   mockDiffTruncated,
@@ -151,5 +152,15 @@ describe("VersionDiff (PANEL-07) — version pills + in-column diff + truncation
     expect(within(dialog).getByText("new line")).toBeInTheDocument()
     // and NO additional diff fetch was made
     expect(vi.mocked(getWorkspaceFileDiff).mock.calls.length).toBe(fetchCallsBefore)
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate. Wait for the diff
+  // region to resolve so the version pills, the +N/−M summary, the new aria-live
+  // announce, and the in-column diff are all rendered before asserting. axe =
+  // STRUCTURE only (Pitfall 5 — contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (populated diff — pills + +N/−M aria-live + in-column diff)", async () => {
+    const { container } = render(<VersionDiff threadId="thread-1" file={file} />)
+    await screen.findByRole("region", { name: /Diff v2 to v3/i })
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

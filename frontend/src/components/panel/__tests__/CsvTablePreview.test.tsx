@@ -10,6 +10,7 @@
  */
 import { describe, it, expect } from "vitest"
 import { render, screen, within } from "@testing-library/react"
+import { axe } from "vitest-axe"
 import { CsvTablePreview } from "@/components/panel/CsvTablePreview"
 import { mockCsvValid, mockCsvMalformed } from "./fixtures"
 
@@ -71,5 +72,18 @@ describe("CsvTablePreview (PANEL-03) — minimal <table>, no dependency", () => 
     const user = userEvent.setup()
     await user.click(screen.getByRole("button", { name: /Download/i }))
     expect(onDownload).toHaveBeenCalledTimes(1)
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate. The populated
+  // <table> state AND the calm fallback. axe = STRUCTURE only (Pitfall 5 —
+  // contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (populated <table> state)", async () => {
+    const { container } = render(<CsvTablePreview content={mockCsvValid} />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (fallback notice state)", async () => {
+    const { container } = render(<CsvTablePreview content={mockCsvMalformed} />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

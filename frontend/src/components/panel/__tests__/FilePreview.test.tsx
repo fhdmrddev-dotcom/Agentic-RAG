@@ -17,6 +17,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 import type { WorkspaceFile } from "@/types"
 import { mockContentInline, mockContentBucket } from "./fixtures"
 
@@ -207,5 +208,35 @@ describe("FilePreview (PANEL-03) — per-type routing + graceful fallback", () =
     )
     await waitFor(() => expect(getWorkspaceFileContent).toHaveBeenCalled())
     expect(container.querySelector("script")).toBeNull()
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate. Await the routed
+  // render (markdown preview / fallback) so the back button + content are present
+  // before asserting. axe = STRUCTURE only (Pitfall 5 — contrast is Plan 05 /
+  // Chrome MCP).
+  it("has no axe violations (inline markdown preview state)", async () => {
+    getWorkspaceFileContent.mockResolvedValue(mockContentInline("text/markdown", "# Hi\n"))
+    const { container } = render(
+      <FilePreview
+        threadId="thread-1"
+        file={fileFor({ path: "summary.md", mime_type: "text/markdown" })}
+        onBack={() => {}}
+      />,
+    )
+    await screen.findByTestId("markdown-renderer")
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (no-preview fallback state)", async () => {
+    getWorkspaceFileContent.mockResolvedValue(mockContentBucket(null, "image/png", "chart.png"))
+    const { container } = render(
+      <FilePreview
+        threadId="thread-1"
+        file={fileFor({ path: "chart.png", mime_type: "image/png" })}
+        onBack={() => {}}
+      />,
+    )
+    await screen.findByText(/No preview available/i)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

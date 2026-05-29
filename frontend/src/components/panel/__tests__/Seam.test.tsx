@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
+import { axe } from "vitest-axe"
 import { SeamPointer } from "../SeamPointer"
 import { SeamCard } from "../SeamCard"
 import { PausedRunCue } from "../PausedRunCue"
@@ -78,5 +79,29 @@ describe("Chat↔Panel Seam (D-05) — live pointer vs reload card", () => {
     expect(screen.getByText(/awaiting your answer/i)).toBeInTheDocument()
     expect(screen.getByText(/agent is paused/i)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /answer in panel/i })).toBeInTheDocument()
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate across all three seam
+  // renderers in their meaningful states: the live SeamPointer, the
+  // reload-resolved SeamCard, and the PausedRunCue. axe = STRUCTURE only
+  // (Pitfall 5 — contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (live SeamPointer)", async () => {
+    const { container } = render(<SeamPointer kind="workspace_write" label="summary.md" />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (reload SeamCard — resolved ask_user)", async () => {
+    const { container } = render(
+      <SeamCard
+        kind="ask_user"
+        payload={{ question: "Which dataset for the Q3 rollup?", answer: "prod_sales_2026" }}
+      />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (PausedRunCue)", async () => {
+    const { container } = render(<PausedRunCue />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

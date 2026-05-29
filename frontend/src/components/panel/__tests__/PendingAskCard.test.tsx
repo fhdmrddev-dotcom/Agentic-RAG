@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, waitFor, cleanup } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 import { mockPendingAskWithRunId, mockPendingAskNoRunId } from "./fixtures"
 import type { PendingAsk } from "@/types"
 
@@ -148,6 +149,36 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
     expect(prompts[1]).toHaveTextContent("Older question?")
     // each is its own amber needs-you card
     expect(screen.getAllByText("Needs you")).toHaveLength(2)
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate across the card's
+  // meaningful states: pending (radiogroup + free-text + buttons), answered
+  // (post-submit green state), and expired (calm timeout). axe = STRUCTURE only
+  // (Pitfall 5 — contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (pending — radiogroup + free-text)", async () => {
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (answered state)", async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    await screen.findByText(/answered · agent resumed/i)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (expired state)", async () => {
+    const expired: PendingAsk = { ...mockPendingAskWithRunId, timeout_seconds: 0 }
+    const { container } = render(
+      <PendingAskCard ask={expired} reconcile={noopReconcile} />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 

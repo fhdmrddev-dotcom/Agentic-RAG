@@ -9,6 +9,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 import { mockWorkspaceFiles } from "./fixtures"
 
 const useWorkspaceFiles = vi.fn()
@@ -77,5 +78,24 @@ describe("FilesSection (PANEL-03) — list rows + drill-in", () => {
     expect(screen.getByTestId("file-preview")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /Files/i }))
     expect(screen.getAllByRole("option").length).toBe(mockWorkspaceFiles.length)
+  })
+
+  // Phase 088-01 (D-13a) — structural a11y regression gate. Populated listbox
+  // (role=listbox + role=option rows + the new aria-selected={isActive}) AND the
+  // empty state. axe = STRUCTURE only (Pitfall 5 — contrast is Plan 05 / Chrome MCP).
+  it("has no axe violations (populated listbox — role=option + aria-selected)", async () => {
+    const { container } = render(<FilesSection />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it("has no axe violations (empty state)", async () => {
+    useWorkspaceFiles.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    const { container } = render(<FilesSection />)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
