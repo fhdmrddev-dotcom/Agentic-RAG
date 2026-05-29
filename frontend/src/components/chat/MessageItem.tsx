@@ -18,6 +18,10 @@ import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 import { SeamPointer, type SeamKind } from "@/components/panel/SeamPointer"
 import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
 import { PausedRunCue } from "@/components/panel/PausedRunCue"
+// Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
+// affordances request it via this module-level signal (additive wiring — no
+// MessageItem→MessageList→ChatArea prop re-plumbing, PANEL-06 safe).
+import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
 import type { ToolCall } from "@/types"
 
 /**
@@ -281,6 +285,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                   key={tc.clientKey ?? tc.id ?? `seam-live-${i}`}
                   kind={seamKindFor(tc.name) as SeamKind}
                   label={tc.args.path ?? tc.args.file_path}
+                  onSeePanel={requestOpenPanel}
                 />
               ))}
             {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
@@ -440,6 +445,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                     key={tc.clientKey ?? tc.id ?? `seam-reload-${i}`}
                     kind={seamKindFor(tc.name) as SeamKind}
                     payload={seamCardPayloadFor(tc)}
+                    onOpenPanel={requestOpenPanel}
                   />
                 ))}
             </div>

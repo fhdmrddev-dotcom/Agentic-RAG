@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
+import { WorkspacePanel } from "@/components/panel/WorkspacePanel"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
@@ -194,6 +195,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
           <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} prefillMessage={prefillMessage} onClearPrefill={() => onSetPrefillMessage(null)} onOpenDrawer={() => setDrawerOpen(true)} />
         )}
       </main>
+
+      {/* Phase 087-02: additive WorkspacePanel sibling — chat view only. The
+          push/split grid lives INSIDE WorkspacePanel (Pitfall 3); the existing
+          flex layout, NavPanel, drawer, and <main> are untouched. */}
+      {activeView === "chat" && <WorkspacePanel selectedThread={selectedThread} />}
     </div>
   )
 }

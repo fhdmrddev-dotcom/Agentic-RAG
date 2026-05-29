@@ -58,7 +58,14 @@ function fileKey(f: WorkspaceFile): string {
   return f.id ?? f.path
 }
 
-export function FilesSection() {
+export interface FilesSectionProps {
+  /** Phase 087-02: lift the opened file to WorkspacePanel so the Versions
+   *  section can compare its versions (the file is never orphaned). Optional —
+   *  FilesSection works standalone (its own drill-in preview) without it. */
+  onSelectFile?: (file: WorkspaceFile) => void
+}
+
+export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   const threadId = useViewingThread()
   const { data: files } = useWorkspaceFiles(threadId)
 
@@ -107,6 +114,8 @@ export function FilesSection() {
   const openFile = (file: WorkspaceFile) => {
     lastOpenedKey.current = fileKey(file)
     setSelected(file)
+    // Lift the opened file so the Versions section can compare it (087-02).
+    onSelectFile?.(file)
   }
 
   const handleBack = () => {
