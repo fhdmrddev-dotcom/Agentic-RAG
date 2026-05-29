@@ -63,11 +63,26 @@ function seamCardPayloadFor(tc: ToolCall): SeamCardPayload {
       }
     }
     case "write_todos": {
-      const total = tc.args.total
-      const done = tc.args.done
+      // 087-08 fix: write_todos args carry a `todos` array ({id, content, status});
+      // there is no total/done field, so the prior tc.args.total/.done read undefined
+      // and the SeamCard always showed "☑ 0 todos". Derive the counts from the list
+      // (array, or JSON string per wire drift). status enum: pending|in_progress|completed.
+      const raw = (tc.args as Record<string, unknown>).todos
+      let todos: Array<{ status?: string }> = []
+      if (Array.isArray(raw)) {
+        todos = raw as Array<{ status?: string }>
+      } else if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) todos = parsed
+        } catch {
+          /* leave empty — never throw in a render-path mapper */
+        }
+      }
+      const doneCount = todos.filter((t) => t?.status === "completed").length
       return {
-        todoTotal: total != null ? Number(total) : undefined,
-        todoDone: done != null ? Number(done) : undefined,
+        todoTotal: todos.length,
+        todoDone: doneCount > 0 ? doneCount : undefined,
       }
     }
     default:
