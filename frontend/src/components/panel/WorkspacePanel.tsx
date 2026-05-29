@@ -178,7 +178,10 @@ export function WorkspacePanel({
       role="complementary"
       aria-label="Agent workspace"
       className={cn(
-        "flex h-screen min-h-0 min-w-0 flex-col overflow-hidden border-l border-border bg-sidebar",
+        // Phase 087 (gaps 5/6): dedicated panel surface + strengthened left edge
+        // so the panel reads as a distinct surface from chat (dark) / page (light)
+        // — NOT bg-sidebar/border-border (those stay shared with NavPanel).
+        "flex h-screen min-h-0 min-w-0 flex-col overflow-hidden border-l border-[hsl(var(--panel-border))] bg-[hsl(var(--panel-surface))]",
         state === "hidden" && "pointer-events-none opacity-0",
       )}
     >

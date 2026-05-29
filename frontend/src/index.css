@@ -29,6 +29,13 @@
     --radius: 0.625rem;
     --sidebar: 220 15% 95%;
     --sidebar-foreground: 222 47% 11%;
+    /* Phase 087 (PANEL-01, gaps 5/6) — workspace-panel surface + edge.
+       Dedicated tokens so the panel/rail separate from the page WITHOUT
+       touching the shared --sidebar (NavPanel / AppDock / drawer keep 95% L).
+       Light: surface drops to 92% L (separates from the 97% page) and the
+       edge darkens to 82% L (clearer than the 89% body border). */
+    --panel-surface: 220 15% 92%;
+    --panel-border: 220 13% 82%;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -67,6 +74,14 @@
     --ring: 239 100% 82%;
     --sidebar: 220 40% 5%;
     --sidebar-foreground: 226 60% 97%;
+    /* Phase 087 (PANEL-01, gaps 5/6) — workspace-panel surface + edge.
+       Dedicated tokens so the panel/rail read as a distinct surface from the
+       chat WITHOUT touching the shared --sidebar (NavPanel / AppDock keep 5% L).
+       Dark: --sidebar (5% L) ≈ --background (4% L) → panel didn't separate, so
+       the panel surface lifts to 8% L; the edge brightens to 24% L (clearer
+       than the 16% body border) so the left border reads against both. */
+    --panel-surface: 220 40% 8%;
+    --panel-border: 220 25% 24%;
   }
 }
 

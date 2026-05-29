@@ -63,7 +63,7 @@ function RailIcon({ Icon, label, badge, warn, onClick }: RailIconProps) {
 
 export function PanelRail({ todos, filesCount, pendingCount, onExpand }: PanelRailProps) {
   return (
-    <div className="flex h-full w-[52px] flex-col items-center gap-3 border-l border-border py-3">
+    <div className="flex h-full w-[52px] flex-col items-center gap-3 border-l border-[hsl(var(--panel-border))] py-3">
       <RailIcon
         Icon={ListChecks}
         label={`Todos — ${todos.done} of ${todos.total} done`}
