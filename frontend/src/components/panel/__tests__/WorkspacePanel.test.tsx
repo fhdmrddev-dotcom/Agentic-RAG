@@ -1,17 +1,21 @@
 /**
- * Phase 087 Plan 02 Task 3 — WorkspacePanel live tests (PANEL-01).
+ * Phase 087 — WorkspacePanel composition tests (PANEL-01).
  *
- * Flipped from the Wave 0 it.todo skeleton. Asserts the grid-state machine
- * (open → rail → hidden via the header toggle), the ⌘./Ctrl+. keyboard toggle,
- * the rail count badges + amber pending-warn affordance, the empty short-circuit
- * (ONE PanelEmpty, never four headers), the four-section composition with the
- * pinned PendingAskStack, the <768px bottom-sheet, and the reactive
- * useViewingThread + four-hook consumption.
+ * Plan 06 re-architecture: WorkspacePanel is now CONTROLLED. The open/rail/hidden
+ * state machine, the ⌘./Ctrl+. key listener, and the subscribeOpenPanel effect
+ * were lifted to ChatLayout. These tests assert the CONTROLLED contract:
+ *   - state="open"   → body/header (four sections + pinned PendingAskStack)
+ *   - state="rail"   → PanelRail icons, no section bodies
+ *   - state="hidden" → opacity-0 + pointer-events-none container, no body/rail
+ *   - the in-panel header chevron calls onCycle; a rail icon calls onExpand
+ *   - the empty short-circuit (ONE PanelEmpty, never four headers)
+ *   - the <768px bottom-sheet (Sheet primitive)
+ *   - the reactive useViewingThread + four-hook consumption
  *
  * The four Phase 086 hooks + useViewingThread are mocked. The heavy section
  * bodies (FilesSection / VersionDiff / TodosSection / PendingAskStack) are mocked
  * to thin sentinels — their own behavior is covered by their own test files; here
- * we assert COMPOSITION + the shell state machine.
+ * we assert COMPOSITION against the controlled props.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
@@ -50,7 +54,7 @@ vi.mock("@/components/panel/PendingAskCard", () => ({
 }))
 
 // eslint-disable-next-line import/first
-import { WorkspacePanel } from "@/components/panel/WorkspacePanel"
+import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
 
 const thread = { id: "thread-1", title: "T" } as never
 
@@ -70,47 +74,48 @@ function setViewport(width: number) {
   Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: width })
 }
 
-describe("WorkspacePanel (PANEL-01) — toggle state machine + empty short-circuit", () => {
+interface RenderOpts {
+  state?: PanelState
+  onCycle?: () => void
+  onExpand?: () => void
+  onHide?: () => void
+}
+function renderPanel({ state = "open", onCycle = vi.fn(), onExpand = vi.fn(), onHide = vi.fn() }: RenderOpts = {}) {
+  return render(
+    <WorkspacePanel
+      selectedThread={thread}
+      state={state}
+      onCycle={onCycle}
+      onExpand={onExpand}
+      onHide={onHide}
+    />,
+  )
+}
+
+describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
   beforeEach(() => {
     setViewport(1280) // desktop default
     setHooks({})
   })
 
   it("renders a complementary landmark labelled 'Agent workspace'", () => {
-    render(<WorkspacePanel selectedThread={thread} />)
+    renderPanel({ state: "open" })
     expect(screen.getByRole("complementary", { name: /Agent workspace/i })).toBeInTheDocument()
   })
 
-  it("renders the three-state toggle: open → rail → hidden via the header button", async () => {
-    const user = userEvent.setup()
-    render(<WorkspacePanel selectedThread={thread} />)
-    // open: sections visible
+  it("state='open' renders the four-section body (controlled)", () => {
+    renderPanel({ state: "open" })
     expect(screen.getByTestId("todos-section")).toBeInTheDocument()
-    const toggle = screen.getByRole("button", { name: /collapse|toggle workspace|hide workspace/i })
-    // open → rail
-    await user.click(toggle)
-    expect(screen.queryByTestId("todos-section")).toBeNull()
-    expect(screen.getByRole("button", { name: /Todos —/i })).toBeInTheDocument() // rail icon
-    // rail → hidden (click a rail icon expands; the header toggle cycles forward)
+    expect(screen.getByTestId("files-section")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Todos/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Files/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^Versions/i })).toBeInTheDocument()
   })
 
-  it("toggles open ↔ collapsed on ⌘. / Ctrl+. keydown", async () => {
-    const user = userEvent.setup()
-    render(<WorkspacePanel selectedThread={thread} />)
-    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
-    await user.keyboard("{Control>}.{/Control}")
-    // hidden — sections gone, rail gone
-    expect(screen.queryByTestId("todos-section")).toBeNull()
-    await user.keyboard("{Control>}.{/Control}")
-    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
-  })
-
-  it("collapsed rail shows count badges (todos / files) and an amber warn affordance when an ask_user is pending", async () => {
+  it("state='rail' renders the rail icons and hides the section bodies", () => {
     setHooks({ asks: [mockPendingAskWithRunId] })
-    const user = userEvent.setup()
-    render(<WorkspacePanel selectedThread={thread} />)
-    const toggle = screen.getByRole("button", { name: /collapse|toggle workspace|hide workspace/i })
-    await user.click(toggle) // → rail
+    renderPanel({ state: "rail" })
+    expect(screen.queryByTestId("todos-section")).toBeNull()
     expect(screen.getByRole("button", { name: /Todos — 1 of 3 done/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Files — 5/i })).toBeInTheDocument()
     expect(
@@ -118,45 +123,79 @@ describe("WorkspacePanel (PANEL-01) — toggle state machine + empty short-circu
     ).toBeInTheDocument()
   })
 
+  it("state='hidden' renders an opacity-0 / pointer-events-none container with no body or rail", () => {
+    renderPanel({ state: "hidden" })
+    const panel = screen.getByRole("complementary", { name: /Agent workspace/i })
+    expect(panel.className).toContain("opacity-0")
+    expect(panel.className).toContain("pointer-events-none")
+    expect(screen.queryByTestId("todos-section")).toBeNull()
+    expect(screen.queryByRole("button", { name: /Todos —/i })).toBeNull()
+  })
+
+  it("the in-panel header chevron calls onCycle (open → rail → hidden → open is owned by ChatLayout)", async () => {
+    const onCycle = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onCycle })
+    await user.click(screen.getByRole("button", { name: /collapse workspace/i }))
+    expect(onCycle).toHaveBeenCalledTimes(1)
+  })
+
+  it("a rail icon click calls onExpand", async () => {
+    const onExpand = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "rail", onExpand })
+    await user.click(screen.getByRole("button", { name: /Files — 5/i }))
+    expect(onExpand).toHaveBeenCalledTimes(1)
+  })
+
+  it("does NOT respond to ⌘./Ctrl+. (listener lifted to ChatLayout)", async () => {
+    const onCycle = vi.fn()
+    const onHide = vi.fn()
+    const onExpand = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onCycle, onHide, onExpand })
+    await user.keyboard("{Control>}.{/Control}")
+    expect(onCycle).not.toHaveBeenCalled()
+    expect(onHide).not.toHaveBeenCalled()
+    expect(onExpand).not.toHaveBeenCalled()
+    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
+  })
+
   it("short-circuits to a single <PanelEmpty/> when todos, files, and asks are all empty (no four empty headers)", () => {
     setHooks({ todos: [], files: [], asks: [] })
-    render(<WorkspacePanel selectedThread={thread} />)
+    renderPanel({ state: "open" })
     expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
-    // No section bodies, no four headers
     expect(screen.queryByTestId("todos-section")).toBeNull()
     expect(screen.queryByTestId("files-section")).toBeNull()
   })
 
-  it("renders all four stacked-accordion sections when any section has data", () => {
-    render(<WorkspacePanel selectedThread={thread} />)
-    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
-    expect(screen.getByTestId("files-section")).toBeInTheDocument()
-    // fixed-order section headers present
-    expect(screen.getByRole("button", { name: /^Todos/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^Files/i })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^Versions/i })).toBeInTheDocument()
-  })
-
   it("pins the pending ask_user stack to the very top of the panel scroll", () => {
     setHooks({ asks: [mockPendingAskWithRunId] })
-    render(<WorkspacePanel selectedThread={thread} />)
+    renderPanel({ state: "open" })
     const panel = screen.getByRole("complementary", { name: /Agent workspace/i })
     const stack = within(panel).getByTestId("pending-ask-stack")
     expect(stack).toBeInTheDocument()
-    // The stack precedes the todos section in DOM order (pinned top).
     const todos = within(panel).getByTestId("todos-section")
     expect(stack.compareDocumentPosition(todos) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it("renders as a bottom-sheet (Sheet primitive) below the 768px breakpoint", () => {
+  it("renders as a bottom-sheet (Sheet primitive) below the 768px breakpoint when state='open'", () => {
     setViewport(375)
-    render(<WorkspacePanel selectedThread={thread} />)
-    // Mobile: a dialog (Radix Sheet) hosts the body when opened.
+    renderPanel({ state: "open" })
     expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
 
+  it("mobile sheet onOpenChange(false) / X calls onHide", async () => {
+    setViewport(375)
+    const onHide = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onHide })
+    await user.click(screen.getByRole("button", { name: /close workspace/i }))
+    expect(onHide).toHaveBeenCalledTimes(1)
+  })
+
   it("reads useViewingThread + the four Phase 086 hooks reactively (no page refresh)", () => {
-    render(<WorkspacePanel selectedThread={thread} />)
+    renderPanel({ state: "open" })
     expect(useViewingThread).toHaveBeenCalled()
     expect(useTodos).toHaveBeenCalledWith("thread-1")
     expect(useWorkspaceFiles).toHaveBeenCalledWith("thread-1")
