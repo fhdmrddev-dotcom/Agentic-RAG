@@ -43,9 +43,11 @@ Usage
 """
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,6 +85,85 @@ _COUNT_QUERIES: dict[str, str] = {
     "todos": "SELECT count(*) AS n FROM todos WHERE thread_id = %s",
     "workspace_files": "SELECT count(*) AS n FROM workspace_files WHERE thread_id = %s",
 }
+
+# How long to wait for one (provider x prompt) agent run to reach a terminal
+# status before marking the cell a timeout. Generous — multi-tool runs do real
+# LLM + sandbox work. Overridable via EVAL_RUN_TIMEOUT_S.
+DEFAULT_RUN_TIMEOUT_S = 240
+RUN_POLL_INTERVAL_S = 3.0
+
+# Terminal run states in public.runs.status (migration 035/038 CHECK constraint).
+_TERMINAL_RUN_STATES = frozenset({"completed", "failed", "cancelled", "timed_out"})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Canonical prompt set N=4 (RESEARCH §Code Examples, D-02). Each entry is
+# (prompt_id, prompt_text, assertion-fn). The assertion fn receives
+# (conn, calls, thread_id) and returns {invoked, arg_shape, persisted} bools —
+# the three assertion families. A field set to None means "not applicable for
+# this prompt" (rendered as a dash in the scoreboard).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _assert_factual_doc_search(conn, calls: list[dict], thread_id: str) -> dict:
+    # search_documents (or query_tables for tabular) must be invoked — never
+    # answered from the model's training data (the SEED-034 weak-model failure).
+    invoked = assert_tool_invoked(calls, "search_documents") or assert_tool_invoked(
+        calls, "query_tables"
+    )
+    return {"invoked": invoked, "arg_shape": None, "persisted": None}
+
+
+def _assert_multi_tool(conn, calls: list[dict], thread_id: str) -> dict:
+    # 2+ tools in one prompt: write_todos (rows in todos) AND workspace_write
+    # (rows in workspace_files). Arg-shape: write_todos args["todos"] is a list
+    # (NOT a stringified array — BUG-260529-01).
+    todos_invoked = assert_tool_invoked(calls, "write_todos")
+    file_invoked = assert_tool_invoked(calls, "workspace_write")
+    invoked = todos_invoked and file_invoked
+    arg_shape = assert_arg_shape(calls, "write_todos", "todos", list)
+    persisted = (
+        count_rows(conn, "todos", thread_id) > 0
+        and count_rows(conn, "workspace_files", thread_id) > 0
+    )
+    return {"invoked": invoked, "arg_shape": arg_shape, "persisted": persisted}
+
+
+def _assert_task_sub_agent(conn, calls: list[dict], thread_id: str) -> dict:
+    # The `task` tool must spawn a sub-agent — tool_calls[].sub_agent present.
+    return {"invoked": assert_sub_agent_present(calls), "arg_shape": None, "persisted": None}
+
+
+def _assert_ask_user_prompt(conn, calls: list[dict], thread_id: str) -> dict:
+    # ask_user must be invoked — JSONB containment on the durable message rows.
+    return {"invoked": assert_ask_user(conn, thread_id), "arg_shape": None, "persisted": None}
+
+
+# (prompt_id, prompt_text, assertion_fn)
+CANONICAL_PROMPTS: list[tuple[str, str, object]] = [
+    (
+        "factual-doc-search",
+        "What does my dissertation say about its main research question? "
+        "Search my documents before answering.",
+        _assert_factual_doc_search,
+    ),
+    (
+        "multi-tool",
+        "Plan a 3-step analysis of my Q3 data and write the summary to a file "
+        "called q3_summary.md in my workspace.",
+        _assert_multi_tool,
+    ),
+    (
+        "task",
+        "Find every mention of methodology across all my documents and "
+        "summarize them for me.",
+        _assert_task_sub_agent,
+    ),
+    (
+        "ask_user",
+        "Overwrite my existing report file with a new version — but confirm "
+        "with me first before you overwrite it.",
+        _assert_ask_user_prompt,
+    ),
+]
 
 LOCALHOST_RE = re.compile(r"(localhost|127\.0\.0\.1)")
 
@@ -281,20 +362,325 @@ def assert_ask_user(conn, thread_id: str) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Entry point — Task 1 scaffold stub. Task 2 wires the live agent-loop driver +
-# the 4-prompt x 4-provider matrix + the PASS/FAIL scoreboard onto these helpers.
+# Live agent-loop driver — drives the REAL HTTP route POST /threads/{id}/messages
+# against the running local backend (Pitfall 2). Provider is switched per-request
+# via the MessageCreate.provider/model override (threads.py:1285 override_provider),
+# which still assembles the REAL active_system_prompt (threads.py:336 SYSTEM_PROMPT
+# + get_tools() descriptions) — exactly the shared path the SEED-034 fold-gate
+# must measure. This avoids mutating global user_settings (no shared state, no
+# cross-test bleed) while measuring the identical effective prompt.
 # ─────────────────────────────────────────────────────────────────────────────
 
+class BackendUnavailable(RuntimeError):
+    """Raised when the backend / Supabase auth is not reachable. Caught in main()
+    so a no-backend invocation exits with a clean connection message — NEVER a
+    traceback that could surface env values."""
+
+
+def _requests():
+    try:
+        import requests  # noqa: PLC0415 — local import keeps --help fast
+    except ImportError:
+        print(
+            "ERROR: requests not installed in this Python. "
+            "Run via the backend venv: backend/venv/Scripts/python.exe"
+        )
+        sys.exit(1)
+    return requests
+
+
+def base_url() -> str:
+    return os.getenv("EVAL_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+
+
+def get_bearer_token() -> str:
+    """Mint a bearer token for the test user via the Supabase password grant
+    (the same auth the app uses; verified server-side by get_current_user →
+    supabase.auth.get_user). Reads SUPABASE_URL + SUPABASE_ANON_KEY from env;
+    NEVER prints either value. Credentials are the documented LOCAL test user.
+    """
+    requests = _requests()
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    anon_key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_PUBLISHABLE_KEY")
+    if not supabase_url or not anon_key:
+        raise BackendUnavailable(
+            "SUPABASE_URL and SUPABASE_ANON_KEY must be set in backend/.env to "
+            "authenticate the test user (presence-checked above)."
+        )
+    email = os.getenv("EVAL_TEST_EMAIL", DEFAULT_TEST_EMAIL)
+    password = os.getenv("EVAL_TEST_PASSWORD", DEFAULT_TEST_PASSWORD)
+    try:
+        resp = requests.post(
+            f"{supabase_url}/auth/v1/token",
+            params={"grant_type": "password"},
+            headers={"apikey": anon_key, "Content-Type": "application/json"},
+            json={"email": email, "password": password},
+            timeout=15,
+        )
+    except Exception as e:  # connection refused / DNS / timeout
+        raise BackendUnavailable(
+            f"Could not reach Supabase auth at {supabase_url} ({type(e).__name__}). "
+            "Is local Supabase running (`supabase start`)?"
+        ) from e
+    if resp.status_code != 200:
+        # Do NOT echo the response body verbatim (could contain token material).
+        raise BackendUnavailable(
+            f"Test-user sign-in failed (HTTP {resp.status_code}). Check the test "
+            "user exists in local Supabase and EVAL_TEST_EMAIL/PASSWORD are correct."
+        )
+    token = resp.json().get("access_token")
+    if not token:
+        raise BackendUnavailable("Supabase auth returned no access_token.")
+    return token
+
+
+def _auth_headers(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+
+def create_thread(token: str, title: str) -> str:
+    """POST /threads → returns the new thread id (the test user's own thread)."""
+    requests = _requests()
+    try:
+        resp = requests.post(
+            f"{base_url()}/threads",
+            headers=_auth_headers(token),
+            json={"title": title},
+            timeout=15,
+        )
+    except Exception as e:
+        raise BackendUnavailable(
+            f"Could not reach the backend at {base_url()} ({type(e).__name__}). "
+            "Start uvicorn in a visible terminal first (operator runs the backend)."
+        ) from e
+    if resp.status_code not in (200, 201):
+        raise BackendUnavailable(
+            f"create_thread failed (HTTP {resp.status_code}) against {base_url()}."
+        )
+    return resp.json()["id"]
+
+
+def run_prompt(token: str, thread_id: str, prompt: str, provider: str, model: str) -> str:
+    """POST /threads/{id}/messages with the per-request provider+model override —
+    the REAL route that builds active_system_prompt (Pitfall 2). Returns run_id."""
+    requests = _requests()
+    try:
+        resp = requests.post(
+            f"{base_url()}/threads/{thread_id}/messages",
+            headers=_auth_headers(token),
+            json={"content": prompt, "provider": provider, "model": model},
+            timeout=30,
+        )
+    except Exception as e:
+        raise BackendUnavailable(
+            f"Could not reach the backend at {base_url()} ({type(e).__name__})."
+        ) from e
+    if resp.status_code not in (200, 201):
+        raise BackendUnavailable(
+            f"send_message failed (HTTP {resp.status_code}) for {provider}/{model}."
+        )
+    return resp.json()["run_id"]
+
+
+def wait_for_run(conn, run_id: str, timeout_s: int) -> str:
+    """Poll public.runs.status until terminal (completed/failed/cancelled/timed_out)
+    or the timeout elapses. Reads the durable runs row directly (psycopg2) —
+    run_id is a parameterized %s value. Returns the final status string (or
+    'timeout' if the deadline passes while still streaming)."""
+    from psycopg2.extras import RealDictCursor
+
+    deadline = time.time() + timeout_s
+    last = "unknown"
+    while time.time() < deadline:
+        # Fresh cursor each poll; commit to avoid a stale snapshot in the
+        # script's long-lived connection (psycopg2 default isolation).
+        conn.rollback()
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT status FROM runs WHERE run_id = %s", (run_id,))
+            row = cur.fetchone()
+        if row:
+            last = row["status"]
+            if last in _TERMINAL_RUN_STATES:
+                return last
+        time.sleep(RUN_POLL_INTERVAL_S)
+    return "timeout"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Scoreboard — greppable per-row PASS/FAIL so Plan 04's fold-gate can diff
+# before/after runs. One row per (provider x prompt).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _cell(val) -> str:
+    if val is None:
+        return "  -  "
+    return "PASS " if val else "FAIL "
+
+
+def run_cell(token: str, conn, provider: str, model: str, prompt_id: str,
+             prompt_text: str, assertion_fn, timeout_s: int) -> dict:
+    """Drive one (provider x prompt) cell end-to-end and run the 3 assertion
+    families. Returns a result dict for the scoreboard. Any per-cell error is
+    captured (not raised) so one bad cell never aborts the whole matrix."""
+    result = {
+        "provider": provider, "model": model, "prompt_id": prompt_id,
+        "invoked": None, "arg_shape": None, "persisted": None,
+        "run_status": "", "ok": False, "note": "",
+    }
+    try:
+        thread_id = create_thread(token, f"eval {provider} {prompt_id}")
+        run_id = run_prompt(token, thread_id, prompt_text, provider, model)
+        run_status = wait_for_run(conn, run_id, timeout_s)
+        result["run_status"] = run_status
+        calls = get_tool_calls(conn, thread_id)
+        asserted = assertion_fn(conn, calls, thread_id)
+        result.update(asserted)
+        # A cell PASSES when every APPLICABLE (non-None) assertion is True.
+        applicable = [v for v in (asserted.get("invoked"), asserted.get("arg_shape"),
+                                  asserted.get("persisted")) if v is not None]
+        result["ok"] = bool(applicable) and all(applicable)
+    except BackendUnavailable:
+        raise  # let main() handle the clean connection message
+    except Exception as e:  # one cell's failure must not abort the matrix
+        result["note"] = f"{type(e).__name__}: {e}"
+    return result
+
+
+def print_scoreboard(rows: list[dict]) -> None:
+    print("\n## Cross-provider tool-use scoreboard\n")
+    header = (
+        f"{'provider':<11} {'prompt_id':<19} "
+        f"{'invoked':<6}{'arg_shape':<10}{'persisted':<10}"
+        f"{'run_status':<11} RESULT"
+    )
+    print(header)
+    print("-" * len(header))
+    passed = 0
+    for r in rows:
+        result = "PASS" if r["ok"] else "FAIL"
+        if r["ok"]:
+            passed += 1
+        # Greppable single-token RESULT at the end of each row.
+        line = (
+            f"{r['provider']:<11} {r['prompt_id']:<19} "
+            f"{_cell(r['invoked'])} {_cell(r['arg_shape'])} {_cell(r['persisted'])}"
+            f"{r['run_status']:<11} {result}"
+        )
+        if r["note"]:
+            line += f"   ({r['note']})"
+        # Machine-greppable marker prefix so `grep 'EVAL_ROW'` extracts the matrix.
+        print(f"EVAL_ROW {line}")
+    print("-" * len(header))
+    print(f"EVAL_SUMMARY {passed}/{len(rows)} cells PASS")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point — the 4-prompt x 4-provider matrix loop. Optional --provider /
+# --prompt run a single cell (lightweight re-run for the fold-gate). A no-backend
+# invocation exits cleanly with a connection message (no traceback / no values).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _parse_args(argv: list[str] | None):
+    parser = argparse.ArgumentParser(
+        prog="eval_cross_provider.py",
+        description=(
+            "Cross-provider tool-use eval engine (Phase 088 D-02). Drives the REAL "
+            "POST /threads/{id}/messages route per (provider x canonical-prompt) "
+            "and asserts tool-invocation + arg-shape + DB persistence. MVP seed of "
+            "the v2.8 harness. Operator must start the backend uvicorn first; "
+            "runs against LOCALHOST only (hard-gated)."
+        ),
+    )
+    parser.add_argument(
+        "--provider",
+        choices=[p for p, _ in PROVIDERS] + ["google-2.5"],
+        help="Run only this provider (default: all 4). 'google-2.5' is a "
+             "known-degraded data point (D-03) — recorded, never gated.",
+    )
+    parser.add_argument(
+        "--prompt",
+        choices=[pid for pid, _, _ in CANONICAL_PROMPTS],
+        help="Run only this canonical prompt (default: all 4).",
+    )
+    parser.add_argument(
+        "--model",
+        help="Override the representative model for the selected --provider "
+             "(new-model onboarding — D-08 seed).",
+    )
+    return parser.parse_args(argv)
+
+
+def _selected_providers(args) -> list[tuple[str, str]]:
+    if args.provider == "google-2.5":
+        # Known-degraded data point — recorded, never gated (D-03).
+        return [("google", args.model or "gemini-2.5-flash")]
+    if args.provider:
+        model = args.model or next(m for p, m in PROVIDERS if p == args.provider)
+        return [(args.provider, model)]
+    return list(PROVIDERS)
+
+
+def _selected_prompts(args) -> list[tuple[str, str, object]]:
+    if args.prompt:
+        return [p for p in CANONICAL_PROMPTS if p[0] == args.prompt]
+    return list(CANONICAL_PROMPTS)
+
+
 def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
     load_env()
-    # HARD-GATE first — before any DB connection or agent-loop call.
+    # HARD-GATE first — before any DB connection or agent-loop call (T-088-02-01).
     assert_localhost_only()
     report_env_presence()
+
+    providers = _selected_providers(args)
+    prompts = _selected_prompts(args)
+    timeout_s = int(os.getenv("EVAL_RUN_TIMEOUT_S", DEFAULT_RUN_TIMEOUT_S))
+
     print(
-        "scaffold ready: env loaded, localhost gate passed, DB assertion helpers "
-        "defined. The live driver + matrix loop are wired in Task 2."
+        f"Running {len(providers)} provider(s) x {len(prompts)} prompt(s) "
+        f"= {len(providers) * len(prompts)} cell(s) against {base_url()} "
+        f"(run timeout {timeout_s}s).\n"
     )
-    return 0
+
+    try:
+        token = get_bearer_token()
+        conn = connect_db()
+    except BackendUnavailable as e:
+        # Clean exit — NO traceback (which could surface env values).
+        print(f"\nCANNOT RUN: {e}")
+        print(
+            "This script needs (1) local Supabase up and (2) the backend uvicorn "
+            "running in a visible terminal. Start them, then re-run."
+        )
+        return 1
+
+    rows: list[dict] = []
+    try:
+        for provider, model in providers:
+            for prompt_id, prompt_text, assertion_fn in prompts:
+                print(f"  -> {provider}/{model} :: {prompt_id} ...")
+                row = run_cell(
+                    token, conn, provider, model, prompt_id, prompt_text,
+                    assertion_fn, timeout_s,
+                )
+                rows.append(row)
+    except BackendUnavailable as e:
+        print(f"\nCANNOT CONTINUE: {e}")
+        if rows:
+            print_scoreboard(rows)
+        return 1
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    print_scoreboard(rows)
+    # Exit non-zero if any gated cell failed, so an operator / Plan 04 can branch
+    # on the exit code. (google-2.5 is run via a separate flag and is not in the
+    # default matrix, so it never flips this gate — D-03.)
+    return 0 if all(r["ok"] for r in rows) else 2
 
 
 if __name__ == "__main__":
