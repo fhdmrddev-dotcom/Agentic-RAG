@@ -2,7 +2,7 @@
 phase: 087-panel-ui
 doc: scenario-matrix
 purpose: Comprehensive workspace-panel/tool test scenarios — identified early so future panel/tool work stays clean. Status as of 2026-05-29 extended live testing.
-status: living
+status: finalized (Phase 087 closed 2026-05-29 — all rows resolved; deferrals → SEED-037/038/039)
 ---
 
 # Phase 087 — Workspace Panel Scenario Matrix

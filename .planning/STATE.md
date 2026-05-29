@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.7
 milestone_name: Milestone Context
 status: executing
-stopped_at: "087-08 COMPLETE — single nav-style in-panel toggle (collapse-to-rail) shipped (c1d446f6); Wave-2 blocking Chrome-MCP gate PASSED for all 4 design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message). Two UAT-found pre-existing bugs fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS '0 todos' SeamCard count (9667a816). Phase 087 ready for verification + completion."
+stopped_at: "087-08 COMPLETE — single nav-style in-panel toggle (collapse-to-rail) shipped (c1d446f6); Wave-2 blocking Chrome-MCP gate PASSED for all 4 design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message). Two UAT-found pre-existing bugs fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS '0 todos' SeamCard count (9667a816). Phase 087 FINALIZED 2026-05-29 — scenario-matrix round-3 (Chrome MCP + Supabase/API) verified every remaining panel scenario (non-adjacent/empty/huge-truncated diffs, large todos, malformed-CSV fallback, Stop-mid-write, invalid-path + empty-search surfaces, empty workspace, free-text ask_user); found+fixed BUG-260529-03 (free-text ask_user → null.length blanked the app, commit 0df4b048); planted SEED-037 (office/PDF viewing + working download), SEED-038 (artifacts unification), SEED-039 (panel reliability/polish). Next: Phase 088."
 last_updated: "2026-05-29T09:14:58.699Z"
-last_activity: 2026-05-29 -- Phase 087 Plan 08 executed; Wave-2 live cross-provider gate PASSED; 2 UAT bugs fixed
+last_activity: 2026-05-29 -- Phase 087 FINALIZED: scenario-matrix round-3 verified all panel scenarios; found+fixed BUG-260529-03 (free-text ask_user crash); planted SEED-037/038/039
 progress:
   total_phases: 6
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-27) + .planning/PRDs/v2.7.md (drafted
 Phase: 087 (panel-ui) — 8 of 8 plans complete; Wave-2 live gate PASSED, ready for phase verification + completion
 Plan: 087-08 complete (single nav-style toggle consolidation + full live design-contract + cross-provider verification)
 Status: All 8 plans shipped. The full Phase 087 panel was verified LIVE via Chrome MCP — 004-panel-shell (single nav-style in-panel toggle collapse-to-rail, welcome-thread reopen-by-mouse, ⌘., no overflow/flush/stable, mobile sheet), 005-file-and-diff (VERSIONS + unified diff + ⤢ overlay), 006-pending-question (paused/locked/pulse/pinned-card/gated-submit → answer→resume→green + 60s timeout), 007-chat-panel-seam (live pointers + reload-resolved cards, no raw-JSON), PANEL-02 (live todos no-refresh + quiet pointers), and the cross-provider 4-axis scoreboard (OpenAI/Anthropic/Google/OpenRouter × multi-tool × parallel-thread × long-message — one UX, four adapters). Two pre-existing bugs the gate surfaced were fixed + re-verified: version-diff 500 (delta_from_prev JSONB double-encoding, 4d35b0f1) and WRITE_TODOS "0 todos" SeamCard count (9667a816). gap-d (welcome-screen reopen) structurally closed by the rail-always-present consolidation.
-Next: phase verification (gsd-verifier) → mark Phase 087 complete → Phase 088 (cross-cutting verification + accessibility).
+Next: Phase 088 (cross-cutting verification + accessibility). Phase 087 finalized (ROADMAP [x]) — substantive verification already done via the round-3 scenario matrix + crash fix; optionally run /gsd:verify-work 087 if you want the formal conversational-UAT record.
 Downstream: Phase 088 (E2E reload flow) de-risked — the 007 seam reload (self-contained resolved cards, no raw-JSON) is confirmed.
 Last activity: 2026-05-29
 
