@@ -123,14 +123,6 @@ def diff_event_streams(before: list[dict], after: list[dict]) -> list:
     return diffs
 
 
-# Event types whose *content* is non-deterministic streaming chunk-noise: the same
-# assistant text / tool-call args arrive split into a different NUMBER of chunks
-# run-to-run. Proven 2026-05-30 (Anthropic, identical code): delta 12/10/11,
-# tool_args_progress 4/3/3 — while every structural event count was identical.
-# The skeleton collapses each maximal run of these to a single content-masked marker.
-_VOLATILE_STREAM_TYPES: tuple[str, ...] = ("delta", "tool_args_progress")
-
-
 def skeleton(events: list[dict]) -> list[str]:
     """Deterministic STRUCTURAL skeleton of an SSE event stream (the SC#3 gate).
 
@@ -146,44 +138,64 @@ def skeleton(events: list[dict]) -> list[str]:
     - the terminal classification — ``done``/``stream_end`` carry whether an error
       was set (the I10 terminal-race / terminal-status invariant).
 
-    Volatile streaming chunk-types (``delta``, ``tool_args_progress``) are collapsed
-    to a single content-masked marker so their varying chunk COUNT is ignored.
+    **Consecutive-run collapse (generalized 2026-05-30 after the live after-diff).**
+    EVERY streaming chunk-type emits a non-deterministic NUMBER of identical
+    consecutive events run-to-run: ``delta`` (assistant text), ``reasoning_delta``
+    (thinking-model reasoning tokens — deepseek/moonshot/glm-4.6), ``tool_args_progress``
+    (streamed tool-call args), ``code_stdout`` (streamed stdout). Rather than maintain
+    a hardcoded volatile-type list (the first cut missed ``reasoning_delta`` and
+    produced 90-176 false diffs for reasoning models), the skeleton collapses ANY
+    maximal run of the SAME token to one. Count is non-deterministic; the TRANSITION
+    grammar is what's deterministic and behavior-bearing.
 
-    Empirically verified: identical across 3 repeated runs of the same pre-move loop
-    (24-token skeleton, byte-stable) while raw event counts varied 36/33/34.
+    Empirically: identical across 3 repeated runs of the same pre-move loop while raw
+    event counts varied. NOTE the residual irreducible non-determinism this CANNOT
+    remove — the agent's TOOL-PATH SELECTION (which tools, in what order) is LLM-decided
+    and legitimately varies run-to-run; that surfaces as real insert/delete opcodes in
+    ``diff_skeletons`` and must be judged (re-run / vocabulary check), not auto-failed.
     """
-    out: list[str] = []
+    raw: list[str] = []
     for e in events:
         t = e.get("type")
-        if t in _VOLATILE_STREAM_TYPES:
-            if out and out[-1] == t:          # collapse consecutive chunk-runs
-                continue
-            out.append(t)
-        elif t in ("tool_start", "tool_preparing"):
-            out.append(f"{t}:{e.get('name')}")          # tool identity is deterministic + meaningful
+        if t in ("tool_start", "tool_preparing"):
+            raw.append(f"{t}:{e.get('name')}")          # tool identity is deterministic + meaningful
         elif t in ("done", "stream_end"):
-            out.append(f"{t}:error={e.get('error') is not None}")  # terminal classification
+            raw.append(f"{t}:error={e.get('error') is not None}")  # terminal classification
         else:
-            out.append(t)
+            raw.append(t)
+    # Collapse consecutive identical tokens — any streaming chunk-type (delta,
+    # reasoning_delta, tool_args_progress, code_stdout, ...) folds to a single marker.
+    out: list[str] = []
+    for tok in raw:
+        if not out or out[-1] != tok:
+            out.append(tok)
     return out
 
 
 def diff_skeletons(before: list[dict], after: list[dict]) -> list:
-    """Per-index differences of ``skeleton(before)`` vs ``skeleton(after)``.
+    """ALIGNMENT-based differences of ``skeleton(before)`` vs ``skeleton(after)``.
 
-    Returns ``(index, before_token, after_token)`` tuples for every position where
-    the structural skeletons disagree (length mismatch reports ``None`` for the
-    missing side). An EMPTY list == structurally byte-identical SSE == SC#3 PASS
-    for that provider. A non-empty result means the lift changed observable
-    structure (a dropped/reordered event, a different tool sequence, a changed
-    terminal classification) → investigate; on a native-7 provider that BLOCKS.
+    Uses difflib edit opcodes (NOT a positional per-index compare — a single
+    inserted/deleted token would otherwise cascade into a false diff at every
+    later position). Returns a list of ``(op, before_block, after_block)`` tuples
+    for each non-equal edit region, where ``op`` is ``replace`` / ``insert`` /
+    ``delete``. An EMPTY list == structurally identical SSE == SC#3 PASS.
+
+    A non-empty result is a REAL structural edit: a dropped/added event type, a
+    different tool sequence, or a changed terminal classification. For an agentic
+    loop that can still be LLM tool-path non-determinism (the agent chose different
+    tools) rather than a code regression — re-run before+after to distinguish a
+    persistent edit (regression) from a flaky one (LLM noise). Since a verbatim
+    move is AST-identical, any persistent edit would indicate the move was NOT
+    byte-identical; a flaky edit is expected agentic non-determinism.
     """
+    import difflib
+
     sb = skeleton(before)
     sa = skeleton(after)
+    sm = difflib.SequenceMatcher(a=sb, b=sa, autojunk=False)
     diffs: list = []
-    for i in range(max(len(sb), len(sa))):
-        b = sb[i] if i < len(sb) else None
-        a = sa[i] if i < len(sa) else None
-        if b != a:
-            diffs.append((i, b, a))
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag != "equal":
+            diffs.append((tag, sb[i1:i2], sa[j1:j2]))
     return diffs

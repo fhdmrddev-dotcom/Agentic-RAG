@@ -69,6 +69,7 @@ SSE_DIFF_PROMPT = (
     "Python code that prints a one-line summary of what you found."
 )
 BASELINE_DIR = pathlib.Path("scripts/.sse_baseline")
+AFTER_DIR = pathlib.Path("scripts/.sse_after")   # saved --mode after captures (offline re-eval)
 
 # native-7 are the hard pass/fail bar; openrouter/ollama are best-effort.
 NATIVE_7 = {"openai", "anthropic", "google", "deepseek", "moonshot", "zhipu", "minimax"}
@@ -106,6 +107,7 @@ async def main() -> int:
         os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
     )
     BASELINE_DIR.mkdir(parents=True, exist_ok=True)
+    AFTER_DIR.mkdir(parents=True, exist_ok=True)
 
     targets = [(p, m) for p, m in PROVIDERS if args.provider in (None, p)]
     if not targets:
@@ -146,7 +148,10 @@ async def main() -> int:
                     native7_failures.append((provider, "missing BEFORE baseline"))
                 continue
             before = json.loads(baseline_path.read_text(encoding="utf-8"))
-            # SC#3 GATE = structural skeleton (deterministic). Raw diff is informational
+            # Save the after-capture so the diff can be re-evaluated OFFLINE (e.g. after
+            # a skeleton-normalizer fix) without burning another live run.
+            (AFTER_DIR / f"{provider}.json").write_text(json.dumps(events, indent=2), encoding="utf-8")
+            # SC#3 GATE = structural skeleton (alignment-based). Raw diff is informational
             # only: it is expected to be non-empty from LLM chunk-noise even with zero
             # code change (proven 2026-05-30), so it must NOT gate.
             sk_diff = diff_skeletons(before, events)
@@ -157,13 +162,14 @@ async def main() -> int:
                       f"raw {len(raw_diff)} chunk-noise diffs, informational)")
             else:
                 print(f"  ✗ AFTER {provider}/{model} [{tag}]: status={status}, "
-                      f"BLOCK — {len(sk_diff)} STRUCTURAL skeleton diffs:")
-                for idx, b, a in sk_diff[:15]:
-                    print(f"      [{idx}] before={b!r}  after={a!r}")
-                print(f"      (re-run before+after 2-3x to rule out LLM tool-path noise "
-                      f"before declaring a regression)")
+                      f"BLOCK — {len(sk_diff)} structural skeleton edit(s) "
+                      f"(skeleton {len(skeleton(events))} tokens vs {len(skeleton(before))} before):")
+                for op, b_block, a_block in sk_diff[:15]:
+                    print(f"      {op}: before={b_block}  after={a_block}")
+                print(f"      (LLM tool-path non-determinism vs regression: re-run 2-3x; "
+                      f"a verbatim move is AST-identical so a persistent edit => not byte-identical)")
                 if is_hard:
-                    native7_failures.append((provider, f"{len(sk_diff)} structural skeleton diffs"))
+                    native7_failures.append((provider, f"{len(sk_diff)} structural skeleton edits"))
 
     conn.close()
     await redis.aclose()
