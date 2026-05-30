@@ -26,7 +26,7 @@ def test_iteration_cap_guard_emits_system_warning_and_log() -> None:
     """The end-of-stream drain path MUST guard on force_no_tools + non-empty
     tool_calls_buffer and emit both the SSE system_warning and a
     logger.warning with the canonical format."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Canonical kind identifier present
@@ -57,7 +57,7 @@ def test_iteration_cap_guard_emits_system_warning_and_log() -> None:
 def test_iteration_cap_guard_clears_buffer_after_warning() -> None:
     """Belt-and-suspenders: after warning, the buffer is cleared so any
     later code path that inspects tool_calls_buffer sees an empty dict."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Look for the canonical clear pattern in the guard region

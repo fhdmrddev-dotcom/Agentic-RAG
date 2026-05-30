@@ -82,24 +82,46 @@ def test_suggestion_emit_still_precedes_terminal_sentinel() -> None:
     Verified by checking the suggestions block is in the AGENT-LOOP BODY
     (not inside _shielded_finalize), so it always runs before the finally:
     that triggers _shielded_finalize.
-    """
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
-    text = src.read_text(encoding="utf-8")
 
-    # Locate suggestion emit
+    Phase 089 Plan 03 (G-5 verbatim move): the suggestion emit + the entire
+    agent-loop body MOVED verbatim into ``app.services.agent_loop.run_agent_loop``
+    (the producer-shell ``_shielded_finalize`` STAYS in threads.py). The Rule 3
+    invariant is preserved structurally: ``run_agent_loop`` runs to completion
+    (emitting suggestions) BEFORE it returns to ``agent_runner``, whose ``finally``
+    then triggers ``_shielded_finalize`` (the terminal sentinel owner). So the
+    assertion is now split across the two modules: the suggestion emit lives in
+    ``run_agent_loop`` (agent_loop.py), and ``_shielded_finalize`` lives in
+    threads.py — the loop module ALWAYS completes before the finalizer.
+    """
+    loop_src = (
+        Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
+    )
+    loop_text = loop_src.read_text(encoding="utf-8")
+    threads_src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    threads_text = threads_src.read_text(encoding="utf-8")
+
+    # Locate suggestion emit — now in run_agent_loop (agent_loop.py)
     sugg_match = re.search(
         r"await\s+_emit\(redis,\s*run_id,\s*['\"]suggestions['\"],\s*questions=questions\[:3\]\)",
-        text,
+        loop_text,
     )
-    assert sugg_match, "suggestion emit not found"
+    assert sugg_match, (
+        "suggestion emit not found in agent_loop.py — Phase 089-03 moved the "
+        "agent-loop body (incl. the suggestions block) into run_agent_loop."
+    )
     sugg_pos = sugg_match.start()
 
-    # Locate _shielded_finalize def
-    finalize_def = text.find("async def _shielded_finalize():")
-    assert finalize_def != -1
-    # suggestion emit must come BEFORE _shielded_finalize def (it lives in
-    # the agent body that runs before finally)
-    assert sugg_pos < finalize_def, (
-        "Suggestion emit must precede _shielded_finalize def in source order "
-        "(it runs in the agent body which always completes before finally)."
+    # The suggestion emit must live inside run_agent_loop (the agent body that
+    # always runs to completion before returning to agent_runner's finally).
+    run_loop_def = loop_text.find("async def run_agent_loop(")
+    assert run_loop_def != -1
+    assert sugg_pos > run_loop_def, (
+        "Suggestion emit must live inside run_agent_loop (the agent body which "
+        "always completes before agent_runner's finally triggers _shielded_finalize)."
+    )
+
+    # _shielded_finalize (the terminal-sentinel owner) STAYS in threads.py.
+    assert "async def _shielded_finalize():" in threads_text, (
+        "_shielded_finalize must STAY in threads.py (producer-shell concern) — "
+        "it owns the terminal sentinel that fires AFTER run_agent_loop returns."
     )

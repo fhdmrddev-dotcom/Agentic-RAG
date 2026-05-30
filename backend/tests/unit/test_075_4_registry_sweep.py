@@ -176,15 +176,18 @@ def test_parallel_tool_calls_gate_defaults_to_supported_for_openai() -> None:
 
 
 def test_anthropic_native_gate_carries_audit_comment() -> None:
-    """Test 7: the gate at threads.py around line 1679 (``if active_provider_name ==
-    \"anthropic\"``) is operator-controlled via active_provider. Audit-only: confirm
-    the Plan 075.4-02 audit comment is present near the gate so future maintainers
+    """Test 7: the gate (``if active_provider_name == \"anthropic\"``) is
+    operator-controlled via active_provider. Audit-only: confirm the Plan
+    075.4-02 audit comment is present near the gate so future maintainers
     don't accidentally refactor it into a registry-based check (which would route
     OpenRouter-Claude variants through the native path and lose the operator's
-    routing/billing/fallback intent)."""
-    from app.api import threads as threads_mod
+    routing/billing/fallback intent).
 
-    src = inspect.getsource(threads_mod)
+    Phase 089-03 (G-5 verbatim move): the provider gate + the audit comment
+    moved with the loop body from threads.py into agent_loop.py — grep there."""
+    from app.services import agent_loop as agent_loop_mod
+
+    src = inspect.getsource(agent_loop_mod)
     # Both the audit comment AND the original gate must be present.
     assert "Plan 075.4-02 audit (Site 4)" in src
     assert 'active_provider_name == "anthropic"' in src

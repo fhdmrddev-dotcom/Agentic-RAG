@@ -32,7 +32,7 @@ def test_final_output_files_emit_carries_filename_url_size_keys() -> None:
     Closes BUG-260522-02 (no url in payload) — auto-closes BUG-260521-02
     (pinned panel no download link) per its re_open_trigger.
     """
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # 1. The emit MUST iterate .values() (per-hash meta), not iterate the
@@ -70,7 +70,7 @@ def test_final_output_files_emit_carries_filename_url_size_keys() -> None:
 def test_final_output_files_emit_under_if_guard() -> None:
     """The emit must be guarded by ``if _previous_files_in_run:`` so empty-
     output runs don't emit a no-op SSE event."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # Match the if-guard + emit pattern (allowing whitespace + intermediate text)

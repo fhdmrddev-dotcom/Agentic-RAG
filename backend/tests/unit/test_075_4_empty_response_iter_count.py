@@ -19,7 +19,7 @@ from pathlib import Path
 def test_empty_response_fallback_uses_actual_iteration_count() -> None:
     """The empty-response fallback string MUST use ``{iteration + 1} iteration(s)``
     not ``{max_iterations} iterations`` (BUG-260522-01 one-liner)."""
-    src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     text = src.read_text(encoding="utf-8")
 
     # New shape must exist

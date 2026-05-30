@@ -382,11 +382,14 @@ def test_finish_reason_map_canonical_values() -> None:
 
 
 def test_threads_module_routes_google_to_native_sdk() -> None:
-    """The active_provider == 'google' branch in threads.py must call stream_google,
+    """The active_provider == 'google' branch must call stream_google,
     NOT create_adaptive_streaming_chat. Audit the source string so future refactors
-    can't silently revert to the OpenAI-compat path."""
-    from app.api import threads as threads_mod
-    src = inspect.getsource(threads_mod)
+    can't silently revert to the OpenAI-compat path.
+
+    Phase 089-03 (G-5 verbatim move): the agent loop (incl. the Google native
+    branch) moved from threads.py into agent_loop.py::run_agent_loop — grep there."""
+    from app.services import agent_loop as agent_loop_mod
+    src = inspect.getsource(agent_loop_mod)
     assert "from app.services.google_service import stream_google" in src
     assert 'elif active_provider_name == "google":' in src
     assert "stream_google(" in src

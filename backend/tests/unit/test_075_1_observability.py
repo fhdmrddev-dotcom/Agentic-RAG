@@ -235,7 +235,10 @@ def test_persisted_tool_calls_carry_sub_agent_model_when_sub_agent_record_presen
     dispatcher_src = Path(__file__).parent.parent.parent / "app" / "services" / "tool_dispatcher.py"
     dispatcher_text = dispatcher_src.read_text(encoding="utf-8")
 
-    threads_src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
+    # Phase 089-03 (G-5 verbatim move): the persisted_tool_calls.append site
+    # (the agent-loop tool-dispatch round) moved from threads.py into
+    # agent_loop.py::run_agent_loop — grep the spread there.
+    threads_src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     threads_text = threads_src.read_text(encoding="utf-8")
 
     # Construction site must include effective_model (now in tool_dispatcher.py)
