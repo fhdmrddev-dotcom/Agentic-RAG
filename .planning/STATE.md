@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: phase_complete
-stopped_at: Phase 090 complete (VERIFICATION passed — schema + RLS + config models)
-last_updated: "2026-05-31T00:00:00.000Z"
-last_activity: 2026-05-31 -- Phase 090 shipped (migrations 056-060, harness.py, 8/8 live-DB verify)
+status: verifying
+stopped_at: Phase 091 context gathered
+last_updated: "2026-05-30T21:11:07.994Z"
+last_activity: 2026-05-30 -- Phase --phase execution started
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 10
+  total_plans: 7
   completed_plans: 7
-  percent: 25
+  percent: 100
 ---
 
 # Project State
@@ -195,7 +195,7 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 090 context gathered
+Stopped at: Phase 091 context gathered
 Resume file: --resume-file
 
 **Planned Phase:** 090 (harness-schema-rls-config-models) — 3 plans — 2026-05-30T20:13:36.774Z
