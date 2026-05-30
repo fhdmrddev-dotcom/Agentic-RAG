@@ -119,3 +119,61 @@ The closed competitors (ChatGPT, Glean, Copilot Studio) are SaaS-locked — your
 ## Cost estimate
 
 Full scope is a 6–10 phase milestone. Phase 1 alone (API + service accounts) is the minimum viable product for "external consumers can call this app."
+
+## Update 2026-05-31 — Worked example: customer-support ticket triage via n8n (fields already exist, just need PUBLIC exposure)
+
+Surfaced during Phase 090 operator-testing-notes triage. This is the concrete "why would anyone call our API" story — and the punchline is that **the most valuable fields the external caller wants ALREADY EXIST inside the app today.** This is not a new-build ask; it is a *public-exposure* ask.
+
+### The scenario (plain language)
+
+A company runs its customer support on a ticketing tool (Zendesk / Freshdesk / Intercom / a plain inbox). They wire up **n8n** (the open automation platform we already name in the competitive landscape above) so that every time a new support ticket arrives, n8n calls *our app* and asks: "given our knowledge base, what's the answer to this customer's question?"
+
+n8n is a dumb pipe here — it just needs a clean JSON answer back so it can decide what to do with the ticket. Concretely, the n8n node POSTs the ticket text to our public endpoint and wants back a small, decision-ready payload:
+
+```jsonc
+{
+  "answer": "To reset your API key, go to Settings → API → Rotate Key…",
+  "confidence": {
+    "level": "high",            // high | medium | low
+    "avg_similarity": 0.83,     // float — how close the retrieved chunks were
+    "disclaimer": null          // human-readable caveat string when grounding is weak
+  },
+  "scope": { "folder_ids": ["uuid-of-support-kb-folder"] },   // which KB slice was searched
+  "source_refs": [ { "document_id": "…", "title": "…", "chunk": "…" } ]
+}
+```
+
+With that payload, the n8n workflow can branch on its own:
+- **`confidence.level == "high"`** → auto-draft the reply and (optionally) auto-send.
+- **`confidence.level == "low"`** (or a `disclaimer` is present) → DON'T auto-reply; route the ticket to a human agent's queue with the draft attached as a suggestion.
+
+### The key insight: these fields already exist — they just aren't PUBLIC
+
+This is the part a future planner must not miss. Every field the n8n caller wants is already produced by the app on the normal chat path; the work is **promoting them onto a versioned public schema**, not building new logic:
+
+- **Response-level confidence** is attached to *every assistant message today.* See `backend/app/models/message.py:25-27` — the message model already carries:
+  - `confidence_level` (`high` / `medium` / `low`)
+  - `confidence_avg_similarity` (float)
+  - `confidence_disclaimer` (the human-readable caveat string)
+- **Folder / scope filtering** already threads all the way through retrieval. See `backend/app/services/retrieval_service.py:32` and `:237-278` — `search_documents` already accepts `folder_ids` and filters the vector search to that KB slice. So "search only our support-KB folder" is a parameter that already works internally; the public API just needs to expose it.
+- **`source_refs`** are the same citations the chat UI already renders under each grounded answer — already assembled, just need to be shaped into the public response model.
+
+So the Phase-1 "promote which existing routes are externally-safe" task (above) gets a very concrete first customer: a `/api/v1/answer` (or `/api/v1/chat`) endpoint whose response model carries `answer + confidence_* + scope + source_refs`.
+
+### Action note for the v3.3 public-schema work (Theme A)
+
+When v3.3 defines the **public Pydantic response schemas** (Theme A of this seed — the versioned `/api/v1/...` contract), explicitly confirm those schemas carry the `confidence_*` fields forward from `message.py`. It would be easy to design a "clean minimal public answer schema" that drops confidence — but confidence is the single most valuable field for the triage use-case (it's what lets the caller decide auto-reply vs human-escalate). Treat `confidence_level` + `confidence_avg_similarity` + `confidence_disclaimer` as **required** public fields, not optional internals.
+
+### Scope clarification — RESPONSE-level vs per-CLAIM confidence (no conflict)
+
+There's a documented decision that **per-CLAIM confidence is permanently out of scope** (`PROJECT.md:230`) — i.e., we do NOT score the trustworthiness of each individual sentence/claim inside an answer. That is a different thing and stays out of scope.
+
+What this triage scenario needs is **RESPONSE-level confidence** — one confidence verdict for the whole answer — which is exactly what `message.py:25-27` already produces. **No conflict with PROJECT.md:230.** A future planner should not read "confidence is out of scope" and wrongly conclude this scenario is blocked; the out-of-scope line is about per-claim granularity only.
+
+### Where the escalation LOGIC lives (cross-ref)
+
+This seed (SEED-013) owns only the **API/MCP surface** — exposing `answer + confidence + scope + source_refs` so an external caller *can* make a decision. It does **not** own the decision itself.
+
+The confidence-GATED, closed-loop behavior — "when confidence is low, route to a human queue / open an escalation / file a ticket" — is **reactive automation logic** and lives in **SEED-014 (Automations & Routines, targeted for v3.4)**. SEED-014 already lists `confidence.low` as a triggered-run event. If we ever want to drive that escalation *inside our own app* (rather than letting n8n branch on the JSON), that's SEED-014 work, not API-layer work. See SEED-014's matching `## Update 2026-05-31` section for the human-in-the-loop (HITL) escalation pattern.
+
+Plain-language split: **SEED-013 hands back the number; SEED-014 decides what to do when the number is low.**

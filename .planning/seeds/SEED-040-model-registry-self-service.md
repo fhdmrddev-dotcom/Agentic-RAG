@@ -46,3 +46,21 @@ This seed should be presented during `/gsd:new-milestone` when the milestone sco
 ## Notes
 
 Surfaced while fixing the zhipu/minimax "tool calls narrated as text" bug (see memory `project-cross-provider-native-tools-registry-trap`): the registry-miss → `native_tools=False` trap was the symptom; this seed is the structural cure (stop hardcoding, give the operator a surface). The 2026-05-30 inference fix bought breathing room (new models on the 7 native-tool providers now work for tool-calling with no edit), but accurate per-model metadata + list freshness still need the operator UI. Operator is a vibe coder — the UI should be plain-language (e.g. a "supports tools" toggle, a timeout field), not raw JSONB editing.
+
+## Update 2026-05-31 — Named Layer-2 use case: OLLAMA / LOCAL MODELS per-model `native_tools` toggle
+
+Concrete, operator-raised example that the Layer-2 no-code capability override (scope item #2 above) is *designed* to solve. Surfaced during Phase 090 operator-testing-notes triage: the operator noted ollama was never tested (no local resources for models larger than ~4B) and said it "should work like deepseek/moonshot."
+
+**The direction:**
+
+- Modern local models (`llama3.x`, `qwen2.5+`, etc.) **DO** support OpenAI-style tools. So in principle ollama can tool-call.
+- BUT ollama's **PROVIDER default stays `native_tools=False` ON PURPOSE** (`backend/app/config.py:305-306`). This is deliberate, not an oversight: local models served via ollama are **heterogeneous** — the same endpoint can serve a capable `llama3.x` or a tiny 4B model that *narrates fake tool calls* instead of emitting real ones. A model that fakes tool calls is **worse** than a model we never sent tools to (the user gets confident-looking output with zero actual tool execution). That is the exact same trap that hit `minimax-m2.7` — see the registry-trap notes above and [[SEED-034]].
+- Because the provider is heterogeneous, the RIGHT granularity is **PER-MODEL, not per-provider** — which is precisely what this seed's `model_capabilities_overrides` write-UI provides. The read half already merges a DB-supplied `native_tools` value on the hot path (`backend/app/config.py:562-566` inside `get_model_capability_async`), so flipping a *specific* ollama model (e.g. `llama3.3:70b`) to `native_tools=True` needs **ZERO code** — just one row in `model_capabilities_overrides`.
+
+**The framing for the operator:** ollama earns tool-calling **per-model** via the override toggle — the operator-facing equivalent of "behaving like deepseek/moonshot." The difference is that deepseek/moonshot get tool-calling by **provider default** because their *hosted* endpoints uniformly support tools (every model behind that provider is known to tool-call), whereas ollama serves a mixed bag, so the operator opts each capable local model in deliberately.
+
+This is also the cleanest answer to the "ollama untested" gap: rather than blanket-flipping the ollama provider default (which would re-arm the fake-tool-call trap for tiny models), the operator validates and flips capable local models one at a time through the same toggle UI everyone else uses.
+
+**Evidence gate (per [[SEED-034]]):** before flipping any ollama/local model's `native_tools` override to `True`, validate via the cross-provider eval harness that the model emits **real** tool calls (not narrated ones). The flip must be evidence-gated, not assumed — see the SEED-034 onboarding-checklist cross-reference added the same day.
+
+Breadcrumbs for this use case: `backend/app/config.py:305-306` (ollama provider default `native_tools=False`), `backend/app/config.py:562-566` (`get_model_capability_async` merges DB override), related [[SEED-034]] (per-provider tool-use + new-model onboarding checklist + eval harness).

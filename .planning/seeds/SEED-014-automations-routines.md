@@ -18,6 +18,7 @@ trigger_when:
   - First B2B / enterprise customer asks about workflow automation, ETL, or document-lifecycle triggers
   - Competitive pressure from ChatGPT Tasks, Claude scheduled actions, Copilot Studio, n8n, or Glean Workflows
   - Planning a milestone scoped to "automation", "routines", "schedules", "workflow", "trigger", "reactive", "ETL", or "scheduled run"
+  - First request for **confidence-gated escalation / human-in-the-loop (HITL)** — e.g. "when the agent isn't sure, send it to a human", "route low-confidence answers to a review queue", "auto-reply only when confident, else escalate". Especially via **n8n + customer-support ticket triage** (see `## Update 2026-05-31`); cross-ref SEED-013 for the API/MCP surface that exposes the answer+confidence the escalation gates on
 ---
 
 # SEED-014: Automations & Routines
@@ -150,3 +151,47 @@ Full scope is a 5–7 phase milestone. Phase 1 (scheduled skill runs) is the min
 ## Differentiation in plain language (for product positioning)
 
 The other agent products are *reactive chat surfaces*. The other automation products are *generic plumbing with AI bolted on*. Our app, with this seed shipped, becomes the open-source agentic platform where *your skills run themselves* — grounded in your KB, on the LLM you choose, with the persistence and observability of a serious system, on infra you own. None of the closed-source competitors can offer all five of those at once. None of the open-source competitors can offer the combined depth.
+
+## Update 2026-05-31 — Target scenario: n8n + confidence-gated escalation + customer-support ticket triage with human-in-the-loop (HITL)
+
+Surfaced during Phase 090 operator-testing-notes triage. This seed already names **n8n** in its competitive landscape and already lists **`confidence.low`** as a triggered-run event (see "Three automation modes" → Triggered, and Phase 2 event-bus producers). But the *closed-loop* pattern those two pieces add up to — **when the answer is unsatisfactory / confidence is low, route it to a human queue instead of acting on it** — was never spelled out as a concrete target scenario. This update spells it out so a future planner treats HITL escalation as a first-class flow, not an afterthought.
+
+### The scenario (plain language): support-ticket triage with a human safety net
+
+A company runs customer support on a ticketing tool. **n8n** sits in front and, for every new ticket, asks our app for an answer. Our app answers and — critically — hands back a **confidence verdict** alongside the answer (this is the SEED-013 public API/MCP surface; the field already exists today at `backend/app/models/message.py:25-27` as `confidence_level` / `confidence_avg_similarity` / `confidence_disclaimer`).
+
+The automation then **gates on confidence**:
+
+- **High confidence** → auto-draft (and optionally auto-send) the reply to the customer. Fully automated, no human touch.
+- **Low confidence** (or a `confidence_disclaimer` is present, or the retrieval came back thin) → **DO NOT auto-reply.** Instead:
+  1. Open / update a ticket in a **human review queue** with the agent's draft attached as a *suggestion*, not a sent reply.
+  2. Notify the human agent (Slack / email / dashboard badge).
+  3. Wait for the human to approve, edit, or reject — the **human-in-the-loop (HITL)** step.
+  4. Optionally feed the human's correction back as a `feedback.thumbs-down` + corrected answer, which is itself a trigger this seed already lists (closing the learning loop — re-label / re-embed the gap so confidence improves next time).
+
+This is the "agent acts on its own, but knows when to ask for help" pattern. The differentiator vs. closed competitors: the confidence number is *real* (grounded in retrieval similarity over the customer's own KB), the escalation policy is *operator-owned*, and the whole loop runs on infra the operator controls.
+
+### Two ways to wire it — and which part is THIS seed
+
+There are two architectural homes for the gating logic, and the planner should be explicit about which one a given milestone is building:
+
+1. **External orchestration (n8n owns the branch).** Our app is a stateless "answer + confidence" endpoint; n8n reads the JSON and does the if/else (auto-reply vs. open-human-ticket) entirely in its own workflow. In this mode, **SEED-013 does all the app-side work** (expose the fields) and SEED-014 contributes *nothing new* — n8n is the automation engine. This is the cheapest path to the scenario and is likely the v3.3 deliverable.
+
+2. **Internal reactive automation (our app owns the branch).** A `confidence.low` event fires on our own event bus (Phase 2 of this seed), a registered triggered-run reacts, and the escalation/ticketing action (open a review-queue item, notify, await approval) runs *inside our platform*. This is the SEED-014 / v3.4 deliverable — it requires the event bus + triggered_runs table + a "human approval" run state + an outgoing webhook/notification to the human. The HITL "await approval" step is a genuinely new run lifecycle state (a run that pauses pending a human decision) and should be scoped carefully.
+
+**Plain-language split (mirrors SEED-013):** *SEED-013 hands back the confidence number; SEED-014 is what decides — inside our app — to escalate to a human when that number is low.* If the operator is happy letting n8n branch, they may never need the SEED-014 internal path for this specific scenario — but the HITL "await human approval" run state is reusable for many other reactive automations, so it earns its place in this seed.
+
+### New architectural surface this scenario adds
+
+Beyond what Phases 1–3 already cover, HITL escalation introduces:
+
+- **A "pending human approval" run state** — a run that has produced a draft but is *suspended* waiting on a human verdict, then resumes (send / discard / edit-and-send). This is more than `cancelled`; it's a pause-and-await. Relates to the run lifecycle in `backend/app/api/runs.py` and the `runs.status` enum (Phase 066).
+- **A human-review queue surface** — UI + data model for "drafts awaiting approval", with approve/edit/reject. Pairs with SEED-012 (admin/operator UI) and the `/automations` page.
+- **An escalation/ticketing action type** — a new automation action that, instead of (or in addition to) posting to chat, creates an external ticket or an internal queue item. For external ticketing, the outgoing-webhook mechanism in SEED-013 Phase 3 is the delivery channel.
+
+### Cross-refs
+
+- **SEED-013 (External Integrations — API + MCP + Webhooks)** — owns the public surface that exposes `answer + confidence_* + scope + source_refs` (the inputs the gate reads) and the outgoing webhooks that deliver escalations. See SEED-013's matching `## Update 2026-05-31` section.
+- **v3.3** — the public API/MCP schemas (SEED-013 Theme A) that make the *external-orchestration* path (n8n owns the branch) possible.
+- **v3.4** — the *internal reactive automation* path (this seed): event bus + triggered runs + the pending-human-approval run state + human-review queue.
+- Existing in-seed pieces this builds on: `confidence.low` triggered-run event (Phase 2 event-bus producers) and `feedback.thumbs-down` (the learning-loop close-out).

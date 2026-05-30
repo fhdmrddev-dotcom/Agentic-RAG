@@ -151,3 +151,55 @@ The Knowledge Health Dashboard (v2.3 F-09) currently surfaces *retrieval* health
 
 ---
 *Planted 2026-05-02 between Phase 059 ship and Phase 060 kickoff. User flagged that this is a "good RAG system that also has limited document management capabilities" and that M-Files-style basics could enhance the DM half without clashing with the architecture. This seed picks the M-Files concepts that compose with the existing metadata + versioning + audit foundation, and explicitly defers the ones that fight it.*
+
+---
+
+## Update 2026-05-31 — Metadata Enrichment + Extraction-Model Flexibility
+
+*Surfaced during v2.8 (Harness Engine & Workflow Mode) — Phase 090 operator-testing-notes triage. The operator explicitly asked for two things: (1) richer/customizable document metadata, and (2) the freedom to choose WHICH model does the metadata extraction, managed through the admin/operator UI. This is **enrichment of the Tier A "metadata, not folders" foundation this seed already owns**, not a bug fix.*
+
+### Plain-language: what's going on and why it matters
+
+When you upload a document, the backend quietly asks an LLM to read the top of it and pull out structured facts — title, author, date, what kind of doc it is, topics, language, a one-line summary. Those facts power the metadata-driven views in Tier A. Three things hold that foundation back today, and the operator wants them fixed as we grow the DM layer:
+
+1. **The set of facts we capture is fixed and small.** You can't add your own fields (e.g. "client name", "matter number", "publication venue"), and there's no per-field confidence to tell you how much to trust each value.
+
+2. **We only read the first ~3,000 characters of the document.** If a thesis puts its real title and author on a title page that lands past that cutoff, we silently miss them. The metadata isn't wrong — we just never looked far enough in.
+
+3. **(Operator priority) Metadata extraction is hardwired to one OLD model — `gpt-4o` — no matter which provider/model you picked for chat.** So even if your chat runs on a newer Anthropic/Google/etc. model, your document metadata is still being extracted by an old OpenAI model. Quality is pinned to that one model and is inconsistent with the rest of the app. The operator wants to choose the extraction model — ideally per-user (use my selected provider/model) OR an admin-set "extraction model" managed through the operator model UI.
+
+> **Important — "author disappeared" is NOT a regression.** This was investigated. `DocumentMetadata.author` is populated whenever the source actually has a byline; when it doesn't, the key is correctly omitted from the response (because `exclude_none=True` is set at `backend/app/api/documents.py:1369`). It has worked this way as best-effort, data-driven extraction since the original Module-4 commit. So this update is **enrichment, not a fix** — don't scope it as a bug.
+
+### The three enrichment workstreams
+
+**(1) Expand + make the metadata field set configurable** *(extends Tier A item 1 "metadata-driven views" and item 3 "classification")*
+- Today's fields: `title / author / date / document_type / topics / language / summary` (see breadcrumbs).
+- Candidate additions: `organization`, `keywords`, `publication_venue`, **user/admin-defined custom fields**, and **per-field confidence scores**.
+- Make the extracted field set user/admin-configurable rather than a hardcoded Pydantic model — this is the natural M-Files "metadata not folders" payoff: richer metadata makes the saved-search / virtual-folder views (Tier A) far more powerful (e.g. "all contracts from Org X expiring in 90 days").
+
+**(2) Lift the 3,000-char extraction window**
+- `extract_metadata` only inspects `content[:3000]` — anything deeper (title page, late byline, appendix metadata) is invisible.
+- Direction: scan a larger window, or do a cheap targeted pass over title-page/front-matter + a tail sample, or make the window configurable. Cheap win; biggest quality lever for long docs (theses, reports, contracts with a cover sheet).
+
+**(3) ⭐ Extraction-model flexibility (the operator's headline ask)**
+- Root cause: `extract_metadata` calls `get_llm_client()` with **no `user_settings`**, so it always falls through to the hardwired global default `gpt-4o`.
+- Direction: route metadata extraction through **the user-selected provider/model** OR an **admin-configurable "extraction model" setting**, surfaced and managed through the operator model UI.
+- Cross-refs: [[SEED-040]] (model-registry self-service — where models are registered/curated) and [[SEED-033]] / SEED-012 (admin/operator UI — where an "extraction model" knob would live). This is exactly the "what models to use / flexibility / manage through admin" the operator called out, applied to the ingestion path instead of only the chat path.
+
+### Trigger (re-surface conditions)
+- Operator wants richer or **custom/user-defined** document metadata fields, **OR**
+- Operator notices metadata quality is poor / stale / **pinned to an old model** and wants to pick the extraction model.
+
+Present during `/gsd:new-milestone` (in addition to the existing DM triggers above) when the milestone scope touches: document metadata enrichment, custom metadata fields, ingestion-quality improvements, or admin-managed model selection for non-chat paths.
+
+### Breadcrumbs (v2.8 audit, 2026-05-31)
+- `backend/app/services/embedding_service.py:100-137` — `extract_metadata` (the whole extraction function)
+  - `:107` — the `content[:3000]` window cap (workstream 2)
+  - `:112` — `get_llm_client()` called with NO `user_settings` → forces the global default (workstream 3)
+- `backend/app/models/document.py:8-16` — `DocumentMetadata` (the fixed field set: title/author/date/document_type/topics/language/summary — workstream 1)
+- `backend/app/api/documents.py:1369` — `exclude_none=True` (why a missing author is correctly omitted — proves "author disappeared" is not a regression)
+- `backend/app/core/config.py:624` — the hardwired `gpt-4o` global default that extraction currently rides on (workstream 3)
+- Related seeds: [[SEED-020]] (retrieval quality), [[SEED-033]] (citation/attribution), [[SEED-040]] (model-registry self-service), SEED-012 (admin/operator UI). The original Tier A items 1 and 3 above are the direct beneficiaries of workstream 1.
+
+### Scope of this update
+**Medium** — workstreams (2) and (3) are small, surgical backend changes (lift a window cap; thread `user_settings` / an admin setting into one `get_llm_client()` call). Workstream (1) is the larger piece: making the field set configurable means moving off a fixed Pydantic model toward a user/admin-defined schema, plus UI to manage fields and surface per-field confidence — that part composes with the admin model UI (SEED-040 / SEED-012) and is the natural lead-in to a dedicated metadata-enrichment phase whenever the DM layer is next scoped.
