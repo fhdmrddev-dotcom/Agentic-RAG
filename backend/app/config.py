@@ -15,8 +15,8 @@ _PROVIDER_BASE_URLS: dict[str, str] = {
     "ollama": "",  # resolved dynamically from ollama_base_url
     "deepseek": "https://api.deepseek.com/v1",
     "moonshot": "https://api.moonshot.ai/v1",
-    "minimax": "https://api.minimax.chat/v1",
-    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "minimax": "https://api.minimax.io/v1",        # INTERNATIONAL host — matches int'l key (D-089 docs curation 2026-05-30; api.minimax.chat is the China host, rejects int'l keys w/ 401)
+    "zhipu": "https://api.z.ai/api/paas/v4",        # INTERNATIONAL z.ai host — matches docs.z.ai key (D-089 docs curation 2026-05-30; open.bigmodel.cn is the China host, separate key namespace)
 }
 
 
@@ -107,11 +107,22 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     # ── Moonshot/Kimi direct ──────────────────────────────────────────────
     "kimi-k2.6":                            200_000,  # actual 262k
     "moonshot-v1-8k":                         7_000,  # actual 8k
-    # ── MiniMax direct ────────────────────────────────────────────────────
-    "minimax-m2.7":                         160_000,  # actual 204k
-    # ── GLM/Zhipu direct ─────────────────────────────────────────────────
-    "glm-4-plus":                           100_000,  # actual 128k
-    "glm-4-flash":                          100_000,  # actual 128k
+    # ── MiniMax direct (int'l api.minimax.io; codes from /models, specs per platform.minimax.io/docs/guides/models-intro; D-089 curation 2026-05-30) ──
+    "MiniMax-M2":                           200_000,  # docs: 200K ctx / 128K out / function calling
+    "MiniMax-M2.1":                         200_000,
+    "MiniMax-M2.1-highspeed":               200_000,
+    "MiniMax-M2.5":                         200_000,
+    "MiniMax-M2.5-highspeed":               200_000,  # fast rep (native-7 baseline)
+    "MiniMax-M2.7":                         200_000,  # flagship
+    "MiniMax-M2.7-highspeed":               200_000,
+    # ── GLM/Zhipu direct (int'l api.z.ai; all 7 from /models, D-089 curation 2026-05-30) ──
+    "glm-4.5":                              128_000,
+    "glm-4.5-air":                          128_000,  # lightweight fast tier
+    "glm-4.6":                              180_000,  # actual 200k (native-7 baseline)
+    "glm-4.7":                              180_000,
+    "glm-5":                                180_000,  # newest flagship family
+    "glm-5-turbo":                          128_000,  # fast GLM-5 tier
+    "glm-5.1":                              180_000,  # latest flagship
 }
 
 
@@ -218,11 +229,22 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.cn
     "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},
     "moonshot-v1-8k":     {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
-    # MiniMax direct — OpenAI-compatible API at api.minimax.chat
-    "minimax-m2.7":       {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
-    # GLM/Zhipu direct — OpenAI-compatible API at open.bigmodel.cn
-    "glm-4-plus":         {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 8192, "capability_source": "registry"},
-    "glm-4-flash":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
+    # MiniMax direct — OpenAI-compatible API at api.minimax.io (INTERNATIONAL; all 7 from live /models 2026-05-30, D-089 docs curation)
+    "MiniMax-M2":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
+    "MiniMax-M2.1":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
+    "MiniMax-M2.1-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast
+    "MiniMax-M2.5":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
+    "MiniMax-M2.5-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast rep (eval/native-7 baseline)
+    "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # flagship (PascalCase — API is case-sensitive)
+    "MiniMax-M2.7-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast flagship
+    # GLM/Zhipu direct — OpenAI-compatible API at api.z.ai/api/paas/v4 (INTERNATIONAL; codes from live /models, specs per docs.z.ai/guides/llm/*; D-089 docs curation 2026-05-30)
+    "glm-4.5":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
+    "glm-4.5-air":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry"},  # lightweight fast tier
+    "glm-4.6":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},  # 200K ctx (eval/native-7 baseline)
+    "glm-4.7":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
+    "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # GLM-5 family — 200K ctx / 128K out
+    "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry"},  # fast GLM-5 tier
+    "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
@@ -551,8 +573,8 @@ _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "ollama":     "",   # Local, user manages their own models
     "deepseek":  "deepseek-v4-flash",
     "moonshot":  "kimi-k2.6",
-    "minimax":   "minimax-m2.7",    # Only model currently available
-    "zhipu":     "glm-4-flash",
+    "minimax":   "MiniMax-M2.5-highspeed",   # int'l api.minimax.io; fast tier, PascalCase (D-089 docs curation 2026-05-30)
+    "zhipu":     "glm-4.6",                  # int'l api.z.ai; official /models id (D-089 docs curation 2026-05-30; glm-4.5-flash worked but isn't in official /models)
 }
 
 

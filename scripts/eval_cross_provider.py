@@ -74,8 +74,8 @@ PROVIDERS: list[tuple[str, str]] = [
     ("moonshot", "kimi-k2.6"),           # native weak-model — SEED-034 fold-gate target
     # --- ADD (Phase 089 D-089-09 — native-7 baseline; _PROVIDER_BASE_URLS source of truth;
     #     provider-class representatives, full pinning pass is Phase 096 EVAL-01) ---
-    ("zhipu", "glm-4-flash"),            # GLM — _SUB_AGENT_MODEL_DEFAULTS["zhipu"] (config.py:555); provider-class rep, full pinning = Phase 096 EVAL-01
-    ("minimax", "minimax-m2.7"),         # _SUB_AGENT_MODEL_DEFAULTS["minimax"] (config.py:554); provider-class rep
+    ("zhipu", "glm-4.6"),                # GLM int'l z.ai official /models id (D-089 docs curation 2026-05-30; glm-4-flash was dead -> 400 model-not-found)
+    ("minimax", "MiniMax-M2.5-highspeed"),  # MiniMax int'l fast tier, PascalCase (D-089 docs curation 2026-05-30; lowercase + China host -> 401)
 ]
 
 # Backend base URL — local uvicorn. Overridable via EVAL_BASE_URL for an operator
