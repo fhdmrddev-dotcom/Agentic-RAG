@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: verifying
-stopped_at: Phase 091 context gathered
-last_updated: "2026-05-30T23:07:33.816Z"
-last_activity: 2026-05-30 -- Phase --phase execution started
+status: ready-to-execute
+stopped_at: Phase 091 planned (7 plans, VERIFICATION PASSED iter 2)
+last_updated: "2026-05-31T00:00:00.000Z"
+last_activity: 2026-05-31 -- Phase 091 planned (7 plans / 5 waves)
 progress:
   total_phases: 8
   completed_phases: 2
@@ -21,15 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 090 COMPLETE — next is Phase 091 (harness engine)
+**Current focus:** Phase 091 PLANNED (7 plans, ready to execute) — the harness engine
 
 ## Current Position
 
-Phase: 090 (Harness Schema + RLS + Config Models) — ✅ COMPLETE (VERIFICATION passed)
-Plans: 3/3 shipped (090-01 models+tests, 090-02 migrations 056-059, 090-03 manual apply + live verify); +migration 060 (code-review WR-01 fix)
-Status: Phase 090 shipped — substrate live (4 tables + threads.active_workflow_run_id), RLS + immutable-on-publish + INSERT-only audit all confirmed against the live local DB; 8/8 verify_090_run.sql blocks PASS; harness.py Pydantic models 8/8 unit tests pass. full-schema.sql regenerated.
+Phase: 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 📋 PLANNED (ready to execute)
+Plans: 7 plans / 5 waves — VERIFICATION PASSED (iteration 2, after 1 column-name blocker + 3 warnings fixed). RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
+  - Wave 1: 091-01 (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
+  - Wave 2: 091-02 (engine core + 2-phase write + db/workflows.py + reachability lint) ‖ 091-06 (dispatch_tool whitelist guard + get_tools budget + max_tools)
+  - Wave 3: 091-03 (5 phase-type executors → substrate) ‖ 091-05 (validation gates + bounded retry + caps)
+  - Wave 4: 091-04 (resumability: startup sweep + claim + ask_user re-subscribe)
+  - Wave 5: 091-07 (4 seed templates / migration 061 + end-to-end + operator SQL-editor apply checkpoint)
+Reqs covered: HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-05 (all 6). Highest-risk surfaces isolated with deterministic proof: 2-phase write (Plans 02/04), ask_user re-subscribe subscribe-before-emit (Plan 04). Migration 061 = autonomous:false SQL-editor checkpoint (no db push). 4-axis UAT (SC#10) in VALIDATION manual-only rows.
+
+Prior phase: 090 (Harness Schema + RLS + Config Models) — ✅ COMPLETE. 3/3 plans + migration 060; substrate live (4 tables + threads.active_workflow_run_id), RLS + immutable-on-publish + INSERT-only audit confirmed against live DB.
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
-Next: `/gsd:discuss-phase 091` — the harness engine: state-machine runtime over the 090 substrate, 5 phase executors, validation gates, the HARNESS-05 tool whitelist. Phase 091 consumes workflow_definitions/runs/phases + the harness.py PhaseConfig models (field shapes are provisional in 090 — finalize against the engine here).
+Next: `/gsd:execute-phase 091` — execute all 7 plans wave-by-wave. (Planning done; RESEARCH/VALIDATION/7×PLAN all committed.) Phase 091 finalizes the harness.py PhaseConfig models against the engine.
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
 G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
