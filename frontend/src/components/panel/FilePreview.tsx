@@ -26,6 +26,7 @@
 import { useEffect, useRef, useState } from "react"
 import { ChevronLeft, Download, Loader2 } from "lucide-react"
 import { getWorkspaceFileContent } from "@/lib/api"
+import { useResolvedFileId } from "@/hooks/useResolvedFileId"
 import type { WorkspaceFile, WorkspaceFileContent } from "@/types"
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
 import { ShikiCode } from "@/components/chat/tool-bodies/ShikiCode"
@@ -172,13 +173,33 @@ function FilePreviewContent({
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  // Phase 088-05 (D-16): resolve a USABLE id before fetching. In the live
+  // (no-refresh) flow the file now arrives with its id on the SSE; if it's ever
+  // missing this backfills it from the GET listing by path (never an empty id →
+  // no `/files//content` 404).
+  const resolved = useResolvedFileId(threadId, file)
+
   useEffect(() => {
+    // Still backfilling the id from the GET listing → hold the spinner.
+    if (resolved.status === "resolving") {
+      setContent(null)
+      setError(false)
+      setLoading(true)
+      return
+    }
+    // No listing row matched the path (or the lookup failed) → graceful fallback.
+    if (resolved.status === "unresolved") {
+      setContent(null)
+      setError(true)
+      setLoading(false)
+      return
+    }
     const controller = new AbortController()
     let active = true
     setLoading(true)
     setError(false)
     setContent(null)
-    getWorkspaceFileContent(threadId, file.id ?? "", controller.signal)
+    getWorkspaceFileContent(threadId, resolved.id, controller.signal)
       .then((c) => {
         if (active) {
           setContent(c)
@@ -195,7 +216,7 @@ function FilePreviewContent({
       active = false
       controller.abort()
     }
-  }, [threadId, file.id])
+  }, [threadId, resolved.status, resolved.id])
 
   if (loading) {
     return (

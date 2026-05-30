@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Maximize2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getWorkspaceFileVersions, getWorkspaceFileDiff } from "@/lib/api"
+import { useResolvedFileId } from "@/hooks/useResolvedFileId"
 import type { WorkspaceFile, WorkspaceVersion, WorkspaceDiff } from "@/types"
 import { parseUnifiedDiff } from "@/lib/diffParse"
 import { DiffLines } from "./DiffLines"
@@ -32,7 +33,12 @@ export interface VersionDiffProps {
 }
 
 export function VersionDiff({ threadId, file }: VersionDiffProps) {
-  const fileId = file.id ?? ""
+  // Phase 088-05 (D-16): resolve a USABLE id before fetching versions/diff. In the
+  // live (no-refresh) flow the file now carries its id on the SSE; if it's ever
+  // missing this backfills it from the GET listing by path (never an empty id →
+  // no `/files//versions` 404).
+  const resolved = useResolvedFileId(threadId, file)
+  const fileId = resolved.id ?? ""
 
   const [versions, setVersions] = useState<WorkspaceVersion[]>([])
   // [base(before), target(after)] — base < target by convention (D5).
@@ -43,10 +49,19 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
 
   // ── Load the version list; default-select the latest two (Compare v{n-1}↔v{n}). ──
   useEffect(() => {
+    // Wait for a usable id; surface an error only if it can't be resolved.
+    if (resolved.status === "resolving") {
+      setError(false)
+      return
+    }
+    if (resolved.status === "unresolved") {
+      setError(true)
+      return
+    }
     const controller = new AbortController()
     let active = true
     setError(false)
-    getWorkspaceFileVersions(threadId, fileId, controller.signal)
+    getWorkspaceFileVersions(threadId, resolved.id, controller.signal)
       .then((vs) => {
         if (!active) return
         setVersions(vs)
@@ -68,11 +83,13 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
       active = false
       controller.abort()
     }
-  }, [threadId, fileId])
+  }, [threadId, resolved.status, resolved.id])
 
   // ── Fetch the diff for the selected pair (abort stale fetches — T-087-09). ──
   useEffect(() => {
-    if (!pair || pair.from === pair.to) {
+    // `pair` is only set after a successful versions fetch, so a real id is
+    // guaranteed here; the empty-id guard is belt-and-suspenders.
+    if (!pair || pair.from === pair.to || !fileId) {
       setDiff(null)
       return
     }

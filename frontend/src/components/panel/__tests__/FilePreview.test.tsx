@@ -22,8 +22,12 @@ import type { WorkspaceFile } from "@/types"
 import { mockContentInline, mockContentBucket } from "./fixtures"
 
 const getWorkspaceFileContent = vi.fn()
+// Phase 088-05 (D-16): FilePreview now resolves a usable id via the GET listing
+// when the selected file has none (useResolvedFileId) before fetching content.
+const getThreadWorkspaceFiles = vi.fn()
 vi.mock("@/lib/api", () => ({
   getWorkspaceFileContent: (...args: unknown[]) => getWorkspaceFileContent(...args),
+  getThreadWorkspaceFiles: (...args: unknown[]) => getThreadWorkspaceFiles(...args),
 }))
 
 vi.mock("@/components/chat/MarkdownRenderer", () => ({
@@ -55,6 +59,7 @@ const fileFor = (over: Partial<WorkspaceFile>): WorkspaceFile => ({
 describe("FilePreview (PANEL-03) — per-type routing + graceful fallback", () => {
   beforeEach(() => {
     getWorkspaceFileContent.mockReset()
+    getThreadWorkspaceFiles.mockReset()
   })
 
   it("inline + text/markdown → renders via MarkdownRenderer (reuse, not re-add)", async () => {
@@ -238,5 +243,49 @@ describe("FilePreview (PANEL-03) — per-type routing + graceful fallback", () =
     )
     await screen.findByText(/No preview available/i)
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  // ── Phase 088-05 (D-16): reconcile-if-missing-id guard. ──
+  // The live (no-refresh) deep-flow blocker was a selected file with NO id →
+  // `getWorkspaceFileContent(threadId, "")` → `/files//content` → 404. The guard
+  // backfills the id from the GET listing (by path) before fetching content.
+  it("D-16: file with NO id → reconciles via GET listing (by path), then fetches content by the REAL id", async () => {
+    getThreadWorkspaceFiles.mockResolvedValue([
+      // listing always carries ids (workspace.py:99); match on path → backfill id.
+      { id: "real-id-7", path: "analysis.md", size_bytes: 538, mime_type: "text/markdown", version: 1 },
+      { id: "other-id", path: "notes.md", size_bytes: 10, mime_type: "text/markdown", version: 1 },
+    ])
+    getWorkspaceFileContent.mockResolvedValue(
+      mockContentInline("text/markdown", "# Live flow\n", "analysis.md"),
+    )
+    render(
+      <FilePreview
+        threadId="thread-1"
+        // No `id` — exactly the broken live-SSE shape before this fix.
+        file={{ path: "analysis.md", size_bytes: 538, mime_type: "text/markdown", version: 1 }}
+        onBack={() => {}}
+      />,
+    )
+    // The preview renders (not the perpetual spinner / fallback) once the id resolves.
+    expect(await screen.findByTestId("markdown-renderer")).toHaveTextContent("# Live flow")
+    // And the content fetch used the backfilled REAL id — never the empty string.
+    await waitFor(() =>
+      expect(getWorkspaceFileContent).toHaveBeenCalledWith("thread-1", "real-id-7", expect.anything()),
+    )
+    expect(getWorkspaceFileContent).not.toHaveBeenCalledWith("thread-1", "", expect.anything())
+  })
+
+  it("D-16: file with an id → fetches content directly, NO GET-listing reconcile call", async () => {
+    getWorkspaceFileContent.mockResolvedValue(mockContentInline("text/markdown", "# Hi\n"))
+    render(
+      <FilePreview
+        threadId="thread-1"
+        file={fileFor({ id: "file-x", path: "summary.md", mime_type: "text/markdown" })}
+        onBack={() => {}}
+      />,
+    )
+    await screen.findByTestId("markdown-renderer")
+    expect(getWorkspaceFileContent).toHaveBeenCalledWith("thread-1", "file-x", expect.anything())
+    expect(getThreadWorkspaceFiles).not.toHaveBeenCalled()
   })
 })

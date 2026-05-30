@@ -1547,10 +1547,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             const next = new Map(s.workspaceFilesByThread)
             const prev = next.get(threadId) ?? EMPTY_FILES
             const idx = prev.findIndex((f) => f.path === file.path)
+            // Phase 088-05 (D-16): the workspace_file_written SSE now carries the
+            // persisted row `id`. DEFENSIVELY preserve a known id on the existing
+            // entry if an incoming update for the same path is ever missing one
+            // (legacy/replayed event) — never clobber a real id with undefined, or
+            // the live panel would regress to fetching `/files//content` → 404.
+            const merged =
+              idx === -1
+                ? file
+                : { ...file, id: file.id ?? prev[idx].id }
             const updated =
               idx === -1
-                ? [...prev, file]
-                : prev.map((f, i) => (i === idx ? file : f))
+                ? [...prev, merged]
+                : prev.map((f, i) => (i === idx ? merged : f))
             next.set(threadId, updated)
             return { workspaceFilesByThread: next }
           }),

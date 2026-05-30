@@ -232,9 +232,12 @@ describe("Phase 086 panel — dispatch routing (real SSE demux -> store)", () =>
   it("FC#9: each panel SSE event routes to its store Map with verified field names", async () => {
     mountProvider()
     const cbs = panelCallbacks(THREAD_A)
+    // Phase 088-05 (D-16): workspace_file_written now carries `id` (the persisted
+    // workspace_files row id) so the live panel can fetch content/versions/diff by
+    // id without a refresh. The store keys by `path` but threads the id through.
     const wire =
       'data: {"type":"todo_updated","todos":[{"id":"t1","content":"do it","status":"pending","parent_id":null,"order_index":0}]}\n\n' +
-      'data: {"type":"workspace_file_written","path":"out/a.txt","size_bytes":12,"mime_type":"text/plain","version":1}\n\n' +
+      'data: {"type":"workspace_file_written","id":"wf-1","path":"out/a.txt","size_bytes":12,"mime_type":"text/plain","version":1}\n\n' +
       'data: {"type":"ask_user_prompt","tool_call_id":"call-1","prompt":"ok?","options":["y","n"],"timeout_seconds":60}\n\n' +
       'data: {"type":"stream_end"}\n\n'
     vi.stubGlobal("fetch", mockSseFetch([wire]))
@@ -244,7 +247,30 @@ describe("Phase 086 panel — dispatch routing (real SSE demux -> store)", () =>
     const st = useStreamsStore.getState()
     expect(st.todosByThread.get(THREAD_A)?.[0].id).toBe("t1")
     expect(st.workspaceFilesByThread.get(THREAD_A)?.[0].path).toBe("out/a.txt")
+    // D-16 regression: the row id must survive the SSE→store path (an empty/absent
+    // id is what caused `/files//content` → 404 in the live no-refresh flow).
+    expect(st.workspaceFilesByThread.get(THREAD_A)?.[0].id).toBe("wf-1")
     expect(st.pendingAsksByThread.get(THREAD_A)?.[0].tool_call_id).toBe("call-1")
+  })
+
+  it("D-16: a later id-less workspace_file_written for the same path never clobbers a known id", async () => {
+    mountProvider()
+    const cbs = panelCallbacks(THREAD_A)
+    // First write carries the id (post-088-05 backend); a hypothetical replayed /
+    // legacy event for the SAME path arrives without one — the store must preserve
+    // the already-known id (defensive merge in setWorkspaceFileForThread).
+    const wire =
+      'data: {"type":"workspace_file_written","id":"wf-9","path":"out/b.txt","size_bytes":3,"mime_type":"text/plain","version":1}\n\n' +
+      'data: {"type":"workspace_file_written","path":"out/b.txt","size_bytes":6,"mime_type":"text/plain","version":2}\n\n' +
+      'data: {"type":"stream_end"}\n\n'
+    vi.stubGlobal("fetch", mockSseFetch([wire]))
+    await act(async () => {
+      await subscribeToRun("run-1", "0", cbs)
+    })
+    const files = useStreamsStore.getState().workspaceFilesByThread.get(THREAD_A) ?? []
+    expect(files).toHaveLength(1)
+    expect(files[0].id).toBe("wf-9") // preserved
+    expect(files[0].version).toBe(2) // but the rest of the update applied
   })
 
   it("FC#6: ask_user_response removes the pending ask by tool_call_id", async () => {

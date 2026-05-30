@@ -275,9 +275,13 @@ export interface Todo {
 }
 
 /** GET /threads/{tid}/workspace/files (workspace.py:99) +
- *  SSE workspace_file_written (tool_dispatcher.py:892, FLAT payload — no nested
- *  `file`, no `id`; carries path/version/size_bytes/mime_type). The store keys
- *  workspace files by `path` (SSE has no `id`), so `id` is optional here. */
+ *  SSE workspace_file_written (tool_dispatcher.py:892, FLAT payload — carries
+ *  id/path/version/size_bytes/mime_type). Phase 088-05 (D-16): the SSE now emits
+ *  the persisted row `id` too (it used to be GET-only), so the live panel can
+ *  fetch content/versions/diff by id without a refresh. The store still keys by
+ *  `path` (stable identity across version bumps); `id` stays optional because a
+ *  replayed/legacy event may lack it — the select→fetch path reconciles-by-GET
+ *  when it's missing (FilePreview / VersionDiff guard). */
 export interface WorkspaceFile {
   id?: string
   path: string

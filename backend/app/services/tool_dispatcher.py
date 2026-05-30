@@ -890,6 +890,14 @@ async def _handle_workspace_write(args: dict, ctx: ToolContext) -> ToolResult:
         )
         await ctx.emit(
             ctx.redis, ctx.run_id, 'workspace_file_written',
+            # Phase 088-05 (D-16): emit the persisted workspace_files row id so the
+            # live (no-refresh) panel can fetch content/versions/diff by id (those
+            # endpoints are id-keyed — workspace.py:124/202/238). Without it the FE
+            # upserts the file id-less and fetches `/files//content` → 404 until a
+            # page reload re-hydrates via the GET listing. ADDITIVE only: no field
+            # renamed/removed, same event name, same shared SSE vocabulary for every
+            # provider (no per-provider branch). result["file_id"] is already a str.
+            id=result["file_id"],
             path=result["path"],
             version=result["version"],
             size_bytes=result["size_bytes"],

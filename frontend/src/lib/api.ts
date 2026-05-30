@@ -298,8 +298,10 @@ export interface StreamCallbacks {
   // ──────────────────────────────────────────────────────────────────────────
   /** todo_updated SSE — FULL canonical todo list (full-state-replace). */
   onTodoUpdated?: (todos: Todo[]) => void
-  /** workspace_file_written SSE — built from the FLAT payload (no nested `file`,
-   *  no `id`; the store keys by `path`). */
+  /** workspace_file_written SSE — built from the FLAT payload (carries
+   *  id/path/version/size_bytes/mime_type; Phase 088-05 D-16 added `id`). The
+   *  store keys by `path`, but the `id` is now threaded through so the live panel
+   *  can fetch content/versions/diff without a refresh. */
   onWorkspaceFileWritten?: (file: WorkspaceFile) => void
   /** workspace_file_deleted SSE — removal keyed by `path`. */
   onWorkspaceFileDeleted?: (path: string) => void
@@ -542,9 +544,14 @@ export async function subscribeToRun(
         else if (t === "todo_updated" && callbacks.onTodoUpdated)
           callbacks.onTodoUpdated((parsed.todos ?? []) as Todo[])
         else if (t === "workspace_file_written" && callbacks.onWorkspaceFileWritten)
-          // FLAT payload — build the WorkspaceFile from path/version/size_bytes/
-          // mime_type (the SSE has no nested `file` and no `id`; store keys by path).
+          // FLAT payload — build the WorkspaceFile from id/path/version/size_bytes/
+          // mime_type (the SSE has no nested `file`; store keys by path). Phase
+          // 088-05 (D-16): thread the persisted row `id` through so the live panel
+          // fetches content/versions/diff by id (no refresh). `id` may be undefined
+          // on a legacy/replayed event — left optional; the store preserves a known
+          // id and the select→fetch path reconciles-by-GET if it's ever missing.
           callbacks.onWorkspaceFileWritten({
+            id: parsed.id as string | undefined,
             path: parsed.path as string,
             version: parsed.version as number | undefined,
             size_bytes: parsed.size_bytes as number,
