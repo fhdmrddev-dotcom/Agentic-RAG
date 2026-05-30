@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.7
-milestone_name: Milestone Context
-status: completed
-stopped_at: Completed 088-05-PLAN.md (verification capstone — phase 088 ALL 5 plans done)
-last_updated: "2026-05-30T08:51:40.219Z"
+milestone: v2.8
+milestone_name: Harness Engine & Workflow Mode
+status: in-progress
+stopped_at: Milestone v2.8 started via /gsd:new-milestone — defining requirements
+last_updated: "2026-05-30T09:30:00.000Z"
 last_activity: 2026-05-30
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 28
-  completed_plans: 28
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,20 +21,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.7 (Agent Workspace & Panel) SHIPPED + archived 2026-05-30 (tag v2.7). Next milestone: v2.8 Harness Engine & Plugin Contract — start with `/gsd:new-milestone`
+**Current focus:** v2.8 (Harness Engine & Workflow Mode) STARTED 2026-05-30 — defining requirements → research → roadmap. Plugin Contract deferred to v2.9.
 
 ## Current Position
 
-Phase: 088 (final phase of v2.7 — milestone shipped)
+Phase: Not started (defining requirements)
 Plan: —
-Status: v2.7 milestone COMPLETE + archived 2026-05-30 (tag v2.7)
-Next: Start v2.8 (Harness Engine & Plugin Contract) with `/gsd:new-milestone`. v2.8 carries: title-gen live-verify (BUG-260527-01, rolled forward unverified); Google secondary-model 404 routing artifact; per-provider task/ask_user gaps a universal text directive did not close (eval script `scripts/eval_cross_provider.py` is the v2.8 harness seed, D-08); chat-tool-card unification (BUG-260529-02 — its own v2.8 phase); 087 deferrals SEED-037 (office/PDF in-panel viewing + download), SEED-038 (artifacts unification), SEED-039 (panel reliability/fast-switch race).
-✅ 088-05 (Wave 3, verification capstone, checkpoint:human-verify) DONE 2026-05-30 — operator felt pass "approved". 088-VALIDATION.md filled: 4-axis cross-provider UAT scoreboard 6/6 PASS (OpenAI/Anthropic/Google(3.5) LIVE via Chrome MCP multi-tool write_todos+workspace_write+ask_user; OpenRouter/DeepSeek/Moonshot via the 088-04 6×4 eval multi-tool rows; parallel-thread PASS — Thread A streaming while Thread B composer+Send stayed enabled, the 075.3 global-isStreaming guard held, zero bleed; long-message PASS — 5321-char ≈5.2KB prompt round-tripped full-text no-truncation; gemini-2.5 provenance-only D-03). a11y: REAL rendered contrast FIXED both themes (dark 7.21:1 / light 4.66:1 after 6b5da2cf, was 3.59:1/4.01:1) + global :focus-visible ring + full keyboard-only walk + operator lived G-4 pass. Deep workspace flow verified LIVE no-refresh on Anthropic+Google (write→v2→VIEW DIFF→ask_user→respond→resume). D-17 gemini-3 thought_signature CLOSED-as-verified (Google axis CLEAN, zero 400; facts.md→v2 proves 2 sequential tool rounds echoed the signature; 075.4 Stage-4 hotfix holds; verified_closed_by: 088). 3 UAT blockers fixed in-088 under D-16 (all additive/panel-scoped, re-verified live): 7f650da0 workspace file-id in SSE (deep-flow 404 blocker), 6b5da2cf panel AA contrast tokens both themes (global tokens untouched), b0b8d735 todo status colors. nyquist_compliant: true; A11Y-01/02 signed off. Transient 503-on-snapshot + page-scroll-during-HMR recorded as non-issues (not reproducible / not code regressions).
-✅ 088-04 (Wave 2, SEED-034 fold-gate) DONE 2026-05-30 — VERDICT FOLDED: text-only universal write_todos + ask_user directive folded into threads.py:336 SYSTEM_PROMPT + openai_service tool descriptions (2f6e2523, TASK_TOOL untouched, no tool_choice forcing); AFTER 6×4 re-run = condition-b MET (OpenAI/Anthropic/OpenRouter `multi-tool` write_todos FAIL→PASS) + condition-c MET (Moonshot `task` FAIL proven sampling variance — re-confirmed PASS) + condition-a git-diff-proven text-only; eval extended 4→6 providers (added native deepseek+moonshot). Wave 1 recap: 088-01 vitest-axe gate + global focus ring + 2 aria-live + FilesSection aria-selected (89/89 panel tests); 088-02 `scripts/eval_cross_provider.py` (687 lines, localhost-gated, real-route, secret-safe); 088-03 `scenario-13-workspace-deep-flow.spec.ts` (294 lines, Anthropic+Google, no-refresh, 400-toEqual([]) D-17 check).
-Downstream: v2.7 Agent Workspace & Panel milestone COMPLETE on the build side (all 6 phases 083-088 shipped); next administrative step is verify + milestone close.
-Last activity: 2026-05-30
+Status: Milestone v2.8 (Harness Engine & Workflow Mode) started — defining requirements → research → roadmap
+Scope: HARNESS-01..03 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs) + MODE-01 (dual Deep/Harness mode) + folded SEED-029 (Continue button) / SEED-034 (eval-harness regression gate) / SEED-035 (tool-count budget) / SEED-036a (`task()` concurrency fair-share) + 2 polish riders (chat tool-card unification, Anthropic cross-provider parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9 (before v3.0). See PROJECT.md D-v2.8-01.
+Next: Research-first ON → 4 parallel harness-domain research agents → REQUIREMENTS.md → ROADMAP.md (gsd-roadmapper). Phase numbering continues from v2.7 (last phase 088 → v2.8 starts at **089**). Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale).
+Carry-forwards into v2.8 (verify at kickoff): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
+G-5 FIRING: `threads.py` (3,186 LOC, 9+ phases) — agent_runner extraction lands FIRST in v2.8 so the harness sits in a clean module.
+Last activity: 2026-05-30 — v2.8 started via /gsd:new-milestone
 
-Progress: [██████████] 100%
+Progress: [          ] 0% — requirements not yet defined
 
 ## Performance Metrics
 
