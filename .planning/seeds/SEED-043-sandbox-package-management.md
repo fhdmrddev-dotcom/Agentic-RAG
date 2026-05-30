@@ -102,3 +102,14 @@ Present during /gsd:new-milestone when the milestone scope matches:
 - Cross-provider is first-class here: the give-up failure was provider-specific (gpt-5.4),
   so half (b)'s reliability work must be validated across all native providers, not just
   the one that already obeys the prompt.
+- **OPEN ITEM — sandbox network reachability (gates half (b)).** Half (b) — the runtime
+  `pip install` fallback — only works if the sandbox container can reach PyPI. The
+  `Dockerfile.sandbox` comment claims "the sandbox network is sealed" (justifying the
+  omission of `requests`/`beautifulsoup4`), BUT the code does **not** set any
+  `network_mode` on the container (`sandbox_service.py` passes no network config, so
+  `llm_sandbox` uses Docker's default bridge = internet access). These contradict. If the
+  network is in fact sealed (at the Docker/compose level), runtime `pip install` is
+  **impossible** and baking into the image (half (a)) becomes the ONLY way to add a
+  package — which would make half (b) moot and half (a) mandatory. **Confirm the live
+  network mode of a running sandbox container (and whether `pip install` reaches PyPI)
+  before scoping half (b).** Flagged 2026-05-31; no live test run yet.
