@@ -60,8 +60,12 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   3. The cross-provider eval harness and the Playwright E2E backstop are GREEN **both before AND after** the extraction; the SSE event sequence is byte-identical per provider for a representative multi-tool run (captured snapshot diff = empty).
   4. SC#10 4-axis kickoff UAT passes on the extracted loop: a multi-tool prompt on each native provider, a parallel thread streaming while another accepts a prompt, and a ≥50-message / ≥5 KB long-message thread — exercised in BOTH `agent_mode` values (**General AND Explorer**), no behavior change.
   5. The CF-01 carry-forward sweep dispositions each item: title-gen on DeepSeek/Moonshot/Google (BUG-260527-01), Google secondary-model 404 routing, and the download-link payload — each marked verified-closed or re-opened with a re-open trigger.
-**Plans**: TBD
-**Notes**: G-5 satisfied here (`threads.py` hot-file extraction). The agent loop being lifted serves BOTH General and Explorer `agent_mode` (Explorer = 6 KB tools + dedicated prompt + `max_iterations=8`); the extraction MUST preserve the Explorer branch byte-identically (its tool-set, prompt, and iteration cap), and SC#4's kickoff UAT verifies it. SEED-037 download wire-up ships separately as a standalone `/gsd:quick` and is NOT a roadmap requirement.
+**Plans**: 4 plans (3 waves)
+- [ ] 089-01-PLAN.md — Prep + `agent_loop.py` skeleton (frozen `RunContext` / `AgentLoopResult` + the 3 pure helpers moved verbatim) + **seam-review checkpoint** (autonomous: false — D-089-04)
+- [ ] 089-02-PLAN.md — Additive proof harness: eval +zhipu/+minimax (native-7, D-089-09) + `capture_run_events`/`normalize` SSE helper + before/after diff runbook
+- [ ] 089-03-PLAN.md — Verbatim loop move into `run_agent_loop` + seam wiring + ~37 monkeypatch-target sweep + `AgentLoopResult` seam test (depends 089-01)
+- [ ] 089-04-PLAN.md — I1–I14 named VERIFICATION + AFTER SSE-diff/eval (operator-run) + 4-axis UAT (both modes) + CF-01 C1/C2/C3 dispositions (autonomous: false; depends 089-02, 089-03)
+**Notes**: G-5 satisfied here (`threads.py` hot-file extraction). The agent loop being lifted serves BOTH General and Explorer `agent_mode` (Explorer = 6 KB tools + dedicated prompt + `max_iterations=8`); the extraction MUST preserve the Explorer branch byte-identically (its tool-set, prompt, and iteration cap), and SC#4's kickoff UAT verifies it. SEED-037 download wire-up ships separately as a standalone `/gsd:quick` and is NOT a roadmap requirement. **Native-7** (D-089-05: +zhipu/GLM +minimax) is the hard pass/fail bar across the matrix — corrects the ROADMAP/REQUIREMENTS "6 native providers" wording for all of v2.8; OpenRouter best-effort, Ollama opportunistic.
 
 #### Phase 090: Harness Schema + RLS + Config Models
 **Goal**: The Postgres substrate for workflows exists — versioned immutable-on-publish definitions, run/phase tables, an audit trail — all RLS-scoped via the proven FK chain, with typed Pydantic models that parse the phase-config JSONB.
@@ -156,7 +160,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 0/0 | Not started | - |
+| 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 0/4 | Planned | - |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 0/0 | Not started | - |
 | 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
