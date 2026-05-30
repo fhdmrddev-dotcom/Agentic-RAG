@@ -4,14 +4,14 @@ milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: planning
 stopped_at: Phase 090 context gathered
-last_updated: "2026-05-30T19:45:40.128Z"
+last_updated: "2026-05-30T20:13:36.782Z"
 last_activity: 2026-05-30
 progress:
   total_phases: 8
   completed_phases: 1
-  total_plans: 4
+  total_plans: 7
   completed_plans: 4
-  percent: 100
+  percent: 57
 ---
 
 # Project State
@@ -198,4 +198,4 @@ Last session: --stopped-at
 Stopped at: Phase 090 context gathered
 Resume file: --resume-file
 
-**Planned Phase:** 089 (agent-loop-extraction-g-5-kickoff-uat) — 4 plans — 2026-05-30T12:03:18.356Z
+**Planned Phase:** 090 (harness-schema-rls-config-models) — 3 plans — 2026-05-30T20:13:36.774Z
