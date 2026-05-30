@@ -4,14 +4,14 @@ milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: verifying
 stopped_at: Phase 091 context gathered
-last_updated: "2026-05-30T21:11:07.994Z"
+last_updated: "2026-05-30T23:07:33.816Z"
 last_activity: 2026-05-30 -- Phase --phase execution started
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 7
+  total_plans: 14
   completed_plans: 7
-  percent: 100
+  percent: 50
 ---
 
 # Project State
@@ -198,4 +198,4 @@ Last session: --stopped-at
 Stopped at: Phase 091 context gathered
 Resume file: --resume-file
 
-**Planned Phase:** 090 (harness-schema-rls-config-models) — 3 plans — 2026-05-30T20:13:36.774Z
+**Planned Phase:** 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 7 plans — 2026-05-30T23:07:33.805Z
