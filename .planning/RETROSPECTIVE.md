@@ -325,6 +325,63 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.7 — Agent Workspace & Panel
+
+**Shipped:** 2026-05-30
+**Phases:** 6 (083-088) | **Plans:** 28 | **Tasks:** 50
+**Timeline:** 2026-05-27 → 2026-05-30 (3 days)
+**Commits:** 226
+**LOC delta:** +52,449 / −3,081 across 673 files
+
+### What Was Built
+
+- Tool-dispatch chain extracted from `threads.py` into a registry-pattern `tool_dispatcher.py` (G-5; 16 tools migrated byte-identical) + 4 carried v2.6 bugs closed (Phase 083)
+- Per-thread workspace filesystem: `workspace_files` + `workspace_file_versions`, hybrid inline-Postgres (≤256 KB) / Supabase Storage, FK-chain RLS, 5 tools, 4 owner-scoped GET endpoints, SSE write/delete events (Phase 084)
+- 3 new agent tools: `write_todos`, `task` (sub-agent — 1-level nesting + per-run `Semaphore(3)` / global Redis cap 20), `ask_user` (the codebase's first Redis pub/sub, cross-worker pause/resume) (Phase 085)
+- StreamsProvider SSE demux to dedicated Zustand stores; per-thread reconcile-on-switch hooks; zero chat-list re-renders on panel events (Phase 086)
+- Right-side workspace panel: open/rail/hidden ChatLayout grid, todos, file browser with per-type preview, client-side unified-diff viewer, ask_user answer surface + chat↔panel seam (Phase 087)
+- WCAG 2.1 AA on all 8 panel surfaces (vitest-axe gate, contrast fixed both themes, focus ring, keyboard walk) + live 4-axis cross-provider UAT 6/6 + SEED-034 fold + D-17 close (Phase 088)
+
+### What Worked
+
+- **Sketch-before-plan (G-2) for the panel** — Phase 087 built to operator-approved mockups (`sketch-findings-agentic-rag`) as the acceptance bar, not a code-first design. The panel still needed gap-closure waves (087-06/07/08) but every wave converged on the sketched contract.
+- **Strict build order** — tool-dispatch extraction first (083), workspace backend before panel (084→087), StreamsProvider demux before UI (086→087). Panel components built against working hooks, never mocks — the recurring "don't build UI before the events exist" discipline held.
+- **Verification-as-a-phase (088)** — making cross-cutting verification + a11y its own phase (not a post-hoc checklist) caught the real rendered-contrast failure (3.59:1 → 7.21:1) that the structural axe gate passed clean, plus 2 other live blockers (file-id 404, todo colors).
+- **In-band gap closure** — 083/084/085/087/088 each closed their own UAT-surfaced bugs within the phase (sub-agent 404 BUG-260528-01, ask_user crash BUG-260529-03, the 3 D-16 088 blockers) instead of spawning new phases — the 8-phase cascade never ballooned the way v2.6's 075.x did.
+- **Evidence-based SEED-034 fold** — 088 built `scripts/eval_cross_provider.py`, MEASURED per-provider tool-use across a 6×4 matrix before/after, and folded only a text-only directive proven +3 / −0. "Measure → gate → conditional-apply" is now a reusable provider-prompt-change pattern.
+
+### What Was Inefficient
+
+- **REQUIREMENTS.md traceability drift** — PANEL-05/06 shipped + verified in Phase 086 but the traceability table still read "Pending"/unchecked at close; required reconciliation. Same phase-by-phase status-mirror gap flagged in the v2.5 retro.
+- **STATE.md frontmatter drift** — `completed_phases`/`percent` showed 7 / 117% (overcounted) until the `milestone complete` CLI recomputed from `roadmap.analyze`. The frontmatter math isn't self-healing mid-milestone.
+- **086 localStorage write-path shipped as a read-only stub (WR-04)** — panel-Map hydration always returned empty because the write side omitted the Map params; caught at verification, closed via a follow-up quick task (260529-0sc) rather than in-phase.
+- **Two redundant panel toggles** — 087 first shipped a chat-header toggle AND an in-panel control with a confusing hidden state; 087-08 consolidated to one nav-style collapse-to-rail toggle. The toggle state machine should have been locked in the sketch before 087-02.
+- **Title-gen bug folded-but-unverified** — BUG-260527-01 was marked `folded_into: 083` but never live-verified; rolled forward to v2.8 at close. Folding a fix is not the same as proving it stopped reproducing.
+
+### Patterns Established
+
+- **`tool_dispatcher.py` registry** — new agent tools register in one place; `threads.py` stays out of tool-specific logic. The extraction that unblocked all 8 of v2.7's new tools.
+- **Redis pub/sub for cross-worker coordination** — `ask_user`'s SUBSCRIBE-first ordering + cancel sentinel + lifespan shutdown broadcast is the template for any future worker-spanning pause/resume under `WORKER_COUNT=2`.
+- **Panel events → dedicated Zustand keys (PANEL-06)** — never route panel state through chat `bucketsBySurface`; the isolation invariant that keeps a second UI surface from re-rendering the chat message list.
+- **Measure → gate → conditional-apply for shared-prompt changes** — a localhost-gated eval harness that proves +N / −0 before folding a provider-prompt change; `scripts/eval_cross_provider.py` is the v2.8 eval seed.
+- **Verification + a11y as a dedicated capstone phase** — structural axe gates pass on broken contrast; real rendered-contrast + keyboard walk + cross-provider scoreboard belong in their own phase with an operator felt-pass gate.
+
+### Key Lessons
+
+- Structural a11y gates (vitest-axe) are necessary but NOT sufficient — they passed while real rendered contrast was 3.59:1. Verify rendered contrast in both themes against the live DOM (G-4 lived-experience), not just the axe assertion.
+- Cross-provider tool-use reliability is a measurable property, not an assumption — the eval script turned "does `write_todos` fire on weak models?" into a 6×4 scoreboard. Build the harness before tuning the prompt.
+- Fold ≠ verify: a bug marked `folded_into` a phase still needs live-reproduction evidence before flipping to `closed`. Carry an explicit `re_open_trigger` when rolling an unverified fix forward.
+- Lock the interaction model in the sketch, not in code — the two-toggle panel confusion (closed by 087-08) leaked into implementation because the toggle state machine wasn't in the approved mockup.
+- A dedicated verification phase pays for itself — 088 found + fixed 3 real blockers that 5 prior phases of structural testing missed.
+
+### Cost Observations
+
+- Model mix: ~Opus 4.x for orchestration / planning / execution; eval + a11y + 4-axis UAT operator-driven via Chrome MCP and the real backend
+- Sessions: multiple across 3 days — 28 plans / 3 days ≈ 9.3 plans/day, the fastest milestone yet by plans/day
+- Notable: Phase 087 (panel UI, 8 plans incl. 3 gap-closure waves) and Phase 088 (verification capstone, ~1h40m on the final plan) consumed the most; backend phases 083-085 were clean single/dual-wave executions
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -334,3 +391,7 @@ Living retrospective — updated at each milestone boundary.
 | v2.1 Stability | 8 | 8 | 1.0 | 3 days |
 | v2.2 Trust & Compliance | 7 | 13 | 1.86 | 4 days |
 | v2.3 Memory, Multimodal & Experience | 11 | 27 | 2.45 | 3 days |
+| v2.4 Stability, Polish & UX Fixes | 12 (+2 deferred) | 42 | 3.5 | 8 days |
+| v2.5 Deployment Strategy | 16 (1 deferred) | 64 | 4.0 | 10 days |
+| v2.6 Foundation: RAG Quality + Multi-Worker + Polish | 35 | 91 | 2.6 | 16 days |
+| v2.7 Agent Workspace & Panel | 6 | 28 | 4.67 | 3 days |

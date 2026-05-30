@@ -1,5 +1,47 @@
 # Milestones
 
+## v2.7 Agent Workspace & Panel (Shipped: 2026-05-30)
+
+**Phases completed:** 6 phases (083–088), 28 plans, 50 tasks
+**Timeline:** 2026-05-27 → 2026-05-30 (3 days, 226 commits)
+**Files changed:** 673 files (+52,449 / −3,081 lines)
+
+**Key accomplishments:**
+
+- Provider-gated Kimi thinking content filter strips <think> tags from visible chat + title generation fixed for DeepSeek/Moonshot/MiniMax/GLM/Google with tier-aware model routing
+- Workspace filesystem schema landed -- workspace_files + workspace_file_versions tables, FK-chain RLS, and private storage bucket created in live local DB. Bootstrap full-schema.sql regenerated.
+- Workspace backend logic layer landed -- asyncpg helpers, response models, and a single workspace_service.py that hides hybrid storage routing (inline bytea <= 256KB / bucket > 256KB), enforces 10MB hard cap, 100-file soft warning, 8192-char read cap, path validation, and structured difflib diffing.
+- 5 workspace tools wired into the agent loop -- handlers in tool_dispatcher.py + LLM schemas in openai_service.get_tools(); write and delete emit SSE events for the Phase 086/087 panel UI.
+- 4 cold-path GET endpoints under /threads/{thread_id}/workspace -- list, content (inline or 60s signed URL), versions, diff. _verify_thread_ownership uses 404-not-403 to prevent existence leak. Router registered in main.py.
+- Three direct fixes that close the cross-provider UAT bandwidth blockers (Google ValidationError, OpenRouter list-empty, REST /content empty body) with 22 new unit tests pinning the behavior so future provider integrations can't silently regress.
+- The shared 087 foundation: 4 typed workspace api.ts client fns (content/versions/diff/answer), amber `--warning` + dim-text CSS tokens, a zero-dependency Radix-Dialog bottom-sheet primitive, and 7 GREEN-only panel test files (52 it.todo contracts) so every downstream wave builds against fixed signatures.
+- The PANEL-01 panel shell + PANEL-02 todos: `WorkspacePanel` hosts an open/rail/hidden grid-state machine (⌘./Ctrl+. toggle, <768px bottom-sheet, laptop-squeeze-aware), short-circuits to ONE calm `PanelEmpty` when idle, and composes the live Wave-1/2 sections (Todos · Files · Versions) into a fixed-order accordion with the `PendingAskStack` pinned at the very top — mounted as one additive sibling in `ChatLayout` (chat-view only) with the chat↔panel seam open-handlers wired via a module-level signal. The new `TodosSection` renders the reactive todo list with non-color-only status indicators. All 7 panel test files GREEN (67 live, 0 todo); full suite at the documented 17-failure baseline, no new failures.
+- The panel's file browser: `FilesSection` lists thread workspace files (icon + mono name + size·version meta, green flash on fresh write) and full-replaces into `FilePreview` — a per-type router that reuses MarkdownRenderer for md, ShikiCode for code, the new dependency-free `CsvTablePreview` `<table>` for csv, framed `<img>` for bucket images, and a calm "No preview available · Download" / "File too large to preview" fallback for null-url / binary / malformed / too-large content. All raw content is React-escaped or routed through sanitizing renderers — zero raw-HTML injection.
+- The PANEL-07 version-diff viewer: a pure client-side `parseUnifiedDiff` (no diff lib), a shared in-column `DiffLines` renderer (fixed 16px sign gutter, honest truncation notice), an opt-in `DiffExpandOverlay` in the existing Radix dialog (same payload, no second fetch), and `VersionDiff` with red-base/green-target accessible pills defaulting to Compare v{n-1}↔v{n} — 14 live tests GREEN (7 parser + 7 component).
+- The PANEL-04 answer surface (stacked amber `PendingAskCard`s with run_id-gated submit + resume-in-place) plus the three additive chat↔panel seam renderers (live `SeamPointer`, reload `SeamCard` that closes the `ask_user` reload gap, and the `PausedRunCue`), mounted strictly additively into the G-5 `MessageItem` with single-source-of-truth (D-05) and zero raw-JSON leak.
+- Hoisted the workspace-panel chat|panel split into a single ChatLayout-level CSS grid (1fr chat | clamp(300-420px)/52px/0 panel) so the panel resolves against the real row width — closing the overflow (gap 1), dead-band (gap 7), and per-thread-shift defects — lifted the open/rail/hidden state machine up to ChatLayout to host a persistent always-visible chat-header toggle (gap 3) with a pulsing-amber-dot ask_user-pending indicator (gap 4 / PANEL-01), and stripped the leaked DevTwoPaneMock debug overlay from the production tree (gap 2).
+- Dedicated `--panel-surface`/`--panel-border` tokens give the workspace panel + rail a distinct surface in both themes (gaps 5/6); Chrome-MCP gate verified the 004-panel-shell layout contract and routed the remaining feature contracts + cross-provider scoreboard to 087-08.
+- One nav-style in-panel workspace toggle (collapse-to-rail) replaces the two-control/hidden-state design; all four design contracts (004/005/006/007) + PANEL-02 + the cross-provider 4-axis scoreboard verified live — surfacing and fixing a real version-diff 500 and a todo-count bug.
+- WCAG 2.1 AA structural conformance closed on all 8 Phase 087 panel surfaces: vitest-axe wired as a durable regression gate, one global zero-specificity :focus-visible ring added, two targeted aria-live announcements (todo count + diff +N/−M), and the FilesSection always-false aria-selected fixed — all 89 panel tests green with zero regression past the 17-failure 086 baseline.
+- A reusable, localhost-gated `scripts/eval_cross_provider.py` that drives the REAL `POST /threads/{id}/messages` route per (provider × canonical-prompt) across OpenAI/Anthropic/Google-3.x/OpenRouter and asserts tool-invocation + arg-shape + DB persistence, emitting a greppable PASS/FAIL scoreboard as the SEED-034 fold-gate evidence source.
+- `scenario-13-workspace-deep-flow.spec.ts` — a provider-parameterized Playwright backstop that drives the full deep workspace flow (write -> see -> update -> diff -> ask_user -> respond -> resume) with NO page refresh on Anthropic AND Google, and asserts zero 400 INVALID_ARGUMENT on both (the D-17 gemini-3 thought-signature live re-verify at the network level).
+- SEED-034 resolved on evidence: a text-only universal `write_todos` + `ask_user` directive folded into the shared `SYSTEM_PROMPT` + tool descriptions — re-verified across an extended 6-provider × 4-prompt matrix to deliver 3 improvements (OpenAI/Anthropic/OpenRouter now invoke `write_todos` on multi-step work) with zero fold-attributable regression. VERDICT: FOLDED (kept at `2f6e2523`).
+- Live 4-axis cross-provider UAT (6 providers PASS) + WCAG 2.1 AA panel a11y re-verified in both themes (contrast fixed dark 7.21:1 / light 4.66:1) + Anthropic+Google deep-flow no-refresh pass + D-17 gemini-3 thought_signature closed-as-verified — recorded into 088-VALIDATION.md; Phase 088 verification gate complete.
+
+**Architectural decisions locked:**
+- FOUND-01: tool-dispatch chain extracted from `threads.py` (~3,800 LOC) into a registry-pattern `tool_dispatcher.py` — G-5 hot-file mandate satisfied; all new tools register here
+- 083-03: `_SINGLE_MODEL_PROVIDERS` frozenset drives tier-aware title-gen model routing; Kimi/Moonshot thinking filter is a provider-gated `<think>` state-machine (moonshot + deepseek only)
+- 084: per-thread workspace uses hybrid storage hidden behind `workspace_service.py` — inline bytea ≤256 KB / Supabase Storage bucket >256 KB; FK-chain RLS; owner endpoints return 404-not-403 to prevent existence leak
+- 085: first Redis pub/sub in the codebase (`ask_user`) — SUBSCRIBE-first ordering + cancel sentinel + uvicorn lifespan shutdown broadcast for cross-worker safety under `WORKER_COUNT=2`; sub-agent `task` capped at 1-level nesting + dual concurrency (per-run `Semaphore(3)` + global Redis Lua-atomic cap 20); tool registry 21→24 (migration 055)
+- PANEL-06: panel SSE events route to dedicated Zustand keys, never chat `bucketsBySurface` — a panel update triggers zero chat-message-list re-renders
+- 087: the chat|panel split is ONE `ChatLayout`-level CSS grid (1fr chat | clamp(300–420px) panel); G-2 sketch-before-plan honored; 087-08 consolidated to a single nav-style in-panel toggle (collapse-to-rail), dropping the redundant chat-header toggle + hidden state
+- 088 / SEED-034: the universal `write_todos`/`ask_user` tool-use directive is TEXT-ONLY — no `tool_choice` forcing, `TASK_TOOL` untouched; eval gate judged on the native providers via `scripts/eval_cross_provider.py`
+- D-17 (gemini-3 `thought_signature`): closed-as-verified — Google-axis deep-flow + multi-tool rounds clean (zero 400 INVALID_ARGUMENT); the 075.4 Stage-4 echo hotfix holds
+
+**Known deferred items at close:** 27 acknowledged (11 pre-GSD micro-tickets; 4 dormant seeds SEED-002/003/004/005; cosmetic UAT status fields; 083 + 085 verification `human_needed` gaps — operator-approved). Plus 087 panel deferrals **SEED-037** (in-panel office/PDF/PPTX viewing + working download), **SEED-038** (chat-vs-panel artifacts unification), **SEED-039** (panel reliability / fast-switch race). Plus v2.8 carry-forwards: title-gen live-verify on DeepSeek/Moonshot/Google (BUG-260527-01, rolled forward unverified), Google secondary-model 404 routing artifact, per-provider `task`/`ask_user` gaps a text-only directive did not close (eval script is the v2.8 harness seed, D-08), and chat-tool-card unification (BUG-260529-02, major — its own v2.8 phase). See STATE.md `## Deferred Items` for the full inventory.
+
+---
+
 ## v2.6 Foundation: RAG Quality + Multi-Worker + Polish (Shipped: 2026-05-27)
 
 **Phases completed:** 35 phases (068–082 including inserts), 91 plans complete
@@ -19,6 +61,7 @@
 9. Cross-cutting verification gate — 5/5 SCs GREEN, 24/24 REQ-IDs Validated, 7 seeds dispositioned (6 closed, 1 partial-consumed).
 
 **Architectural decisions locked:**
+
 - D-PRD-12: Multi-worker enablement — D-v2.5-02 formally superseded; WORKER_COUNT=2 default; revert via env var flip
 - D-v2.6-01: supabase-py 2.10 → 2.29.x upgrade (httpx conflict resolved)
 - D-v2.6-04: Opt-in re-extraction via `POST /documents/{id}/reextract`
@@ -44,6 +87,7 @@
 6. Skills test infrastructure repair (Phase 065) — eradicated AttributeError on `app.api.threads.create_streaming_chat` across 11 patch sites + 19 tuple-wrapped fakes (065-01); 3 export-test assertion drifts fixed (065-02); 11 tests migrated to canonical Phase 063 POST→GET-stream pattern using `_build_mock_supabase()` (065-03). Combined skills test run: 26/26 pass. Foundation for Skill Studio milestone.
 
 **Architectural decisions locked:**
+
 - D-v2.5-01: blocking I/O in async handlers must be wrapped via `run_in_threadpool` / `aexec`
 - D-v2.5-02: single uvicorn worker (multi-worker masks concurrency bugs)
 - D-v2.5-03: Realtime is best-effort hint, not source of truth — always reconcile via fetch on (re)connect

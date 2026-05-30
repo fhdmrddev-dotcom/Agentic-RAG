@@ -4,10 +4,10 @@ title: Kimi thinking/reasoning text leaks into main chat content
 reported: 2026-05-26
 surface: Agentic-RAG
 severity: medium
-status: folded
+status: closed
 affected_areas: [backend/streaming, frontend/chat]
 folded_into: "083"
-verified_closed_by: null
+verified_closed_by: "083"
 related_seeds: [SEED-032]
 re_open_trigger: null
 reproduces_on:

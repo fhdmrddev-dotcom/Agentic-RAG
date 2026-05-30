@@ -4,10 +4,10 @@ title: Output files not visible after page reload — finalOutputFiles SSE-only
 reported: 2026-05-26
 surface: Agentic-RAG
 severity: medium
-status: folded
+status: closed
 affected_areas: [frontend/chat, backend/streaming]
 folded_into: "083"
-verified_closed_by: null
+verified_closed_by: "083"
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
