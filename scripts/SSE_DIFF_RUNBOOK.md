@@ -10,10 +10,22 @@ is a PURE behavior-preserving lift. Its acceptance bar is **byte-identical SSE p
 provider**, NOT "tests pass" — the suite mocks the LLM and so proves only plumbing,
 never the per-provider round-trip invariants. The proof is two-pronged (D-089-08):
 
-- **(a) SSE-diff:** capture each provider's SSE event sequence BEFORE the lift, capture
-  the identical run AFTER, assert the normalized diff is EMPTY.
+- **(a) SSE structural-skeleton diff:** capture each provider's SSE event sequence
+  BEFORE the lift, capture the identical run AFTER, assert the **structural-skeleton**
+  diff is EMPTY (`diff_skeletons`).
 - **(b) Eval backstop:** `scripts/eval_cross_provider.py` `EVAL_SUMMARY` native-7 all-pass
   BEFORE and AFTER.
+
+> **SC#3 MECHANISM NOTE (established empirically 2026-05-30).** A *raw* per-index
+> SSE diff is NOT a valid gate: repeating the SAME pre-move loop on Anthropic 3×
+> produced 36 / 33 / 34 events — the LLM streams the same content in a varying number
+> of `delta` / `tool_args_progress` chunks, so the raw diff is non-empty even with
+> ZERO code change. The **structural skeleton** (`capture_run_events.skeleton` /
+> `diff_skeletons` — event-type order + tool names/sequence + code-exec lifecycle +
+> terminal classification, collapsing the volatile chunk-types) WAS byte-identical
+> across all 3 runs (24-token skeleton). The skeleton is the SC#3 pass/fail gate; the
+> raw `diff_event_streams` is kept for forensic inspection only. The turnkey driver
+> `scripts/capture_sse_baseline.py --mode after` already gates on the skeleton.
 
 **This plan (089-02) runs in Wave 1 — BEFORE the verbatim move (Plan 03) and the CF-01
 sweep (Plan 04). So the BEFORE baseline below is captured against the PRE-MOVE loop NOW.**
@@ -145,23 +157,35 @@ that is a capture problem to resolve before the lift, not a pass.
 
 ## 3. AFTER procedure (Plan 04 / post-lift)
 
-Re-run the IDENTICAL pinned prompt per provider against the EXTRACTED loop, capture +
-normalize, and assert an empty diff against the saved baseline:
+Just run the turnkey driver in AFTER mode — it captures the identical pinned prompt per
+provider against the EXTRACTED loop and asserts an empty **structural-skeleton** diff
+against each saved baseline:
+
+```
+backend/venv/Scripts/python.exe scripts/capture_sse_baseline.py --mode after
+```
+
+It prints per-provider `PASS — skeleton identical` / `BLOCK — N structural skeleton diffs`
+and a final `SSE_DIFF_RESULT: PASS|BLOCK` line. Equivalent inline form:
 
 ```python
-from scripts.capture_run_events import capture_run_events, normalize, diff_event_streams
-# ... same driver, but instead of saving:
+from scripts.capture_run_events import capture_run_events, normalize, diff_skeletons
 after = normalize(await capture_run_events(redis, run_id))
 before = json.loads((BASELINE_DIR / f"{provider}.json").read_text(encoding="utf-8"))
-diff = diff_event_streams(before, after)
-print(f"AFTER {provider}: {'PASS (empty diff)' if diff == [] else f'BLOCK — {len(diff)} diffs'}")
+diff = diff_skeletons(before, after)   # structural skeleton — the SC#3 gate
+print(f"AFTER {provider}: {'PASS (empty skeleton diff)' if diff == [] else f'BLOCK — {len(diff)} structural diffs'}")
 for idx, b, a in diff:
     print(f"  [{idx}] before={b}  after={a}")
 ```
 
-- **Empty `diff_event_streams(before, after) == []` per native-7 provider == SC#3 PASS.**
-- **Any non-empty diff on a native-7 provider == the lift changed behavior → BLOCK** the
-  phase, investigate, do NOT proceed. (OpenRouter diff is logged, not blocking — D-089-07.)
+- **Empty `diff_skeletons(before, after) == []` per native-7 provider == SC#3 PASS.**
+- **Any non-empty SKELETON diff on a native-7 provider == the lift changed observable
+  structure → investigate.** Re-run before+after 2–3× to rule out occasional LLM
+  tool-path noise (the agent choosing a different number of tool calls); a *persistent*
+  structural diff == a real regression → BLOCK the phase, do NOT proceed. (OpenRouter
+  skeleton diff is logged, not blocking — D-089-07.)
+- The raw `diff_event_streams` diff is expected to be non-empty (chunk-noise) and is
+  informational only — never gate on it.
 
 ---
 

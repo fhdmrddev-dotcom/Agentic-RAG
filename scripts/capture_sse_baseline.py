@@ -50,7 +50,17 @@ from scripts.capture_run_events import (  # noqa: E402
     capture_run_events,
     normalize,
     diff_event_streams,
+    skeleton,
+    diff_skeletons,
 )
+
+# Windows consoles default to cp1252 and crash on Unicode status marks (✓/⚠/✗);
+# force UTF-8 so the driver prints cleanly whether to a console or a pipe.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 — reconfigure unsupported on some wrapped streams
+        pass
 
 # The PINNED representative multi-tool prompt — identical BEFORE and AFTER
 # (SSE_DIFF_RUNBOOK.md §1; search_documents + execute_code, SC#10 multi-tool axis).
@@ -136,17 +146,24 @@ async def main() -> int:
                     native7_failures.append((provider, "missing BEFORE baseline"))
                 continue
             before = json.loads(baseline_path.read_text(encoding="utf-8"))
-            diff = diff_event_streams(before, events)
-            if diff == []:
+            # SC#3 GATE = structural skeleton (deterministic). Raw diff is informational
+            # only: it is expected to be non-empty from LLM chunk-noise even with zero
+            # code change (proven 2026-05-30), so it must NOT gate.
+            sk_diff = diff_skeletons(before, events)
+            raw_diff = diff_event_streams(before, events)
+            if sk_diff == []:
                 print(f"  ✓ AFTER {provider}/{model} [{tag}]: status={status}, "
-                      f"PASS (empty diff, {len(events)} events)")
+                      f"PASS — skeleton identical ({len(skeleton(events))} tokens; "
+                      f"raw {len(raw_diff)} chunk-noise diffs, informational)")
             else:
                 print(f"  ✗ AFTER {provider}/{model} [{tag}]: status={status}, "
-                      f"BLOCK — {len(diff)} diffs")
-                for idx, b, a in diff[:10]:
-                    print(f"      [{idx}] before={b}  after={a}")
+                      f"BLOCK — {len(sk_diff)} STRUCTURAL skeleton diffs:")
+                for idx, b, a in sk_diff[:15]:
+                    print(f"      [{idx}] before={b!r}  after={a!r}")
+                print(f"      (re-run before+after 2-3x to rule out LLM tool-path noise "
+                      f"before declaring a regression)")
                 if is_hard:
-                    native7_failures.append((provider, f"{len(diff)} SSE diffs"))
+                    native7_failures.append((provider, f"{len(sk_diff)} structural skeleton diffs"))
 
     conn.close()
     await redis.aclose()

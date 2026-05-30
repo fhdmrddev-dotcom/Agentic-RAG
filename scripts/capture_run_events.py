@@ -102,9 +102,15 @@ def diff_event_streams(before: list[dict], after: list[dict]) -> list:
 
     Returns a list of ``(index, before_event, after_event)`` tuples for every
     position where the normalized streams disagree (including length mismatch,
-    where the shorter side reports ``None`` for the missing position). An EMPTY
-    list == byte-identical SSE == SC#3 PASS for that provider. Any non-empty
-    result means the lift changed observable behavior → BLOCK.
+    where the shorter side reports ``None`` for the missing position).
+
+    NOTE (empirically established 2026-05-30): a RAW per-index diff is NOT a
+    valid SC#3 gate against live providers. Repeating the SAME pre-move loop on
+    Anthropic 3× produced 36 / 33 / 34 events — the LLM streams the same content
+    in a varying number of ``delta`` / ``tool_args_progress`` chunks (and slightly
+    different wording), so this raw diff is non-empty even with ZERO code change.
+    Use ``diff_skeletons`` for the SC#3 pass/fail gate; this raw diff is retained
+    for FORENSIC inspection (eyeballing exactly which content bytes moved).
     """
     nb = normalize(before)
     na = normalize(after)
@@ -112,6 +118,72 @@ def diff_event_streams(before: list[dict], after: list[dict]) -> list:
     for i in range(max(len(nb), len(na))):
         b = nb[i] if i < len(nb) else None
         a = na[i] if i < len(na) else None
+        if b != a:
+            diffs.append((i, b, a))
+    return diffs
+
+
+# Event types whose *content* is non-deterministic streaming chunk-noise: the same
+# assistant text / tool-call args arrive split into a different NUMBER of chunks
+# run-to-run. Proven 2026-05-30 (Anthropic, identical code): delta 12/10/11,
+# tool_args_progress 4/3/3 — while every structural event count was identical.
+# The skeleton collapses each maximal run of these to a single content-masked marker.
+_VOLATILE_STREAM_TYPES: tuple[str, ...] = ("delta", "tool_args_progress")
+
+
+def skeleton(events: list[dict]) -> list[str]:
+    """Deterministic STRUCTURAL skeleton of an SSE event stream (the SC#3 gate).
+
+    Live LLMs make a raw per-index diff false-positive (see ``diff_event_streams``).
+    The skeleton keeps only the layer that is deterministic across repeated runs of
+    the SAME loop AND that genuinely changes when behavior changes:
+
+    - event-type ordering (the grammar of the stream);
+    - tool IDENTITY + order — ``tool_start``/``tool_preparing`` carry the tool
+      ``name`` (which tools, in what sequence — the 075.x regressions dropped/reordered these);
+    - the code-execution lifecycle (``code_execution_start`` → ``code_stdout`` →
+      ``code_execution_complete``);
+    - the terminal classification — ``done``/``stream_end`` carry whether an error
+      was set (the I10 terminal-race / terminal-status invariant).
+
+    Volatile streaming chunk-types (``delta``, ``tool_args_progress``) are collapsed
+    to a single content-masked marker so their varying chunk COUNT is ignored.
+
+    Empirically verified: identical across 3 repeated runs of the same pre-move loop
+    (24-token skeleton, byte-stable) while raw event counts varied 36/33/34.
+    """
+    out: list[str] = []
+    for e in events:
+        t = e.get("type")
+        if t in _VOLATILE_STREAM_TYPES:
+            if out and out[-1] == t:          # collapse consecutive chunk-runs
+                continue
+            out.append(t)
+        elif t in ("tool_start", "tool_preparing"):
+            out.append(f"{t}:{e.get('name')}")          # tool identity is deterministic + meaningful
+        elif t in ("done", "stream_end"):
+            out.append(f"{t}:error={e.get('error') is not None}")  # terminal classification
+        else:
+            out.append(t)
+    return out
+
+
+def diff_skeletons(before: list[dict], after: list[dict]) -> list:
+    """Per-index differences of ``skeleton(before)`` vs ``skeleton(after)``.
+
+    Returns ``(index, before_token, after_token)`` tuples for every position where
+    the structural skeletons disagree (length mismatch reports ``None`` for the
+    missing side). An EMPTY list == structurally byte-identical SSE == SC#3 PASS
+    for that provider. A non-empty result means the lift changed observable
+    structure (a dropped/reordered event, a different tool sequence, a changed
+    terminal classification) → investigate; on a native-7 provider that BLOCKS.
+    """
+    sb = skeleton(before)
+    sa = skeleton(after)
+    diffs: list = []
+    for i in range(max(len(sb), len(sa))):
+        b = sb[i] if i < len(sb) else None
+        a = sa[i] if i < len(sa) else None
         if b != a:
             diffs.append((i, b, a))
     return diffs
