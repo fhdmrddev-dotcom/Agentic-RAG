@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: executing
-stopped_at: Phase 090 context gathered
-last_updated: "2026-05-30T20:14:51.367Z"
-last_activity: 2026-05-30 -- Phase --phase execution started
+status: phase_complete
+stopped_at: Phase 090 complete (VERIFICATION passed — schema + RLS + config models)
+last_updated: "2026-05-31T00:00:00.000Z"
+last_activity: 2026-05-31 -- Phase 090 shipped (migrations 056-060, harness.py, 8/8 live-DB verify)
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_phases: 2
+  total_plans: 10
+  completed_plans: 7
+  percent: 25
 ---
 
 # Project State
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 090
+**Current focus:** Phase 090 COMPLETE — next is Phase 091 (harness engine)
 
 ## Current Position
 
-Phase: --phase (090) — EXECUTING
-Plan: 1 of --name
-Status: Executing Phase --phase
+Phase: 090 (Harness Schema + RLS + Config Models) — ✅ COMPLETE (VERIFICATION passed)
+Plans: 3/3 shipped (090-01 models+tests, 090-02 migrations 056-059, 090-03 manual apply + live verify); +migration 060 (code-review WR-01 fix)
+Status: Phase 090 shipped — substrate live (4 tables + threads.active_workflow_run_id), RLS + immutable-on-publish + INSERT-only audit all confirmed against the live local DB; 8/8 verify_090_run.sql blocks PASS; harness.py Pydantic models 8/8 unit tests pass. full-schema.sql regenerated.
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
-Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
+Next: `/gsd:discuss-phase 091` — the harness engine: state-machine runtime over the 090 substrate, 5 phase executors, validation gates, the HARNESS-05 tool whitelist. Phase 091 consumes workflow_definitions/runs/phases + the harness.py PhaseConfig models (field shapes are provisional in 090 — finalize against the engine here).
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
 G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.

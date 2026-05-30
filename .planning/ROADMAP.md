@@ -40,7 +40,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 ### Phases
 
 - [ ] **Phase 089: Agent-Loop Extraction (G-5) + Kickoff UAT** — Behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` (byte-identical cross-provider SSE), plus the v2.7 carry-forward UAT sweep.
-- [ ] **Phase 090: Harness Schema + RLS + Config Models** — Migrations 056+ for workflow definitions/runs/phases/audit, immutable-on-publish trigger, FK-chain RLS, Pydantic phase-config models.
+- [x] **Phase 090: Harness Schema + RLS + Config Models** — Migrations 056+ for workflow definitions/runs/phases/audit, immutable-on-publish trigger, FK-chain RLS, Pydantic phase-config models. ✅ Shipped 2026-05-31 (migrations 056–060 applied live, 8/8 verify blocks PASS, models 8/8 tests).
 - [ ] **Phase 091: Harness Engine + 5 Phase Types + Gates + Whitelist** — The milestone core: state-machine engine, 5 phase executors, validation gates with bounded retry, per-phase tool-whitelist enforcement, seed templates, tool-count budget.
 - [ ] **Phase 092: Dual-Mode Wiring + Continue Button** — Deep/Harness toggle, per-thread workflow-lock, server-side lock enforcement, Cancel, and the SEED-029 Continue affordance.
 - [ ] **Phase 093: Anthropic Cross-Provider Parity** — Evidence-first (LangSmith) summary-tail + iteration-bloat fixes for Anthropic, real task descriptions for non-Anthropic providers; shared-path-safe.
