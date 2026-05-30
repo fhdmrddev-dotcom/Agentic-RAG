@@ -155,6 +155,7 @@ Surfaced for any reconcile/snapshot/message-list change (relevant to Phase 089 e
 |---|-------------|------|--------|-----------|
 | 260529-0sc | Fix Phase 086 WR-04: persist panel todo/task Maps to localStorage write-path (closes the sole blocking gap from 086-VERIFICATION.md) | 2026-05-28 | 62c1cf0 | [260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t](./quick/260529-0sc-fix-phase-086-wr-04-persist-panel-todo-t/) |
 | 260529-1wb | Fix BUG-260529-01: write_todos crashes on stringified `todos` arg — json.loads coercion + isinstance guards so weak/OpenRouter models get a self-correcting error instead of a crash loop (RED→GREEN regression test) | 2026-05-28 | c756522 | [260529-1wb-fix-bug-260529-01-write-todos-crashes-on](./quick/260529-1wb-fix-bug-260529-01-write-todos-crashes-on/) |
+| 260530-wjp | Fix cross-provider native-tools: deepseek/moonshot/minimax/zhipu infer native_tools=True on registry-miss model ids (was big-3 only) → real tool calls instead of narrated/fabricated text (closes zhipu/minimax tool-calling + workspace breakage); +`<think>` strip for minimax/zhipu; canonical newest-first model lists (DB). Verified live: minimax-m2.7 real workspace_write + zhipu glm-4-plus real search_documents | 2026-05-30 | d87047c1 | [260530-wjp-infer-native-tools-for-deepseek-moonshot](./quick/260530-wjp-infer-native-tools-for-deepseek-moonshot/) |
 
 ## Deferred Items
 
