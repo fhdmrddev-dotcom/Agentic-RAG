@@ -289,10 +289,25 @@ _INFERENCE_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 _INFERENCE_FALLBACK_PROVIDER: str = "ollama"
 
 # D-075.3-07: safe defaults per inferred provider. native_tools True for the
-# big-3 (openai/anthropic/google); False for openrouter/ollama. max_output_tokens
+# native-tool providers (see _NATIVE_TOOL_PROVIDERS below: big-3 + deepseek/
+# moonshot/minimax/zhipu); False for openrouter/ollama. max_output_tokens
 # 8192 for big-3 + ollama; 4096 for openrouter (more heterogeneous backends,
 # safer ceiling). Timeout 90s for all (matches the D-066-03 "fast / mini-tier").
 _BIG_3_PROVIDERS: frozenset[str] = frozenset({"openai", "anthropic", "google"})
+# Providers whose OpenAI-compatible endpoints support native function calling
+# per their OWN official docs (verified 2026-05-30): openai/anthropic/google
+# (big-3) PLUS the four OpenAI-compatible native providers deepseek / moonshot /
+# minimax / zhipu. Used to set native_tools for INFERRED (registry-miss) models
+# so a mis-cased or not-yet-registered model id (e.g. 'glm-4-plus',
+# 'minimax-m2.7' lowercase) still gets NATIVE tool-calling instead of falling to
+# structured mode (which never sends the tools param → the model narrates — and
+# even fabricates — tool calls as text; live-confirmed on minimax-m2.7).
+# Scoped on purpose: openrouter (heterogeneous backends) and ollama (local
+# models with unreliable tool support) intentionally stay native_tools=False.
+# See memory project-cross-provider-native-tools-registry-trap.
+_NATIVE_TOOL_PROVIDERS: frozenset[str] = _BIG_3_PROVIDERS | frozenset(
+    {"deepseek", "moonshot", "minimax", "zhipu"}
+)
 _INFERRED_DEFAULT_MAX_TOKENS: dict[str, int] = {
     "openai": 8192,
     "anthropic": 8192,
@@ -344,7 +359,7 @@ def _build_inferred_defaults(model_id: str, provider: str) -> ModelCapability:
     ``model_id`` are escaped by the formatter — T-075.3-02-02 mitigation.
     """
     cap: ModelCapability = {
-        "native_tools": provider in _BIG_3_PROVIDERS,
+        "native_tools": provider in _NATIVE_TOOL_PROVIDERS,
         "provider": provider,
         "llm_call_timeout_seconds": _INFERRED_DEFAULT_TIMEOUT_S,
         "max_output_tokens": _INFERRED_DEFAULT_MAX_TOKENS.get(provider, 8192),

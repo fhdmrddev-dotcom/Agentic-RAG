@@ -1608,7 +1608,12 @@ async def run_agent_loop(
                                 # content and route to reasoning_content instead.
                                 # DeepSeek included for defense-in-depth (some models via
                                 # OpenRouter may also use <think> tags in content).
-                                if active_provider_name in ("moonshot", "deepseek"):
+                                # minimax + zhipu added 2026-05-30: MiniMax M2 emits <think>
+                                # inline in content by default (reasoning_split off, per
+                                # platform.minimax.io docs) and GLM-4.6+ can too; live-confirmed
+                                # a minimax <think> leak into visible content. No-op when the
+                                # provider instead uses a separate reasoning_content field.
+                                if active_provider_name in ("moonshot", "deepseek", "minimax", "zhipu"):
                                     _visible = ""
                                     _reasoning = ""
                                     _remaining = _content
