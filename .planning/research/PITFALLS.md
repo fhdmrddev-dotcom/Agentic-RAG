@@ -1,311 +1,434 @@
-# Domain Pitfalls: v2.7 Agent Workspace & Panel
+# Pitfalls Research
 
-**Domain:** Adding workspace filesystems, right-side panels, sub-agent tools, and agent-pause/resume to an existing run-backed streaming chat platform
-**Researched:** 2026-05-27
-**Scope:** Pitfalls specific to THIS codebase (Agentic RAG v2.6 architecture), not generic advice
+**Domain:** Deterministic workflow harness (LLM state machine) + dual-mode UX on a mature multi-provider streaming agent platform
+**Researched:** 2026-05-30
+**Confidence:** HIGH (grounded in actual substrate — `tool_dispatcher.py`, `task_service.py`, `ask_user_service.py`, `threads.py` agent_runner, `openai_service.get_tools`; cross-checked against v2.7 PRD §3/§6/§7 + durable-execution prior art)
+
+> **Scope note.** These pitfalls are specific to adding a harness/workflow-runtime + Deep/Harness dual-mode to *this* codebase. Generic "state machines are hard" advice is omitted. Every prevention names a real file:line and an owning phase. Phase numbers below are the v2.8 phases the roadmapper will create; where the v2.7 PRD §12 already proposed a phase shape (079=schema, 081=harness scaffold), I reference that intent but renumber to the real v2.8 head (the milestone renumbers migrations from **056+** per PROJECT.md, and the PRD's 079-089/migration-125-139 numbers are stale fiction from before the v2.7/v2.8 split).
+
+> **Phase-ownership legend (used throughout):**
+> - **P-EXTRACT** — `agent_runner` extraction from `threads.py` into a clean `harness/agent_loop` module (G-5 FIRING — must land FIRST).
+> - **P-SCHEMA** — migrations 056+ (workflow_definitions / workflow_runs / workflow_phases / immutable trigger / RLS).
+> - **P-ENGINE** — harness state-machine engine (transitions, validators, persistence, resume).
+> - **P-ENFORCE** — per-phase tool-whitelist enforcement at the dispatch seam.
+> - **P-BATCH** — `llm_batch_agents` fan-out + concurrency.
+> - **P-MODE** — dual-mode UX + workflow-lock + mid-thread switch.
+> - **P-EVAL** — cross-provider eval harness (SEED-034 regression gate) + tool-count budget (SEED-035).
+> - **P-VERIFY** — cross-cutting verification (resume smoke test, 4-axis UAT, Chrome MCP).
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, 075.x-style cascades, or cross-provider regressions.
+### Pitfall 1: Cross-provider regression from editing the shared streaming/tool-dispatch hot path
 
-### Pitfall 1: threads.py God-Function Compounding (G-5 FIRES)
+**What goes wrong:**
+The harness needs per-phase tool whitelisting, which the v2.7 PRD §6 row 1 wires into "the tool dispatcher inside the agent loop." If that wiring edits the shared per-provider streaming branches in `threads.py` (the Anthropic branch ~L1897, Google branch ~L2025, OpenAI-compat branch ~L2169, all feeding one `tool_calls_buffer`) or the shared `dispatch_tool` path, a change that looks correct for one provider silently breaks another. This is the exact failure class that produced the entire 075.x cascade (8 phases): Gemini-3 `thought_signature` drops, Anthropic 22-iteration loops, OpenRouter duplicate outputs, the global `isStreaming` lockout — each from a shared-path edit.
 
-**What goes wrong:** The PRD names `threads.py:1059` (agent_runner) and `:1186-1198` (skill catalog injection) as the two modification sites for harness tool-dispatcher whitelist enforcement. But threads.py is already 3843 LOC, has been touched by 9+ phases in v2.6 alone (G-5 fires), and the tool dispatch section (lines 2548-3600+) is a monolithic `for tool_index, tc in enumerate(tool_calls):` with ~50 `elif` branches for each tool name. Adding `workspace_write`, `workspace_read`, `workspace_list`, `workspace_diff`, `workspace_delete`, `write_todos`, `task`, and `ask_user` means 8 more `elif` branches in that same giant function, plus the harness whitelist pre-check, plus `ask_user` pause/resume coordination.
+**Why it happens:**
+The agent loop has 3 provider-specific accumulation branches that converge on a single `tool_calls_buffer` and a single `dispatch_tool` call site (`threads.py:2677`). Adding "check the phase whitelist" feels like a one-line insert at the convergence point, but the providers differ in *when* tool calls finalize (Anthropic emits `end_turn` not `tool_calls`; Google attaches `thought_signature`; DeepSeek/Moonshot need `reasoning_content` round-trip). A refusal that mutates `messages` or `tool_calls_buffer` in the wrong spot corrupts a provider that wasn't tested.
 
-**Why it happens:** The tool dispatch site was never extracted from the agent_runner closure. Every new tool adds another branch inside a 2400-line nested function definition that closes over `redis`, `run_id`, `supabase`, `current_user`, `thread_id`, `user_settings`, `messages`, etc. The closure capture makes extraction non-trivial.
+**How to avoid:**
+- **Enforce at the dispatch boundary, not in the streaming branches.** The clean seam is `dispatch_tool(tool_name, args, ctx)` (`tool_dispatcher.py:1495`) and its call site (`threads.py:2677`). `ToolContext` *already carries* `available_tools: list[str]` (`tool_dispatcher.py:88`, populated at `threads.py:2656-2659`). The whitelist check is purely additive: before invoking the handler, if `ctx.workflow_phase_tools is not None and tool_name not in ctx.workflow_phase_tools`, return `ToolResult(result=<tool_not_available_in_phase JSON>)`. This rides the SAME `tool_result` → `messages` → next-iteration path every provider already uses. No streaming branch touched.
+- **There is a proven in-codebase precedent:** `_handle_task` (`tool_dispatcher.py:1090-1110`) already refuses out-of-subset tools by returning a friendly `ToolResult` string — generalize THAT pattern, don't invent a new one.
+- **Mode-gate the whole feature to a no-op when no workflow is active.** When `threads.active_workflow_run_id IS NULL`, `ctx.workflow_phase_tools` stays `None` and the dispatcher is byte-identical to today. Deep Mode (the default, every existing user) is provably untouched.
+- **Honor CLAUDE.md `feedback_no_cross_provider_regressions`:** provider fixes must be provider-scoped or additive; never modify the shared chunk handler / SSE emitter in ways that break a working provider. The whitelist edit must be a pure pre-check, never a streaming-branch edit.
 
-**Consequences:** (1) Merge conflicts when parallel phases touch the same tool dispatch block. (2) Any shared-path change (e.g., `_emit` call ordering, tool_result format, error handling) risks cross-provider regression (exactly what happened with BUG-260523-01 through BUG-260523-03 after 075.3). (3) The file becomes unnavigable for code review, increasing the chance of silent bugs.
+**Warning signs:**
+A diff to any of `threads.py` lines ~1897 / ~2025 / ~2169 (provider branches), to `tool_calls_buffer` assembly, or to `_emit`/`_emit_terminal`. Any change whose test plan exercises only one provider. A whitelist check placed *inside* a `if active_provider_name == ...` block.
 
-**Prevention:**
-- **Phase 079 or 080 MUST include a threads.py extraction phase BEFORE adding tools.** Extract the tool dispatch `for` loop into a `backend/app/services/tool_dispatcher.py` module with a registry pattern (dict mapping tool_name to async handler callable). Each handler receives a typed context object instead of closing over 15+ variables. This is the G-5 refactor the hot-file ledger demands.
-- The harness whitelist pre-check should live in the dispatcher module, not inline in agent_runner. The dispatcher reads `workflow_phases.available_tools` from an in-memory cache and refuses before calling the handler.
-- New tools (`workspace_*`, `write_todos`, `task`, `ask_user`) register as handler functions in separate modules, never as `elif` branches.
-
-**Detection:** If a phase plan's `files_modified` list includes `backend/app/api/threads.py` with more than 30 LOC net-add in the tool dispatch section, the G-5 guardrail should fire.
-
-**Affected phases:** 080 (workspace tools), 081 (harness engine whitelist), 082 (three new LLM tools), 083 (panel streams integration)
-
----
-
-### Pitfall 2: ask_user Pause/Resume Breaks the Agent Loop's Assumption of Continuous Execution
-
-**What goes wrong:** The current agent_runner (threads.py:1381-3800) is a single `async def` that runs to completion inside an `asyncio.Task`. It has ONE await pattern: `async for chunk in stream:` inside `asyncio.timeout()`. There is no mechanism for pausing mid-execution, waiting for external input, then resuming with that input injected as a tool_result.
-
-`ask_user` requires: (1) emit `ask_user_prompt` SSE event, (2) PAUSE the agent loop, (3) wait for `POST /runs/{run_id}/ask_user_response`, (4) inject the user's response as the tool_result, (5) RESUME the loop for the next iteration.
-
-**Why it happens:** The agent loop was designed as a fire-and-forget producer. Adding a "wait for external event" primitive is an async coordination pattern the loop has never needed. The naive approach (insert an `await asyncio.Event()` inside the tool dispatch) creates several hazards:
-- The `asyncio.timeout()` per-LLM-call timer does not cover tool execution (by design, per threads.py:1411-1417). But `ask_user` could wait indefinitely for user input. If wrapped in the per-call timeout, legitimate long user-think-time would trigger `timed_out`. If NOT wrapped, the producer task could hang forever.
-- The `_shielded_finalize` block assumes the producer terminates naturally or via exception. A paused producer that's cancelled during uvicorn shutdown would hit the finally-block with partial state.
-- Multi-worker: if the user responds and the POST hits a different worker, that worker must signal the paused producer on the original worker. Redis pub/sub or a shared coordination key is needed.
-
-**Consequences:** (1) Deadlocked producer tasks that never emit terminal sentinels, leaving the frontend in permanent "streaming" state. (2) Token/cost leaks from LLM calls whose results are never delivered. (3) Race conditions between the pause event and the cancel/stop flow (user presses Stop while agent is paused). (4) Cross-worker resume failures in multi-worker mode.
-
-**Prevention:**
-- Implement `ask_user` as an `asyncio.Event` per-run, stored in a module-level registry (like `RUN_TASKS`). The `POST /runs/{run_id}/ask_user_response` endpoint sets the event + stores the response payload. The tool dispatch handler awaits the event with a dedicated timeout (`ask_user_timeout_seconds`, default from `app_settings` or tool arg).
-- The pause MUST be OUTSIDE the per-LLM-call `asyncio.timeout()` wrapper (tools are already outside it per line 1411-1417).
-- Add a dedicated timeout for `ask_user` (configurable, default 300s). On timeout, inject a tool_result like `"User did not respond within the time limit."` and continue the loop (do NOT terminate the run).
-- The `_shielded_finalize` block must check for and resolve any pending `ask_user` Event before finalizing (defensive cleanup).
-- Multi-worker coordination: use a Redis key `ask_user:{run_id}` with BLPOP/pub-sub. The POST endpoint writes the response to Redis; the paused producer's Event is triggered by a background listener on that key. This mirrors the existing `run:{run_id}` Stream pattern.
-
-**Detection:** Any implementation that puts `await` inside the tool dispatch `for` loop without a timeout wrapper and cross-worker coordination is a bug.
-
-**Affected phases:** 082 (`ask_user` tool implementation), 081 (harness `llm_human_input` phase type uses the same mechanism)
+**Phase to address:** P-EXTRACT (extract the loop cleanly first so the seam is obvious), P-ENFORCE (add the additive pre-check), P-EVAL (the eval harness is the regression backstop), P-VERIFY (4-axis UAT).
 
 ---
 
-### Pitfall 3: StreamsProvider Demultiplexer — Panel Events Triggering Chat Re-renders
+### Pitfall 2: Tool-whitelist enforcement bypass — non-whitelisted tool crashes instead of being refused-and-fed-back
 
-**What goes wrong:** The v2.6 `<StreamsProvider>` Context was designed for a single consumer surface ("chat"). Adding the panel as a second consumer means new SSE event types (`workspace_file_written`, `todo_updated`, `workflow_phase_*`, `ask_user_prompt`, etc.) flow through the same `subscribeToRun` callback chain. If the `makeStreamCallbacks` factory in StreamsProvider.tsx (line 214+) dispatches these events via `setMessagesForBucket`, every panel event triggers a React state update that cascades to the chat message list, causing needless re-renders.
+**What goes wrong:**
+The state-machine guarantee is "the model literally cannot escape the phase." If a refused tool call throws (KeyError, unhandled exception, or a malformed `tool_result` the provider rejects on the next round), the run dies or hangs instead of cleanly telling the LLM "that tool isn't available now, here's what is." Worse: if the refusal isn't fed back as a normal `tool_result`, the provider's next call sees an `assistant` tool-call turn with no matching `tool` response → 400 error (every provider requires the tool-call/tool-result pairing — see the DeepSeek `reasoning_content` and Gemini `thought_signature` round-trip constraints at `threads.py:2604-2620`).
 
-**Why it happens:** The current `onDelta`/`onToolStart`/`onToolEnd`/etc. callbacks all funnel through `setMessagesForBucket(surfaceId, threadId, updater)`, which mutates `bucketsBySurface` — a single Map. Even if the panel uses a different surfaceId, the Map reference changes, causing all subscribers to re-evaluate. The `React.memo(MessageItem)` from Phase 075.4 helps but doesn't prevent the list-level reconciliation.
+**Why it happens:**
+Developers model the whitelist as "remove the tool from `get_tools()` so the model never sees it." But models hallucinate tool names anyway (and the schema list and the enforcement list can drift). The dispatcher must handle "model emitted a tool not in this phase" as a *normal, expected* event, not an exception.
 
-**Consequences:** (1) Visible jank on long message threads when the agent writes workspace files frequently (e.g., `workspace_write` emitting 10+ events per iteration). (2) "StreamsProvider caused N re-renders" DevTools warnings. (3) Battery/CPU cost on mobile where the bottom-sheet panel is hidden but events still trigger state changes.
+**How to avoid:**
+- **The substrate already does this correctly for unknown tools:** `dispatch_tool` returns `ToolResult(result=f"Unknown tool: {tool_name}")` for any unregistered name (`tool_dispatcher.py:1497-1499`) — never raises. The phase-whitelist refusal must follow the identical shape: return a structured `ToolResult`, e.g. `{"error": "tool_not_available_in_phase", "tool": name, "available": [...], "hint": "call one of the available tools"}`.
+- **Belt-and-suspenders: also constrain the schema.** Filter `get_tools(user_settings)` to the phase's `available_tools` so the model's tool-choice menu matches enforcement (reduces refusals to ~zero in the happy path). But NEVER rely on schema-filtering alone — enforcement at dispatch is the actual guarantee.
+- **The call site already swallows tool exceptions** (`threads.py:2690-2698`: `json.JSONDecodeError` / `ValueError` / `RuntimeError` / bare `Exception` all map to a `tool_result` string and `_emit('tool_end')`). The refusal path inherits this safety net. Add a test that asserts the refused call produces a `tool` message with matching `tool_call_id` so the next provider round is well-formed.
+- **Emit a `tool_not_available_in_phase` event on the run stream** so the panel can show "blocked tool X" — this is observability, riding the existing `_emit` XADD path (no new substrate).
 
-**Prevention:**
-- Panel state MUST live in a SEPARATE Zustand slice or separate keys in streamsStore, NOT in `bucketsBySurface`. New state shape: `panelState: Map<threadId, PanelThreadState>` where `PanelThreadState = { todos: Todo[], workspaceFiles: WorkspaceFile[], workflowPhases: WorkflowPhase[], pendingAskUser: AskUserPrompt | null }`.
-- The `subscribeToRun` SSE parser in `api.ts` needs new callback arms for each panel event type (e.g., `onTodoUpdated`, `onWorkspaceFileWritten`, `onWorkflowPhaseStart`). These are dispatched to the panel state slice, NOT to `setMessagesForBucket`.
-- The demultiplexer logic should be in the `makeStreamCallbacks` factory (StreamsProvider.tsx:214+), routing by event type BEFORE the callback fires. Chat events go to the existing message-bucket path; panel events go to the new panel-state path.
-- Use Zustand selectors with shallow equality (`useStreamsStore(selector, shallow)`) for panel hooks so only the affected panel section re-renders.
+**Warning signs:**
+A run that 500s or hangs when the model picks a wrong tool. A provider 400 ("tool_call_id has no matching tool response" / "tool_use ids must have tool_result") on the iteration AFTER a refusal. A refusal path that doesn't append a `{"role": "tool", "tool_call_id": ...}` message.
 
-**Detection:** Chrome DevTools Profiler: if a `workspace_file_written` event causes `MessageList` to re-render, the demux is leaking. Add a Vitest unit that asserts panel events do NOT trigger `bucketsBySurface` mutations.
-
-**Affected phases:** 083 (panel scaffold — this is where the demux architecture is decided), 080 (workspace tools emitting SSE events)
-
----
-
-### Pitfall 4: Hybrid Storage Content Leak via Workspace File Reads in Agent Context
-
-**What goes wrong:** When the agent calls `workspace_read(path)`, the tool handler must return the file content as a tool_result string. For large files stored in Supabase Storage (>256KB), this means downloading the file from the bucket, converting to string, and injecting into the LLM context. A single 256KB+ file as a tool_result could consume 85K+ tokens, blowing the context window and triggering inter-iteration trim (Phase 018's rolling trim), which may evict OTHER tool results the agent needs.
-
-**Why it happens:** The existing `read_document` tool already has a 3K char cap (D-22, threads.py line ~2578). But workspace files are agent-authored — the agent may write a 500KB research document and later try to `workspace_read` it. The hybrid storage threshold (256KB) means the largest inline files are already context-budget-threatening, and bucket files can be arbitrarily large.
-
-**Consequences:** (1) Context window overflow causing trim of earlier messages, breaking multi-iteration reasoning. (2) Expensive token consumption (a 256KB file at chars/3 ratio = ~85K tokens = $0.50+ per read on expensive models). (3) Silent quality degradation: the agent reads a large file but trim removes the search results it retrieved earlier.
-
-**Prevention:**
-- `workspace_read` MUST have a content cap, analogous to `read_document`'s 3K char cap. Default: `app_settings.workspace_read_max_chars` (recommend 8K chars, ~2.7K tokens — generous enough for plan files, safe for context budgets).
-- For files larger than the cap, return a truncation summary: first N chars + `"[Truncated — full file is {size_bytes} bytes. Use workspace_read(path, start_line=X, end_line=Y) to read specific sections.]"`
-- The `workspace_diff` tool should return a SUMMARY diff (hunks only, not full before/after), with the delta_from_prev JSONB providing compact representation.
-- Never inject raw bytea content into the tool_result for binary files. Return metadata only: `{"path": "/output.pptx", "size_bytes": 1234567, "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "note": "Binary file — cannot display inline. Use the workspace file browser in the panel to download."}`.
-
-**Detection:** Add a unit test asserting `workspace_read` tool_result length never exceeds `workspace_read_max_chars + 200` (200 chars for truncation message).
-
-**Affected phases:** 080 (workspace tools implementation)
+**Phase to address:** P-ENFORCE (owns the refusal contract). Cross-provider correctness verified in P-EVAL + P-VERIFY (4-axis: a refusal row per provider).
 
 ---
 
-### Pitfall 5: task Tool Sub-Agent Spawning Exhausts asyncio Task Registry and Redis Streams
+### Pitfall 3: State-machine deadlock — a phase that never advances (stuck `active`/`gate_validating`)
 
-**What goes wrong:** The `task` tool spawns a sub-agent that creates a new `run:{sub_run_id}` Redis Stream and a new `asyncio.Task` registered in `RUN_TASKS` (threads.py:92). The PRD's `llm_batch_agents` phase type fans out N parallel sub-agents. At 50 concurrent parent runs with batch phases spawning 5 sub-agents each = 250 concurrent sub-agent tasks. Combined with 50 parent tasks = 300 entries in `RUN_TASKS` + 300 Redis Streams.
+**What goes wrong:**
+A phase enters `active` and the run sits forever: an `llm_agent` phase whose model keeps calling tools and never self-terminates; a `programmatic` phase whose Python function hangs on I/O; a `gate_validating` phase whose `on_failure: retry` loops; a phase whose only valid next tool isn't in its own whitelist (an unreachable transition — the model is told "you may only call X" but X cannot satisfy the gate, so it can never produce the output the gate wants). The run's `status` stays `active`, no terminal sentinel is emitted, the panel timeline freezes mid-phase.
 
-**Why it happens:** The current `RUN_TASKS` dict is a global module-level registry with no size cap. The AnyIO threadpool ceiling is 200 (per STACK.md:122). Sub-agent tasks are `asyncio.Task` instances (not threadpool threads), so they don't hit the threadpool ceiling directly, but they DO compete for the event loop's time-slice. 300 concurrent coroutines each doing LLM API calls + Redis XADDs can saturate the event loop.
+**Why it happens:**
+The harness has TWO independent "who decides we're done" authorities that can disagree: the per-phase `max_steps` cap (LLM-loop bound) and the validation gate (output bound). If a phase's whitelist makes the gate unsatisfiable, neither fires cleanly. Also: the existing agent loop's `force_no_tools` safety (`threads.py:1868` — last iteration forces a text response) is per-RUN, not per-PHASE; a naive `llm_agent` phase reimplementation can omit it.
 
-**Consequences:** (1) Event loop starvation: existing parent run SSE consumers see latency spikes because sub-agent tasks dominate the event loop. (2) Redis memory pressure from 300 concurrent Streams (each buffering up to MAXLEN 10000 entries). (3) Orphaned sub-agent tasks if the parent run is cancelled — the parent's `_shielded_finalize` currently has no mechanism to cancel child tasks.
+**How to avoid:**
+- **Every phase MUST have a wall-clock cap AND a step cap, both enforced by the backend, not the LLM.** The PRD §5 already specifies `HARNESS_PHASE_MAX_DURATION_SEC=600` env default + per-phase `max_duration_seconds` override — wrap each phase's execution in `asyncio.wait_for(..., timeout=phase_max_duration)`. This mirrors the per-LLM-call timeout machinery already proven in v2.5 Phase 066 and the `asyncio.wait_for` Docling wall-clock fail-safe in Phase 071.1.
+- **`llm_agent` phases reuse the existing `force_no_tools`-on-last-iteration guard** (`threads.py:1868`) — port it into the extracted loop so the final step always forces a tool-free answer. This is exactly why P-EXTRACT must land first: the guard must live in the shared extracted loop, not be re-implemented per phase.
+- **Phase timeout → `on_failure` handler, never silent.** A phase that hits its wall-clock or step cap transitions to `failed` (or `skipped`/`retry` per config) with a `workflow_phase_end{status: 'failed', reason: 'timeout'}` event. The backend owns this transition.
+- **Validate workflow definitions at PUBLISH time** for reachability: every gate's required output must be producible by at least one tool in that phase's whitelist; every `skip_to_phase:<slug>` target must exist. A static lint at publish prevents authoring an unsatisfiable phase.
 
-**Prevention:**
-- Implement a per-run sub-agent cap: `max_sub_agents_per_run` (default 5, configurable). The `task` tool refuses to spawn beyond this cap, returning a tool_result error.
-- Implement a global sub-agent cap: `max_concurrent_sub_agents` (default 50). Enforced at spawn time with a module-level counter.
-- Sub-agent tasks MUST be registered as children of the parent run. Add a `parent_run_id` field to the `runs` table INSERT. On parent cancellation or failure, cascade-cancel all children.
-- The `_shielded_finalize` block must include a sub-agent cleanup step: `for child_run_id in _child_run_ids: cancel_child(child_run_id)`.
-- The `task` tool's sub-agent should NOT use the full `agent_runner` closure (which closes over the parent's `supabase`, `redis`, `thread_id`, etc.). Instead, factor sub-agent execution into a standalone async function in a new module (`backend/app/services/task_runner.py`) that receives explicit parameters.
+**Warning signs:**
+`workflow_runs.status = 'active'` with `current_phase_id` unchanged for > phase timeout. No `workflow_phase_end` after a `workflow_phase_start`. A phase whose `validators` reference a file/field no whitelisted tool can write. CPU pinned by a `programmatic` phase.
 
-**Detection:** Add a load test (or at least a unit test) that spawns 10 concurrent `task` calls and verifies: (1) all complete, (2) `RUN_TASKS` dict size returns to baseline after completion, (3) Redis Streams are EXPIRED.
-
-**Affected phases:** 082 (`task` tool), 081 (`llm_batch_agents` phase type)
-
----
-
-### Pitfall 6: 075.x Cascade Redux — Insufficient Cross-Provider UAT on New SSE Event Types
-
-**What goes wrong:** v2.7 introduces 13 new SSE event types (per PRD section 5). Each event type must be: (1) emitted correctly by the backend across 4 provider paths (OpenAI, Anthropic, Google, OpenRouter), (2) parsed correctly by `subscribeToRun` in api.ts, (3) routed correctly by the StreamsProvider demultiplexer, (4) rendered correctly by the panel UI. The v2.6 075.x cascade (8 phases) happened because new SSE events were only tested on OpenAI, and cross-provider regressions surfaced in UAT after closeout.
-
-**Why it happens:** The 4 provider streaming paths have structurally different event shapes:
-- OpenAI: `delta.tool_calls[].function.arguments` streaming with index-based tool accumulation
-- Anthropic: `content_block_start` / `content_block_delta` with text/tool_use discriminator
-- Google: native SDK with `Part` objects and `thought_signature` round-trip
-- OpenRouter: OpenAI-compatible but with quirks (synthetic timeout, `:extended` model IDs, duplicate output dedup)
-
-New SSE events like `workspace_file_written` are emitted from the tool dispatch section which is SHARED across providers, but the timing/ordering relative to provider-specific events (`delta`, `tool_preparing`, `tool_end`) differs.
-
-**Consequences:** Provider-specific regressions discovered post-ship, requiring insert-phases (075.1, 075.2, 075.3, 075.4 were all cross-provider fix-ups).
-
-**Prevention:**
-- MANDATORY per CLAUDE.md SC#10: any phase touching streaming or SSE events MUST include UAT rows for all 4 providers + multi-tool + parallel-thread + long-message scenarios.
-- For v2.7 specifically: create a `v2.7-sse-event-matrix.md` test matrix with every new event type x every provider. Fill it during Phase 080 (first phase emitting new events) and verify it at Phase 089 (cross-cutting verification).
-- Add a backend integration test for each new event type that asserts: event is emitted, event has the correct JSON shape, event appears in the Redis Stream after XADD.
-- Frontend Vitest unit for each new callback arm in `subscribeToRun` (api.ts) — parse a mock SSE line and assert the correct callback fires.
-
-**Detection:** If a phase ships without a 4-provider UAT row for each new SSE event type it introduces, flag it at verify-work.
-
-**Affected phases:** 080, 081, 082, 083 (all emit new SSE events)
+**Phase to address:** P-ENGINE (timeouts + transition authority + publish-time reachability lint), P-EXTRACT (the shared force-no-tools guard).
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 4: Validation-gate infinite-retry loop
 
-### Pitfall 7: Workspace File Versioning Accumulation Without Cleanup
+**What goes wrong:**
+A phase with `on_failure: retry` and a deterministically-failing validator (the model can't satisfy the `json_schema`, the `workspace_file_exists` file is never written, a buggy `programmatic` validator always returns False) retries forever — burning tokens, money, and a global concurrency slot. This is Pitfall 3's twin but specifically the gate path.
 
-**What goes wrong:** Every `workspace_write` creates a new `workspace_file_versions` row (PRD Q-v2.7-02 recommendation a). An agent that iteratively refines a plan file across 20 iterations creates 20 version rows. Across 1000 threads with 10 workspace files each and 10 versions per file = 100K version rows. The PRD acknowledges this (Section 7 row 6, Section 11) and defers TTL to v3.4, but the accumulation starts immediately.
+**Why it happens:**
+`retry` is the intuitive default for "gate failed," but retries without a cap assume the failure is transient. Many gate failures are *structural* (the prompt can't produce schema-valid output) and retrying is futile.
 
-**Prevention:**
-- Add a soft cap: `app_settings.workspace_max_versions_per_file` (default 50). On exceeding, prune oldest versions (keeping version 1 and the most recent N).
-- The `workspace_file_versions` table needs an index on `(workspace_file_id, version DESC)` for efficient latest-version queries and pruning.
-- The `workspace_diff` tool should warn when requesting diffs between very old versions (>20 apart) that the diff may be large.
+**How to avoid:**
+- **Cap retries per phase** (`max_retries`, recommend default 2-3, hard ceiling configurable). After the cap, escalate to `on_failure_final` (fail_run or skip), never loop. Persist `retry_count` in `workflow_phases` so the cap survives a worker restart (otherwise a restart mid-retry resets the counter → Pitfall 5 interaction).
+- **Distinguish transient vs structural failure.** A `json_schema` validation failure on attempt N with identical model output as attempt N-1 is structural — short-circuit immediately (don't waste the remaining retries). Hash the phase output; if two consecutive retries produce byte-identical failing output, fail fast.
+- **Feed the validator error back into the retry prompt.** A blind retry repeats the mistake; a retry that includes "your output failed schema validation: <error>" gives the model a chance to self-correct (turns a structural failure into a recoverable one). This mirrors the self-correcting tool-error pattern already used for weak-model arg coercion (`tool_dispatcher.py:1219-1242`).
+- **Every retry increments the run's token counters** (PRD §6 row 8 — harness phases write `runs.input_tokens/output_tokens`) so a runaway retry is visible in spend telemetry, and a future spend cap can kill it.
 
-**Affected phases:** 080 (workspace tools), 079 (schema — add the index)
+**Warning signs:**
+`workflow_phases.status = 'gate_validating'` cycling. Token counters climbing on a run with no panel progress. Identical `validator_results` payloads on consecutive `workflow_phase_gate_check` events. A `programmatic` validator with no observed True return.
 
----
-
-### Pitfall 8: Harness Tool Whitelist Cache Staleness Across Phase Transitions
-
-**What goes wrong:** The PRD (Section 6 row 1) recommends caching the active phase's `available_tools` whitelist in-memory per `run_id` to avoid a Postgres roundtrip on every tool dispatch. But if the cache isn't invalidated precisely at phase transitions, a tool call at the boundary could be evaluated against the OLD phase's whitelist, incorrectly refusing a tool that IS allowed in the new phase (or worse, allowing one that isn't).
-
-**Prevention:**
-- The phase transition function in `harness_engine.py` MUST: (1) write the new phase row to Postgres, (2) invalidate the in-memory cache for the run_id, (3) THEN emit the `workflow_transition` SSE event. The ORDER matters — cache-invalidation before SSE ensures the next tool dispatch reads the correct whitelist.
-- Use a simple dict keyed by `run_id` with a monotonic `phase_index` as the cache key. On each tool dispatch, compare the cached `phase_index` with the current `workflow_runs.current_phase_id` — if mismatched, refresh.
-- In Deep Mode (no active workflow), skip the cache entirely — `available_tools` is None, meaning all tools are allowed.
-
-**Affected phases:** 081 (harness engine)
+**Phase to address:** P-ENGINE (retry cap + structural-failure detection + error-feedback prompt).
 
 ---
 
-### Pitfall 9: Right-Side Panel Layout Breaking Mobile Responsive
+### Pitfall 5: Resumability edge cases — worker restart mid-phase, mid-LLM-call, mid-ask_user-pause
 
-**What goes wrong:** The current `ChatLayout.tsx` (line 70) is a simple `flex h-screen` with NavPanel + main content. Adding a ~30% right-side panel changes the layout to a 3-column structure. The mobile breakpoint (<768px) requires the panel to become a bottom-sheet. The existing mobile drawer (lines 87-182) already uses `fixed inset-y-0 left-0 z-50` — if the panel bottom-sheet uses a similar z-index and positioning, the two can overlap or fight for gesture space.
+**What goes wrong:**
+HARNESS-RUN-01's promise is "kill uvicorn, restart, resume, no state loss." But the failure modes are subtle:
+- **Mid-LLM-call restart:** the `create_adaptive_streaming_chat` call was in flight; the partial completion is lost. If the phase was marked `active` but no output persisted, resume must RE-RUN the phase, not skip it. If it was double-marked `completed` optimistically before the output landed, resume skips a phase that never produced output.
+- **Mid-`programmatic`-phase restart:** the Python function had side effects (wrote a workspace file, called an external API). Re-running on resume double-applies them unless the function is idempotent.
+- **Mid-`ask_user`-pause restart:** the paused handler was blocked on a Redis SUBSCRIBE (`_handle_ask_user`, `tool_dispatcher.py:1396-1417`). On restart, the SUBSCRIBE is gone — but the `messages` row with `kind='ask_user_prompt'` was persisted FIRST (`tool_dispatcher.py:1358-1374`, D-085-05). If resume doesn't re-establish the subscription AND replay the pending prompt, the user's eventual answer PUBLISHes into the void and the run hangs.
+- **Multi-worker:** a different worker resumes than the one that started — in-memory state (the per-run whitelist cache from PRD §6 row 1, the `per_run_task_semaphore`) is gone.
 
-**Prevention:**
-- The panel bottom-sheet should use a HIGHER z-index than the mobile drawer (e.g., z-60 vs z-50) since it's more contextual (active agent interaction vs navigation).
-- On mobile, the panel bottom-sheet should be triggered by the same toggle button as desktop, NOT auto-opened. Auto-opening on Harness Mode entry (per PRD) should be disabled on mobile (screen real estate is too constrained).
-- Test at 375px width (iPhone SE) — the bottom-sheet should not overlap the `MessageInput` component.
+**Why it happens:**
+The existing run-backed streaming substrate persists *events* (Redis Stream) and *run status* (Postgres), but the agent loop's in-memory `messages` list, accumulators, and semaphores are ephemeral. "Resume" naively means "restart the producer task," which loses everything not in Postgres.
 
-**Affected phases:** 083 (panel scaffold), G-2 guardrail (sketch-before-plan for UX) should fire
+**How to avoid:**
+- **Persist phase state transitions as a strict 2-phase write:** mark `active` BEFORE the work; persist `output` + mark `completed` only AFTER the output is durably stored. On resume, any phase in `active` (not `completed`) is RE-RUN from scratch — never assume partial progress. This is the at-least-once + idempotent contract; the PRD §6 row 2 already names "phase row UPSERT first; SSE emit second."
+- **Make `programmatic` phases idempotent or guarded.** Either the function is naturally idempotent, or it checks "did I already produce my output?" (e.g. workspace file exists at expected version) before side-effecting. Document this as a hard contract for `PROGRAMMATIC_PHASE_REGISTRY` authors.
+- **`llm_single`/`llm_agent` phases are safe to re-run** (LLM calls are stateless per CLAUDE.md — "stateless chat completions, no provider-side thread state"); just re-run the phase prompt. The only cost is duplicate tokens, acceptable.
+- **Resume must re-hydrate the `ask_user` pause.** On startup/resume, scan for runs in `status='awaiting_user'`, re-SUBSCRIBE to `ask_user:{run_id}:{tool_call_id}` (derivable from the persisted `messages.tool_calls` row), and re-emit the pending `ask_user_prompt` so the panel re-renders. The durability path is already half-built (the row persists first); the resume-side re-subscribe is the new work. **Crucially: the user's POST response endpoint already persists the response row before PUBLISH** (`ask_user_service.publish_response` returns subscriber count; `publish_response` docstring: "POST endpoint still returns 200 because the messages row was persisted FIRST") — so resume can also reconcile by reading the persisted response if it arrived during the gap.
+- **Rebuild ephemeral in-memory state on resume:** re-create the whitelist cache from `workflow_phases.available_tools` (Postgres is source of truth — D-v2.5-03 reconcile-on-reconnect rule), re-init the `per_run_task_semaphore`.
+- **Write a resume smoke test that kills uvicorn at each phase type** (this is HARNESS-RUN-01's verification — PRD §12 Phase 089/our P-VERIFY): mid-`programmatic`, mid-`llm_agent`, mid-`ask_user`.
 
----
+**Warning signs:**
+Resumed runs that skip a phase (output is empty/missing). Double-applied side effects (two workspace versions from one `programmatic` phase). An `awaiting_user` run that never resumes after the user answers post-restart. A resumed run that crashes on a missing semaphore/cache.
 
-### Pitfall 10: sub_agent_service.py Migration — Breaking Existing Skill Instructions
-
-**What goes wrong:** The PRD says `task` tool "replaces ad-hoc `run_sub_agent` per skill" and the function remains as an alias for backward compat. But existing skills stored in the `skills` table may have `instructions` text that references `run_sub_agent` by name (e.g., "Use run_sub_agent to analyze the document"). If the function signature, return type, or streaming behavior changes, these skill instructions become stale or misleading.
-
-**Prevention:**
-- `run_sub_agent` MUST remain as a thin wrapper that calls the new `task` tool implementation. Same signature. Same return type (Generator[str, None, None]).
-- The `task` tool in the LLM's toolbox is a NEW tool — the LLM calls `task(description=...)`. The old `run_sub_agent` call site inside the `analyze_document` tool handler continues to use the function directly (NOT through the LLM tool dispatch).
-- Do NOT merge the `analyze_document`'s internal sub-agent invocation with the LLM's `task` tool. They serve different purposes: `analyze_document` is a backend-driven sub-agent; `task` is an LLM-directed sub-agent.
-
-**Affected phases:** 082 (`task` tool)
-
----
-
-### Pitfall 11: Workspace UNIQUE(thread_id, path) — Case Sensitivity Across OSes
-
-**What goes wrong:** The PRD specifies case-sensitive paths (POSIX convention). The Postgres UNIQUE constraint on `(thread_id, path)` is case-sensitive by default. But users on Windows or macOS may expect `/Plan.md` and `/plan.md` to be the same file. If the agent writes `/PLAN.md` and later reads `/plan.md`, the read fails with a "file not found" error, confusing the agent.
-
-**Prevention:**
-- Keep case-sensitive (per PRD decision — POSIX expectations for skill authors).
-- Add a SYSTEM PROMPT instruction to the agent: "Workspace file paths are case-sensitive. Use lowercase paths consistently (e.g., `/plan.md`, not `/Plan.md`)."
-- The `workspace_write` tool should normalize common path issues: strip trailing slashes, collapse double slashes, ensure leading `/`.
-- Consider adding a `workspace_list` tool that returns existing paths so the agent can check before writing.
-
-**Affected phases:** 080 (workspace tools)
+**Phase to address:** P-ENGINE (2-phase write + idempotency contract + resume re-hydration), P-VERIFY (per-phase-type kill-and-resume smoke test). Multi-worker discipline inherits D-PRD-08.
 
 ---
 
-### Pitfall 12: Plugin Contract Extension Loading Crashes Lifespan Startup
+### Pitfall 6: `llm_batch_agents` fan-out blows the AnyIO 200-concurrency ceiling + global task cap
 
-**What goes wrong:** The PRD's `PLUGINS_BOOTSTRAP` env var path upserts plugin rows at lifespan startup. If a plugin's Python module has a top-level import error (e.g., missing dependency), the lifespan function could crash, preventing the entire application from starting. A single bad plugin takes down the entire deployment.
+**What goes wrong:**
+`llm_batch_agents` spawns N parallel sub-agents. The PRD §7 row 3 already flags this: "N=10 batch agents × 50 parallel workflow runs = 500 concurrent sub-runs — exceeds AnyIO ceiling." Each sub-agent's LLM call goes through `run_in_threadpool` (`task_service.py:_stream_one_iteration` → `create_adaptive_streaming_chat` is a SYNC iterator drained in a worker thread). The default AnyIO threadpool ceiling is **40 tokens** (not 200 — see correction below); the codebase raised it, but it remains finite. Exhaust it and EVERY threadpool-dependent operation app-wide (sandbox execution, supabase-py sync calls wrapped in `run_in_threadpool`) starves — the whole app hangs, not just the batch phase.
 
-**Prevention:**
-- Per-plugin try/except in the bootstrap loader. Failed plugins logged + skipped; deployment continues.
-- Each plugin's Python code MUST be loaded in a lazy fashion (importlib on first use, NOT at lifespan startup). The bootstrap path validates the manifest and creates registry rows; actual code loading happens when the extension point is first exercised.
-- Add a `plugin_registry.status` column: `healthy` / `failed` / `disabled`. Bootstrap sets `failed` with an error message if manifest validation fails. The `/admin/plugins` API exposes this status.
+> **Evidence correction:** PROJECT.md §7 and the PRD reference an "AnyIO 200 ceiling." AnyIO/Starlette's default `run_in_threadpool` limiter is **40** total tokens by default; the project apparently lifted it (Phase 058 "200 post-Phase 058"). Treat the exact number as a *tunable shared budget*, not infinite — the batch phase must reserve against it, whatever its current value. **VERIFY the live `total_tokens` value before sizing batch defaults** (`anyio.to_thread.current_default_thread_limiter().total_tokens`).
 
-**Affected phases:** 085 (plugin contract)
+**Why it happens:**
+The `task` tool's existing caps are designed for an LLM that *occasionally* spawns a sub-agent: per-run `asyncio.Semaphore(3)` (`task_service.py` docstring, default 3) + global Redis-Lua counter cap 20 (`acquire_global_task_slot`, `tasks:global:active`). A `llm_batch_agents` phase that wants N=10 deterministic parallel agents will saturate the per-run semaphore (only 3 slots) → 7 of 10 refused with "task() per-run concurrency limit reached" (`tool_dispatcher.py:1143`), OR if the phase bypasses the `task` tool and spawns directly, it can blow past the global cap of 20.
 
----
+**How to avoid:**
+- **`llm_batch_agents` MUST enforce its own `max_parallel` (the PRD §7 recommends default 5).** Fan out N total agents but run at most `max_parallel` concurrently (a bounded `asyncio.Semaphore(max_parallel)` LOCAL to the phase + `asyncio.gather` over batches). Never spawn all N at once.
+- **The phase's `max_parallel` must compose with the global cap, not bypass it.** If `llm_batch_agents` reuses the `task` tool (PRD Theme B says it "reuses the existing `task` tool for spawning"), then ALL batch agents go through `acquire_global_task_slot` — good, they respect the global cap of 20. But the per-run `Semaphore(3)` is too small for batch work: introduce a SEPARATE, larger per-phase semaphore for batch agents (SEED-036a "`task()` global-concurrency fair-share" is exactly this), OR raise the per-run semaphore when inside a batch phase. Decide explicitly; don't let 3 silently throttle a batch of 10.
+- **Fail-share, not fail-whole.** If the global cap is saturated, a batch phase should run the agents it *can* (serialized through available slots) rather than refusing the whole phase. `acquire_global_task_slot` fails-closed per-agent (`task_service.py:80` returns False on cap/error) — the batch executor must treat a False as "wait and retry this agent," not "abort the batch."
+- **Size batch defaults against the SHARED budget.** With a global cap of 20 and an AnyIO threadpool budget of ~200 (verify), `max_parallel=5` per batch phase × realistic concurrent workflow count stays well under both. Document the math in the engine.
+- **Do NOT run blocking I/O in async handlers** (D-v2.5-01): batch agents' sync LLM streams stay wrapped in `run_in_threadpool` exactly as `task_service.py:193` already does. Don't "optimize" by calling the sync SDK directly in the async path.
 
-## Minor Pitfalls
+**Warning signs:**
+App-wide latency spike during a batch phase (threadpool starvation — cross-tab GET that was <15ms now seconds). "task() per-run concurrency limit reached" in logs during a batch phase. `tasks:global:active` pinned at 20. A batch phase that completes far fewer agents than requested.
 
-### Pitfall 13: Workspace Files Storage Bucket RLS Mismatch
-
-**What goes wrong:** The `workspace-files` Supabase Storage bucket needs RLS policies that match the `workspace_files` table's RLS (auth.uid() = thread owner). But Storage bucket policies are configured separately from table RLS. If the Storage RLS is missing or misconfigured, users could access other users' workspace files via direct Storage URL.
-
-**Prevention:** Configure Storage bucket policies in the same migration that creates the bucket (migration 126). Use Supabase's `storage.objects` RLS with a join to `workspace_files` and `threads` to verify ownership. Test with a cross-user read attempt.
-
-**Affected phases:** 079 (schema), 080 (storage adapter)
-
----
-
-### Pitfall 14: todo_updated SSE Flooding on Rapid Agent Writes
-
-**What goes wrong:** The `write_todos` tool does a full-state replace (per PRD — "simpler invariants"). If the agent calls `write_todos` 5 times in rapid succession (e.g., building a plan step by step), each call emits a `todo_updated` SSE event, and the panel re-renders the entire todo list 5 times. Combined with Pitfall 3 (demux re-renders), this creates visible flicker.
-
-**Prevention:**
-- Throttle `todo_updated` SSE events: emit at most once per 500ms per run_id. The final state is always correct (full-state replace means last write wins).
-- Alternatively, batch `write_todos` calls within a single iteration: if the agent makes multiple `write_todos` calls in the same tool-dispatch round, only emit ONE `todo_updated` event after the last call.
-
-**Affected phases:** 082 (`write_todos` tool), 083 (panel rendering)
+**Phase to address:** P-BATCH (owns `max_parallel` + fair-share + threadpool-budget sizing). SEED-036a folds here. Verified under P-VERIFY 4-axis parallel-thread axis.
 
 ---
 
-### Pitfall 15: Diff Viewer Memory Pressure on Large Workspace Files
+### Pitfall 7: Immutable-on-publish race conditions
 
-**What goes wrong:** The `workspace_diff` tool computes diffs using `difflib` (per PRD). For large files (near the 256KB inline threshold), `difflib.unified_diff` or `difflib.ndiff` can consume significant memory (O(n*m) for the standard algorithm). The diff viewer in the panel receives the full diff and renders it, which for large files could freeze the browser tab.
+**What goes wrong:**
+`workflow_definitions` is immutable-on-publish (HARNESS-DEF-01: `published_at` can't be UPDATEd; editing requires a new semver). Race windows:
+- **Publish-while-running:** worker A publishes v1.1 of a definition while worker B is mid-run on v1.0. If `workflow_runs` references the *definition row* by mutable slug rather than the immutable `(slug, version)` snapshot, B's in-flight run can read v1.1's phases mid-execution → phase-config drift mid-run.
+- **Concurrent publish of the same version:** two requests publish `(slug, '1.0.0')` simultaneously; without a DB-level uniqueness guarantee + trigger, one overwrites or both partially commit.
+- **Trigger bypass:** the immutable trigger blocks UPDATE, but a `DELETE` + `INSERT` of the same `(slug, version)` sidesteps the immutability semantics (the "version" now means something different than it did mid-run).
 
-**Prevention:**
-- Cap diff output at 500 hunks or 50KB of diff text. Beyond that, show a summary ("Changed 2,847 lines across 234 hunks — file too large for inline diff. Download both versions to compare.").
-- Use `difflib.unified_diff` (not `ndiff`) — unified diffs are more compact and standard.
-- Store `delta_from_prev` as a JSON-patch or unified-diff format in the `workspace_file_versions` table, computed at write time (amortized cost), not at read time.
+**Why it happens:**
+Immutability is enforced at the row level (trigger on UPDATE), but the *reference* semantics (which row a running workflow reads) and the *publish atomicity* (insert-then-flip-published_at) are separate concerns developers conflate.
 
-**Affected phases:** 080 (workspace tools — diff computation), 084 (diff viewer UI)
+**How to avoid:**
+- **`workflow_runs` snapshots the resolved phase config at run start**, OR references the immutable `workflow_definitions.id` (the specific `(slug, version)` row, never the mutable slug). A running workflow must read a frozen definition. The PRD §3 has `workflow_runs.workflow_definition_id uuid fk` — make resolution by ID, and treat the row as immutable once `published_at` is set.
+- **Enforce immutability with BOTH a `UNIQUE(slug, version)` constraint AND the UPDATE-blocking trigger** (PRD §3 specifies both). Mirror the proven `skill_versions` immutable trigger shape (D-PRD-13). Also block DELETE of a published version that any `workflow_runs` row references (FK with `ON DELETE RESTRICT`).
+- **Publish atomically:** insert the definition with `published_at` set in a single statement (not insert-then-update), so there's no "published but half-written" window. Validate the full `phases` jsonb (reachability lint from Pitfall 3) *before* the insert, inside the same transaction.
+- **RLS still applies** — the trigger and constraints are orthogonal to RLS; both must be present (CLAUDE.md: all new tables need RLS).
 
----
+**Warning signs:**
+A run whose observed phase order doesn't match the definition it started with. Two `workflow_definitions` rows with the same `(slug, version)`. A publish that leaves `published_at` NULL on a row that's already referenced by runs. An integration test that publishes then UPDATEs and the UPDATE *succeeds*.
 
-## Phase-Specific Warnings
-
-| Phase Topic | Likely Pitfall | Mitigation | Severity |
-|---|---|---|---|
-| 079 (Schema) | Migration 133 ALTERs `threads` table — 9+ phases have touched it | Test migration on a copy of production data first; idempotent `ADD COLUMN IF NOT EXISTS` | Moderate |
-| 080 (Workspace Tools) | Pitfall 1 (threads.py compounding), Pitfall 4 (content size), Pitfall 11 (case sensitivity) | Extract tool dispatcher BEFORE adding tools; cap workspace_read; normalize paths | Critical |
-| 081 (Harness Engine) | Pitfall 8 (cache staleness), tool whitelist enforcement adding latency to EVERY tool call | In-memory cache with phase_index version key; skip cache in Deep Mode | Moderate |
-| 082 (New LLM Tools) | Pitfall 2 (ask_user pause/resume), Pitfall 5 (task spawning exhaustion), Pitfall 10 (sub_agent migration) | asyncio.Event with timeout + cross-worker Redis coordination; per-run + global spawn caps; preserve run_sub_agent signature | Critical |
-| 083 (Panel UI) | Pitfall 3 (demux re-renders), Pitfall 9 (mobile layout), Pitfall 6 (cross-provider SSE) | Separate Zustand slice for panel state; sketch-before-plan (G-2); 4-provider UAT matrix | Critical |
-| 084 (Diff/Preview UI) | Pitfall 15 (large file diffs) | Cap diff output; compute at write time | Minor |
-| 085 (Plugin Contract) | Pitfall 12 (lifespan crash) | Per-plugin try/except; lazy loading; status column | Moderate |
-| 086 (Dual-mode UX) | Mode-switching mid-thread creating orphaned workflow_runs if user cancels before first phase completes | Cancel-workflow cleanup must cascade to all child resources (workflow_phases rows, sub-agent tasks, pending ask_user events) | Moderate |
-| 087 (Reference Plugin) | Plugin manifest schema too strict / too loose — blocks future plugins or allows invalid manifests | Ship the reference plugin FIRST and iterate the schema based on what it actually needs, not theoretical completeness | Minor |
-| 088 (Seed Workflows) | Seed workflow_definitions rows baked into migrations are hard to update post-ship | Use idempotent UPSERT on `(slug, version)` so future migrations can evolve seed workflows without conflicting | Minor |
-| 089 (Verification) | Declaring GREEN without cross-provider + multi-tool + parallel-thread UAT (the v2.6 075.x lesson) | SC#10 MANDATORY: 4-axis UAT matrix with ALL 4 providers exercised before milestone close | Critical |
+**Phase to address:** P-SCHEMA (UNIQUE constraint + immutable trigger + FK RESTRICT), P-ENGINE (run reads by immutable ID / snapshots config; publish-time validation in-transaction).
 
 ---
 
-## Structural Risk: Build-Order Hazard
+### Pitfall 8: Dual-mode mid-thread switch — state corruption + workflow-lock holes
 
-The most dangerous ordering mistake is shipping Phase 082 (`ask_user`, `task`, `write_todos`) BEFORE Phase 080's tool-dispatcher extraction (from Pitfall 1). If the 3 new tools are added as `elif` branches in the current monolithic agent_runner, and Phase 080 then tries to extract the dispatcher, the extraction PR conflicts with every tool addition and the diff becomes unreviewable.
+**What goes wrong:**
+MODE-SWITCH-01: Deep → Harness allowed mid-thread (spawns a `workflow_runs` row); Harness → Deep REFUSED until the workflow completes or is cancelled. Corruption modes:
+- **Switch while streaming:** the user toggles to Harness Mode while a Deep-Mode run is mid-stream. The in-flight run's `available_tools` was computed for Deep Mode; the new phase whitelist doesn't apply to it; the panel shows a phase timeline for a run that isn't phase-constrained.
+- **Lock bypass via parallel tabs/threads:** the workflow-lock is per-thread, but the 075.x history shows global UI flags leak across threads (BUG-260523-01: composer locked globally during any stream — fixed by lifting to per-thread `Map`/`Set`). A naive `isHarnessLocked` boolean re-introduces the same cross-thread bug.
+- **Stale `active_workflow_run_id`:** the column is set on switch but a crashed/cancelled workflow leaves it dangling → the thread is permanently "locked in Harness Mode" with no active run.
+- **Mid-thread switch loses Deep-Mode context:** `threads.deep_mode_metadata` snapshot (PRD Theme F) isn't captured, so switching back after cancel drops the todo/workspace state.
 
-**Recommended dependency insertion:**
+**Why it happens:**
+Mode is thread-level state, but UI streaming flags and the agent loop's tool resolution are run-level. The two must stay consistent across the switch boundary, and the lock must be per-thread (never global).
 
-```
-079 (Schema) → 079.5 (NEW: threads.py tool-dispatcher extraction — G-5 refactor)
-079.5 → 080 (Workspace Tools — registered in new dispatcher)
-079.5 → 082 (New LLM Tools — registered in new dispatcher)
-080 + 081 → 083 (Panel)
-```
+**How to avoid:**
+- **Mode switch only takes effect on the NEXT run, never mutates an in-flight run.** A switch sets `threads.active_workflow_run_id` / mode metadata; the currently-streaming run finishes under its original mode. Enforce: refuse a switch *during* an active stream on that thread, OR queue it. The existing per-thread streaming state (`streamsStore.ts` per-thread `Map<threadId, T>` from BUG-260523-01) is the model — mode-lock state MUST be per-thread keyed, never a global boolean.
+- **The workflow-lock is a server-side invariant, not just a UI affordance.** Harness → Deep refusal is enforced where the run is created (check `active_workflow_run_id IS NOT NULL AND workflow status NOT IN ('completed','failed','cancelled')`), not only by graying out a button. UI and server agree.
+- **Clear `active_workflow_run_id` on every terminal workflow status** (completed/failed/cancelled) in the same transaction that writes the terminal status — no dangling lock. The "Cancel workflow" affordance (PRD Theme F) must perform this clear.
+- **Snapshot `deep_mode_metadata` on switch into Harness** so cancel/return restores it.
+- **Reconcile on (re)connect** (D-v2.5-03): the panel fetches `GET /threads/{id}/workflow` on mount to learn the true mode/lock state — never trust a Realtime/SSE hint alone.
 
-This adds one phase but prevents a 075.x-style cascade. The extraction phase is estimated at 3 plans (extract dispatcher module, migrate existing tools, add registration pattern for new tools) and directly addresses the G-5 hot-file ledger entry for `threads.py`.
+**Warning signs:**
+A thread stuck in Harness Mode with no running workflow (`active_workflow_run_id` set, workflow terminal). Composer/mode toggle disabled on Thread B because Thread A is streaming (global-flag leak — the 075.x signature). A phase timeline rendering over a free-chat run. Switching back to Deep loses todos/files.
+
+**Phase to address:** P-MODE (per-thread lock state + next-run-only semantics + terminal clear + metadata snapshot). Cross-thread isolation verified under P-VERIFY 4-axis parallel-thread axis (the explicit lesson from BUG-260523-01).
 
 ---
+
+### Pitfall 9: `ask_user` / human-input timeout + graceful expiry across workers
+
+**What goes wrong:**
+`llm_human_input` phases (and Deep-Mode `ask_user`) pause indefinitely waiting for a human. Failure modes:
+- **No expiry → zombie runs:** a user never answers; the run holds a global concurrency slot and an open Redis SUBSCRIBE forever.
+- **Timeout fires but the LLM gets a confusing result:** on timeout the handler returns `"ask_user timed out — no response received within Ns"` (`tool_dispatcher.py:1416`) — but for an `llm_human_input` *phase*, a timeout should drive the phase's `on_failure`, not just hand the LLM a string.
+- **Cross-worker answer race:** the POST `/ask_user_response` lands on worker B; the paused SUBSCRIBE is on worker A. The pub/sub rendezvous handles this (channel `ask_user:{run_id}:{tool_call_id}`), but only if A's subscription is alive. After a restart (Pitfall 5) it isn't.
+- **Shutdown during pause:** uvicorn restarts while paused; without the shutdown sentinel the handler hangs and blocks graceful shutdown.
+
+**Why it happens:**
+Human input is unbounded by nature; the system must impose bounds the LLM and the human both understand, and the pause must survive the multi-worker + restart reality.
+
+**How to avoid:**
+- **The substrate already solves the cross-worker + shutdown + cancel cases — REUSE IT VERBATIM, don't reinvent.** `ask_user_service.py` has: timeout via `asyncio.wait_for` (`tool_dispatcher.py:1413`), cross-worker cancel via `publish_cancel_sentinel` (`ask_user_service.py:142`), shutdown broadcast via `broadcast_shutdown_sentinel_to_all` (`ask_user_service.py:167`), SUBSCRIBE-before-advertise ordering (race mitigation), durable `messages` row first (reload survival), and the `timeout=1.0` never-0 spin-loop fix. The `llm_human_input` phase type wraps this, it does not re-implement it.
+- **Server clamps timeout** to `settings.ask_user_max_timeout_seconds` (default 1800s = 30min, `tool_dispatcher.py:1319`). A `llm_human_input` phase must inherit a (possibly longer, but bounded) cap — never unbounded.
+- **`llm_human_input` timeout drives the phase's `on_failure`.** Map the timeout `ToolResult` to a phase transition: `on_failure: 'fail_run'` ends the workflow; `skip_to_phase` routes onward. The phase wraps the tool result and consults the gate, rather than feeding the raw timeout string to a free LLM loop.
+- **Resume re-establishes the pause** (Pitfall 5): on restart, runs in `awaiting_user` re-subscribe and re-emit the prompt.
+- **The global concurrency slot must be released during a long pause** — a 30-minute human wait should NOT hold a `tasks:global:active` slot (that's for active compute, not waiting). Audit: `ask_user` runs at the top level (not via `task`), so it doesn't hold a `task` slot — but confirm an `llm_human_input` phase inside a batch doesn't pin a batch slot while waiting.
+
+**Warning signs:**
+Runs in `awaiting_user` older than the max timeout. Open Redis SUBSCRIBEs with no live handler (`ask_user:channels:*` entries for dead runs — the 3600s safety TTL should clear these). Shutdown that hangs waiting on a paused handler. A timed-out human-input phase that loops instead of failing.
+
+**Phase to address:** P-ENGINE (`llm_human_input` wraps `ask_user_service` + maps timeout to gate `on_failure`), P-VERIFY (mid-pause restart + cross-worker answer test). The pub/sub substrate is inherited from v2.7 Phase 085 — no rebuild.
+
+---
+
+### Pitfall 10: Tool-count budget degradation on Google past ~20-26 tools
+
+**What goes wrong:**
+The toolbox is already 24 tools (`get_tools`, `openai_service.py:768-784` — 22 base + web_search + execute_code). Adding plugin tools (deferred to v2.9 but the budget guard is v2.8 / SEED-035) pushes past the point where some providers degrade. Google/Gemini in particular shows tool-selection accuracy and latency degradation as the function-declaration count climbs past ~20-30; the model picks wrong tools, hallucinates tool names (→ Pitfall 2 refusals), or the request balloons. Other providers have softer ceilings but all degrade eventually.
+
+**Why it happens:**
+Every tool's full JSON schema is sent on every call. More tools = more tokens in the tool menu + harder selection problem. Developers add tools without a budget because each one seems cheap.
+
+**How to avoid:**
+- **SEED-035 tool-count budget guard at `get_tools()` (`openai_service.py:768`) is the designed mitigation — implement it.** Cap the tool count exposed per call; when over budget, prune to the most relevant subset. The per-phase whitelist (Pitfall 1/2) is *itself* the strongest budget control — a phase exposing 4 tools instead of 24 sidesteps this entirely. **This is a major harness win:** Harness Mode phases inherently shrink the tool menu, improving Google accuracy.
+- **Order/prioritize tools** so the budget keeps the most-used ones (per the `priority` concept the PRD uses for plugin extension ordering).
+- **Make the budget provider-aware.** `MODEL_CAPABILITIES` already carries per-model fields (`uses_max_completion_tokens`, `supports_parallel_tools` — added Phase 075.4); add a `max_tools` soft ceiling per provider and prune harder for Google. Provider-specific handling at the service boundary (CLAUDE.md), never a shared-path hack.
+- **Measure, don't guess the exact threshold.** Verify Gemini's current behavior via the eval harness (Pitfall 11) — the "~20-26" figure is directional; the eval harness pins the real number per current model versions.
+
+**Warning signs:**
+Google runs picking obviously-wrong tools or emitting non-existent tool names (refusal storms). Latency climbing with toolbox size. Eval-harness tool-selection accuracy dropping on Google as tools are added. Token usage dominated by the tool menu.
+
+**Phase to address:** P-EVAL (SEED-035 budget guard at `get_tools()` + per-provider `max_tools`). The per-phase whitelist (P-ENFORCE) is the structural mitigation. Threshold pinned by the eval harness.
+
+---
+
+### Pitfall 11: Per-provider tool-use gaps the v2.7 SEED-034 text-only directive did NOT close
+
+**What goes wrong:**
+v2.7 folded SEED-034 as a *text-only universal tool-use directive* (a system-prompt instruction, eval-gated across 6 providers). A text directive cannot close behavioral gaps that live in the wire protocol / SDK: Gemini `thought_signature` round-trip (D-075.5/BUG-260523-02), Anthropic `end_turn`-instead-of-`tool_calls` (`threads.py:2562`), DeepSeek `reasoning_content` mandatory round-trip (`threads.py:2614-2620`), Moonshot/Kimi empty-content-after-tool-call (`threads.py:2570-2580`), OpenRouter stringified-JSON args + duplicate outputs. The harness *amplifies* these: a deterministic workflow makes MANY more tool calls in a locked sequence, so a per-provider tool-use gap that's a 1% annoyance in free chat becomes a workflow-killing systematic failure (every run of workflow X fails on provider Y at phase 3).
+
+**Why it happens:**
+The "one UX, four adapters" principle (`feedback_provider_uniform_ux`) means the UI is provider-agnostic, but the harness's correctness depends on every provider completing a tool-call/tool-result round-trip identically. A text directive normalizes *intent*, not *protocol*. The 075.x cascade proved these gaps are protocol-level.
+
+**How to avoid:**
+- **The cross-provider eval harness (SEED-034, `scripts/eval_cross_provider.py`) is THE mitigation — make it a hard regression gate, not a one-off script.** It must run a representative multi-phase workflow on all 6 native providers (OpenAI, Anthropic, Google, DeepSeek, Kimi/Moonshot, MiniMax — OpenRouter/Ollama best-effort per `feedback_openrouter_is_experimental`) and assert each completes the locked phase sequence with correct tool round-trips. Wire it into CI as the regression gate the milestone's reliability rider promises.
+- **The harness must NOT regress the existing per-provider round-trip fixes.** The extracted agent loop (P-EXTRACT) must carry forward verbatim: `thought_signature` top-level field (`threads.py:2604`), `reasoning_content` conditional spread (`threads.py:2620`), `end_turn` tool-execution-regardless (`threads.py:2562`), empty-retry guard (`threads.py:2574`). These are load-bearing — a "clean rewrite" that drops them re-opens the 075.x cascade.
+- **4-axis UAT per CLAUDE.md SC#10** (cross-provider × multi-tool × parallel-thread × long-message) applied to harness runs: a workflow that uses 2+ tools per phase, on each provider, with a parallel thread streaming, on a long thread.
+- **Provider-specific handling stays at the service boundary** (`feedback_multi_provider_behavior_variance`) — never a shared-path edit (Pitfall 1).
+
+**Warning signs:**
+A workflow that succeeds on OpenAI but deterministically fails at the same phase on Google/DeepSeek/Anthropic. Provider 400s on multi-tool phases. The eval harness passing on a stale model list but real models drifting (`feedback_model_names_representative` — curate the provider model list). Eval harness treated as optional/skipped in CI.
+
+**Phase to address:** P-EVAL (eval harness as CI regression gate + provider round-trip carry-forward audit), P-EXTRACT (carry forward all per-provider fixes during extraction), P-VERIFY (4-axis harness UAT).
+
+---
+
+### Pitfall 12: The `threads.py` god-function extraction (G-5) done wrong re-opens every prior fix
+
+**What goes wrong:**
+`backend/app/api/threads.py` is 3,186 LOC and G-5 FIRING (CLAUDE.md hot-file ledger: "9+ phases, extraction due"). The harness needs the agent loop in a clean module. But `agent_runner` (`threads.py:1423`) is dense with battle-won fixes: terminal-status race (`_shielded_finalize`), per-provider streaming branches, iteration-cap silent-drop guard (`threads.py:2506-2520`), context-truncation warnings (`threads.py:2828+`), thought_signature/reasoning_content round-trips, empty-retry. A careless extraction that "cleans up" or reorders these re-introduces bugs that took 8 phases (075.x) to close.
+
+**Why it happens:**
+Extraction is framed as a refactor ("no behavior change"), but the function's behavior IS a pile of subtle ordering invariants (e.g. `_emit('done')` removal + `_shielded_finalize` so `runs.status` UPDATE precedes the terminal sentinel — Phase 075.4). A mechanical move that preserves logic but reorders emits can break the wire contract.
+
+**How to avoid:**
+- **Extraction is behavior-preserving and lands FIRST, before any harness feature** (CLAUDE.md G-1/G-5; PRD §12 sequences schema→engine but the agent-loop extraction is the true prerequisite). Move `agent_runner` + `_emit`/`_emit_terminal` + the provider branches into `harness/agent_loop.py` (or similar) with ZERO logic changes — a pure move, asserted by the existing E2E backstop (Playwright 6 scenarios from Phase 075.4) + the per-provider eval harness BEFORE and AFTER.
+- **Snapshot the wire contract first.** Record the exact SSE event sequence for a representative multi-tool run per provider; assert byte-identical sequence post-extraction. The 075.4 E2E scenarios already map 1:1 to regression classes — run them as the extraction gate.
+- **Do the extraction as its own phase with its own verification**, not bundled into a feature phase (G-5: "insert a dedicated refactor phase BEFORE the next feature phase").
+- **Preserve the documented invariants by name** (they're commented in-code): terminal-status race, thought_signature, reasoning_content, end_turn handling, empty-retry, iteration-cap drop guard, context-truncation. A checklist in the extraction phase's VERIFICATION.
+
+**Warning signs:**
+Any "while I'm in here" cleanup during extraction. Reordered `_emit` calls. A terminal sentinel emitted before the status UPDATE. Eval harness or E2E backstop red after extraction. Extraction bundled with a feature.
+
+**Phase to address:** P-EXTRACT (dedicated, behavior-preserving, eval+E2E gated). This is the literal first phase of v2.8.
+
+---
+
+### Pitfall 13: Iteration-cap "Continue" (SEED-029) silently dropping tool calls vs. resuming
+
+**What goes wrong:**
+Today, on the last iteration `force_no_tools=True` (`threads.py:1868`) and if the model STILL emits tool calls, they're silently dropped with a `system_warning kind=iteration_cap_dropped_tool_calls` (`threads.py:2506-2520`). SEED-029's "Continue" button should let the user resume PAST the cap. In Harness Mode, each phase has its own `max_steps` — if "Continue" naively bumps a global cap, it can let a phase run unbounded (Pitfall 3), or resume into the WRONG phase, or resume a phase whose whitelist has since changed.
+
+**Why it happens:**
+The iteration cap is currently per-RUN; Harness Mode makes it per-PHASE. "Continue" must know *which* phase's cap was hit and resume that phase's loop, re-establishing that phase's whitelist — not just increment a counter.
+
+**How to avoid:**
+- **"Continue" resumes the SAME phase with a bounded additional step budget**, re-reading `workflow_phases.available_tools` (Postgres source of truth) — never a blind global bump.
+- **In Deep Mode, "Continue" is simpler** (resume the single run's loop with more iterations) but must still re-establish `messages` state from persisted history (stateless completions — CLAUDE.md).
+- **Preserve the existing drop-guard + warning** (`threads.py:2506-2520`) as the pre-Continue state; "Continue" consumes the dropped tool calls rather than re-dropping them.
+- **The per-phase `max_steps` cap is the natural home** (PROJECT.md: "Harness Mode's per-phase `max_steps` is its natural home").
+
+**Warning signs:**
+"Continue" that resumes the wrong phase. A phase running past `max_steps` after Continue. Dropped tool calls lost permanently after Continue instead of executed.
+
+**Phase to address:** P-ENGINE (per-phase Continue semantics) + P-MODE (the Continue affordance + Deep-Mode variant).
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Enforce whitelist by schema-filtering `get_tools()` only (no dispatch-time check) | One-line change; model "never sees" the tool | Model hallucinates tool names anyway → unenforced escape; the core state-machine guarantee is a lie | **Never** — dispatch-time refusal is the guarantee; schema-filter is an optimization on top |
+| Per-run in-memory whitelist cache without a refresh-on-transition hook | Avoids a Postgres read per tool call (PRD §6 row 1) | Stale whitelist after a phase transition on another worker → wrong tools allowed | Acceptable WITH explicit cache-clear on `workflow_transition` event + Postgres as source-of-truth fallback |
+| `programmatic` phases assumed idempotent without enforcing it | Faster to ship phase authors' functions | Resume after mid-phase crash double-applies side effects (Pitfall 5) | Acceptable only for genuinely pure functions; MUST document the contract + guard side-effecting ones |
+| Reuse per-run `Semaphore(3)` for `llm_batch_agents` | No new concurrency primitive | Batch of >3 silently throttled or refused (Pitfall 6) | Never for batch; introduce per-phase `max_parallel` |
+| "Clean up" `agent_runner` during the G-5 extraction | Tidier code | Re-opens 075.x cross-provider cascade (Pitfall 12) | Never — extraction is behavior-preserving; cleanup is a separate, later phase |
+| Skip resume re-subscribe for `ask_user`, rely on user re-asking | Less resume code | Paused human-input runs hang forever after restart (Pitfall 5/9) | Never — the durable `messages` row exists precisely to enable resume |
+| Global `isHarnessLocked` boolean for the mode lock | Simple UI flag | Cross-thread lock leak (the BUG-260523-01 signature, Pitfall 8) | Never — must be per-thread keyed `Map`/`Set` |
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Redis Streams (run-backed SSE) | Inventing a new namespace/stream for workflow events | All new SSE types (`workflow_phase_*`, `workflow_transition`, etc.) ride the EXISTING `run:{run_id}` XADD via `_emit` (`threads.py:109`) — PRD §5 confirms "no new substrate" |
+| Redis pub/sub (`ask_user`) | Re-implementing pause/resume in the `llm_human_input` phase | Wrap `ask_user_service.py` verbatim — SUBSCRIBE-first ordering, cancel/shutdown sentinels, durable row, `timeout=1.0` are load-bearing and already correct |
+| asyncpg pool (hot paths) | Reading the phase whitelist via sync supabase-py inside the async loop | Whitelist reads go through the asyncpg pool (`ToolContext.pool`, D-v2.5-01); supabase-py sync calls stay wrapped in `run_in_threadpool` |
+| Supabase RLS | New harness tables without RLS, or RLS via thread that breaks on global/shared scope | Every new table (`workflow_definitions/runs/phases`, `harness_audit`) gets RLS; runs/phases scope via `thread → user_id`; definitions support owner-private + org-shared (PRD §3) |
+| 9 LLM providers | Testing the harness on OpenAI only | Eval harness on all 6 native providers (Pitfall 11); 4-axis UAT (SC#10) |
+| Multi-worker uvicorn (WORKER_COUNT=2) | In-memory phase/whitelist/semaphore state assumed to survive a different resuming worker | Postgres is source of truth (D-PRD-08); rebuild ephemeral state on resume (Pitfall 5) |
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| Postgres read per tool call for the phase whitelist | Tool latency climbs per call; DB load scales with tool-call volume | In-memory cache per `run_id`, cleared on `workflow_transition` (PRD §6 row 1) | Noticeable at 50+ parallel runs × many tools/phase |
+| `llm_batch_agents` fan-out without `max_parallel` | App-wide threadpool starvation; cross-tab GET latency spikes (Pitfall 6) | Per-phase `max_parallel` (default 5) + respect global cap 20 + verify AnyIO budget | N agents × M concurrent workflows > shared threadpool budget (~200, verify) |
+| `workflow_phases` / `harness_audit` rows unbounded | Table bloat over months | Index on `(workflow_run_id, phase_index)`; TTL/retention deferred to v3.4 but DOCUMENT the growth (PRD §7 row 6) | ~500k rows annually at modeled scale — trivial near-term, plan retention |
+| Validation-gate infinite retry | Token spend climbs with no progress (Pitfall 4) | `max_retries` cap + structural-failure short-circuit | Any deterministically-failing gate with `on_failure: retry` |
+| Browser EventSource limit (6/origin) | Panel + chat + multi-thread tabs exhaust connections | Panel shares the SAME `run:{run_id}` EventSource as chat via `<StreamsProvider>` demux (PANEL-06, single subscription) | >6 concurrent run subscriptions per browser origin |
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| `programmatic` / validator phases run arbitrary registered Python with full app privileges | A malicious/buggy registered function reads/writes any user's data | `PROGRAMMATIC_PHASE_REGISTRY` / `VALIDATOR_REGISTRY` are CODE-defined (not user-authored in v2.8); plugin-authored phase types are deferred to v2.9 — keep it that way. RLS still scopes data access through the user-scoped supabase client / asyncpg queries |
+| Workflow definition jsonb authored by a user injecting a phase that whitelists a privilege-escalating tool | A workflow that grants itself `execute_code` / `save_skill` outside intended scope | Whitelist is enforced server-side from `workflow_phases.available_tools`; the available universe is still gated by `get_tools(user_settings)` (web/sandbox toggles honored) — a phase can't whitelist a tool the user's settings disabled |
+| `harness_audit` / workflow tables missing RLS | Cross-user visibility of another user's workflow runs/phase outputs | RLS on every new table (CLAUDE.md); audit table INSERT-only like `audit_log` |
+| Resumed run re-executes a `programmatic` phase that calls an external paid API | Double-charge / duplicate external side effect | Idempotency contract + guard (Pitfall 5) |
+| `ask_user` prompt/response stored unsanitized, rendered in panel | Stored XSS via model- or user-supplied prompt text in the panel | Panel renders prompt/response as text, not HTML (existing React escaping); same discipline as chat messages |
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Phase timeline freezes with no signal when a phase stalls (Pitfall 3) | User can't tell if the workflow is working or dead | Per-phase wall-clock with a visible "running… Ns" + timeout → explicit `failed` state in the panel |
+| Mode toggle disabled across all threads during any stream (Pitfall 8 / BUG-260523-01) | User can't switch modes on Thread B because Thread A streams | Per-thread mode-lock state; never a global flag |
+| "Continue" resumes the wrong phase or unbounded (Pitfall 13) | Confusing/runaway runs | Resume the same phase with a bounded budget; re-read its whitelist |
+| Refused tool call shows as an error/crash rather than a graceful "blocked in this phase" (Pitfall 2) | User thinks the agent broke | Panel renders `tool_not_available_in_phase` as an expected, styled "phase guard" event |
+| Workflow lock with no escape (no Cancel) | User trapped in Harness Mode | "Cancel workflow" affordance that clears `active_workflow_run_id` + restores Deep-Mode metadata (PRD Theme F) |
+| Harness Mode hidden as the default surprise | Existing users see a new locked UX unexpectedly | Deep Mode stays the default (PRD Theme F); Harness is opt-in via toggle/skill metadata |
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **Tool-whitelist enforcement:** Often missing the dispatch-time refusal (only schema-filtered) — verify a hallucinated/non-whitelisted tool returns a clean `tool_result`, not a crash or provider 400, on ALL 6 providers.
+- [ ] **Resumability:** Often missing the `ask_user` re-subscribe and the `active`-phase re-run — verify kill-uvicorn-and-resume at mid-`programmatic`, mid-`llm_agent`, AND mid-`ask_user`.
+- [ ] **`llm_batch_agents`:** Often missing `max_parallel` — verify N=10 fans out at ≤5 concurrent and doesn't starve the threadpool or refuse 7 agents.
+- [ ] **Immutable-on-publish:** Often missing the running-run snapshot — verify publishing v1.1 mid-run on v1.0 doesn't drift the in-flight run's phases.
+- [ ] **Dual-mode switch:** Often missing per-thread lock isolation — verify Thread A streaming doesn't lock Thread B's mode toggle (the BUG-260523-01 regression).
+- [ ] **Validation gates:** Often missing the retry cap — verify a deterministically-failing gate stops after `max_retries`, doesn't loop.
+- [ ] **G-5 extraction:** Often missing a per-provider round-trip invariant — verify eval harness + E2E backstop green BEFORE and AFTER extraction, byte-identical SSE sequence.
+- [ ] **Phase timeouts:** Often missing the wall-clock cap — verify a hanging `programmatic` or never-terminating `llm_agent` phase fails cleanly at its timeout.
+- [ ] **Token accounting:** Often missing per-phase `runs.input_tokens/output_tokens` writes — verify each LLM phase increments the counters (PRD §6 row 8, needed for future spend caps).
+- [ ] **RLS:** Often missing on the new tables — verify cross-user reads of `workflow_runs`/`workflow_phases`/`harness_audit` are denied.
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| Cross-provider regression from shared-path edit (1) | HIGH | Revert the shared-path edit; re-apply enforcement as a pure dispatch pre-check; re-run eval harness on all 6 providers (this is the 075.x recovery playbook) |
+| Whitelist bypass crash (2) | LOW | Wrap refusal in the existing `ToolResult` shape; the call-site `except` already exists — just route the refusal through it |
+| Phase deadlock (3) | MEDIUM | Add `asyncio.wait_for` phase wrapper + `on_failure` routing; backfill publish-time reachability lint |
+| Infinite gate retry (4) | LOW | Add `max_retries` + structural-failure hash short-circuit; cancel the stuck run via terminal status |
+| Resumability gap (5) | HIGH | Implement 2-phase write + active-phase re-run + ask_user re-subscribe; reconcile dangling `awaiting_user`/`active` runs via a startup sweep |
+| Batch threadpool starvation (6) | MEDIUM | Add per-phase `max_parallel`; verify against live AnyIO budget; serialize through global cap |
+| Immutable publish race (7) | MEDIUM | Add UNIQUE + trigger + FK RESTRICT; migrate runs to reference immutable definition ID/snapshot |
+| Mode-lock cross-thread leak (8) | MEDIUM | Lift the lock flag to per-thread `Map`/`Set` (mirror BUG-260523-01 fix); enforce lock server-side |
+| ask_user zombie/hang (9) | LOW-MEDIUM | Reuse `ask_user_service` sentinels; add startup sweep for stale `awaiting_user`; clamp timeout |
+| Tool-count degradation (10) | LOW | Enable SEED-035 budget at `get_tools()`; lean on per-phase whitelist to shrink the menu |
+| Provider tool-use gap (11) | HIGH | Eval harness as CI gate; carry forward the protocol-level fixes; provider-scoped patches only |
+| G-5 extraction regression (12) | HIGH | Revert to pre-extraction; redo as pure behavior-preserving move gated by eval+E2E |
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| 1. Cross-provider shared-path regression | P-EXTRACT + P-ENFORCE + P-EVAL | Eval harness green on 6 providers before/after; whitelist is a pure dispatch pre-check (diff touches no provider branch) |
+| 2. Whitelist enforcement bypass / crash | P-ENFORCE | Integration test: non-whitelisted tool → clean `tool_result` with matching `tool_call_id`, no provider 400, per provider |
+| 3. State-machine deadlock | P-ENGINE (+ P-EXTRACT for force-no-tools) | Hanging `programmatic` + never-terminating `llm_agent` both fail at phase timeout; publish-time reachability lint rejects unsatisfiable phases |
+| 4. Validation-gate infinite retry | P-ENGINE | Deterministically-failing gate stops at `max_retries`; identical-output short-circuit fires |
+| 5. Resumability edge cases | P-ENGINE + P-VERIFY | Kill-and-resume smoke test at each phase type (incl. mid-ask_user); no skipped/double-applied phases |
+| 6. Batch fan-out concurrency | P-BATCH (SEED-036a) | N=10 runs at ≤`max_parallel`; no threadpool starvation; global cap respected |
+| 7. Immutable-publish race | P-SCHEMA + P-ENGINE | Publish mid-run doesn't drift in-flight run; UPDATE/DELETE of published version refused |
+| 8. Dual-mode switch corruption | P-MODE + P-VERIFY | Thread A stream doesn't lock Thread B toggle; terminal workflow clears `active_workflow_run_id`; lock enforced server-side |
+| 9. ask_user timeout/expiry cross-worker | P-ENGINE + P-VERIFY | Cross-worker answer + mid-pause restart + shutdown-during-pause all resolve cleanly |
+| 10. Tool-count budget degradation | P-EVAL (SEED-035) | Eval tool-selection accuracy stable as toolbox grows; per-provider `max_tools` prunes |
+| 11. Per-provider tool-use gaps | P-EVAL + P-EXTRACT + P-VERIFY | Multi-phase workflow completes on all 6 providers; protocol fixes carried forward; 4-axis UAT |
+| 12. G-5 extraction regression | P-EXTRACT | Byte-identical SSE sequence + eval + E2E green before/after; extraction is its own phase |
+| 13. Continue-button cap semantics | P-ENGINE + P-MODE | Continue resumes correct phase with bounded budget; dropped calls executed not re-dropped |
 
 ## Sources
 
-- `backend/app/api/threads.py` — 3843 LOC; agent_runner at line 1381; tool dispatch at line 2548; _shielded_finalize at line 3692; RUN_TASKS at line 92; _emit at line 115
-- `frontend/src/providers/StreamsProvider.tsx` — 1599 LOC; makeStreamCallbacks at line 214; surfaceId pattern throughout
-- `frontend/src/stores/streamsStore.ts` — Zustand v5 store; bucketsBySurface at line 44; per-thread state lift at line 47-79
-- `frontend/src/hooks/useMessages.ts` — 112 LOC thin reader; Branch D-3 guard preserved
-- `frontend/src/components/layout/ChatLayout.tsx` — flex h-screen layout at line 70; main content at line 184
-- `frontend/src/lib/api.ts` — subscribeToRun SSE parser at line 335; 30+ event type branches at lines 396-509
-- `backend/app/services/sub_agent_service.py` — run_sub_agent at line 20; sync Generator return type; 152 LOC
-- `.planning/PRDs/v2.7.md` — Section 5 (architecture changes), Section 6 (compatibility check), Section 7 (scalability check), Section 12 (phase outline)
-- `.planning/PROJECT.md` — Hot-file ledger (threads.py 9+ phases); G-5 guardrail; SC#10 UAT mandate
-- CLAUDE.md — Workflow guardrails G-1 through G-6; hot-file ledger
-- Project memory `feedback_regressions_during_075_3_uat.md` — 4 cross-provider regressions after 075.3 closeout
-- Project memory `feedback_uat_lived_experience_gap.md` — orchestrator-driven UAT misses felt-experience defects
+- **Actual substrate (HIGH confidence — read directly):**
+  - `backend/app/services/tool_dispatcher.py` — `dispatch_tool` graceful-unknown-tool handling (L1495-1500); `ToolContext.available_tools` (L88); `_handle_task` toolset-subset refusal precedent (L1090-1110) + per-run/global concurrency gate sequence (L1128-1196); `_handle_ask_user` timeout/cancel/shutdown machinery (L1273-1458); weak-model arg normalization (L844-875, L1219-1242).
+  - `backend/app/services/task_service.py` — per-run `Semaphore` + global Redis-Lua cap (`_ACQUIRE_LUA`, L58-90); sub-agent loop + `run_in_threadpool` sync-stream drain (L121-193); fresh `previous_files_in_run` isolation (L291).
+  - `backend/app/services/ask_user_service.py` — SUBSCRIBE-first ordering, cancel/shutdown sentinels, `timeout=1.0` spin-loop fix, durable-row-first resume path.
+  - `backend/app/api/threads.py` — `agent_runner` (L1423); per-provider streaming branches (Anthropic ~L1897, Google ~L2025, OpenAI-compat ~L2169) feeding shared `tool_calls_buffer`; `dispatch_tool` call site + `ToolContext` build with `available_tools` (L2632-2677); `force_no_tools` last-iteration guard (L1868); iteration-cap silent-drop guard (L2506-2520); `thought_signature`/`reasoning_content` round-trips (L2604-2620); context-truncation warning (L1828-1859).
+  - `backend/app/services/openai_service.py` — `get_tools()` 24-tool toolbox + web/sandbox conditionals (L768-784); per-provider `MODEL_CAPABILITIES` token budgets (L893-908).
+- **Planning docs:** `.planning/PRDs/v2.7.md` §3 Theme B (harness design), §6 (compatibility/mitigations), §7 (scalability bounds — `max_parallel_agents` default 5, AnyIO ceiling, whitelist cache), §10 (LangGraph rejection); `.planning/PROJECT.md` (v2.8 scope, SEED-029/034/035/036a, migration head 056+).
+- **Prior-art lessons (project memory, HIGH confidence):** `feedback_no_cross_provider_regressions`, `feedback_regressions_during_075_3_uat`, `feedback_provider_uniform_ux`, `feedback_multi_provider_behavior_variance`, `feedback_workflow_guardrails` (G-1..G-6), `project_phase075_4` (BUG-260523-01 per-thread state lift), CLAUDE.md SC#10 (4-axis UAT) + hot-file ledger (threads.py G-5).
+- **External prior art (durable-execution patterns, MEDIUM confidence — patterns referenced, NOT adopted per no-LangGraph rule):** state-machine workflow engines (Temporal/Argo-style) for the at-least-once + idempotent-activity + bounded-retry + immutable-definition-version principles; AnyIO/Starlette `run_in_threadpool` default limiter semantics (default 40 tokens; project-lifted — VERIFY live value).
+
+---
+*Pitfalls research for: deterministic workflow harness + dual-mode on a multi-provider streaming agent platform*
+*Researched: 2026-05-30*
