@@ -61,8 +61,10 @@ export function PanelSection({
         onClick={() => setOpen((o) => !o)}
         className={cn(
           "flex w-full items-center gap-2 px-4 py-3 text-left",
-          "text-[0.72rem] uppercase tracking-[0.07em] text-[hsl(var(--muted-foreground-dim))]",
-          "transition-colors hover:text-muted-foreground",
+          // Phase 088-05 (UAT SC#2): panel-scoped AA muted (was --muted-foreground-dim
+          // → 3.59:1 dark / 4.01:1 light on the panel surface; now ≥4.5:1 both themes).
+          "text-[0.72rem] uppercase tracking-[0.07em] text-panel-muted-foreground-dim",
+          "transition-colors hover:text-panel-muted-foreground",
           "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         )}
       >
@@ -79,7 +81,9 @@ export function PanelSection({
             className={cn(
               // The ONLY non-400 weight in the panel (UI-SPEC Typography).
               "ml-auto font-mono text-[0.72rem] font-semibold normal-case tracking-normal",
-              warn ? "text-[hsl(var(--warning))]" : "text-muted-foreground",
+              // Phase 088-05 (UAT SC#2): the count badge ("2/2", "2") is meaningful
+              // metadata → panel-scoped AA muted (light --muted-foreground was 4.01:1).
+              warn ? "text-[hsl(var(--warning))]" : "text-panel-muted-foreground",
             )}
           >
             {countText}

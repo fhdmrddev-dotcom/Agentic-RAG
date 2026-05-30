@@ -51,7 +51,7 @@ function StatusIndicator({ status }: { status: TodoStatus }) {
       />
     )
   }
-  return <Circle className="h-4 w-4 flex-none text-muted-foreground" aria-hidden="true" />
+  return <Circle className="h-4 w-4 flex-none text-panel-muted-foreground" aria-hidden="true" />
 }
 
 function TodoRow({ todo }: { todo: Todo }) {
@@ -64,14 +64,16 @@ function TodoRow({ todo }: { todo: Todo }) {
       <span
         className={cn(
           "min-w-0 flex-1 text-foreground/90",
-          status === "completed" && "text-muted-foreground line-through",
+          // Phase 088-05 (UAT SC#2): completed-todo text is meaningful content →
+          // panel-scoped AA muted (light --muted-foreground was 4.01:1 on panel).
+          status === "completed" && "text-panel-muted-foreground line-through",
         )}
       >
         {todo.content}
       </span>
       {/* Status text — non-color-only A11Y; in the accessible tree (NOT
           aria-hidden) so the status is conveyed by text, not color alone. */}
-      <span className="ml-auto flex-none font-mono text-[0.62rem] uppercase tracking-wider text-[hsl(var(--muted-foreground-dim))]">
+      <span className="ml-auto flex-none font-mono text-[0.62rem] uppercase tracking-wider text-panel-muted-foreground-dim">
         {STATUS_LABEL[status]}
       </span>
     </li>

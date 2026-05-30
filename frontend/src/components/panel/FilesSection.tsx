@@ -162,7 +162,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
 
   if (rows.length === 0) {
     return (
-      <p className="px-3 py-4 text-[13px] text-muted-foreground">No files yet.</p>
+      <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">No files yet.</p>
     )
   }
 
@@ -191,11 +191,13 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
               flashKey === key && "animate-fileFlash",
             )}
           >
-            <Icon className="h-4 w-4 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+            <Icon className="h-4 w-4 flex-shrink-0 text-panel-muted-foreground" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground/90">
               {file.path}
             </span>
-            <span className="flex-shrink-0 font-mono text-[10px] text-muted-foreground">
+            {/* Phase 088-05 (UAT SC#2): size/version meta ("376 B · v2") is
+                meaningful metadata → panel-scoped AA muted (was 4.01:1 light). */}
+            <span className="flex-shrink-0 font-mono text-[10px] text-panel-muted-foreground">
               {formatBytes(file.size_bytes)}
               {file.version != null && ` · v${file.version}`}
             </span>

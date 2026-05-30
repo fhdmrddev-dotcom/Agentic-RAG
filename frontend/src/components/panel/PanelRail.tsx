@@ -49,7 +49,7 @@ function RailIcon({ Icon, label, badge, warn, onClick }: RailIconProps) {
       aria-label={label}
       onClick={onClick}
       className={cn(
-        "relative grid h-[30px] w-[30px] place-items-center rounded-md text-[hsl(var(--muted-foreground-dim))]",
+        "relative grid h-[30px] w-[30px] place-items-center rounded-md text-panel-muted-foreground-dim",
         "transition-colors hover:bg-accent hover:text-foreground",
         "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
       )}
@@ -82,7 +82,7 @@ export function PanelRail({ todos, filesCount, pendingCount, pending, onExpand }
         aria-label="Expand workspace"
         onClick={onExpand}
         className={cn(
-          "relative grid h-[30px] w-[30px] place-items-center rounded-md text-[hsl(var(--muted-foreground-dim))]",
+          "relative grid h-[30px] w-[30px] place-items-center rounded-md text-panel-muted-foreground-dim",
           "transition-colors hover:bg-accent hover:text-foreground",
           "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         )}

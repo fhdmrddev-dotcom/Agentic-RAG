@@ -100,7 +100,7 @@ function Fallback({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-      <p className="text-[13px] text-muted-foreground">{message}</p>
+      <p className="text-[13px] text-panel-muted-foreground">{message}</p>
       {onDownload && (
         <button
           type="button"
@@ -142,7 +142,7 @@ export function FilePreview({ threadId, file, onBack }: FilePreviewProps) {
           ref={backRef}
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs text-panel-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
         >
           <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />Files
         </button>
@@ -221,7 +221,7 @@ function FilePreviewContent({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-10">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+        <Loader2 className="h-4 w-4 animate-spin text-panel-muted-foreground" aria-hidden="true" />
       </div>
     )
   }

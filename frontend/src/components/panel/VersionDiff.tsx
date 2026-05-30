@@ -141,7 +141,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
 
   if (error) {
     return (
-      <p className="px-3 py-4 text-[13px] text-muted-foreground">
+      <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">
         Could not load versions.
       </p>
     )
@@ -149,7 +149,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
 
   if (versions.length === 0) {
     return (
-      <p className="px-3 py-4 text-[13px] text-muted-foreground">
+      <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">
         No versions yet.
       </p>
     )
@@ -157,7 +157,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
 
   if (versions.length === 1) {
     return (
-      <p className="px-3 py-4 text-[13px] text-muted-foreground">
+      <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">
         Only one version — nothing to compare yet.
       </p>
     )
@@ -170,7 +170,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
     <div className="flex flex-col">
       {/* Version-pill strip (D5): red base / green target, text + aria. */}
       <div className="flex flex-wrap items-center gap-1.5 border-b border-border/60 px-3 py-2">
-        <span className="mr-0.5 text-[11px] text-muted-foreground">Compare</span>
+        <span className="mr-0.5 text-[11px] text-panel-muted-foreground">Compare</span>
         {versions.map((v) => {
           const isBase = pair?.from === v.version
           const isTarget = pair?.to === v.version && pair.from !== pair.to
@@ -188,7 +188,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
               aria-pressed={isBase || isTarget}
               className={cn(
                 "rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors",
-                "border-border bg-surface text-muted-foreground hover:bg-accent",
+                "border-border bg-surface text-panel-muted-foreground hover:bg-accent",
                 "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
                 isBase &&
                   "border-[hsl(var(--destructive))] bg-[hsl(var(--destructive)/0.12)] text-[hsl(var(--destructive))]",
@@ -205,7 +205,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
           onClick={() => setOverlayOpen(true)}
           aria-label="Expand diff to a wide view"
           disabled={lines.length === 0}
-          className="ml-auto inline-flex items-center rounded-md px-1.5 py-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
+          className="ml-auto inline-flex items-center rounded-md px-1.5 py-1 text-panel-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-40"
         >
           <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
@@ -236,7 +236,7 @@ export function VersionDiff({ threadId, file }: VersionDiffProps) {
       ) : (
         pair &&
         pair.from !== pair.to && (
-          <p className="px-3 py-4 text-[13px] text-muted-foreground">
+          <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">
             Loading diff…
           </p>
         )

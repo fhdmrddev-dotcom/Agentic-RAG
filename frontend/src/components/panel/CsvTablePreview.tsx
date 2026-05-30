@@ -105,7 +105,7 @@ function Fallback({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-8 text-center">
-      <p className="text-[13px] text-muted-foreground">{message}</p>
+      <p className="text-[13px] text-panel-muted-foreground">{message}</p>
       {onDownload && (
         <button
           type="button"
@@ -164,7 +164,7 @@ export function CsvTablePreview({ content, onDownload }: CsvTablePreviewProps) {
               {r.map((cell, ci) => (
                 <td
                   key={ci}
-                  className="border-b border-border/50 px-2.5 py-1.5 text-muted-foreground whitespace-nowrap"
+                  className="border-b border-border/50 px-2.5 py-1.5 text-panel-muted-foreground whitespace-nowrap"
                 >
                   {cell}
                 </td>

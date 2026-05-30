@@ -127,7 +127,7 @@ export function WorkspacePanel({
             {selectedFile && threadId ? (
               <VersionDiff threadId={threadId} file={selectedFile} />
             ) : (
-              <p className="px-3 py-4 text-[13px] text-muted-foreground">
+              <p className="px-3 py-4 text-[13px] text-panel-muted-foreground">
                 Select a file to compare versions
               </p>
             )}
@@ -147,7 +147,7 @@ export function WorkspacePanel({
         type="button"
         onClick={onToggle}
         aria-label="Collapse workspace"
-        className="ml-auto grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="ml-auto grid h-7 w-7 place-items-center rounded-md text-panel-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         <PanelRightClose className="h-4 w-4" aria-hidden="true" />
       </button>
@@ -172,7 +172,7 @@ export function WorkspacePanel({
                 type="button"
                 onClick={onToggle}
                 aria-label="Close workspace"
-                className="ml-auto grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="ml-auto grid h-7 w-7 place-items-center rounded-md text-panel-muted-foreground hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

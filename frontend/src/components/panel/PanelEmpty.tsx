@@ -13,9 +13,9 @@ import { Inbox } from "lucide-react"
 
 export function PanelEmpty() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center text-[hsl(var(--muted-foreground-dim))]">
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center text-panel-muted-foreground-dim">
       <Inbox className="h-7 w-7 opacity-50" aria-hidden="true" />
-      <h3 className="text-sm font-normal text-muted-foreground">
+      <h3 className="text-sm font-normal text-panel-muted-foreground">
         No workspace activity yet
       </h3>
       <p className="max-w-[220px] text-[0.72rem] leading-relaxed">

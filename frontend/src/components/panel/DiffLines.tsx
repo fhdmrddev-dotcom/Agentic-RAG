@@ -49,7 +49,7 @@ export function DiffLines({ lines, truncated, className }: DiffLinesProps) {
             return (
               <div
                 key={i}
-                className="whitespace-pre px-1.5 text-[hsl(var(--muted-foreground-dim))]"
+                className="whitespace-pre px-1.5 text-panel-muted-foreground-dim"
               >
                 {line.text}
               </div>
@@ -74,13 +74,13 @@ export function DiffLines({ lines, truncated, className }: DiffLinesProps) {
                 "flex whitespace-pre px-1.5",
                 isAdd && "bg-[hsl(var(--success)/0.14)]",
                 isDel && "bg-[hsl(var(--destructive)/0.14)]",
-                !isAdd && !isDel && "text-muted-foreground",
+                !isAdd && !isDel && "text-panel-muted-foreground",
               )}
             >
               <span
                 aria-hidden="true"
                 className={cn(
-                  "w-4 flex-none select-none text-[hsl(var(--muted-foreground-dim))]",
+                  "w-4 flex-none select-none text-panel-muted-foreground-dim",
                   isAdd && "text-[hsl(var(--success))]",
                   isDel && "text-[hsl(var(--destructive))]",
                 )}
