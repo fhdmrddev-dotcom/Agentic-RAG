@@ -72,6 +72,10 @@ PROVIDERS: list[tuple[str, str]] = [
     ("openrouter", "z-ai/glm-5.1"),
     ("deepseek", "deepseek-v4-flash"),   # native weak-model — SEED-034 fold-gate target
     ("moonshot", "kimi-k2.6"),           # native weak-model — SEED-034 fold-gate target
+    # --- ADD (Phase 089 D-089-09 — native-7 baseline; _PROVIDER_BASE_URLS source of truth;
+    #     provider-class representatives, full pinning pass is Phase 096 EVAL-01) ---
+    ("zhipu", "glm-4-flash"),            # GLM — _SUB_AGENT_MODEL_DEFAULTS["zhipu"] (config.py:555); provider-class rep, full pinning = Phase 096 EVAL-01
+    ("minimax", "minimax-m2.7"),         # _SUB_AGENT_MODEL_DEFAULTS["minimax"] (config.py:554); provider-class rep
 ]
 
 # Backend base URL — local uvicorn. Overridable via EVAL_BASE_URL for an operator
@@ -215,6 +219,8 @@ def report_env_presence() -> None:
         ("ANTHROPIC_API_KEY", True),
         ("GOOGLE_API_KEY", True),
         ("OPENROUTER_API_KEY", True),
+        ("ZHIPU_API_KEY", True),       # ADD — Phase 089 D-089-09 (config.py:580, .env.example:100)
+        ("MINIMAX_API_KEY", True),     # ADD — Phase 089 D-089-09 (config.py:581, .env.example:101)
     ]
     print("## Environment (presence only — secret VALUES are never printed)\n")
     for name, _is_secret in checks:
