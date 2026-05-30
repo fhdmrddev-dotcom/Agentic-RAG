@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: in-progress
-stopped_at: Roadmap created — 8 phases (089-096), 21/21 requirements mapped; ready to plan phase 089
-last_updated: "2026-05-30T10:15:00.000Z"
-last_activity: 2026-05-30
+status: ROADMAP.md created — 8 phases (089-096), 21/21 v2.8 requirements mapped, 0 unmapped. Ready to begin phase 089.
+stopped_at: Phase 089 context gathered
+last_updated: "2026-05-30T11:26:14.121Z"
+last_activity: 2026-05-30 — ROADMAP.md + REQUIREMENTS.md traceability created (gsd-roadmapper)
 progress:
   total_phases: 8
   completed_phases: 0
@@ -184,8 +184,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-30T10:15:00.000Z
-Stopped at: ROADMAP.md created for v2.8 (8 phases, 089-096; 21/21 requirements mapped) — REQUIREMENTS.md traceability filled
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 089 context gathered
+Resume file: --resume-file
 
 **Planned Phase:** None yet — next is `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`)
