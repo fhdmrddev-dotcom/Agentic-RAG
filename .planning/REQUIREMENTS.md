@@ -82,37 +82,47 @@ Deferred per **D-v2.8-01** — the plugin contract is cross-milestone load-beari
 
 ## Traceability
 
-Populated during roadmap creation.
+Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7 (last phase 088) → v2.8 starts at 089.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-03 | — | Pending |
-| HARNESS-01 | — | Pending |
-| HARNESS-02 | — | Pending |
-| HARNESS-03 | — | Pending |
-| HARNESS-04 | — | Pending |
-| HARNESS-05 | — | Pending |
-| HARNESS-06 | — | Pending |
-| HARNESS-07 | — | Pending |
-| MODE-01 | — | Pending |
-| MODE-02 | — | Pending |
-| CONT-01 | — | Pending |
-| PANEL-08 | — | Pending |
-| PANEL-09 | — | Pending |
-| A11Y-03 | — | Pending |
-| EVAL-01 | — | Pending |
-| EVAL-02 | — | Pending |
-| CONC-01 | — | Pending |
-| TOOL-05 | — | Pending |
-| CHAT-04 | — | Pending |
-| PARITY-01 | — | Pending |
-| CF-01 | — | Pending |
+| FOUND-03 | Phase 089 | Pending |
+| CF-01 | Phase 089 | Pending |
+| HARNESS-02 | Phase 090 | Pending |
+| HARNESS-06 | Phase 090 | Pending |
+| HARNESS-01 | Phase 091 | Pending |
+| HARNESS-03 | Phase 091 | Pending |
+| HARNESS-04 | Phase 091 | Pending |
+| HARNESS-05 | Phase 091 | Pending |
+| HARNESS-07 | Phase 091 | Pending |
+| TOOL-05 | Phase 091 | Pending |
+| MODE-01 | Phase 092 | Pending |
+| MODE-02 | Phase 092 | Pending |
+| CONT-01 | Phase 092 | Pending |
+| PARITY-01 | Phase 093 | Pending |
+| PANEL-08 | Phase 094 | Pending |
+| PANEL-09 | Phase 094 | Pending |
+| A11Y-03 | Phase 094 | Pending |
+| CHAT-04 | Phase 095 | Pending |
+| EVAL-01 | Phase 096 | Pending |
+| EVAL-02 | Phase 096 | Pending |
+| CONC-01 | Phase 096 | Pending |
 
 **Coverage:**
 - v2.8 requirements: 21 total
-- Mapped to phases: 0 ⚠️ (roadmap pending)
-- Unmapped: 21
+- Mapped to phases: 21 ✓ (8 phases, 089-096)
+- Unmapped: 0 ✓
+
+**Per-phase requirement count:**
+- Phase 089 (Agent-Loop Extraction + Kickoff UAT): FOUND-03, CF-01 — 2 reqs
+- Phase 090 (Harness Schema + RLS + Config Models): HARNESS-02, HARNESS-06 — 2 reqs
+- Phase 091 (Harness Engine + 5 Phase Types + Gates + Whitelist): HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-05 — 6 reqs
+- Phase 092 (Dual-Mode Wiring + Continue): MODE-01, MODE-02, CONT-01 — 3 reqs
+- Phase 093 (Anthropic Cross-Provider Parity): PARITY-01 — 1 req
+- Phase 094 (Panel Phase Timeline): PANEL-08, PANEL-09, A11Y-03 — 3 reqs
+- Phase 095 (Chat Tool-Card Unification): CHAT-04 — 1 req
+- Phase 096 (Eval Harness + Cross-Provider Verification + Concurrency): EVAL-01, EVAL-02, CONC-01 — 3 reqs
 
 ---
 *Requirements defined: 2026-05-30*
-*Last updated: 2026-05-30 after initial definition (research-grounded, D-v2.8-01 scope)*
+*Last updated: 2026-05-30 after roadmap creation — 21/21 mapped across 8 phases (089-096), 0 unmapped*

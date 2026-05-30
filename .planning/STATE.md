@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: in-progress
-stopped_at: Milestone v2.8 started via /gsd:new-milestone — defining requirements
-last_updated: "2026-05-30T09:30:00.000Z"
+stopped_at: Roadmap created — 8 phases (089-096), 21/21 requirements mapped; ready to plan phase 089
+last_updated: "2026-05-30T10:15:00.000Z"
 last_activity: 2026-05-30
 progress:
-  total_phases: 0
+  total_phases: 8
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,20 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.8 (Harness Engine & Workflow Mode) STARTED 2026-05-30 — defining requirements → research → roadmap. Plugin Contract deferred to v2.9.
+**Current focus:** v2.8 (Harness Engine & Workflow Mode) — roadmap created 2026-05-30. Deterministic, auditable workflow runtime (locked phases + dispatcher-enforced tool whitelists + validation gates) + Deep/Harness dual-mode. Plugin Contract deferred to v2.9.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 089 (Agent-Loop Extraction (G-5) + Kickoff UAT) — not started
 Plan: —
-Status: Milestone v2.8 (Harness Engine & Workflow Mode) started — defining requirements → research → roadmap
-Scope: HARNESS-01..03 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs) + MODE-01 (dual Deep/Harness mode) + folded SEED-029 (Continue button) / SEED-034 (eval-harness regression gate) / SEED-035 (tool-count budget) / SEED-036a (`task()` concurrency fair-share) + 2 polish riders (chat tool-card unification, Anthropic cross-provider parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9 (before v3.0). See PROJECT.md D-v2.8-01.
-Next: Research-first ON → 4 parallel harness-domain research agents → REQUIREMENTS.md → ROADMAP.md (gsd-roadmapper). Phase numbering continues from v2.7 (last phase 088 → v2.8 starts at **089**). Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale).
-Carry-forwards into v2.8 (verify at kickoff): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
-G-5 FIRING: `threads.py` (3,186 LOC, 9+ phases) — agent_runner extraction lands FIRST in v2.8 so the harness sits in a clean module.
-Last activity: 2026-05-30 — v2.8 started via /gsd:new-milestone
+Status: ROADMAP.md created — 8 phases (089-096), 21/21 v2.8 requirements mapped, 0 unmapped. Ready to begin phase 089.
+Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
+Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
+Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
+G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
+G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
+SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-message) baked into success criteria for 089, 091, 092, 093, 094, 095, 096.
+Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
+Last activity: 2026-05-30 — ROADMAP.md + REQUIREMENTS.md traceability created (gsd-roadmapper)
 
-Progress: [          ] 0% — requirements not yet defined
+Progress: [          ] 0% — 0/8 phases complete
 
 ## Performance Metrics
 
@@ -72,6 +75,14 @@ Progress: [          ] 0% — requirements not yet defined
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (v2.8 roadmap): 8 phases (089-096) derived from 21 requirements; research A→G build order adopted with 2 polish riders sequenced after the extraction
+- (v2.8 roadmap): whitelist enforcement (research "Phase D") folds into Phase 091 — shares the ToolContext construction site, NOT a separate phase
+- (v2.8 roadmap): G-5 satisfied by Phase 089 (threads.py extraction lands FIRST, behavior-preserving, byte-identical SSE gate)
+- (v2.8 roadmap): G-2 fires for Phase 094 (panel timeline) AND Phase 095 (chat-card unification) — sketch-before-plan mandatory
+- (v2.8 roadmap): migrations renumber from real head 056+ (PRD's 125-139 reservation is stale fiction); deep_mode_metadata column dropped (no v2.8 consumer)
+- (v2.8 roadmap): zero new dependencies — harness is ~80% composition of shipped task_service / ask_user_service / tool_dispatcher primitives; all SSE rides existing run:{run_id} stream
+- (D-v2.8-01): v2.8 = harness + dual-mode only; Plugin Contract + super_admin/operator role tier deferred to v2.9 (lock on harness telemetry)
+- (v2.8 mode-axis clarification, operator-raised): Deep/Harness is ORTHOGONAL to the existing `agent_mode` (General/Explorer). "Deep Mode" = `active_workflow_run_id IS NULL` (umbrella for General AND Explorer, unchanged); the HARNESS-05 whitelist guard is a no-op in Deep Mode so Explorer's 6-KB-tool set is untouched when no workflow runs. Phase 089 extraction MUST preserve the Explorer branch byte-identically (UAT covers it); Phase 092 owns the small UX call of what the General/Explorer selector does DURING an active workflow. No architectural conflict.
 - (v2.7 roadmap): 6 phases derived from 22 requirements; research consensus confirmed build order
 - (v2.7 roadmap): G-5 mandated -- threads.py extraction is Phase 083, prerequisite for all new tools
 - (v2.7 roadmap): G-2 fires for Phase 087 (Panel UI) -- sketch-before-plan mandatory
@@ -107,13 +118,10 @@ Recent decisions affecting current work:
 - (088-01): global :focus-visible ring added to index.css @layer base via zero-specificity :where(...) — a floor, not an override (components with their own focus-visible:ring-* still win)
 - (088-01): A11Y-01/02 structurally GREEN + axe-gated on all 8 panel components (89/89), no component restructure needed (no D-09 SEED); contrast/focus-ring real-verification deferred to Plan 05 Chrome MCP Lighthouse (Pitfall 5)
 - (088-02): cross-provider eval script switches provider via the per-request MessageCreate.provider/model override (threads.py:1285), NOT a persistent user_settings UPDATE — measures the REAL active_system_prompt (Pitfall 2) with zero global-state mutation
-- (088-02): scripts/eval_cross_provider.py is the SEED-034 fold-gate evidence source (D-05) — greppable EVAL_ROW/EVAL_SUMMARY scoreboard; Plan 04 re-runs it before/after a text-only prompt change to prove +1 failing model passes / 0 strong regressions. Authored here, run LIVE in Plans 04/05 (operator backend)
-- D-088-03: scenario-13 deep-flow E2E uses assert-then-expand to open the default-open panel (never the blind ⌘./Ctrl+. toggle) and selects the diff by aria-label '^=Diff v' to disambiguate from the PanelSection region bodies; built REUSE-AND-EXTEND on scenario-02 + 3 fixtures, parameterized over Anthropic + Google, with zero-400 toEqual([]) on both axes (D-17).
-- (088-04): SEED-034 VERDICT = FOLDED — text-only universal write_todos + ask_user directive kept at 2f6e2523; AFTER 6x4 eval = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (zero fold-attributable regression; Moonshot task FAIL is sampling variance, re-confirmed PASS) + condition-a git-diff-proven text-only (TASK_TOOL untouched, no tool_choice forcing)
-- (088-04): eval PROVIDERS extended 4->6 (operator-approved, additive) — native deepseek + moonshot added as the weak-model fold-gate targets; Google is a constant 404 confound (gate judged on 5 non-Google providers; 404 did not reproduce this run); per-provider task/ask_user gaps + Google secondary-model 404 deferred to v2.8 (eval script is the v2.8 harness seed, D-08)
-- (088-05): Phase 088 verification gate COMPLETE — 4-axis cross-provider UAT 6/6 PASS (OpenAI/Anthropic/Google live + OpenRouter/DeepSeek/Moonshot via 088-04 eval; parallel-thread + 5.2KB long-message PASS); a11y real-contrast FIXED both themes (dark 7.21:1 / light 4.66:1); deep flow LIVE no-refresh Anthropic+Google; A11Y-01/02 signed off; nyquist_compliant: true; operator felt pass 'approved'
-- (088-05): D-17 gemini-3 thought_signature CLOSED-as-verified — Google-axis deep flow + multi-tool rounds CLEAN (zero 400; facts.md->v2 proves 2 tool rounds echoed the signature; 075.4 Stage-4 hotfix holds); transient 088-04 Google 404 is a SEPARATE secondary-model routing artifact (v2.8), did not reproduce
-- (088-05): 3 UAT blockers fixed in-088 under D-16 (verified-capability only, all additive/panel-scoped) — 7f650da0 workspace file-id in SSE (deep-flow 404), 6b5da2cf panel AA contrast tokens both themes (global tokens untouched), b0b8d735 todo status colors
+- (088-02): scripts/eval_cross_provider.py is the SEED-034 fold-gate evidence source (D-05) — greppable EVAL_ROW/EVAL_SUMMARY scoreboard; Plan 04 re-runs it before/after a text-only prompt change to prove +1 failing model passes / 0 strong regressions. Authored here, run LIVE in Plans 04/05 (operator backend) — this is the v2.8 harness eval seed (EVAL-01)
+- (088-04): SEED-034 VERDICT = FOLDED — text-only universal write_todos + ask_user directive kept at 2f6e2523; AFTER 6x4 eval = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (zero fold-attributable regression) + condition-a git-diff-proven text-only (TASK_TOOL untouched, no tool_choice forcing)
+- (088-04): eval PROVIDERS extended 4->6 (operator-approved, additive) — native deepseek + moonshot added as the weak-model fold-gate targets; Google is a constant 404 confound; per-provider task/ask_user gaps + Google secondary-model 404 deferred to v2.8 (eval script is the v2.8 harness seed, D-08)
+- (088-05): D-17 gemini-3 thought_signature CLOSED-as-verified — Google-axis deep flow + multi-tool rounds CLEAN (zero 400); transient 088-04 Google 404 is a SEPARATE secondary-model routing artifact (v2.8 CF-01)
 
 ### Pending Todos
 
@@ -121,18 +129,18 @@ None yet.
 
 ### Blockers/Concerns
 
-- Phase 085 `ask_user` tool has the highest implementation risk in the milestone -- Redis pub/sub cleanup path needs explicit decision records during planning
-- Phase 087 Panel UI requires sketch approval (G-2) before planning can begin
-- Tool count budget: 16 existing + ~8 new = ~24 total; Google warns >20; consolidation into fewer tools with action parameters recommended during Phase 084/085 planning
+- Phase 089 (G-5 extraction) is the highest-risk-if-done-wrong phase of v2.8 — a careless "while-I-am-in-here" cleanup re-opens the entire 075.x cross-provider cascade. Acceptance bar is byte-identical SSE per provider (eval + E2E GREEN before AND after), NOT just "tests pass". Carry forward EVERY per-provider round-trip fix verbatim (named checklist in VERIFICATION).
+- Phase 091 highest-risk implementation details: the 2-phase write (mark active before work, completed only after durable output) and the `ask_user` resume re-subscription (re-SUBSCRIBE + re-emit pending prompt on startup sweep). Resumability is the trickiest correctness surface.
+- AnyIO threadpool live budget (CONC-01 / Phase 096): verify `anyio.to_thread.current_default_thread_limiter().total_tokens` before sizing `llm_batch_agents max_parallel` defaults — PRD cites ~200, AnyIO default is 40, project lifted it; exact current value unknown without a live check.
+- Per-provider eval model list (EVAL-01 / Phase 096): needs a curation pass to current model IDs per native provider (model names are representative of provider class, not pinned).
+- Phase 094 (panel) + Phase 095 (chat-card) require sketch approval (G-2) before planning can begin.
 
 ### Phase 086 surface note — BUG-260528-01 fix (2026-05-28, commit 7d2b3d2)
 
-Surfaced for Phase 086 (streamsprovider-extension-panel-hooks), which touches the same snapshot/reconcile/message-list surface:
+Surfaced for any reconcile/snapshot/message-list change (relevant to Phase 089 extraction + Phase 094 panel reconcile):
 
 - **What was fixed:** `GET /threads/{id}/snapshot` and `/messages` now filter `role='system'` rows (`.neq("role","system")`). Phase 085's `ask_user` tool persists prompt/response as durable `role='system'` rows (migration 048), but `MessageResponse.role` is `Literal["user","assistant"]` — serializing a system row raised `ResponseValidationError` → **500, thread won't load**. Regression guard added in `test_075_snapshot.py`.
-- **Constraint for 086:** any reconcile/snapshot/message-list change MUST preserve this filter, or threads with ask_user history 500 on load again. The `panel.py` `/pending` query (raw asyncpg, scans system rows directly) is the separate path and is unaffected.
-- **OPEN FOLLOW-UP for 086 to decide:** answered ask_user Q&A turns are NOT rendered in reloaded conversation history (no frontend renderer for `tool_calls[].kind='ask_user_*'`; `/pending` only surfaces *unanswered* prompts). If reloaded ask_user history should be visible to the user, Phase 086 owns building that renderer (+ widening the wire model) rather than filtering. See `.planning/reported-bugs/snapshot-500-on-system-role-askuser-rows.md`.
-- Also cleaned 2026-05-28: 7 ask_user test-fixture threads purged from dev DB; 8 stale git worktrees pruned.
+- **Constraint going forward:** any reconcile/snapshot/message-list change MUST preserve this filter, or threads with ask_user history 500 on load again. The `panel.py` `/pending` query (raw asyncpg, scans system rows directly) is the separate path and is unaffected.
 
 ### Quick Tasks Completed
 
@@ -159,7 +167,7 @@ Surfaced for Phase 086 (streamsprovider-extension-panel-hooks), which touches th
 | Quick tasks | 260529-0sc, 260529-1wb | Actually DONE (commits 62c1cf0, c756522) — audit false-positive |
 | Dormant seeds | SEED-002 / SEED-003 / SEED-004 / SEED-005 | Dormant — long-deferred future milestones |
 
-Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-panel office/PDF/PPTX viewing + working download), **SEED-038** (chat-vs-panel artifacts unification), **SEED-039** (panel reliability / fast-switch race), **BUG-260527-01** (title-gen live-verify on DeepSeek/Moonshot/Google — folded into 083 but unverified), **BUG-260529-02** (chat-tool-card unification — own v2.8 phase).
+Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-panel office/PDF/PPTX viewing + working download — viewing → v2.9 file_preview plugin; download wire-up → standalone `/gsd:quick` in v2.8), **SEED-038** (chat-vs-panel artifacts unification), **SEED-039** (panel reliability / fast-switch race), **BUG-260527-01** (title-gen live-verify on DeepSeek/Moonshot/Google — folded into 083 but unverified → CF-01 in Phase 089), **BUG-260529-02** (chat-tool-card unification → CHAT-04 / Phase 095).
 
 ### Carried forward from v2.6 milestone close:
 
@@ -176,8 +184,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-30T08:05:03.904Z
-Stopped at: Completed 088-05-PLAN.md (verification capstone — phase 088 ALL 5 plans done)
+Last session: 2026-05-30T10:15:00.000Z
+Stopped at: ROADMAP.md created for v2.8 (8 phases, 089-096; 21/21 requirements mapped) — REQUIREMENTS.md traceability filled
 Resume file: None
 
-**Planned Phase:** 088 (cross-cutting-verification-accessibility) — 5 plans — 2026-05-29T17:09:34.911Z
+**Planned Phase:** None yet — next is `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`)
