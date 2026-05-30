@@ -77,7 +77,10 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   3. Cross-user reads of `workflow_runs`, `workflow_phases`, and `harness_audit` are denied by RLS (FK chain through `threads.user_id`, exact pattern from migrations 054/055); `harness_audit` is INSERT-only like `audit_log`.
   4. The proposed `threads.deep_mode_metadata jsonb` column is NOT created (dropped per research delta #4 — no consumer in v2.8 scope); every table carries `org_id uuid NULL` for forward-compat but RLS predicates stay user-scoped.
   5. `app/models/harness.py` Pydantic models (`PhaseConfig` discriminated union over the 5 phase types, `ValidatorSpec`, `WorkflowDefinition`) parse a seed workflow's `phases` JSONB via `model_validate()` and reject a malformed config with a structured error.
-**Plans**: TBD
+**Plans**: 3 plans (2 waves)
+- [ ] 090-01-PLAN.md — Pydantic harness config models (`harness.py`, extra=forbid discriminated union) + pure-Python model unit test (SC#5/D-07) + `verify_090.sql` live-DB gate script [Wave 1]
+- [ ] 090-02-PLAN.md — Author migrations 056-059 (workflow_definitions+immutable trigger+UNIQUE+owner/global RLS w/ is_global=false INSERT guard; workflow_runs RESTRICT FK+1-hop RLS; workflow_phases 2-hop RLS; harness_audit INSERT-only + threads.active_workflow_run_id) [Wave 1]
+- [ ] 090-03-PLAN.md — [BLOCKING autonomous:false] manual SQL-editor apply 056→059 + regenerate full-schema.sql + run verify_090.sql live-DB gate (SC#1/#2/#3/#4 + HARNESS-06) [Wave 2]
 
 #### Phase 091: Harness Engine + 5 Phase Types + Gates + Whitelist
 **Goal**: A user can run an agent through an ordered, locked workflow the LLM cannot escape — 5 phase types execute end-to-end, validation gates pass/fail with bounded retry, per-phase tool whitelists are enforced at the dispatcher, and phase state is durably resumable.
