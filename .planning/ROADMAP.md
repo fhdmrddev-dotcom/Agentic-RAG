@@ -119,7 +119,7 @@ Full details: `.planning/milestones/v2.5-ROADMAP.md`
  (completed 2026-05-28)
 - [x] **Phase 086: StreamsProvider Extension + Panel Hooks** - New SSE event types demuxed to separate Zustand stores, panel-ready hooks (completed 2026-05-29 — verified passed 3/3; WR-04 closed via quick 260529-0sc; UAT 4/5 across 6 providers; thread-switch reconcile-abort deferred to Phase 087 (no hook consumer until panel UI; unit-tested FC#5); surfaced+closed BUG-260529-01)
 - [x] **Phase 087: Panel UI** - Right-side collapsible panel with todos, file browser, ask_user prompt, and diff viewer (8/8 plans complete + finalized 2026-05-29. Plan 087-08 shipped the single nav-style in-panel toggle; Wave-2 live gate PASSED all 4 design contracts + PANEL-02 + cross-provider scoreboard. Exhaustive scenario-matrix round-3 (Chrome MCP + Supabase/API cross-check): non-adjacent v1↔v3 diff, empty/huge(>500-line truncated) diffs, 12-todo list, malformed-CSV fallback, Stop-mid-write partial state, invalid-path + empty-search surfaces, empty workspace, free-text ask_user — all verified. Found+fixed **BUG-260529-03** (free-text ask_user → null.length blanked the whole app; commit 0df4b048). Deferred via **SEED-037** (office/PDF viewing + working download), **SEED-038** (artifacts unification), **SEED-039** (panel reliability/polish — fast-switch race + minor findings). See 087-SCENARIO-MATRIX.md)
-- [ ] **Phase 088: Cross-Cutting Verification + Accessibility** - 4-axis UAT matrix (SC#10), WCAG 2.1 AA audit, E2E validation
+- [x] **Phase 088: Cross-Cutting Verification + Accessibility** - 4-axis UAT matrix (SC#10), WCAG 2.1 AA audit, E2E validation (completed 2026-05-30)
 
 ## Phase Details
 
