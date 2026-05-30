@@ -99,7 +99,25 @@ CREATE TRIGGER workflow_definitions_block_published
   FOR EACH ROW EXECUTE FUNCTION public.workflow_definitions_block_published_update();
 
 -- ============================================================
--- One minimal valid global seed (D-02) — references the 018 seed system user.
+-- Seed system user (idempotent) — satisfies the created_by FK for the global seed below.
+-- 056 is self-sufficient: it does NOT assume 018_skill_creator_seed.sql has been applied
+-- (the seed user may be absent on a given DB). Same row/UUID as 018 — ON CONFLICT makes
+-- re-applying either migration a no-op.
+-- ============================================================
+INSERT INTO auth.users (
+  id, email, encrypted_password, email_confirmed_at,
+  created_at, updated_at, raw_app_meta_data, raw_user_meta_data, aud, role
+)
+VALUES (
+  '00000000-0000-0000-0000-000000000001',
+  'seed@system.local', '', now(), now(), now(),
+  '{"provider":"email","providers":["email"]}', '{}',
+  'authenticated', 'authenticated'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- One minimal valid global seed (D-02) — references the seed system user above.
 -- This single seed doubles as the WorkflowDefinition.model_validate() fixture (RESEARCH OQ1 / SC#5).
 -- The real 2-3 templates (HARNESS-07) are Phase 091's job — this only proves the seed MECHANISM
 -- and gives the 090-01 unit test a parseable row. Ships status='published' so the block-published
