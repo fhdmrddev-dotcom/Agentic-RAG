@@ -56,3 +56,16 @@ the SEED-034 failing-row evidence is reproduced cleanly on `completed` runs from
 Suggested routing: investigate the secondary/title-gen model-name routing for Google (and re-check
 DeepSeek/Moonshot per the same memory) in v2.8 — out of scope for the 088 close-out fold-gate.
 Do NOT fix in 088-04.
+
+## 088-05 (color-code todo status text)
+
+### Pre-existing `tsc -b` type errors confirmed unchanged (NOT caused by 088-05)
+
+This color-only change (TodosSection.tsx + index.css + tailwind.config.js) was verified to
+introduce ZERO new type errors: `npx tsc -b` reported **54 errors both WITH and WITHOUT** the
+change (measured via `git stash` of the three files, then restore). The 54 are the same
+pre-existing drift already catalogued under 088-01 above (plus the `vitest-axe`
+`toHaveNoViolations` matcher-typing miss that affects every `panel/__tests__/*` file). None
+reference the three changed source files. Vite build passes (exit 0) and all 8 panel test files
+/ 91 tests pass at runtime (vitest = esbuild transpile, not tsc). Out of scope — same v2.8
+test/type-hygiene sweep routing as 088-01.

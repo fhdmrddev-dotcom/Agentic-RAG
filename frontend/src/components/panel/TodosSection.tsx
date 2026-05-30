@@ -34,6 +34,18 @@ const STATUS_LABEL: Record<TodoStatus, string> = {
   completed: "Completed",
 }
 
+// Phase 088-05 (operator request) — per-status color for the STATUS-TEXT label.
+// Color is ADDITIVE only (the word still renders → non-color-only A11Y intact).
+// Panel-scoped, per-theme AA tokens (≥4.5:1 on the --panel-surface in BOTH
+// themes; computed in index.css). Matches the icon hues in spirit: completed →
+// green (like the check icon), in_progress → amber active accent. Pending stays
+// the neutral muted-dim (not-started = no status color).
+const STATUS_TEXT_COLOR: Record<TodoStatus, string> = {
+  pending: "text-panel-muted-foreground-dim",
+  in_progress: "text-panel-status-active",
+  completed: "text-panel-status-done",
+}
+
 function StatusIndicator({ status }: { status: TodoStatus }) {
   if (status === "completed") {
     return (
@@ -72,8 +84,15 @@ function TodoRow({ todo }: { todo: Todo }) {
         {todo.content}
       </span>
       {/* Status text — non-color-only A11Y; in the accessible tree (NOT
-          aria-hidden) so the status is conveyed by text, not color alone. */}
-      <span className="ml-auto flex-none font-mono text-[0.62rem] uppercase tracking-wider text-panel-muted-foreground-dim">
+          aria-hidden) so the status is conveyed by text, not color alone. The
+          per-status color (088-05) is ADDITIVE — the word is the source of
+          truth; color just reinforces it (green=done, amber=active, muted=pending). */}
+      <span
+        className={cn(
+          "ml-auto flex-none font-mono text-[0.62rem] uppercase tracking-wider",
+          STATUS_TEXT_COLOR[status],
+        )}
+      >
         {STATUS_LABEL[status]}
       </span>
     </li>

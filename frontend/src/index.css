@@ -47,6 +47,18 @@
          --panel-muted-foreground-dim : 220 10% 42% (#606876) → 4.66:1 on #e8eaee */
     --panel-muted-foreground: 220 12% 40%;
     --panel-muted-foreground-dim: 220 10% 42%;
+    /* Phase 088-05 (operator request) — panel-scoped status-TEXT colors for the
+       todo STATUS label (completed=green, in_progress=amber). Color is ADDITIVE
+       only — the status word still renders (non-color-only A11Y preserved). The
+       status text is ~0.62rem normal text → WCAG AA 1.4.3 needs ≥4.5:1; the
+       vivid global --success/--primary read fine as ICONS (graphics need 3:1)
+       but FAIL as text on the light panel (#e8eaee), so these are panel-scoped
+       per-theme shades. Light needs DARK shades to clear ≥4.5:1 on the light bg.
+       Pending keeps --panel-muted-foreground-dim (neutral = not-started).
+         --panel-status-done   : 142 65% 28% (#19763b) → 4.72:1 on #e8eaee
+         --panel-status-active : 32 90% 30%  (#915108) → 5.15:1 on #e8eaee */
+    --panel-status-done: 142 65% 28%;
+    --panel-status-active: 32 90% 30%;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -103,6 +115,14 @@
          --panel-muted-foreground-dim : 220 16% 70% (#a6aebf) → 8.42:1 on #0c121d */
     --panel-muted-foreground: 220 16% 65%;
     --panel-muted-foreground-dim: 220 16% 70%;
+    /* Phase 088-05 (operator request) — panel-scoped status-TEXT colors (dark).
+       On the near-black dark --panel-surface (#0c121d) a brighter green/amber
+       clears ≥4.5:1 easily; these mirror the icon hues (green check / amber
+       active) in spirit while staying panel-scoped (global tokens untouched).
+         --panel-status-done   : 142 71% 55% (#3bde77) → 10.63:1 on #0c121d
+         --panel-status-active : 38 92% 62%  (#f7b645) → 10.48:1 on #0c121d */
+    --panel-status-done: 142 71% 55%;
+    --panel-status-active: 38 92% 62%;
   }
 }
 
