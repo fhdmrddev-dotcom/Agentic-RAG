@@ -154,7 +154,9 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   2. The harness passes the 4-axis UAT scoreboard (cross-provider × multi-tool × parallel-thread × long-message) PLUS a uvicorn-restart-mid-workflow smoke per phase type — including mid-`ask_user`, where after restart the prompt re-renders in the panel AND the user's POST response reaches the engine.
   3. `llm_batch_agents` fan-out is bounded by `max_parallel_agents` (default 5) composing with the global Redis-Lua cap (20); N=10 fans out at ≤5 concurrent and a batch phase does not starve app-wide request latency (cross-tab GET stays <50ms); the live AnyIO threadpool budget is verified before sizing defaults (SEED-036a).
   4. HARNESS-03 resumability is independently verified: kill-and-resume at mid-`programmatic`, mid-`llm_agent`, and mid-`ask_user` produces no skipped phases and no double-applied side effects.
+  5. The thread-switch connection-saturation hang (BUG-260530-01) is fixed: with ≥6 concurrent active runs streaming, switching threads reconciles in <1s (no 15-30s stall). Fix is **frontend stream-cap** — only the viewed thread (plus a small bounded pool) holds a live `fetch` stream; background runs reconcile via `GET /threads/{id}/snapshot` on return (D-v2.5-03). Preserves PANEL-06 isolation + per-thread demux; carries the SC#10 4-axis parallel-thread UAT (StreamsProvider is a G-5 hot file).
 **Plans**: TBD
+**Notes**: CONC-01 covers BOTH backend fan-out fairness (`llm_batch_agents`) AND the frontend stream-connection saturation (BUG-260530-01) — same parallel-thread responsiveness guarantee. The frontend cap-live-streams fix lands here because Phase 094's panel timeline rides the same `run:{run_id}` stream and must not be throttled by held-open background streams. Operator-chosen approach 2026-05-30 (rejected: single multiplexed transport, HTTP/2 serving).
 
 ### Progress
 
