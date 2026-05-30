@@ -61,6 +61,7 @@ DECLARE
   v_b uuid := '00000000-0000-0000-0000-0000000000b2';
   v_thread uuid; v_def uuid; v_run uuid; v_audit uuid;
   c_runs int; c_phases int; c_audit int; c_self int; upd_count int;
+  v_global_blocked boolean := false;
 BEGIN
   INSERT INTO public.threads (user_id) VALUES (v_a) RETURNING id INTO v_thread;
   INSERT INTO public.workflow_definitions (slug, version, name, status, created_by, definition)
@@ -80,20 +81,15 @@ BEGIN
     INSERT INTO _v090 VALUES (2, 'B DELETE RESTRICT (HARNESS-02/SC#2)', 'PASS — DELETE raised 23503');
   END;
 
-  -- BLOCK D — cross-user RLS: impersonate user B, must see 0 of user A's rows
+  -- BLOCK D — cross-user RLS: impersonate user B, must see 0 of user A's rows.
+  -- Query each target table DIRECTLY by its own PK / FK (NOT joining through threads),
+  -- so a broken runs/phases/audit USING predicate cannot be masked by threads RLS (WR-02).
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims',
                      json_build_object('sub', v_b::text, 'role', 'authenticated')::text, true);
-  SELECT count(*) INTO c_runs
-    FROM public.workflow_runs wr JOIN public.threads t ON t.id = wr.thread_id
-   WHERE t.user_id = v_a;
-  SELECT count(*) INTO c_phases
-    FROM public.workflow_phases wp
-    JOIN public.workflow_runs wr ON wr.id = wp.workflow_run_id
-    JOIN public.threads t ON t.id = wr.thread_id
-   WHERE t.user_id = v_a;
-  SELECT count(*) INTO c_audit
-    FROM public.harness_audit WHERE user_id = v_a;
+  SELECT count(*) INTO c_runs   FROM public.workflow_runs    WHERE id = v_run;
+  SELECT count(*) INTO c_phases FROM public.workflow_phases  WHERE workflow_run_id = v_run;
+  SELECT count(*) INTO c_audit  FROM public.harness_audit    WHERE id = v_audit;
 
   -- BLOCK E (mutation) — as the OWNER (user A): can read own audit, but UPDATE affects 0 rows
   PERFORM set_config('request.jwt.claims',
@@ -101,6 +97,15 @@ BEGIN
   SELECT count(*) INTO c_self FROM public.harness_audit WHERE user_id = v_a;
   UPDATE public.harness_audit SET event_type = 'tampered' WHERE id = v_audit;
   GET DIAGNOSTICS upd_count = ROW_COUNT;
+
+  -- BLOCK G (WR-01 regression, migration 060) — owner CANNOT promote own draft to is_global=true.
+  -- The UPDATE policy's WITH CHECK rejects the new row → SQLSTATE 42501 (insufficient_privilege).
+  BEGIN
+    UPDATE public.workflow_definitions SET is_global = true WHERE id = v_def;
+    v_global_blocked := false;   -- no error == guard FAILED
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_global_blocked := true;    -- WITH CHECK denied the promotion == guard works
+  END;
 
   -- reset to superuser context before recording results / cleanup
   PERFORM set_config('role', 'postgres', true);
@@ -119,6 +124,14 @@ BEGIN
   ELSE
     INSERT INTO _v090 VALUES (5, 'E INSERT-only audit (HARNESS-06)',
       format('FAIL — owner_reads=%s update_rows=%s (want reads>=1, update=0)', c_self, upd_count));
+  END IF;
+
+  IF v_global_blocked THEN
+    INSERT INTO _v090 VALUES (8, 'G is_global self-promotion guard (WR-01 / migration 060)',
+      'PASS — owner cannot UPDATE own draft to is_global=true (WITH CHECK denied, 42501)');
+  ELSE
+    INSERT INTO _v090 VALUES (8, 'G is_global self-promotion guard (WR-01 / migration 060)',
+      'FAIL — owner promoted own draft to is_global=true (UPDATE WITH CHECK missing — apply migration 060)');
   END IF;
 END $$;
 

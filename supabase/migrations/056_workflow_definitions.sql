@@ -145,7 +145,7 @@ VALUES (
       }
     ]
   }'::jsonb,
-  '00000000-0000-0000-0000-000000000001',   -- seed system user from 018_skill_creator_seed.sql
+  '00000000-0000-0000-0000-000000000001',   -- seed system user (created idempotently above; same UUID as 018)
   true                                        -- D-02: global
 )
 ON CONFLICT (id) DO NOTHING;

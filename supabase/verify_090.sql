@@ -72,7 +72,7 @@ VALUES ('verify-b', 1, 'Verify B', 'draft',
 RETURNING id AS def_id \gset
 
 INSERT INTO public.workflow_runs (definition_id, thread_id, status)
-VALUES (:'def_id', :'thread_id', 'running');
+VALUES (:'def_id', :'thread_id', 'active');  -- 'active' ∈ workflow_runs status CHECK set
 
 -- EXPECT: RAISES SQLSTATE 23503 (foreign_key_violation) — RESTRICT blocks the delete.
 DELETE FROM public.workflow_definitions WHERE id = :'def_id';
