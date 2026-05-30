@@ -1,9 +1,10 @@
 # Agent-Loop Extraction Seam (Phase 089 — G-5)
 
-**Status:** PROPOSED — awaiting operator sign-off (D-089-04, Task 4 checkpoint).
-**Authored:** 2026-05-30 (Plan 089-01, Task 3).
-**Decision owner:** the operator confirms the `run_agent_loop` signature + the
-Category-B boundary (B1 vs B2) BEFORE the verbatim loop move (Plan 089-03) runs.
+**Status:** ✅ APPROVED — operator signed off 2026-05-30 (D-089-04, Task 4 checkpoint).
+**Authored:** 2026-05-30 (Plan 089-01, Task 3). **Locked:** 2026-05-30 (Plan 089-01, Task 4).
+**Operator decision:** B1 boundary (setup moves into the loop) + `_reconstruct_history`
+co-located in `agent_loop.py` (cycle-free). Signature, RunContext (9 fields), and
+AgentLoopResult (5 fields) confirmed as proposed. **Plan 089-03 follows this contract exactly.**
 
 This document is the contract between `threads.py` (the producer shell that
 STAYS) and `agent_loop.py` (the loop that MOVES). It changes file location
@@ -113,8 +114,9 @@ re-touching it. The mode branch (L1520-1527: Explorer prompt + `get_explorer_too
 `max_iterations=15`) moves into the loop under B1 and MUST be preserved
 byte-identically (SC#4; `test_explorer_agent.py` stays green).
 
-> **OPERATOR DECISION REQUIRED:** confirm **B1**, or specify **B2** (and which
-> derived fields to add to `RunContext`), before Plan 03's verbatim move runs.
+> **✅ OPERATOR DECISION (2026-05-30): B1 — LOCKED.** The L1470-1627 setup block
+> moves into `run_agent_loop`; `RunContext` stays the 9 raw inputs only. Plan 03's
+> verbatim move follows B1.
 
 ---
 
@@ -136,10 +138,11 @@ byte-identically (SC#4; `test_explorer_agent.py` stays green).
   (a B2-flavored exception for this one symbol). The cleanest cycle-free B1
   shape is to **co-locate `_reconstruct_history` in `agent_loop.py`** (it's a
   pure function, no other live caller depends on it staying in threads.py).
-  This is flagged for the operator: keep-and-import only works if the import is
-  one-directional; otherwise co-locate. The Google `thought_signature` echo on
-  reload (I3, threads.py L1184-1188) lives inside `_reconstruct_history` and
-  moves WITH it verbatim.
+  **✅ OPERATOR DECISION (2026-05-30): co-locate `_reconstruct_history` in
+  `agent_loop.py` — LOCKED.** Keep-and-import was rejected because the
+  `agent_loop → threads` import direction reintroduces the cycle. The Google
+  `thought_signature` echo on reload (I3, threads.py L1184-1188) lives inside
+  `_reconstruct_history` and moves WITH it verbatim.
 
 > The frontend read path — `get_snapshot`/`get_messages` with the
 > `.neq("role","system")` filter (Phase 086 landmine, threads.py L800/L1113) —
@@ -196,10 +199,15 @@ proof is the same SSE-diff + eval rows as the other OpenAI-compat providers.
 
 ---
 
-## Awaiting operator sign-off
+## ✅ Operator sign-off — LOCKED (2026-05-30)
 
-Type **"approved"** to lock this seam (Plan 03 proceeds with the verbatim move
-as proposed: signature above, RunContext = 9 raw inputs, AgentLoopResult = 5
-finalizer outputs, **B1** boundary, `_reconstruct_history` co-located in
-`agent_loop.py` to keep the import one-directional). Otherwise, specify changes
-to the signature, the `RunContext` fields, or the **B1-vs-B2** boundary.
+The operator approved this seam as proposed. Plan 089-03 proceeds with the
+verbatim move on this exact contract:
+
+- **Signature:** `async def run_agent_loop(ctx: RunContext, *, emit, emit_terminal, spawn) -> AgentLoopResult`
+- **RunContext** = the 9 raw inputs (§2), frozen.
+- **AgentLoopResult** = the 5 finalizer outputs (§3).
+- **Boundary = B1:** the L1470-1627 setup moves into the loop.
+- **`_reconstruct_history`:** co-located in `agent_loop.py` (cycle-free; keep-and-import rejected).
+
+No changes were requested to the signature, the RunContext fields, or the boundary.
