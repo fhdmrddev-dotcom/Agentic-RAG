@@ -253,7 +253,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -278,7 +278,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -310,7 +310,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -335,7 +335,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -360,7 +360,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -385,7 +385,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.api.threads.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "default"},
@@ -404,30 +404,37 @@ class TestSendMessageAgentModeBranching:
 # ---------------------------------------------------------------------------
 
 class TestMaxIterationsConfig:
-    """GEN-04: Assert max_iterations values in threads.py meet the target spec."""
+    """GEN-04: Assert max_iterations values meet the target spec.
+
+    Phase 089 Plan 03 (G-5 verbatim move): the General/Explorer mode branch
+    (the B1 setup block that sets ``max_iterations = 15`` / ``= 8``) MOVED
+    verbatim from threads.py into ``app.services.agent_loop.run_agent_loop``.
+    These source-grep guards now read agent_loop.py — same GEN-04 intent,
+    new file location.
+    """
 
     def _read_threads_source(self) -> str:
         import os
-        # Navigate from this test file to threads.py
+        # Phase 089-03: the mode branch moved to agent_loop.py — read it there.
         here = os.path.dirname(__file__)
-        threads_path = os.path.join(here, "..", "..", "app", "api", "threads.py")
-        with open(threads_path) as f:
+        loop_path = os.path.join(here, "..", "..", "app", "services", "agent_loop.py")
+        with open(loop_path, encoding="utf-8") as f:
             return f.read()
 
     def test_general_mode_max_iterations_is_15(self):
         """General agent mode must allow 15 iterations (was 8) — GEN-04."""
         source = self._read_threads_source()
         assert "max_iterations = 15" in source, (
-            "Expected 'max_iterations = 15' in threads.py for general mode. "
-            "Current value is 8 — will be fixed in 054-02-PLAN.md (Wave 1)."
+            "Expected 'max_iterations = 15' in agent_loop.py for general mode "
+            "(B1 mode branch moved here in Phase 089-03)."
         )
 
     def test_explorer_mode_max_iterations_is_8(self):
         """Explorer mode must allow 8 iterations (was 6) — GEN-04."""
         source = self._read_threads_source()
         assert "max_iterations = 8" in source, (
-            "Expected 'max_iterations = 8' in threads.py for explorer mode. "
-            "Current value is 6 — will be fixed in 054-02-PLAN.md (Wave 1)."
+            "Expected 'max_iterations = 8' in agent_loop.py for explorer mode "
+            "(B1 mode branch moved here in Phase 089-03)."
         )
 
     def test_old_general_max_iterations_8_is_gone(self):

@@ -82,7 +82,7 @@ async def test_timeout_branch_writes_timed_out(redis_client, monkeypatch):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_stalling_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -140,7 +140,7 @@ async def test_failed_error_truncated_to_200_chars(redis_client, monkeypatch):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_crashing_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

@@ -278,7 +278,7 @@ async def _post_and_drain(
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=fake_create_streaming_chat,
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

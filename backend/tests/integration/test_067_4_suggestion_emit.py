@@ -74,7 +74,7 @@ async def test_always_emit_when_empty(redis_client):
     events = []
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_slow_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -173,7 +173,7 @@ async def test_narrowed_exception_logs_warning(redis_client):
     events = []
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_slow_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

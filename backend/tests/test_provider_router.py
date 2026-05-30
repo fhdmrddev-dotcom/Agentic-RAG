@@ -240,10 +240,10 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
             "app.api.threads.override_provider",
             side_effect=_override_provider_passthrough,
         ), patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_fast_chunks()), CallingMode.NATIVE),
         ), patch(
-            "app.api.threads.stream_anthropic",
+            "app.services.agent_loop.stream_anthropic",
             side_effect=lambda *a, **k: iter([]),
         ), patch(
             "app.api.threads.generate_thread_title",
@@ -258,7 +258,7 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
             "app.api.threads.finalize_run",
             new=finalize_run_mock,
         ), patch(
-            "app.api.threads.insert_assistant_message",
+            "app.services.agent_loop.insert_assistant_message",
             new=insert_message_mock,
         ):
             async with httpx.AsyncClient(

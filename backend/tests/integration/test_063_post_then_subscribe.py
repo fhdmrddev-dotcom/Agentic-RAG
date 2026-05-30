@@ -56,7 +56,7 @@ async def test_post_then_get_stream_renders_full_response(redis_client):
       4. Assert at least one delta event seen AND last event is terminal.
 
     Patches mirror test_062_stream_replay.py exactly:
-      - app.api.threads.create_adaptive_streaming_chat → slow chunks
+      - app.services.agent_loop.create_adaptive_streaming_chat → slow chunks
       - app.services.suggestion_service.generate_suggestions → no-op
       - app.api.threads.generate_thread_title → fixed title
     """
@@ -64,7 +64,7 @@ async def test_post_then_get_stream_renders_full_response(redis_client):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.api.threads.create_adaptive_streaming_chat",
+            "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_slow_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
