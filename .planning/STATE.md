@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ROADMAP.md created — 8 phases (089-096), 21/21 v2.8 requirements mapped, 0 unmapped. Ready to begin phase 089.
-stopped_at: Phase 089 context gathered
-last_updated: "2026-05-30T11:26:14.121Z"
-last_activity: 2026-05-30 — ROADMAP.md + REQUIREMENTS.md traceability created (gsd-roadmapper)
+status: executing
+stopped_at: Completed 089-02-PLAN.md
+last_updated: "2026-05-30T14:06:31.231Z"
+last_activity: 2026-05-30
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** v2.8 (Harness Engine & Workflow Mode) — roadmap created 2026-05-30. Deterministic, auditable workflow runtime (locked phases + dispatcher-enforced tool whitelists + validation gates) + Deep/Harness dual-mode. Plugin Contract deferred to v2.9.
+**Current focus:** Phase 089 — agent-loop-extraction-g-5-kickoff-uat
 
 ## Current Position
 
-Phase: 089 (Agent-Loop Extraction (G-5) + Kickoff UAT) — not started
-Plan: —
-Status: ROADMAP.md created — 8 phases (089-096), 21/21 v2.8 requirements mapped, 0 unmapped. Ready to begin phase 089.
+Phase: 089 (agent-loop-extraction-g-5-kickoff-uat) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
 Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
@@ -35,9 +35,9 @@ G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
 SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-message) baked into success criteria for 089, 091, 092, 093, 094, 095, 096.
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
-Last activity: 2026-05-30 — ROADMAP.md + REQUIREMENTS.md traceability created (gsd-roadmapper)
+Last activity: 2026-05-30
 
-Progress: [          ] 0% — 0/8 phases complete
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -67,6 +67,7 @@ Progress: [          ] 0% — 0/8 phases complete
 | Phase 088 P088-03 | 3min | 2 tasks | 1 files |
 | Phase 088 P088-04 | 75min | 3 tasks | 4 files |
 | Phase 088 P088-05 | 1h 40m | 3 tasks | 2 files |
+| Phase 089 P02 | 6min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,8 @@ Recent decisions affecting current work:
 - (088-04): SEED-034 VERDICT = FOLDED — text-only universal write_todos + ask_user directive kept at 2f6e2523; AFTER 6x4 eval = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (zero fold-attributable regression) + condition-a git-diff-proven text-only (TASK_TOOL untouched, no tool_choice forcing)
 - (088-04): eval PROVIDERS extended 4->6 (operator-approved, additive) — native deepseek + moonshot added as the weak-model fold-gate targets; Google is a constant 404 confound; per-provider task/ask_user gaps + Google secondary-model 404 deferred to v2.8 (eval script is the v2.8 harness seed, D-08)
 - (088-05): D-17 gemini-3 thought_signature CLOSED-as-verified — Google-axis deep flow + multi-tool rounds CLEAN (zero 400); transient 088-04 Google 404 is a SEPARATE secondary-model routing artifact (v2.8 CF-01)
+- (089-02): eval extended to native-7 — zhipu/glm-4-flash + minimax/minimax-m2.7 appended to PROVIDERS + ZHIPU/MINIMAX_API_KEY presence checks (is_secret, presence-only); choices auto-derive, localhost hard-gate untouched (D-089-09)
+- (089-02): byte-identical SC#3 proof = capture_run_events (XRANGE run:{run_id}) + normalize (mask message_id/run_id, drop captured_at) + diff_event_streams ([] == PASS); operator runbook captures BEFORE baseline against the pre-move loop in Wave 1, AFTER diff in Plan 04 (D-089-08)
 
 ### Pending Todos
 
@@ -184,8 +187,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 089 context gathered
-Resume file: --resume-file
+Last session: 2026-05-30T14:06:31.223Z
+Stopped at: Completed 089-02-PLAN.md
+Resume file: None
 
-**Planned Phase:** None yet — next is `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`)
+**Planned Phase:** 089 (agent-loop-extraction-g-5-kickoff-uat) — 4 plans — 2026-05-30T12:03:18.356Z

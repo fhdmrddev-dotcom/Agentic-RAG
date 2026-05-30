@@ -11,7 +11,8 @@
 
 ### Foundation — Agent-Loop Extraction (G-5)
 
-- [ ] **FOUND-03**: The agent loop is extracted from `threads.py` (3,186 LOC) into a dedicated `agent_loop.py` module with **byte-identical cross-provider behavior** — eval harness + E2E backstop GREEN before AND after, all per-provider round-trip fixes (Anthropic `end_turn`, Google `thought_signature`, DeepSeek `reasoning_content`, empty-retry guard, `force_no_tools`-on-last-iteration) carried verbatim. Ships FIRST; zero harness features bundled. Deep Mode unchanged.
+- [x] **FOUND-03
+**: The agent loop is extracted from `threads.py` (3,186 LOC) into a dedicated `agent_loop.py` module with **byte-identical cross-provider behavior** — eval harness + E2E backstop GREEN before AND after, all per-provider round-trip fixes (Anthropic `end_turn`, Google `thought_signature`, DeepSeek `reasoning_content`, empty-retry guard, `force_no_tools`-on-last-iteration) carried verbatim. Ships FIRST; zero harness features bundled. Deep Mode unchanged.
 
 ### Harness Engine
 
