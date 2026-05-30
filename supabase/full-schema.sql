@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ylQ2LCVDTx0aojh7z496u97ycnVzhbW2QFdS3yccqauajgEeKfRdwjga3Y4qB9w
+\restrict U2vk3kaXhAdxXMvk3T2YeCF8HXzR0xY3zbGfHI29iy447GvuQx7cOBSNltaLXPt
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -1927,7 +1927,7 @@ CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE USING ((
 -- Name: workflow_definitions Users can update own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE USING ((auth.uid() = created_by));
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE USING ((auth.uid() = created_by)) WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
 
 
 --
@@ -2277,6 +2277,9 @@ CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO
 CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+  WHERE (wr.id = workflow_phases.workflow_run_id)))) WITH CHECK ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
   WHERE (wr.id = workflow_phases.workflow_run_id))));
 
 
@@ -2318,6 +2321,8 @@ CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO aut
 --
 
 CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workflow_runs.thread_id)))) WITH CHECK ((auth.uid() = ( SELECT threads.user_id
    FROM public.threads
   WHERE (threads.id = workflow_runs.thread_id))));
 
@@ -2394,5 +2399,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ylQ2LCVDTx0aojh7z496u97ycnVzhbW2QFdS3yccqauajgEeKfRdwjga3Y4qB9w
+\unrestrict U2vk3kaXhAdxXMvk3T2YeCF8HXzR0xY3zbGfHI29iy447GvuQx7cOBSNltaLXPt
 

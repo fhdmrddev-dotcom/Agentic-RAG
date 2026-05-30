@@ -53,8 +53,22 @@ prints a PASS/FAIL grid; `ROLLBACK`s). Operator ran it in Studio — **all 6 blo
 ## Key-files.created
 - supabase/verify_090_run.sql
 
+## Code-review remediation (post-execution gate)
+`090-REVIEW.md`: 0 critical, 4 warning, 6 info. Fixed the security + artifact warnings before close:
+- **WR-01 (security)** — migration `060_harness_update_with_check.sql` adds `WITH CHECK` to the
+  workflow_definitions/runs/phases UPDATE policies. Closes the `is_global` self-promotion bypass
+  (INSERT-side T-090-06 guard was defeatable via a later UPDATE) + ownership-transfer on runs/phases.
+  Applied live; **verify Block G** now proves the promotion is denied (SQLSTATE 42501).
+- **WR-03** — `verify_090.sql` used `status='running'` (not in the workflow_runs CHECK set) → `'active'`.
+- **WR-02** — `verify_090_run.sql` Block D now queries runs/phases/audit directly by PK (not via a
+  threads JOIN that could mask a broken predicate); added Block G regression.
+- Info items (provisional 091 field shapes, schemaless output/config, comment cleanup) left as-is by design.
+
+Re-verified after 060: **all 8 blocks A–G PASS** against the live DB. full-schema.sql regenerated again
+to capture the 060 policy changes.
+
 ## Self-Check: PASSED
-Phase gate met: full pytest GREEN (Plan 01 model test) AND all 6 live-DB blocks confirmed.
+Phase gate met: full pytest GREEN (Plan 01 model test) AND all 8 live-DB blocks (A–G) confirmed.
 
 ## Notes for downstream (Phase 091)
 - 056 ships ONE minimal global seed (`research-summarize`) as the `model_validate()` fixture;
