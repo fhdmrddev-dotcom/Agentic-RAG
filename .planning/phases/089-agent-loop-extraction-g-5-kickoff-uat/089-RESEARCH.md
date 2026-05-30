@@ -596,9 +596,11 @@ The mode branch is at L1520-1527 (in Category B — moves into `run_agent_loop` 
 | A5 | Capturing SSE at the `run:{run_id}` XRANGE (vs. SSE response body) is sufficient for the byte-identical proof | Code Examples / SC#3 | LOW — the stream IS the wire payload the consumer forwards; equivalent and deterministic. Confirmed by runs.py XREAD consumer reading the same key. |
 | A6 | A 28-cell eval (7×4) is the right gate shape (vs 24) | Sampling Rate | LOW — native-7 gated, OpenRouter best-effort (not in the gated count); exact cell count is the planner's to set. |
 
-## Open Questions
+## Open Questions (RESOLVED in plans)
 
-1. **The Category-B boundary: where do the L1470-1627 derivations live (the seam-review decision)?**
+> Disposition (added 2026-05-30 at plan-check): Q1 is deferred-by-design to the operator seam-review checkpoint (089-01 Task 4 → `SEAM.md`; the verbatim move 089-03 `depends_on: ["089-01"]` cannot run before sign-off). Q2 resolved as the 4-plan reviewable sequence. Q3 resolved as keep-in-`threads.py` + import (089-03 Task 1). Plans accommodate either B1/B2 outcome.
+
+1. **The Category-B boundary: where do the L1470-1627 derivations live (the seam-review decision)?** — RESOLVED: operator confirms B1 (recommended) vs B2 at the 089-01 seam checkpoint before any move.
    - What we know: folder-scope, mode/prompt/tool selection, skills/memory injection, history reconstruction + trim all happen inside `agent_runner` BEFORE the loop. They're loop SETUP, not producer-shell concern.
    - What's unclear: move them into `run_agent_loop` (B1 — thinner ctx, recommended) or keep in `agent_runner` and pass the computed values via an extended ctx (B2 — more ctx fields, `agent_runner` stays fatter).
    - Recommendation: **B1**, and explicitly include this in the seam-signature reported to the operator (D-089-04). It makes `RunContext` carry raw inputs only; the loop owns its own setup. Operator confirms before any move.
