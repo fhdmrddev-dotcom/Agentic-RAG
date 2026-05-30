@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: planning
+status: executing
 stopped_at: Phase 090 context gathered
-last_updated: "2026-05-30T20:13:36.782Z"
-last_activity: 2026-05-30
+last_updated: "2026-05-30T20:14:51.367Z"
+last_activity: 2026-05-30 -- Phase --phase execution started
 progress:
   total_phases: 8
   completed_phases: 1
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 089 — agent-loop-extraction-g-5-kickoff-uat
+**Current focus:** Phase --phase — 090
 
 ## Current Position
 
-Phase: 090
-Plan: Not started
-Status: Ready to plan
+Phase: --phase (090) — EXECUTING
+Plan: 1 of --name
+Status: Executing Phase --phase
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
 Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
@@ -35,7 +35,7 @@ G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
 SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-message) baked into success criteria for 089, 091, 092, 093, 094, 095, 096.
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
-Last activity: 2026-05-30
+Last activity: 2026-05-30 -- Phase --phase execution started
 
 Progress: [████████░░] 75%
 
