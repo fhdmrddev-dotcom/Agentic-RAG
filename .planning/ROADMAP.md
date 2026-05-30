@@ -264,7 +264,7 @@ Plans:
 - [x] 088-02-PLAN.md — Reusable cross-provider eval script (scripts/eval_cross_provider.py, localhost-gated; asserts tool-invocation + arg-shape + DB persistence across 4 providers) (Wave 1) (completed 2026-05-29 — 687-line engine modeled on observe-run.py; drives REAL POST /threads/{id}/messages w/ per-request provider override; greppable EVAL_ROW scoreboard for Plan 04 fold-gate; parse-clean + no-backend clean-exit + secret-safe; live run deferred to Plans 04/05)
 - [x] 088-03-PLAN.md — Deep E2E scenario-13 on Anthropic + Google (write->see->update->diff->ask_user->respond->resume, no refresh; D-17 thought-signature network re-verify) (Wave 1) (completed 2026-05-29 — 294-line provider-parameterized Playwright backstop EXTENDING scenario-02 + the 3 fixtures; asserts the FILES listbox row, the Diff-v region, the PendingAskCard + Send Answer->resume, zero-400 toEqual([]) on both axes (D-17), no page.reload; discovered under both provider blocks + type-clean; LIVE green pass deferred to Plan 05 operator gate)
 - [x] 088-04-PLAN.md — SEED-034 conditional fold (measure->gate->conditional-apply; universal-only text, checkpoint-gated; or route-to-v2.8) (Wave 2) (completed 2026-05-30 — VERDICT: FOLDED; eval extended 4->6 providers; operator chose fold-and-apply at the checkpoint; text-only directive at 2f6e2523 (write_todos multi-step + ask_user confirm-first in SYSTEM_PROMPT + tool descriptions, TASK_TOOL untouched); AFTER 6x4 re-run vs live folded prompt = condition-b MET (OpenAI/Anthropic/OpenRouter multi-tool write_todos FAIL->PASS) + condition-c MET (Moonshot task FAIL proven sampling variance, not a regression) + condition-a git-diff-proven text-only; Google 404 confound did not reproduce (bonus, still v2.8-deferred); kept at 65aa79bf)
-- [ ] 088-05-PLAN.md — Verification capstone (4-axis UAT scoreboard + Chrome MCP Lighthouse/keyboard walk + lived pass + D-17 bug routing; checkpoint:human-verify)
+- [x] 088-05-PLAN.md — Verification capstone (4-axis UAT scoreboard + Chrome MCP a11y/keyboard walk + lived pass + D-17 bug routing; checkpoint:human-verify) (Wave 3) (completed 2026-05-30 — operator felt pass "approved"; VALIDATION filled: 4-axis scoreboard 6/6 PASS (OpenAI/Anthropic/Google live + OpenRouter/DeepSeek/Moonshot via 088-04 eval; parallel-thread + 5.2KB long-message PASS; gemini-2.5 provenance-only D-03); a11y real-contrast FIXED both themes (dark 7.21:1 / light 4.66:1 after 6b5da2cf) + focus ring + keyboard walk + lived G-4 pass; deep flow LIVE no-refresh on Anthropic+Google; D-17 gemini-3 thought_signature CLEAN -> report closed-verified; 3 UAT blockers fixed in-088 under D-16 (7f650da0 file-id 404 / 6b5da2cf AA contrast / b0b8d735 todo status colors); nyquist_compliant: true; A11Y-01/02 signed off)
 
 ## Progress
 
@@ -278,7 +278,7 @@ Phases execute in numeric order: 083 -> 084 -> 085 -> 086 -> 087 -> 088
 | 085. New LLM Tools | 5/5 | Complete    | 2026-05-28 |
 | 086. StreamsProvider Extension + Panel Hooks | 2/2 | Complete    | 2026-05-29 |
 | 087. Panel UI | 8/8 | In progress | - |
-| 088. Cross-Cutting Verification + Accessibility | 4/5 | In progress | - |
+| 088. Cross-Cutting Verification + Accessibility | 5/5 | Complete    | 2026-05-30 |
 
 ---
 

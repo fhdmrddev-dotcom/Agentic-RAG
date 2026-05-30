@@ -92,8 +92,8 @@
 | PANEL-05 | Phase 086 | Pending |
 | PANEL-06 | Phase 086 | Pending |
 | PANEL-07 | Phase 087 | Complete (087-04) |
-| A11Y-01 | Phase 088 | Pending |
-| A11Y-02 | Phase 088 | Pending |
+| A11Y-01 | Phase 088 | Complete (088-05) |
+| A11Y-02 | Phase 088 | Complete (088-05) |
 
 **Coverage:**
 - v2.7 requirements: 22 total
