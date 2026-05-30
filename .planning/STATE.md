@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: executing
+status: ready_to_plan
 stopped_at: Completed 089-03-PLAN.md (THE verbatim move)
 last_updated: "2026-05-30T16:24:12.764Z"
 last_activity: 2026-05-30
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
   completed_plans: 3
-  percent: 75
+  percent: 13
 ---
 
 # Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 089 (agent-loop-extraction-g-5-kickoff-uat) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Phase: 090
+Plan: Not started
+Status: Ready to plan
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
 Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
@@ -43,7 +43,7 @@ Progress: [████████░░] 75%
 
 **Velocity:**
 
-- Total plans completed: 25 (v2.7)
+- Total plans completed: 29 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 75%
 | 085 | 5 | - | - |
 | 087 | 5/5 | - | ~8min (087-02) |
 | 088 | 5 | - | - |
+| 089 | 4 | - | - |
 
 **Recent Trend:**
 

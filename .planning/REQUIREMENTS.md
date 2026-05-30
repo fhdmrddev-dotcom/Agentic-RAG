@@ -53,7 +53,7 @@
 
 ### Carry-Forward Verification
 
-- [ ] **CF-01**: The v2.7 carry-forwards are verified-and-closed or re-opened via a **cross-provider UAT sweep** at kickoff — title-gen on DeepSeek/Moonshot/Google (BUG-260527-01), Google secondary-model 404 routing, and the download-link payload; **SEED-037 download wire-up** ships as a standalone `/gsd:quick`.
+- [x] **CF-01**: The v2.7 carry-forwards are verified-and-closed or re-opened via a **cross-provider UAT sweep** at kickoff — title-gen on DeepSeek/Moonshot/Google (BUG-260527-01), Google secondary-model 404 routing, and the download-link payload; **SEED-037 download wire-up** ships as a standalone `/gsd:quick`.
 
 ---
 
@@ -87,8 +87,8 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-03 | Phase 089 | Pending |
-| CF-01 | Phase 089 | Pending |
+| FOUND-03 | Phase 089 | Complete |
+| CF-01 | Phase 089 | Complete |
 | HARNESS-02 | Phase 090 | Pending |
 | HARNESS-06 | Phase 090 | Pending |
 | HARNESS-01 | Phase 091 | Pending |

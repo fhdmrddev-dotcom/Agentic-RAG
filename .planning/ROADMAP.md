@@ -64,7 +64,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 - [x] 089-01-PLAN.md — Prep + `agent_loop.py` skeleton (frozen `RunContext` / `AgentLoopResult` + the 3 pure helpers moved verbatim) + **seam-review checkpoint** (autonomous: false — D-089-04)
 - [x] 089-02-PLAN.md — Additive proof harness: eval +zhipu/+minimax (native-7, D-089-09) + `capture_run_events`/`normalize` SSE helper + before/after diff runbook
 - [x] 089-03-PLAN.md — Verbatim loop move into `run_agent_loop` + seam wiring + ~37 monkeypatch-target sweep + `AgentLoopResult` seam test (depends 089-01)
-- [ ] 089-04-PLAN.md — I1–I14 named VERIFICATION + AFTER SSE-diff/eval (operator-run) + 4-axis UAT (both modes) + CF-01 C1/C2/C3 dispositions (autonomous: false; depends 089-02, 089-03)
+- [x] 089-04-PLAN.md — I1–I14 named VERIFICATION + AFTER SSE-diff/eval (operator-run) + 4-axis UAT (both modes) + CF-01 C1/C2/C3 dispositions (autonomous: false; depends 089-02, 089-03)
 **Notes**: G-5 satisfied here (`threads.py` hot-file extraction). The agent loop being lifted serves BOTH General and Explorer `agent_mode` (Explorer = 6 KB tools + dedicated prompt + `max_iterations=8`); the extraction MUST preserve the Explorer branch byte-identically (its tool-set, prompt, and iteration cap), and SC#4's kickoff UAT verifies it. SEED-037 download wire-up ships separately as a standalone `/gsd:quick` and is NOT a roadmap requirement. **Native-7** (D-089-05: +zhipu/GLM +minimax) is the hard pass/fail bar across the matrix — corrects the ROADMAP/REQUIREMENTS "6 native providers" wording for all of v2.8; OpenRouter best-effort, Ollama opportunistic.
 
 #### Phase 090: Harness Schema + RLS + Config Models
@@ -160,7 +160,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 3/4 | In progress | - |
+| 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 0/0 | Not started | - |
 | 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
