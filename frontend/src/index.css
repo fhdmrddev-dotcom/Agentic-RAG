@@ -29,6 +29,36 @@
     --radius: 0.625rem;
     --sidebar: 220 15% 95%;
     --sidebar-foreground: 222 47% 11%;
+    /* Phase 087 (PANEL-01, gaps 5/6) — workspace-panel surface + edge.
+       Dedicated tokens so the panel/rail separate from the page WITHOUT
+       touching the shared --sidebar (NavPanel / AppDock / drawer keep 95% L).
+       Light: surface drops to 92% L (separates from the 97% page) and the
+       edge darkens to 82% L (clearer than the 89% body border). */
+    --panel-surface: 220 15% 92%;
+    --panel-border: 220 13% 82%;
+    /* Phase 088-05 (UAT SC#2 / WCAG 2.1 AA 1.4.3) — panel-scoped muted text.
+       The global --muted-foreground (220 9% 46% = #6b7280) measures 4.01:1 on the
+       light --panel-surface (#e8eaee) → FAILS the ≥4.5:1 floor for meaningful text.
+       These panel-only tokens darken the muted text JUST inside the workspace panel
+       (section headers, todo text, status/meta badges, counts) WITHOUT shifting the
+       global muted aesthetic used by chat/nav. Light values verified ≥4.5:1 on the
+       light panel surface; see the .dark block for the dark-theme values.
+         --panel-muted-foreground     : 220 12% 40% (#5a6272) → 5.09:1 on #e8eaee
+         --panel-muted-foreground-dim : 220 10% 42% (#606876) → 4.66:1 on #e8eaee */
+    --panel-muted-foreground: 220 12% 40%;
+    --panel-muted-foreground-dim: 220 10% 42%;
+    /* Phase 088-05 (operator request) — panel-scoped status-TEXT colors for the
+       todo STATUS label (completed=green, in_progress=amber). Color is ADDITIVE
+       only — the status word still renders (non-color-only A11Y preserved). The
+       status text is ~0.62rem normal text → WCAG AA 1.4.3 needs ≥4.5:1; the
+       vivid global --success/--primary read fine as ICONS (graphics need 3:1)
+       but FAIL as text on the light panel (#e8eaee), so these are panel-scoped
+       per-theme shades. Light needs DARK shades to clear ≥4.5:1 on the light bg.
+       Pending keeps --panel-muted-foreground-dim (neutral = not-started).
+         --panel-status-done   : 142 65% 28% (#19763b) → 4.72:1 on #e8eaee
+         --panel-status-active : 32 90% 30%  (#915108) → 5.15:1 on #e8eaee */
+    --panel-status-done: 142 65% 28%;
+    --panel-status-active: 32 90% 30%;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -53,11 +83,46 @@
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    /* Phase 087 (PANEL-04): amber needs-you / paused treatment for ask_user.
+       HSL channels (no hsl() wrapper) matching the existing token convention.
+       --warning-foreground is darkened to ≥4.5:1 against the amber background
+       (deep-midnight ink), not lightened, per UI-SPEC Color section. */
+    --warning: 38 92% 60%;
+    --warning-foreground: 240 60% 8%;
+    /* Phase 087: dim-label token for meta text (file sizes, version chips,
+       diff context gutters) — one step quieter than --muted-foreground. */
+    --muted-foreground-dim: 220 16% 45%;
     --border: 220 20% 16%;
     --input: 220 20% 16%;
     --ring: 239 100% 82%;
     --sidebar: 220 40% 5%;
     --sidebar-foreground: 226 60% 97%;
+    /* Phase 087 (PANEL-01, gaps 5/6) — workspace-panel surface + edge.
+       Dedicated tokens so the panel/rail read as a distinct surface from the
+       chat WITHOUT touching the shared --sidebar (NavPanel / AppDock keep 5% L).
+       Dark: --sidebar (5% L) ≈ --background (4% L) → panel didn't separate, so
+       the panel surface lifts to 8% L; the edge brightens to 24% L (clearer
+       than the 16% body border) so the left border reads against both. */
+    --panel-surface: 220 40% 8%;
+    --panel-border: 220 25% 24%;
+    /* Phase 088-05 (UAT SC#2 / WCAG 2.1 AA 1.4.3) — panel-scoped muted text (dark).
+       The dim meta token --muted-foreground-dim (220 16% 45% = #606d85) measures
+       3.59:1 on the dark --panel-surface (#0c121d) → FAILS the ≥4.5:1 floor for
+       meaningful text (section headers, COMPLETED badges, meta). These panel-only
+       overrides lift the muted text inside the workspace panel ONLY, keeping the
+       blue-gray "muted" read; the global tokens are untouched (chat/nav unchanged).
+         --panel-muted-foreground     : 220 16% 65% (#97a1b4) → 7.21:1 on #0c121d
+         --panel-muted-foreground-dim : 220 16% 70% (#a6aebf) → 8.42:1 on #0c121d */
+    --panel-muted-foreground: 220 16% 65%;
+    --panel-muted-foreground-dim: 220 16% 70%;
+    /* Phase 088-05 (operator request) — panel-scoped status-TEXT colors (dark).
+       On the near-black dark --panel-surface (#0c121d) a brighter green/amber
+       clears ≥4.5:1 easily; these mirror the icon hues (green check / amber
+       active) in spirit while staying panel-scoped (global tokens untouched).
+         --panel-status-done   : 142 71% 55% (#3bde77) → 10.63:1 on #0c121d
+         --panel-status-active : 38 92% 62%  (#f7b645) → 10.48:1 on #0c121d */
+    --panel-status-done: 142 71% 55%;
+    --panel-status-active: 38 92% 62%;
   }
 }
 
@@ -74,6 +139,17 @@
   #root {
     height: 100vh;
     width: 100%;
+  }
+  /* Phase 088-01 (A11Y-01 / D-11, RESEARCH Pattern 6) — global keyboard
+     focus indicator. None existed before this; components relied on scattered
+     per-utility `focus-visible:ring-*` classes. `:where(...)` is ZERO-specificity
+     so any component that sets its OWN focus-visible ring still wins — this is a
+     FLOOR, not an override (no double-rings). `:focus-visible` (not `:focus`)
+     keeps the ring off mouse clicks. Uses the existing --ring token (light
+     239 84% 67% / dark 239 100% 82%) so it harmonizes with the per-utility rings. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 }
 
@@ -240,6 +316,28 @@
 
 .animate-toolSlideIn {
   animation: toolSlideIn 0.25s ease-out forwards;
+}
+
+/* Phase 087-03 (PANEL-03 / file-browser-and-diff.md): green flash on a
+   freshly-written workspace file row. 1.4s green-success-dim → transparent
+   fade. prefers-reduced-motion disables the animation (UI-SPEC A11Y). */
+@keyframes fileFlash {
+  0% {
+    background-color: hsl(var(--success) / 0.18);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-fileFlash {
+  animation: fileFlash 1.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fileFlash {
+    animation: none;
+  }
 }
 
 /* Tool panel progress shimmer bar */

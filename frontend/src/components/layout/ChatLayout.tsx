@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
+import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
+import { subscribeOpenPanel } from "@/components/panel/panelOpenSignal"
 import { IngestionPage } from "@/pages/IngestionPage"
 import { SettingsPage } from "@/pages/SettingsPage"
 import { SkillsPage } from "@/pages/SkillsPage"
@@ -65,6 +67,43 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
+
+  // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
+  //    split is a single ChatLayout-level CSS grid; the single in-panel toggle +
+  //    the seam signal drive THIS state.
+  //    Plan 08 (operator directive 2026-05-29): consolidated to a NAV-STYLE
+  //    2-state machine (open ↔ rail), mirroring NavPanel. The "hidden" state and
+  //    the redundant chat-header toggle are gone — the ~52px rail is ALWAYS
+  //    present, so the panel is reopenable by mouse on every thread (incl. the
+  //    empty/welcome screen), and the pulsing-amber-dot has a permanent host on
+  //    the rail's Expand control. ──
+  const [panelState, setPanelState] = useState<PanelState>("open")
+
+  // Single in-panel toggle, nav-parity (NavPanel.tsx single button): open ↔ rail.
+  // The open-state collapse control (WorkspacePanel header) and the rail Expand
+  // control (PanelRail) both flip THIS toggle.
+  const togglePanel = useCallback(() => {
+    setPanelState((s) => (s === "open" ? "rail" : "open"))
+  }, [])
+  // Rail Expand control / seam pointer: → open (force-open, never to rail).
+  const expand = useCallback(() => setPanelState("open"), [])
+
+  // ⌘./Ctrl+. toggles open ↔ rail (D6, now nav-style — no fully-hidden state).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ".") {
+        e.preventDefault()
+        togglePanel()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [togglePanel])
+
+  // Chat-side seam affordances request a panel-open via the module-level signal
+  // (additive wiring — moved up from WorkspacePanel; PANEL-06 safe). A seam
+  // pointer still force-opens the panel.
+  useEffect(() => subscribeOpenPanel(expand), [expand])
 
   return (
     <div className="flex h-screen bg-background">
@@ -181,19 +220,53 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
         </div>
       )}
 
-      <main className="flex-1 overflow-hidden">
-        {activeView === "documents" ? (
-          <IngestionPage />
-        ) : activeView === "skills" ? (
-          <SkillsPage onTryInChat={handleTryInChat} />
-        ) : activeView === "settings" ? (
-          <SettingsPage />
-        ) : activeView === "library-health" ? (
-          <KnowledgeHealthPage />
-        ) : (
-          <ChatArea thread={selectedThread} onCreateThread={newThread} onTitleUpdate={handleTitleUpdate} folders={folders} prefillMessage={prefillMessage} onClearPrefill={() => onSetPrefillMessage(null)} onOpenDrawer={() => setDrawerOpen(true)} />
-        )}
-      </main>
+      {activeView === "chat" ? (
+        // Phase 087-06: App-level chat|panel CSS grid (panel-shell.md D1). The
+        // panel column resolves against the REAL row width (not the panel's own
+        // indefinite flex width), so 1fr + clamp(...) always sums to the row —
+        // zero horizontal overflow, flush-right panel, and the chat centers
+        // within its own 1fr column (no dead band).
+        // Phase 087-08: nav-style 2-state track — clamp(...) when open, 52px when
+        // rail. NO 0 column: the rail is always present, so the panel is always
+        // reopenable by mouse (incl. the empty/welcome screen).
+        <div
+          className="grid min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+          style={{
+            gridTemplateColumns:
+              "1fr " + (panelState === "open" ? "clamp(300px,30%,420px)" : "52px"),
+          }}
+        >
+          <main className="min-w-0 overflow-hidden">
+            <ChatArea
+              thread={selectedThread}
+              onCreateThread={newThread}
+              onTitleUpdate={handleTitleUpdate}
+              folders={folders}
+              prefillMessage={prefillMessage}
+              onClearPrefill={() => onSetPrefillMessage(null)}
+              onOpenDrawer={() => setDrawerOpen(true)}
+            />
+          </main>
+          <WorkspacePanel
+            selectedThread={selectedThread}
+            state={panelState}
+            onToggle={togglePanel}
+            onExpand={expand}
+          />
+        </div>
+      ) : (
+        <main className="flex-1 overflow-hidden">
+          {activeView === "documents" ? (
+            <IngestionPage />
+          ) : activeView === "skills" ? (
+            <SkillsPage onTryInChat={handleTryInChat} />
+          ) : activeView === "settings" ? (
+            <SettingsPage />
+          ) : (
+            <KnowledgeHealthPage />
+          )}
+        </main>
+      )}
     </div>
   )
 }

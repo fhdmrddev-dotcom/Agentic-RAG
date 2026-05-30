@@ -267,8 +267,36 @@ _GOOGLE_UNSUPPORTED_SCHEMA_KEYS: frozenset[str] = frozenset({
 })
 
 
+def _translate_nullable_type(schema_dict: dict) -> dict:
+    """If schema_dict has ``type: [X, "null"]`` (Phase 084's OpenAI-strict-mode
+    optional shape), rewrite to ``type: X, nullable: True`` (Google's required
+    OpenAPI subset form). Returns a new dict, never mutates the input. No-op
+    otherwise.
+
+    Examples:
+        {"type": ["string", "null"]}    -> {"type": "string", "nullable": True}
+        {"type": ["null", "integer"]}   -> {"type": "integer", "nullable": True}
+        {"type": ["string", "integer"]} -> unchanged (no null entry)
+        {"type": "string"}              -> unchanged (scalar)
+    """
+    t = schema_dict.get("type")
+    if not isinstance(t, list) or len(t) != 2:
+        return schema_dict
+    if "null" not in t:
+        return schema_dict
+    non_null = [x for x in t if x != "null"]
+    if len(non_null) != 1 or not isinstance(non_null[0], str):
+        return schema_dict
+    new_schema = {k: v for k, v in schema_dict.items() if k != "type"}
+    new_schema["type"] = non_null[0]
+    new_schema["nullable"] = True
+    return new_schema
+
+
 def _sanitize_schema_for_google(schema: Any) -> Any:
-    """Recursively strip JSON Schema fields Google's OpenAPI subset rejects.
+    """Recursively strip JSON Schema fields Google's OpenAPI subset rejects
+    AND translate ``type: ["X", "null"]`` strict-mode optionals into
+    ``{type: "X", nullable: true}`` (Google's required null-permission form).
 
     The map-type idiom (``additionalProperties: {type: "string"}``) loses its
     value-type constraint after this strip — the property still accepts an
@@ -277,13 +305,20 @@ def _sanitize_schema_for_google(schema: Any) -> Any:
     maps, and our tool implementations handle malformed values defensively
     (search_documents and query_tables both validate metadata_filter /
     column_filter at call time before forwarding to Postgres).
+
+    Without the type-array translation, google-genai's Pydantic validation
+    rejects the entire Tool at construction time (verified live 2026-05-28
+    on workspace_read.start_line via gemini-2.5-flash — the whole workspace
+    tool list became unreachable, including workspace_write which has no
+    nullable optionals, because Google validates the Tool object as a unit).
     """
     if isinstance(schema, dict):
-        return {
+        out = {
             k: _sanitize_schema_for_google(v)
             for k, v in schema.items()
             if k not in _GOOGLE_UNSUPPORTED_SCHEMA_KEYS
         }
+        return _translate_nullable_type(out)
     if isinstance(schema, list):
         return [_sanitize_schema_for_google(item) for item in schema]
     return schema

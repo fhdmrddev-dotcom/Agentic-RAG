@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -92,6 +92,29 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
       level: confidence_level as "high" | "medium" | "low",
       avg_similarity: confidence_avg_similarity ?? 0,
       disclaimer: confidence_disclaimer ?? null,
+    }
+  }
+  // BUG-260526-03 (D-05): reconstruct finalOutputFiles from persisted tool_calls
+  // so reloaded messages display output file download links in the Final Outputs panel.
+  // The persisted execute_code result contains output_files with {filename, url}.
+  if (mapped.tool_calls?.length) {
+    const outputFiles: { filename: string; url?: string }[] = []
+    for (const tc of mapped.tool_calls) {
+      if (tc.name === "execute_code" && tc.result) {
+        try {
+          const r = typeof tc.result === "string" ? JSON.parse(tc.result) : tc.result
+          if (Array.isArray(r.output_files)) {
+            for (const f of r.output_files) {
+              if (f.filename) {
+                outputFiles.push({ filename: f.filename, url: f.url })
+              }
+            }
+          }
+        } catch { /* ignore parse errors on non-JSON results */ }
+      }
+    }
+    if (outputFiles.length > 0) {
+      mapped.finalOutputFiles = outputFiles
     }
   }
   return mapped
@@ -265,6 +288,34 @@ export interface StreamCallbacks {
   onPlanning?: (iteration: number) => void
   onIterationStart?: (iteration: number) => void
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void
+  // ──────────────────────────────────────────────────────────────────────────
+  // Phase 086 Plan 01 (PANEL-05) — agent-panel SSE callbacks. The 6 new event
+  // types (Phases 084/085) demux to these. Field names are VERIFIED against
+  // the emit sites (086-01-PLAN <interfaces>). The sub_agent_start/done bookends
+  // route here ONLY when `parsed.sub_run_id != null` (TASK variant — D-086-06);
+  // the legacy analyze_document path keeps its byte-identical onSubAgentStart/
+  // onSubAgentDone call below.
+  // ──────────────────────────────────────────────────────────────────────────
+  /** todo_updated SSE — FULL canonical todo list (full-state-replace). */
+  onTodoUpdated?: (todos: Todo[]) => void
+  /** workspace_file_written SSE — built from the FLAT payload (carries
+   *  id/path/version/size_bytes/mime_type; Phase 088-05 D-16 added `id`). The
+   *  store keys by `path`, but the `id` is now threaded through so the live panel
+   *  can fetch content/versions/diff without a refresh. */
+  onWorkspaceFileWritten?: (file: WorkspaceFile) => void
+  /** workspace_file_deleted SSE — removal keyed by `path`. */
+  onWorkspaceFileDeleted?: (path: string) => void
+  /** ask_user_prompt SSE — built from the FLAT payload (identity key
+   *  `tool_call_id`; no message_id/run_id/created_at on the SSE). */
+  onAskUserPrompt?: (ask: PendingAsk) => void
+  /** ask_user_response SSE — removal keyed by `tool_call_id`. */
+  onAskUserResponse?: (toolCallId: string) => void
+  /** sub_agent_start TASK variant (has sub_run_id) — distinct from the legacy
+   *  analyze_document onSubAgentStart 2-arg path. */
+  onTaskStart?: (subRunId: string, description: string, tools: string[], maxSteps: number) => void
+  /** sub_agent_done TASK variant (has sub_run_id) — distinct from the legacy
+   *  analyze_document onSubAgentDone no-arg path. */
+  onTaskDone?: (subRunId: string, status: string, summary: string) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -414,12 +465,33 @@ export async function subscribeToRun(
           )
         else if (t === "tool_end" && callbacks.onToolEnd)
           callbacks.onToolEnd(parsed.name as string, parsed.result as string | undefined)
-        else if (t === "sub_agent_start" && callbacks.onSubAgentStart)
-          callbacks.onSubAgentStart(parsed.filename as string, parsed.task as string)
-        else if (t === "sub_agent_delta" && callbacks.onSubAgentDelta)
+        // Phase 086 Plan 01 (D-086-06): payload-shape branch. The TASK variant
+        // (task_service.py) carries `sub_run_id`; the LEGACY analyze_document
+        // variant (tool_dispatcher.py) does NOT. `parsed.sub_run_id != null` is
+        // the SOLE discriminator. The legacy call expression is preserved
+        // BYTE-IDENTICAL (failure mode #3/#4 — cross-provider safety).
+        else if (t === "sub_agent_start") {
+          if (parsed.sub_run_id != null)
+            callbacks.onTaskStart?.(
+              parsed.sub_run_id as string,
+              parsed.description as string,
+              parsed.tools as string[],
+              parsed.max_steps as number,
+            )
+          else if (callbacks.onSubAgentStart)
+            callbacks.onSubAgentStart(parsed.filename as string, parsed.task as string)
+        } else if (t === "sub_agent_delta" && callbacks.onSubAgentDelta)
           callbacks.onSubAgentDelta(parsed.content as string)
-        else if (t === "sub_agent_done" && callbacks.onSubAgentDone)
-          callbacks.onSubAgentDone()
+        else if (t === "sub_agent_done") {
+          if (parsed.sub_run_id != null)
+            callbacks.onTaskDone?.(
+              parsed.sub_run_id as string,
+              parsed.status as string,
+              parsed.summary as string,
+            )
+          else if (callbacks.onSubAgentDone)
+            callbacks.onSubAgentDone()
+        }
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
         else if (t === "skill_loaded" && callbacks.onSkillLoaded)
@@ -463,6 +535,41 @@ export async function subscribeToRun(
             parsed.avg_similarity as number,
             parsed.disclaimer as string | null,
           )
+        // Phase 086 Plan 01 (PANEL-05, PATTERNS §4): 4 plain panel-event
+        // branches. They sit ABOVE the terminal `done` branch and carry NO
+        // `return` so the cursor-advance block at the bottom still fires
+        // (cursor-advance safety). Field names are read from the FLAT SSE
+        // payloads verbatim (parsed.todos / parsed.path / parsed.tool_call_id —
+        // NOT parsed.file / parsed.file_id / parsed.ask_id).
+        else if (t === "todo_updated" && callbacks.onTodoUpdated)
+          callbacks.onTodoUpdated((parsed.todos ?? []) as Todo[])
+        else if (t === "workspace_file_written" && callbacks.onWorkspaceFileWritten)
+          // FLAT payload — build the WorkspaceFile from id/path/version/size_bytes/
+          // mime_type (the SSE has no nested `file`; store keys by path). Phase
+          // 088-05 (D-16): thread the persisted row `id` through so the live panel
+          // fetches content/versions/diff by id (no refresh). `id` may be undefined
+          // on a legacy/replayed event — left optional; the store preserves a known
+          // id and the select→fetch path reconciles-by-GET if it's ever missing.
+          callbacks.onWorkspaceFileWritten({
+            id: parsed.id as string | undefined,
+            path: parsed.path as string,
+            version: parsed.version as number | undefined,
+            size_bytes: parsed.size_bytes as number,
+            mime_type: parsed.mime_type as string,
+          })
+        else if (t === "workspace_file_deleted" && callbacks.onWorkspaceFileDeleted)
+          callbacks.onWorkspaceFileDeleted(parsed.path as string)
+        else if (t === "ask_user_prompt" && callbacks.onAskUserPrompt)
+          // FLAT payload — identity key tool_call_id; message_id/run_id/created_at
+          // exist only on the GET, not the SSE.
+          callbacks.onAskUserPrompt({
+            tool_call_id: parsed.tool_call_id as string,
+            prompt: parsed.prompt as string,
+            options: (parsed.options ?? []) as string[],
+            timeout_seconds: parsed.timeout_seconds as number,
+          })
+        else if (t === "ask_user_response" && callbacks.onAskUserResponse)
+          callbacks.onAskUserResponse(parsed.tool_call_id as string)
         else if (t === "done") {
           if (!doneFired) {
             doneFired = true
@@ -595,6 +702,146 @@ export async function getSnapshot(
     active_runs: data.active_runs,
     since_cursors: data.since_cursors,
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 086 Plan 01 (PANEL-05): 4 agent-panel GET helpers for thread-switch
+// reconcile. Each mirrors getActiveRuns verbatim — getAuthHeaders() + fetch
+// with optional AbortSignal + non-OK throw — and reuses the existing fetch
+// stack (NO new fetch library). The backend already reshapes (panel.py:67 maps
+// todo_id -> id) so no client mapper is needed; cast the JSON to the typed array.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /threads/{tid}/todos (panel.py:67). Returns the thread's full todo list. */
+export async function getThreadTodos(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<Todo[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/todos`, { headers, signal })
+  if (!res.ok) throw new Error("Failed to list thread todos")
+  return (await res.json()) as Todo[]
+}
+
+/** GET /threads/{tid}/workspace/files (workspace.py:99). Returns the workspace
+ *  file index for the thread. */
+export async function getThreadWorkspaceFiles(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceFile[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, { headers, signal })
+  if (!res.ok) throw new Error("Failed to list workspace files")
+  return (await res.json()) as WorkspaceFile[]
+}
+
+/** GET /threads/{tid}/ask_user/pending (panel.py:103). Returns the thread's
+ *  outstanding ask_user prompts. */
+export async function getThreadPendingAsks(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<PendingAsk[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/ask_user/pending`, { headers, signal })
+  if (!res.ok) throw new Error("Failed to list pending asks")
+  return (await res.json()) as PendingAsk[]
+}
+
+/** GET /threads/{tid}/tasks (panel.py:156). Returns the thread's sub-agent task
+ *  run index. */
+export async function getThreadTasks(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<TaskRunIndexItem[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/tasks`, { headers, signal })
+  if (!res.ok) throw new Error("Failed to list thread tasks")
+  return (await res.json()) as TaskRunIndexItem[]
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 087 Plan 01 (PANEL-03/04/07): 3 workspace file GET helpers + the
+// ask_user answer POST. Each mirrors the Phase 086 GET helper shape verbatim —
+// getAuthHeaders() + fetch with optional AbortSignal + non-OK throw — and reuses
+// the existing fetch stack (NO new fetch library). The backend already shapes
+// the JSON (workspace.py two-shape content + difflib unified-diff string), so no
+// client mapper is needed; cast the JSON to the typed shape. Routes VERIFIED
+// against workspace.py:124-323 / runs.py:496.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /threads/{tid}/workspace/files/{id}/content (workspace.py:124). Returns
+ *  the two-shape content payload: inline (text) or bucket (signed_url, 60s TTL,
+ *  may be null). FilePreview routes on `storage_type` (D-02). */
+export async function getWorkspaceFileContent(
+  threadId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceFileContent> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/content`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to fetch workspace file content")
+  return (await res.json()) as WorkspaceFileContent
+}
+
+/** GET /threads/{tid}/workspace/files/{id}/versions (workspace.py:202). Returns
+ *  the file's version rows sorted version DESC — feeds the red-base/green-target
+ *  version picker (D-04). */
+export async function getWorkspaceFileVersions(
+  threadId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<WorkspaceVersion[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/versions`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to list workspace file versions")
+  return (await res.json()) as WorkspaceVersion[]
+}
+
+/** GET /threads/{tid}/workspace/files/{id}/diff?from=&to= (workspace.py:238).
+ *  Returns a raw unified-diff STRING in `delta.diff` (parsed client-side by
+ *  VersionDiff — Pattern 2). Backend truncates at 500 diff lines and sets
+ *  `delta.truncated` (Pitfall 4). */
+export async function getWorkspaceFileDiff(
+  threadId: string,
+  fileId: string,
+  from: number,
+  to: number,
+  signal?: AbortSignal,
+): Promise<WorkspaceDiff> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/diff?from=${from}&to=${to}`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error("Failed to fetch diff")
+  return (await res.json()) as WorkspaceDiff
+}
+
+/** POST /runs/{runId}/ask_user_response (runs.py:496). Persist-first-then-publish:
+ *  the backend persists the answer then publishes the resume; the resulting
+ *  `ask_user_response` SSE removes the prompt from the store, reactively clearing
+ *  the card and un-pausing the run (Pattern 3). `runId` comes from
+ *  `PendingAsk.run_id` (GET-only — Pitfall 1 / A2); the submit caller (Plan 05)
+ *  gates on its presence. Throws on non-OK. */
+export async function answerAskUser(
+  runId: string,
+  body: AskUserAnswerBody,
+  signal?: AbortSignal,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/runs/${runId}/ask_user_response`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  })
+  if (!res.ok) throw new Error(`Failed to submit ask_user answer (status ${res.status})`)
 }
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the

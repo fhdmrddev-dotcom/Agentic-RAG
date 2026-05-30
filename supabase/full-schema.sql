@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
+\restrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -446,6 +446,13 @@ ALTER TABLE ONLY public.messages REPLICA IDENTITY FULL;
 
 
 --
+-- Name: COLUMN messages.tool_calls; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.messages.tool_calls IS 'JSONB array. For role=system rows, first element may carry a "kind" discriminator: context_truncated | iteration_cap_dropped_tool_calls (Phase 075.4) | ask_user_prompt | ask_user_response (Phase 085).';
+
+
+--
 -- Name: model_capabilities_overrides; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -511,6 +518,7 @@ CREATE TABLE public.runs (
     output_tokens integer,
     error text,
     spawned_by_worker text,
+    parent_run_id uuid,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
@@ -585,6 +593,24 @@ CREATE TABLE public.threads (
 
 
 --
+-- Name: todos; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.todos (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    todo_id text NOT NULL,
+    content text NOT NULL,
+    status text NOT NULL,
+    parent_id text,
+    order_index integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT todos_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text])))
+);
+
+
+--
 -- Name: user_memory; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -607,6 +633,42 @@ CREATE TABLE public.user_settings (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     preferences jsonb DEFAULT '{}'::jsonb
+);
+
+
+--
+-- Name: workspace_file_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_file_versions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    workspace_file_id uuid NOT NULL,
+    version integer NOT NULL,
+    content_inline bytea,
+    content_storage_path text,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    delta_from_prev jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: workspace_files; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workspace_files (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    thread_id uuid NOT NULL,
+    path text NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    mime_type text DEFAULT 'application/octet-stream'::text NOT NULL,
+    content_inline bytea,
+    content_storage_path text,
+    created_by uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
+    CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
 );
 
 
@@ -763,6 +825,22 @@ ALTER TABLE ONLY public.threads
 
 
 --
+-- Name: todos todos_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: todos todos_thread_todo_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_thread_todo_unique UNIQUE (thread_id, todo_id);
+
+
+--
 -- Name: user_memory user_memory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -784,6 +862,38 @@ ALTER TABLE ONLY public.user_memory
 
 ALTER TABLE ONLY public.user_settings
     ADD CONSTRAINT user_settings_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: workspace_file_versions workspace_file_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_file_versions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_files workspace_files_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: workspace_files workspace_files_thread_path_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_thread_path_unique UNIQUE (thread_id, path);
+
+
+--
+-- Name: workspace_file_versions workspace_versions_file_version_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_versions_file_version_unique UNIQUE (workspace_file_id, version);
 
 
 --
@@ -910,6 +1020,34 @@ CREATE INDEX idx_runs_active ON public.runs USING btree (user_id, thread_id, sta
 --
 
 CREATE INDEX idx_runs_history ON public.runs USING btree (user_id, thread_id, started_at DESC);
+
+
+--
+-- Name: idx_runs_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (parent_run_id IS NOT NULL);
+
+
+--
+-- Name: idx_todos_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_index);
+
+
+--
+-- Name: idx_workspace_files_thread; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_thread ON public.workspace_files USING btree (thread_id);
+
+
+--
+-- Name: idx_workspace_versions_file; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_versions_file ON public.workspace_file_versions USING btree (workspace_file_id, version DESC);
 
 
 --
@@ -1172,6 +1310,14 @@ ALTER TABLE ONLY public.runs
 
 
 --
+-- Name: runs runs_parent_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runs
+    ADD CONSTRAINT runs_parent_run_id_fkey FOREIGN KEY (parent_run_id) REFERENCES public.runs(run_id) ON DELETE SET NULL;
+
+
+--
 -- Name: runs runs_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1244,11 +1390,35 @@ ALTER TABLE ONLY public.threads
 
 
 --
+-- Name: todos todos_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.todos
+    ADD CONSTRAINT todos_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
 -- Name: user_memory user_memory_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.user_memory
     ADD CONSTRAINT user_memory_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_file_versions workspace_file_versions_workspace_file_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_file_versions
+    ADD CONSTRAINT workspace_file_versions_workspace_file_id_fkey FOREIGN KEY (workspace_file_id) REFERENCES public.workspace_files(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workspace_files workspace_files_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workspace_files
+    ADD CONSTRAINT workspace_files_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
 
 
 --
@@ -1678,14 +1848,124 @@ ALTER TABLE public.skills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.threads ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: todos; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: todos todos_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
+-- Name: todos todos_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = todos.thread_id))));
+
+
+--
 -- Name: user_memory; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.user_memory ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: workspace_file_versions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workspace_file_versions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workspace_files; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: workspace_files workspace_files_delete_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_files workspace_files_update_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+   FROM public.threads
+  WHERE (threads.id = workspace_files.thread_id))));
+
+
+--
+-- Name: workspace_file_versions workspace_versions_insert_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
+  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+
+
+--
+-- Name: workspace_file_versions workspace_versions_select_own; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+   FROM (public.threads t
+     JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
+  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict f4GBONsqq5U7xdS6f0W6MzE8iHUVivTmSYbs3HFlRJjl5CbGCdeKUBwwznR9gP8
+\unrestrict 8vViTxUUQwcNnf8CiyezcKzVtaFhaenOmsQbINsd9PMlvl4QEAS1vRWC3trnNjy
 

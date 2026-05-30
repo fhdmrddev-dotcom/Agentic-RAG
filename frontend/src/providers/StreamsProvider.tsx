@@ -60,6 +60,10 @@ import type {
   OutputFile,
   SourceReference,
   Citation,
+  Todo,
+  WorkspaceFile,
+  PendingAsk,
+  TaskRunIndexItem,
 } from "@/types"
 import {
   getMessages,
@@ -68,9 +72,14 @@ import {
   getActiveRuns,
   getSnapshot,
   cancelRun,
+  getThreadTodos,
+  getThreadWorkspaceFiles,
+  getThreadPendingAsks,
+  getThreadTasks,
   type StreamCallbacks,
   type ThreadSnapshot,
 } from "@/lib/api"
+import { usePanelReconcile } from "@/hooks/usePanelReconcile"
 import {
   useStreamsStore,
   type SurfaceId,
@@ -84,6 +93,27 @@ import { makeToolKey } from "@/lib/toolKey"
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
 // selector result is shallow-equal across stores.
 const EMPTY_ARRAY: Message[] = []
+
+// Phase 086 Plan 02 (D-086-05) — module-level EMPTY constants for the 4 panel
+// hooks. Same rationale as EMPTY_ARRAY: a per-thread Map miss (or null threadId)
+// returns the SAME stable reference, so useSyncExternalStore skips re-render and
+// PANEL-06 (panel events never re-render chat) holds structurally.
+const EMPTY_TODOS: Todo[] = []
+const EMPTY_FILES: WorkspaceFile[] = []
+const EMPTY_ASKS: PendingAsk[] = []
+const EMPTY_TASKS: TaskRunIndexItem[] = []
+
+// WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
+// todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
+// all three watched refs are unchanged, so a reference change in bucketsBySurface
+// OR todosByThread OR tasksByThread fires the throttled write. PANEL-06 isolation
+// is preserved: these are the *persistence trigger* refs only — the chat MessageList
+// selectors still read bucketsBySurface exclusively and a panel-Map mutation never
+// touches the chat bucket reference (see test FC#1).
+const persistTriggerEqual = (
+  a: readonly [unknown, unknown, unknown],
+  b: readonly [unknown, unknown, unknown],
+): boolean => a[0] === b[0] && a[1] === b[1] && a[2] === b[2]
 
 /**
  * Phase 075.1 Plan 01: widened from the Phase 075 buffer_expired-only filter
@@ -631,6 +661,44 @@ export function makeStreamCallbacks(opts: {
         })
       }, 4000)
     },
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 086 Plan 02 (PATTERNS §6 / PANEL-06) — 7 panel default handlers.
+    // Unlike every handler above (which writes to the chat-message bucket via
+    // `setMessages`), these write to the dedicated per-thread panel Maps via the
+    // store actions, so live SSE panel events update the 4 Maps WITHOUT touching
+    // bucketsBySurface (chat selectors never re-render). Each closes over the
+    // factory's `threadId` (L-068-04) — both call sites already pass it in opts,
+    // so there is NO call-site signature change. The getState().actions
+    // indirection mirrors setMessagesForBucketBound (StreamsProvider.tsx:709-712).
+    // ────────────────────────────────────────────────────────────────────────
+    onTodoUpdated: (todos) =>
+      useStreamsStore.getState().actions.replaceTodosForThread(threadId, todos),
+    onWorkspaceFileWritten: (file) =>
+      useStreamsStore.getState().actions.setWorkspaceFileForThread(threadId, file),
+    onWorkspaceFileDeleted: (path) =>
+      useStreamsStore.getState().actions.removeWorkspaceFileForThread(threadId, path),
+    onAskUserPrompt: (ask) =>
+      useStreamsStore.getState().actions.addPendingAskForThread(threadId, ask),
+    onAskUserResponse: (toolCallId) =>
+      useStreamsStore.getState().actions.removePendingAskForThread(threadId, toolCallId),
+    onTaskStart: (subRunId, description, tools, maxSteps) =>
+      useStreamsStore.getState().actions.setTaskForThread(threadId, {
+        sub_run_id: subRunId,
+        // parent_run_id is not carried on the SSE bookend; the GET reconcile
+        // (panel.py:156) is the authoritative source. Seed empty so the wire
+        // type is satisfied; reconcile overwrites with the canonical row.
+        parent_run_id: "",
+        status: "running",
+        model: "",
+        provider: "",
+        description,
+        tools,
+        max_steps: maxSteps,
+      }),
+    onTaskDone: (subRunId, status, summary) =>
+      useStreamsStore
+        .getState()
+        .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
   }
 }
 
@@ -1445,6 +1513,134 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             })
           }
         },
+
+        // ────────────────────────────────────────────────────────────────────
+        // Phase 086 Plan 02 (PATTERNS §2 / PANEL-06) — 11 panel action bodies.
+        // Every body uses the immutable `new Map(prev)` clone-then-set discipline
+        // (analog: setMessagesForBucket @717-731, delete-key @1386-1392) so the
+        // outer Map ref always changes and subscribeWithSelector selectors stay
+        // stable — chat-message selectors (which read bucketsBySurface) NEVER
+        // re-render when a panel Map mutates. Identity keys per the backend wire
+        // shapes: Todo by `id` (full-replace), WorkspaceFile by `path`, PendingAsk
+        // by `tool_call_id`, TaskRunIndexItem by `sub_run_id`.
+        // ────────────────────────────────────────────────────────────────────
+
+        // --- todos: full-state-replace (todo_updated SSE / GET reconcile) ---
+        replaceTodosForThread: (threadId, todos) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.todosByThread)
+            next.set(threadId, todos)
+            return { todosByThread: next }
+          }),
+        // setTodosForThread mirrors replace (the SSE `todos` array is the full
+        // canonical list — there is no per-todo delta to merge).
+        setTodosForThread: (threadId, todos) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.todosByThread)
+            next.set(threadId, todos)
+            return { todosByThread: next }
+          }),
+
+        // --- workspace files: keyed-by-`path` upsert / remove / full-replace ---
+        setWorkspaceFileForThread: (threadId, file) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            const prev = next.get(threadId) ?? EMPTY_FILES
+            const idx = prev.findIndex((f) => f.path === file.path)
+            // Phase 088-05 (D-16): the workspace_file_written SSE now carries the
+            // persisted row `id`. DEFENSIVELY preserve a known id on the existing
+            // entry if an incoming update for the same path is ever missing one
+            // (legacy/replayed event) — never clobber a real id with undefined, or
+            // the live panel would regress to fetching `/files//content` → 404.
+            const merged =
+              idx === -1
+                ? file
+                : { ...file, id: file.id ?? prev[idx].id }
+            const updated =
+              idx === -1
+                ? [...prev, merged]
+                : prev.map((f, i) => (i === idx ? merged : f))
+            next.set(threadId, updated)
+            return { workspaceFilesByThread: next }
+          }),
+        removeWorkspaceFileForThread: (threadId, path) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            const prev = next.get(threadId) ?? EMPTY_FILES
+            next.set(
+              threadId,
+              prev.filter((f) => f.path !== path),
+            )
+            return { workspaceFilesByThread: next }
+          }),
+        replaceWorkspaceFilesForThread: (threadId, files) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.workspaceFilesByThread)
+            next.set(threadId, files)
+            return { workspaceFilesByThread: next }
+          }),
+
+        // --- pending asks: keyed-by-`tool_call_id` add / remove / full-replace ---
+        addPendingAskForThread: (threadId, ask) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            const prev = next.get(threadId) ?? EMPTY_ASKS
+            // Idempotent on replay: drop any existing ask with the same
+            // tool_call_id before appending the fresh one.
+            const deduped = prev.filter((a) => a.tool_call_id !== ask.tool_call_id)
+            next.set(threadId, [...deduped, ask])
+            return { pendingAsksByThread: next }
+          }),
+        removePendingAskForThread: (threadId, toolCallId) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            const prev = next.get(threadId) ?? EMPTY_ASKS
+            next.set(
+              threadId,
+              prev.filter((a) => a.tool_call_id !== toolCallId),
+            )
+            return { pendingAsksByThread: next }
+          }),
+        replacePendingAsksForThread: (threadId, asks) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.pendingAsksByThread)
+            next.set(threadId, asks)
+            return { pendingAsksByThread: next }
+          }),
+
+        // --- tasks: keyed-by-`sub_run_id` upsert / status-update / full-replace ---
+        setTaskForThread: (threadId, task) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            const prev = next.get(threadId) ?? EMPTY_TASKS
+            const idx = prev.findIndex((t) => t.sub_run_id === task.sub_run_id)
+            const updated =
+              idx === -1
+                ? [...prev, task]
+                : // Merge so an upsert from the SSE bookend doesn't clobber
+                  // fields the GET reconcile already populated.
+                  prev.map((t, i) => (i === idx ? { ...t, ...task } : t))
+            next.set(threadId, updated)
+            return { tasksByThread: next }
+          }),
+        updateTaskStatusForThread: (threadId, subRunId, status, summary) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            const prev = next.get(threadId) ?? EMPTY_TASKS
+            next.set(
+              threadId,
+              prev.map((t) =>
+                t.sub_run_id === subRunId ? { ...t, status, summary } : t,
+              ),
+            )
+            return { tasksByThread: next }
+          }),
+        replaceTasksForThread: (threadId, tasks) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.tasksByThread)
+            next.set(threadId, tasks)
+            return { tasksByThread: next }
+          }),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
@@ -1504,23 +1700,35 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       // meaningful to cache yet. The hydrate path at mount still works because
       // it reads the existing snapshot before any write fires.
       if (!streamingTid && !activeTid) return
-      writeSnapshotToLocalStorage(state.bucketsBySurface, Date.now(), (_surface, tid) =>
-        tid === streamingTid || tid === activeTid,
+      writeSnapshotToLocalStorage(
+        state.bucketsBySurface,
+        Date.now(),
+        (_surface, tid) => tid === streamingTid || tid === activeTid,
+        state.todosByThread,
+        state.tasksByThread,
       )
     }
     const throttledWrite = makeThrottle(writeNow, 500)
     throttledWriteRef.current = throttledWrite
-    // B-02 fix: selector-bound subscription — only fires when bucketsBySurface
-    // reference changes, NOT on every reconcileErrors / streamingThreads /
+    // B-02 fix: selector-bound subscription — only fires when one of the watched
+    // references changes, NOT on every reconcileErrors / streamingThreads /
     // subscriptionsByThread / loadingThreads / viewedThreadId / fallbackNotices
     // setState. Avoids wasted serialization on bookkeeping state.
     // (Plan 075.4-01 D-075.4-A1: comment updated for per-thread field names.)
+    // WR-04 fix (260529-0sc): the trigger set now includes todosByThread +
+    // tasksByThread so panel-Map mutations also fire the throttled persist (the
+    // write-path that hydrates readTodosSyncOrEmpty/readTasksSyncOrEmpty on F5).
+    // PANEL-06 chat-isolation is unaffected: these Maps are part of the *write
+    // trigger* only — the chat MessageList selectors still read bucketsBySurface
+    // exclusively, and a panel-Map mutation never changes the chat bucket ref.
     // Requires `subscribeWithSelector` middleware in the store factory.
     const unsubscribe = useStreamsStore.subscribe(
-      (state) => state.bucketsBySurface,
+      (state) =>
+        [state.bucketsBySurface, state.todosByThread, state.tasksByThread] as const,
       () => {
         throttledWrite(useStreamsStore.getState())
       },
+      { equalityFn: persistTriggerEqual },
     )
     return () => {
       throttledWrite.flush()
@@ -1544,6 +1752,95 @@ export const useThreadMessages = (
   useStreamsStore((state) =>
     threadId ? state.bucketsBySurface.get(surfaceId)?.get(threadId) ?? EMPTY_ARRAY : EMPTY_ARRAY,
   )
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 086 Plan 02 (D-086-02 / D-086-09 / D-086-10 / PANEL-05 / PANEL-06) —
+// the 4 agent-panel hooks Phase 087 imports. Each is a thin wrapper: a null-safe
+// store selector (returns the matching module-level EMPTY constant on a Map miss
+// or null threadId, so `data` is NEVER undefined and the empty ref is stable for
+// PANEL-06) + usePanelReconcile for the thread-switch reconcile / isLoading /
+// composite-error plumbing. The raw useStreamsStore is NEVER exported (D-086-02):
+// these named hooks are the only consumer surface.
+//
+// Return contract (D-086-10): { data: T[]; isLoading; error; reconcile }.
+// ─────────────────────────────────────────────────────────────────────────────
+export function useTodos(threadId: string | null): {
+  data: Todo[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.todosByThread.get(threadId) ?? EMPTY_TODOS) : EMPTY_TODOS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceTodosForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<Todo>({
+    threadId,
+    hookId: "todos",
+    fetcher: getThreadTodos,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+export function useWorkspaceFiles(threadId: string | null): {
+  data: WorkspaceFile[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.workspaceFilesByThread.get(threadId) ?? EMPTY_FILES) : EMPTY_FILES,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceWorkspaceFilesForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<WorkspaceFile>({
+    threadId,
+    hookId: "files",
+    fetcher: getThreadWorkspaceFiles,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+// useAskUserPrompt surfaces a PendingAsk[] — parallel asks are possible
+// (D-085-06), so reconcile REPLACES the inner Map atomically (D-086-08).
+export function useAskUserPrompt(threadId: string | null): {
+  data: PendingAsk[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.pendingAsksByThread.get(threadId) ?? EMPTY_ASKS) : EMPTY_ASKS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replacePendingAsksForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<PendingAsk>({
+    threadId,
+    hookId: "asks",
+    fetcher: getThreadPendingAsks,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+export function useTasks(threadId: string | null): {
+  data: TaskRunIndexItem[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.tasksByThread.get(threadId) ?? EMPTY_TASKS) : EMPTY_TASKS,
+  )
+  const replace = useStreamsStore((s) => s.actions.replaceTasksForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<TaskRunIndexItem>({
+    threadId,
+    hookId: "tasks",
+    fetcher: getThreadTasks,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
 
 export const useViewingThread = (): string | null =>
   useStreamsStore((state) => state.viewedThreadId)

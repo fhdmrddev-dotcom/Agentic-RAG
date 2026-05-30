@@ -67,8 +67,13 @@ QUERY_DOCUMENTS_TOOL = {
             "folder_id (uuid, nullable, references folders.id), "
             "metadata (jsonb with keys: title, author, date, document_type, topics, "
             "language, summary). "
+            "IMPORTANT: id is a UUID — never use LIKE or ILIKE on it. "
+            "To search by a document identifier or name, check metadata->>'title' or filename. "
             "IMPORTANT: the file-type column is named mime_type, NOT file_type. "
             "To filter PDFs use: WHERE d.mime_type = 'application/pdf'. "
+            "Metadata query example: SELECT d.filename, d.metadata->>'title' AS title, "
+            "d.metadata->>'author' AS author FROM documents d "
+            "WHERE d.metadata->>'title' ILIKE '%search_term%'. "
             "Table: folders. Columns: id (uuid), name (text), parent_id (uuid, nullable), "
             "user_id (uuid), is_global (boolean). "
             "JOIN example: SELECT d.filename, f.name AS folder FROM documents d "
@@ -483,6 +488,260 @@ EXECUTE_CODE_TOOL = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Phase 084: Workspace tools
+# ---------------------------------------------------------------------------
+
+WORKSPACE_WRITE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_write",
+        "description": (
+            "Write or update a file in the thread's persistent workspace. "
+            "The workspace is a virtual filesystem that persists across conversation turns. "
+            "Use for saving reports, plans, code, data exports, or any content the user "
+            "might want to reference later. Files are versioned automatically -- every "
+            "write creates a new version. "
+            "Path must start with / and use forward slashes (e.g. /reports/weekly.md). "
+            "Maximum file size: 10MB. Workspace holds up to 100 files per thread."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path in the workspace (e.g. /plan.md, /data/results.csv). Must start with /.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "File content to write. For text files, this is the full content.",
+                },
+            },
+            "required": ["path", "content"],
+        },
+    },
+}
+
+WORKSPACE_READ_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_read",
+        "description": (
+            "Read a file from the thread's workspace. Returns file content (truncated "
+            "for large files). Use start_line and end_line for targeted reads of large files. "
+            "For binary files, returns metadata only (size, type)."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to read (e.g. /plan.md).",
+                },
+                "start_line": {
+                    "type": ["integer", "null"],
+                    "description": "Optional: start reading from this line number (1-indexed).",
+                },
+                "end_line": {
+                    "type": ["integer", "null"],
+                    "description": "Optional: stop reading at this line number (inclusive).",
+                },
+            },
+            "required": ["path", "start_line", "end_line"],
+        },
+    },
+}
+
+WORKSPACE_LIST_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_list",
+        "description": (
+            "List files in the thread's workspace, optionally filtered by path prefix. "
+            "Returns file paths, sizes, MIME types, and last-modified timestamps."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prefix": {
+                    "type": ["string", "null"],
+                    "description": "Optional path prefix to filter (e.g. /reports/ lists only files under /reports/). Omit or null to list all files.",
+                },
+            },
+            "required": ["prefix"],
+        },
+    },
+}
+
+WORKSPACE_DELETE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_delete",
+        "description": (
+            "Delete a file from the thread's workspace. This also deletes all version history. "
+            "Use with caution -- deletion is permanent."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to delete (e.g. /draft.md).",
+                },
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+WORKSPACE_DIFF_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "workspace_diff",
+        "description": (
+            "Show the differences between two versions of a workspace file. "
+            "Returns a unified diff with additions and deletions. "
+            "Use to review changes made to a file across versions."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path to diff (e.g. /plan.md).",
+                },
+                "from_version": {
+                    "type": ["integer", "null"],
+                    "description": "Version number to diff from (older version). Omit to use the previous version.",
+                },
+                "to_version": {
+                    "type": ["integer", "null"],
+                    "description": "Version number to diff to (newer version). Omit to use the latest version.",
+                },
+            },
+            "required": ["path", "from_version", "to_version"],
+        },
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Phase 085 — 3 new tools (D-085-25: 24-tool toolbox)
+# Descriptions lead with "Use when:" + "Do not use for:" per D-085-25 to mitigate
+# the 24-tool selection-accuracy concern across Google + DeepSeek/Moonshot.
+# Copy-verbatim from 085-RESEARCH.md §E (lines 767-862).
+# ---------------------------------------------------------------------------
+
+# Phase 085 D-085-17..22 — write_todos tool schema
+WRITE_TODOS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "write_todos",
+        "description": (
+            "Record or update the task list for a multi-step request so it appears in the user's workspace panel. "
+            "Call this WHENEVER the user asks you to plan, track, or work through several steps — call it at the "
+            "START of multi-step work and again to flip a todo's status as you complete each step. "
+            "Use when: you need to break a complex multi-step task into trackable items the user can see, "
+            "or when updating the status of in-flight work. "
+            "Do not use for: short single-step answers, scratch notes, or per-message reminders. "
+            "Do NOT just narrate the steps in text — a narrated list the user cannot see is not tracking; "
+            "this tool persists a real, user-visible list. "
+            "Semantics: full-state-replace — every call OVERWRITES the entire todo list. "
+            "Include all current todos (both new and existing) in every call, not just the changes. "
+            "Status values: pending | in_progress | completed."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "todos": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "description": "Stable client-supplied identifier (e.g. 't1', 't2'). Reuse the same id when updating status of an existing todo."},
+                            "content": {"type": "string", "description": "What needs to be done. One sentence."},
+                            "status": {"type": "string", "enum": ["pending", "in_progress", "completed"]},
+                            "parent_id": {"type": ["string", "null"], "description": "Optional id of a parent todo for nesting. Omit or null for top-level items."},
+                            "order_index": {"type": "integer", "description": "Display order within the list. 0-indexed."},
+                        },
+                        "required": ["id", "content", "status", "parent_id", "order_index"],
+                    },
+                },
+            },
+            "required": ["todos"],
+        },
+    },
+}
+
+
+# Phase 085 D-085-08..16 — task sub-agent tool schema
+TASK_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "task",
+        "description": (
+            "Spawn a focused sub-agent to perform a delegated piece of work and return a summary. "
+            "Use when: the work has a clear bounded objective that benefits from its own short context "
+            "(e.g. 'find all mentions of X across these documents and summarize') and would otherwise pollute "
+            "the main conversation. "
+            "Do not use for: simple lookups (use search_documents directly), or for tasks that need "
+            "to ask the user a question (sub-agents cannot call ask_user). "
+            "Sub-agents cannot call task(), ask_user(), or write_todos(). "
+            "Max sub-agent steps clamped server-side; long-running work should still be broken into multiple task() calls."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "description": "Required. What the sub-agent should accomplish, in one or two sentences."},
+                "instructions": {"type": ["string", "null"], "description": "Optional task-specific guidance APPENDED to the server's base sub-agent prompt."},
+                "tools": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Optional. Restrict the sub-agent's toolset to these tool names (must be a subset of your own tools). Omit/null = use a safe read-only default set.",
+                },
+                "max_steps": {"type": ["integer", "null"], "description": "Optional. Maximum sub-agent iterations. Server clamps to a hard maximum."},
+            },
+            "required": ["description", "instructions", "tools", "max_steps"],
+        },
+    },
+}
+
+
+# Phase 085 D-085-01..07 — ask_user pause/resume tool schema
+ASK_USER_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "ask_user",
+        "description": (
+            "Pause and ask the user a question. The agent waits for the user's response (up to a timeout) "
+            "before continuing. "
+            "Use when: you have a true blocker that requires a decision only the user can make "
+            "(e.g. 'which of these 3 files should I overwrite?'), when you need information only the user has, "
+            "or when proceeding without confirmation would risk an ambiguous or destructive action. "
+            "When the user explicitly asks you to confirm before acting, CALL this tool — do not just narrate "
+            "the question in prose and assume an answer. "
+            "Do not use for: clarification questions you can answer yourself, or as a substitute for "
+            "writing final assistant content (just respond normally instead). Only call it for a genuine "
+            "blocker; when the intent is clear and safe, proceed without asking. "
+            "Always pass a clear, specific prompt — never ask 'are you sure?' without context."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "Required. The question to show the user. Be specific."},
+                "options": {
+                    "type": ["array", "null"],
+                    "items": {"type": "string"},
+                    "description": "Optional. Multiple-choice options. If provided, panel renders as buttons; user can still type free-text.",
+                },
+                "timeout_seconds": {"type": ["integer", "null"], "description": "Optional. Maximum seconds to wait. Server clamps."},
+            },
+            "required": ["prompt", "options", "timeout_seconds"],
+        },
+    },
+}
+
+
 EXPLORER_SYSTEM_PROMPT = (
     "You are a Knowledge Base Explorer. Navigate the user's document library using the fewest tool calls needed.\n\n"
     "## CRITICAL: Stop when you have the answer\n"
@@ -511,7 +770,11 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     effective = user_settings if user_settings is not None else None
     tools = [SEARCH_DOCUMENTS_TOOL, QUERY_DOCUMENTS_TOOL, LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL,
              LOAD_SKILL_TOOL, SAVE_SKILL_TOOL, READ_SKILL_FILE_TOOL,
-             REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL]
+             REMEMBER_TOOL, RECALL_TOOL, QUERY_TABLES_TOOL,
+             WORKSPACE_WRITE_TOOL, WORKSPACE_READ_TOOL, WORKSPACE_LIST_TOOL,
+             WORKSPACE_DELETE_TOOL, WORKSPACE_DIFF_TOOL,
+             # Phase 085 — D-085-25 — 3 new tools (24-tool toolbox after this line)
+             WRITE_TODOS_TOOL, TASK_TOOL, ASK_USER_TOOL]
     web_enabled = effective.web_search_enabled if effective is not None else settings.web_search_enabled
     sandbox_enabled = effective.sandbox_enabled if effective is not None else settings.sandbox_enabled
     if web_enabled:

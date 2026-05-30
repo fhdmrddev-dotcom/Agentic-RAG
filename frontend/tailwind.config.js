@@ -40,6 +40,18 @@ export default {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
+        // Phase 088-05 (UAT SC#2 / WCAG 2.1 AA 1.4.3): panel-scoped muted text
+        // colors that hit ≥4.5:1 on the workspace --panel-surface in BOTH themes.
+        // Used ONLY inside components/panel/* (text-panel-muted-foreground[-dim])
+        // so the global muted aesthetic of chat/nav stays unchanged.
+        "panel-muted-foreground": "hsl(var(--panel-muted-foreground))",
+        "panel-muted-foreground-dim": "hsl(var(--panel-muted-foreground-dim))",
+        // Phase 088-05 (operator request / WCAG 2.1 AA 1.4.3): panel-scoped
+        // status-TEXT colors for the todo STATUS label (completed=green,
+        // in_progress=amber). Same mapping pattern as panel-muted-foreground;
+        // used ONLY in components/panel/* (text-panel-status-done/-active).
+        "panel-status-done": "hsl(var(--panel-status-done))",
+        "panel-status-active": "hsl(var(--panel-status-active))",
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",

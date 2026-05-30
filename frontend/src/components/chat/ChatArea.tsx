@@ -357,6 +357,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
             {scopedFolder?.name ?? "Folder"}
           </span>
         )}
+        {/* Phase 087-08 (operator directive 2026-05-29): the chat-header
+            "Toggle workspace" button was REMOVED. The workspace panel now has a
+            single nav-style in-panel toggle (collapse-to-rail); the always-present
+            rail's Expand control is the sole reopen-by-mouse affordance and hosts
+            the pulsing-amber-dot pending indicator. No workspace control lives in
+            the chat header. */}
       </div>
       {fallbackNotice && (
         <div className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1">

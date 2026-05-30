@@ -180,6 +180,116 @@ def test_sanitize_strips_additional_properties_recursively() -> None:
     assert out["properties"]["filter"]["description"] == "string map"
 
 
+# -- Phase 084 Plan 05: type-array -> nullable translation ----------------
+
+
+def test_sanitize_translates_type_array_with_null_to_nullable_string() -> None:
+    """Phase 084 strict-mode optionals use ``type: ["X", "null"]`` for OpenAI
+    strict-mode compat. Google's OpenAPI subset rejects array-typed ``type``
+    fields and requires ``{type: "X", nullable: true}`` instead."""
+    from app.services.google_service import _sanitize_schema_for_google
+    schema = {
+        "type": "object",
+        "properties": {
+            "prefix": {
+                "type": ["string", "null"],
+                "description": "optional path prefix",
+            },
+        },
+        "required": ["prefix"],
+    }
+    out = _sanitize_schema_for_google(schema)
+    prefix = out["properties"]["prefix"]
+    assert prefix["type"] == "string", f"expected scalar 'string', got {prefix['type']!r}"
+    assert prefix["nullable"] is True
+    assert prefix["description"] == "optional path prefix"
+
+
+def test_sanitize_translates_type_array_with_null_to_nullable_integer() -> None:
+    """workspace_read.start_line / workspace_read.end_line use the integer-
+    null shape; same translation must apply across scalar types."""
+    from app.services.google_service import _sanitize_schema_for_google
+    schema = {"type": ["integer", "null"], "description": "1-indexed line"}
+    out = _sanitize_schema_for_google(schema)
+    assert out["type"] == "integer"
+    assert out["nullable"] is True
+
+
+def test_sanitize_handles_reversed_null_first_ordering() -> None:
+    """JSON Schema allows ["null", "X"] order; translation must be order-agnostic."""
+    from app.services.google_service import _sanitize_schema_for_google
+    out = _sanitize_schema_for_google({"type": ["null", "string"]})
+    assert out["type"] == "string"
+    assert out["nullable"] is True
+
+
+def test_sanitize_passes_through_scalar_type() -> None:
+    """Non-array ``type`` values must not gain a spurious ``nullable`` field."""
+    from app.services.google_service import _sanitize_schema_for_google
+    out = _sanitize_schema_for_google({"type": "string"})
+    assert out == {"type": "string"}
+    assert "nullable" not in out
+
+
+def test_sanitize_passes_through_type_array_without_null() -> None:
+    """``type: ["string", "integer"]`` (a union of two non-null types) is not
+    Phase 084's nullable-optional shape -- leave unchanged."""
+    from app.services.google_service import _sanitize_schema_for_google
+    out = _sanitize_schema_for_google({"type": ["string", "integer"]})
+    assert out["type"] == ["string", "integer"]
+    assert "nullable" not in out
+
+
+def test_sanitize_translates_recursively_inside_nested_object_properties() -> None:
+    """The 5 workspace_* tools nest the nullable optionals one level deep
+    under .parameters.properties. Translation must walk into nested dicts."""
+    from app.services.google_service import _sanitize_schema_for_google
+    schema = {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string"},
+            "start_line": {"type": ["integer", "null"], "description": "..."},
+            "end_line": {"type": ["integer", "null"], "description": "..."},
+        },
+        "required": ["path", "start_line", "end_line"],
+    }
+    out = _sanitize_schema_for_google(schema)
+    assert out["properties"]["path"] == {"type": "string"}
+    assert out["properties"]["start_line"]["type"] == "integer"
+    assert out["properties"]["start_line"]["nullable"] is True
+    assert out["properties"]["end_line"]["type"] == "integer"
+    assert out["properties"]["end_line"]["nullable"] is True
+    assert out["required"] == ["path", "start_line", "end_line"]
+
+
+def test_real_workspace_tools_pass_sanitize_for_google() -> None:
+    """Regression backstop -- the 5 workspace_* tools defined in
+    openai_service.py (Phase 084) must all translate cleanly through
+    _convert_tools_to_google and emit valid Google FunctionDeclarations."""
+    from app.services.openai_service import get_tools
+    from app.services.google_service import _convert_tools_to_google
+
+    tools = get_tools(None)
+    workspace_tools = [
+        t for t in tools
+        if t.get("function", {}).get("name", "").startswith("workspace_")
+    ]
+    assert len(workspace_tools) == 5, (
+        f"expected 5 workspace_* tools, got {len(workspace_tools)}"
+    )
+
+    gtools = _convert_tools_to_google(workspace_tools)
+    assert len(gtools) == 1
+    names = {fd.name for fd in gtools[0].function_declarations}
+    assert names == {
+        "workspace_write",
+        "workspace_read",
+        "workspace_list",
+        "workspace_delete",
+        "workspace_diff",
+    }
+
+
 def test_signature_encode_decode_round_trip() -> None:
     """Google's SDK returns thought_signature as raw bytes, but the downstream
     pipeline (token-estimate json.dumps, asyncpg jsonb persist) needs a

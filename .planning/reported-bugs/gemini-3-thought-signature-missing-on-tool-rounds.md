@@ -4,11 +4,12 @@ title: Gemini 3 / 3.5 fail with "Function call is missing a thought_signature" o
 reported: 2026-05-23
 surface: Agentic-RAG
 severity: major
-status: reopened
+status: closed
 affected_areas: [backend/streaming, backend/openai-compat, google-genai, chunk-handler, tool-rounds, agent-loop]
-folded_into: "075.4"
+folded_into: "088"
+verified_closed_by: "088"
 related_seeds: []
-re_open_trigger: "Phase 075.4 claimed closure 2026-05-23 but operator reproduced the same 400 INVALID_ARGUMENT live after restart. Unit tests covered capture + persist + reload-echo (Tests 1-7) but the live multi-round path appends tool_calls to messages[] at threads.py:2279-2289 without the thought_signature — that fourth stage was missing. Hotfix landed in same phase 2026-05-23: conditional spread on tc.get('thought_signature') at the messages.append() site + new Test 8 (in-flight echo) regression guard."
+re_open_trigger: "Phase 075.4 claimed closure 2026-05-23 but operator reproduced the same 400 INVALID_ARGUMENT live after restart. Unit tests covered capture + persist + reload-echo (Tests 1-7) but the live multi-round path appends tool_calls to messages[] at threads.py:2279-2289 without the thought_signature — that fourth stage was missing. Hotfix landed in same phase 2026-05-23: conditional spread on tc.get('thought_signature') at the messages.append() site + new Test 8 (in-flight echo) regression guard. Re-folded into Phase 088 (2026-05-29 discuss): the cross-provider 4-axis UAT (Google axis) + the Anthropic+Google deep E2E flow re-verify the 075.4 Stage-4 hotfix live; fix-in-088 if it reproduces, else flip to closed as verified."
 reproduces_on:
   branch: v2.5-dev
   commit: 46e8a63
@@ -21,6 +22,12 @@ hotfix:
 ---
 
 # BUG-260523-02: Gemini 3 tool-call rounds drop the `thought_signature` field, causing 400 INVALID_ARGUMENT
+
+## Resolution — CLOSED (verified live in Phase 088, 2026-05-30)
+
+**Status: folded → closed.** The 075.4 Stage-4 hotfix (in-flight echo of `thought_signature` at the live multi-round `messages.append()` site) was **re-verified live in Phase 088** on the Google axis — the deep workspace flow (write → update → v2 → diff → ask_user → respond → resume, no refresh) + the multi-tool rounds — driven via Chrome MCP on `gemini-3.5-flash`. **Zero `400 INVALID_ARGUMENT` "missing thought_signature"** across the tool rounds: `facts.md` reaching **v2 proves two sequential tool rounds both succeeded** (the continuation turn echoed the captured `thought_signature`). `write_todos` also fired on the Google axis. The scenario-13 Playwright backstop (088-03) asserts the same with a zero-400 `toEqual([])` check on both Anthropic + Google. Evidence: `088-VALIDATION.md` § Deep workspace flow + § 4-Axis Scoreboard (Google row PASS). No reproduction → the Stage-4 fix holds; report closed, `verified_closed_by: 088`.
+
+> Note: the 088-04 cross-provider eval saw a *transient* Google 404 confound (`models/gemini-v4p1s-rev24-ajax-sentinel`, a SECONDARY-model routing artifact — see `project_title_gen_deepseek_moonshot_broken`) — this is a **separate** pre-existing local-env routing bug, NOT this thought_signature bug, and it did NOT reproduce in the Phase 088 live deep-flow re-verify. The secondary-model 404 stays deferred to v2.8 (`deferred-items.md`).
 
 ## What we observed
 

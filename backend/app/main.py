@@ -212,6 +212,27 @@ async def lifespan(app_instance):
 
     yield
 
+    # Phase 085 D-085-07 — broadcast ask_user shutdown sentinel BEFORE cancelling
+    # the producer tasks below (RESEARCH §A.6 PUBLISH-first ordering). Allows
+    # any paused _handle_ask_user calls to return a normal ToolResult
+    # ("ask_user interrupted by server shutdown") so the agent loop iterates
+    # once more and the run finalizes with status='failed' (T-085-T17 — paused
+    # runs would otherwise remain stuck in status='streaming' forever after
+    # uvicorn restarts).
+    #
+    # Best-effort + 2s deadline — NEVER block shutdown on Redis failure or
+    # half-dead Redis sockets (matches the broader "graceful shutdown" rule
+    # at this site).
+    try:
+        from app.services.ask_user_service import broadcast_shutdown_sentinel_to_all
+        from app.dependencies import get_redis
+        await asyncio.wait_for(
+            broadcast_shutdown_sentinel_to_all(get_redis()),
+            timeout=2.0,
+        )
+    except Exception:
+        logger.exception("ask_user shutdown sentinel broadcast failed")
+
     # Phase 061 (D-061-11): cancel all in-flight producer tasks (registry
     # lives in threads.py; late-bind import to avoid circular import at
     # module load — same pattern as the sandbox_manager import below).
@@ -300,7 +321,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, admin  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -313,7 +334,9 @@ app.include_router(audit.router)
 app.include_router(knowledge_health.router)
 app.include_router(feedback.router)
 app.include_router(sandbox_outputs.router)
+app.include_router(workspace.router)
 app.include_router(admin.router)
+app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

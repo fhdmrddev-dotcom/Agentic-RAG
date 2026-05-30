@@ -141,6 +141,13 @@ async def test_snapshot_returns_messages_active_runs_cursors():
             f"Expected assistant run_status='streaming'; got {asst.get('run_status')!r}"
         )
 
+        # BUG-260528-01 regression: snapshot MUST filter role='system' rows
+        # (ask_user durable records, migration 048 / Plan 085) out of the
+        # messages SELECT. MessageResponse.role is Literal["user","assistant"],
+        # so a system row would 500 the endpoint via ResponseValidationError
+        # and the thread would never load. Assert the .neq filter is applied.
+        msgs_builder.neq.assert_any_call("role", "system")
+
         # active_runs: 1 streaming run.
         assert len(body["active_runs"]) == 1, (
             f"Expected 1 active_run; got {len(body['active_runs'])} body={body!r}"

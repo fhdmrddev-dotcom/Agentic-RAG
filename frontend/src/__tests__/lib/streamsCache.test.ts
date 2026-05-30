@@ -170,7 +170,10 @@ describe("Phase 068.5 — streamsCache: version drift recovery", () => {
     expect(out.size).toBe(0)
     expect(localStorage.getItem(STREAMS_CACHE_KEY)).toBeNull()
     // STREAMS_CACHE_VERSION export is the source of truth — sanity-check.
-    expect(STREAMS_CACHE_VERSION).toBe(1)
+    // Phase 086 Plan 01 (D-086-04): bumped 1 -> 2 to admit the todosByThread +
+    // tasksByThread persisted slots. The drift-recovery behavior above is
+    // unchanged (a version != current still drops the key).
+    expect(STREAMS_CACHE_VERSION).toBe(2)
   })
 })
 

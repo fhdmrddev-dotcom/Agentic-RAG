@@ -11,6 +11,84 @@ import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
 import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
+// Phase 087-05 (D-05 / chat-panel-seam.md): ADDITIVE seam renderers. Live runs
+// show quiet pointers / a paused cue; reloaded history resolves to self-contained
+// cards. These mount as NEW siblings only — they never touch RunCard /
+// ToolCallPanel internals (G-5; BUG-260529-02 stays a separate phase).
+import { SeamPointer, type SeamKind } from "@/components/panel/SeamPointer"
+import { SeamCard, type SeamCardPayload } from "@/components/panel/SeamCard"
+import { PausedRunCue } from "@/components/panel/PausedRunCue"
+// Phase 087-02: the WorkspacePanel owns the open action; the chat-side seam
+// affordances request it via this module-level signal (additive wiring — no
+// MessageItem→MessageList→ChatArea prop re-plumbing, PANEL-06 safe).
+import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
+import type { ToolCall } from "@/types"
+
+/**
+ * Phase 087-05: the three panel-owned tools (write_todos / workspace_write /
+ * ask_user) render via the seam, not as raw chat tool rows. Map a ToolCall name
+ * to its SeamKind, or null when it is not panel-owned.
+ */
+function seamKindFor(name: string): SeamKind | null {
+  if (name === "write_todos" || name === "workspace_write" || name === "ask_user") {
+    return name
+  }
+  return null
+}
+
+/** A paused run is one with an ask_user tool still awaiting the user (D2). */
+function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
+  return (
+    toolCalls?.some(
+      (tc) => tc.name === "ask_user" && (tc.status === "running" || tc.status === "interrupted"),
+    ) ?? false
+  )
+}
+
+/**
+ * Build the reload-mode SeamCard payload from a resolved panel-owned ToolCall
+ * (D3). Renders ONLY summarized known fields — never the raw payload. Values are
+ * best-effort: args are a Record<string,string> (Phase 086 wire), result is the
+ * agent's answer for ask_user.
+ */
+function seamCardPayloadFor(tc: ToolCall): SeamCardPayload {
+  switch (tc.name) {
+    case "ask_user":
+      return { question: tc.args.prompt, answer: tc.result ?? undefined }
+    case "workspace_write": {
+      const v = tc.args.version
+      return {
+        path: tc.args.path ?? tc.args.file_path,
+        version: v != null ? Number(v) : undefined,
+      }
+    }
+    case "write_todos": {
+      // 087-08 fix: write_todos args carry a `todos` array ({id, content, status});
+      // there is no total/done field, so the prior tc.args.total/.done read undefined
+      // and the SeamCard always showed "☑ 0 todos". Derive the counts from the list
+      // (array, or JSON string per wire drift). status enum: pending|in_progress|completed.
+      const raw = (tc.args as Record<string, unknown>).todos
+      let todos: Array<{ status?: string }> = []
+      if (Array.isArray(raw)) {
+        todos = raw as Array<{ status?: string }>
+      } else if (typeof raw === "string") {
+        try {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) todos = parsed
+        } catch {
+          /* leave empty — never throw in a render-path mapper */
+        }
+      }
+      const doneCount = todos.filter((t) => t?.status === "completed").length
+      return {
+        todoTotal: todos.length,
+        todoDone: doneCount > 0 ? doneCount : undefined,
+      }
+    }
+    default:
+      return {}
+  }
+}
 
 interface Props {
   message: Message
@@ -206,6 +284,28 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
         {message.tool_calls && message.tool_calls.length > 0 && (
           <RunCard message={message} isStreaming={isStreaming} />
         )}
+        {/* Phase 087-05 (D-05 / chat-panel-seam.md D2) — ADDITIVE live seam.
+            While THIS run is streaming, panel-owned tools render as quiet
+            one-line pointers (the panel is the canonical live view; duplicating
+            the rich state here would be noise + drift). A still-awaiting
+            ask_user additionally surfaces the paused cue (pending-question.md
+            D2). Rendered as NEW siblings next to RunCard — no RunCard internals
+            touched. When not live, nothing extra renders here. */}
+        {isMessageStreaming && message.tool_calls && message.tool_calls.length > 0 && (
+          <div className="mt-1 flex flex-col gap-0.5">
+            {message.tool_calls
+              .filter((tc) => seamKindFor(tc.name) !== null && tc.name !== "ask_user")
+              .map((tc, i) => (
+                <SeamPointer
+                  key={tc.clientKey ?? tc.id ?? `seam-live-${i}`}
+                  kind={seamKindFor(tc.name) as SeamKind}
+                  label={tc.args.path ?? tc.args.file_path}
+                  onSeePanel={requestOpenPanel}
+                />
+              ))}
+            {hasPendingAsk(message.tool_calls) && <PausedRunCue />}
+          </div>
+        )}
         {message.activatedSkill && (
           <div className="flex items-center gap-1.5 mt-2 text-xs text-primary animate-fadeSlideUp">
             <Zap className="h-3 w-3" />
@@ -342,6 +442,29 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             </div>
           </div>
         )}
+        {/* Phase 087-05 (D-05 / chat-panel-seam.md D3) — ADDITIVE reload seam.
+            On a rehydrated/terminal message the panel won't replay history, so
+            panel-owned tools resolve to self-contained cards here: the answered
+            ask_user Q&A (closes the documented reload gap), a workspace_write
+            file chip, a write_todos final-state note. Rendered as a NEW sibling
+            near the final-outputs panel — no existing markup changed. Gate:
+            message NOT streaming (mode = rehydrated history vs live run). */}
+        {!isMessageStreaming &&
+          message.tool_calls &&
+          message.tool_calls.some((tc) => seamKindFor(tc.name) !== null) && (
+            <div className="mt-2 flex flex-col gap-2">
+              {message.tool_calls
+                .filter((tc) => seamKindFor(tc.name) !== null)
+                .map((tc, i) => (
+                  <SeamCard
+                    key={tc.clientKey ?? tc.id ?? `seam-reload-${i}`}
+                    kind={seamKindFor(tc.name) as SeamKind}
+                    payload={seamCardPayloadFor(tc)}
+                    onOpenPanel={requestOpenPanel}
+                  />
+                ))}
+            </div>
+          )}
       </div>
     </div>
   )

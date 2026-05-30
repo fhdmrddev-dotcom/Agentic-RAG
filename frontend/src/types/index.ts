@@ -243,3 +243,156 @@ export interface SkillFile {
   mime_type: string
   created_at: string
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 086 Plan 01 — agent-panel wire-mirror interfaces.
+//
+// These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there
+// is no client-side reshape — the backend already reshapes where needed (e.g.
+// panel.py:67 maps todo_id -> id before serializing). The exact field names are
+// VERIFIED against the emit sites + GET reshapes (086-01-PLAN <interfaces>):
+//   GET /threads/{tid}/todos            (panel.py:67)
+//   GET /threads/{tid}/workspace/files  (workspace.py:99)
+//   GET /threads/{tid}/ask_user/pending (panel.py:103)
+//   GET /threads/{tid}/tasks            (panel.py:156)
+// plus the 6 SSE event payloads from Phases 084/085.
+//
+// Rendering is Phase 087 — these types only back the data-plumbing layer
+// (store Maps + SSE dispatch + GET helpers + cache) shipped in Plan 086-01.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /threads/{tid}/todos (panel.py:67 reshapes todo_id -> id) +
+ *  SSE todo_updated (tool_dispatcher.py:1239) — the SSE `todos` array is the
+ *  FULL canonical list (full-state-replace, not a delta). Identity key: `id`. */
+export interface Todo {
+  id: string
+  content: string
+  status: string
+  parent_id: string | null
+  order_index: number
+  created_at?: string
+  updated_at?: string
+}
+
+/** GET /threads/{tid}/workspace/files (workspace.py:99) +
+ *  SSE workspace_file_written (tool_dispatcher.py:892, FLAT payload — carries
+ *  id/path/version/size_bytes/mime_type). Phase 088-05 (D-16): the SSE now emits
+ *  the persisted row `id` too (it used to be GET-only), so the live panel can
+ *  fetch content/versions/diff by id without a refresh. The store still keys by
+ *  `path` (stable identity across version bumps); `id` stays optional because a
+ *  replayed/legacy event may lack it — the select→fetch path reconciles-by-GET
+ *  when it's missing (FilePreview / VersionDiff guard). */
+export interface WorkspaceFile {
+  id?: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  version?: number
+  created_at?: string
+  updated_at?: string
+}
+
+/** GET /threads/{tid}/ask_user/pending (panel.py:103) +
+ *  SSE ask_user_prompt (tool_dispatcher.py:1357, FLAT payload — no
+ *  message_id/run_id/created_at; those exist only on the GET). Identity key:
+ *  `tool_call_id` (NOT `ask_id`). */
+export interface PendingAsk {
+  tool_call_id: string
+  prompt: string
+  options: string[]
+  timeout_seconds: number
+  message_id?: string
+  run_id?: string
+  created_at?: string
+}
+
+/** GET /threads/{tid}/tasks (panel.py:156) + SSE sub_agent_start/done TASK
+ *  variant (task_service.py:264/428 — both carry `sub_run_id`, the discriminator
+ *  vs the legacy analyze_document sub_agent_* path which has none). The optional
+ *  description/tools/max_steps/summary fields are populated from the sub_agent
+ *  SSE bookends. Identity key: `sub_run_id`. */
+export interface TaskRunIndexItem {
+  sub_run_id: string
+  parent_run_id: string
+  status: string
+  model: string
+  provider: string
+  started_at?: string
+  completed_at?: string
+  description?: string
+  tools?: string[]
+  max_steps?: number
+  summary?: string
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 087 Plan 01 — workspace file content / versions / diff wire-mirror
+// interfaces + the ask_user answer POST body.
+//
+// These mirror the backend JSON field names BYTE-FOR-BYTE (snake_case) so there
+// is no client-side reshape. VERIFIED against:
+//   GET  /threads/{tid}/workspace/files/{id}/content  (workspace.py:124-199 — two-shape)
+//   GET  /threads/{tid}/workspace/files/{id}/versions (workspace.py:202-235)
+//   GET  /threads/{tid}/workspace/files/{id}/diff      (workspace.py:238-323 + workspace_service.py:99)
+//   POST /runs/{run_id}/ask_user_response               (runs.py:496)
+// ────────────────────────────────────────────────────────────────────────────
+
+/** GET /content — inline shape: small text files return their content directly. */
+export interface WorkspaceFileContentInline {
+  id: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  storage_type: "inline"
+  content: string
+}
+
+/** GET /content — bucket shape: binary/large files return a 60s-TTL signed URL
+ *  (best-effort; `signed_url` may be null → calm "no preview · Download"). */
+export interface WorkspaceFileContentBucket {
+  id: string
+  path: string
+  size_bytes: number
+  mime_type: string
+  storage_type: "bucket"
+  signed_url: string | null
+}
+
+/** Discriminated union over `storage_type` — FilePreview routes on it (D-02). */
+export type WorkspaceFileContent =
+  | WorkspaceFileContentInline
+  | WorkspaceFileContentBucket
+
+/** GET /versions — one row per stored version, sorted version DESC. */
+export interface WorkspaceVersion {
+  id: string
+  version: number
+  size_bytes: number
+  created_at: string
+}
+
+/** GET /diff — raw unified-diff STRING in `delta.diff` (NOT pre-parsed hunks);
+ *  VersionDiff parses it client-side (Pattern 2). Backend truncates at 500 diff
+ *  lines and sets `delta.truncated=true` — the UI must surface that (Pitfall 4). */
+export interface WorkspaceDiff {
+  path: string
+  from_version: number
+  to_version: number
+  delta: {
+    format: "unified"
+    diff: string
+    stats: { additions: number; deletions: number }
+    truncated: boolean
+  }
+  stats: { additions: number; deletions: number }
+}
+
+/** POST /runs/{run_id}/ask_user_response body. `choice_index` is the picked
+ *  option index (null for free-text answers); `response_text` always carries the
+ *  resolved answer string. `run_id` for the route comes from PendingAsk.run_id
+ *  (GET-only — see Pitfall 1 / A2). */
+export interface AskUserAnswerBody {
+  tool_call_id: string
+  response_text: string
+  choice_index: number | null
+}

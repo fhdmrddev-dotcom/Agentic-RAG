@@ -4,12 +4,12 @@ title: Title generation fails on DeepSeek/Moonshot, partial on Google (few lette
 reported: 2026-05-27
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/streaming, backend/providers]
-folded_into: null
+folded_into: "083"
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "v2.8: live-verify thread-title generation on DeepSeek, Moonshot (Kimi), and Google (Gemini). The Phase 083 _SINGLE_MODEL_PROVIDERS routing fix shipped but was never confirmed to stop reproducing (rolled forward unverified at v2.7 close 2026-05-30). Re-open if titles still show 'New Chat' on DeepSeek/Moonshot or truncate to one word on Google."
 reproduces_on:
   branch: v2.5-dev
   commit: 0850053

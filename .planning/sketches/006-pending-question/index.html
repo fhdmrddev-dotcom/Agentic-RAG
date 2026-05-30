@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 006 — Pending Question</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+.app { display: grid; grid-template-columns: 1fr 384px; height: 100%; overflow: hidden; }
+
+/* chat */
+.chat { display: flex; flex-direction: column; min-width: 0; background: var(--color-bg); border-right: 1px solid var(--color-border); }
+.chat-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.chat-head .title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.model-pill { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-muted); border: 1px solid var(--color-border); padding: 3px 8px; border-radius: var(--radius-full); }
+.chat-scroll { flex: 1; overflow-y: auto; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.msg { display: flex; gap: var(--space-3); }
+.msg .avatar { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; }
+.msg.user .avatar { background: var(--color-accent); }
+.msg.bot .avatar { background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+.msg .who { font-size: var(--text-xs); color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: 2px; }
+.msg .txt { font-size: var(--text-sm); }
+
+.run-card { border: 1px solid var(--color-primary-glow); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; box-shadow: var(--shadow-glow-primary); }
+.run-card.paused { border-color: var(--color-warning); box-shadow: 0 0 24px var(--color-warning-dim); }
+.run-head { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--color-border-soft); }
+.run-head .bot { width: 20px; height: 20px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); animation: brandPulse 1.5s ease-in-out infinite; }
+.run-card.paused .run-head .bot { animation: none; background: var(--color-warning); }
+.run-head .lbl { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+.run-card.paused .run-head .lbl { color: var(--color-warning); }
+.run-head .timer { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-primary); }
+.run-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
+.run-step { display: flex; gap: 8px; font-size: var(--text-xs); color: var(--color-text-muted); font-family: var(--font-mono); }
+.run-step.done { color: var(--color-text-dim); }
+.run-step.wait { color: var(--color-warning); }
+
+/* dual-surface inline ask cue in chat (variant C) */
+.chat-ask-cue { display: none; margin-top: 10px; border: 1px dashed var(--color-warning); background: var(--color-warning-dim); border-radius: var(--radius-md); padding: 10px 12px; font-size: var(--text-xs); color: var(--color-warning); align-items: center; gap: 8px; }
+.chat-ask-cue .jump { margin-left: auto; background: var(--color-warning); color: #06061a; border: none; border-radius: var(--radius-sm); padding: 3px 9px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--font-mono); }
+.v-c .run-card.paused .chat-ask-cue { display: flex; }
+
+.composer { border-top: 1px solid var(--color-border-soft); padding: var(--space-3) var(--space-5); }
+.composer .box { display: flex; align-items: center; gap: var(--space-3); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 14px; color: var(--color-text-dim); font-size: var(--text-sm); }
+.composer.locked .box { opacity: 0.5; }
+.composer .hint { margin-left: auto; font-size: 10px; font-family: var(--font-mono); color: var(--color-warning); }
+
+/* panel */
+.panel { background: var(--color-bg-elev1); display: flex; flex-direction: column; min-width: 0; overflow: hidden; position: relative; }
+.panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border-soft); }
+.panel-head .ptitle { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-sm); }
+.panel-body { flex: 1; overflow-y: auto; }
+
+.sec-head { display: flex; align-items: center; gap: 8px; padding: var(--space-3) var(--space-4); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-dim); }
+.sec-head .count { margin-left: auto; font-family: var(--font-mono); color: var(--color-text-muted); text-transform: none; }
+.sec-body { padding: 0 var(--space-3) var(--space-3); display: flex; flex-direction: column; gap: 5px; }
+.todo { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: var(--radius-sm); font-size: var(--text-sm); background: var(--color-surface); border: 1px solid var(--color-border-soft); }
+.todo .tick { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--color-text-dim); flex: none; display: grid; place-items: center; font-size: 9px; }
+.todo.done .tick { background: var(--color-success); border-color: var(--color-success); color: #06061a; } .todo.done .label { text-decoration: line-through; color: var(--color-text-dim); }
+.file { display: flex; align-items: center; gap: 8px; padding: 6px 9px; font-size: var(--text-xs); font-family: var(--font-mono); color: var(--color-text-muted); }
+
+/* the ask card — the star of this sketch */
+.ask {
+  border: 1px solid var(--color-warning); background: var(--color-warning-dim);
+  border-radius: var(--radius-md); padding: var(--space-4); margin: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  animation: fadeSlideUp var(--dur-slow) var(--ease-out);
+}
+.ask .qlbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--color-warning); font-family: var(--font-mono); display: flex; align-items: center; gap: 6px; }
+.ask .qlbl .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--color-warning); animation: dotBounce 1.4s ease-in-out infinite; }
+.ask .qlbl .clock { margin-left: auto; color: var(--color-text-dim); }
+.ask .qtext { font-size: var(--text-base); color: var(--color-text); line-height: 1.5; }
+.ask .opts { display: flex; flex-direction: column; gap: 6px; }
+.ask .opt { text-align: left; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 12px; font-size: var(--text-sm); color: var(--color-text); cursor: pointer; transition: all var(--dur-fast); }
+.ask .opt:hover { border-color: var(--color-warning); background: var(--color-warning-dim); }
+.ask .opt.sel { border-color: var(--color-warning); background: var(--color-warning); color: #06061a; font-weight: 600; }
+.ask .or { font-size: 10px; text-align: center; color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+.ask .free { display: flex; gap: 6px; }
+.ask .free input { flex: 1; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px; color: var(--color-text); font-size: var(--text-sm); font-family: var(--font-sans); }
+.ask .free input:focus { outline: none; border-color: var(--color-warning); }
+.ask .submit { background: var(--color-warning); color: #06061a; border: none; border-radius: var(--radius-sm); padding: 8px 14px; font-weight: 700; font-size: var(--text-sm); cursor: pointer; }
+.ask .submit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* answered / resumed state */
+.ask.answered { border-color: var(--color-success); background: var(--color-success-dim); }
+.ask.answered .qlbl { color: var(--color-success); }
+.ask.answered .qlbl .pip { background: var(--color-success); animation: none; }
+.answered-row { font-size: var(--text-sm); color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+.answered-row .you { color: var(--color-success); font-weight: 600; }
+
+/* timeout */
+.ask.expired { border-color: var(--color-text-dim); background: var(--color-muted); opacity: 0.85; }
+.ask.expired .qlbl { color: var(--color-text-dim); }
+.ask.expired .qlbl .pip { background: var(--color-text-dim); animation: none; }
+
+/* VARIANT A: takeover scrim */
+.takeover-scrim { display: none; position: absolute; inset: 0; background: hsl(216 45% 4% / 0.55); backdrop-filter: blur(2px); z-index: 5; }
+.v-a.pending .takeover-scrim { display: block; }
+.v-a.pending .ask { position: relative; z-index: 6; box-shadow: var(--shadow-lg); }
+.v-a.pending .panel-body { overflow: hidden; }
+
+/* VARIANT B: pinned (calm) — ask sits at top, sections stay fully usable. (no scrim) */
+
+/* sticky pin so the ask stays visible while scrolling sections */
+.ask-slot.pinned { position: sticky; top: 0; z-index: 4; }
+
+.state-strip { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: hsl(220 40% 5% / 0.92); border-bottom: 1px solid var(--color-border); position: sticky; top: 0; z-index: 200; backdrop-filter: blur(14px); }
+.state-strip .lbl { font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--font-mono); }
+.state-strip .sbtn { background: transparent; color: var(--color-text-muted); border: 1px solid transparent; border-radius: var(--radius-sm); padding: 5px 10px; font-size: var(--text-xs); cursor: pointer; font-family: var(--font-mono); }
+.state-strip .sbtn:hover { background: var(--color-accent); color: var(--color-text); }
+.state-strip .sbtn.active { background: var(--color-warning-dim); color: var(--color-warning); border-color: var(--color-warning); }
+.state-note { padding: 6px 16px; font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface); border-bottom: 1px solid var(--color-border-soft); font-style: italic; }
+.frame { height: calc(100vh - 88px); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 006 · Pending Question</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: Takeover</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B: Pinned (calm)</button>
+  <button class="variant-tab active" onclick="showVariant('c', event)">C: Dual-surface <span class="star">★</span></button>
+</div>
+<div class="state-strip">
+  <span class="lbl">Flow</span>
+  <button class="sbtn active" data-s="pending" onclick="setState('pending', event)">1 · Pending</button>
+  <button class="sbtn" data-s="answered" onclick="setState('answered', event)">2 · Answered → resume</button>
+  <button class="sbtn" data-s="expired" onclick="setState('expired', event)">3 · Timeout</button>
+</div>
+<div class="state-note" id="note"></div>
+
+<div class="frame">
+<div class="app v-c pending" id="app">
+  <!-- chat -->
+  <div class="chat">
+    <div class="chat-head"><span class="title">Q3 revenue analysis</span><span class="model-pill">gpt-5.4</span></div>
+    <div class="chat-scroll">
+      <div class="msg user"><div class="avatar">🧑</div><div><div class="who">you</div><div class="txt">Update the summary and save it.</div></div></div>
+      <div class="msg bot"><div class="avatar">Æ</div><div style="flex:1">
+        <div class="who">agent</div>
+        <div class="txt" style="margin-bottom:10px">Working through it — I hit a decision I need you on.</div>
+        <div class="run-card paused" id="runcard">
+          <div class="run-head"><span class="bot"></span><span class="lbl" id="runlbl">Paused · waiting for you</span><span class="timer" id="runtimer">1:12</span></div>
+          <div class="run-body">
+            <div class="run-step done">✓ read_document · finance_q3.pdf</div>
+            <div class="run-step done">✓ execute_code · yoy = 30.87%</div>
+            <div class="run-step wait" id="runwait">⏸ ask_user · awaiting your answer →</div>
+          </div>
+          <div class="chat-ask-cue">
+            <span>⚠ The agent needs your input to continue.</span>
+            <button class="jump" onclick="flashPanel()">Answer in panel →</button>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <div class="composer locked" id="composer">
+      <div class="box"><span id="composertext">Agent is paused — answer its question to continue</span><span class="hint" id="composerhint">⏸ blocked</span></div>
+    </div>
+  </div>
+
+  <!-- panel -->
+  <div class="panel" id="panel">
+    <div class="takeover-scrim" onclick="flashAsk()"></div>
+    <div class="panel-head"><span class="ptitle">Workspace</span></div>
+    <div class="panel-body" id="pbody"></div>
+  </div>
+</div>
+</div>
+
+<div class="sketch-toolbar">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const ASK = { prompt: "summary.md already exists. How should I save the update?", options: ["Overwrite summary.md", "Save as summary_v2.md", "Cancel — leave it"] };
+const TODOS = [{c:"Read deck",d:1},{c:"Compute YoY",d:1},{c:"Save summary",d:0}];
+const FILES = ["finance_q3.pdf","yoy_by_segment.csv"];
+
+let VARIANT = "c";
+let STATE = "pending";
+let picked = null;
+
+const NOTES = {
+  pending: "PENDING — the agent loop is blocked on ask_user. Chat run-card shows ⏸ paused, composer is locked. Watch how each variant makes the question impossible to miss WITHOUT being obnoxious.",
+  answered: "ANSWERED → RESUME — you pick/type, submit. The card flips to a calm answered state (your answer recorded), run-card resumes, composer unlocks — all without leaving the panel (SC#4).",
+  expired: "TIMEOUT — ask_user has a configurable timeout. If you never answer, it expires gracefully with a clear message (not a silent hang) and the agent reports it couldn't proceed.",
+};
+
+function todoRows() { return TODOS.map(t=>`<div class="todo ${t.d?'done':''}"><span class="tick">${t.d?'✓':''}</span><span class="label">${t.c}</span></div>`).join(""); }
+function fileRows() { return FILES.map(f=>`<div class="file">📄 ${f}</div>`).join(""); }
+
+function askCard() {
+  if (STATE === "answered") {
+    return `<div class="ask answered ask-slot">
+      <div class="qlbl"><span class="pip"></span>Answered · agent resumed</div>
+      <div class="qtext">${ASK.prompt}</div>
+      <div class="answered-row"><span class="you">You:</span> ${picked || "Overwrite summary.md"}</div>
+    </div>`;
+  }
+  if (STATE === "expired") {
+    return `<div class="ask expired ask-slot">
+      <div class="qlbl"><span class="pip"></span>Question expired</div>
+      <div class="qtext">${ASK.prompt}</div>
+      <div style="font-size:var(--text-xs);color:var(--color-text-dim)">No response within 5:00 — the agent stopped and reported it couldn't proceed without your input. You can re-run the request.</div>
+    </div>`;
+  }
+  // pending
+  const pinned = VARIANT === "b" ? "pinned" : "";
+  return `<div class="ask ask-slot ${pinned}">
+    <div class="qlbl"><span class="pip"></span>Agent needs you<span class="clock">⏲ 4:48 left</span></div>
+    <div class="qtext">${ASK.prompt}</div>
+    <div class="opts">${ASK.options.map((o,i)=>`<button class="opt ${picked===o?'sel':''}" onclick="pick('${o.replace(/'/g,"\\'")}')">${o}</button>`).join("")}</div>
+    <div class="or">— or type your own —</div>
+    <div class="free"><input id="freein" placeholder="Type a custom answer…" oninput="picked=this.value||null;syncSubmit()"><button class="submit" id="submitbtn" disabled onclick="submitAnswer()">Send</button></div>
+  </div>`;
+}
+
+function renderPanel() {
+  const pbody = document.getElementById("pbody");
+  const ask = askCard();
+  const sections = `
+    <div class="sec-head">Todos<span class="count">2/3</span></div><div class="sec-body">${todoRows()}</div>
+    <div class="sec-head">Files<span class="count">2</span></div><div class="sec-body">${fileRows()}</div>`;
+
+  if (VARIANT === "a") {
+    // takeover: ask front-and-center, sections behind scrim
+    pbody.innerHTML = ask + `<div style="opacity:0.5">${sections}</div>`;
+  } else if (VARIANT === "b") {
+    // calm pinned: ask pinned on top, sections fully usable below
+    pbody.innerHTML = ask + sections;
+  } else {
+    // dual-surface: same calm pin in panel + the chat cue (shown via .v-c css)
+    pbody.innerHTML = ask + sections;
+  }
+  syncSubmit();
+}
+
+function pick(o) { picked = o; const inp = document.getElementById("freein"); if (inp) inp.value=""; renderPanel(); }
+function syncSubmit() { const b = document.getElementById("submitbtn"); if (b) b.disabled = !picked; }
+function submitAnswer() { if (!picked) return; setState("answered"); }
+
+function flashPanel() { const p = document.getElementById("panel"); p.animate([{boxShadow:"inset 0 0 0 2px var(--color-warning)"},{boxShadow:"inset 0 0 0 0 transparent"}],{duration:900}); }
+function flashAsk() { const a = document.querySelector(".ask"); if(a) a.animate([{transform:"scale(1.02)"},{transform:"scale(1)"}],{duration:300,easing:"ease-out"}); }
+
+function applyChatState() {
+  const rc = document.getElementById("runcard");
+  const lbl = document.getElementById("runlbl");
+  const wait = document.getElementById("runwait");
+  const timer = document.getElementById("runtimer");
+  const comp = document.getElementById("composer");
+  const ctext = document.getElementById("composertext");
+  const chint = document.getElementById("composerhint");
+  if (STATE === "answered") {
+    rc.classList.remove("paused"); lbl.textContent = "Working · resumed"; lbl.style.color="";
+    wait.className="run-step done"; wait.textContent="✓ ask_user · \""+(picked||"Overwrite summary.md")+"\"";
+    timer.textContent="1:18";
+    comp.classList.remove("locked"); ctext.textContent="Reply to the agent…"; chint.textContent="";
+  } else if (STATE === "expired") {
+    rc.classList.remove("paused"); lbl.textContent="Stopped · no answer"; lbl.style.color="var(--color-text-dim)";
+    wait.className="run-step"; wait.style.color="var(--color-text-dim)"; wait.textContent="✕ ask_user · timed out";
+    comp.classList.remove("locked"); ctext.textContent="Re-run the request…"; chint.textContent="";
+  } else {
+    rc.classList.add("paused"); lbl.textContent="Paused · waiting for you"; lbl.style.color="";
+    wait.className="run-step wait"; wait.style.color=""; wait.textContent="⏸ ask_user · awaiting your answer →";
+    timer.textContent="1:12";
+    comp.classList.add("locked"); ctext.textContent="Agent is paused — answer its question to continue"; chint.textContent="⏸ blocked";
+  }
+}
+
+function setState(s, e) {
+  STATE = s;
+  if (s === "pending") picked = null;
+  document.querySelectorAll(".state-strip .sbtn").forEach(b=>b.classList.toggle("active", b.dataset.s===s));
+  document.getElementById("note").textContent = NOTES[s];
+  applyChatState();
+  renderPanel();
+}
+function showVariant(v, e) {
+  VARIANT = v; STATE = "pending"; picked = null;
+  const app = document.getElementById("app");
+  app.className = "app v-" + v + " pending";
+  document.querySelectorAll(".variant-nav .variant-tab").forEach(t=>t.classList.remove("active"));
+  e.target.classList.add("active");
+  document.querySelectorAll(".state-strip .sbtn").forEach(b=>b.classList.toggle("active", b.dataset.s==="pending"));
+  document.getElementById("note").textContent = NOTES.pending;
+  applyChatState(); renderPanel();
+}
+// keep app class in sync with state for scrim
+const _origSet = setState;
+setState = function(s,e){ _origSet(s,e); const app=document.getElementById("app"); app.classList.toggle("pending", s==="pending"); };
+
+setState("pending");
+</script>
+</body>
+</html>

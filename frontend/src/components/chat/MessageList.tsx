@@ -115,7 +115,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
               msg.role === "assistant" && idx === messages.length - 1
             return (
               <MessageItem
-                key={msg.id}
+                key={msg.role === "assistant" && msg.runId ? `run-${msg.runId}` : msg.id}
                 message={msg}
                 isStreaming={isStreaming && isLastAssistant}
                 onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
