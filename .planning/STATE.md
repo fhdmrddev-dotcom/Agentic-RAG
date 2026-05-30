@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: Completed 089-02-PLAN.md
-last_updated: "2026-05-30T14:06:31.231Z"
+stopped_at: Completed 089-03-PLAN.md (THE verbatim move)
+last_updated: "2026-05-30T16:24:12.764Z"
 last_activity: 2026-05-30
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
-  percent: 50
+  completed_plans: 3
+  percent: 75
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 ## Current Position
 
 Phase: 089 (agent-loop-extraction-g-5-kickoff-uat) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
 Next: `/gsd:discuss-phase 089` (or `/gsd:plan-phase 089`). Phase 089 is the G-5 agent-loop extraction — behavior-preserving lift of the agent loop from `threads.py` into `agent_loop.py` with byte-identical cross-provider SSE (eval + E2E backstop GREEN before AND after), plus the CF-01 v2.7 carry-forward UAT sweep. Migrations renumber from real head **056+** (PRD's 125-139 reservation is stale) — that lands in Phase 090.
@@ -37,7 +37,7 @@ SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-messag
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
 Last activity: 2026-05-30
 
-Progress: [█████░░░░░] 50%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -68,6 +68,7 @@ Progress: [█████░░░░░] 50%
 | Phase 088 P088-04 | 75min | 3 tasks | 4 files |
 | Phase 088 P088-05 | 1h 40m | 3 tasks | 2 files |
 | Phase 089 P02 | 6min | 3 tasks | 3 files |
+| Phase 089 P03 | ~3h | 3 tasks | 35 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,8 @@ Recent decisions affecting current work:
 - (088-05): D-17 gemini-3 thought_signature CLOSED-as-verified — Google-axis deep flow + multi-tool rounds CLEAN (zero 400); transient 088-04 Google 404 is a SEPARATE secondary-model routing artifact (v2.8 CF-01)
 - (089-02): eval extended to native-7 — zhipu/glm-4-flash + minimax/minimax-m2.7 appended to PROVIDERS + ZHIPU/MINIMAX_API_KEY presence checks (is_secret, presence-only); choices auto-derive, localhost hard-gate untouched (D-089-09)
 - (089-02): byte-identical SC#3 proof = capture_run_events (XRANGE run:{run_id}) + normalize (mask message_id/run_id, drop captured_at) + diff_event_streams ([] == PASS); operator runbook captures BEFORE baseline against the pre-move loop in Wave 1, AFTER diff in Plan 04 (D-089-08)
+- 089-03 (G-5 verbatim move): agent loop lifted byte-identically from threads.py into agent_loop.run_agent_loop; _shielded_finalize + _terminal_status classifier STAY; zero net regression vs baseline (identical 102-failure set)
+- 089-03: module-level loop helpers + _reconstruct_history moved to agent_loop.py and re-imported into threads.py (cycle-free, one canonical copy); AgentLoopResult gained persist_system_warnings + run_agent_loop gained timeout_ctx/result_sink kw-only params (Rule-3 structural, behavior-preserving)
 
 ### Pending Todos
 
@@ -187,8 +190,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-30T14:06:31.223Z
-Stopped at: Completed 089-02-PLAN.md
+Last session: 2026-05-30T16:24:12.758Z
+Stopped at: Completed 089-03-PLAN.md (THE verbatim move)
 Resume file: None
 
 **Planned Phase:** 089 (agent-loop-extraction-g-5-kickoff-uat) — 4 plans — 2026-05-30T12:03:18.356Z
