@@ -553,6 +553,55 @@ async def delete_thread(
 _SINGLE_MODEL_PROVIDERS = frozenset({"deepseek", "moonshot", "minimax", "zhipu", "ollama"})
 
 
+def _strip_think_blocks(text: str) -> str:
+    """Remove <think>...</think> reasoning blocks (closed) and any unclosed trailing
+    <think> from text. Reasoning providers (minimax inline, GLM-4.6+) emit <think>
+    in message.content rather than a separate reasoning_content field, which would
+    otherwise bury or replace a generated title."""
+    out = text or ""
+    lower = out.lower()
+    while "<think>" in lower and "</think>" in lower:
+        start = lower.find("<think>")
+        end = lower.find("</think>", start)
+        if end == -1:
+            break
+        out = out[:start] + out[end + len("</think>"):]
+        lower = out.lower()
+    idx = out.lower().find("<think>")  # unclosed trailing think (ran out of budget mid-reasoning)
+    if idx != -1:
+        out = out[:idx]
+    return out
+
+
+def _derive_title_from_message(msg: str) -> str:
+    """Deterministic fallback title from the first user message — used when the LLM
+    returned reasoning-only / empty / a refusal. Returns a clean short title (first
+    line, first ~8 words, <=50 chars) instead of the bare 'New Chat' sentinel."""
+    text = (msg or "").strip()
+    if not text:
+        return "New Chat"
+    first_line = text.splitlines()[0].strip()
+    title = " ".join(first_line.split()[:8])[:50].strip()
+    return title or "New Chat"
+
+
+def _clean_llm_title(raw: str, first_user_message: str) -> str:
+    """Extract a usable title from raw LLM output. Strips <think> blocks + markdown/
+    quotes; falls back to a title derived from the user message (NOT bare 'New Chat')
+    when the model returned reasoning-only / empty / a refusal. Closes the title-gen
+    'stuck on New Chat' bug on reasoning providers (deepseek/moonshot/google/minimax)
+    whose tiny token budget left content empty after hidden reasoning."""
+    cleaned = _strip_think_blocks(raw or "")
+    cleaned = cleaned.strip().strip('"').strip("'").strip("*").strip()
+    if (
+        not cleaned
+        or len(cleaned) > 60
+        or cleaned.startswith(("I ", "I'", "**", "Sorry", "As ", "<"))
+    ):
+        return _derive_title_from_message(first_user_message)
+    return cleaned
+
+
 def generate_thread_title(
     first_user_message: str,
     user_settings=None,
@@ -589,9 +638,13 @@ def generate_thread_title(
                     or (user_settings.llm_model if user_settings else settings.llm_model)
                 )
 
-        # Google models need more token budget for 4-6 word titles.
-        # Other providers work fine at 30.
-        _title_max_tokens = 60 if provider == "google" else 30
+        # Google (Gemini) is verbose and truncates a title at 60 — give it room
+        # for a full 4-6 word title. Other providers keep 30: non-reasoning models
+        # emit a short title fine, and reasoning models (deepseek/moonshot/minimax/
+        # zhipu) would burn any larger budget on hidden reasoning while BLOCKING the
+        # producer spawn — so we keep their budget small (fast empty return) and let
+        # _clean_llm_title fall back to a derived title. No added first-message latency.
+        _title_max_tokens = 160 if provider == "google" else 30
         token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
         title_messages = [
             {
@@ -606,24 +659,22 @@ def generate_thread_title(
             stream=False,
             **{token_param: _title_max_tokens},
         )
-        raw_title = (response.choices[0].message.content or "").strip()
-        # Guard against models returning refusals or markdown instead of a title
-        if len(raw_title) > 60 or raw_title.startswith(("I ", "I'", "**", "Sorry", "As ")):
-            return first_user_message[:40].strip() or "New Chat", None
-        return raw_title or "New Chat", None
+        # _clean_llm_title strips <think> blocks, markdown/quotes, and refusals,
+        # falling back to a derived title (never bare 'New Chat') on empty content.
+        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), None
     except openai.NotFoundError:
         provider = user_settings.active_provider if user_settings else ""
         if provider in _SINGLE_MODEL_PROVIDERS:
             # Single-model provider and the model 404'd -- no fallback available
-            return first_user_message[:40].strip() or "New Chat", None
+            return _derive_title_from_message(first_user_message), None
         fallback = (
             _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
             or (user_settings.llm_model if user_settings else settings.llm_model)
         )
         if not fallback or fallback == model:
-            return first_user_message[:40].strip() or "New Chat", None
+            return _derive_title_from_message(first_user_message), None
         fallback_info = {"original_model": model, "fallback_model": fallback}
-        _title_max_tokens_fb = 60 if provider == "google" else 30
+        _title_max_tokens_fb = 160 if provider == "google" else 30
         token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
         title_messages = [
             {
@@ -638,13 +689,13 @@ def generate_thread_title(
             stream=False,
             **{token_param2: _title_max_tokens_fb},
         )
-        return (response.choices[0].message.content or "").strip() or "New Chat", fallback_info
+        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), fallback_info
     except Exception as e:
         logger.warning(
             "title_generation_failed: %s", e,
             exc_info=True,
         )
-        return first_user_message[:40].strip() or "New Chat", None
+        return _derive_title_from_message(first_user_message), None
 
 
 @router.get("/{thread_id}/messages", response_model=list[MessageResponse])
