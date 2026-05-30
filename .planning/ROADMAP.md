@@ -93,7 +93,15 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   4. A workflow run is resumable: phase state persists via a strict 2-phase write (mark `active` before work, `completed` only after output is durable); a phase left `active` by a worker restart re-runs from the top, and a mid-`ask_user` pause re-subscribes AND re-emits its pending prompt on the startup sweep.
   5. Every phase has both a step cap AND a wall-clock cap (`asyncio.wait_for`) enforced by the backend; a hanging `programmatic` or never-terminating `llm_agent` phase fails cleanly at its timeout and drives `on_failure`; publish-time reachability lint rejects an unsatisfiable phase.
   6. 2–3 seed workflow templates (e.g. Research→Summarize, Plan→Execute→Verify) ship and run end-to-end as UAT fixtures; the tool-count budget guard (TOOL-05) caps the schema list at the `get_tools()` composition site with a per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES`.
-**Plans**: TBD
+**Plans**: 7 plans (2-3 tasks each), 5 waves
+- [ ] 091-01-PLAN.md — Finalize harness.py models + Wave-0 test scaffold & shared fixtures (wave 1)
+- [ ] 091-02-PLAN.md — Engine core: run_workflow loop + 2-phase write + db/workflows.py + reachability lint (wave 2)
+- [ ] 091-06-PLAN.md — Whitelist guard at dispatch_tool + get_tools budget + max_tools (wave 2)
+- [ ] 091-03-PLAN.md — 5 phase-type executors wired to substrate + system_prompt_override (wave 3)
+- [ ] 091-05-PLAN.md — Validation gates (4 kinds) + bounded retry + on_failure + caps (wave 3)
+- [ ] 091-04-PLAN.md — Resumability: startup sweep + claim + ask_user re-subscribe (wave 4)
+- [ ] 091-07-PLAN.md — 4 seed templates (migration 061) + end-to-end + operator apply (wave 5)
+
 **Notes**: Phase D (whitelist enforcement) folds in here — it shares the `ToolContext` construction site; do NOT split it out. Every workflow SSE event rides the existing `run:{run_id}` stream via `_emit` (zero new Redis namespace). All harness logic lives ABOVE the loop or at the single `dispatch_tool` entry — never in provider-specific streaming branches (075.x cascade prevention).
 
 #### Phase 092: Dual-Mode Wiring + Continue Button
