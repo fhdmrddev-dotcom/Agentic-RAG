@@ -28,6 +28,12 @@ FROM python:3.11-slim
 # opencv-python (heavy, rare), transformers/torch/tensorflow (gigabytes,
 # agent IS the LLM), nltk/spacy (need model downloads), pdfplumber (pypdf
 # covers the 80%).
+#
+# 2026-05-31: added reportlab — pypdf only READS pdfs; there was NO PDF-WRITING
+# library, so "generate a 1-page PDF report" prompts failed with no engine
+# (operator-reported). reportlab is part of Claude.ai's analysis-tool set, which
+# this comment cites as the bar. Rebuild + bump SANDBOX_IMAGE to pick it up
+# (new chats only — sessions are cached per thread_id until idle eviction).
 RUN pip install --no-cache-dir \
     python-pptx==1.0.2 \
     matplotlib==3.9.2 \
@@ -36,6 +42,7 @@ RUN pip install --no-cache-dir \
     openpyxl==3.1.5 \
     python-docx==1.1.2 \
     pypdf==5.1.0 \
+    reportlab==4.2.5 \
     seaborn==0.13.2 \
     scipy==1.14.1 \
     scikit-learn==1.5.2 \
