@@ -22,7 +22,8 @@
 - [x] **HARNESS-03
 **: A workflow run is **resumable** — phase state persists to Postgres (`workflow_phases`) and survives a uvicorn restart and cross-worker resume via a two-phase write (mark `active` before work, `completed` only after output is durable).
 - [ ] **HARNESS-04**: Each phase can declare **validation gates** (`json_schema`, `regex_match`, `workspace_file_exists`, `programmatic`) with a **bounded** `on_failure` policy (`fail_run` / `retry` with `max_retries=2` + consecutive-identical-output short-circuit / `skip_to_phase:<slug>`) — a deterministically-failing gate reaches `failed`, never loops forever.
-- [ ] **HARNESS-05**: Per-phase **tool-whitelist enforcement** lives in `dispatch_tool()` — a tool call outside the current phase's whitelist is refused with a clean `tool_result` on all 6 native providers (no crash, no provider 400); the guard is a literal no-op when no workflow is active (Deep Mode unaffected).
+- [x] **HARNESS-05
+**: Per-phase **tool-whitelist enforcement** lives in `dispatch_tool()` — a tool call outside the current phase's whitelist is refused with a clean `tool_result` on all 6 native providers (no crash, no provider 400); the guard is a literal no-op when no workflow is active (Deep Mode unaffected).
 - [ ] **HARNESS-06**: Every phase transition, gate result, and tool refusal is recorded to an **INSERT-only `harness_audit` trail** the user/operator can inspect.
 - [ ] **HARNESS-07**: 2–3 **seed workflow templates** ship (e.g. Research→Summarize, Plan→Execute→Verify) as the end-to-end exercisers and UAT fixtures — v1 workflow authoring is seed/JSONB/API (no visual builder).
 
@@ -46,7 +47,8 @@
 - [ ] **EVAL-01**: A cross-provider eval (`scripts/eval_cross_provider.py`, extended) runs a multi-phase workflow on all **6 native providers** and asserts the locked phase sequence completes with correct tool round-trips — wired as the **CI regression gate**. *(SEED-034)*
 - [ ] **EVAL-02**: The harness passes the **4-axis UAT scoreboard** (cross-provider × multi-tool × parallel-thread × long-message) plus a **uvicorn-restart-mid-workflow** smoke per phase type (including mid-`ask_user`). *(SC#10)*
 - [ ] **CONC-01**: `llm_batch_agents` fan-out is bounded by `max_parallel_agents` (default 5) composing with the global Redis-Lua cap (20); a batch phase does not starve app-wide request latency (cross-tab GET stays <50ms). *(SEED-036a)* **Also covers the frontend stream-connection saturation (BUG-260530-01):** with ≥6 concurrent active runs, the HTTP/1.1 6-connection-per-host cap is saturated by one held-open streaming `fetch` per run → 15-30s thread-switch hang; fix = frontend cap-live-streams (only the viewed thread holds a live stream; background runs reconcile on return). Same parallel-thread responsiveness guarantee.
-- [ ] **TOOL-05**: A **tool-count budget guard** at `get_tools()` / per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES` protects providers (esp. Google) from accuracy degradation past their tool limit; the per-phase whitelist is the structural complement. *(SEED-035)*
+- [x] **TOOL-05
+**: A **tool-count budget guard** at `get_tools()` / per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES` protects providers (esp. Google) from accuracy degradation past their tool limit; the per-phase whitelist is the structural complement. *(SEED-035)*
 
 ### Polish Riders
 

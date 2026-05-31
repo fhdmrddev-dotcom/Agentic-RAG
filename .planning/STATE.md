@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Completed 091-02-PLAN.md
-last_updated: "2026-05-31T05:16:48.021Z"
+stopped_at: Completed 091-06-PLAN.md
+last_updated: "2026-05-31T05:24:59.345Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 14
-  completed_plans: 9
-  percent: 64
+  completed_plans: 10
+  percent: 71
 ---
 
 # Project State
@@ -29,9 +29,9 @@ Phase: 091 — EXECUTING
 Plan: 3 of 7
 Plans: 7 plans / 5 waves — VERIFICATION PASSED (iteration 2, after 1 column-name blocker + 3 warnings fixed). RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
 
-  - Wave 1: 091-01 (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
-  - Wave 2: 091-02 (engine core + 2-phase write + db/workflows.py + reachability lint) ‖ 091-06 (dispatch_tool whitelist guard + get_tools budget + max_tools)
-  - Wave 3: 091-03 (5 phase-type executors → substrate) ‖ 091-05 (validation gates + bounded retry + caps)
+  - Wave 1: 091-01 ✅ (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
+  - Wave 2: 091-02 ✅ (engine core + 2-phase write + db/workflows.py + reachability lint) ‖ 091-06 ✅ (dispatch_tool whitelist guard + get_tools budget + max_tools) — Wave 2 COMPLETE
+  - Wave 3: 091-03 (5 phase-type executors → substrate) ‖ 091-05 (validation gates + bounded retry + caps) — NEXT
   - Wave 4: 091-04 (resumability: startup sweep + claim + ask_user re-subscribe)
   - Wave 5: 091-07 (4 seed templates / migration 061 + end-to-end + operator SQL-editor apply checkpoint)
 
@@ -39,7 +39,7 @@ Reqs covered: HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-0
 
 Prior phase: 090 (Harness Schema + RLS + Config Models) — ✅ COMPLETE. 3/3 plans + migration 060; substrate live (4 tables + threads.active_workflow_run_id), RLS + immutable-on-publish + INSERT-only audit confirmed against live DB.
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
-Next: `/gsd:execute-phase 091` — execute all 7 plans wave-by-wave. (Planning done; RESEARCH/VALIDATION/7×PLAN all committed.) Phase 091 finalizes the harness.py PhaseConfig models against the engine.
+Next: Wave 3 — 091-03 (5 phase-type executors) ‖ 091-05 (validation gates + bounded retry + caps). Wave 1 + Wave 2 COMPLETE (091-01, 091-02, 091-06 shipped). HARNESS-05 + TOOL-05 closed by 091-06: dispatch_tool whitelist guard (D-04 refusal + D-06 audit, Deep-Mode no-op) + apply_tool_budget (D-05 layer-1 filter + max_tools cap, Google=16/SEED-035, NOT wired to Deep-Mode get_tools so byte-identical incl. Google). 091-03 wires apply_tool_budget(get_tools, model, phase_whitelist) into the per-phase tools_override.
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
 G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
@@ -47,7 +47,7 @@ SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-messag
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
 Last activity: 2026-05-31
 
-Progress: [██████░░░░] 64%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -82,6 +82,7 @@ Progress: [██████░░░░] 64%
 | Phase 089 P03 | ~3h | 3 tasks | 35 files |
 | Phase 091 P01 | 7min | 3 tasks | 10 files |
 | Phase 091 P02 | 7min | 3 tasks | 7 files |
+| Phase 091 P06 | 5min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Recent decisions affecting current work:
 - (091-01): Wave-0 scaffold = 7 test files + 5 shared fixtures (mock_asyncpg_pool UPDATE-recorder, fake_redis pub/sub+XADD events log, make_tool_context w/ phase_whitelist, make_run_context, build_workflow_definition/four_seed_defs); 22 live anchors green, 27 skipped contracts each name owning plan; ctx factory uses SimpleNamespace so phase_whitelist exists pre-Plan-06
 - (091-02): harness_engine.run_workflow drives phases in phase_index order via PHASE_TYPE_REGISTRY seam (LLM never picks next); 2-phase write delegated to db/workflows.py (mark_phase_active before work, complete_phase status+output ONE atomic UPDATE after durable); crash leaves phase active (propagates, never completed); final phase output IS chat message (D-10, no synthesis LLM call)
 - (091-02): reachability lint edge model links by phase_index VALUE +1 (not sorted position) so non-contiguous gaps genuinely orphan/strand terminal; 4 seeds lint clean; run-keyed workflow_phases reads use workflow_run_id (42703 guard)
+- (091-06): HARNESS-05 whitelist guard at the single dispatch_tool() entry (above _TOOL_REGISTRY.get, below all provider branches) — out-of-phase tool returns the D-04 guiding ToolResult + D-06 tool_refused audit; phase_whitelist=None (Deep Mode) is a literal no-op so Explorer/General stay byte-identical (zero provider-branch edits)
+- (091-06): TOOL-05 apply_tool_budget = D-05 layer-1 whitelist filter + per-provider max_tools cap (whitelist tools always retained, soft ceiling yields); max_tools added to ModelCapability (absent=no cap), Google rows=16 (SEED-035). NOT wired into any Deep-Mode get_tools() call site — harness executor (Plan 03) is sole caller, so Deep Mode incl. Google is byte-identical (SC#2)
 
 ### Pending Todos
 
@@ -210,8 +213,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T05:16:39.360Z
-Stopped at: Completed 091-02-PLAN.md
+Last session: 2026-05-31T05:24:46.626Z
+Stopped at: Completed 091-06-PLAN.md
 Resume file: None
 
 **Planned Phase:** 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 7 plans — 2026-05-30T23:07:33.805Z

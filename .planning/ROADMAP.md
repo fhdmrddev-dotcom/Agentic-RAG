@@ -96,7 +96,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 **Plans**: 7 plans (2-3 tasks each), 5 waves
 - [x] 091-01-PLAN.md — Finalize harness.py models + Wave-0 test scaffold & shared fixtures (wave 1)
 - [x] 091-02-PLAN.md — Engine core: run_workflow loop + 2-phase write + db/workflows.py + reachability lint (wave 2) ✅ 2026-05-31
-- [ ] 091-06-PLAN.md — Whitelist guard at dispatch_tool + get_tools budget + max_tools (wave 2)
+- [x] 091-06-PLAN.md — Whitelist guard at dispatch_tool + get_tools budget + max_tools (wave 2) ✅ 2026-05-31
 - [ ] 091-03-PLAN.md — 5 phase-type executors wired to substrate + system_prompt_override (wave 3)
 - [ ] 091-05-PLAN.md — Validation gates (4 kinds) + bounded retry + on_failure + caps (wave 3)
 - [ ] 091-04-PLAN.md — Resumability: startup sweep + claim + ask_user re-subscribe (wave 4)
@@ -175,7 +175,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 |-------|----------------|--------|-----------|
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
-| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 1/7 | In progress | - |
+| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 3/7 | In progress | - |
 | 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |
