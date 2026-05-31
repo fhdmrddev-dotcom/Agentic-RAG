@@ -119,6 +119,8 @@ Progress: [██████████] 95%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (D-092-UX, 2026-05-31, operator-approved after strategy-brief research): **Composer consolidation target = A+C** — fold Provider INTO Model (one grouped pill) AND move workflow-START out of the composer into the Phase 087 workspace panel ("▶ Run workflow"). Composer settles to `[ Model ▾ ] [ General/Explorer ▾ ]`. Rationale: Deep/Harness ⊥ General/Explorer are orthogonal axes (2×2), not 4 sibling modes; rendering them as identical pills is the confusion. Workflows stay THREAD-bound (shared run SSE/anchor/lock) — NOT a separate `/workflows` route (would fight 068/075.x reconciliation arch). G-2 sketch-before-plan FIRES → `/gsd:sketch` before any plan-phase. Moving workflow-start to the panel also SHRINKS the F3 lock-UX surface. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
+- (D-092-AUTHOR, 2026-05-31, operator-approved): **Workflow authoring = NL-describe→strict-parse→form-edit→lint-on-publish; NOT a visual drag-canvas** (the squeezed-dead middle per 2025-26 evidence). Phase 091 already shipped the back half (WorkflowDefinition validation + reachability lint + immutable-on-publish + RLS). **Ship Authoring Phase A (draft/edit/publish API only — reuses shipped validator+lint, no schema change) as a small late-v2.8 add** so the dual-mode picker shows user-authored workflows, not just the 4 seeds. NL-generate (B) + guided form editor (C, G-2 sketch) + optional read-only DAG (D) → v2.9 alongside the Plugin Contract. Differentiation thesis: KB-grounded phases (anti-Glean) + native sandbox-code phases + persistent shareable skills + NL-to-WorkflowDefinition safe-by-construction + first-class gates/human-input — no competitor combines these. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
 - (v2.8 roadmap): 8 phases (089-096) derived from 21 requirements; research A→G build order adopted with 2 polish riders sequenced after the extraction
 - (v2.8 roadmap): whitelist enforcement (research "Phase D") folds into Phase 091 — shares the ToolContext construction site, NOT a separate phase
 - (v2.8 roadmap): G-5 satisfied by Phase 089 (threads.py extraction lands FIRST, behavior-preserving, byte-identical SSE gate)
@@ -216,6 +218,13 @@ Surfaced for any reconcile/snapshot/message-list change (relevant to Phase 089 e
 | 260531-00x | Add reportlab==4.2.5 to Dockerfile.sandbox — sandbox had no PDF-WRITING lib (pypdf only reads) so "generate a PDF report" prompts failed. Bumped CLAUDE.md image tag 075.1→075.1.1. Operator must rebuild image + bump SANDBOX_IMAGE (new chats only). Deeper gap (managed package set + agent pip-install-don't-give-up) seeded separately | 2026-05-31 | 7492f1eb | [260531-00x-add-reportlab-to-sandbox-image-pdf-writi](./quick/260531-00x-add-reportlab-to-sandbox-image-pdf-writi/) |
 
 ## Deferred Items
+
+### Planned next phases (from 092 strategy brief, 2026-05-31)
+
+- **092-05 (NOW):** gap-closure for 092-04 UAT — F1 (harness_audit.user_id crash), F2 (stuck lock), F3 (client lock-UX). See 092-04-UAT-FINDINGS.md. `/gsd:plan-phase 092 --gaps`.
+- **Composer consolidation (NEW phase, post-092, sketch-first):** D-092-UX (A+C). G-2 fires → `/gsd:sketch` first. Use sketch-findings-agentic-rag panel-shell + chat↔panel-seam baseline.
+- **Authoring Phase A (NEW small phase, late v2.8):** D-092-AUTHOR — draft/edit/publish API over shipped validator+lint; picker shows user workflows. Re-open trigger: after 092-05 ships (a workflow runs end-to-end), insert before v2.8 close.
+- **Authoring B/C/D → v2.9:** NL-generate (eval-gated) + guided form editor (G-2 sketch) + optional read-only DAG. Plant alongside Plugin Contract.
 
 ### v2.8 in-flight deferrals
 
