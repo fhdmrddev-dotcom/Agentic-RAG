@@ -390,11 +390,52 @@ async def test_locked_thread_deep_send_refused_409(fake_redis, mock_asyncpg_pool
 
 # ── SC#2: cancel/terminal clears the anchor in the same transaction (Plan 03) ─
 
-@pytest.mark.skip(reason="contract — owned by plan 03 (lock-clear txn)")
 @pytest.mark.asyncio
 async def test_cancel_clears_anchor_in_same_transaction(mock_asyncpg_pool):
-    """SC#2: after the terminal-status write, threads.active_workflow_run_id is
-    NULL, and the clear rides the SAME UPDATE/transaction as the terminal-status
-    write (no dangling lock). Assert against mock_asyncpg_pool.calls.
+    """SC#2: the Harness terminal write (finish_run, the single authoritative
+    clear site for the workflow_runs row — Landmine 5) clears
+    threads.active_workflow_run_id in the SAME transaction as the
+    workflow_runs terminal-status write, and fires exactly once. Assert against
+    mock_asyncpg_pool.calls: a transaction span wraps BOTH the workflow_runs
+    status UPDATE and the threads anchor-clear, and the anchor-clear is keyed by
+    this run's id (= the FK target), so no dangling lock survives a terminal run.
     """
-    raise NotImplementedError("Plan 03 clears the anchor on cancel/terminal")
+    from app.db.workflows import finish_run
+
+    run_id = uuid.uuid4()
+    await finish_run(mock_asyncpg_pool, run_id, "completed")
+
+    calls = mock_asyncpg_pool.calls
+    # exactly one workflow_runs terminal UPDATE.
+    wf_update_idxs = [
+        i for i, (sql, _) in enumerate(calls)
+        if "UPDATE workflow_runs SET status" in sql
+    ]
+    assert len(wf_update_idxs) == 1
+    # exactly one anchor-clear, keyed by this run id (the FK target), set to NULL.
+    clear_idxs = [
+        i for i, (sql, _) in enumerate(calls)
+        if "active_workflow_run_id = NULL" in sql
+    ]
+    assert len(clear_idxs) == 1
+    assert calls[clear_idxs[0]][1] == (run_id,)
+    # both writes ride the SAME transaction span (enter < both writes < exit).
+    enter_idx = next(i for i, (sql, _) in enumerate(calls) if sql == "transaction_enter")
+    exit_idx = next(i for i, (sql, _) in enumerate(calls) if sql == "transaction_exit")
+    assert enter_idx < wf_update_idxs[0] < exit_idx
+    assert enter_idx < clear_idxs[0] < exit_idx
+
+
+def test_cap_paused_is_not_in_cancel_idempotency_terminal_set():
+    """SC#2 corollary: cap_paused is NON-terminal and MUST remain cancellable —
+    it must NOT be added to the cancel_run idempotency terminal set (runs.py:650),
+    so a cancel of a cap_paused run transitions it to cancelled (and clears the
+    lock), instead of short-circuiting 204 as already-terminal.
+    """
+    import inspect
+    from app.api import runs as runs_mod
+
+    src = inspect.getsource(runs_mod.cancel_run)
+    # the idempotency guard lists the genuinely-terminal statuses.
+    assert '"completed", "failed", "cancelled", "timed_out"' in src
+    assert "cap_paused" not in src
