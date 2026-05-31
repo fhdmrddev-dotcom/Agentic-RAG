@@ -861,6 +861,14 @@ class Settings(BaseSettings):
     harness_phase_max_steps: int = 8
     harness_phase_wall_clock_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 8  # 300 x 8 = 2400
 
+    # Phase 091 (091-08 / CR-01) — resume-claim lease window. claim_run stamps
+    # workflow_runs.claimed_at on the winning CAS; a racing WORKER_COUNT=2 sibling
+    # sees the fresh stamp → 0 rows → skips (no double-execution). A crash mid-resume
+    # leaves claimed_at stamped; the run becomes re-claimable once this lease expires
+    # (so a dead worker's claim doesn't strand the run forever). Named knob, not a
+    # magic literal; env-overridable via pydantic-settings.
+    harness_resume_lease_seconds: int = 300  # 5 min
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"
