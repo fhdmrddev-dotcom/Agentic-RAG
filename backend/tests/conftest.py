@@ -387,6 +387,12 @@ class _RecordingConnection:
 
     async def fetchrow(self, sql, *args):
         self._pool.calls.append((sql, args))
+        # Phase 092: a queued sequence takes precedence so a test can return
+        # DIFFERENT rows for successive fetchrow calls (e.g. the GET reconcile's
+        # workflow_runs join then the latest cap_paused `runs` row). Falls back to
+        # the single sticky value when the queue is empty/unset.
+        if self._pool._fetchrow_results:
+            return self._pool._fetchrow_results.pop(0)
         return self._pool._fetchrow_result
 
     async def fetch(self, sql, *args):
@@ -447,6 +453,7 @@ class _MockAsyncpgPool:
         self.calls: list[tuple] = []
         self._execute_result = "UPDATE 1"
         self._fetchrow_result = None
+        self._fetchrow_results: list = []  # Phase 092 — per-call fetchrow queue
         self._fetch_result = []
         self._fetchval_result = None
         self._conn = _RecordingConnection(self)
@@ -473,6 +480,10 @@ class _MockAsyncpgPool:
 
     def set_fetchrow_result(self, v):
         self._fetchrow_result = v
+
+    def set_fetchrow_results(self, seq):
+        """Queue per-call fetchrow return values (Phase 092 — successive joins)."""
+        self._fetchrow_results = list(seq)
 
     def set_fetch_result(self, v):
         self._fetch_result = v

@@ -181,6 +181,28 @@ async def test_list_published_workflows_scopes_to_published_owned_or_global(
 
 # ── SC#1: producer mode-branch above the loop (Plan 02) ──────────────────────
 
+def test_published_workflows_list_endpoint(client, mock_asyncpg_pool):
+    """MODE-01 / D-01: GET /workflows/published returns the picker feed
+    (id/slug/name), owner-scoped via list_published_workflows.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    wf_id = uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(
+        [{"id": wf_id, "slug": "research_summarize", "name": "Research -> Summarize"}]
+    )
+    with patch("app.api.workflows.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)):
+        resp = client.get("/workflows/published")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body == [
+        {"id": str(wf_id), "slug": "research_summarize",
+         "name": "Research -> Summarize"}
+    ]
+
+
 def _branch_test_supabase(thread_id, *, active_workflow_run_id=None,
                           workflow_def_row=None):
     """A per-test supabase mock for the send_message branch/lock tests.

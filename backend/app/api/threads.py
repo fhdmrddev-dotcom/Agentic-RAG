@@ -1423,3 +1423,131 @@ async def send_message(
             "run_id": str(run_id),
         },
     )
+
+
+# Phase 092 (SC#5 / D-v2.5-03) — reconcile mode/lock/phase/Continue state.
+# Realtime is a hint, not truth: the frontend fetches this on (re)connect /
+# thread-switch to reconcile the per-thread workflow lock + Continue affordance.
+_TERMINAL_WORKFLOW_STATUSES = ("completed", "failed", "cancelled")
+_MAX_CONTINUES_PER_RUN = 3  # D-06 (mirror of config.max_continues_per_run; Plan 03 wires the knob)
+
+
+@router.get("/{thread_id}/workflow", response_model=ThreadWorkflowState)
+async def get_thread_workflow(
+    thread_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+) -> ThreadWorkflowState:
+    """PURE READ — reconcile a thread's Deep/Harness mode + lock + phase + Continue.
+
+    Ownership-gated FIRST (T-092-04 — 404, never leak existence). Then a joined
+    read over the thread anchor -> workflow_runs -> workflow_definitions ->
+    workflow_phases, plus the latest non-terminal `runs` row for the Deep-run
+    cap_paused case (RESEARCH Q3). NEVER writes — the lock-clear is owned by the
+    cancel/terminal path (Plan 03); `lock_is_stale` is a diagnostic self-heal
+    signal only, so a thread is never stuck Harness-locked with a terminal/absent
+    run.
+    """
+    # 1. Ownership gate — fetch the anchor in the same SELECT (threads.py:341 idiom).
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("id, active_workflow_run_id")
+        .eq("id", str(thread_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = thread_resp.data if thread_resp is not None else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    active_workflow_run_id = row.get("active_workflow_run_id")
+    pool = await get_pg_pool()
+
+    # 2. Workflow-run state (joined: run -> definition -> current phase + total).
+    run_status = None
+    definition_slug = None
+    definition_name = None
+    current_phase_slug = None
+    current_phase_index = None
+    total_phases = None
+    wf_continues_used = 0
+    if active_workflow_run_id is not None:
+        wf_row = await pool.fetchrow(
+            """
+            SELECT wr.status,
+                   wr.continues_used,
+                   wd.slug  AS definition_slug,
+                   wd.name  AS definition_name,
+                   cp.slug  AS current_phase_slug,
+                   cp.phase_index AS current_phase_index,
+                   (SELECT count(*) FROM workflow_phases wp
+                     WHERE wp.workflow_run_id = wr.id) AS total_phases
+            FROM workflow_runs wr
+            JOIN workflow_definitions wd ON wd.id = wr.definition_id
+            LEFT JOIN workflow_phases cp ON cp.id = wr.current_phase_id
+            WHERE wr.id = $1
+            """,
+            UUID(active_workflow_run_id) if isinstance(active_workflow_run_id, str) else active_workflow_run_id,
+        )
+        if wf_row is not None:
+            run_status = wf_row["status"]
+            wf_continues_used = wf_row["continues_used"] or 0
+            definition_slug = wf_row["definition_slug"]
+            definition_name = wf_row["definition_name"]
+            current_phase_slug = wf_row["current_phase_slug"]
+            current_phase_index = wf_row["current_phase_index"]
+            total_phases = wf_row["total_phases"]
+
+    # mode / locked / lock_is_stale derive from the anchor + run terminality.
+    mode = "harness" if active_workflow_run_id is not None else "deep"
+    locked = (
+        active_workflow_run_id is not None
+        and run_status is not None
+        and run_status not in _TERMINAL_WORKFLOW_STATUSES
+    )
+    # SC#5 heal: anchor set BUT the run row is missing OR terminal -> stale lock.
+    lock_is_stale = active_workflow_run_id is not None and (
+        run_status is None or run_status in _TERMINAL_WORKFLOW_STATUSES
+    )
+
+    # 3. cap_paused / continues: a workflow run carries it on workflow_runs; a
+    # Deep run carries it on the latest non-terminal `runs` row (RESEARCH Q3 —
+    # report from whichever run holds the pause).
+    cap_paused = run_status == "cap_paused"
+    continues_used = wf_continues_used
+    if not cap_paused:
+        # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
+        deep_row = await pool.fetchrow(
+            """
+            SELECT status, continues_used
+            FROM runs
+            WHERE thread_id = $1 AND status = 'cap_paused'
+            ORDER BY started_at DESC
+            LIMIT 1
+            """,
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        if deep_row is not None:
+            cap_paused = True
+            continues_used = deep_row["continues_used"] or 0
+
+    return ThreadWorkflowState(
+        thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        mode=mode,
+        locked=locked,
+        active_workflow_run_id=(
+            UUID(active_workflow_run_id)
+            if isinstance(active_workflow_run_id, str)
+            else active_workflow_run_id
+        ),
+        run_status=run_status,
+        definition_slug=definition_slug,
+        definition_name=definition_name,
+        current_phase_slug=current_phase_slug,
+        current_phase_index=current_phase_index,
+        total_phases=total_phases,
+        lock_is_stale=lock_is_stale,
+        cap_paused=cap_paused,
+        continues_used=continues_used,
+        continues_remaining=max(0, _MAX_CONTINUES_PER_RUN - continues_used),
+    )
