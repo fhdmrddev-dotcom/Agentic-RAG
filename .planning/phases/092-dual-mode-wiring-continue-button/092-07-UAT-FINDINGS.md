@@ -84,8 +84,17 @@ Re-ran Harness Research→Summarize on the DBA folder (thread 8852c3ce, run 370d
 - **Out-of-KB transparency:** how a non-document answer is reflected.
 - **SC#3 parallel-thread, SC#5 reload-mid-run, CONT-01 cap→Continue, native-7 cross-provider scoreboard.**
 
+## UPDATE 4 (after F7 fix ba5949c4) — grounding now VISIBLE; separate content-quality finding
+
+Re-ran Harness Research→Summarize on the DBA folder (thread a96d177d):
+- **F7 VERIFIED:** the assistant answer now renders **"● Medium confidence"** + an expandable **"5 sources"** chip (screenshot 224844 was the bare-text "before"; now sources+confidence show). Persisted: `source_refs: 5`, `confidence_level: "medium"` on the assistant message (Deep's param shape). Grounding is now visible + matches Deep.
+- **NEW finding F8 (content quality — NOT 092 wiring):** this run's answer was a clarifying question ("please send me the topic…") DESPITE finding 5 sources — whereas an earlier identical run produced a correct grounded RPA summary. So the dual-mode WIRING is solid (runs, searches, surfaces sources+confidence), but the SEED WORKFLOW prompts/handoff (research→summarize) are inconsistent: the phases don't reliably anchor on the user's kickoff question, sometimes asking for a topic while attaching sources. This is workflow-definition / prompt-tuning (the `061_harness_seed_templates` prompts + the phase accumulated_outputs handoff), separate from the 092 toggle wiring. Candidate follow-up (workflow-prompt-quality phase or seed); NOT a 092-07 wiring defect.
+
 ## Disposition
 
-- **F4, resume-current_user, F5, F6: VERIFIED CLOSED live.** The core document-grounded workflow runs end-to-end and surfaces a grounded answer.
+- **F4, resume-current_user, F5, F6, F7: VERIFIED CLOSED live.** Workflows run end-to-end over the user's docs, surface a grounded answer WITH visible sources + confidence.
+- **F8 (workflow answer-quality inconsistency):** separate from wiring — route as a workflow-prompt-tuning follow-up (not 092-07).
+- Rich live workflow panel (run-card / phase timeline / live tool calls / workspace-during-run) = Phase 094 (deferred by design).
+- Remaining binding UAT rows (still owed): ask_user render (Doc Q&A), Deep parity, out-of-KB transparency, F3 lock-during-run (needs a long workflow), SC#3 parallel-thread, SC#5 reload-mid-run, CONT-01, native-7 cross-provider scoreboard. The core document-grounded workflow runs end-to-end and surfaces a grounded answer.
 - MODE-01/MODE-02/CONT-01 stay OPEN until the remaining binding rows above pass (F3 lock-during-run, ask_user render, cross-provider, parallel/reload/Continue).
 - All fixes folded into 092-07 (deviations): commits 27b12c37 (resume current_user), a7be6423 (F5 ctx), 803aafd3 (F6 surface).
