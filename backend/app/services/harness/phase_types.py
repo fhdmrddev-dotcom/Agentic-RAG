@@ -62,9 +62,12 @@ __all__ = [
 ]
 
 # The Explorer agent-loop step convention (D-12): an llm_agent phase whose config
-# carries the model default (LlmAgentPhaseConfig.max_steps == 10) clamps to this so
-# bounded harness sub-agents match the shipped Explorer cap rather than running long.
-_EXPLORER_STEP_CAP = 8
+# carries the model default (LlmAgentPhaseConfig.max_steps == 10) clamps to the
+# harness per-phase step cap (Settings.harness_phase_max_steps, default 8 — the
+# Explorer max_iterations convention, agent_loop.py:846) so bounded harness
+# sub-agents match the shipped Explorer cap rather than running long. Read off
+# Settings (sized in Plan 05 / config.py) so an operator can override via env.
+_EXPLORER_STEP_CAP = settings.harness_phase_max_steps
 _MODEL_DEFAULT_MAX_STEPS = 10  # LlmAgentPhaseConfig.max_steps LOCKED default
 
 

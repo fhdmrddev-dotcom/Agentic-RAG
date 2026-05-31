@@ -39,15 +39,25 @@ import json
 from typing import Callable
 from uuid import UUID
 
+from app.config import settings
 from app.db.workflows import (
     advance_current_phase,
     complete_phase,
+    fail_phase,
     finish_run,
     load_run_phases,
     mark_phase_active,
+    skip_phase,
     write_audit,
 )
 from app.models.harness import WorkflowDefinition
+
+# NOTE: ``run_gates`` (harness.validators) and ``parse_skip_target``
+# (harness.reachability) are imported LAZILY inside the functions that use them.
+# A top-level import of anything under the ``app.services.harness`` PACKAGE runs
+# that package's ``__init__`` → ``phase_types.register_all()`` → which imports
+# back from THIS module before ``PHASE_TYPE_REGISTRY`` is bound (circular import).
+# The lazy import (the same pattern phase_types uses for the engine) breaks it.
 
 __all__ = ["run_workflow", "PHASE_TYPE_REGISTRY", "PhaseTypeNotRegistered"]
 
@@ -61,9 +71,17 @@ class PhaseTypeNotRegistered(KeyError):
 # flips the dispatch tests live; this plan ships it EMPTY (tests inject stubs).
 PHASE_TYPE_REGISTRY: dict[str, Callable] = {}
 
-# Placeholder default — Plan 05 sizes the real per-phase wall-clock from the
-# existing cap knobs. Per-phase override is ``phase.config.wall_clock_seconds``.
-_DEFAULT_PHASE_WALL_CLOCK = 1800  # seconds
+# Per-phase wall-clock cap default, sized from existing knobs (D-12): a phase
+# making up to harness_phase_max_steps bounded LLM calls must allow >= N x the
+# per-call timeout. Read off Settings so an operator can override via env without
+# code change. Per-phase override is ``phase.config.wall_clock_seconds``.
+_DEFAULT_PHASE_WALL_CLOCK = settings.harness_phase_wall_clock_seconds
+
+# Per-phase STEP cap default (D-12). The cap itself is enforced INSIDE the
+# executor (run_task_sub_agent's max_steps in Plan 03's llm_agent path); the
+# engine surfaces the default here + onto ctx so the executor and the engine
+# agree on the bound. Aligned to the Explorer=8 convention via Settings.
+_DEFAULT_PHASE_MAX_STEPS = settings.harness_phase_max_steps
 
 # Outputs larger than this spill to the workspace-files bucket (path-only), so
 # the workflow_phases.output jsonb never bloats (T-091-07 / Pattern 3).

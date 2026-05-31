@@ -846,6 +846,21 @@ class Settings(BaseSettings):
     task_per_run_concurrency: int = 3
     task_global_concurrency: int = 20
 
+    # Phase 091 — harness per-phase caps (D-12: derive from existing knobs, do
+    # NOT invent arbitrary numbers). Both a STEP cap and a WALL-CLOCK cap are
+    # enforced on every phase (a hanging phase fails cleanly at its timeout).
+    #   - step cap: aligned to the existing agent-loop Explorer convention
+    #     (max_iterations=8, agent_loop.py:846); llm_batch_agents reuses the same
+    #     per-agent step cap.
+    #   - wall-clock cap: a phase that makes up to N bounded LLM calls must allow
+    #     >= N x the per-call timeout, so the default is
+    #     DEFAULT_LLM_CALL_TIMEOUT_SECONDS (300) x harness_phase_max_steps (8) = 2400.
+    #     A per-phase config.wall_clock_seconds (harness.py) overrides this when set.
+    # Both get the standard pydantic-settings env override for free — no new env
+    # var beyond these two Settings fields.
+    harness_phase_max_steps: int = 8
+    harness_phase_wall_clock_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 8  # 300 x 8 = 2400
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"
