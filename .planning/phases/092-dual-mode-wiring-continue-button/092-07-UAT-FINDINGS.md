@@ -69,7 +69,23 @@ Re-ran Harness Research→Summarize on the DBA folder. The `harness_audit` trail
 
 **This is very likely the LAST domino:** with F4 (runs), F5 (tools/ctx), F6 (output surfaced), the full loop closes — ask → search the user's docs → grounded answer rendered as the assistant reply. The harness path simply was never exercised live before, so each fix peeled one layer (F1→F2→F4→F5→F6); F6 is the surface layer (the user-visible answer). Note: only LIVE UAT caught these — the mock-pool tests + structural-skeleton SSE proof passed through all of them.
 
+## UPDATE 3 (after F6 fix 803aafd3) — CORE DOC-GROUNDED LOOP VERIFIED WORKING ✅
+
+Re-ran Harness Research→Summarize on the DBA folder (thread 8852c3ce, run 370dd816):
+- **The assistant reply rendered live** — a 1,503-char grounded summary drawn from the user's actual DBA documents (cites the specific study: mixed-methods RPA-in-BPM, 309 survey participants, 8 expert interviews, the SUCCESS framework, organisational readiness/trust/risk perception). Unmistakably grounded in the user's docs, NOT generic world knowledge.
+- **Persisted:** `GET /messages` → 2 rows (user + assistant, 1575 chars). Survives reload.
+- **SC#2 natural-completion:** `active_workflow_run_id = NULL`, `locked=false` after completion.
+- **F4 + F5 + F6 ALL VERIFIED LIVE.** The full RAG loop closes end-to-end: ask → search the user's DBA docs (search_documents) → grounded summary rendered + persisted as the assistant reply.
+
+### Still OPEN (remaining binding UAT rows)
+- **F3 lock-during-active-run:** NOT yet positively observed — the run completes in ~7s, too fast to catch the composer disabled (modeSel showed "Deep"/enabled at t0=1.5s). Needs a longer-running workflow (Plan→Execute→Verify / Literature review) or a sub-second poll to confirm the per-thread lock disables the composer mid-run.
+- **Doc Q&A (ask_user / llm_human_input):** the Facet B ask_user-transport hole — verify the prompt RENDERS + the answer round-trips.
+- **Deep parity:** a Deep RAG message on the DBA folder unchanged.
+- **Out-of-KB transparency:** how a non-document answer is reflected.
+- **SC#3 parallel-thread, SC#5 reload-mid-run, CONT-01 cap→Continue, native-7 cross-provider scoreboard.**
+
 ## Disposition
 
-- F4 + resume-current_user: VERIFIED CLOSED live.
-- F5: blocks the binding RAG-grounding UAT rows (and every doc-grounded workflow). Route: fold into 092-07 as a deviation fix (same "Harness workflow runs end-to-end" goal + same UAT gate) OR a new gap plan 092-08. MODE-01/MODE-02/CONT-01 stay OPEN until a doc-grounded workflow completes end-to-end.
+- **F4, resume-current_user, F5, F6: VERIFIED CLOSED live.** The core document-grounded workflow runs end-to-end and surfaces a grounded answer.
+- MODE-01/MODE-02/CONT-01 stay OPEN until the remaining binding rows above pass (F3 lock-during-run, ask_user render, cross-provider, parallel/reload/Continue).
+- All fixes folded into 092-07 (deviations): commits 27b12c37 (resume current_user), a7be6423 (F5 ctx), 803aafd3 (F6 surface).
