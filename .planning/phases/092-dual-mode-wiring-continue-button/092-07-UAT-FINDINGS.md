@@ -107,3 +107,26 @@ Operator directive: NOTE these for a separate comprehensive phase rather than co
 - **F10 (Doc Q&A ask_user / llm_human_input):** the Doc Q&A workflow (OpenAI) jumped STRAIGHT to ask_user with NO draft text, AND did not accept the user's answer. So: (a) the `draft` (llm_agent) phase produced no visible output before the `confirm` (llm_human_input) phase, and (b) the ask_user round-trip is broken (prompt fired but the answer didn't resume the workflow) — the Facet B ask_user-transport hole the adversarial verifier (092-07-RESEARCH) explicitly flagged.
 
 Both are BINDING and currently OPEN. Recommendation: a comprehensive phase (design/discuss → plan → execute) covering cross-provider harness parity (F9) + ask_user round-trip (F10) + the presentation/legibility direction (mode differentiation + 094 panel), rather than more single-domino deviations on 092-07.
+
+## UPDATE 6 (live evidence, 2026-05-31) — Deep is provider-robust; F9 is harness-specific; F9/F10 root causes confirmed
+
+**Live API test, Deep mode, same RAG prompt, one model per native provider (evidence, not guess):**
+| Provider/model | answered | sources | confidence |
+|---|---|---|---|
+| openai/gpt-5.4-mini | ✅ | 5 | high |
+| anthropic/claude-sonnet-4-6 | ✅ | 25 | high |
+| google/gemini-2.5-flash | ✅ | 5 | high |
+| deepseek/deepseek-chat | ✅ | 9 | high |
+| moonshot/kimi-k2.6 | ✅ | 14 | high |
+| minimax/MiniMax-M2.5 | ✅ | 5 | high |
+| zhipu/glm-4.6 | ✅ | 20 | high |
+
+**Finding: Deep mode works + is grounded across ALL 7 native providers.** So the cross-provider failure (F9) is **HARNESS-specific**, not a provider problem — Deep uses the real per-provider service boundary; the harness phase sub-agent does not.
+
+**F9/F10 root causes (from 092-COMPREHENSIVE-PHASE-SCOPE.md):**
+- F9: (A) harness `wf_ctx` never carries `_resolved_model` → `_effective_model` falls back to stale `user_settings.llm_model` (OpenAI id) → wrong model off-OpenAI (400/404). (B) harness funnels all phase LLM calls through OpenAI-SDK-only `create_adaptive_streaming_chat` — no native anthropic/google path, no STRUCTURED-mode tool injection for GLM/MiniMax registry-miss → tools narrated as text → search_documents never runs. (+ dead net: resolve_sub_agent_model_safely reads non-existent `user_settings.llm_models`).
+- F10: (b) answer rejected = run_id namespace mismatch (submit endpoint queries `runs` table; harness keys on `workflow_runs` id → 404 before persist/publish). (a) no draft = F6 ceiling (only final phase surfaced; human-input blocks before the final delta).
+
+**Cross-cutting theme:** the harness was "Deep's intent without Deep's substrate," verified only on OpenAI / single-turn / no-human-input. Correction = make the harness a first-class provider-agnostic, legible surface that consumes Deep's substrate (shared provider boundary).
+
+Comprehensive bug-landscape audit (wluzklz4e) → `092-COMPREHENSIVE-AUDIT.md` (full provider×mode×phase-type×workflow×UI matrix) was still running at session wrap; consume it next session.
