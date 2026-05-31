@@ -15,6 +15,7 @@ import {
   getProviders,
   getThreadWorkflow,
   listPublishedWorkflows,
+  ApiError,
   type PublishedWorkflow,
 } from "@/lib/api"
 import type { Folder, Message, Thread } from "@/types"
@@ -465,20 +466,34 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       {reconcileError && (
         <div
           className="text-xs text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-md mx-3 my-1 flex items-center justify-between"
-          data-testid="reconcile-error-banner"
+          data-testid={
+            reconcileError instanceof ApiError && reconcileError.status === 409
+              ? "workflow-lock-error-banner"
+              : "reconcile-error-banner"
+          }
           role="status"
           aria-live="polite"
         >
-          <span>Couldn&apos;t load latest messages. Showing cached version.</span>
+          {/* Phase 092 (092-06 / F3): a 409 lock-refusal reuses the per-thread
+              error surface but shows the fixed lock copy (T-092-06-03) and only
+              a Dismiss control — retrying a doomed send is meaningless. The
+              reconcile-failure case keeps its cached-version copy + Retry. */}
+          <span>
+            {reconcileError instanceof ApiError && reconcileError.status === 409
+              ? reconcileError.message
+              : "Couldn't load latest messages. Showing cached version."}
+          </span>
           <span className="flex gap-2 items-center">
-            <button
-              type="button"
-              onClick={handleRetryReconcile}
-              className="underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
-              aria-label="Retry loading messages"
-            >
-              Retry
-            </button>
+            {!(reconcileError instanceof ApiError && reconcileError.status === 409) && (
+              <button
+                type="button"
+                onClick={handleRetryReconcile}
+                className="underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40 rounded px-1"
+                aria-label="Retry loading messages"
+              >
+                Retry
+              </button>
+            )}
             <button
               type="button"
               onClick={dismissReconcileError}

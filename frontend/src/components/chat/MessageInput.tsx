@@ -106,7 +106,10 @@ export function MessageInput({
 
   const handleSend = () => {
     const trimmed = value.trim()
-    if (!trimmed || disabled) return
+    // Phase 092 (092-06 / F3 — D-05): a locked thread cannot type/send. The
+    // client disable is a COURTESY; the server 409 lock-refusal stays the
+    // authority (StreamsProvider rolls back both optimistic bubbles on a 409).
+    if (!trimmed || disabled || workflowLocked) return
     onSend(trimmed)
     setValue("")
     if (textareaRef.current) {
@@ -121,7 +124,8 @@ export function MessageInput({
     }
   }
 
-  const canSend = !disabled && value.trim().length > 0
+  // Phase 092 (092-06 / F3): Send is also gated on the per-thread workflow lock.
+  const canSend = !disabled && !workflowLocked && value.trim().length > 0
   const showProviderSelector = providers.length > 1 && selectedProvider && onProviderChange
   const showModelSelector = models.length > 1 && selectedModel && onModelChange
 
@@ -150,8 +154,11 @@ export function MessageInput({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask anything…"
-              disabled={disabled}
+              // Phase 092 (092-06 / F3 — D-05): a locked thread shows the
+              // "cancel to switch back" hint instead of the usual prompt.
+              placeholder={workflowLocked ? "Workflow running — Cancel to switch back" : "Ask anything…"}
+              title={workflowLocked ? "Workflow running — Cancel to switch back" : undefined}
+              disabled={disabled || workflowLocked}
               rows={1}
               className="w-full resize-none overflow-hidden min-h-[36px] border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 text-sm placeholder:text-muted-foreground/50"
             />

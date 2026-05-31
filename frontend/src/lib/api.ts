@@ -14,11 +14,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL as string
  *  name). Thrown only by postMessage — the rest of api.ts keeps its generic
  *  throws (additive, minimal diff). */
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-  ) {
+  readonly status: number
+  constructor(message: string, status: number) {
     super(message)
+    this.status = status
     this.name = "ApiError"
   }
 }

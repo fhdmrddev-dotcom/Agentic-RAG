@@ -1364,6 +1364,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.
+            } else if (err instanceof ApiError && err.status === 409) {
+              // Phase 092 (092-06 / F3): a 409 lock-refusal (MODE-02 server-side
+              // Harness→Deep refusal). Roll back BOTH optimistic bubbles — the
+              // user bubble AND the orphaned assistant placeholder — so no ghost
+              // messages linger. Then surface a fixed, per-thread error banner
+              // (T-092-06-03: a constant user-facing string, never the raw
+              // server body). Keyed by the OWNING threadId — never a global flag.
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
+              )
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(
+                  threadId,
+                  new ApiError(
+                    "This thread is running a workflow — cancel it to send a Deep message.",
+                    409,
+                  ),
+                ),
+              }))
             } else {
               console.error("sendMessage failed:", err)
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
