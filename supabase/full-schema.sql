@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 98dlGg7tq4MI8jwTcIXhQRWZkMvyV2KBfD1fhs9kRqJCOwffVKvwVy0HxSwPEnd
+\restrict pszVGTSp55gaXeoX6NcTwTFxCrDe9M2ysHkrdczlUZjfaqfDPbIhIqcL0e9gEZd
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -561,7 +561,8 @@ CREATE TABLE public.runs (
     error text,
     spawned_by_worker text,
     parent_run_id uuid,
-    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
+    continues_used integer DEFAULT 0 NOT NULL,
+    CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
 
@@ -570,6 +571,13 @@ CREATE TABLE public.runs (
 --
 
 COMMENT ON COLUMN public.runs.spawned_by_worker IS 'OS PID of the uvicorn worker that INSERTed this run. Populated at INSERT time (Phase 079). NULL for pre-079 runs.';
+
+
+--
+-- Name: COLUMN runs.continues_used; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.continues_used IS 'D-06: Continue cap counter, max 3/run (Deep-run cap). Durable (WORKER_COUNT=2).';
 
 
 --
@@ -746,7 +754,10 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     claimed_at timestamp with time zone,
-    CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    model text,
+    continues_used integer DEFAULT 0 NOT NULL,
+    CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
 
@@ -762,6 +773,27 @@ COMMENT ON COLUMN public.workflow_runs.org_id IS 'Forward-compat (D-PRD-02/D-11)
 --
 
 COMMENT ON COLUMN public.workflow_runs.claimed_at IS 'Resume CAS lease (Phase 091 CR-01): the startup sweep stamps now() when it wins the claim_run CAS so a racing WORKER_COUNT=2 sibling matches 0 rows and skips. Re-claimable once the lease (engine constant, default 5 min) expires. Orthogonal to status; NULL = never claimed.';
+
+
+--
+-- Name: COLUMN workflow_runs.inputs; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.inputs IS 'SEED-047: kickoff inputs persisted at creation for resume rehydration (top-level programmatic inputs + kickoff_prompt). Defaults to {} for legacy rows.';
+
+
+--
+-- Name: COLUMN workflow_runs.model; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.model IS 'SEED-047: resolved model at run creation, rehydrated into the resume ctx so resumed llm_* phases do not run with an empty model. Nullable — older rows have none.';
+
+
+--
+-- Name: COLUMN workflow_runs.continues_used; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.continues_used IS 'D-06: Continue cap counter, max 3/run. Durable (WORKER_COUNT=2) — the Continue-handling worker may differ from the one that hit the cap.';
 
 
 --
@@ -2407,5 +2439,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 98dlGg7tq4MI8jwTcIXhQRWZkMvyV2KBfD1fhs9kRqJCOwffVKvwVy0HxSwPEnd
+\unrestrict pszVGTSp55gaXeoX6NcTwTFxCrDe9M2ysHkrdczlUZjfaqfDPbIhIqcL0e9gEZd
 
