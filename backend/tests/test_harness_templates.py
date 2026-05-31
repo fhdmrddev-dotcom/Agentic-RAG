@@ -204,7 +204,7 @@ async def test_each_seed_runs_end_to_end_mocked_llm(
         return ("Synthesized answer. VERIFIED.", [])
 
     async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                              allowed_tools, max_steps, system_prompt_override=None):
+                              allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
         return {
             "sub_run_id": _uuid.uuid4(),
             "summary": "sub-agent findings",
@@ -360,7 +360,7 @@ async def test_retry_feedback_producer_consumer_round_trip(
         return ("plan/exec output", [])
 
     async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                              allowed_tools, max_steps, system_prompt_override=None):
+                              allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
         return {"sub_run_id": _uuid.uuid4(), "summary": "executed", "status": "completed"}
 
     ctx = SimpleNamespace(

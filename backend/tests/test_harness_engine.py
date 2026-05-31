@@ -323,6 +323,85 @@ async def test_completion_final_phase_output_is_chat_message(
 
 
 # ═══════════════════════════════════════════════════════════════════════
+# CR-02 (091-08) — large outputs are stored INLINE, never silently discarded
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def test_persist_output_large_payload_stored_inline_not_placeholder():
+    """A > 64 KB output round-trips through _persist_output with FULL content (CR-02)."""
+    from app.services.harness_engine import _OUTPUT_INLINE_LIMIT, _persist_output
+
+    big_text = "x" * (_OUTPUT_INLINE_LIMIT + 10_000)  # comfortably over the limit
+    output = {"text": big_text}
+    durable = _persist_output(output)
+    # NEVER the dead placeholder; the full payload is preserved inline.
+    assert "_spilled_path" not in durable, "must not emit a pending spill placeholder"
+    assert durable == output, "full content preserved inline (no data loss)"
+    assert durable["text"] == big_text
+
+
+def test_persist_output_small_payload_unchanged():
+    """A small output passes through unchanged (no behavior change)."""
+    from app.services.harness_engine import _persist_output
+
+    out = {"text": "small"}
+    assert _persist_output(out) == out
+
+
+def test_persist_output_honors_real_spilled_path():
+    """A real _spilled_path (future bucket spill) is honored path-only when present."""
+    from app.services.harness_engine import _OUTPUT_INLINE_LIMIT, _persist_output
+
+    output = {"text": "y" * (_OUTPUT_INLINE_LIMIT + 5_000),
+              "_spilled_path": "workspace-files://run/abc.json"}
+    durable = _persist_output(output)
+    assert durable == {"_spilled_path": "workspace-files://run/abc.json"}
+
+
+@pytest.mark.asyncio
+async def test_engine_persists_large_phase_output_inline(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """The engine's complete_phase write carries the FULL large output, not a placeholder."""
+    import json as _json
+
+    from app.services import harness_engine
+    from app.services.harness_engine import _OUTPUT_INLINE_LIMIT
+
+    wf = build_workflow_definition(
+        [{"config": {"phase_type": "llm_single", "prompt": "draft"}}]
+    )
+    run_id = uuid.uuid4()
+    phase_id = uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(
+        [{"id": phase_id, "slug": "p0", "phase_index": 0, "status": "pending", "output": {}}]
+    )
+    big_text = "z" * (_OUTPUT_INLINE_LIMIT + 8_000)
+
+    async def _stub(phase, accumulated, ctx):
+        return {"text": big_text}
+
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = type("C", (), {})()
+        await harness_engine.run_workflow(
+            run_id, wf, ctx, pool=mock_asyncpg_pool, redis=_NoopRedis()
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    # The completed-phase UPDATE persisted the full payload (output is arg $2 json).
+    completed_args = [
+        args for sql, args in mock_asyncpg_pool.calls
+        if "SET status='completed'" in sql
+    ]
+    assert len(completed_args) == 1
+    persisted = _json.loads(completed_args[0][1])  # the output=$2::jsonb json string
+    assert persisted == {"text": big_text}, "full output stored inline, no placeholder"
+    assert "_spilled_path" not in persisted
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # LIVE — Plan 03: programmatic registry + split_topic (Task 1)
 # ═══════════════════════════════════════════════════════════════════════
 
@@ -500,7 +579,7 @@ class TestPhaseExecutors:
         captured = {}
 
         async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                                  allowed_tools, max_steps, system_prompt_override=None):
+                                  allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
             captured["whitelist"] = parent_ctx.phase_whitelist
             captured["allowed_tools"] = allowed_tools
             captured["max_steps"] = max_steps
@@ -525,7 +604,7 @@ class TestPhaseExecutors:
         captured = {}
 
         async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                                  allowed_tools, max_steps, system_prompt_override=None):
+                                  allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
             captured["max_steps"] = max_steps
             return {"sub_run_id": uuid.uuid4(), "summary": "ok", "status": "completed"}
 
@@ -543,7 +622,7 @@ class TestPhaseExecutors:
         calls = []
 
         async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                                  allowed_tools, max_steps, system_prompt_override=None):
+                                  allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
             calls.append(system_prompt_override)
             # echo the sub-question back as the summary
             q = system_prompt_override.rsplit("Sub-question: ", 1)[-1]
@@ -564,7 +643,7 @@ class TestPhaseExecutors:
         from app.services.harness import phase_types
 
         async def _fake_sub_agent(*, parent_ctx, description, instructions,
-                                  allowed_tools, max_steps, system_prompt_override=None):
+                                  allowed_tools, max_steps, system_prompt_override=None, tools_override=None):
             q = system_prompt_override.rsplit("Sub-question: ", 1)[-1]
             return {"sub_run_id": uuid.uuid4(), "summary": q, "status": "completed"}
 

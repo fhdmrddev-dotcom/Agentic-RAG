@@ -135,3 +135,63 @@ def test_unknown_model_no_cap():
     schemas = [_fn(f"tool_{i}") for i in range(30)]
     out = apply_tool_budget(schemas, model="some-unregistered-model", whitelist=None)
     assert out == schemas
+
+
+# ── WR-04 (091-08) — the budget cap actually reaches the sub-agent's schemas ──
+
+
+@pytest.mark.asyncio
+async def test_llm_agent_passes_budget_capped_tools_override():
+    """_exec_llm_agent passes the whitelist-filtered + max_tools-capped list as
+    tools_override to run_task_sub_agent — so the model SEES the capped schemas
+    (WR-04: the layer-1 cap was previously computed-then-discarded)."""
+    import uuid
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.harness import phase_types
+
+    # A Google model carries a max_tools ceiling; build a whitelist LARGER than it
+    # so the cap actually fires on what the sub-agent sees.
+    google_model = next(
+        mid for mid, cap in MODEL_CAPABILITIES.items()
+        if cap.get("provider") == "google" and "max_tools" in cap
+    )
+    cap = MODEL_CAPABILITIES[google_model]["max_tools"]
+    wl_names = [f"wl_{i}" for i in range(cap + 6)]
+
+    cfg = LlmAgentPhaseConfig.model_validate(
+        {"phase_type": "llm_agent", "prompt": "Research.", "model": google_model,
+         "available_tools": wl_names}
+    )
+    phase = SimpleNamespace(slug="p0", phase_index=0, config=cfg, validators=[])
+
+    captured = {}
+
+    async def _fake_sub_agent(*, parent_ctx, description, instructions, allowed_tools,
+                              max_steps, system_prompt_override=None, tools_override=None):
+        captured["tools_override"] = tools_override
+        return {"sub_run_id": uuid.uuid4(), "summary": "done", "status": "completed"}
+
+    ctx = SimpleNamespace(
+        redis=None, run_id=uuid.uuid4(), thread_id=str(uuid.uuid4()), supabase=None,
+        pool=None, user_settings=None, current_user={"id": "u"}, folder_subtree_ids=None,
+        scoped_folder_path=None, emit=AsyncMock(), spawn=None, model=google_model,
+        per_run_task_semaphore=None, retry_feedback=None,
+    )
+
+    # get_tools returns the whitelist tools (plus filler the whitelist filter drops).
+    fake_tools = [_fn(n) for n in wl_names] + [_fn(f"filler_{i}") for i in range(4)]
+    with patch.object(phase_types, "get_tools", lambda us: fake_tools), \
+         patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+        await phase_types._exec_llm_agent(phase, {}, ctx)
+
+    override = captured["tools_override"]
+    assert override is not None, "tools_override MUST be passed (WR-04 — not discarded)"
+    names = {t["function"]["name"] for t in override}
+    # Filler dropped by the whitelist filter; only whitelist tools survive, capped.
+    assert names.issubset(set(wl_names)), "non-whitelist filler must be filtered out"
+    # Whitelist exceeds the cap → all whitelist tools retained (structural req wins).
+    assert names == set(wl_names)
+
+

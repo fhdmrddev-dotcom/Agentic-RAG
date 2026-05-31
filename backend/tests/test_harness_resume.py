@@ -191,6 +191,10 @@ async def test_ask_user_answered_vs_pending_query(mock_asyncpg_pool):
     assert sql is not None
     assert "role = 'system'" in sql, "must scan system rows directly (NOT /snapshot)"
     assert "tool_call_id" in sql, "must key the response by tool_call_id"
+    # WR-06 (091-08): run-scoped via a matching PROMPT row carrying run_id (the
+    # response row stores no run_id) so a multi-run thread can't false-positive.
+    assert "ask_user_prompt" in sql, "must join the prompt row that carries run_id"
+    assert "->>'run_id' = $1::text" in sql, "must scope the prompt by THIS run_id"
 
 
 @pytest.mark.asyncio
@@ -216,6 +220,12 @@ async def test_get_pending_ask_user_returns_prompt_payload(mock_asyncpg_pool):
     assert payload["prompt"] == "Pick one"
     assert payload["options"] == ["a", "b"]
     assert payload["timeout_seconds"] == 60
+
+    # WR-05 (091-08): the prompt query is run-scoped on the stored run_id so a
+    # thread with multiple runs re-emits THIS run's prompt, not the newest one.
+    sql = _sql_for(mock_asyncpg_pool.calls, "ask_user_prompt")
+    assert sql is not None
+    assert "->>'run_id' = $1::text" in sql, "prompt must be scoped by THIS run_id (WR-05)"
 
 
 # ── HARNESS-03 Plan 04 Task 2 — resume_pending_prompt (LIVE) ─────────────────
@@ -280,7 +290,7 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis):
             {"run_id": lost, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": "u"},
         ]
 
-    async def _claim(pool, run_id):
+    async def _claim(pool, run_id, lease_seconds):
         order.append(f"claim:{run_id}")
         return run_id == won  # the loser worker's claim fails
 
@@ -324,7 +334,7 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis):
         return [{"run_id": run_id, "thread_id": uuid.uuid4(),
                  "current_phase_id": None, "user_id": "u"}]
 
-    async def _claim(pool, run_id):
+    async def _claim(pool, run_id, lease_seconds):
         return True
 
     async def _active(pool, run_id):
@@ -358,3 +368,86 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis):
 
     await harness_engine.resume_stranded_workflows(pool=object(), redis=fake_redis)
     assert resume_called["n"] == 0, "answered prompt must NOT be re-asked"
+
+
+# ── CR-01 (091-08) — claim_run lease CAS: exactly-one-winner + expiry ─────────
+
+class _LeasePool:
+    """A fake pool that MODELS the claim_run lease CAS WHERE predicate.
+
+    Holds a single ``workflow_runs`` row's (status, claimed_at) and applies the
+    real CR-01 CAS semantics on ``fetchrow``: the UPDATE matches only when status
+    is claimable AND (claimed_at is NULL OR older than the lease). The winner
+    stamps ``now()``; a racing loser sees the fresh stamp and matches 0 rows.
+    ``now`` is injectable so the expiry branch is deterministic (no real sleep).
+    """
+
+    def __init__(self, status="active", claimed_at=None, now=0.0):
+        self.status = status
+        self.claimed_at = claimed_at  # float epoch or None
+        self._now = now
+
+    def set_now(self, now):
+        self._now = now
+
+    async def fetchrow(self, sql, run_id, lease_seconds):
+        # Model: WHERE status IN (active,paused) AND (claimed_at IS NULL OR
+        #        claimed_at < now() - lease) ; SET claimed_at = now() RETURNING id.
+        if self.status not in ("active", "paused"):
+            return None
+        expired = (
+            self.claimed_at is None
+            or self.claimed_at < (self._now - lease_seconds)
+        )
+        if not expired:
+            return None
+        self.claimed_at = self._now  # winner stamps the lease
+        return {"id": run_id}
+
+
+@pytest.mark.asyncio
+async def test_claim_run_exactly_one_winner_under_concurrency():
+    """Two claims racing the SAME stranded run → exactly ONE True (CR-01)."""
+    from app.db.workflows import claim_run
+
+    pool = _LeasePool(status="active", claimed_at=None, now=1000.0)
+    run_id = uuid.uuid4()
+    # Two workers race the same run with a 300s lease.
+    first = await claim_run(pool, run_id, 300)
+    second = await claim_run(pool, run_id, 300)
+    assert first is True, "the first worker wins the claim"
+    assert second is False, "the racing loser sees the fresh lease → 0 rows"
+    assert (first, second).count(True) == 1, "exactly one winner"
+
+
+@pytest.mark.asyncio
+async def test_claim_run_reclaimable_after_lease_expires():
+    """A crash-mid-resume run is re-claimable once the lease window passes (CR-01)."""
+    from app.db.workflows import claim_run
+
+    run_id = uuid.uuid4()
+    pool = _LeasePool(status="active", claimed_at=None, now=1000.0)
+    # Worker A claims (and then "crashes" — never finishes, status stays active).
+    assert await claim_run(pool, run_id, 300) is True
+    # A sibling racing immediately loses (lease still fresh).
+    assert await claim_run(pool, run_id, 300) is False
+    # Lease expires (now advances past claimed_at + 300s); the run re-claims.
+    pool.set_now(1000.0 + 301)
+    assert await claim_run(pool, run_id, 300) is True, (
+        "an expired lease must be re-claimable (no permanent stranding)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_claim_run_sql_is_lease_cas_not_status_self_transition(mock_asyncpg_pool):
+    """The claim SQL stamps claimed_at (lease CAS), NOT a no-op status self-transition."""
+    from app.db.workflows import claim_run
+
+    mock_asyncpg_pool.set_fetchrow_result({"id": uuid.uuid4()})
+    await claim_run(mock_asyncpg_pool, uuid.uuid4(), 300)
+    sql = _sql_for(mock_asyncpg_pool.calls, "UPDATE workflow_runs")
+    assert sql is not None
+    assert "SET claimed_at = now()" in sql, "must stamp the lease, not status"
+    assert "claimed_at IS NULL OR claimed_at <" in sql, "lease-expiry predicate present"
+    # The old no-op self-transition must be GONE.
+    assert "SET status = 'active'" not in sql

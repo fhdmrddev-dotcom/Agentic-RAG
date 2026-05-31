@@ -389,3 +389,83 @@ async def test_fail_run_keeps_partial_outputs(
     assert "p1" in reason and "gate failed" in reason  # plain-language, names the phase
     # No run_completed (the run stopped at the failure).
     assert len(_emitted(fake_redis, "run_completed")) == 0
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# WR-03 (091-08) — retry bound AND route derive from the SAME failing validator
+# ════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_run_gates_threads_failing_validator_index():
+    """run_gates stamps GateResult.validator_index with the FAILING validator's index."""
+    from app.services.harness.validators import run_gates
+
+    ctx = SimpleNamespace(pool=None, thread_id="t")
+    # validator[0] passes (matches), validator[1] fails → index 1 is threaded back.
+    phase = _phase_with(
+        [
+            {"kind": "regex_match", "config": {"pattern": r"a"}},
+            {"kind": "regex_match", "config": {"pattern": r"ZZZ"}},
+        ]
+    )
+    result = await run_gates(phase, {"text": "a only"}, ctx)
+    assert result.passed is False
+    assert result.validator_index == 1, "the SECOND (failing) validator's index"
+
+    # All pass → validator_index is None.
+    ok = await run_gates(
+        _phase_with([{"kind": "regex_match", "config": {"pattern": r"a"}}]),
+        {"text": "a"}, ctx,
+    )
+    assert ok.passed and ok.validator_index is None
+
+
+@pytest.mark.asyncio
+async def test_retry_bound_and_route_from_same_failing_validator(
+    mock_asyncpg_pool, fake_redis, make_run_context, build_workflow_definition
+):
+    """A 2-validator phase: validator[0] (max_retries=2, fail_run) PASSES; validator[1]
+    (max_retries=0, skip_to_phase:p2) FAILS → BOTH the bound (0 → no retries) AND the
+    route (skip_to_phase) come from validator[1] — WR-03. Previously the bound came
+    from validator[0] (2 retries) while the route came from validator[1]."""
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    rows = _rows(("p0", "pending"), ("p1", "pending"), ("p2", "pending"))
+    mock_asyncpg_pool.set_fetch_result(rows)
+
+    runs = {"p0": 0}
+
+    async def _exec(phase, accumulated, ctx):
+        runs[phase.slug] = runs.get(phase.slug, 0) + 1
+        return {"text": "MATCHME"}  # matches validator[0] /MATCHME/, fails validator[1]
+
+    defn = build_workflow_definition(
+        [
+            {"slug": "p0", "phase_index": 0, "config": {"phase_type": "llm_single", "prompt": "a"},
+             "validators": [
+                 # validator[0]: PASSES (matches MATCHME), bound 2, would-be fail_run
+                 {"kind": "regex_match", "config": {"pattern": r"MATCHME"},
+                  "on_failure": "fail_run", "max_retries": 2},
+                 # validator[1]: FAILS, bound 0 (no retries), routes skip_to_phase:p2
+                 {"kind": "regex_match", "config": {"pattern": r"NEVER_ZZZ"},
+                  "on_failure": "skip_to_phase:p2", "max_retries": 0},
+             ]},
+            {"slug": "p1", "phase_index": 1, "config": {"phase_type": "llm_single", "prompt": "b"}},
+            {"slug": "p2", "phase_index": 2, "config": {"phase_type": "llm_single", "prompt": "c"}},
+        ]
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    # Bound from validator[1] (max_retries=0) → p0 ran exactly ONCE (no retries),
+    # NOT 3 times (which validator[0]'s bound of 2 would have allowed).
+    assert runs["p0"] == 1, "retry bound must come from the FAILING validator (0 retries)"
+    # Route from validator[1] (skip_to_phase:p2): p1 skipped, p2 ran.
+    assert "p1" not in runs and runs.get("p2") == 1
+    transitions = _emitted(fake_redis, "phase_transition")
+    assert any(t.get("via") == "skip_to_phase" and t.get("to_phase") == "p2" for t in transitions)
+    assert len(_emitted(fake_redis, "run_completed")) == 1  # skip recovered the run
