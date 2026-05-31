@@ -784,6 +784,79 @@ def get_tools(user_settings: "UserEffectiveSettings | None" = None) -> list[dict
     return tools
 
 
+def apply_tool_budget(
+    schemas: list[dict],
+    model: str,
+    whitelist: "frozenset[str] | None",
+) -> list[dict]:
+    """Phase 091 — D-05 layer 1 whitelist filter + TOOL-05 per-provider budget cap.
+
+    Pure function (no side effects). Used by the harness phase executor (Plan 03)
+    to build a per-phase ``tools_override``::
+
+        apply_tool_budget(get_tools(user_settings), model, phase_whitelist)
+
+    Two stages:
+
+    1. **Whitelist filter (D-05 layer 1):** when ``whitelist`` is not None, keep only
+       the schemas whose ``function.name`` is in the whitelist — the model only SEES
+       the allowed tools. ``None`` (Deep Mode) skips the filter entirely.
+    2. **Budget cap (TOOL-05):** read ``MODEL_CAPABILITIES[model].max_tools``. When
+       that ``max_tools is None`` (absent / unregistered model) OR the list already
+       fits, return as-is. Otherwise drop schemas from the LOW-priority end (registry/
+       assembly order — last appended = lowest priority, A3) until it fits, but NEVER
+       drop a whitelisted tool (whitelist tools are the point of the phase). If the
+       whitelist alone exceeds the cap, keep ALL whitelist tools (the structural
+       requirement wins over the soft ceiling) and log a warning.
+
+    IMPORTANT (SC#2 / Phase 089 byte-identical invariant): this function is NOT wired
+    into any Deep-Mode/default ``get_tools()`` call site in 091 — it is invoked ONLY
+    from the harness executor (phase config present). Google's ``max_tools`` ceiling
+    therefore applies only on the harness path; Explorer/General/Deep-Mode tool sets —
+    including Google — stay byte-identical. Order is preserved throughout.
+    """
+    # Stage 1 — D-05 layer 1 whitelist filter (None = Deep Mode = no filter).
+    if whitelist is not None:
+        schemas = [t for t in schemas if t["function"]["name"] in whitelist]
+
+    # Stage 2 — TOOL-05 budget cap.
+    max_tools = MODEL_CAPABILITIES.get(model, {}).get("max_tools")
+    if max_tools is None or len(schemas) <= max_tools:
+        return schemas
+
+    # Over budget: drop lowest-priority (latest in assembly order) NON-whitelist tools
+    # first. Iterate from the end so the earliest (highest-priority) tools survive.
+    wl = whitelist or frozenset()
+    kept: list[dict] = []
+    dropped_protected = False
+    # Walk in reverse, dropping non-whitelist tools until we fit; always keep whitelist.
+    surviving = list(schemas)
+    # Indices of droppable (non-whitelist) tools, lowest-priority (last) first.
+    droppable = [
+        i for i in range(len(surviving) - 1, -1, -1)
+        if surviving[i]["function"]["name"] not in wl
+    ]
+    to_drop: set[int] = set()
+    for i in droppable:
+        if len(surviving) - len(to_drop) <= max_tools:
+            break
+        to_drop.add(i)
+    kept = [t for idx, t in enumerate(surviving) if idx not in to_drop]
+
+    if len(kept) > max_tools:
+        # Only whitelist tools remain and they still exceed the cap — the structural
+        # requirement (the phase NEEDS these tools) wins over the soft ceiling.
+        dropped_protected = True
+
+    if dropped_protected:
+        logger.warning(
+            "apply_tool_budget: whitelist (%d tools) exceeds model %s max_tools=%d; "
+            "retaining all whitelist tools (soft ceiling yields to phase requirement)",
+            len(kept), model, max_tools,
+        )
+    return kept
+
+
 def get_explorer_tools() -> list[dict]:
     """Tool list for explorer mode: KB navigation + document analysis only."""
     return [LS_TOOL, TREE_TOOL, GREP_TOOL, GLOB_TOOL, READ_DOCUMENT_TOOL, ANALYZE_DOCUMENT_TOOL]

@@ -152,6 +152,13 @@ class ModelCapability(TypedDict, total=False):
     # absent (preserves back-compat for inferred-provider models).
     uses_max_completion_tokens: bool  # Plan 075.4-02 — o-series + gpt-5+
     supports_parallel_tools: bool  # Plan 075.4-02 — currently False for google
+    # Phase 091 TOOL-05 — per-provider tool-count soft ceiling. ABSENT = no cap
+    # (the budget guard only fires for registered low-limit models). Google is
+    # the SEED-035 priority target: its accuracy degrades past a modest tool
+    # count, so the harness executor path caps the schema list at this value
+    # (whitelist tools are always retained). Read at
+    # openai_service.apply_tool_budget via MODEL_CAPABILITIES[model].get("max_tools").
+    max_tools: int  # Phase 091 TOOL-05 — soft ceiling on get_tools schema count (SEED-035)
 
 
 # Capability registry: which models support native API tool calling.
@@ -206,21 +213,25 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # because Google's OpenAI-compat layer rejects parallel_tool_calls. This is
     # the registry-driven replacement for the openai_service.py _NO_PARALLEL_TOOL_CALLS
     # frozenset({"google"}) heuristic (legacy fallback stays as defense-in-depth).
-    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    # Phase 091 TOOL-05: max_tools=16 — Google's function-calling accuracy degrades
+    # past a modest active-tool count (SEED-035). Conservative ceiling; the harness
+    # executor caps the per-phase schema list here (whitelist tools always retained).
+    # Only affects the harness path — Deep-Mode get_tools() is untouched (SC#2).
+    "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
-    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "capability_source": "registry", "supports_parallel_tools": False},
-    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3-flash-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
+    "gemini-3.1-pro-preview": {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
     # gemini-3.5-flash — representative-class per memory feedback_model_names_representative.md.
     # Caps mirrored from gemini-2.5-flash; revisit when Google publishes the GA spec.
     # Added 2026-05-22 (the model surfaced quick-task 260522-gdg by virtue of being live-used).
-    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
     # gemini-3.1-flash-lite — production budget tier in the Gemini-3 family;
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
-    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False},
+    "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
     # DeepSeek direct — OpenAI-compatible API at api.deepseek.com
     "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
     "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry"},
