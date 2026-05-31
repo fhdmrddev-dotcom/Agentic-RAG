@@ -10,6 +10,12 @@ class MessageCreate(BaseModel):
     model: str | None = None
     provider: str | None = None   # override active provider for this request
     agent_mode: str = "default"   # "default" | "explorer"
+    # Phase 092 D-02 (MODE-01): when set, THIS message kicks off the named
+    # published workflow — the next chat message IS the workflow input. The
+    # send_message handler resolves+parses the definition under the user's RLS,
+    # calls create_workflow_run (which sets threads.active_workflow_run_id), and
+    # the producer branches to the harness engine. None = ordinary Deep send.
+    workflow_definition_id: UUID | None = None
 
 
 class MessageResponse(BaseModel):

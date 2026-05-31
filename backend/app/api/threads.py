@@ -36,6 +36,12 @@ from app.services.audit_service import write_audit_entry
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_run, finalize_run, insert_assistant_message
+# Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
+# imports are cycle-safe (db/workflows.py imports only models). run_workflow +
+# _load_run_definition are imported LOCALLY inside the producer branch to keep
+# the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
+from app.db.workflows import create_workflow_run, list_published_workflows
+from app.models.thread import ThreadWorkflowState
 from app.utils.folder_utils import fetch_visible_folders
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
@@ -765,13 +771,78 @@ async def send_message(
 ):
     thread_resp = await aexec(
         supabase.table("threads")
-        .select("id")
+        .select("id, active_workflow_run_id")
         .eq("id", thread_id)
         .eq("user_id", current_user["id"])
         .single()
     )
     if not thread_resp.data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
+
+    # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
+    # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
+    # only — D-05). The anchor + its run's terminal-state decide whether a send is
+    # allowed and whether it kicks off a workflow. Done BEFORE the user-message
+    # INSERT so a refused send writes nothing.
+    _existing_anchor = (thread_resp.data or {}).get("active_workflow_run_id")
+    _kickoff_definition = None          # parsed WorkflowDefinition when kicking off
+    _kickoff_definition_id = None       # workflow_definitions.id for the kickoff
+    if _existing_anchor is not None:
+        # A run currently holds the lock — is it still live (non-terminal)?
+        _pool = await get_pg_pool()
+        _anchor_status = await _pool.fetchval(
+            "SELECT status FROM workflow_runs WHERE id = $1",
+            UUID(_existing_anchor) if isinstance(_existing_anchor, str) else _existing_anchor,
+        )
+        _TERMINAL_WORKFLOW = ("completed", "failed", "cancelled")
+        if _anchor_status is not None and _anchor_status not in _TERMINAL_WORKFLOW:
+            # The lock holds. Refuse a Deep send AND a different-workflow send
+            # (SC#2 / MODE-02 — the binding 409, not just a grayed button). A
+            # send is only allowed if it targets THE SAME active run (continuation
+            # of the locked workflow). Since the kickoff field carries a
+            # *definition* id (not the run id), any kickoff against a locked thread
+            # is a different-workflow attempt → refuse. The lock is cleared by
+            # cancel / natural terminal (Plan 03), never by this handler.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Thread is workflow-locked — cancel the active workflow to "
+                    "switch back to Deep mode."
+                ),
+            )
+        # else: anchor is set but its run is terminal/absent (a stale lock). We do
+        # NOT clear it here (the GET reconcile reports lock_is_stale; cancel/terminal
+        # owns the clear). A fresh kickoff below will re-point the anchor atomically.
+
+    if body.workflow_definition_id is not None:
+        # Resolve+parse the published definition UNDER THE USER'S RLS (T-092-05 IDOR
+        # mitigation): only a published, owned-or-global definition may be kicked
+        # off. A non-owned / private / unpublished id is refused 404 (never leaks
+        # existence) — a user cannot start another user's private workflow.
+        _def_resp = await aexec(
+            supabase.table("workflow_definitions")
+            .select("id, definition, status, is_global, created_by")
+            .eq("id", str(body.workflow_definition_id))
+            .or_(f"is_global.eq.true,created_by.eq.{current_user['id']}")
+            .maybe_single()
+        )
+        _def_row = _def_resp.data if _def_resp is not None else None
+        if not _def_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Workflow not found",
+            )
+        if _def_row.get("status") != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workflow is not published",
+            )
+        from app.models.harness import WorkflowDefinition
+        _raw_def = _def_row["definition"]
+        if isinstance(_raw_def, str):
+            _raw_def = json.loads(_raw_def)
+        _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
+        _kickoff_definition_id = _def_row["id"]
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new
@@ -904,6 +975,27 @@ async def send_message(
             pass
         raise
 
+    # ── Phase 092 MODE-01 — kickoff: create the workflow run + set the anchor ──
+    # AFTER the producer-shell `runs` row exists (two-rows model, RESEARCH A2 /
+    # Landmine 5: the `runs` row carries SSE-terminal consistency; this
+    # `workflow_runs` row is the engine's row) and BEFORE the producer spawns, so
+    # agent_runner reads a non-null anchor and branches to the harness engine.
+    # create_workflow_run sets threads.active_workflow_run_id atomically (FK-ordered).
+    _active_workflow_run_id = None
+    if _kickoff_definition is not None:
+        _active_workflow_run_id = await create_workflow_run(
+            await get_pg_pool(),
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            definition_id=(
+                UUID(_kickoff_definition_id)
+                if isinstance(_kickoff_definition_id, str)
+                else _kickoff_definition_id
+            ),
+            definition=_kickoff_definition,
+            inputs={"kickoff_prompt": body.content},   # SEED-047
+            model=_resolved_model,                      # SEED-047
+        )
+
     # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
     # but BEFORE the agent producer task starts (asyncio.create_task at the bottom
     # of this handler). Title is derived from the user message alone — independent
@@ -1035,25 +1127,68 @@ async def send_message(
             _result_sink: dict = {}
 
             try:  # middle try/finally — guarantees persist even on GeneratorExit (client disconnect)
-                ctx = RunContext(
-                    run_id=run_id,
-                    thread_id=thread_id,
-                    current_user=current_user,
-                    user_settings=user_settings,
-                    body=body,
-                    redis=redis,
-                    supabase=supabase,
-                    resolved_model=_resolved_model,
-                    resolved_provider=_resolved_provider,
-                )
-                _agent_loop_result = await run_agent_loop(
-                    ctx,
-                    emit=_emit,
-                    emit_terminal=_emit_terminal,
-                    spawn=_spawn,
-                    timeout_ctx=_timeout_ctx,
-                    result_sink=_result_sink,
-                )
+                # ── Phase 092 MODE-01 — producer mode-branch (SC#1) ────────────
+                # The ONE additive branch: Harness iff the thread holds a live
+                # workflow anchor (set by create_workflow_run above), else Deep.
+                # MUST live here (above the loop, inside this try) — NEVER inside a
+                # provider streaming branch (075.x cascade rule). The Deep `else`
+                # is BYTE-IDENTICAL to the pre-092 call. The surrounding except +
+                # finally:_shielded_finalize stay mode-agnostic (untouched). The
+                # harness branch's `run_workflow` owns the workflow_runs terminal
+                # write internally; the producer-shell `runs` row still finalizes
+                # via _shielded_finalize for SSE-terminal consistency (the lock-clear
+                # is Plan 03's single-clear-site concern — this plan only SETS it).
+                if _active_workflow_run_id is not None:        # Harness
+                    # Engine ctx is NOT RunContext (Landmine 7) — build the loose
+                    # SimpleNamespace bag the engine threads through, mirroring
+                    # harness_engine._build_resume_context.
+                    from types import SimpleNamespace
+                    from app.services.harness_engine import (
+                        run_workflow,
+                        _load_run_definition,
+                        _emit as _harness_emit,
+                    )
+                    _wf_pool = await get_pg_pool()
+                    _wf_definition = await _load_run_definition(
+                        _wf_pool, _active_workflow_run_id
+                    )
+                    wf_ctx = SimpleNamespace(
+                        run_id=_active_workflow_run_id,
+                        thread_id=thread_id,
+                        current_user=current_user,
+                        user_settings=user_settings,
+                        redis=redis,
+                        pool=_wf_pool,
+                        emit=_harness_emit,
+                        retry_feedback=None,
+                    )
+                    await run_workflow(
+                        _active_workflow_run_id,
+                        _wf_definition,
+                        wf_ctx,
+                        pool=_wf_pool,
+                        redis=redis,
+                    )
+                else:                                          # Deep — byte-identical
+                    ctx = RunContext(
+                        run_id=run_id,
+                        thread_id=thread_id,
+                        current_user=current_user,
+                        user_settings=user_settings,
+                        body=body,
+                        redis=redis,
+                        supabase=supabase,
+                        resolved_model=_resolved_model,
+                        resolved_provider=_resolved_provider,
+                    )
+                    _agent_loop_result = await run_agent_loop(
+                        ctx,
+                        emit=_emit,
+                        emit_terminal=_emit_terminal,
+                        spawn=_spawn,
+                        timeout_ctx=_timeout_ctx,
+                        result_sink=_result_sink,
+                    )
                 # Mirror the loop-surfaced timeout context back onto the
                 # producer-shell locals the classifier reads (keeps the
                 # timed_out error string byte-identical — Phase 066 D-066-07).

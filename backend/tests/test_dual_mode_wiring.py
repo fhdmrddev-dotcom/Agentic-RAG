@@ -181,15 +181,189 @@ async def test_list_published_workflows_scopes_to_published_owned_or_global(
 
 # ── SC#1: producer mode-branch above the loop (Plan 02) ──────────────────────
 
-@pytest.mark.skip(reason="contract — owned by plan 02 (producer mode-branch)")
-@pytest.mark.asyncio
-async def test_producer_branches_harness_when_anchor_set(make_run_context):
-    """SC#1: active_workflow_run_id not None -> run_workflow path; None ->
-    run_agent_loop path (Deep, byte-identical). Branch lives ABOVE the loop in
-    agent_runner, NEVER in a provider branch. Assert via a spy on which branch
-    is taken.
+def _branch_test_supabase(thread_id, *, active_workflow_run_id=None,
+                          workflow_def_row=None):
+    """A per-test supabase mock for the send_message branch/lock tests.
+
+    Routes the handler's reads:
+      - threads ownership SELECT -> {id, active_workflow_run_id}
+      - threads title SELECT     -> {"title": "Existing"} (skip title-gen)
+      - messages INSERT          -> [{"id": <uuid>}]
+      - workflow_definitions SELECT -> ``workflow_def_row`` (kickoff resolve)
     """
-    raise NotImplementedError("Plan 02 wires the producer mode-branch")
+    from unittest.mock import MagicMock
+
+    def _result(data):
+        r = MagicMock()
+        r.data = data
+        return r
+
+    threads_state = {"select_count": 0}
+
+    def _threads_execute(*a, **k):
+        threads_state["select_count"] += 1
+        # 1st threads read = ownership SELECT (id + anchor);
+        # later threads read = title check.
+        if threads_state["select_count"] == 1:
+            return _result({"id": str(thread_id),
+                            "active_workflow_run_id": active_workflow_run_id})
+        return _result({"title": "Existing"})
+
+    def _messages_execute(*a, **k):
+        return _result([{"id": str(uuid.uuid4())}])
+
+    def _defs_execute(*a, **k):
+        return _result(workflow_def_row)
+
+    def _default_execute(*a, **k):
+        return _result([])
+
+    def _builder(execute_fn):
+        b = MagicMock()
+        for m in ("select", "insert", "update", "delete", "eq", "neq", "in_",
+                  "order", "limit", "single", "maybe_single", "is_", "or_",
+                  "gte", "lt", "range"):
+            getattr(b, m).return_value = b
+        b.execute.side_effect = execute_fn
+        return b
+
+    builders = {
+        "threads": _builder(_threads_execute),
+        "messages": _builder(_messages_execute),
+        "workflow_definitions": _builder(_defs_execute),
+        "runs": _builder(_default_execute),
+    }
+    default_builder = _builder(_default_execute)
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: builders.get(name, default_builder)
+    sb.rpc.return_value = default_builder
+    return sb
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_producer_branches_harness_when_anchor_set(
+    fake_redis, mock_asyncpg_pool
+):
+    """SC#1: a kickoff send creates a workflow run + sets the anchor, and the
+    producer branches to run_workflow (NOT run_agent_loop). The Deep path stays
+    on run_agent_loop. The branch lives ABOVE the loop in agent_runner, never in
+    a provider branch. Asserted via spies on both call paths.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+
+    # Kickoff resolves a published, global definition.
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    harness_spy = AsyncMock()
+    deep_spy = AsyncMock()
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.run_agent_loop", deep_spy), \
+             patch("app.services.harness_engine.run_workflow", harness_spy), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "research X",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+
+            # Await the spawned producer so the branch runs.
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            # Harness branch taken; Deep loop NOT called.
+            assert harness_spy.await_count == 1
+            assert deep_spy.await_count == 0
+            # run_workflow driven on the new workflow run id.
+            assert harness_spy.await_args.args[0] == new_run_id
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_locked_thread_deep_send_refused_409(fake_redis, mock_asyncpg_pool):
+    """SC#2 / MODE-02: a Deep send on a thread whose anchor points at a
+    NON-TERMINAL workflow run is refused server-side with HTTP 409 — the binding
+    backstop, not just a grayed button. No user message is persisted.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    locked_run_id = uuid.uuid4()
+    sb = _branch_test_supabase(thread_id, active_workflow_run_id=str(locked_run_id))
+
+    # The locked run is non-terminal ('active') -> the lock holds.
+    mock_asyncpg_pool.set_fetchval_result("active")
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool",
+                   AsyncMock(return_value=mock_asyncpg_pool)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "switch me back to deep"},
+                )
+        assert resp.status_code == 409, resp.text
+        assert "workflow-locked" in resp.json()["detail"].lower()
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
 
 
 # ── SC#2: cancel/terminal clears the anchor in the same transaction (Plan 03) ─
