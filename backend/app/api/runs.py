@@ -692,7 +692,9 @@ async def continue_run(
     if active_workflow_run_id is not None:
         wf_resp = await aexec(
             supabase.table("workflow_runs")
-            .select("id, continues_used, definition_id")
+            # F8 (092-07): pull `inputs` too so the re-driven first phase can read
+            # the original kickoff_prompt back (Continue resume path).
+            .select("id, continues_used, definition_id, inputs")
             .eq("id", str(active_workflow_run_id))
             .maybe_single()
         )
@@ -795,6 +797,20 @@ async def continue_run(
             parent_run_id=None,
         )
 
+        # F8 (092-07): rehydrate the original kickoff_prompt from the persisted
+        # workflow_runs.inputs jsonb so a re-driven first phase still acts on the
+        # user's question. supabase-py decodes jsonb to a dict, but parse
+        # defensively (str → json.loads) to match the startup-sweep resume builder.
+        import json as _json_harness_resume  # noqa: PLC0415
+        _wf_inputs = (wf_row or {}).get("inputs") or {}
+        if isinstance(_wf_inputs, str):
+            try:
+                _wf_inputs = _json_harness_resume.loads(_wf_inputs)
+            except (ValueError, TypeError):
+                _wf_inputs = {}
+        if not isinstance(_wf_inputs, dict):
+            _wf_inputs = {}
+
         async def _harness_continuation():
             wf_ctx = SimpleNamespace(
                 run_id=wf_run_uuid,
@@ -803,6 +819,8 @@ async def continue_run(
                 thread_id=thread_id,
                 current_user=current_user,
                 user_settings=None,
+                # F8 (092-07): the persisted inputs (kickoff_prompt) for the re-driven run.
+                inputs=_wf_inputs,
                 redis=redis,
                 pool=pool,
                 emit=_harness_emit,

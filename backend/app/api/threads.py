@@ -1220,6 +1220,15 @@ async def send_message(
                         thread_id=thread_id,
                         current_user=current_user,
                         user_settings=user_settings,
+                        # F8 (092-07): the consumption half of SEED-047. create_workflow_run
+                        # STORED the user's kickoff question in workflow_runs.inputs.kickoff_prompt
+                        # (:995 above) but the phase executors never read it — the FIRST phase
+                        # (research) ran with an empty user turn and asked "send me the topic…".
+                        # Mirror EXACTLY what was persisted so live ctx.inputs == the durable
+                        # inputs jsonb the resume builders read back. phase_types._exec_llm_*
+                        # use ctx.inputs["kickoff_prompt"] as the first phase's user turn /
+                        # sub-agent task; programmatic split_topic reads ctx.inputs at :178.
+                        inputs={"kickoff_prompt": body.content},
                         redis=redis,
                         pool=_wf_pool,
                         emit=_harness_emit,

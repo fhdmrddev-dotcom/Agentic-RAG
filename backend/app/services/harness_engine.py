@@ -774,10 +774,26 @@ async def _build_resume_context(run, redis, pool):
     from app.dependencies import get_supabase
     _service_supabase = get_supabase()
 
+    # F8 (092-07): rehydrate the original kickoff_prompt from the durable
+    # workflow_runs.inputs jsonb (carried on the `run` row by find_resumable_runs'
+    # `wr.inputs` SELECT) so a resumed first phase still acts on the user's question
+    # instead of running with an empty user turn. jsonb arrives as a str under
+    # asyncpg's default codec → parse defensively (mirror _load_run_definition).
+    _resume_inputs = run.get("inputs") or {}
+    if isinstance(_resume_inputs, str):
+        try:
+            _resume_inputs = json.loads(_resume_inputs)
+        except (ValueError, TypeError):
+            _resume_inputs = {}
+    if not isinstance(_resume_inputs, dict):
+        _resume_inputs = {}
+
     return SimpleNamespace(
         run_id=run["run_id"],
         producer_run_id=_producer_id,
         thread_id=str(run["thread_id"]),
+        # F8 (092-07): the persisted inputs (kickoff_prompt) for the resumed run.
+        inputs=_resume_inputs,
         # 092-07: coerce to str, mirroring str(run["thread_id"]) above. On the
         # resume path run["user_id"] is an asyncpg pgproto.UUID OBJECT (not a
         # str like the live auth dict). task_service.insert_run does

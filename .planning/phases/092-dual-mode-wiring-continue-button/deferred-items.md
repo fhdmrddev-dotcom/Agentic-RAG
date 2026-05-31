@@ -48,3 +48,20 @@ not `_persist_assistant_message`).
 **Routing:** defer to the backend test-hygiene pass (same family already catalogued
 in `091/deferred-items.md`). F6's own surface (`test_dual_mode_wiring.py`) is 100%
 green (38 passed, incl. 3 new F6 tests).
+
+### F8 re-verification (092-07 kickoff_prompt wiring)
+
+The F8 fix (thread `kickoff_prompt` into the harness ctx + first-phase user turn)
+re-confirmed the same two pre-existing failures by `git stash`-ing the F8 changes
+and re-running each in isolation — both fail IDENTICALLY on the clean baseline:
+
+| Test | Symptom | Caused by F8? |
+|------|---------|---------------|
+| `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts` | `_audit_failures(pool) == 0` | No — same stale-test family above (fails standalone pre-F8 too). F8 never touches the gate retry/audit loop. |
+| `tests/integration/test_061_producer_survives_disconnect.py::test_producer_continues_after_consumer_disconnect` | `runs_thread_id_fkey` FK violation | No — live-DB integration test (needs a seeded `threads` row); fails pre-F8. |
+| `tests/integration/test_066_per_call_timer.py::test_tool_exec_outside_timer` | live-DB integration | No — same live-DB integration family. |
+
+F8's own surface is 100% green: `test_dual_mode_wiring.py` = 52 passed (42 prior +
+10 new F8 tests covering wf_ctx/resume-ctx kickoff carry, first-phase user-turn =
+kickoff, later-phase user-turn = prior output, sub-agent description = kickoff,
+sub-agent later-phase = prior output, jsonb-str parse, source-level wiring asserts).

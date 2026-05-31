@@ -2222,3 +2222,252 @@ async def test_exec_llm_agent_threads_subagent_grounding_to_phase_output():
     assert out["source_refs"] == sub_result["source_refs"]
     assert out["citations"] == sub_result["citations"]
     assert out["similarity_scores"] == [0.5]
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 092-07 — F8: thread the kickoff_prompt into the harness ctx + first-phase turn
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# F8: SEED-047 STORED the user's question in workflow_runs.inputs.kickoff_prompt
+# (threads.py create_workflow_run), but the consumption half was never wired. The
+# LLM phase executors built their user turn from _prior_output_text(accumulated),
+# which is EMPTY for the FIRST phase — so a Research→Summarize workflow's research
+# phase ran with NO user question and asked "please send me the topic…". The fix
+# threads kickoff_prompt onto the engine ctx (live wf_ctx + BOTH resume builders,
+# mirroring the persisted inputs jsonb) and feeds it to the FIRST phase's user turn
+# / sub-agent task ONLY (later phases keep chaining off prior output — unchanged).
+
+
+def _llm_single_phase(slug="research", prompt="do research"):
+    """A minimal llm_single PhaseSpec for the F8 user-turn tests."""
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec.model_validate(
+        {
+            "slug": slug,
+            "phase_index": 0,
+            "config": {"phase_type": "llm_single", "prompt": prompt},
+        }
+    )
+
+
+# ── F8 (a): the live wf_ctx + both resume builders carry inputs.kickoff_prompt ──
+
+def test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source():
+    """F8 (live): the threads.py harness wf_ctx build sets inputs={"kickoff_prompt":
+    body.content} — mirroring EXACTLY what create_workflow_run persisted (:995) so
+    live ctx.inputs matches the durable inputs jsonb the resume builders read back.
+    """
+    import inspect
+    from app.api import threads as threads_mod
+
+    src = inspect.getsource(threads_mod)
+    # create_workflow_run stored it; the wf_ctx must mirror it so the first phase reads it.
+    assert 'inputs={"kickoff_prompt": body.content}' in src, (
+        "harness wf_ctx must set inputs={'kickoff_prompt': body.content} (the "
+        "consumption half of SEED-047 — without it the first phase gets an empty "
+        "user turn and asks for the topic)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_build_resume_context_rehydrates_kickoff_prompt(
+    monkeypatch, fake_redis, mock_asyncpg_pool
+):
+    """F8 (resume sweep): _build_resume_context sets ctx.inputs from the persisted
+    workflow_runs.inputs jsonb carried on the `run` row (find_resumable_runs now
+    SELECTs wr.inputs) — so a resumed first phase still knows the original question.
+    """
+    from app.services import harness_engine
+
+    async def _spy_insert(pool, **kwargs):
+        return None
+
+    import app.db.runs as runs_mod
+    monkeypatch.setattr(runs_mod, "insert_run", _spy_insert)
+    import app.dependencies as deps_mod
+    monkeypatch.setattr(deps_mod, "get_supabase", lambda: object())
+
+    wf_run_id = uuid.uuid4()
+    run = {
+        "run_id": wf_run_id,
+        "thread_id": uuid.uuid4(),
+        "user_id": uuid.uuid4(),
+        # the persisted inputs jsonb (find_resumable_runs SELECTs wr.inputs).
+        "inputs": {"kickoff_prompt": "research mitochondria"},
+    }
+
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+    assert (getattr(ctx, "inputs", None) or {}).get("kickoff_prompt") == "research mitochondria"
+
+
+@pytest.mark.asyncio
+async def test_build_resume_context_parses_inputs_when_jsonb_arrives_as_str(
+    monkeypatch, fake_redis, mock_asyncpg_pool
+):
+    """F8 (resume sweep, codec): asyncpg's default codec hands jsonb back as a str —
+    _build_resume_context parses it defensively (json.loads) so ctx.inputs is a dict.
+    """
+    import json as _json
+    from app.services import harness_engine
+
+    async def _spy_insert(pool, **kwargs):
+        return None
+
+    import app.db.runs as runs_mod
+    monkeypatch.setattr(runs_mod, "insert_run", _spy_insert)
+    import app.dependencies as deps_mod
+    monkeypatch.setattr(deps_mod, "get_supabase", lambda: object())
+
+    run = {
+        "run_id": uuid.uuid4(),
+        "thread_id": uuid.uuid4(),
+        "user_id": uuid.uuid4(),
+        "inputs": _json.dumps({"kickoff_prompt": "topic from a jsonb str"}),
+    }
+
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+    assert isinstance(ctx.inputs, dict)
+    assert ctx.inputs["kickoff_prompt"] == "topic from a jsonb str"
+
+
+def test_find_resumable_runs_selects_inputs_in_source():
+    """F8: find_resumable_runs must SELECT wr.inputs so _build_resume_context can
+    read run.get('inputs') (the kickoff_prompt rehydration source on resume).
+    """
+    import inspect
+    from app.db import workflows as wf_mod
+
+    src = inspect.getsource(wf_mod.find_resumable_runs)
+    assert "wr.inputs" in src, (
+        "find_resumable_runs must SELECT wr.inputs so the resume ctx rehydrates the "
+        "kickoff_prompt"
+    )
+
+
+def test_harness_continuation_threads_kickoff_prompt_in_source():
+    """F8 (continue): the Continue resume path reads workflow_runs.inputs and sets
+    inputs= on the continuation ctx — so a re-driven first phase still acts on the
+    user's question. Source-level assertion against continue_run.
+    """
+    import inspect
+    from app.api import runs as runs_api
+
+    src = inspect.getsource(runs_api.continue_run)
+    # the workflow_runs select pulls inputs ...
+    assert '"id, continues_used, definition_id, inputs"' in src, (
+        "the Continue path's workflow_runs SELECT must pull `inputs` for kickoff rehydration"
+    )
+    # ... and the continuation ctx carries it.
+    assert "inputs=_wf_inputs" in src, (
+        "_harness_continuation must set inputs= from the persisted workflow_runs.inputs"
+    )
+
+
+# ── F8 (b): the FIRST LLM phase's user turn / sub-agent task carries kickoff ─────
+
+@pytest.mark.asyncio
+async def test_exec_llm_single_first_phase_user_turn_is_kickoff_prompt():
+    """F8 (b): with NO accumulated outputs (the first phase), _exec_llm_single's user
+    turn is the kickoff_prompt — so the first phase acts on the user's question
+    instead of an empty string.
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import phase_types
+
+    captured = {}
+
+    async def _fake_stream(*, messages, tools, model, user_settings):
+        captured["messages"] = messages
+        return ("ok", [])
+
+    ctx = _harness_ctx(inputs={"kickoff_prompt": "What do the theses say about query optimization?"})
+    with patch.object(phase_types, "_stream_one_iteration", _fake_stream):
+        await phase_types._exec_llm_single(_llm_single_phase(), {}, ctx)
+
+    user_msg = next(m for m in captured["messages"] if m["role"] == "user")
+    assert user_msg["content"] == "What do the theses say about query optimization?"
+
+
+@pytest.mark.asyncio
+async def test_exec_llm_single_later_phase_user_turn_is_prior_output_not_kickoff():
+    """F8 (c): a LATER phase (accumulated outputs present) uses the prior phase's
+    output as its user turn — NOT the kickoff_prompt. Chaining is unchanged.
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import phase_types
+
+    captured = {}
+
+    async def _fake_stream(*, messages, tools, model, user_settings):
+        captured["messages"] = messages
+        return ("ok", [])
+
+    ctx = _harness_ctx(inputs={"kickoff_prompt": "ORIGINAL QUESTION"})
+    accumulated = {"research": {"text": "PRIOR PHASE OUTPUT"}}
+    with patch.object(phase_types, "_stream_one_iteration", _fake_stream):
+        await phase_types._exec_llm_single(
+            _llm_single_phase(slug="summarize", prompt="summarize"), accumulated, ctx
+        )
+
+    user_msg = next(m for m in captured["messages"] if m["role"] == "user")
+    # The later phase chains off prior output — the kickoff_prompt must NOT leak in.
+    assert user_msg["content"] == "PRIOR PHASE OUTPUT"
+    assert "ORIGINAL QUESTION" not in user_msg["content"]
+
+
+@pytest.mark.asyncio
+async def test_exec_llm_agent_first_phase_subagent_task_carries_kickoff_prompt():
+    """F8 (b): the sub-agent's USER turn is its `description` (task_service.py:351).
+    For the FIRST phase (no accumulated outputs), the description MUST include the
+    kickoff_prompt so the sub-agent's search_documents targets the user's topic —
+    pre-F8 it was just the slug label `Phase: <slug>` (no question).
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import phase_types
+
+    captured = {}
+
+    async def _fake_sub_agent(**kwargs):
+        captured["description"] = kwargs.get("description")
+        return {"sub_run_id": uuid.uuid4(), "summary": "s", "status": "completed"}
+
+    ctx = _harness_ctx(inputs={"kickoff_prompt": "summarize the DBA folder theses"})
+    ctx.supabase = object()
+    ctx.user_settings = None
+    with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+        await phase_types._exec_llm_agent(_llm_agent_phase(), {}, ctx)
+
+    assert "summarize the DBA folder theses" in captured["description"], (
+        "the first phase's sub-agent description (its user turn) must carry the "
+        "kickoff_prompt so search_documents targets the user's question"
+    )
+
+
+@pytest.mark.asyncio
+async def test_exec_llm_agent_later_phase_subagent_task_uses_prior_output():
+    """F8 (c): a LATER llm_agent phase's sub-agent description carries the PRIOR
+    phase output, not the kickoff_prompt — chaining preserved.
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import phase_types
+
+    captured = {}
+
+    async def _fake_sub_agent(**kwargs):
+        captured["description"] = kwargs.get("description")
+        return {"sub_run_id": uuid.uuid4(), "summary": "s", "status": "completed"}
+
+    ctx = _harness_ctx(inputs={"kickoff_prompt": "ORIGINAL QUESTION"})
+    ctx.supabase = object()
+    ctx.user_settings = None
+    accumulated = {"research": {"text": "PRIOR PHASE OUTPUT"}}
+    with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+        await phase_types._exec_llm_agent(_llm_agent_phase(), accumulated, ctx)
+
+    assert "PRIOR PHASE OUTPUT" in captured["description"]
+    assert "ORIGINAL QUESTION" not in captured["description"]

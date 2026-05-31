@@ -92,6 +92,31 @@ def _prior_output_text(accumulated_outputs: dict) -> str:
     return texts[-1] if len(texts) == 1 else "\n\n".join(texts)
 
 
+def _kickoff_prompt(ctx) -> str:
+    """The user's original kickoff question, threaded in from ctx.inputs (F8).
+
+    SEED-047 STORED the user's question in workflow_runs.inputs.kickoff_prompt;
+    Phase 092-07 F8 wires the CONSUMPTION half: threads.py (live), the startup-sweep
+    resume builder, and the Continue resume builder all set ctx.inputs from the same
+    persisted jsonb. Returns "" when absent (a workflow with no stored kickoff —
+    behavior-preserving, identical to the pre-F8 empty first-phase user turn).
+    """
+    return ((getattr(ctx, "inputs", None) or {}).get("kickoff_prompt") or "")
+
+
+def _first_phase_user_turn(accumulated_outputs: dict, ctx) -> str:
+    """The user turn for an LLM phase: prior-phase chaining, kickoff for the first.
+
+    Later phases use ``_prior_output_text`` (the running result) EXACTLY as before —
+    chaining is unchanged. ONLY the first phase (no accumulated outputs yet) falls
+    back to the user's kickoff_prompt, so a Research→Summarize workflow's research
+    phase actually researches the user's question instead of improvising (F8 root
+    cause: the first phase used to get an empty user turn).
+    """
+    prior = _prior_output_text(accumulated_outputs)
+    return prior or _kickoff_prompt(ctx)
+
+
 def _retry_suffix(ctx) -> str:
     """The CONSUMER side of the retry-feedback pair (producer = Plan 05).
 
@@ -198,10 +223,12 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     checkpoint is possible). Consumes ctx.retry_feedback (producer = Plan 05).
     """
     system_prompt = phase.config.prompt + _retry_suffix(ctx)
+    # F8 (092-07): first phase → the user's kickoff question; later phases → prior
+    # output (chaining unchanged). Without this the first phase saw an empty user turn.
     content, _tool_calls = await _stream_one_iteration(
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": _prior_output_text(accumulated_outputs)},
+            {"role": "user", "content": _first_phase_user_turn(accumulated_outputs, ctx)},
         ],
         tools=[],
         model=_effective_model(phase, ctx),
@@ -240,9 +267,21 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         max_steps = _EXPLORER_STEP_CAP
 
     system_prompt = phase.config.prompt + _retry_suffix(ctx)
+    # F8 (092-07): the sub-agent's USER turn is its `description` (task_service.py:351
+    # — messages=[system_prompt_override, {"role":"user","content":description}]).
+    # Pre-F8 it was just the slug label `f"Phase: {phase.slug}"` — so the FIRST phase's
+    # sub-agent never saw the user's question and its search_documents had no real
+    # topic to target. Now: first phase → the user's kickoff question; later phases →
+    # the prior phase's output (chaining UNCHANGED). The phase prompt stays the
+    # system_prompt_override (OQ1). We keep the slug as a label prefix so the task is
+    # still attributable to the phase, but the substance is the actual question/output.
+    user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
+    description = (
+        f"Phase: {phase.slug}\n\n{user_turn}" if user_turn else f"Phase: {phase.slug}"
+    )
     result = await run_task_sub_agent(
         parent_ctx=phase_ctx,
-        description=f"Phase: {phase.slug}",
+        description=description,
         instructions=None,
         allowed_tools=list(phase.config.available_tools),
         max_steps=max_steps,
@@ -292,12 +331,25 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     base_prompt = phase.config.prompt + _retry_suffix(ctx)
     sem = asyncio.Semaphore(phase.config.max_parallel_agents)
 
+    # F8 (092-07): the overall topic context — the user's kickoff question — so each
+    # parallel branch researches its sub-question IN SERVICE OF the original ask
+    # (split_topic itself gets the kickoff via ctx.inputs from fix #1/#2; the batch
+    # branches get it here). Empty when no kickoff was stored (behavior-preserving).
+    overall_topic = _kickoff_prompt(ctx)
+
     async def _one(question: str) -> dict:
         async with sem:  # composes with the shipped per-run + Redis-Lua caps
             phase_ctx = _build_phase_tool_context(phase, ctx)
+            # The sub-agent's USER turn (task_service.py:351) = the sub-question, the
+            # actual substance to research — not the truncated slug label it was before.
+            # Prefix the overall topic so the branch keeps the user's intent in view.
+            description = (
+                f"Overall topic: {overall_topic}\n\nSub-question: {question}"
+                if overall_topic else question
+            )
             return await run_task_sub_agent(
                 parent_ctx=phase_ctx,
-                description=f"Phase: {phase.slug} — {question[:80]}",
+                description=description,
                 instructions=None,
                 allowed_tools=list(phase.config.available_tools),
                 max_steps=max_steps,
