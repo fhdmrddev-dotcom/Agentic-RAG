@@ -288,6 +288,18 @@ export interface StreamCallbacks {
   onPlanning?: (iteration: number) => void
   onIterationStart?: (iteration: number) => void
   onFallbackModel?: (originalModel: string, fallbackModel: string) => void
+  /** Phase 092 (CONT-01 / D-07) — NON-terminal `cap_paused` SSE event. The
+   *  iteration cap fired WITH buffered tool calls; the run is paused (NOT
+   *  terminal) and a Continue card should appear. Delivered out-of-band (the
+   *  durable carrier row is a role='system' message filtered from /messages —
+   *  BUG-260528-01), so the consumer renders the Continue affordance from this
+   *  callback + the mount-time getThreadWorkflow reconcile. */
+  onCapPaused?: (info: {
+    runId: string
+    toolNames: string[]
+    continuesUsed: number
+    continuesRemaining: number
+  }) => void
   // ──────────────────────────────────────────────────────────────────────────
   // Phase 086 Plan 01 (PANEL-05) — agent-panel SSE callbacks. The 6 new event
   // types (Phases 084/085) demux to these. Field names are VERIFIED against
@@ -342,6 +354,11 @@ export async function postMessage(
     model?: string
     provider?: string
     agentMode?: string
+    /** Phase 092 (MODE-01 / D-02) — when set, this send is a Harness kickoff:
+     *  the backend atomically creates a workflow run (create_workflow_run) and
+     *  the producer drives run_workflow instead of the Deep agent loop. Only
+     *  sent when a workflow is picked — a Deep send omits it (byte-identical). */
+    workflowDefinitionId?: string
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -353,6 +370,10 @@ export async function postMessage(
       model: options.model,
       provider: options.provider,
       agent_mode: options.agentMode ?? "default",
+      // D-02: include the kickoff field only when a workflow is selected.
+      ...(options.workflowDefinitionId
+        ? { workflow_definition_id: options.workflowDefinitionId }
+        : {}),
     }),
   })
   if (!res.ok) throw new Error("Failed to send message")
@@ -613,6 +634,16 @@ export async function subscribeToRun(
             parsed.original_model as string,
             parsed.fallback_model as string,
           )
+        } else if (t === "cap_paused" && callbacks.onCapPaused) {
+          // Phase 092 (CONT-01 / D-07) — NON-terminal pause. NOT a terminal
+          // sentinel (Landmine 6): the stream stays attachable for Continue.
+          // Mirror the fallback_model branch (no `return`).
+          callbacks.onCapPaused({
+            runId,
+            toolNames: (parsed.tool_names ?? []) as string[],
+            continuesUsed: (parsed.continues_used ?? 0) as number,
+            continuesRemaining: (parsed.continues_remaining ?? 0) as number,
+          })
         }
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
@@ -864,6 +895,108 @@ export async function cancelRun(runId: string, signal?: AbortSignal): Promise<vo
   if (!res.ok && res.status !== 404) {
     throw new Error(`Failed to cancel run (status ${res.status})`)
   }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 092 (MODE-01 / MODE-02 / CONT-01) — dual-mode + Continue clients.
+// Backend contracts: 092-02-SUMMARY (GET /threads/{id}/workflow, GET
+// /workflows/published) + 092-03-SUMMARY (POST /runs/{id}/continue).
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Phase 092 (SC#5 / D-v2.5-03) — the reconcile-via-fetch contract mirroring
+ *  the backend `ThreadWorkflowState` Pydantic model (backend/app/models/thread.py).
+ *  GET /threads/{id}/workflow is a PURE READ — the source of truth for a thread's
+ *  Deep/Harness mode + workflow lock + current phase + Continue budget. NEVER
+ *  trust a Realtime/SSE hint alone (D-v2.5-03). */
+export interface ThreadWorkflowState {
+  thread_id: string
+  /** harness iff active_workflow_run_id IS NOT NULL. */
+  mode: "deep" | "harness"
+  /** True iff a non-terminal workflow run holds the lock. */
+  locked: boolean
+  active_workflow_run_id: string | null
+  /** workflow_runs.status; null when the run row is absent. */
+  run_status: string | null
+  definition_slug: string | null
+  definition_name: string | null
+  current_phase_slug: string | null
+  current_phase_index: number | null
+  total_phases: number | null
+  /** SC#5 heal: anchor set BUT the run row is missing or terminal. */
+  lock_is_stale: boolean
+  /** CONT-01 / D-06 — a Continue affordance is currently pending. */
+  cap_paused: boolean
+  continues_used: number
+  /** max_continues_per_run - continues_used (D-06). */
+  continues_remaining: number
+}
+
+/** A picker row from GET /workflows/published (backend/app/api/workflows.py
+ *  PublishedWorkflow). The minimum the Harness picker needs to list + kick off. */
+export interface PublishedWorkflow {
+  id: string
+  slug: string
+  name: string
+}
+
+/** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
+ *  Returns the authoritative mode/lock/phase/Continue state for a thread. Used on
+ *  thread mount to reconcile the composer lock + Continue card from truth (never a
+ *  stale SSE hint). Ownership-gated 404 on the backend. (getThreadPendingAsks shape.) */
+export async function getThreadWorkflow(
+  threadId: string,
+  signal?: AbortSignal,
+): Promise<ThreadWorkflowState> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workflow`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to load thread workflow state (status ${res.status})`)
+  return (await res.json()) as ThreadWorkflowState
+}
+
+/** Phase 092 (MODE-01 / D-01) — GET /workflows/published. The Harness-mode
+ *  picker feed: published workflow definitions the user may start (owner-scoped
+ *  on the backend via the RLS-mirroring predicate — the frontend cannot widen
+ *  the scope, T-092-17). */
+export async function listPublishedWorkflows(
+  signal?: AbortSignal,
+): Promise<PublishedWorkflow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/published`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to list published workflows (status ${res.status})`)
+  return (await res.json()) as PublishedWorkflow[]
+}
+
+/** The POST /runs/{id}/continue response (092-03). `status:"ok"` resumes the
+ *  SAME run with a fresh bounded budget; `status:"refused"` means the 3-cap is
+ *  exhausted (a clean 200 refusal — surface the message, do NOT throw). */
+export interface ContinueRunResult {
+  status: "ok" | "refused"
+  run_id?: string
+  message?: string
+  continues_used: number
+  continues_remaining: number
+}
+
+/** Phase 092 (CONT-01 / D-06) — POST /runs/{id}/continue. Resumes a cap_paused
+ *  run with a fresh bounded budget that CONSUMES the dropped tool calls (Deep) or
+ *  re-drives the active phase (Harness). The backend refuses the (max+1)-th
+ *  Continue with a clean 200 `{status:"refused"}` payload — we DON'T throw on that
+ *  (it is the expected exhausted-cap path, D-06); we only throw on a real HTTP
+ *  error. (cancelRun mutation shape.) */
+export async function continueRun(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<ContinueRunResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/runs/${runId}/continue`, {
+    method: "POST",
+    headers,
+    signal,
+  })
+  if (!res.ok) {
+    throw new Error(`Failed to continue run (status ${res.status})`)
+  }
+  return (await res.json()) as ContinueRunResult
 }
 
 export async function listDocuments(): Promise<Document[]> {
