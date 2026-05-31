@@ -309,3 +309,74 @@ async def test_completion_final_phase_output_is_chat_message(
 
     # The FINAL phase's output is set as the chat message verbatim (D-10).
     assert ctx.final_output == {"text": "output of p1"}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# LIVE — Plan 03: programmatic registry + split_topic (Task 1)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class TestProgrammaticRegistry:
+    """Closed PROGRAMMATIC_PHASE_REGISTRY + decorator + idempotent split_topic."""
+
+    def test_registry_is_closed_dict_with_split_topic(self):
+        from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
+
+        assert isinstance(PROGRAMMATIC_PHASE_REGISTRY, dict)
+        assert "split_topic" in PROGRAMMATIC_PHASE_REGISTRY
+
+    def test_register_programmatic_decorator_registers(self):
+        from app.services.harness.programmatic import (
+            PROGRAMMATIC_PHASE_REGISTRY,
+            register_programmatic,
+        )
+
+        @register_programmatic("_unit_test_fn")
+        async def _fn(input, ctx):
+            return {"ok": True}
+
+        try:
+            assert PROGRAMMATIC_PHASE_REGISTRY["_unit_test_fn"] is _fn
+        finally:
+            PROGRAMMATIC_PHASE_REGISTRY.pop("_unit_test_fn", None)
+
+    @pytest.mark.asyncio
+    async def test_split_topic_splits_on_clauses(self):
+        from app.services.harness.programmatic import split_topic
+
+        out = await split_topic(
+            {"topic": "transformers in NLP; diffusion models and reinforcement learning"},
+            None,
+        )
+        assert out["sub_questions"] == [
+            "transformers in NLP",
+            "diffusion models",
+            "reinforcement learning",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_split_topic_single_topic_fallback(self):
+        from app.services.harness.programmatic import split_topic
+
+        out = await split_topic({"topic": "quantum computing"}, None)
+        assert out["sub_questions"] == ["quantum computing"]
+
+    @pytest.mark.asyncio
+    async def test_split_topic_empty_topic(self):
+        from app.services.harness.programmatic import split_topic
+
+        out = await split_topic({"topic": ""}, None)
+        assert out["sub_questions"] == []
+        out2 = await split_topic({}, None)
+        assert out2["sub_questions"] == []
+
+    @pytest.mark.asyncio
+    async def test_split_topic_is_idempotent(self):
+        """Pattern 3 — same input twice yields identical output (resume-safe)."""
+        from app.services.harness.programmatic import split_topic
+
+        topic = {"topic": "A and B and C"}
+        first = await split_topic(dict(topic), None)
+        second = await split_topic(dict(topic), None)
+        assert first == second
+        assert first["sub_questions"] == ["A", "B", "C"]
