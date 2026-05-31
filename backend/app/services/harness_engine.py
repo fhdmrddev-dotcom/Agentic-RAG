@@ -224,6 +224,7 @@ async def _run_phase_with_gates(
     pool,
     redis,
     wall_clock: int,
+    _audit_user_id: UUID | None,
 ) -> PhaseOutcome:
     """Execute a phase under a bounded-retry gate loop (HARNESS-04 — the SC#3 bar).
 
@@ -270,8 +271,8 @@ async def _run_phase_with_gates(
             gate_error = f"wall_clock_timeout after {wall_clock}s"
             # Treat the timeout as a terminal gate failure: audit + emit, then route.
             await write_audit(
-                pool, run_id, "gate_failed",
-                {"phase": phase.slug, "attempt": attempt, "error": gate_error},
+                pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
+                metadata={"phase": phase.slug, "attempt": attempt, "error": gate_error},
             )
             await _emit(
                 redis, run_id, "gate_failed",
@@ -285,7 +286,10 @@ async def _run_phase_with_gates(
         gate = await run_gates(phase, output, ctx)
         if gate.passed:
             if validators:
-                await write_audit(pool, run_id, "gate_passed", {"phase": phase.slug})
+                await write_audit(
+                    pool, run_id, user_id=_audit_user_id,
+                    event_type="gate_passed", metadata={"phase": phase.slug},
+                )
             # Clear the retry feedback so a downstream phase isn't polluted.
             _clear_retry_feedback(ctx)
             return PhaseOutcome("completed", output, None, None)
@@ -304,8 +308,8 @@ async def _run_phase_with_gates(
         last_output = output
 
         await write_audit(
-            pool, run_id, "gate_failed",
-            {"phase": phase.slug, "attempt": attempt, "error": gate.error_message},
+            pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
+            metadata={"phase": phase.slug, "attempt": attempt, "error": gate.error_message},
         )
         await _emit(
             redis, run_id, "gate_failed",
@@ -377,6 +381,16 @@ async def run_workflow(
     keeping completed phases' outputs with a plain reason (D-07), or jumps to a
     ``skip_to_phase`` target (D-09).
     """
+    # Phase 092-05 F1: the run-owner id every harness_audit write must bind
+    # (harness_audit.user_id is NOT NULL). Live runs set ctx.current_user from the
+    # route; the resume path's _build_resume_context reads back the persisted
+    # workflow_runs.user_id. A unit stub without current_user resolves to None.
+    _audit_user_id = (
+        (ctx.current_user or {}).get("id")
+        if getattr(ctx, "current_user", None)
+        else None
+    )
+
     rows = await load_run_phases(pool, run_id)
     # Resumed runs see prior outputs: seed accumulated_outputs from completed rows.
     accumulated_outputs: dict[str, dict] = {}
@@ -415,8 +429,9 @@ async def run_workflow(
         await write_audit(
             pool,
             run_id,
-            "phase_started",
-            {"phase": phase.slug, "phase_index": phase.phase_index},
+            user_id=_audit_user_id,
+            event_type="phase_started",
+            metadata={"phase": phase.slug, "phase_index": phase.phase_index},
         )
         await _emit(
             redis,
@@ -438,6 +453,7 @@ async def run_workflow(
             pool=pool,
             redis=redis,
             wall_clock=wall_clock,
+            _audit_user_id=_audit_user_id,
         )
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
@@ -446,7 +462,10 @@ async def run_workflow(
             # Completed phases' outputs are ALREADY durable — finish_run does NOT
             # touch them (D-07). The run flips to `failed`; nothing silently dropped.
             await finish_run(pool, run_id, "failed")
-            await write_audit(pool, run_id, "run_failed", {"reason": outcome.reason})
+            await write_audit(
+                pool, run_id, user_id=_audit_user_id,
+                event_type="run_failed", metadata={"reason": outcome.reason},
+            )
             await _emit(redis, run_id, "run_failed", reason=outcome.reason)
             return  # stop — no further phases
 
@@ -454,8 +473,8 @@ async def run_workflow(
         if outcome.kind == "skip_to":
             await skip_phase(pool, phase_id)
             await write_audit(
-                pool, run_id, "phase_transition",
-                {"from": phase.slug, "to": outcome.target_slug, "via": "skip_to_phase"},
+                pool, run_id, user_id=_audit_user_id, event_type="phase_transition",
+                metadata={"from": phase.slug, "to": outcome.target_slug, "via": "skip_to_phase"},
             )
             await _emit(
                 redis, run_id, "phase_transition",
@@ -470,7 +489,10 @@ async def run_workflow(
                     f"at runtime (phase {phase.slug})"
                 )
                 await finish_run(pool, run_id, "failed")
-                await write_audit(pool, run_id, "run_failed", {"reason": reason})
+                await write_audit(
+                    pool, run_id, user_id=_audit_user_id,
+                    event_type="run_failed", metadata={"reason": reason},
+                )
                 await _emit(redis, run_id, "run_failed", reason=reason)
                 return
             i = target_i
@@ -489,8 +511,9 @@ async def run_workflow(
         await write_audit(
             pool,
             run_id,
-            "phase_completed",
-            {"phase": phase.slug, "phase_index": phase.phase_index},
+            user_id=_audit_user_id,
+            event_type="phase_completed",
+            metadata={"phase": phase.slug, "phase_index": phase.phase_index},
         )
         await _emit(
             redis,
@@ -503,8 +526,9 @@ async def run_workflow(
             await write_audit(
                 pool,
                 run_id,
-                "phase_transition",
-                {"from": phase.slug, "to": ordered[i + 1]["slug"]},
+                user_id=_audit_user_id,
+                event_type="phase_transition",
+                metadata={"from": phase.slug, "to": ordered[i + 1]["slug"]},
             )
             await _emit(
                 redis,
@@ -526,7 +550,10 @@ async def run_workflow(
     # Mirror _shielded_finalize ordering: durable run-status UPDATE BEFORE the
     # terminal _emit.
     await finish_run(pool, run_id, "completed")
-    await write_audit(pool, run_id, "run_completed", {"run_id": str(run_id)})
+    await write_audit(
+        pool, run_id, user_id=_audit_user_id,
+        event_type="run_completed", metadata={"run_id": str(run_id)},
+    )
     await _emit(redis, run_id, "run_completed", status="completed")
 
 

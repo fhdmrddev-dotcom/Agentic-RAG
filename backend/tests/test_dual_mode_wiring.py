@@ -75,6 +75,7 @@ async def test_create_workflow_run_inserts_run_phases_and_sets_anchor_atomically
     mock_asyncpg_pool.set_fetchval_result(new_run_id)
     thread_id = uuid.uuid4()
     definition_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
 
     returned = await create_workflow_run(
         mock_asyncpg_pool,
@@ -83,6 +84,7 @@ async def test_create_workflow_run_inserts_run_phases_and_sets_anchor_atomically
         definition=wf,
         inputs={"kickoff_prompt": "hello"},
         model="gpt-5.4",
+        user_id=owner_id,
     )
     assert returned == new_run_id
 
@@ -91,6 +93,10 @@ async def test_create_workflow_run_inserts_run_phases_and_sets_anchor_atomically
         i for i, (sql, _) in enumerate(calls)
         if "INSERT INTO workflow_runs" in sql
     )
+    # Phase 092-05 F1: the run-owner user_id is in the INSERT column list AND bound.
+    run_insert_sql, run_insert_args = calls[run_insert_idx]
+    assert "user_id" in run_insert_sql
+    assert owner_id in run_insert_args
     phase_insert_idxs = [
         i for i, (sql, _) in enumerate(calls)
         if "INSERT INTO workflow_phases" in sql
@@ -131,6 +137,7 @@ async def test_create_workflow_run_persists_inputs_and_model(
     )
     mock_asyncpg_pool.set_fetchval_result(uuid.uuid4())
 
+    owner_id = uuid.uuid4()
     await create_workflow_run(
         mock_asyncpg_pool,
         thread_id=uuid.uuid4(),
@@ -138,6 +145,7 @@ async def test_create_workflow_run_persists_inputs_and_model(
         definition=wf,
         inputs={"kickoff_prompt": "research mitochondria"},
         model="claude-opus-4-8",
+        user_id=owner_id,
     )
 
     run_insert = next(
@@ -146,10 +154,64 @@ async def test_create_workflow_run_persists_inputs_and_model(
     )
     sql, args = run_insert
     # inputs written as json.dumps + $3::jsonb (NOT a plain dict — this file has
-    # no pool JSONB codec); model on $4.
+    # no pool JSONB codec); model on $4; user_id on $5 (Phase 092-05 F1).
     assert "$3::jsonb" in sql
     assert json.loads(args[2]) == {"kickoff_prompt": "research mitochondria"}
     assert args[3] == "claude-opus-4-8"
+    assert args[4] == owner_id
+
+
+# ── F1 (092-05): write_audit binds the run-owner user_id ─────────────────────
+
+@pytest.mark.asyncio
+async def test_write_audit_includes_user_id_in_insert(mock_asyncpg_pool):
+    """F1: write_audit MUST issue a 4-column INSERT
+    ``(run_id, user_id, event_type, metadata)`` binding the owner user_id (the
+    column is NOT NULL — the prior 3-column INSERT killed every live run). Assert
+    the SQL string shape + the exact bind order against the mock pool.
+    """
+    import json
+
+    from app.db.workflows import write_audit
+
+    run_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    await write_audit(
+        mock_asyncpg_pool,
+        run_id,
+        user_id=owner_id,
+        event_type="phase_started",
+        metadata={"phase": "p0"},
+    )
+
+    sql, args = mock_asyncpg_pool.calls[-1]
+    assert "INSERT INTO harness_audit (run_id, user_id, event_type, metadata)" in sql
+    # bind order: run_id, user_id, event_type, json.dumps(metadata)
+    assert args[0] == run_id
+    assert args[1] == owner_id
+    assert args[2] == "phase_started"
+    assert json.loads(args[3]) == {"phase": "p0"}
+
+
+@pytest.mark.asyncio
+async def test_write_audit_rejects_unknown_event_type_before_insert(mock_asyncpg_pool):
+    """The _AUDIT_EVENT_TYPES fail-fast guard is preserved: an unknown event_type
+    raises ValueError BEFORE any INSERT is issued (no harness_audit write recorded).
+    """
+    from app.db.workflows import write_audit
+
+    with pytest.raises(ValueError, match="event_type"):
+        await write_audit(
+            mock_asyncpg_pool,
+            uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            event_type="not_a_real_event",
+            metadata={},
+        )
+    # the guard fires before the INSERT — nothing recorded.
+    assert not any(
+        "INSERT INTO harness_audit" in sql for sql, _ in mock_asyncpg_pool.calls
+    )
 
 
 @pytest.mark.asyncio

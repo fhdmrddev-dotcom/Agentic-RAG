@@ -63,6 +63,7 @@ async def create_workflow_run(
     definition: WorkflowDefinition,
     inputs: dict,
     model: str | None,
+    user_id: UUID,
 ) -> UUID:
     """Atomically create a workflow run + its phase rows + set the thread anchor.
 
@@ -85,8 +86,11 @@ async def create_workflow_run(
 
     RLS (file header contract): this helper runs as service role; owner-scoping
     lives UPSTREAM in the route (the send_message handler already ownership-checked
-    the thread and resolved the definition under the user's RLS). No user_id check
-    here. ``$N`` placeholders only; ``json.dumps(inputs)`` + ``$3::jsonb`` (this file
+    the thread and resolved the definition under the user's RLS). The run-owner
+    ``user_id`` (resolved from the route's ``current_user``) IS persisted on the
+    workflow_runs row (Phase 092-05 F1) — it is the trusted owner stamp that the
+    resume path (_build_resume_context) and every harness_audit write read back.
+    ``$N`` placeholders only; ``json.dumps(inputs)`` + ``$3::jsonb`` (this file
     does NOT use a pool JSONB codec — mirror complete_phase :240).
 
     Returns the new workflow_run id.
@@ -95,14 +99,15 @@ async def create_workflow_run(
         async with con.transaction():
             run_id = await con.fetchval(
                 """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model)
-                VALUES ($1, $2, 'active', $3::jsonb, $4)
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5)
                 RETURNING id
                 """,
                 thread_id,
                 definition_id,
                 json.dumps(inputs),
                 model,
+                user_id,
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
@@ -455,7 +460,12 @@ async def claim_run(
 
 # ── harness_audit (this table's own column IS run_id — correct) ──────────────
 async def write_audit(
-    pool: asyncpg.Pool, run_id: UUID, event_type: str, metadata: dict
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    user_id: UUID | None,
+    event_type: str,
+    metadata: dict,
 ) -> None:
     """INSERT one ``harness_audit`` row (INSERT-only RLS).
 
@@ -463,6 +473,14 @@ async def write_audit(
     against ``_AUDIT_EVENT_TYPES`` so a typo fails fast in tests (ValueError),
     not as a Postgres 23514 mid-run (Pitfall 6). The ``harness_audit`` table's
     own foreign-key column IS ``run_id`` — this predicate is correct.
+
+    Phase 092-05 F1: ``harness_audit.user_id`` is NOT NULL, but this INSERT
+    previously OMITTED it — the first audit write of any live run raised
+    ``NotNullViolationError`` and killed the run before any phase executed (the
+    bug was mock-only-invisible until the first live run in Phase 092). The
+    run-owner ``user_id`` (threaded from ``ctx.current_user`` at every call site)
+    is now bound explicitly. It is keyword-only so no caller can re-introduce the
+    omission silently.
     """
     if event_type not in _AUDIT_EVENT_TYPES:
         raise ValueError(
@@ -470,8 +488,10 @@ async def write_audit(
             f"got {event_type!r}"
         )
     await pool.execute(
-        "INSERT INTO harness_audit (run_id, event_type, metadata) VALUES ($1, $2, $3::jsonb)",
+        "INSERT INTO harness_audit (run_id, user_id, event_type, metadata) "
+        "VALUES ($1, $2, $3, $4::jsonb)",
         run_id,
+        user_id,
         event_type,
         json.dumps(metadata),
     )

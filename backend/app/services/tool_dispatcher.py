@@ -1512,10 +1512,14 @@ def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[st
     run_id = ctx.parent_run_id or ctx.run_id
     if ctx.pool is None or run_id is None:
         return  # no harness substrate on this ctx — nothing to audit against
+    # Phase 092-05 F1: harness_audit.user_id is NOT NULL — bind the run-owner
+    # (the dispatching user). asyncpg coerces the str id to uuid on the bind.
+    _owner_id = (ctx.current_user or {}).get("id") if ctx.current_user else None
     try:
         from app.db.workflows import write_audit  # local import: avoid load-time cycle
         ctx.spawn(write_audit(
-            ctx.pool, run_id, "tool_refused", {"tool": tool_name, "allowed": allowed},
+            ctx.pool, run_id, user_id=_owner_id,
+            event_type="tool_refused", metadata={"tool": tool_name, "allowed": allowed},
         ))
     except Exception:  # noqa: BLE001 — audit is best-effort; never block the refusal
         logger.exception("tool_refused audit spawn failed for tool=%s", tool_name)

@@ -994,6 +994,9 @@ async def send_message(
             definition=_kickoff_definition,
             inputs={"kickoff_prompt": body.content},   # SEED-047
             model=_resolved_model,                      # SEED-047
+            # Phase 092-05 F1: persist the run-owner so harness_audit writes
+            # (NOT NULL user_id) and the resume path resolve a real user.
+            user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
         )
 
     # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
