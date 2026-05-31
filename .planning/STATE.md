@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: gaps_found
-stopped_at: "092-06 code-complete (F3 frontend lock-UX, Tasks 1-2 shipped); Task 3 UAT = gaps_found — F1/F2 VERIFIED CLOSED live + SC#2 PASS, but NEW blocker F4 (harness sub-agent parent_run_id FK) blocks a workflow running end-to-end → phase 092 NOT complete, routed to gap plan 092-07"
-last_updated: "2026-05-31T21:00:00.000Z"
+status: unknown
+stopped_at: "092-07 Tasks 1-5 (F4 id-routing code + live-DB FK test) DONE sequentially; Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (backend restart required — F4 fixes are in backend code) — phase 092 NOT complete; MODE-01/02 + CONT-01 stay OPEN until UAT GREEN"
+last_updated: "2026-05-31T17:30:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 21
-  completed_plans: 20
-  percent: 91
+  total_plans: 22
+  completed_plans: 21
+  percent: 95
 ---
 
 # Project State
@@ -35,7 +35,7 @@ Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connect
   - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint) — CODE SHIPPED (Tasks 1-3), UAT FAILED at Task 4
   - Gap 1: 092-05 (F1 audit-owner crash + F2 wedged lock — backend) — ✅ COMPLETE 2026-05-31 (4 tasks; F1+F2 closed; live-DB audit test green; zero net-new full-suite failures)
   - Gap 2: 092-06 (F3 client lock-UX + UAT re-run gate) — ⚠️ CODE-COMPLETE 2026-05-31 (Tasks 1-2 shipped, tsc+build clean); Task 3 UAT = gaps_found → NEW blocker F4 (harness sub-agent parent_run_id FK) blocks end-to-end workflow → phase NOT complete
-  - Gap 3: 092-07 (F4 harness sub-agent parent_run_id FK mismatch — backend) — NEXT: `/gsd:plan-phase 092 --gaps`. Re-runs UAT rows 4-10 (SC#3/SC#5/CONT-01/SC#10 native-7/Deep byte-identical + SC#2 natural-completion/Cancel variants + F3 live lock observation)
+  - Gap 3: 092-07 (F4 harness sub-agent parent_run_id FK mismatch — backend + frontend) — ⏸ Tasks 1-5 DONE 2026-05-31 (sequential exec; F4 id-routing closed in code + live-DB FK test green); Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (re-runs UAT rows 4-10: SC#3/SC#5/CONT-01/SC#10 native-7/Deep byte-identical + SC#2 natural/Cancel + ask_user render + resume×Continue). **Operator MUST restart the backend (uvicorn) before the UAT — the F4 fixes are in backend code.** Commits: fa14a1c3 (Facet A), ca0ee5c5 (Facet B), 0f6a66df (Facet C resume), cdd775f6 (Facet C Continue-404 + surfacing + frontend), ec9dd4f4 (live FK test), 69e01300 + 2aa25777 (test-pollution fixes). Backend full-suite ZERO net-new failures vs 092-03 baseline; frontend tsc -b 54 baseline (0 net-new) + vite build clean. SUMMARY.md deferred until the UAT gate resolves.
 
 **092-05 (gap-closure) verdict (2026-05-31): ✅ COMPLETE.** F1 closed — `workflow_runs.user_id` persisted (migration 064), `write_audit` binds the run-owner, all 11 audit sites pass it (10 harness_engine + 1 tool_dispatcher); a harness run executes end-to-end with no `NotNullViolationError`. F2 closed — `_shielded_finalize` terminalizes `workflow_runs` + clears the anchor on any non-completed harness escape; `lock_is_stale` self-heals on a terminal producer run (pure read). Live-DB integration test (`test_092_harness_audit_live.py`) closes the 091 mock blind spot — both gates green vs local Postgres. Full backend suite: 103-failed/1014-passed vs 102/1008 baseline = +6 new passing tests, ZERO net-new failures (the one "new" entry, `test_bounded_retry_reaches_failed_after_3_attempts`, is a pre-existing isolation failure unrelated to this plan). Requirements MODE-01/MODE-02/CONT-01 stay OPEN — 092-06 (F3) + phase verification own closure. Operator live F1 proof (backend kickoff of a Research→Summarize workflow) still pending per VERIFICATION.
 
@@ -288,9 +288,19 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T21:00:00.000Z
-Stopped at: 092-06 code-complete (F3 frontend lock-UX shipped); Task 3 UAT gaps_found (F1/F2 closed live + SC#2 pass, NEW blocker F4 blocks end-to-end workflow) — phase 092 NOT complete
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-06-UAT-FINDINGS.md → plan gap 092-07
+Last session: 2026-05-31T22:30:00.000Z
+Stopped at: 092-07 Tasks 1-5 (F4 id-routing fix + live-DB FK test) DONE sequentially; Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (backend restart required first) — phase 092 NOT complete
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-07-PLAN.md → Task 6 (operator UAT gate)
+
+**Plan 092-07 — ⏸ Tasks 1-5 DONE (code + tests); Task 6 UAT AWAITING OPERATOR (2026-05-31):** F4 id-routing gap-closure (sub-agent parent_run_id FK + SSE routing + resume/Continue-404). Ran SEQUENTIALLY on the main working tree.
+
+- Task 1 ✅ Facet A — wf_ctx carries producer_run_id=run_id (the producer runs.run_id, FK target for sub-agent parent_run_id); _build_phase_tool_context sources the parent id from producer_run_id FAIL-CLOSED (raises if absent — no silent FK re-trigger for any of the 7 providers); task_service UNCHANGED (Deep byte-identical). Commit fa14a1c3.
+- Task 2 ✅ Facet B — run_workflow + _run_phase_with_gates thread a keyword-only stream_run_id; all 9 engine _emits route to run:{producer} (the watched stream); write_audit stays workflow-run-keyed (F1 shape). ask_user_prompt emit (a DIRECT executor emit) routes on the producer transport while the durable prompt-row run_id VALUE + subscribe_for_response channel stay on the workflow_run id. Sibling-escape audit: ask_user_prompt is the only direct executor emit. Commit ca0ee5c5.
+- Task 3 ✅ Facet C resume — _build_resume_context + _harness_continuation mint a fresh producer-shell runs row (NON-NULL model/provider='unknown', parent None) + set producer_run_id; the sweep + continuation terminalize the shell on EVERY exit path (try/finally → finalize_run, success/exception) so a crashed resume never re-wedges the thread (F2 self-heal preserved). CONT-01 cap untouched. Commit 0f6a66df.
+- Task 4 ✅ Facet C Continue-404 + surfacing — continue_run resolves a post-reload workflow_run id under the caller's ownership (AND user_id + thread-anchor confirm; IDOR preserved — another user's id still 404s); get_thread_workflow surfaces latest_producer_run_id as a PURE additive read (added run_id to the EXISTING F2 self-heal SELECT — no new query, no write); frontend (StreamsProvider + MessageItem + producerResubscribeSignal + api.ts) re-subscribes the fresh producer stream on BOTH paths (the /continue 200 producer_run_id AND the mount/reconcile latest_producer_run_id), per-thread keyed, additive. tsc -b 54 baseline (0 net-new), vite build clean. Commit cdd775f6.
+- Task 5 ✅ live-DB FK regression test (tests/integration/test_092_subagent_parent_fk_live.py) — the backstop the mock pool cannot give: a producer parent resolves (end-to-end JOIN), a workflow_run-id parent raises ForeignKeyViolationError, the resume mint produces a valid FK target, the Deep chain is unchanged. 4 green vs PG :54322; SKIPS cleanly when PG down. Commit ec9dd4f4.
+- No-regression: backend full-suite ZERO net-new test-node failures vs the 092-03 baseline (the only pre-existing harness failure, test_bounded_retry_reaches_failed_after_3_attempts, persists per 092-05 SUMMARY). Two test-pollution fixes (registry save/restore + producer_run_id on harness-ctx test builders) so the fail-closed guard didn't false-red ordering-dependent tests: commits 69e01300 + 2aa25777.
+- Task 6 ⏸ BINDING checkpoint:human-action — the operator runs the 4-axis native-7 UAT (re-runs 092-06 rows 4-10 LIVE). **The operator MUST restart the backend (uvicorn) before the UAT — the F4 fixes are in backend code.** SUMMARY.md (092-07-SUMMARY.md) DEFERRED until the gate resolves. MODE-01/MODE-02/CONT-01 stay OPEN; phase 092 NOT complete until the UAT is GREEN.
 
 **Plan 092-06 — ⚠️ CODE-COMPLETE (Tasks 1-2 shipped); Task 3 UAT gaps_found:** F3 client lock-UX gap-closure. See `092-06-SUMMARY.md` + `092-06-UAT-FINDINGS.md`.
 
@@ -317,7 +327,7 @@ Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-06-UAT-FI
 - Verify status: `vite build` PASSES clean; `tsc -b` has 54 PRE-EXISTING baseline errors (0 net new — see deferred-items.md). Frontend Deep chat byte-identical when no workflow active (lock Map empty = no behavioral change).
 - SUMMARY (092-04-SUMMARY.md) DEFERRED until the UAT checkpoint resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN (phase verification owns closure; SDK requirements.mark-complete intentionally skipped).
 
-**Planned Phase:** 092 (Dual-Mode Wiring + Continue Button) — 6 plans — 2026-05-31T14:51:10.150Z
+**Planned Phase:** 092 (dual-mode-wiring-continue-button) — 7 plans — 2026-05-31T16:52:00.016Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
