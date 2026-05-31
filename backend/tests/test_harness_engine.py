@@ -203,23 +203,109 @@ class TestModelsFinalized:
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# Wave-0 contracts — flipped live by Plan 02 / Plan 03
+# LIVE — HARNESS-01 engine contracts (Plan 02)
 # ═══════════════════════════════════════════════════════════════════════
 
+import uuid  # noqa: E402
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 02/03")
+
+class _NoopRedis:
+    """Records nothing; satisfies the engine's _emit XADD."""
+
+    def __init__(self):
+        self.xadds = []
+
+    async def xadd(self, stream, fields, *args, **kwargs):
+        self.xadds.append((stream, fields))
+        return "0-0"
+
+
+@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 03 (5 real executors)")
 def test_phase_dispatch_routes_each_of_5_types(build_workflow_definition):
     """HARNESS-01: each of the 5 phase_type literals routes to its executor."""
     raise NotImplementedError
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 02")
-def test_engine_drives_ordered_transitions(build_workflow_definition, mock_asyncpg_pool):
+@pytest.mark.asyncio
+async def test_engine_drives_ordered_transitions(
+    build_workflow_definition, mock_asyncpg_pool
+):
     """HARNESS-01: engine drives phases in phase_index order with audited transitions."""
-    raise NotImplementedError
+    from app.services import harness_engine
+
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": "first"}},
+            {"config": {"phase_type": "llm_single", "prompt": "second"}},
+            {"config": {"phase_type": "llm_single", "prompt": "third"}},
+        ]
+    )
+    run_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in range(3)]
+    mock_asyncpg_pool.set_fetch_result(
+        [
+            {"id": ids[0], "slug": "p0", "phase_index": 0, "status": "pending", "output": {}},
+            {"id": ids[1], "slug": "p1", "phase_index": 1, "status": "pending", "output": {}},
+            {"id": ids[2], "slug": "p2", "phase_index": 2, "status": "pending", "output": {}},
+        ]
+    )
+
+    visited: list[str] = []
+
+    async def _stub(phase, accumulated, ctx):
+        visited.append(phase.slug)
+        return {"text": phase.slug}
+
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = type("C", (), {})()
+        await harness_engine.run_workflow(
+            run_id, wf, ctx, pool=mock_asyncpg_pool, redis=_NoopRedis()
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    # Phases ran in phase_index order (the LLM did NOT pick the next phase).
+    assert visited == ["p0", "p1", "p2"]
+    # A terminal run_completed UPDATE on workflow_runs landed.
+    assert any(
+        "UPDATE workflow_runs SET status = $2" in sql for sql, _ in mock_asyncpg_pool.calls
+    )
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 02/03")
-def test_completion_final_phase_output_is_chat_message(make_run_context):
+@pytest.mark.asyncio
+async def test_completion_final_phase_output_is_chat_message(
+    build_workflow_definition, mock_asyncpg_pool
+):
     """HARNESS-01/D-10: the terminal phase output IS the chat message (no extra LLM call)."""
-    raise NotImplementedError
+    from app.services import harness_engine
+
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": "draft"}},
+            {"config": {"phase_type": "llm_single", "prompt": "final"}},
+        ]
+    )
+    run_id = uuid.uuid4()
+    ids = [uuid.uuid4(), uuid.uuid4()]
+    mock_asyncpg_pool.set_fetch_result(
+        [
+            {"id": ids[0], "slug": "p0", "phase_index": 0, "status": "pending", "output": {}},
+            {"id": ids[1], "slug": "p1", "phase_index": 1, "status": "pending", "output": {}},
+        ]
+    )
+
+    async def _stub(phase, accumulated, ctx):
+        return {"text": f"output of {phase.slug}"}
+
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = type("C", (), {})()
+        await harness_engine.run_workflow(
+            run_id, wf, ctx, pool=mock_asyncpg_pool, redis=_NoopRedis()
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    # The FINAL phase's output is set as the chat message verbatim (D-10).
+    assert ctx.final_output == {"text": "output of p1"}
