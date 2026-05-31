@@ -1274,6 +1274,17 @@ async def send_message(
                     _wf_final_text = (
                         getattr(wf_ctx, "final_output", None) or {}
                     ).get("text", "") or ""
+                    # ── F7 (092-07): the run-level grounding union the engine exposed ──
+                    # run_workflow accumulated source_refs/citations/confidence across
+                    # ALL phases (the research phase gathers them via search_documents;
+                    # the summarize phase has none) and set ctx.final_source_refs /
+                    # ctx.final_citations / ctx.final_confidence. We thread them onto BOTH
+                    # the persisted assistant message (so references render on reload) and
+                    # the live SSE stream (so they render WITHOUT reload) — mirroring the
+                    # Deep path's persist params + SSE event vocabulary EXACTLY.
+                    _wf_source_refs = getattr(wf_ctx, "final_source_refs", None) or []
+                    _wf_citations = getattr(wf_ctx, "final_citations", None) or []
+                    _wf_confidence = getattr(wf_ctx, "final_confidence", None) or None
                     # 1. LIVE render: emit the answer as a `delta` on the PRODUCER
                     # stream (run:{run_id}) so the frontend's api.ts:485
                     # `type=="delta" → onDelta(content)` appends it to the assistant
@@ -1297,6 +1308,45 @@ async def send_message(
                                 "(answer still persisted below)", run_id,
                             )
 
+                    # F7 (092-07): emit the grounding SSE events on the PRODUCER stream
+                    # so reference chips + confidence render LIVE (no reload), mirroring
+                    # the Deep path's event vocabulary + ordering EXACTLY
+                    # (agent_loop.py:2412-2435): `sources` (sources=<list>), then
+                    # `citations` (citations=<list>, passage truncated to 400 chars like
+                    # Deep's SSE payload), then `confidence` (level/avg_similarity/
+                    # disclaimer). The frontend handlers (api.ts:566-575) onSources /
+                    # onCitations / onConfidence are the SAME ones the Deep stream drives.
+                    # Best-effort: a Redis hiccup must not abort the run (the persisted
+                    # row below is the durable truth; a reload still surfaces sources).
+                    try:
+                        if _wf_source_refs:
+                            await _harness_emit(
+                                redis, run_id, "sources", sources=_wf_source_refs
+                            )
+                        if _wf_citations:
+                            _sse_citations = []
+                            for _c in _wf_citations:
+                                _sse_c = dict(_c)
+                                _passage = _sse_c.get("passage")
+                                if _passage and len(_passage) > 400:
+                                    _sse_c["passage"] = _passage[:400]
+                                _sse_citations.append(_sse_c)
+                            await _harness_emit(
+                                redis, run_id, "citations", citations=_sse_citations
+                            )
+                        if _wf_confidence:
+                            await _harness_emit(
+                                redis, run_id, "confidence",
+                                level=_wf_confidence["level"],
+                                avg_similarity=_wf_confidence["avg_similarity"],
+                                disclaimer=_wf_confidence.get("disclaimer"),
+                            )
+                    except Exception:
+                        logger.exception(
+                            "harness grounding SSE emit failed for run %s "
+                            "(sources still persisted below)", run_id,
+                        )
+
                     # 2. DURABLE persist: populate _result_sink["persist"] with a
                     # zero-arg async callable that inserts the assistant `messages`
                     # row, mirroring the EXACT shape run_agent_loop installs
@@ -1305,21 +1355,36 @@ async def send_message(
                     # with content=_strip_nul(text)). _shielded_finalize (which runs in
                     # this middle-try `finally`) reads _result_sink.get("persist") at
                     # :1359, awaits it, and threads the returned id into finalize_run's
-                    # message_id (:1424) — identical consumption to the Deep path. We
-                    # set ONLY `persist` (no tool_calls/source_refs/confidence — the
-                    # harness final answer is plain text; those slots stay absent, which
-                    # the persist consumer already treats as optional). Token totals stay
-                    # None (the engine owns its own audit; the producer-shell runs.usage
+                    # message_id (:1424) — identical consumption to the Deep path. F7
+                    # (092-07) now ALSO threads source_refs + confidence into the persist
+                    # via the EXACT Deep insert_assistant_message param shape (so the
+                    # grounding renders on reload); tool_calls stays absent (the harness
+                    # final answer is plain prose, no per-tool cards on the answer — the
+                    # tool-call panel is Phase 094). Token totals stay None (the engine
+                    # owns its own audit; the producer-shell runs.usage
                     # legitimately has no aggregated SDK usage here → NULL + the existing
                     # :1413 warn, unchanged).
                     if _wf_final_text:
                         _wf_thread_id = thread_id
                         _wf_user_id = current_user["id"]
 
+                        # F7 (092-07): bind the grounding into the persist closure using
+                        # the EXACT Deep param shape (agent_loop.py:1136-1145 →
+                        # insert_assistant_message): source_refs (full deduped citation
+                        # objects, Deep D-13 → messages.source_refs), confidence_level /
+                        # confidence_avg_similarity / confidence_disclaimer (the
+                        # _confidence_slot fields Deep persists). Absent grounding leaves
+                        # the params None (a non-RAG workflow) — identical to a Deep turn
+                        # that searched nothing.
+                        _wf_persist_source_refs = _wf_source_refs or None
+                        _wf_persist_conf = _wf_confidence or {}
+
                         async def _persist_harness_message(
                             _text=_wf_final_text,
                             _tid=_wf_thread_id,
                             _uid=_wf_user_id,
+                            _src_refs=_wf_persist_source_refs,
+                            _conf=_wf_persist_conf,
                         ) -> str | None:
                             try:
                                 _inserted_id = await insert_assistant_message(
@@ -1327,6 +1392,10 @@ async def send_message(
                                     thread_id=UUID(_tid) if isinstance(_tid, str) else _tid,
                                     user_id=UUID(_uid) if isinstance(_uid, str) else _uid,
                                     content=_strip_nul(_text),
+                                    source_refs=_src_refs,
+                                    confidence_level=_conf.get("level"),
+                                    confidence_avg_similarity=_conf.get("avg_similarity"),
+                                    confidence_disclaimer=_conf.get("disclaimer"),
                                 )
                                 return str(_inserted_id) if _inserted_id else None
                             except Exception as e:

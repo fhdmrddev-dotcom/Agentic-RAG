@@ -1829,3 +1829,396 @@ def test_deep_path_does_not_install_harness_persist_in_source():
     assert '_result_sink["persist"] = _persist_harness_message' in src
     # Deep stays byte-identical: run_agent_loop is still the sole Deep persist source.
     assert "result_sink=_result_sink" in src
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 092-07 — F7: surface source_refs / citations / confidence ON the harness answer
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# F7: the F6 fix surfaced the answer TEXT, but the chat showed NO references /
+# citations / confidence — the grounding (it searched the user's docs) was
+# invisible. ROOT CAUSE: search_documents returns a ToolResult with source_refs +
+# citations + similarity_score, but the sub-agent loop + _exec_llm_agent discarded
+# them (returned only {"text", "sub_run_id"}), so they never reached ctx.final_*
+# or the F6 persist payload. CROSS-PHASE NUANCE: in Research→Summarize the SOURCES
+# are gathered in the RESEARCH phase (llm_agent w/ search_documents), but the FINAL
+# phase is SUMMARIZE (llm_single, no tools, no sources) — so the grounding must be
+# ACCUMULATED across ALL phases (union) and attached to the FINAL answer. The fix
+# threads source_refs/citations/similarity through run_task_sub_agent → the phase
+# executors → a run-level union in run_workflow (ctx.final_source_refs /
+# final_citations / final_confidence) → the F6 persist + the live SSE events
+# (sources / citations / confidence), all mirroring the Deep path shape EXACTLY.
+
+
+@pytest.mark.asyncio
+async def test_harness_final_grounding_persisted_with_deep_param_shape(
+    fake_redis, mock_asyncpg_pool
+):
+    """F7 (core): after a SUCCESSFUL harness run whose engine exposed the run-level
+    grounding union on wf_ctx (final_source_refs / final_citations / final_confidence),
+    the producer-shell finalizer persists the assistant `messages` row carrying that
+    grounding via insert_assistant_message — using the EXACT Deep param shape
+    (source_refs=, confidence_level=, confidence_avg_similarity=, confidence_disclaimer=).
+
+    Drives a real kickoff send; stubs run_workflow to set BOTH final_output AND the
+    F7 grounding attrs (the engine's natural-completion hand-off); patches
+    insert_assistant_message (the path the REAL _shielded_finalize calls via
+    _result_sink["persist"]). End-to-end through the unchanged finalizer.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+    inserted_msg_id = uuid.uuid4()
+    ANSWER = "Three theses converge on adaptive query optimization."
+
+    # A research phase gathered these via search_documents; the summarize phase
+    # (the FINAL phase) has none of its own — the union carries them to the answer.
+    SOURCE_REFS = [
+        {"document_id": "doc-1", "filename": "thesis_a.pdf", "chunk_index": 3,
+         "passage": "Adaptive optimization adjusts the plan at runtime.", "similarity": 0.71},
+        {"document_id": "doc-2", "filename": "thesis_b.pdf", "chunk_index": 7,
+         "passage": "Cost models drift under skew.", "similarity": 0.63},
+    ]
+    CITATIONS = list(SOURCE_REFS)
+    CONFIDENCE = {"level": "high", "avg_similarity": 0.67, "disclaimer": None}
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
+        ctx.final_output = {"text": ANSWER}
+        ctx.final_source_refs = SOURCE_REFS
+        ctx.final_citations = CITATIONS
+        ctx.final_confidence = CONFIDENCE
+
+    insert_spy = AsyncMock(return_value=inserted_msg_id)
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.api.threads.insert_assistant_message", insert_spy), \
+             patch("app.services.harness_engine.run_workflow", _wf_stub), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "summarize the DBA folder",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            assert insert_spy.await_count == 1
+            kw = insert_spy.await_args.kwargs
+            # F7: the persisted row carries the accumulated grounding via the Deep
+            # param shape — source_refs = the deduped citation objects, confidence_*
+            # split across the three columns Deep uses.
+            assert kw["content"] == ANSWER
+            assert kw["source_refs"] == SOURCE_REFS
+            assert kw["confidence_level"] == "high"
+            assert kw["confidence_avg_similarity"] == 0.67
+            assert kw["confidence_disclaimer"] is None
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_harness_final_grounding_emits_sources_citations_confidence_live(
+    fake_redis, mock_asyncpg_pool
+):
+    """F7 (live render): the harness branch emits `sources`, `citations`, and
+    `confidence` SSE events on the PRODUCER stream (run:{producer_run_id}) — the
+    SAME event vocabulary + ordering the Deep path uses (agent_loop.py:2412-2435),
+    routed to the api.ts onSources / onCitations / onConfidence handlers — so the
+    reference chips + confidence render WITHOUT a reload.
+    """
+    import asyncio as _asyncio
+    import json as _json
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+    ANSWER = "Grounded answer with visible sources."
+    SOURCE_REFS = [{"document_id": "doc-1", "filename": "a.pdf"}]
+    CITATIONS = [{"document_id": "doc-1", "filename": "a.pdf", "chunk_index": 1,
+                  "passage": "x" * 600, "similarity": 0.6}]
+    CONFIDENCE = {"level": "medium", "avg_similarity": 0.42, "disclaimer": None}
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
+        ctx.final_output = {"text": ANSWER}
+        ctx.final_source_refs = SOURCE_REFS
+        ctx.final_citations = CITATIONS
+        ctx.final_confidence = CONFIDENCE
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.api.threads.insert_assistant_message",
+                   AsyncMock(return_value=uuid.uuid4())), \
+             patch("app.services.harness_engine.run_workflow", _wf_stub), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "answer me",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+            producer_run_id = resp.json()["run_id"]
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(producer_run_id)
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            by_type: dict[str, tuple[str, dict]] = {}
+            for stream, fields in fake_redis.xadds:
+                payload = _json.loads(fields["data"])
+                by_type[payload["type"]] = (stream, payload)
+
+            expected_stream = f"run:{producer_run_id}"
+            # All three grounding events fired on the producer stream.
+            assert "sources" in by_type and by_type["sources"][0] == expected_stream
+            assert by_type["sources"][1]["sources"] == SOURCE_REFS
+            assert "citations" in by_type and by_type["citations"][0] == expected_stream
+            # passage truncated to 400 chars in the SSE payload (Deep parity).
+            assert len(by_type["citations"][1]["citations"][0]["passage"]) == 400
+            assert "confidence" in by_type and by_type["confidence"][0] == expected_stream
+            conf_payload = by_type["confidence"][1]
+            assert conf_payload["level"] == "medium"
+            assert conf_payload["avg_similarity"] == 0.42
+            assert conf_payload["disclaimer"] is None
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_accumulates_grounding_across_phases_onto_final(
+    build_workflow_definition, mock_asyncpg_pool, fake_redis
+):
+    """F7 cross-phase nuance: the engine UNIONS source_refs/citations/similarity
+    across ALL phases and exposes the deduped + confidence-scored union on
+    ctx.final_source_refs / final_citations / final_confidence — so a RESEARCH
+    phase (gathers grounding) → SUMMARIZE phase (no grounding of its own) ends with
+    the research grounding ON the final answer.
+    """
+    from app.services import harness_engine
+
+    wf = build_workflow_definition(
+        [
+            {"slug": "research", "config": {"phase_type": "llm_single", "prompt": "r"}},
+            {"slug": "summarize", "config": {"phase_type": "llm_single", "prompt": "s"}},
+        ]
+    )
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+    ids = [uuid.uuid4(), uuid.uuid4()]
+    mock_asyncpg_pool.set_fetch_result([
+        {"id": ids[0], "slug": "research", "phase_index": 0, "status": "pending", "output": {}},
+        {"id": ids[1], "slug": "summarize", "phase_index": 1, "status": "pending", "output": {}},
+    ])
+
+    async def _stub(phase, accumulated, ctx):
+        if phase.slug == "research":
+            # The research phase gathered grounding (two hits, one a dup of the other
+            # by document_id+chunk_index → deduped to one citation).
+            return {
+                "text": "research notes",
+                "source_refs": [
+                    {"document_id": "doc-1", "filename": "a.pdf"},
+                    {"document_id": "doc-1", "filename": "a.pdf"},
+                ],
+                "citations": [
+                    {"document_id": "doc-1", "filename": "a.pdf", "chunk_index": 2,
+                     "passage": "p", "similarity": 0.6},
+                    {"document_id": "doc-1", "filename": "a.pdf", "chunk_index": 2,
+                     "passage": "p", "similarity": 0.6},
+                ],
+                "similarity_scores": [0.6],
+            }
+        # The summarize (FINAL) phase produces only prose — NO grounding of its own.
+        return {"text": "FINAL ANSWER"}
+
+    # Force the harness package import FIRST so run_workflow's lazy
+    # `from app.services.harness.validators import run_gates` (which transitively
+    # runs register_all → PHASE_TYPE_REGISTRY.update with the REAL executors) cannot
+    # OVERWRITE the stub mid-run. Without this, an isolated run imports the package
+    # fresh inside run_workflow and clobbers the stub (test-ordering fragility).
+    import app.services.harness  # noqa: F401
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        await harness_engine.run_workflow(
+            wf_run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis,
+            stream_run_id=producer_id,
+        )
+    finally:
+        _restore_registry(harness_engine, "llm_single", _orig)
+
+    # The FINAL answer is the summarize phase's text (D-10) ...
+    assert ctx.final_output["text"] == "FINAL ANSWER"
+    # ... but the grounding is the RESEARCH phase's, accumulated + deduped onto it.
+    assert len(ctx.final_citations) == 1, "citations deduped by document_id+chunk_index"
+    assert ctx.final_citations[0]["document_id"] == "doc-1"
+    # source_refs prefers the full deduped citation objects (Deep D-13).
+    assert ctx.final_source_refs == ctx.final_citations
+    # confidence computed from the avg similarity over the union (0.6 → 'high').
+    assert ctx.final_confidence is not None
+    assert ctx.final_confidence["level"] == "high"
+    assert ctx.final_confidence["avg_similarity"] == 0.6
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_no_grounding_leaves_final_grounding_empty(
+    build_workflow_definition, mock_asyncpg_pool, fake_redis
+):
+    """F7 negative: a workflow whose phases gather NO grounding (a non-RAG workflow)
+    ends with empty source_refs/citations and confidence=None — identical to a Deep
+    turn that searched nothing (no reference chips, no confidence chip).
+    """
+    from app.services import harness_engine
+
+    wf = _three_phase_def(build_workflow_definition)
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in range(3)]
+    mock_asyncpg_pool.set_fetch_result([
+        {"id": ids[0], "slug": "p0", "phase_index": 0, "status": "pending", "output": {}},
+        {"id": ids[1], "slug": "p1", "phase_index": 1, "status": "pending", "output": {}},
+        {"id": ids[2], "slug": "p2", "phase_index": 2, "status": "pending", "output": {}},
+    ])
+
+    async def _stub(phase, accumulated, ctx):
+        return {"text": phase.slug}  # no grounding keys
+
+    # Force the harness package import FIRST (see the sibling F7 engine test) so the
+    # lazy register_all inside run_workflow cannot clobber the stub on isolated runs.
+    import app.services.harness  # noqa: F401
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        await harness_engine.run_workflow(
+            wf_run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis,
+            stream_run_id=producer_id,
+        )
+    finally:
+        _restore_registry(harness_engine, "llm_single", _orig)
+
+    assert ctx.final_source_refs == []
+    assert ctx.final_citations == []
+    assert ctx.final_confidence is None
+
+
+@pytest.mark.asyncio
+async def test_exec_llm_agent_threads_subagent_grounding_to_phase_output():
+    """F7 (executor seam): _exec_llm_agent returns source_refs/citations/
+    similarity_scores from the sub-agent result on the phase-output dict (so the
+    engine can union them). run_task_sub_agent is stubbed to return the grounding the
+    real sub-agent loop now accumulates off each search_documents ToolResult.
+    """
+    from unittest.mock import patch
+
+    from app.services.harness import phase_types
+
+    sub_result = {
+        "sub_run_id": uuid.uuid4(),
+        "summary": "research summary",
+        "status": "completed",
+        "source_refs": [{"document_id": "doc-9", "filename": "z.pdf"}],
+        "citations": [{"document_id": "doc-9", "filename": "z.pdf", "chunk_index": 0,
+                       "passage": "q", "similarity": 0.5}],
+        "similarity_scores": [0.5],
+    }
+
+    async def _fake_sub_agent(**kwargs):
+        return sub_result
+
+    ctx = _harness_ctx()
+    ctx.supabase = object()
+    ctx.user_settings = None
+    # apply_tool_budget/get_tools read user_settings=None safely; stub the sub-agent.
+    with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+        out = await phase_types._exec_llm_agent(_llm_agent_phase(), {}, ctx)
+
+    assert out["text"] == "research summary"
+    assert out["source_refs"] == sub_result["source_refs"]
+    assert out["citations"] == sub_result["citations"]
+    assert out["similarity_scores"] == [0.5]

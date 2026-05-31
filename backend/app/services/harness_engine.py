@@ -151,6 +151,86 @@ def _persist_output(output: dict) -> dict:
     return output
 
 
+# ── F7 (092-07): run-level grounding union ────────────────────────────────────
+def _accumulate_phase_grounding(
+    output: dict | None,
+    run_source_refs: list[dict],
+    run_citations: list[dict],
+    run_similarity_scores: list[float],
+) -> None:
+    """Fold one phase's grounding (if any) into the run-level union (in place).
+
+    A phase executor's output (harness/phase_types.py) may carry ``source_refs`` /
+    ``citations`` (per-tool lists) and ``similarity_scores`` (one avg-cosine per
+    search call). Mirrors the Deep agent-loop accumulation EXACTLY
+    (agent_loop.py:2229-2234): EXTEND the ref/citation lists, EXTEND the score list
+    (the per-phase list is already the per-call collection from the sub-agent loop).
+    Non-grounding phases (no keys) contribute nothing — no behavior change.
+    """
+    if not isinstance(output, dict):
+        return
+    refs = output.get("source_refs")
+    if refs:
+        run_source_refs.extend(refs)
+    cites = output.get("citations")
+    if cites:
+        run_citations.extend(cites)
+    scores = output.get("similarity_scores")
+    if scores:
+        run_similarity_scores.extend(scores)
+
+
+def _finalize_run_grounding(
+    run_source_refs: list[dict],
+    run_citations: list[dict],
+    run_similarity_scores: list[float],
+) -> tuple[list[dict], list[dict], dict | None]:
+    """Dedupe the union + compute confidence, MATCHING the Deep path exactly.
+
+    Returns ``(final_source_refs, final_citations, final_confidence)`` where:
+      * ``final_citations`` = ``_deduplicate_citations`` of the union (Deep D-14).
+      * ``final_source_refs`` = the deduped CITATION objects when present (Deep D-13:
+        ``row["source_refs"] = unique_citations``), else the source_refs deduped by
+        ``document_id`` (Deep backward-compat: ``unique_sources``). This is the value
+        that lands in ``messages.source_refs`` so the references render with passages.
+      * ``final_confidence`` = ``{"level", "avg_similarity", "disclaimer"}`` from the
+        avg over the union via ``_compute_confidence`` (Deep D-05/D-10), or None when
+        no similarity was gathered (a non-RAG workflow — no confidence chip, like Deep).
+
+    Deep helpers are lazy-imported (agent_loop imports this package transitively; a
+    top-level import risks the same cycle phase_types breaks lazily).
+    """
+    from app.services.agent_loop import (
+        CONFIDENCE_DISCLAIMER,
+        _compute_confidence,
+        _deduplicate_citations,
+    )
+
+    unique_citations = _deduplicate_citations(run_citations) if run_citations else []
+    if unique_citations:
+        final_source_refs = unique_citations
+    elif run_source_refs:
+        # Deep backward-compat path: dedupe by document_id (agent_loop.py:2414).
+        final_source_refs = list(
+            {s["document_id"]: s for s in run_source_refs}.values()
+        )
+    else:
+        final_source_refs = []
+
+    final_confidence: dict | None = None
+    if run_similarity_scores:
+        final_avg = sum(run_similarity_scores) / len(run_similarity_scores)
+        level = _compute_confidence(final_avg)
+        disclaimer = CONFIDENCE_DISCLAIMER if level == "low" else None
+        final_confidence = {
+            "level": level,
+            "avg_similarity": round(final_avg, 4),
+            "disclaimer": disclaimer,
+        }
+
+    return final_source_refs, unique_citations, final_confidence
+
+
 async def _execute_phase(phase, accumulated_outputs: dict, ctx) -> dict:
     """Dispatch a phase to its executor via the registry SEAM (Plan 03 fills it)."""
     phase_type = phase.config.phase_type
@@ -413,6 +493,14 @@ async def run_workflow(
     rows = await load_run_phases(pool, run_id)
     # Resumed runs see prior outputs: seed accumulated_outputs from completed rows.
     accumulated_outputs: dict[str, dict] = {}
+    # F7 (092-07): on resume, the grounding gathered by phases that completed BEFORE
+    # the restart lives only in their durable workflow_phases.output — re-fold it
+    # into the run-level union (declared below) from those rows, so a resumed run's
+    # final answer still SHOWS the sources earlier phases gathered. Forward-declared
+    # here; the loop body folds LIVE-completed phases into the same lists.
+    _resumed_grounding_rows = [
+        r.get("output") or {} for r in rows if r.get("status") == "completed"
+    ]
     for r in rows:
         if r.get("status") == "completed":
             accumulated_outputs[r["slug"]] = r.get("output") or {}
@@ -424,6 +512,20 @@ async def run_workflow(
     index_by_slug = {row["slug"]: i for i, row in enumerate(ordered)}
 
     last_output: dict = {}
+    # F7 (092-07): the run-level grounding union. Every phase's executor output may
+    # carry source_refs/citations/similarity_scores (an llm_agent research phase
+    # gathers them via search_documents; an llm_single summarize phase has none).
+    # We UNION across ALL phases here so the FINAL phase's answer SHOWS the sources
+    # the EARLIER phases gathered — the cross-phase nuance F7 turns on. Mirrors the
+    # Deep agent-loop accumulators (agent_loop.py:1078-1081): extend/extend/append.
+    run_source_refs: list[dict] = []
+    run_citations: list[dict] = []
+    run_similarity_scores: list[float] = []
+    # F7: fold the grounding of phases completed before a restart (resume path).
+    for _resumed_output in _resumed_grounding_rows:
+        _accumulate_phase_grounding(
+            _resumed_output, run_source_refs, run_citations, run_similarity_scores
+        )
     # Index-driven loop (not a for-each) so skip_to_phase can jump the cursor (D-09).
     i = 0
     while i < len(ordered):
@@ -521,6 +623,10 @@ async def run_workflow(
         await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
         last_output = output
+        # F7 (092-07): fold this phase's grounding into the run-level union.
+        _accumulate_phase_grounding(
+            output, run_source_refs, run_citations, run_similarity_scores
+        )
 
         # 4. Advance current_phase + audit/emit the transition.
         next_phase_id = ordered[i + 1]["id"] if i + 1 < len(ordered) else None
@@ -559,6 +665,26 @@ async def run_workflow(
         ctx.final_output = last_output
     except (AttributeError, TypeError):
         pass  # ctx may be an immutable stub in unit tests
+
+    # F7 (092-07): expose the run-level grounding union for the persist+emit hand-off
+    # (threads.py F6 branch). Dedupe + confidence are computed with the SAME helpers
+    # the Deep path uses (lazy-imported to keep the harness-package import cycle
+    # broken): _deduplicate_citations (by document_id+chunk_index, order-preserving)
+    # and _compute_confidence (avg cosine → high/medium/low). source_refs prefers the
+    # full deduped CITATION objects (Deep D-13: row["source_refs"] = unique_citations
+    # when present, else unique_sources) so the references render with passages.
+    _final_source_refs, _final_citations, _final_confidence = _finalize_run_grounding(
+        run_source_refs, run_citations, run_similarity_scores
+    )
+    for _attr, _val in (
+        ("final_source_refs", _final_source_refs),
+        ("final_citations", _final_citations),
+        ("final_confidence", _final_confidence),
+    ):
+        try:
+            setattr(ctx, _attr, _val)
+        except (AttributeError, TypeError):
+            pass  # immutable stub ctx in some unit tests
 
     # Mirror _shielded_finalize ordering: durable run-status UPDATE BEFORE the
     # terminal _emit.

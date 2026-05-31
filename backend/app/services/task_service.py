@@ -355,6 +355,16 @@ async def run_task_sub_agent(
     final_status = "completed"
     error_msg: str | None = None
 
+    # F7 (092-07): accumulate the grounding off every ToolResult so the harness
+    # final answer can SHOW its sources (a harness research phase gathers them via
+    # search_documents here, but the FINAL phase is summarize — llm_single with no
+    # tools — so the sub-agent return MUST carry them up to the engine). Mirrors the
+    # Deep agent-loop accumulation EXACTLY (agent_loop.py:2229-2234): source_refs +
+    # citations EXTEND (per-tool lists), similarity_score APPENDS one avg per call.
+    sub_source_refs: list[dict] = []
+    sub_citations: list[dict] = []
+    sub_similarity_scores: list[float] = []
+
     try:
         for step in range(max_steps):
             # Emit per-iteration heartbeat on the SUB-agent's stream so Phase
@@ -399,6 +409,15 @@ async def run_task_sub_agent(
                     "tool_call_id": tc.get("id", ""),
                     "content": tr.result if isinstance(tr, ToolResult) else str(tr),
                 })
+                # F7 (092-07): harvest the grounding from this ToolResult — same
+                # extend/extend/append shape the Deep loop uses (agent_loop.py:2229).
+                if isinstance(tr, ToolResult):
+                    if tr.source_refs:
+                        sub_source_refs.extend(tr.source_refs)
+                    if tr.citations:
+                        sub_citations.extend(tr.citations)
+                    if tr.similarity_score is not None:
+                        sub_similarity_scores.append(tr.similarity_score)
 
             # Replay assistant + tool messages for next iteration
             messages.append({
@@ -470,4 +489,17 @@ async def run_task_sub_agent(
         except Exception:  # noqa: BLE001
             logger.exception("sub_agent_done emit failed for sub_run_id=%s", sub_run_id)
 
-    return {"sub_run_id": sub_run_id, "summary": summary, "status": final_status}
+    # F7 (092-07): return the accumulated grounding alongside the summary so the
+    # harness phase executor can thread it onto the run-level union (the engine then
+    # attaches it to the persisted+emitted final answer). Existing callers (Deep
+    # task() / analyze_document) ignore these extra keys — additive, no behavior
+    # change. similarity_scores stays a raw per-call list; the engine computes the
+    # avg → confidence using the SAME _compute_confidence the Deep path uses.
+    return {
+        "sub_run_id": sub_run_id,
+        "summary": summary,
+        "status": final_status,
+        "source_refs": sub_source_refs,
+        "citations": sub_citations,
+        "similarity_scores": sub_similarity_scores,
+    }

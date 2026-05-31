@@ -249,7 +249,18 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         system_prompt_override=system_prompt,
         tools_override=tools_override,
     )
-    return {"text": result["summary"], "sub_run_id": str(result["sub_run_id"])}
+    # F7 (092-07): thread the grounding the sub-agent gathered (search_documents'
+    # source_refs/citations/similarity) up to the phase output. The engine unions
+    # it across ALL phases and attaches the accumulated set to the final answer —
+    # so a Research→Summarize workflow shows the RESEARCH phase's sources on the
+    # SUMMARIZE phase's prose (the final phase has none of its own).
+    return {
+        "text": result["summary"],
+        "sub_run_id": str(result["sub_run_id"]),
+        "source_refs": result.get("source_refs") or [],
+        "citations": result.get("citations") or [],
+        "similarity_scores": result.get("similarity_scores") or [],
+    }
 
 
 async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
@@ -305,7 +316,25 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     else:  # "concat"
         merged = "\n\n".join(summaries)
 
-    return {"text": merged, "sub_run_ids": sub_run_ids}
+    # F7 (092-07): union the grounding across ALL parallel branches (same shape as
+    # _exec_llm_agent — extend lists, concatenate similarity scores). The engine
+    # dedupes + averages over the run-level union, so per-branch overlap here is
+    # harmless (it's collapsed downstream by the same dedupe the Deep path uses).
+    batch_source_refs: list[dict] = []
+    batch_citations: list[dict] = []
+    batch_similarity_scores: list[float] = []
+    for r in results:
+        batch_source_refs.extend(r.get("source_refs") or [])
+        batch_citations.extend(r.get("citations") or [])
+        batch_similarity_scores.extend(r.get("similarity_scores") or [])
+
+    return {
+        "text": merged,
+        "sub_run_ids": sub_run_ids,
+        "source_refs": batch_source_refs,
+        "citations": batch_citations,
+        "similarity_scores": batch_similarity_scores,
+    }
 
 
 async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
