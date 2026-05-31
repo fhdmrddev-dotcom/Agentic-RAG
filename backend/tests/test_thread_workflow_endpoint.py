@@ -62,8 +62,9 @@ def test_thread_workflow_state_shape(client, mock_asyncpg_pool, mock_execute_res
         "id": str(thread_id),
         "active_workflow_run_id": str(run_id),
     }
-    # workflow_runs join, then the (skipped) deep cap_paused probe — but the run
-    # is 'active' so cap_paused=False and the deep probe DOES run -> None.
+    # fetchrow order: (1) workflow_runs join -> 'active'; (2) F2 producer-run
+    # backstop probe -> a non-terminal producer row (so it does NOT flip
+    # lock_is_stale); (3) deep cap_paused probe -> None.
     mock_asyncpg_pool.set_fetchrow_results([
         {
             "status": "active",
@@ -74,6 +75,7 @@ def test_thread_workflow_state_shape(client, mock_asyncpg_pool, mock_execute_res
             "current_phase_index": 1,
             "total_phases": 3,
         },
+        {"status": "streaming"},  # F2 producer-run probe — non-terminal
         None,  # latest cap_paused runs row — none
     ])
 
@@ -137,6 +139,51 @@ def test_lock_is_stale_when_run_terminal_or_absent(
     body = resp.json()
     assert body["lock_is_stale"] is True   # anchor set, run terminal
     assert body["locked"] is False         # terminal -> not locked
+
+
+def test_lock_is_stale_when_producer_run_terminal_workflow_lagged(
+    client, mock_asyncpg_pool, mock_execute_result
+):
+    """F2 backstop (092-05): even if workflow_runs.status lagged at a non-terminal
+    'active' (e.g. a crash between run_workflow's two writes), if the underlying
+    producer `runs` row for the thread is terminal the lock is reported stale
+    (self-heal). The frontend treats such a thread as unlocked.
+    """
+    thread_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    mock_execute_result.data = {
+        "id": str(thread_id),
+        "active_workflow_run_id": str(run_id),
+    }
+    # fetchrow order: (1) workflow_runs join -> STILL 'active' (lagged);
+    # (2) F2 producer-run probe -> terminal 'failed' -> flips lock_is_stale;
+    # (3) deep cap_paused probe -> None.
+    mock_asyncpg_pool.set_fetchrow_results([
+        {
+            "status": "active",
+            "continues_used": 0,
+            "definition_slug": "wf",
+            "definition_name": "WF",
+            "current_phase_slug": "p0",
+            "current_phase_index": 0,
+            "total_phases": 2,
+        },
+        {"status": "failed"},  # producer run is terminal — lock is stale
+        None,
+    ])
+
+    with patch("app.api.threads.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # workflow_runs lagged 'active' so `locked` stays server-authoritative True,
+    # but lock_is_stale=True surfaces the heal so the client treats it as Deep.
+    assert body["lock_is_stale"] is True
+    # pure read — the heal probe must not write.
+    for sql, _ in mock_asyncpg_pool.calls:
+        assert "UPDATE" not in sql.upper() and "INSERT" not in sql.upper()
 
 
 def test_get_workflow_is_pure_read_never_writes(

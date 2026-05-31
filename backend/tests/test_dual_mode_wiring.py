@@ -408,6 +408,154 @@ async def test_producer_branches_harness_when_anchor_set(
         app.dependency_overrides.pop(get_redis, None)
 
 
+# ── F2 (092-05): a harness run that escapes terminalizes + clears the anchor ──
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_harness_failure_terminalizes_and_clears_anchor(
+    fake_redis, mock_asyncpg_pool
+):
+    """F2: when the harness producer branch raises (run_workflow blows up before
+    reaching its own finish_run), the producer's finalize path calls
+    finish_run(pool, <workflow run id>, "failed") exactly once — terminalizing
+    workflow_runs AND clearing threads.active_workflow_run_id. Without this the
+    thread is wedged locked (lock_is_stale=false, no UI recovery).
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    # run_workflow blows up mid-run (never reaches its own finish_run).
+    boom = AsyncMock(side_effect=RuntimeError("phase exploded"))
+    finish_spy = AsyncMock()
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.db.workflows.finish_run", finish_spy), \
+             patch("app.services.harness_engine.run_workflow", boom), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "research X",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            # F2: finish_run called exactly once, on the WORKFLOW run id, 'failed'
+            # — terminalizes workflow_runs + clears the anchor (no wedged lock).
+            assert finish_spy.await_count == 1
+            assert finish_spy.await_args.args[1] == new_run_id
+            assert finish_spy.await_args.args[2] == "failed"
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_deep_run_failure_does_not_terminalize_workflow(
+    fake_redis, mock_asyncpg_pool
+):
+    """F2 negative: a Deep send (no workflow anchor) that fails MUST NOT call the
+    workflow finish_run from the producer finalize path — the F2 terminalize is
+    gated on _active_workflow_run_id and a Deep run leaves it None (byte-identical).
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    # Deep thread — no workflow_definition_id, no anchor.
+    sb = _branch_test_supabase(thread_id)
+
+    boom = AsyncMock(side_effect=RuntimeError("deep loop exploded"))
+    finish_spy = AsyncMock()
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.db.workflows.finish_run", finish_spy), \
+             patch("app.api.threads.run_agent_loop", boom):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "just a deep chat"},
+                )
+            assert resp.status_code == 201, resp.text
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            # No workflow anchor -> the F2 terminalize never fires.
+            assert finish_spy.await_count == 0
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
 @pytest.mark.asyncio
 @pytest.mark.timeout(15)
 async def test_locked_thread_deep_send_refused_409(fake_redis, mock_asyncpg_pool):

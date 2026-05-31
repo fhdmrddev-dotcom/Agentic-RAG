@@ -1375,6 +1375,35 @@ async def send_message(
                     except BaseException:
                         logger.exception("ZREM failed for run %s", run_id)
 
+                    # 6. Phase 092-05 F2: a HARNESS run that escapes via
+                    # exception/timeout/cancel never reached run_workflow's own
+                    # finish_run, so workflow_runs would stay 'active' and the
+                    # thread is wedged locked (lock_is_stale=false, no UI recovery).
+                    # Terminalize the workflow_runs row + clear the anchor here on
+                    # any NON-completed terminal status. Idempotent: finish_run
+                    # no-ops the anchor-clear if run_workflow already cleared it on
+                    # its own internal failure path. A natural-success run
+                    # (_terminal_status=='completed') is SKIPPED — run_workflow
+                    # already wrote finish_run(..., 'completed'). Deep runs
+                    # (_active_workflow_run_id is None) skip this entirely
+                    # (byte-identical).
+                    if (
+                        _active_workflow_run_id is not None
+                        and _terminal_status != "completed"
+                    ):
+                        try:
+                            from app.db.workflows import finish_run as _finish_wf
+                            await _finish_wf(
+                                await get_pg_pool(),
+                                _active_workflow_run_id,
+                                "failed",
+                            )
+                        except BaseException:
+                            logger.exception(
+                                "F2 harness-failure terminalize failed for run %s",
+                                _active_workflow_run_id,
+                            )
+
                 try:
                     await asyncio.shield(_shielded_finalize())
                 except asyncio.CancelledError:
@@ -1512,6 +1541,25 @@ async def get_thread_workflow(
     lock_is_stale = active_workflow_run_id is not None and (
         run_status is None or run_status in _TERMINAL_WORKFLOW_STATUSES
     )
+
+    # Phase 092-05 F2 backstop: even if workflow_runs.status somehow lagged at a
+    # non-terminal value (e.g. a crash between run_workflow's two writes), if the
+    # underlying producer `runs` row for this thread is terminal/missing the lock
+    # is stale — surface it so the F3 frontend treats the thread as unlocked
+    # (self-heals a future stranded lock on reconcile). PURE READ — no writes
+    # (the test_thread_workflow_endpoint.py pure-read invariant must hold).
+    producer_terminal = False
+    if active_workflow_run_id is not None and not lock_is_stale:
+        prod_row = await pool.fetchrow(
+            "SELECT status FROM runs WHERE thread_id = $1 "
+            "ORDER BY started_at DESC LIMIT 1",
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        prod_status = prod_row["status"] if prod_row is not None else None
+        producer_terminal = prod_status in (
+            "completed", "failed", "cancelled", "timed_out"
+        )
+    lock_is_stale = lock_is_stale or producer_terminal
 
     # 3. cap_paused / continues: a workflow run carries it on workflow_runs; a
     # Deep run carries it on the latest non-terminal `runs` row (RESEARCH Q3 —
