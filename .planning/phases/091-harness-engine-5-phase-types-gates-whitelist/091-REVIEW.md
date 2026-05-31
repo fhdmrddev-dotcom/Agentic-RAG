@@ -24,7 +24,7 @@ findings:
   warning: 6
   info: 5
   total: 13
-status: issues_found
+status: resolved
 ---
 
 # Phase 091: Code Review Report
@@ -32,7 +32,7 @@ status: issues_found
 **Reviewed:** 2026-05-31
 **Depth:** standard
 **Files Reviewed:** 15
-**Status:** issues_found
+**Status:** resolved (gap-closure plan 091-08 — see Resolution below)
 
 ## Summary
 
@@ -152,6 +152,32 @@ Preferred for v1: store inline and defer the spill optimization, since correctne
 
 ---
 
+## Resolution (091-08)
+
+Gap-closure plan **091-08** (wave 6, `gap_closure: true`, source = this REVIEW) was planned and executed on 2026-05-31. Three task commits landed the code + migration + tests; the operator applied migration 062 via the Supabase SQL editor, then a continuation finalized the artifact and tracking. Full harness suite GREEN against the live `claimed_at` column (95 passed, 0 skipped).
+
+**Fixed (7 findings):**
+
+- **CR-01** — `claim_run` is now a real CAS via a `claimed_at timestamptz` lease (migration `062_workflow_run_claim_lease.sql`). The winning worker stamps `claimed_at = now()`; a racing `WORKER_COUNT=2` sibling matches 0 rows (predicate adds `claimed_at IS NULL OR claimed_at < now() - $2::interval`) → returns False → no double-execute. A crash-mid-resume run is re-claimable once the lease (engine/config constant, default 5 min) expires. Status set untouched (no new `resuming` status — lease is orthogonal to status, avoids a CHECK-constraint migration). Commit 77394956 (caller), 42cf002f (migration + lease constant).
+- **CR-02** — `_persist_output` no longer returns a `workspace-files://pending` placeholder for outputs > 64 KB. The full payload is stored **inline** in `workflow_phases.output` (jsonb); the size gate may log but never discards content. No silent data loss; bucket spill remains a future optimization, not a correctness dependency. Commit 77394956.
+- **WR-03** — the failing-validator index is threaded back through `GateResult`; `_run_phase_with_gates` / `_route_on_failure` now derive BOTH `max_retries` and `on_failure` from the SAME failing validator (`phase.validators[failed_idx]`), not `validators[0]` for the bound and a different one for routing. Commit 77394956.
+- **WR-04** — the TOOL-05 per-provider `max_tools` budget cap is now actually applied to the tool schemas the sub-agent model sees on the `run_task_sub_agent` path (was computed-then-discarded as a dead `_tools_override`). Whitelist (HARNESS-05) still enforced; Deep-Mode byte-identical invariant preserved (no cap when whitelist is None / no active workflow). Commit 77394956.
+- **WR-05 + WR-06** — `get_pending_ask_user` and `ask_user_response_exists` are now run-scoped (predicate on the stored `run_id` in `tool_calls`), not merely thread-scoped, so a multi-run thread resumes the prompt/answer belonging to the specific stranded run. Commit 77394956.
+- **IN-01** — dropped the always-`None` dead `gate` parameter from `_failing_on_failure`. Commit 77394956.
+
+Regression tests for every fix landed in commit ac1083e6 (test_harness_resume.py, test_harness_gates.py, test_tool_budget.py).
+
+**Deferred to Phase 092 (2 findings):**
+
+- **WR-01** (resume ctx missing `inputs`) + **WR-02** (resume ctx missing `model`/`user_settings`) — the proper fix requires persisting run inputs + model at workflow_runs **creation**, which does not exist in Phase 091 (no `INSERT INTO workflow_runs` in `backend/app`). Run creation + per-run context construction is owned by Phase 092 (dual-mode + Continue). Planted as **SEED-040** with a concrete re-open trigger: Phase 092 run-creation persists `workflow_runs.inputs` + `model`, rehydrated into the resume ctx; **Phase 096 EVAL-02 (live kill-and-resume)** is the proof gate. Until then, resumed LLM / top-level-input phases are a known live-resume limitation (the deterministic unit proof for resume mechanics stands).
+
+**No action — cosmetic / doc-only (3 findings):**
+
+- **IN-03** (`_prior_output_text` joins all prior phases — clarify docstring intent), **IN-04** (`_DEFAULT_PHASE_*` import-time settings snapshot — note for test authors, consistent with codebase settings pattern), **IN-05** (`_route_on_failure` reason text `attempt + 1` mislabels wall-clock-timeout case — cosmetic, failure is correctly terminal). Optional polish, no correctness impact. **IN-02** (`apply_tool_budget` reverse-index drop is convoluted) — behavior-neutral cleanup, also no-action.
+
+---
+
 _Reviewed: 2026-05-31_
 _Reviewer: Claude (gsd-code-reviewer)_
+_Resolution: 2026-05-31 (plan 091-08)_
 _Depth: standard_

@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict U2vk3kaXhAdxXMvk3T2YeCF8HXzR0xY3zbGfHI29iy447GvuQx7cOBSNltaLXPt
+\restrict 98dlGg7tq4MI8jwTcIXhQRWZkMvyV2KBfD1fhs9kRqJCOwffVKvwVy0HxSwPEnd
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -745,6 +745,7 @@ CREATE TABLE public.workflow_runs (
     org_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    claimed_at timestamp with time zone,
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -754,6 +755,13 @@ CREATE TABLE public.workflow_runs (
 --
 
 COMMENT ON COLUMN public.workflow_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN workflow_runs.claimed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.claimed_at IS 'Resume CAS lease (Phase 091 CR-01): the startup sweep stamps now() when it wins the claim_run CAS so a racing WORKER_COUNT=2 sibling matches 0 rows and skips. Re-claimable once the lease (engine constant, default 5 min) expires. Orthogonal to status; NULL = never claimed.';
 
 
 --
@@ -2399,5 +2407,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict U2vk3kaXhAdxXMvk3T2YeCF8HXzR0xY3zbGfHI29iy447GvuQx7cOBSNltaLXPt
+\unrestrict 98dlGg7tq4MI8jwTcIXhQRWZkMvyV2KBfD1fhs9kRqJCOwffVKvwVy0HxSwPEnd
 

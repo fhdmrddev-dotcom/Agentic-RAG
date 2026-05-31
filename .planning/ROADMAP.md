@@ -101,6 +101,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 - [x] 091-05-PLAN.md — Validation gates (4 kinds) + bounded retry + on_failure + caps (wave 3) ✅ 2026-05-31
 - [x] 091-04-PLAN.md — Resumability: startup sweep + claim + ask_user re-subscribe (wave 4) ✅ 2026-05-31
 - [x] 091-07-PLAN.md — 4 seed templates (migration 061) + end-to-end + operator apply (wave 5) ✅ 2026-05-31
+- [x] 091-08-PLAN.md — Gap closure for 091-REVIEW (CR-01 claim CAS lease/migration 062 + CR-02 inline large output + WR-03/04/05/06 + IN-01) (wave 6) ✅ 2026-05-31
 
 **Notes**: Phase D (whitelist enforcement) folds in here — it shares the `ToolContext` construction site; do NOT split it out. Every workflow SSE event rides the existing `run:{run_id}` stream via `_emit` (zero new Redis namespace). All harness logic lives ABOVE the loop or at the single `dispatch_tool` entry — never in provider-specific streaming branches (075.x cascade prevention).
 
@@ -175,7 +176,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 |-------|----------------|--------|-----------|
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
-| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 7/7 | Awaiting verify | - |
+| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Awaiting verify | - |
 | 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |

@@ -97,11 +97,11 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | HARNESS-02 | Phase 090 | Pending |
 | HARNESS-06 | Phase 090 | Pending |
 | HARNESS-01 | Phase 091 | Pending |
-| HARNESS-03 | Phase 091 | Pending |
+| HARNESS-03 | Phase 091 | Complete |
 | HARNESS-04 | Phase 091 | Pending |
-| HARNESS-05 | Phase 091 | Pending |
+| HARNESS-05 | Phase 091 | Complete |
 | HARNESS-07 | Phase 091 | Complete |
-| TOOL-05 | Phase 091 | Pending |
+| TOOL-05 | Phase 091 | Complete |
 | MODE-01 | Phase 092 | Pending |
 | MODE-02 | Phase 092 | Pending |
 | CONT-01 | Phase 092 | Pending |
