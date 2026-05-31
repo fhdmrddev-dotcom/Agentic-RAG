@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: "092-05-PLAN.md COMPLETE (F1+F2 backend gap-closure shipped, Tasks 1-4) — next is 092-06 (F3 frontend + UAT gate)"
-last_updated: "2026-05-31T19:20:00.000Z"
+stopped_at: "092-06 Tasks 1-2 SHIPPED (F3 frontend lock-UX) — PAUSED at Task 3 checkpoint:human-action (Chrome-MCP + native-7 cross-provider UAT, orchestrator+operator owned)"
+last_updated: "2026-05-31T20:05:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
@@ -275,9 +275,16 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T19:20:00.000Z
-Stopped at: 092-05-PLAN.md COMPLETE (Tasks 1-4 shipped; F1+F2 closed; live-DB audit test green) — next is 092-06 (F3 frontend + UAT re-run gate)
-Resume file: None
+Last session: 2026-05-31T20:05:00.000Z
+Stopped at: 092-06 Tasks 1-2 SHIPPED (F3 frontend lock-UX) — PAUSED at Task 3 checkpoint:human-action UAT gate
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-06-PLAN.md (Task 3)
+
+**Plan 092-06 — ⏸ IN PROGRESS (Tasks 1-2 done, awaiting Task 3 UAT):** F3 client lock-UX gap-closure.
+
+- Task 1 ✅ api.ts ApiError (status-carrying 409) + StreamsProvider: per-thread workflow lock SEEDED at kickoff (Harness send) + SEEDED/CLEARED on the mount-time getThreadWorkflow reconcile (D-v2.5-03; clears on stale/terminal anchor = F2 self-heal). tsc --noEmit clean (commit 3b21f230)
+- Task 2 ✅ MessageInput: textarea + Send + canSend now gate on workflowLocked (toggle + selector already did); locked textarea shows the D-05 "Workflow running — Cancel to switch back" hint. StreamsProvider sendMessage catch: a 409 ApiError rolls back BOTH optimistic bubbles (user + orphaned assistant placeholder) and surfaces a fixed per-thread error via the existing reconcileErrors Map (T-092-06-03 — no internals leaked). ChatArea: per-thread banner message-aware — 409 renders fixed lock copy (data-testid=workflow-lock-error-banner, Dismiss only); reconcile-failure keeps cached-version copy + Retry. api.ts ApiError uses an explicit field (not a TS parameter-property) so tsc -b erasableSyntaxOnly accepts it. Verify: tsc -b = exactly 54 baseline (ZERO net-new), vite build clean (commit 4546b5bb)
+- All changes per-thread keyed + additive; no provider streaming branch touched (SC#3 / BUG-260523-01 / 075.x cascade rules honored).
+- Task 3 ⏸ BLOCKING checkpoint:human-action — the F1-unblocked lived-experience UAT (9 steps: F1 end-to-end, SC#2 anchor→NULL, SC#3 parallel-thread, SC#5 reload-reconcile + Stop-unlock, F2 no-wedge, F3 composer+409, CONT-01 cap-drive→Continue→3-cap, SC#10 native-7 4-axis scoreboard, Deep byte-identical). Operator starts the backend uvicorn + npm run dev; orchestrator drives Chrome DevTools MCP + live Supabase/LangSmith. Results → 092-06-UAT-FINDINGS.md. SUMMARY (092-06-SUMMARY.md) DEFERRED until UAT resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN — phase verification + this UAT gate own closure.
 
 **Plan 092-05 — ✅ COMPLETE (2026-05-31):** backend gap-closure for the 092-04 UAT.
 
