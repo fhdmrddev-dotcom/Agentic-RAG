@@ -636,6 +636,18 @@ async def _build_resume_context(run, redis, pool):
         parent_run_id=None,
     )
 
+    # F5 (092-07): the startup sweep has NO request, so there is no request-scoped
+    # supabase to thread. Source the SERVICE-ROLE client from the existing
+    # dependencies factory (get_supabase — a module-level singleton building
+    # create_client(SUPABASE_URL, SERVICE_ROLE_KEY); dependencies.py:16-20). Without
+    # ctx.supabase a resumed phase's search_documents hits ctx.supabase.rpc → None
+    # AttributeError (the exact F5 crash). THREAT: the service-role client bypasses
+    # RLS, so retrieval MUST stay owner-scoped — search_documents filters by
+    # current_user["id"], which we set below from run["user_id"] (the durable
+    # run-owner), so a resumed search can never read another user's documents.
+    from app.dependencies import get_supabase
+    _service_supabase = get_supabase()
+
     return SimpleNamespace(
         run_id=run["run_id"],
         producer_run_id=_producer_id,
@@ -653,7 +665,28 @@ async def _build_resume_context(run, redis, pool):
         pool=pool,
         emit=_emit,
         retry_feedback=None,
+        # F5 (092-07): the tool-context substrate every Supabase tool reads via
+        # ctx.<field>. supabase = the service-role client (owner-scoped retrieval
+        # enforced above). Folder scope is not durably recoverable from the run on
+        # resume → None (unscoped search, acceptable per the gap-plan). spawn = the
+        # module-level asyncio task spawner so a resumed sub-agent's task() can fan
+        # out; per_run_task_semaphore = a fresh per-run gate for this resumed run.
+        supabase=_service_supabase,
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        spawn=_resume_spawn,
+        per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),
     )
+
+
+def _resume_spawn(coro) -> asyncio.Task:
+    """Fire-and-forget task spawner for resumed workflows (F5, 092-07).
+
+    Mirrors threads.py:_spawn — a resumed sub-agent's task() tool needs the same
+    spawn surface the live producer's RunContext carries. The startup sweep has no
+    request-scoped _spawn, so the engine provides this minimal create_task wrapper.
+    """
+    return asyncio.create_task(coro)
 
 
 async def _resume_run(run_id: UUID, definition: WorkflowDefinition, ctx, *, pool, redis) -> None:

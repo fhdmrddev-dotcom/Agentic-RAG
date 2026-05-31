@@ -1411,6 +1411,164 @@ def patch_get_pg_pool(pool):
     return patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool))
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# 092-07 — F5: thread supabase + folder-scope + spawn + semaphore into harness ctx
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# F5: the harness wf_ctx (threads.py) + the two resume ctx builders (harness_engine
+# _build_resume_context, runs.py _harness_continuation) set run-identity fields but
+# NOT the tool-context substrate every Supabase tool reads via ctx.<field>
+# (supabase / folder_subtree_ids / scoped_folder_path / spawn / per_run_task_semaphore).
+# _build_phase_tool_context already FORWARDS them via getattr — they just resolved
+# to None, so the FIRST search_documents hit ctx.supabase.rpc → AttributeError on
+# 'NoneType'. These assertions make the None.rpc precondition explicit (the mock-pool
+# blind spot that hid F5 live) so it can't silently regress.
+
+_F5_TOOL_CTX_FIELDS = (
+    "supabase",
+    "folder_subtree_ids",
+    "scoped_folder_path",
+    "spawn",
+    "per_run_task_semaphore",
+)
+
+
+def test_live_wf_ctx_sets_tool_context_substrate_in_source():
+    """F5 (live): the threads.py harness wf_ctx build must set the 5 tool-context
+    fields — supabase=supabase (same value Deep's RunContext uses), the folder-scope
+    pair, spawn=_spawn, and a per_run_task_semaphore. Source-level assertion: these
+    fields appear on the wf_ctx SimpleNamespace in the agent_runner harness branch.
+    """
+    import inspect
+    from app.api import threads as threads_mod
+
+    src = inspect.getsource(threads_mod)
+    # supabase wired from the request param (the SAME local Deep's RunContext uses).
+    assert "supabase=supabase" in src, (
+        "harness wf_ctx must set supabase=supabase (without it ctx.supabase is None "
+        "→ search_documents hits None.rpc — the F5 crash)"
+    )
+    # spawn wired from the module-level _spawn (the SAME ref Deep passes).
+    assert "spawn=_spawn" in src
+    # the folder-scope pair + per-run semaphore appear on the bag.
+    assert "folder_subtree_ids=" in src
+    assert "scoped_folder_path=" in src
+    assert "per_run_task_semaphore=asyncio.Semaphore(" in src
+
+
+def test_phase_tool_context_carries_nonnull_supabase_given_engine_ctx_with_one():
+    """F5 chokepoint: _build_phase_tool_context yields a ToolContext whose
+    .supabase is NON-NULL when the engine ctx carries a supabase — i.e. once the
+    wf_ctx sets supabase, the forwarded sub-agent ToolContext can call
+    supabase.rpc(...). This is the EXACT precondition that was violated live (the
+    'NoneType' object has no attribute 'rpc' crash).
+    """
+    from app.services.harness.phase_types import _build_phase_tool_context
+
+    sentinel_supabase = object()
+    sentinel_subtree = ["folder-a", "folder-b"]
+    sentinel_path = "/DBA"
+    sentinel_spawn = lambda c: c  # noqa: E731
+    import asyncio as _asyncio
+    sentinel_sem = _asyncio.Semaphore(3)
+
+    ctx = _harness_ctx(
+        supabase=sentinel_supabase,
+        folder_subtree_ids=sentinel_subtree,
+        scoped_folder_path=sentinel_path,
+        spawn=sentinel_spawn,
+        per_run_task_semaphore=sentinel_sem,
+    )
+    tool_ctx = _build_phase_tool_context(_llm_agent_phase(), ctx)
+
+    # The whole point of F5: a non-None supabase flows through so .rpc is callable.
+    assert tool_ctx.supabase is sentinel_supabase
+    assert tool_ctx.supabase is not None
+    # The folder scope flows through so the DBA-folder filter applies inside the
+    # workflow (search_documents folder_ids=ctx.folder_subtree_ids).
+    assert tool_ctx.folder_subtree_ids == sentinel_subtree
+    assert tool_ctx.scoped_folder_path == sentinel_path
+    # spawn + the per-run semaphore complete the tool substrate.
+    assert tool_ctx.spawn is sentinel_spawn
+    assert tool_ctx.per_run_task_semaphore is sentinel_sem
+
+
+def test_phase_tool_context_supabase_none_reproduces_f5_precondition():
+    """F5 regression guard (negative): the pre-fix engine ctx (NO supabase field)
+    forwards ctx.supabase as None — the exact state that made ctx.supabase.rpc
+    crash. This documents WHY the wf_ctx must set supabase: an engine ctx without
+    it yields a ToolContext whose .supabase is None.
+    """
+    from app.services.harness.phase_types import _build_phase_tool_context
+
+    # _harness_ctx default does NOT set supabase → models the pre-F5 bag.
+    ctx = _harness_ctx()
+    assert getattr(ctx, "supabase", None) is None
+    tool_ctx = _build_phase_tool_context(_llm_agent_phase(), ctx)
+    assert tool_ctx.supabase is None  # the None.rpc precondition (pre-fix state)
+
+
+@pytest.mark.asyncio
+async def test_build_resume_context_carries_nonnull_supabase_and_substrate(
+    monkeypatch, fake_redis, mock_asyncpg_pool
+):
+    """F5 (resume sweep): _build_resume_context sets a NON-NULL supabase (the
+    service-role client — the sweep has no request) plus spawn + per_run_task_semaphore,
+    so a resumed workflow's search_documents resolves. Folder scope is None on resume
+    (unscoped, acceptable). Owner-scoping is preserved: current_user["id"] is the
+    durable run owner, and search_documents filters by it.
+    """
+    from app.services import harness_engine
+
+    async def _spy_insert(pool, **kwargs):
+        return None
+
+    import app.db.runs as runs_mod
+    monkeypatch.setattr(runs_mod, "insert_run", _spy_insert)
+
+    # Stub the service-role factory so the test asserts the WIRING, not a live client.
+    sentinel_service_client = object()
+    import app.dependencies as deps_mod
+    monkeypatch.setattr(deps_mod, "get_supabase", lambda: sentinel_service_client)
+
+    wf_run_id = uuid.uuid4()
+    owner_id = uuid.uuid4()
+    run = {"run_id": wf_run_id, "thread_id": uuid.uuid4(), "user_id": owner_id}
+
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+
+    # supabase is the (service-role) client, NOT None → search_documents.rpc works.
+    assert getattr(ctx, "supabase", None) is sentinel_service_client
+    assert ctx.supabase is not None
+    # the rest of the tool substrate is present (folder scope None on resume).
+    assert getattr(ctx, "spawn", None) is not None
+    assert getattr(ctx, "per_run_task_semaphore", None) is not None
+    assert ctx.folder_subtree_ids is None
+    assert ctx.scoped_folder_path is None
+    # THREAT: owner-scoping intact — current_user["id"] is the durable run owner,
+    # so the service-role (RLS-bypassing) client can't leak another user's docs.
+    assert ctx.current_user["id"] == str(owner_id)
+
+
+def test_harness_continuation_threads_supabase_and_substrate_in_source():
+    """F5 (continue): _harness_continuation (POST /runs/{id}/continue) sets the
+    request supabase on its resume ctx (it has Depends(get_supabase) in scope) plus
+    spawn + per_run_task_semaphore. Source-level assertion against continue_run.
+    """
+    import inspect
+    from app.api import runs as runs_api
+
+    src = inspect.getsource(runs_api.continue_run)
+    # the request supabase is threaded onto the continuation ctx.
+    assert "supabase=supabase" in src, (
+        "_harness_continuation must set supabase=<request supabase> so a re-driven "
+        "phase's search_documents resolves (else ctx.supabase.rpc → None crash)"
+    )
+    # spawn + a fresh per-run semaphore complete the substrate.
+    assert "spawn=_spawn_harness_resume" in src
+    assert "per_run_task_semaphore=_asyncio.Semaphore(" in src
+
+
 def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
     """Deep-path guard: _build_phase_tool_context is harness-executor-only. The
     Deep path builds its ToolContext in task_service from a producer runs id and

@@ -748,6 +748,10 @@ async def continue_run(
         from types import SimpleNamespace  # noqa: PLC0415
         from app.dependencies import get_pg_pool  # noqa: PLC0415
         from app.api.threads import RUN_TASKS as _RUN_TASKS  # noqa: PLC0415
+        # F5 (092-07): the same module-level _spawn the Deep RunContext uses
+        # (threads.py:105 / :1198) — gives a re-driven sub-agent task() the same
+        # fire-and-forget spawn surface Deep has.
+        from app.api.threads import _spawn as _spawn_harness_resume  # noqa: PLC0415
         import asyncio as _asyncio  # noqa: PLC0415
 
         from app.db.runs import insert_run as _insert_run, finalize_run as _finalize_run  # noqa: PLC0415
@@ -803,6 +807,22 @@ async def continue_run(
                 pool=pool,
                 emit=_harness_emit,
                 retry_feedback=None,
+                # F5 (092-07): the tool-context fields every Supabase tool reads via
+                # ctx.<field>. The Continue endpoint HAS the request supabase
+                # (Depends(get_supabase), runs.py:622) in scope — pass it so a
+                # re-driven phase's search_documents resolves (without it ctx.supabase
+                # is None → AttributeError on the first RPC). Owner-scoped retrieval is
+                # preserved: search_documents filters by current_user["id"] (this run's
+                # verified owner from the Step-1 ownership SELECT). Folder scope is not
+                # rehydrated on continue (best-effort None → unscoped search); spawn +
+                # a fresh per-run semaphore complete the tool substrate.
+                supabase=supabase,
+                folder_subtree_ids=None,
+                scoped_folder_path=None,
+                spawn=_spawn_harness_resume,
+                per_run_task_semaphore=_asyncio.Semaphore(
+                    settings.task_per_run_concurrency
+                ),
             )
             _failed = False
             try:

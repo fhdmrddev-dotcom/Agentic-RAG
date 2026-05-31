@@ -1155,6 +1155,62 @@ async def send_message(
                     _wf_definition = await _load_run_definition(
                         _wf_pool, _active_workflow_run_id
                     )
+                    # F5 (092-07): resolve the SAME folder scope the Deep path
+                    # computes inside run_agent_loop (agent_loop.py:895-931) so a
+                    # harness phase's search_documents/ls/tree/grep stays scoped to
+                    # the thread's folder subtree. Computed inline here (threads.py
+                    # has supabase + current_user + thread_id + fetch_visible_folders
+                    # in scope; the Deep computation lives in agent_loop, not as a
+                    # threads.py local we could mirror by name). Mirrors the Deep
+                    # subtree-walk + path-build logic verbatim.
+                    _wf_folder_subtree_ids: list[str] | None = None
+                    _wf_scoped_folder_path: str | None = None
+                    try:
+                        _wf_thread_data = await aexec(
+                            supabase.table("threads")
+                            .select("folder_id")
+                            .eq("id", thread_id)
+                            .single()
+                        )
+                        _wf_thread_folder_id = (
+                            _wf_thread_data.data.get("folder_id")
+                            if _wf_thread_data.data else None
+                        )
+                        if _wf_thread_folder_id:
+                            _wf_all_folders = await fetch_visible_folders(
+                                supabase, current_user["id"]
+                            )
+
+                            def _wf_get_subtree(root_id, folders):
+                                result = [root_id]
+                                for f in folders:
+                                    if f["parent_id"] == root_id:
+                                        result.extend(_wf_get_subtree(f["id"], folders))
+                                return result
+
+                            _wf_folder_subtree_ids = _wf_get_subtree(
+                                _wf_thread_folder_id, _wf_all_folders
+                            )
+                            _wf_folder_map = {f["id"]: f for f in _wf_all_folders}
+                            _wf_path_parts: list[str] = []
+                            _wf_current_fid = _wf_thread_folder_id
+                            while _wf_current_fid:
+                                _f = _wf_folder_map.get(_wf_current_fid)
+                                if not _f:
+                                    break
+                                _wf_path_parts.append(_f.get("name", ""))
+                                _wf_current_fid = _f.get("parent_id")
+                            _wf_scoped_folder_path = (
+                                "/" + "/".join(reversed(_wf_path_parts))
+                                if _wf_path_parts else None
+                            )
+                    except Exception:
+                        # Best-effort scope resolution — a failure here must not abort
+                        # the workflow; fall through to unscoped (None) search.
+                        logger.exception(
+                            "harness folder-scope resolution failed for thread %s "
+                            "(falling back to unscoped search)", thread_id
+                        )
                     wf_ctx = SimpleNamespace(
                         run_id=_active_workflow_run_id,
                         # Facet A (092-07): the producer runs.run_id is the FK target
@@ -1168,6 +1224,25 @@ async def send_message(
                         pool=_wf_pool,
                         emit=_harness_emit,
                         retry_feedback=None,
+                        # F5 (092-07): the tool-context fields every Supabase tool
+                        # reads via ctx.<field> (search_documents/hybrid/ls/tree/grep/
+                        # glob/fetch_document/skills/code-exec logging). Sourced from
+                        # the SAME in-scope values the Deep RunContext + run_agent_loop
+                        # use: supabase=supabase (threads.py:1190), spawn=_spawn
+                        # (threads.py:1198, the module-level _spawn). Without these
+                        # _build_phase_tool_context forwards None → ctx.supabase.rpc
+                        # raises AttributeError on the first search_documents (F5).
+                        supabase=supabase,
+                        folder_subtree_ids=_wf_folder_subtree_ids,
+                        scoped_folder_path=_wf_scoped_folder_path,
+                        spawn=_spawn,
+                        # Per-run task() concurrency gate — mirrors the Deep
+                        # run_agent_loop local (_per_run_task_semaphore,
+                        # agent_loop.py:1234). A fresh per-run semaphore is correct
+                        # (this is a fresh top-level workflow run).
+                        per_run_task_semaphore=asyncio.Semaphore(
+                            settings.task_per_run_concurrency
+                        ),
                     )
                     await run_workflow(
                         _active_workflow_run_id,
