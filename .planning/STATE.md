@@ -246,8 +246,17 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 ## Session Continuity
 
 Last session: 2026-05-31T12:37:27.233Z
-Stopped at: Completed 092-03-PLAN.md
-Resume file: None
+Stopped at: 092-04-PLAN.md Tasks 1-3 done (committed) — PAUSED at Task 4 blocking checkpoint:human-verify (Chrome MCP UAT)
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-04-PLAN.md (Task 4)
+
+**Plan 092-04 — ⏸ IN PROGRESS (Tasks 1-3 done, awaiting Task 4 UAT):**
+
+- Task 1 ✅ api.ts — getThreadWorkflow + continueRun + listPublishedWorkflows + cap_paused SSE callback + workflow_definition_id kickoff field (commit 9fe94d26)
+- Task 2 ✅ per-thread keyed workflow-lock state (SC#3 — Map, copy-then-mutate, GC delete-the-key; NO global boolean) + useWorkflowLockForThread selector + onCapPaused SSE populate + terminal clear (commit ca09c90d)
+- Task 3 ✅ Deep/Harness toggle (data-testid=workflow-mode-selector) + published-workflow picker + disable-with-tooltip on BOTH selectors while locked (D-03/D-05) + inline Continue card (out-of-band cap_paused, 3-cap) + mount-time getThreadWorkflow reconcile (SC#5/D-v2.5-03) (commit fcb825b5)
+- Task 4 ⏸ BLOCKING checkpoint:human-verify — Chrome MCP lived-experience UAT (SC#3 parallel-thread + SC#5 reconcile + SC#2 DB-NULL + CONT-01 Continue + SC#10 native-7 4-axis scoreboard). Operator must run backend uvicorn + frontend dev server. Resume signal: "approved" or describe the failing scenario.
+- Verify status: `vite build` PASSES clean; `tsc -b` has 54 PRE-EXISTING baseline errors (0 net new — see deferred-items.md). Frontend Deep chat byte-identical when no workflow active (lock Map empty = no behavioral change).
+- SUMMARY (092-04-SUMMARY.md) DEFERRED until the UAT checkpoint resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN (phase verification owns closure; SDK requirements.mark-complete intentionally skipped).
 
 **Planned Phase:** 092 (dual-mode-wiring-continue-button) — 4 plans — 2026-05-31T11:04:01.842Z
 
