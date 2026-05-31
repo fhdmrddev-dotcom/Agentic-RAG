@@ -60,7 +60,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   3. The cross-provider eval harness and the Playwright E2E backstop are GREEN **both before AND after** the extraction; the SSE event sequence is byte-identical per provider for a representative multi-tool run (captured snapshot diff = empty).
   4. SC#10 4-axis kickoff UAT passes on the extracted loop: a multi-tool prompt on each native provider, a parallel thread streaming while another accepts a prompt, and a ≥50-message / ≥5 KB long-message thread — exercised in BOTH `agent_mode` values (**General AND Explorer**), no behavior change.
   5. The CF-01 carry-forward sweep dispositions each item: title-gen on DeepSeek/Moonshot/Google (BUG-260527-01), Google secondary-model 404 routing, and the download-link payload — each marked verified-closed or re-opened with a re-open trigger.
-**Plans**: 4 plans (3 waves)
+**Plans**: 6 plans (4 + 2 gap-closure for the Wave 4 UAT F1/F2/F3 findings) (3 waves)
 - [x] 089-01-PLAN.md — Prep + `agent_loop.py` skeleton (frozen `RunContext` / `AgentLoopResult` + the 3 pure helpers moved verbatim) + **seam-review checkpoint** (autonomous: false — D-089-04)
 - [x] 089-02-PLAN.md — Additive proof harness: eval +zhipu/+minimax (native-7, D-089-09) + `capture_run_events`/`normalize` SSE helper + before/after diff runbook
 - [x] 089-03-PLAN.md — Verbatim loop move into `run_agent_loop` + seam wiring + ~37 monkeypatch-target sweep + `AgentLoopResult` seam test (depends 089-01)
@@ -115,12 +115,14 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   3. The lock state is per-thread keyed (a `Map`/`Set`, never a global boolean — BUG-260523-01 pattern): SC#10 parallel-thread UAT confirms Thread A streaming a workflow does NOT lock Thread B's mode toggle or composer.
   4. When a run hits its step cap (a Deep run OR a Harness phase), a Continue affordance resumes the SAME run/phase with a bounded additional step budget — re-reading `workflow_phases.available_tools` from Postgres for a Harness phase — and consumes the previously-dropped tool calls rather than re-dropping them; it never blindly bumps a global cap unbounded.
   5. The panel reconciles true mode/lock state via `GET /threads/{id}/workflow` on mount (D-v2.5-03), never trusting a Realtime/SSE hint alone; a thread is never stuck Harness-locked with a terminal/absent run.
-**Plans**: 4 plans
+**Plans**: 6 plans (4 + 2 gap-closure for the Wave 4 UAT F1/F2/F3 findings)
 Plans:
 - [x] 092-01-PLAN.md — Migration 063 (inputs/model/continues_used + cap_paused) + Wave-0 test scaffolds + operator SQL-editor apply (wave 1) ✅ 2026-05-31
 - [x] 092-02-PLAN.md — Backend MODE-01/02: create_workflow_run atomic txn + producer mode-branch + server-side lock + GET /threads/{id}/workflow + published-workflows list (wave 2) ✅ 2026-05-31
 - [x] 092-03-PLAN.md — Backend MODE-02 cancel/terminal lock-clear + CONT-01: persist-at-cap (consume not drop) + POST /runs/{id}/continue + 3-cap (wave 3) ✅ 2026-05-31
-- [ ] 092-04-PLAN.md — Frontend: Deep/Harness toggle + picker + per-thread keyed lock + inline Continue card + mount reconcile + Chrome MCP 4-axis UAT (wave 4)
+- [x] 092-04-PLAN.md — Frontend: Deep/Harness toggle + picker + per-thread keyed lock + inline Continue card + mount reconcile (Tasks 1-3) ✅ 2026-05-31; Task 4 Chrome MCP UAT FAILED → gap-closure 092-05/06
+- [ ] 092-05-PLAN.md — Gap-closure (F1+F2): migration 064 workflow_runs.user_id + write_audit/create_workflow_run/harness_engine user_id threading + failure-path terminalize + lock_is_stale self-heal + live-DB audit test (wave 1)
+- [ ] 092-06-PLAN.md — Gap-closure (F3) + verification: disable-while-locked textarea/Send + 409 toast/rollback + lock seed-at-kickoff/reconcile + the F1-unblocked Manual-Only UAT gate (SC#2/3/5 + CONT-01 + SC#10 native-7 + Deep byte-identical) (wave 2)
 **Notes**: Deep/Harness is ORTHOGONAL to the existing `agent_mode` (General/Explorer) — Deep Mode is keyed on `active_workflow_run_id IS NULL` and is the umbrella for "not in a workflow," covering BOTH General and Explorer unchanged; the per-phase whitelist (091) is a no-op in Deep Mode so Explorer's tool-set is untouched when no workflow runs. **Discuss-phase decision:** the General/Explorer selector's behavior DURING an active workflow (stays visible / disabled / hidden until the run completes) — a workflow's phase whitelist is authoritative while active, so the selector is moot mid-run; pick the least-confusing affordance. No conflict; this is a UX-composition call, not an architectural one.
 
 #### Phase 093: Anthropic Cross-Provider Parity
