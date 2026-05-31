@@ -51,3 +51,18 @@ verdict: BLOCKED — F1 & F2 verifiably closed; a NEW blocker (F4) prevents a Ha
 - **092-06 (F3 frontend): code-complete, tsc/build clean; live behavior blocked by F4.**
 - **MODE-01 / MODE-02 / CONT-01: REMAIN OPEN** — the binding criterion "a Harness workflow runs end-to-end" is not met.
 - **Route:** new gap-closure plan **092-07** for F4 (harness sub-agent `parent_run_id`), whose verification re-runs rows 4–10 (+ the SC#2 natural-completion/Cancel variants).
+
+## Regression guardrails for 092-07 (operator directive — do NOT regress accumulated stability)
+
+The F4 fix touches a G-5 hot file (`threads.py`, 9+ phases) + the harness ctx threading + `task_service`/`phase_types`/`harness_engine._build_resume_context`. It MUST be additive + harness-scoped and preserve everything already stabilized. The 092-07 plan + its UAT gate MUST explicitly protect, at minimum (not limited to):
+
+1. **Deep mode byte-identical** — change lives ONLY in the harness branch (`_active_workflow_run_id is not None`); the Deep `else` stays untouched (089 run1-vs-run1 structural-diff-empty). Never touch a provider streaming branch (075.x cascade rule).
+2. **All providers' functionality (native-7 + OpenRouter)** — the sub-agent path runs through `resolve_sub_agent_model_safely` + provider routing; re-verify OpenAI / Anthropic / Google / DeepSeek / Moonshot / GLM / MiniMax (+ OpenRouter best-effort). Honor the zhipu/minimax MODEL_CAPABILITIES registry-trap (correct model IDs → native tools, not structured fallback). Provider-scoped/additive only — NO shared-path changes (`feedback_no_cross_provider_regressions`).
+3. **Thread-switch mid-run** — per-thread keying (BUG-260523-01); Thread A locked + streaming while Thread B composer stays free (SC#3); switch A↔B mid-run without bleed or stale-id race.
+4. **Refresh / reload mid-run** — lock + run state reconcile from GET `/threads/{id}/workflow` and the run snapshot (Realtime-as-hint, reconcile-on-fetch — D-v2.5-03); no ghost/stale lock after reload.
+5. **Sub-agent SSE demux + panel** — Phase 086 demux contract (R9): sub-agent events on the sub-agent stream, `sub_agent_start`/`sub_agent_done` on the PARENT stream, panel drill-down intact. Changing `parent_run_id` must not break the panel timeline.
+6. **F1 + F2 stay closed** — harness_audit non-null user_id; failed/timeout run still terminalizes workflow_runs + clears the anchor (no wedged lock); `lock_is_stale` self-heal.
+7. **CONT-01 Continue** — cap-drive → Continue runs dropped tools on the SAME run_id; 3-cap then refused — unaffected.
+8. **Test baselines** — backend full-suite zero net-new failures vs the 092-03 baseline; frontend tsc 54-baseline / 0 net-new; build clean. Cover the new FK path with a live-DB test (mirror `test_092_harness_audit_live.py`) so the mock blind spot can't re-hide it.
+
+These are the binding UAT axes for 092-07 — the same 4-axis scoreboard (cross-provider × multi-tool × parallel-thread × long-message) plus reload + thread-switch, run LIVE (no "if data permits" deferrals).
