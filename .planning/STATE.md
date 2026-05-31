@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: Phase 092 execution started
-last_updated: "2026-05-31T11:11:29.103Z"
-last_activity: 2026-05-31 -- Phase 092 execution started
+stopped_at: Phase 092 Plan 01 — BLOCKED at Task 3 (operator migration-063 apply checkpoint)
+last_updated: "2026-05-31T11:14:00.000Z"
+last_activity: 2026-05-31 -- Phase 092 Plan 01 Tasks 1-2 committed; paused at Task 3 human-verify checkpoint
 progress:
   total_phases: 8
   completed_phases: 3
@@ -238,8 +238,13 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 092 context gathered
-Resume file: --resume-file
+Last session: 2026-05-31
+Stopped at: Phase 092 Plan 01 — Tasks 1-2 committed (migration 063 @35bbfade, scaffolds+verify_092.sql @2e8106f0); BLOCKED at Task 3 (operator pastes migration 063 into Supabase SQL editor, runs verify_092.sql, then `bash scripts/regenerate-full-schema.sh`, then signals "applied")
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-01-PLAN.md
 
 **Planned Phase:** 092 (dual-mode-wiring-continue-button) — 4 plans — 2026-05-31T11:04:01.842Z
+
+**Plan 092-01 — IN PROGRESS (paused at blocking checkpoint):**
+- Task 1 ✅ migration 063_dual_mode_continue.sql (commit 35bbfade)
+- Task 2 ✅ 3 Wave-0 pytest scaffolds + verify_092.sql; suite exits 0 (3 anchors pass / 12 contracts skipped) (commit 2e8106f0)
+- Task 3 ⏸ checkpoint:human-verify (blocking) — operator applies migration 063 + regenerates full-schema.sql. Resume signal: "applied". Full SUMMARY.md written after the checkpoint resolves.
