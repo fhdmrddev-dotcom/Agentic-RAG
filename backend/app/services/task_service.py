@@ -200,10 +200,21 @@ async def run_task_sub_agent(
     instructions: str | None,
     allowed_tools: list[str],
     max_steps: int,
+    system_prompt_override: str | None = None,
 ) -> dict:
     """Spawn a sub-agent with its own runs row + stream + tool dispatch loop.
 
     Returns ``{"sub_run_id": UUID, "summary": str, "status": "completed"|"error"}``.
+
+    Phase 091 OQ1 (additive, backward-compatible): when ``system_prompt_override``
+    is provided, it REPLACES the hardcoded ``_build_sub_agent_system_prompt``
+    "focused sub-agent" framing for THIS call only — the harness ``llm_agent`` /
+    ``llm_batch_agents`` phases need the phase's own ``prompt`` to be the system
+    framing, not the generic sub-agent text. ``None`` (every existing caller —
+    tasks / sub-agents) is byte-identical to pre-091 behavior: the helper-built
+    prompt is used unchanged. ``_build_sub_agent_system_prompt`` and
+    ``resolve_sub_agent_model_safely`` (D-085-16 replicated footgun) are NOT
+    touched.
 
     Flow:
       1. Resolve a provider-safe sub-agent model name (D-075.5-04 footgun).
@@ -308,7 +319,14 @@ async def run_task_sub_agent(
     ]
 
     # 5. The minimal sub-agent loop
-    sys_prompt = _build_sub_agent_system_prompt(description, instructions, allowed_tools)
+    #    OQ1 (Phase 091): system_prompt_override REPLACES the helper-built framing
+    #    for harness phases; None = byte-identical to pre-091 (helper used unchanged).
+    if system_prompt_override is not None:
+        sys_prompt = system_prompt_override
+    else:
+        sys_prompt = _build_sub_agent_system_prompt(
+            description, instructions, allowed_tools
+        )
     messages: list[dict] = [
         {"role": "system", "content": sys_prompt},
         {"role": "user", "content": description},

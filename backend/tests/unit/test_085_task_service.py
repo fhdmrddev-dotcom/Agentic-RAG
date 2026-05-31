@@ -405,6 +405,94 @@ async def test_handle_task_global_cap_blocks_spawn():
     assert ctx.per_run_task_semaphore._value == 3
 
 
+# ---------------------------------------------------------------------------
+# Phase 091 OQ1 — additive system_prompt_override on run_task_sub_agent
+# ---------------------------------------------------------------------------
+#
+# The harness llm_agent/llm_batch_agents executors need the phase's own prompt
+# to be the system framing (not the hardcoded "focused sub-agent" text). The
+# param is additive + keyword-only: None (every existing caller) is byte-
+# identical to pre-091; a string REPLACES the helper-built prompt for that call.
+
+
+def _build_sub_agent_ctx():
+    """A parent ToolContext for direct run_task_sub_agent calls (no nesting cap)."""
+    from app.services.tool_dispatcher import ToolContext
+    redis = MagicMock()
+    redis.eval = AsyncMock(return_value=1)
+    redis.decr = AsyncMock(return_value=0)
+    return ToolContext(
+        redis=redis,
+        run_id=PARENT_RUN_ID,
+        thread_id=THREAD_ID,
+        supabase=MagicMock(),
+        pool=MagicMock(),
+        user_settings=None,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"},
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        emit=AsyncMock(),
+        spawn=lambda c: None,
+        parent_run_id=None,
+        per_run_task_semaphore=asyncio.Semaphore(3),
+        available_tools=["search_documents"],
+    )
+
+
+async def _capture_sub_agent_system_prompt(**override_kwargs) -> str:
+    """Run run_task_sub_agent with all I/O mocked, returning the system prompt
+    that reached the LLM (messages[0]['content'])."""
+    from app.services import task_service
+
+    ctx = _build_sub_agent_ctx()
+    captured: dict = {}
+
+    async def _fake_stream(*, messages, tools, model, user_settings):
+        captured["messages"] = messages
+        # No tool calls -> the loop breaks with this content as the summary.
+        return ("done", [])
+
+    with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+        patch.object(task_service, "insert_run", AsyncMock()), \
+        patch.object(task_service, "finalize_run", AsyncMock()), \
+        patch.object(task_service, "resolve_sub_agent_model_safely", lambda *a, **k: "gpt-4o"), \
+        patch.object(task_service, "get_tools", lambda us: []), \
+        patch.object(task_service, "_stream_one_iteration", _fake_stream):
+        await task_service.run_task_sub_agent(
+            parent_ctx=ctx,
+            description="Phase: research",
+            instructions=None,
+            allowed_tools=["search_documents"],
+            max_steps=2,
+            **override_kwargs,
+        )
+    return captured["messages"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_sub_agent_prompt_none_path_byte_identical():
+    """OQ1: system_prompt_override=None (default) yields the SAME assembled system
+    prompt as the helper builds — byte-identical to pre-091 for every caller."""
+    from app.services.task_service import _build_sub_agent_system_prompt
+
+    got = await _capture_sub_agent_system_prompt()  # no override -> None default
+    expected = _build_sub_agent_system_prompt(
+        "Phase: research", None, ["search_documents"]
+    )
+    assert got == expected
+    # Sanity: the helper framing is the generic sub-agent text.
+    assert "focused sub-agent" in got
+
+
+@pytest.mark.asyncio
+async def test_sub_agent_prompt_override_replaces_framing():
+    """OQ1: a system_prompt_override string REPLACES the helper framing verbatim."""
+    phase_prompt = "You are running phase 'research'. Investigate the corpus thoroughly."
+    got = await _capture_sub_agent_system_prompt(system_prompt_override=phase_prompt)
+    assert got == phase_prompt
+    assert "focused sub-agent" not in got
+
+
 def test_handle_task_in_registry():
     """Test 10 (Task 4): _TOOL_REGISTRY['task'] == _handle_task."""
     from app.services.tool_dispatcher import _TOOL_REGISTRY, _handle_task
