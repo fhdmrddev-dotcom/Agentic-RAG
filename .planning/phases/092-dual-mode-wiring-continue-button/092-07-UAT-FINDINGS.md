@@ -98,3 +98,12 @@ Re-ran Harness Research→Summarize on the DBA folder (thread a96d177d):
 - Remaining binding UAT rows (still owed): ask_user render (Doc Q&A), Deep parity, out-of-KB transparency, F3 lock-during-run (needs a long workflow), SC#3 parallel-thread, SC#5 reload-mid-run, CONT-01, native-7 cross-provider scoreboard. The core document-grounded workflow runs end-to-end and surfaces a grounded answer.
 - MODE-01/MODE-02/CONT-01 stay OPEN until the remaining binding rows above pass (F3 lock-during-run, ask_user render, cross-provider, parallel/reload/Continue).
 - All fixes folded into 092-07 (deviations): commits 27b12c37 (resume current_user), a7be6423 (F5 ctx), 803aafd3 (F6 surface).
+
+## UPDATE 5 (operator UAT 2026-05-31) — cross-provider + ask_user defects → route to a COMPREHENSIVE phase, stop piecemeal fixing
+
+Operator directive: NOTE these for a separate comprehensive phase rather than continue ad-hoc fixing.
+
+- **F9 (cross-provider harness parity):** the Research workflow ("What are the success factors for digital transformation according to the research documents?") worked with **OpenAI ONLY** — failed on the other native providers (random model selected per provider). F4–F8 were verified on OpenAI; the harness phase/sub-agent LLM path is NOT provider-agnostic yet (candidate causes: sub-agent model resolution per provider, structured-vs-native tool path in the phase sub-agent, the MODEL_CAPABILITIES registry trap for zhipu/minimax, provider-specific streaming in the phase executor). This is the SC#10 native-7 row — now with evidence of failure off-OpenAI.
+- **F10 (Doc Q&A ask_user / llm_human_input):** the Doc Q&A workflow (OpenAI) jumped STRAIGHT to ask_user with NO draft text, AND did not accept the user's answer. So: (a) the `draft` (llm_agent) phase produced no visible output before the `confirm` (llm_human_input) phase, and (b) the ask_user round-trip is broken (prompt fired but the answer didn't resume the workflow) — the Facet B ask_user-transport hole the adversarial verifier (092-07-RESEARCH) explicitly flagged.
+
+Both are BINDING and currently OPEN. Recommendation: a comprehensive phase (design/discuss → plan → execute) covering cross-provider harness parity (F9) + ask_user round-trip (F10) + the presentation/legibility direction (mode differentiation + 094 panel), rather than more single-domino deviations on 092-07.
