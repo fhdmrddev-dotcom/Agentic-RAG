@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: Completed 092-03-PLAN.md
-last_updated: "2026-05-31T12:37:27.243Z"
-last_activity: 2026-05-31
+status: executing
+stopped_at: Phase 092 Plan 04 code-complete; Wave 4 UAT FAILED (F1 critical) — gap-closure 092-05 pending
+last_updated: "2026-05-31T13:30:00.000Z"
+last_activity: 2026-05-31 -- 092-04 Tasks 1-3 shipped; Chrome MCP UAT found critical harness_audit.user_id blocker (see 092-04-UAT-FINDINGS.md)
 progress:
   total_phases: 8
   completed_phases: 3
@@ -32,7 +32,16 @@ Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connect
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
   - Wave 2: 092-02 (MODE-01 mode switch + workflow-run creation + MODE-02 server-side lock-refusal — autonomous)
   - Wave 3: 092-03 (MODE-02 cancel/terminal lock-clear + CONT-01 Continue — autonomous)
-  - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint)
+  - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint) — CODE SHIPPED (Tasks 1-3), UAT FAILED at Task 4
+
+**Wave 4 UAT verdict (2026-05-31, Chrome MCP, operator-confirmed): FAILED — see `092-04-UAT-FINDINGS.md`.**
+Verified working: MODE-01 toggle/picker/gating, MODE-01 atomic workflow-run creation (INSERT workflow_runs + anchor + lock; correct ThreadWorkflowState — the trigger that unblocks 091's parked UAT), MODE-02 server-side 409 lock-refusal.
+Findings → gap-closure **092-05**:
+- **F1 CRITICAL** — `write_audit` omits `user_id`; `harness_audit.user_id` NOT NULL; `workflow_runs` has no `user_id` column; `create_workflow_run` never persists one. First `run_started` audit write throws `NotNullViolationError` → run dies before any phase → empty assistant / no tool calls / no workspace. Harness mode end-to-end non-functional. (Missed in 091: audit write was mock-only; 092 is the first live run.)
+- **F2 HIGH** — failure leaves `workflow_runs.status='active'` → thread stuck `locked`/`lock_is_stale:false`, no UI recovery.
+- **F3 MEDIUM (UX)** — composer not disabled-while-locked on active thread (toggle/agent-selector/textarea/Send live); 409'd send added optimistically, no error toast, orphaned assistant placeholder.
+Blocked by F1: SC#5 reload-reconcile, SC#2 DB-NULL, CONT-01 cap-drive, SC#10 scoreboard.
+NEXT: `/gsd:plan-phase 092 --gaps` (or plan 092-05) — fix F1 (migration: workflow_runs.user_id + persist + write_audit user_id + live-DB audit test), F2 (terminal lock-clear on run failure + lock_is_stale considers underlying run), F3 (client disable-while-locked + 409 toast + optimistic rollback). Do NOT mark phase 092 complete until 092-05 ships + UAT re-runs GREEN.
 
 ### Phase 091 (prior) — ✅ COMPLETE
 
