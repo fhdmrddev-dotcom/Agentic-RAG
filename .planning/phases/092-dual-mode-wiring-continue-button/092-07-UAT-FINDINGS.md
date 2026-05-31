@@ -93,7 +93,7 @@ Re-ran Harness Research→Summarize on the DBA folder (thread a96d177d):
 ## Disposition
 
 - **F4, resume-current_user, F5, F6, F7: VERIFIED CLOSED live.** Workflows run end-to-end over the user's docs, surface a grounded answer WITH visible sources + confidence.
-- **F8 (workflow answer-quality inconsistency):** separate from wiring — route as a workflow-prompt-tuning follow-up (not 092-07).
+- **F8 (kickoff_prompt not threaded into the workflow): FIXED + VERIFIED (95da3032).** It was a WIRING gap, not prompt tuning — `create_workflow_run` stored `inputs.kickoff_prompt` (SEED-047) but no phase consumed it. Now threaded into wf_ctx + both resume ctxs + the first phase's user turn (sub-agent task = `Phase: research\n\n<user question>`). Live re-test (thread d900f668): on-topic grounded synthesis ("Main success factors… 1. Digital maturity… strongest predictor…"), 2536 chars, source_refs=5, confidence=medium, anchor NULL. Consistent + correct.
 - Rich live workflow panel (run-card / phase timeline / live tool calls / workspace-during-run) = Phase 094 (deferred by design).
 - Remaining binding UAT rows (still owed): ask_user render (Doc Q&A), Deep parity, out-of-KB transparency, F3 lock-during-run (needs a long workflow), SC#3 parallel-thread, SC#5 reload-mid-run, CONT-01, native-7 cross-provider scoreboard. The core document-grounded workflow runs end-to-end and surfaces a grounded answer.
 - MODE-01/MODE-02/CONT-01 stay OPEN until the remaining binding rows above pass (F3 lock-during-run, ask_user render, cross-provider, parallel/reload/Continue).
