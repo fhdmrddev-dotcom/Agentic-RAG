@@ -8,7 +8,7 @@ status: deferred
 affected_areas: [backend/agent-loop, anthropic, system-prompt, tool-results]
 folded_into: null
 related_seeds: []
-re_open_trigger: "Phase 075.4 E2E scenario 6 (cross-provider iteration-count parity) surfaces the magnitude; root-cause fix needs LangSmith trace data Plans 03/05 unlock. Re-open as a focused investigation phase after 075.4 ships."
+re_open_trigger: "Phase 075.4 E2E scenario 6 (cross-provider iteration-count parity) surfaces the magnitude; root-cause fix needs LangSmith trace data Plans 03/05 unlock. Re-open as a focused investigation phase after 075.4 ships. RE-DEFERRED at /gsd:discuss-phase 093 (2026-06-01): operator notes the high Anthropic iteration count may be EXPECTED Claude behaviour, not a defect; not worth a shared-path risk while Deep is provider-robust on all 7. Re-open only if iteration count starts hitting the agent-loop cap and killing runs, OR a focused Deep-mode efficiency phase opens."
 reproduces_on:
   branch: v2.5-dev
   commit: 46e8a63

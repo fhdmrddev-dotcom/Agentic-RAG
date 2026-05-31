@@ -51,10 +51,17 @@
 - [x] **TOOL-05
 **: A **tool-count budget guard** at `get_tools()` / per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES` protects providers (esp. Google) from accuracy degradation past their tool limit; the per-phase whitelist is the structural complement. *(SEED-035)*
 
+### Harness Cross-Provider Hardening (rescope 2026-06-01 — discuss-093)
+
+> Live UAT (092-07) + the 092 comprehensive audit + a 2026-06-01 live-code verification proved the **harness path only works on OpenAI** (1 of 4 seed workflows, 1 of 7 providers) — a harness-substrate problem, NOT a Deep problem (Deep is provider-robust on all 7). These two requirements replace the original PARITY-01 polish rider as the milestone-blocking parity work.
+
+- [ ] **GATEWAY-01** *(Phase 092.5 — NEW)*: `agent_loop.py`'s per-provider dispatch + chunk-normalization is extracted into ONE **shared provider gateway** that Deep AND the harness consume — Deep verified **byte-identical** in isolation (089-style eval + E2E + SSE-diff GREEN before/after), every per-provider round-trip invariant preserved verbatim (Anthropic `end_turn`, Google `thought_signature`, DeepSeek `reasoning_content`, Moonshot `<think>`/empty-retry, `force_no_tools`, iteration cap). One home for all provider logic; the seam Phase 093 consumes.
+- [ ] **PARITY-02** *(Phase 093 — NEW; the milestone-blocking parity req)*: The Harness path reaches cross-provider parity by **consuming the gateway** — all 5 phase-types + all 4 seed workflows run end-to-end on the **native-7**: a shared **model-resolver** (resolve from the provider, never mutate saved settings) kills the stale-id class; the **ask_user round-trip** works (workflow_run-id namespace reconciled, Option (i)); the 3 never-run phase-types are completed (`split_topic` code fix → `llm_batch_agents` fan-out; verify-gate routes forward) and the 5 phase-types are **safe-by-construction** validated primitives (publish-time reachability lint extended to input/output-contract breaks); resume/Continue **surface the answer** + the ask_user **draft** (plumbing — chrome is Phase 094). **Deep byte-identical** (red line). Acceptance = **native-7 × 5-phase-type × 4-workflow LIVE UAT** + live-DB/real-provider tests (closes the mock blind spot).
+
 ### Polish Riders
 
 - [ ] **CHAT-04**: Chat tool-cards render in **one consistent frame** with auto-scroll, details-on-demand collapse, and no duplicates — closing BUG-260529-02 + `timer-disappears-long-runs` + `step-count-mismatch-timer-vs-panel` + the dead download link. *(sketch-first — G-2 fires)*
-- [ ] **PARITY-01**: Anthropic reaches **cross-provider parity** on multi-step tasks — a synthesized **summary tail** (not a raw action-log, BUG-260514-02) and reduced **iteration bloat** (BUG-260523-04) — and non-Anthropic providers show real task descriptions (not "Generating code", BUG-260528-03); all evidence-driven (LangSmith) and shared-path-safe.
+- [~] **PARITY-01** *(RE-DEFERRED 2026-06-01 — discuss-093)*: ~~Anthropic Deep-mode parity — synthesized **summary tail** (BUG-260514-02), reduced **iteration bloat** (BUG-260523-04), non-Anthropic real task descriptions (BUG-260528-03).~~ Re-deferred: Deep is provider-robust on all 7; the 3 bugs aren't reproducing for the operator and aren't worth a shared-path risk. Re-open trigger: a focused Deep-mode UX phase OR the bugs re-reproduce. (The "cross-provider parity" the milestone actually needs is PARITY-02 — the *harness* path.)
 
 ### Carry-Forward Verification
 
@@ -105,7 +112,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | MODE-01 | Phase 092 | Pending |
 | MODE-02 | Phase 092 | Pending |
 | CONT-01 | Phase 092 | Pending |
-| PARITY-01 | Phase 093 | Pending |
+| GATEWAY-01 | Phase 092.5 | Pending |
+| PARITY-02 | Phase 093 | Pending |
+| PARITY-01 | (re-deferred 2026-06-01) | Deferred |
 | PANEL-08 | Phase 094 | Pending |
 | PANEL-09 | Phase 094 | Pending |
 | A11Y-03 | Phase 094 | Pending |
@@ -115,8 +124,8 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | CONC-01 | Phase 096 | Pending |
 
 **Coverage:**
-- v2.8 requirements: 21 total
-- Mapped to phases: 21 ✓ (8 phases, 089-096)
+- v2.8 requirements: 22 active + 1 re-deferred (PARITY-01) — rescoped 2026-06-01 (discuss-093)
+- Mapped to phases: 22 ✓ (9 phases incl. the NEW 092.5; 089–096)
 - Unmapped: 0 ✓
 
 **Per-phase requirement count:**
@@ -124,7 +133,8 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 - Phase 090 (Harness Schema + RLS + Config Models): HARNESS-02, HARNESS-06 — 2 reqs
 - Phase 091 (Harness Engine + 5 Phase Types + Gates + Whitelist): HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-05 — 6 reqs
 - Phase 092 (Dual-Mode Wiring + Continue): MODE-01, MODE-02, CONT-01 — 3 reqs
-- Phase 093 (Anthropic Cross-Provider Parity): PARITY-01 — 1 req
+- Phase 092.5 (Provider Gateway Extraction — NEW): GATEWAY-01 — 1 req
+- Phase 093 (Harness Cross-Provider Parity + Phase-Type Hardening): PARITY-02 — 1 req (PARITY-01 re-deferred)
 - Phase 094 (Panel Phase Timeline): PANEL-08, PANEL-09, A11Y-03 — 3 reqs
 - Phase 095 (Chat Tool-Card Unification): CHAT-04 — 1 req
 - Phase 096 (Eval Harness + Cross-Provider Verification + Concurrency): EVAL-01, EVAL-02, CONC-01 — 3 reqs

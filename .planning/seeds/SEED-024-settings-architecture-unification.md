@@ -25,6 +25,7 @@ re_open_triggers:
   - Any operator who hand-edits `settings_override.json` in production (sign that admin UI surface is missing)
   - Multi-tenancy planning (v3.2) — a JSON file on disk doesn't survive multi-tenant deployment patterns
   - When `settings_override.json` file diverges between local dev and production (drift inevitable, just a question of when)
+  - **Reinforced 2026-06-01 (discuss-093):** the harness stale-model bug (F9) traced to scattered model-resolution — `override_provider` (`models/user_settings.py:514`) updates provider/key/base-url but NOT `llm_model`, and the cross-provider safety net (`resolve_sub_agent_model_safely`) was dead code reading a non-existent field (`llm_models` vs `available_models`). Phase 093 adds a contained shared model-resolver (resolve-don't-mutate) as the immediate root-fix; this seed owns the WIDER theme the operator raised — admin/full controllability over model + settings across ALL features at scale (also SEED-012). Re-open when the v2.9 admin/operator role tier is scoped.
 
 priority: HIGH (security/architecture concern; affects v3.1 scope directly)
 suggested_phase: Fold into v3.1 plan-phase OR ship as a v2.6 polish phase before v3.0 starts (e.g., 081.x or 082.x). Cannot defer past v3.1 close.
