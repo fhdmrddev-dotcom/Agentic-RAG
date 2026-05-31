@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: executing
+status: ready_to_plan
 stopped_at: Completed 091-08-PLAN.md (Phase 091 gap closure — all code-review criticals resolved; 8/8 plans done — awaiting verify)
 last_updated: "2026-05-31T07:15:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 14
   completed_plans: 14
-  percent: 100
+  percent: 38
 ---
 
 # Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 091 — EXECUTING (all 8 plans complete incl. gap closure — awaiting /gsd:verify-work)
-Plan: 8 of 8 ✅
+Phase: 092
+Plan: Not started
 Plans: 8 plans / 6 waves COMPLETE — VERIFICATION PASSED (iteration 2). Gap-closure plan 091-08 (wave 6) closed all code-review Criticals + actionable Warnings; 091-REVIEW.md status → resolved. RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
 
   - Wave 1: 091-01 ✅ (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
@@ -54,7 +54,7 @@ Progress: [█████████░] 93%
 
 **Velocity:**
 
-- Total plans completed: 29 (v2.7)
+- Total plans completed: 37 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -68,6 +68,7 @@ Progress: [█████████░] 93%
 | 087 | 5/5 | - | ~8min (087-02) |
 | 088 | 5 | - | - |
 | 089 | 4 | - | - |
+| 091 | 8 | - | - |
 
 **Recent Trend:**
 

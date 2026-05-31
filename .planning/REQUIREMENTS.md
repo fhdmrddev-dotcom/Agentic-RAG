@@ -96,9 +96,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | CF-01 | Phase 089 | Complete |
 | HARNESS-02 | Phase 090 | Pending |
 | HARNESS-06 | Phase 090 | Pending |
-| HARNESS-01 | Phase 091 | Pending |
+| HARNESS-01 | Phase 091 | Complete |
 | HARNESS-03 | Phase 091 | Complete |
-| HARNESS-04 | Phase 091 | Pending |
+| HARNESS-04 | Phase 091 | Complete |
 | HARNESS-05 | Phase 091 | Complete |
 | HARNESS-07 | Phase 091 | Complete |
 | TOOL-05 | Phase 091 | Complete |

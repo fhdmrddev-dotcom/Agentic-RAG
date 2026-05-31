@@ -176,7 +176,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
 |-------|----------------|--------|-----------|
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
-| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Awaiting verify | - |
+| 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
 | 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |
