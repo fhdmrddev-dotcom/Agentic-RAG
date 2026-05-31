@@ -117,7 +117,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   5. The panel reconciles true mode/lock state via `GET /threads/{id}/workflow` on mount (D-v2.5-03), never trusting a Realtime/SSE hint alone; a thread is never stuck Harness-locked with a terminal/absent run.
 **Plans**: 4 plans
 Plans:
-- [ ] 092-01-PLAN.md — Migration 063 (inputs/model/continues_used + cap_paused) + Wave-0 test scaffolds + operator SQL-editor apply (wave 1)
+- [x] 092-01-PLAN.md — Migration 063 (inputs/model/continues_used + cap_paused) + Wave-0 test scaffolds + operator SQL-editor apply (wave 1) ✅ 2026-05-31
 - [ ] 092-02-PLAN.md — Backend MODE-01/02: create_workflow_run atomic txn + producer mode-branch + server-side lock + GET /threads/{id}/workflow + published-workflows list (wave 2)
 - [ ] 092-03-PLAN.md — Backend MODE-02 cancel/terminal lock-clear + CONT-01: persist-at-cap (consume not drop) + POST /runs/{id}/continue + 3-cap (wave 3)
 - [ ] 092-04-PLAN.md — Frontend: Deep/Harness toggle + picker + per-thread keyed lock + inline Continue card + mount reconcile + Chrome MCP 4-axis UAT (wave 4)
@@ -182,7 +182,7 @@ Plans:
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
-| 092. Dual-Mode Wiring + Continue Button | 0/0 | Not started | - |
+| 092. Dual-Mode Wiring + Continue Button | 1/4 | In progress | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |

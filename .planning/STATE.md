@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: Phase 092 Plan 01 — BLOCKED at Task 3 (operator migration-063 apply checkpoint)
-last_updated: "2026-05-31T11:14:00.000Z"
-last_activity: 2026-05-31 -- Phase 092 Plan 01 Tasks 1-2 committed; paused at Task 3 human-verify checkpoint
+stopped_at: Phase 092 Plan 01 — COMPLETE (migration 063 applied live + full-schema.sql regenerated @e79acec7; SUMMARY written). Next is Plan 02 (Wave 2 — MODE-01 mode switch + workflow-run creation + MODE-02 server-side lock).
+last_updated: "2026-05-31T11:23:54.362Z"
+last_activity: 2026-05-31 -- Phase 092 Plan 01 COMPLETE (schema foundation: migration 063 live + 3 Wave-0 scaffolds + verify_092.sql)
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 19
-  completed_plans: 15
-  percent: 79
+  completed_plans: 16
+  percent: 84
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 ## Current Position
 
 Phase: 092 (dual-mode-wiring-continue-button) — EXECUTING
-Plan: 1 of 4
+Plan: 2 of 4
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -55,9 +55,9 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-05-31 -- Phase 092 execution started
+Last activity: 2026-05-31
 
-Progress: [█████████░] 93%
+Progress: [████████░░] 84%
 
 ## Performance Metrics
 
@@ -99,6 +99,7 @@ Progress: [█████████░] 93%
 | Phase 091 P04 | 5min | 3 tasks | 5 files |
 | Phase 091 P07 | ~14min | 3 tasks | 2 files |
 | Phase 091 P08 | ~20min | 3 tasks | 12 files |
+| Phase 092 P01 | 25min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -239,12 +240,15 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 ## Session Continuity
 
 Last session: 2026-05-31
-Stopped at: Phase 092 Plan 01 — Tasks 1-2 committed (migration 063 @35bbfade, scaffolds+verify_092.sql @2e8106f0); BLOCKED at Task 3 (operator pastes migration 063 into Supabase SQL editor, runs verify_092.sql, then `bash scripts/regenerate-full-schema.sh`, then signals "applied")
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-01-PLAN.md
+Stopped at: Phase 092 Plan 01 — COMPLETE. Next is Plan 02 (Wave 2) — MODE-01 mode switch + workflow-run creation (INSERT INTO workflow_runs, persists inputs/model — closes SEED-047 + unblocks 091 cross-provider UAT) + MODE-02 server-side lock-refusal.
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-02-PLAN.md
 
 **Planned Phase:** 092 (dual-mode-wiring-continue-button) — 4 plans — 2026-05-31T11:04:01.842Z
 
-**Plan 092-01 — IN PROGRESS (paused at blocking checkpoint):**
-- Task 1 ✅ migration 063_dual_mode_continue.sql (commit 35bbfade)
-- Task 2 ✅ 3 Wave-0 pytest scaffolds + verify_092.sql; suite exits 0 (3 anchors pass / 12 contracts skipped) (commit 2e8106f0)
-- Task 3 ⏸ checkpoint:human-verify (blocking) — operator applies migration 063 + regenerates full-schema.sql. Resume signal: "applied". Full SUMMARY.md written after the checkpoint resolves.
+**Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
+
+- Task 1 ✅ migration 063_dual_mode_continue.sql — 4 columns + cap_paused on both status CHECKs (commit 35bbfade)
+- Task 2 ✅ 3 Wave-0 pytest scaffolds + verify_092.sql; suite exits 0 (3 anchors pass / 12 contracts skipped, owned by Plans 02/03) (commit 2e8106f0)
+- Task 3 ✅ operator applied migration 063 LIVE via SQL editor; verify_092.sql confirmed 4 columns + cap_paused (paused preserved on workflow_runs); full-schema.sql regenerated (no reset) — continues_used ×6, cap_paused ×2 on disk (commit e79acec7)
+- SUMMARY: 092-01-SUMMARY.md (self-check PASSED). Requirements MODE-01/02/CONT-01 stay OPEN — Plan 01 is schema-only; Plans 02/03/04 wire them.
+- Key facts: cap_paused is a NEW non-terminal status distinct from paused; workflow_runs.inputs/model persist kickoff ctx (SEED-047); continues_used on both tables = D-06 Continue cap (max 3/run). Downstream Plans 02/03 flip the skipped contract tests.
