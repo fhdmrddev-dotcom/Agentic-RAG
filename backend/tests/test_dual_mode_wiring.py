@@ -1161,6 +1161,243 @@ def _async_return(value):
     return _fn
 
 
+# ── Task 4 / Facet C: Continue-404 repair + latest_producer_run_id surfacing ───
+
+def _continue_supabase(*, runs_row=None, workflow_self_row=None,
+                       thread_anchor=None, owner="owner"):
+    """A query-routed supabase mock for the continue_run resolve tests.
+
+    Routes:
+      - runs SELECT (Step 1)              -> runs_row (None = not a runs row)
+      - workflow_runs SELECT (404 repair) -> workflow_self_row (owner-scoped)
+      - threads SELECT (anchor confirm)   -> {"active_workflow_run_id": thread_anchor}
+    """
+    from unittest.mock import MagicMock
+
+    def _result(data):
+        r = MagicMock()
+        r.data = data
+        return r
+
+    def _runs_execute(*a, **k):
+        return _result(runs_row)
+
+    wf_state = {"n": 0}
+
+    def _wf_execute(*a, **k):
+        wf_state["n"] += 1
+        # 1st workflow_runs read in continue_run is the 404-repair owner-scoped
+        # resolve; later reads (Step 2 cap lookup) return the same self row.
+        return _result(workflow_self_row)
+
+    def _threads_execute(*a, **k):
+        return _result({"active_workflow_run_id": thread_anchor})
+
+    def _default_execute(*a, **k):
+        return _result(None)
+
+    def _builder(fn):
+        b = MagicMock()
+        for m in ("select", "insert", "update", "delete", "eq", "neq", "in_",
+                  "order", "limit", "single", "maybe_single", "is_", "or_"):
+            getattr(b, m).return_value = b
+        b.execute.side_effect = fn
+        return b
+
+    builders = {
+        "runs": _builder(_runs_execute),
+        "workflow_runs": _builder(_wf_execute),
+        "threads": _builder(_threads_execute),
+    }
+    default = _builder(_default_execute)
+    sb = MagicMock()
+    sb.table.side_effect = lambda name: builders.get(name, default)
+    sb.rpc.return_value = default
+    return sb
+
+
+@pytest.mark.asyncio
+async def test_continue_accepts_workflow_run_id_post_reload_no_404(
+    fake_redis, mock_asyncpg_pool, monkeypatch
+):
+    """Facet C Continue-404: POST /runs/{id}/continue with a WORKFLOW_RUN id (the
+    value workflowLock.runId carries post-reload) does NOT 404 — it resolves under
+    the caller's ownership (workflow_runs.user_id + the thread anchor) and drives
+    the harness branch, returning 200 with the fresh producer_run_id.
+    """
+    import httpx
+    from httpx import ASGITransport
+    from unittest.mock import AsyncMock, patch
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    wf_run_id = uuid.uuid4()
+    thread_id = uuid.uuid4()
+
+    sb = _continue_supabase(
+        runs_row=None,  # NOT a runs row → would 404 at Step 1 without the repair
+        workflow_self_row={"id": str(wf_run_id), "thread_id": str(thread_id),
+                           "continues_used": 0},
+        thread_anchor=str(wf_run_id),  # the id IS the thread's live anchor
+    )
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.dependencies.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.services.harness_engine._load_run_definition", AsyncMock(return_value=object())), \
+             patch("app.db.workflows.get_active_phase", AsyncMock(return_value=None)), \
+             patch("app.api.runs.resolve_phase_available_tools", lambda *a, **k: []), \
+             patch("app.db.runs.insert_run", AsyncMock()), \
+             patch("app.db.runs.finalize_run", AsyncMock()), \
+             patch("app.services.harness_engine.run_workflow", AsyncMock()):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/runs/{wf_run_id}/continue",
+                    headers={"Authorization": "Bearer test-token"},
+                )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["status"] == "ok"
+        # the fresh producer id is surfaced for the frontend re-subscribe.
+        assert "producer_run_id" in body and body["producer_run_id"]
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+async def test_continue_idor_other_users_workflow_run_id_still_404s(
+    fake_redis, mock_asyncpg_pool
+):
+    """T-092-07-02: another user's workflow_run id still 404s — the resolve stays
+    owner-scoped (workflow_runs.user_id == current_user); existence never leaks.
+    """
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    wf_run_id = uuid.uuid4()
+
+    sb = _continue_supabase(
+        runs_row=None,           # not the caller's runs row
+        workflow_self_row=None,  # owner-scoped workflow_runs SELECT finds nothing
+        thread_anchor=None,
+    )
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        async with httpx.AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            resp = await c.post(
+                f"/runs/{wf_run_id}/continue",
+                headers={"Authorization": "Bearer test-token"},
+            )
+        assert resp.status_code == 404, resp.text
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+def test_continue_resolve_stays_owner_scoped_in_source():
+    """T-092-07-02: the Continue-404 repair ADDS an owner-scoped workflow_runs
+    resolve (AND user_id) + the thread-anchor confirmation — it does NOT weaken the
+    existing ownership check. Assert the source carries the owner-scoped resolve.
+    """
+    import inspect
+    from app.api import runs as runs_api
+
+    src = inspect.getsource(runs_api.continue_run)
+    assert "workflow_runs" in src, "the 404 repair must resolve workflow_runs"
+    assert "active_workflow_run_id" in src, "must confirm the thread anchor"
+    # owner-scoping: the workflow_runs resolve is keyed by the current user.
+    assert 'eq("user_id", current_user["id"])' in src
+
+
+def test_get_thread_workflow_surfaces_latest_producer_when_live(
+    client, mock_asyncpg_pool, mock_execute_result
+):
+    """Facet C surfacing: when the thread's latest producer runs row is NON-terminal
+    (live), get_thread_workflow returns latest_producer_run_id == that run_id;
+    reuses the EXISTING F2 self-heal SELECT (no second runs query).
+    """
+    thread_id = uuid.uuid4()
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+    mock_execute_result.data = {
+        "id": str(thread_id),
+        "active_workflow_run_id": str(wf_run_id),
+    }
+    # fetchrow order: (1) workflow_runs join -> active; (2) F2 producer probe now
+    # selecting run_id+status -> a LIVE (streaming) producer row; (3) deep probe None.
+    mock_asyncpg_pool.set_fetchrow_results([
+        {
+            "status": "active", "continues_used": 0,
+            "definition_slug": "wf", "definition_name": "WF",
+            "current_phase_slug": "p0", "current_phase_index": 0, "total_phases": 2,
+        },
+        {"run_id": producer_id, "status": "streaming"},
+        None,
+    ])
+
+    with patch_get_pg_pool(mock_asyncpg_pool):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["latest_producer_run_id"] == str(producer_id)
+    # Pure read — only one runs probe (no second runs query for the surfacing).
+    runs_probes = [
+        sql for sql, _ in mock_asyncpg_pool.calls
+        if "FROM runs WHERE thread_id" in sql
+    ]
+    assert len(runs_probes) == 1, "must reuse the existing F2 SELECT (no new query)"
+
+
+def test_get_thread_workflow_latest_producer_none_when_terminal(
+    client, mock_asyncpg_pool, mock_execute_result
+):
+    """Facet C surfacing: when the latest producer row is terminal, the surfaced
+    latest_producer_run_id is None (don't point the frontend at a dead stream).
+    """
+    thread_id = uuid.uuid4()
+    wf_run_id = uuid.uuid4()
+    mock_execute_result.data = {
+        "id": str(thread_id),
+        "active_workflow_run_id": str(wf_run_id),
+    }
+    mock_asyncpg_pool.set_fetchrow_results([
+        {
+            "status": "active", "continues_used": 0,
+            "definition_slug": "wf", "definition_name": "WF",
+            "current_phase_slug": "p0", "current_phase_index": 0, "total_phases": 2,
+        },
+        {"run_id": uuid.uuid4(), "status": "completed"},  # terminal producer
+        None,
+    ])
+
+    with patch_get_pg_pool(mock_asyncpg_pool):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["latest_producer_run_id"] is None
+    # terminal producer also flips lock_is_stale (the F2 self-heal still works).
+    assert resp.json()["lock_is_stale"] is True
+
+
+def patch_get_pg_pool(pool):
+    from unittest.mock import AsyncMock, patch
+
+    return patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool))
+
+
 def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
     """Deep-path guard: _build_phase_tool_context is harness-executor-only. The
     Deep path builds its ToolContext in task_service from a producer runs id and

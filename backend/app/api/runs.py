@@ -632,6 +632,43 @@ async def continue_run(
         .maybe_single()
     )
     row = row_resp.data if row_resp is not None else None
+
+    if not row:
+        # Facet C (092-07) Continue-404 repair: after a page reload
+        # workflowLock.runId carries the WORKFLOW_RUN id (StreamsProvider seeds it
+        # from wf.active_workflow_run_id on reconcile), which is NOT a `runs` row →
+        # the SELECT above 404s before the harness branch ever runs. Resolve it as
+        # a workflow_runs.id UNDER THE CALLER'S OWNERSHIP (T-092-07-02: the resolve
+        # stays owner-scoped — never trust the path id alone, never leak existence)
+        # and confirm it is the thread's live anchor, then synthesize the Step-1 row
+        # so the existing harness branch drives it.
+        wf_self_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, thread_id, continues_used")
+            .eq("id", str(run_id))
+            .eq("user_id", current_user["id"])
+            .maybe_single()
+        )
+        wf_self = wf_self_resp.data if wf_self_resp is not None else None
+        if wf_self:
+            # Confirm this workflow_run is the thread's CURRENT live anchor (only
+            # Continue the thread's active workflow — owner-scoped thread read).
+            anchor_resp = await aexec(
+                supabase.table("threads")
+                .select("active_workflow_run_id")
+                .eq("id", wf_self["thread_id"])
+                .eq("user_id", current_user["id"])
+                .maybe_single()
+            )
+            _anchor = (anchor_resp.data if anchor_resp is not None else None) or {}
+            if str(_anchor.get("active_workflow_run_id")) == str(run_id):
+                row = {
+                    "run_id": str(run_id),
+                    "status": None,
+                    "thread_id": wf_self["thread_id"],
+                    "continues_used": wf_self.get("continues_used") or 0,
+                }
+
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 

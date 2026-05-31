@@ -91,6 +91,10 @@ import {
 import { makeThrottle } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
+// Phase 092-07 (Facet C): the Continue affordance (MessageItem) fires this signal
+// with the FRESH producer_run_id from the /continue 200 body; the provider
+// re-subscribes that thread's producer stream (additive, per-thread keyed).
+import { subscribeProducerResubscribe } from "@/providers/producerResubscribeSignal"
 
 // RESEARCH §Finding #1: module-level constant gives every empty-bucket subscriber
 // the SAME reference, so React/useSyncExternalStore skips re-render when the
@@ -806,6 +810,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
   const resumeInFlightRef = useRef(false)
+  // Phase 092-07 (Facet C): the producer-stream re-subscribe closure, installed by
+  // useEffect #1 (it closes over subscriptionsRef/lastSeenOffsetRef) and consumed
+  // by the mount reconcile + the producer-resubscribe signal listener.
+  const subscribeProducerStreamRef = useRef<
+    ((threadId: string, producerRunId: string) => void) | null
+  >(null)
 
   // Phase 068.5 D-068.5-03: throttled localStorage writer; hoisted into a ref
   // so the synchronous setViewingThread action body can call `.flush()` without
@@ -822,6 +832,65 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       (surfaceId: SurfaceId, threadId: string): ThreadBoundSetMessages =>
       (updater) =>
         useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, updater)
+
+    // Phase 092-07 (Facet C): re-subscribe a thread's FRESH producer stream so a
+    // startup-sweep-resumed run (mount reconcile latest_producer_run_id) AND a
+    // Harness Continue (the /continue 200 producer_run_id) re-attach their live
+    // events with no page action. Per-thread keyed (BUG-260523-01), idempotent
+    // (won't double-subscribe), additive — reuses the existing subscribeToRun
+    // machinery + the chat-surface callbacks; touches no provider streaming branch.
+    const subscribeProducerStream = (threadId: string, producerRunId: string) => {
+      if (!threadId || !producerRunId) return
+      // Idempotent: already attached → no-op.
+      if (subscriptionsRef.current.has(producerRunId)) return
+      const surfaceId: SurfaceId = "chat"
+      const controller = new AbortController()
+      subscriptionsRef.current.set(producerRunId, controller)
+      useStreamsStore.setState((s) => ({
+        subscriptionsByThread: _addRunToThread(
+          s.subscriptionsByThread,
+          threadId,
+          producerRunId,
+        ),
+      }))
+      const callbacks: StreamCallbacks = makeStreamCallbacks({
+        // No assistant placeholder to target — the resumed run's phase/sub-agent
+        // events render in the panel via the shared callbacks; the chat transcript
+        // is reconciled separately. Use the run id as the target id (harmless when
+        // no placeholder matches).
+        assistantId: producerRunId,
+        threadId,
+        setMessages: setMessagesForBucketBound(surfaceId, threadId),
+      })
+      callbacks.onCursor = (msId: string) => {
+        lastSeenOffsetRef.current.set(producerRunId, msId)
+      }
+      const originalOnTerminal = callbacks.onTerminal
+      callbacks.onTerminal = (kind, errorPayload) => {
+        subscriptionsRef.current.delete(producerRunId)
+        useStreamsStore.setState((s) => ({
+          subscriptionsByThread: _removeRunFromThread(
+            s.subscriptionsByThread,
+            threadId,
+            producerRunId,
+          ),
+        }))
+        originalOnTerminal(kind, errorPayload)
+      }
+      subscribeToRun(
+        producerRunId,
+        lastSeenOffsetRef.current.get(producerRunId) ?? "0",
+        callbacks,
+        controller.signal,
+      ).catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("producer re-subscribe failed:", err)
+        }
+        subscriptionsRef.current.delete(producerRunId)
+      })
+    }
+    // expose to the reconcile action + the producer-resubscribe signal listener.
+    subscribeProducerStreamRef.current = subscribeProducerStream
 
     useStreamsStore.setState({
       actions: {
@@ -1149,6 +1218,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     capPaused: wf.cap_paused,
                     continuesRemaining: wf.continues_remaining,
                   })
+                  // Phase 092-07 (Facet C, startup-sweep re-attach): when the
+                  // workflow is live AND the backend reports a live producer runs
+                  // row (latest_producer_run_id — the fresh shell a startup-sweep
+                  // resume minted), re-subscribe its stream so the resumed run's
+                  // events render with no page action. Per-thread keyed; idempotent.
+                  if (wf.latest_producer_run_id) {
+                    subscribeProducerStreamRef.current?.(
+                      threadId,
+                      wf.latest_producer_run_id,
+                    )
+                  }
                 } else {
                   // Stale / terminal / Deep → unlock (honors the F2 self-heal).
                   actions.clearWorkflowLockForThread(threadId)
@@ -1800,6 +1880,26 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       window.removeEventListener("focus", onFocus)
       window.removeEventListener("pageshow", onPageShow)
     }
+  }, [])
+
+  // ---- useEffect #2b (092-07 Facet C): Continue producer re-subscribe ----
+  // The Continue affordance fires requestProducerResubscribe(threadId, producerId)
+  // on a Harness /continue 200 (the backend minted a fresh producer runs row).
+  // Point the per-thread lock at the fresh id AND re-subscribe its live stream
+  // (per-thread keyed; idempotent — won't double-subscribe).
+  useEffect(() => {
+    const unsubscribe = subscribeProducerResubscribe(({ threadId, producerRunId }) => {
+      const actions = useStreamsStore.getState().actions
+      const existing = useStreamsStore.getState().workflowLockByThread.get(threadId)
+      if (existing) {
+        actions.setWorkflowLockForThread(threadId, {
+          ...existing,
+          runId: producerRunId,
+        })
+      }
+      subscribeProducerStreamRef.current?.(threadId, producerRunId)
+    })
+    return unsubscribe
   }, [])
 
   // ---- useEffect #3: unmount cleanup (mirror of useMessages.ts:1209-1214) ----

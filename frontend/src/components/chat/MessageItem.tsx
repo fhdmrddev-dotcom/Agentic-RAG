@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button"
 // thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered
 // from /messages, BUG-260528-01) via the cap_paused SSE + the mount reconcile.
 import { useWorkflowLockForThread } from "@/providers/StreamsProvider"
+// Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
+// producer runs row + returns its id; re-subscribe its live stream (per-thread
+// keyed, additive — mirrors panelOpenSignal).
+import { requestProducerResubscribe } from "@/providers/producerResubscribeSignal"
 import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
@@ -398,6 +402,16 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                           if (res.status === "refused") {
                             // D-06: the 3-cap was hit — show the stop message, no throw.
                             setContinueExhausted(true)
+                          } else if (res.producer_run_id && message.thread_id) {
+                            // Facet C (092-07): the Harness re-drive minted a FRESH
+                            // producer runs row (the original stream EXPIREd) — the
+                            // /continue 200 body carries its id. Re-subscribe its
+                            // live stream (per-thread keyed, idempotent) so the panel
+                            // shows the resumed run's events with no page action.
+                            requestProducerResubscribe({
+                              threadId: message.thread_id,
+                              producerRunId: res.producer_run_id,
+                            })
                           }
                         } catch (err) {
                           console.error("continueRun failed:", err)

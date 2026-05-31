@@ -1556,9 +1556,15 @@ async def get_thread_workflow(
     # (self-heals a future stranded lock on reconcile). PURE READ — no writes
     # (the test_thread_workflow_endpoint.py pure-read invariant must hold).
     producer_terminal = False
+    # Facet C (092-07): surface the thread's latest producer runs.run_id WHEN live
+    # (non-terminal) so the StreamsProvider reconcile re-attaches a startup-sweep-
+    # resumed run's live stream (GET /runs/{id}/stream) on mount with no page
+    # action. We REUSE the existing F2 self-heal SELECT — add `run_id` to it (no
+    # new query, no write — the 092-05 pure-read F2 invariant holds).
+    latest_producer_run_id = None
     if active_workflow_run_id is not None and not lock_is_stale:
         prod_row = await pool.fetchrow(
-            "SELECT status FROM runs WHERE thread_id = $1 "
+            "SELECT run_id, status FROM runs WHERE thread_id = $1 "
             "ORDER BY started_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
@@ -1566,6 +1572,9 @@ async def get_thread_workflow(
         producer_terminal = prod_status in (
             "completed", "failed", "cancelled", "timed_out"
         )
+        # Only point the frontend at a stream that is still being written (live).
+        if prod_row is not None and not producer_terminal:
+            latest_producer_run_id = prod_row["run_id"]
     lock_is_stale = lock_is_stale or producer_terminal
 
     # 3. cap_paused / continues: a workflow run carries it on workflow_runs; a
@@ -1608,6 +1617,11 @@ async def get_thread_workflow(
         cap_paused=cap_paused,
         continues_used=continues_used,
         continues_remaining=max(0, _MAX_CONTINUES_PER_RUN - continues_used),
+        latest_producer_run_id=(
+            UUID(latest_producer_run_id)
+            if isinstance(latest_producer_run_id, str)
+            else latest_producer_run_id
+        ),
     )
 
 

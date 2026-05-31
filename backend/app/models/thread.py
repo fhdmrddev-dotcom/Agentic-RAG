@@ -75,3 +75,11 @@ class ThreadWorkflowState(BaseModel):
     continues_used: int
     # 3 - continues_used (max_continues_per_run, D-06).
     continues_remaining: int
+    # Facet C (092-07) — the thread's latest producer `runs.run_id` WHEN it is live
+    # (non-terminal). The frontend re-subscribes GET /runs/{id}/stream to re-attach
+    # a startup-sweep-resumed run's live stream on mount/reconcile with no page
+    # action. None when the latest producer row is terminal/absent. Surfaced as a
+    # PURE additive read (reuses the existing F2 self-heal SELECT — no new query,
+    # no write; the 092-05 F2 invariant holds). Owner-scoped via the existing
+    # get_thread_workflow ownership check.
+    latest_producer_run_id: UUID | None = None

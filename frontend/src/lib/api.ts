@@ -946,6 +946,13 @@ export interface ThreadWorkflowState {
   continues_used: number
   /** max_continues_per_run - continues_used (D-06). */
   continues_remaining: number
+  /** Facet C (092-07) — the thread's latest producer `runs.run_id` WHEN live
+   *  (non-terminal). The StreamsProvider reconcile re-subscribes
+   *  GET /runs/{id}/stream to re-attach a startup-sweep-resumed run's live stream
+   *  on mount with no page action. null when the latest producer row is
+   *  terminal/absent. PURE additive read (no new query, no write — the 092-05 F2
+   *  invariant holds). */
+  latest_producer_run_id?: string | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py
@@ -989,6 +996,11 @@ export async function listPublishedWorkflows(
 export interface ContinueRunResult {
   status: "ok" | "refused"
   run_id?: string
+  /** Facet C (092-07) — on a Harness re-drive the backend mints a FRESH producer
+   *  `runs` row (the original stream EXPIREd) and returns its id here so the
+   *  frontend re-subscribes GET /runs/{producer_run_id}/stream. Absent on the Deep
+   *  consume path (same run_id) and on a `refused` response. */
+  producer_run_id?: string
   message?: string
   continues_used: number
   continues_remaining: number

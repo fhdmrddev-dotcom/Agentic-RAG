@@ -75,7 +75,8 @@ def test_thread_workflow_state_shape(client, mock_asyncpg_pool, mock_execute_res
             "current_phase_index": 1,
             "total_phases": 3,
         },
-        {"status": "streaming"},  # F2 producer-run probe — non-terminal
+        # F2 producer-run probe (092-07: now SELECTs run_id+status) — non-terminal
+        {"run_id": uuid.uuid4(), "status": "streaming"},
         None,  # latest cap_paused runs row — none
     ])
 
@@ -168,7 +169,8 @@ def test_lock_is_stale_when_producer_run_terminal_workflow_lagged(
             "current_phase_index": 0,
             "total_phases": 2,
         },
-        {"status": "failed"},  # producer run is terminal — lock is stale
+        # producer run is terminal — lock is stale (092-07: run_id+status)
+        {"run_id": uuid.uuid4(), "status": "failed"},
         None,
     ])
 
