@@ -49,6 +49,26 @@ AttributeError: 'NoneType' object has no attribute 'rpc'
 
 **Confidence this is the LAST major domino:** the ToolContext is the single chokepoint — once the harness ctx carries the same fields Deep's RunContext does, the sub-agent has everything Deep has (and Deep works end-to-end). After F5, the document-grounded workflows should run to completion.
 
+## UPDATE 2 (after F5 fix a7be6423) — F4+F5 CONFIRMED WORKING; NEW final gap F6
+
+Re-ran Harness Research→Summarize on the DBA folder. The `harness_audit` trail is COMPLETE and clean (no traceback):
+`phase_started(research) → phase_completed(research) → phase_transition → phase_started(summarize) → phase_completed(summarize) → run_completed`.
+- **F4 + F5 VERIFIED WORKING:** both phases executed, `search_documents` ran over the DBA docs with NO `None.rpc` crash, the run completed in ~7s, the anchor cleared to NULL (SC#2 natural-completion ✓).
+- The product DOES behave as a RAG engine in workflow mode: the workflow searched the user's documents end-to-end.
+
+### NEW BLOCKER — F6: harness workflow output is never surfaced/persisted as the assistant reply
+
+**Symptom:** after a successful run, `GET /threads/{id}/messages` returns ONLY the user message (count=1) — there is NO assistant message. The chat stays empty; a reload shows just the question. The workflow does the work and the answer is dropped. (This is the operator's exact concern: "how is the answer reflected to the user?" — currently it isn't.)
+
+**Root cause (confirmed in code):**
+- Design intent D-10 (harness_engine.py:32-34, 555-559): "the FINAL phase's text becomes the assistant message verbatim; the engine sets `ctx.final_output`; the existing message-insert path persists it." `run_workflow` DOES set `ctx.final_output = last_output` (:559).
+- BUT the producer-shell finalizer `_shielded_finalize` (threads.py:1342+) persists the assistant message from `_result_sink.get("persist")` (:1359) — and `_result_sink` is populated ONLY by `run_agent_loop` (the Deep path, :1275). In the harness branch `run_agent_loop` never runs (run_workflow runs instead), so `_result_sink` is empty → `_persist` is None → NO assistant message persisted, and nothing emitted as assistant content.
+- The "existing message-insert path persists ctx.final_output" hand-off (D-10) was never actually wired: no code reads `wf_ctx.final_output` and routes it into the persist/emit path.
+
+**Fix shape (focused):** after `run_workflow` returns successfully in the harness branch (threads.py ~1168), populate `_result_sink["persist"]` from `wf_ctx.final_output` (the `{"text": ...}` summarize payload) so the existing `_shielded_finalize` persist+emit path writes the assistant message + emits the content on the producer stream — reusing the proven Deep persist path (D-10's intent), keeping rendering identical. Also confirm the content streams/emits so it renders without a reload (Facet B completeness for assistant content, not just phase events).
+
+**This is very likely the LAST domino:** with F4 (runs), F5 (tools/ctx), F6 (output surfaced), the full loop closes — ask → search the user's docs → grounded answer rendered as the assistant reply. The harness path simply was never exercised live before, so each fix peeled one layer (F1→F2→F4→F5→F6); F6 is the surface layer (the user-visible answer). Note: only LIVE UAT caught these — the mock-pool tests + structural-skeleton SSE proof passed through all of them.
+
 ## Disposition
 
 - F4 + resume-current_user: VERIFIED CLOSED live.
