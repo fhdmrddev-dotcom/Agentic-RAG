@@ -220,10 +220,21 @@ class _NoopRedis:
         return "0-0"
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 03 (5 real executors)")
-def test_phase_dispatch_routes_each_of_5_types(build_workflow_definition):
+def test_phase_dispatch_routes_each_of_5_types():
     """HARNESS-01: each of the 5 phase_type literals routes to its executor."""
-    raise NotImplementedError
+    import app.services.harness  # noqa: F401 — triggers register_all()
+    from app.services.harness_engine import PHASE_TYPE_REGISTRY
+
+    assert set(PHASE_TYPE_REGISTRY) == {
+        "programmatic",
+        "llm_single",
+        "llm_agent",
+        "llm_batch_agents",
+        "llm_human_input",
+    }
+    # Every registered executor is callable (the dispatch seam resolves each).
+    for executor in PHASE_TYPE_REGISTRY.values():
+        assert callable(executor)
 
 
 @pytest.mark.asyncio
@@ -380,3 +391,226 @@ class TestProgrammaticRegistry:
         second = await split_topic(dict(topic), None)
         assert first == second
         assert first["sub_questions"] == ["A", "B", "C"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# LIVE — Plan 03: the 5 phase-type executors (Task 3)
+# ═══════════════════════════════════════════════════════════════════════
+
+from types import SimpleNamespace  # noqa: E402
+from unittest.mock import AsyncMock, patch  # noqa: E402
+
+
+def _phase(config_dict):
+    """Build a single typed PhaseSpec from a config dict."""
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec.model_validate(
+        {"slug": "p0", "phase_index": 0, "config": config_dict}
+    )
+
+
+def _exec_ctx(**overrides):
+    """A minimal harness run-ctx bag the executors read substrate off of."""
+    defaults = dict(
+        redis=_NoopRedis(),
+        run_id=uuid.uuid4(),
+        thread_id=str(uuid.uuid4()),
+        supabase=None,
+        pool=None,
+        user_settings=None,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"},
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        emit=AsyncMock(),
+        spawn=lambda *a, **k: None,
+        model="gpt-4o",
+        per_run_task_semaphore=None,
+        retry_feedback=None,
+        inputs={},
+    )
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+class TestPhaseExecutors:
+    """The 5 executors wrap their shipped substrate (no loop reimplementation)."""
+
+    @pytest.mark.asyncio
+    async def test_programmatic_runs_registered_fn(self):
+        from app.services.harness import phase_types
+
+        phase = _phase({"phase_type": "programmatic", "fn": "split_topic",
+                        "input_keys": ["topic"]})
+        ctx = _exec_ctx(inputs={"topic": "alpha; beta"})
+        out = await phase_types._exec_programmatic(phase, {}, ctx)
+        assert out["sub_questions"] == ["alpha", "beta"]
+
+    @pytest.mark.asyncio
+    async def test_programmatic_unknown_fn_raises(self):
+        from app.services.harness import phase_types
+
+        phase = _phase({"phase_type": "programmatic", "fn": "not_registered"})
+        with pytest.raises(KeyError):
+            await phase_types._exec_programmatic(phase, {}, _exec_ctx())
+
+    @pytest.mark.asyncio
+    async def test_llm_single_calls_stream_with_prompt(self):
+        from app.services.harness import phase_types
+
+        captured = {}
+
+        async def _fake_stream(*, messages, tools, model, user_settings):
+            captured["messages"] = messages
+            captured["tools"] = tools
+            return ("the summary", [])
+
+        phase = _phase({"phase_type": "llm_single", "prompt": "Summarize."})
+        with patch.object(phase_types, "_stream_one_iteration", _fake_stream):
+            out = await phase_types._exec_llm_single(
+                phase, {"prev": {"text": "prior content"}}, _exec_ctx()
+            )
+        assert out == {"text": "the summary"}
+        assert captured["messages"][0] == {"role": "system", "content": "Summarize."}
+        assert captured["messages"][1]["content"] == "prior content"
+        assert captured["tools"] == []  # llm_single uses no tools
+
+    @pytest.mark.asyncio
+    async def test_llm_single_consumes_retry_feedback(self):
+        """CONSUMER side — ctx.retry_feedback is appended to the prompt (Plan 05 sets it)."""
+        from app.services.harness import phase_types
+
+        captured = {}
+
+        async def _fake_stream(*, messages, tools, model, user_settings):
+            captured["sys"] = messages[0]["content"]
+            return ("x", [])
+
+        phase = _phase({"phase_type": "llm_single", "prompt": "Base prompt."})
+        ctx = _exec_ctx(retry_feedback="The JSON was missing the 'title' field.")
+        with patch.object(phase_types, "_stream_one_iteration", _fake_stream):
+            await phase_types._exec_llm_single(phase, {}, ctx)
+        assert "Base prompt." in captured["sys"]
+        assert "missing the 'title' field" in captured["sys"]
+
+    @pytest.mark.asyncio
+    async def test_llm_agent_wires_whitelist_prompt_and_explorer_cap(self):
+        from app.services.harness import phase_types
+
+        captured = {}
+
+        async def _fake_sub_agent(*, parent_ctx, description, instructions,
+                                  allowed_tools, max_steps, system_prompt_override=None):
+            captured["whitelist"] = parent_ctx.phase_whitelist
+            captured["allowed_tools"] = allowed_tools
+            captured["max_steps"] = max_steps
+            captured["system_prompt_override"] = system_prompt_override
+            return {"sub_run_id": uuid.uuid4(), "summary": "agent done", "status": "completed"}
+
+        # max_steps omitted -> model default 10 -> clamps to Explorer=8 (D-12).
+        phase = _phase({"phase_type": "llm_agent", "prompt": "Research it.",
+                        "available_tools": ["search_documents"]})
+        with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+            out = await phase_types._exec_llm_agent(phase, {}, _exec_ctx())
+        assert out["text"] == "agent done"
+        assert captured["whitelist"] == frozenset({"search_documents"})  # D-05 layer 2
+        assert captured["allowed_tools"] == ["search_documents"]
+        assert captured["system_prompt_override"] == "Research it."  # OQ1
+        assert captured["max_steps"] == 8  # Explorer clamp (D-12)
+
+    @pytest.mark.asyncio
+    async def test_llm_agent_respects_explicit_max_steps(self):
+        from app.services.harness import phase_types
+
+        captured = {}
+
+        async def _fake_sub_agent(*, parent_ctx, description, instructions,
+                                  allowed_tools, max_steps, system_prompt_override=None):
+            captured["max_steps"] = max_steps
+            return {"sub_run_id": uuid.uuid4(), "summary": "ok", "status": "completed"}
+
+        # Explicit non-default max_steps is NOT clamped.
+        phase = _phase({"phase_type": "llm_agent", "prompt": "x",
+                        "available_tools": ["search_documents"], "max_steps": 3})
+        with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+            await phase_types._exec_llm_agent(phase, {}, _exec_ctx())
+        assert captured["max_steps"] == 3
+
+    @pytest.mark.asyncio
+    async def test_batch_agents_fans_out_and_merges_numbered(self):
+        from app.services.harness import phase_types
+
+        calls = []
+
+        async def _fake_sub_agent(*, parent_ctx, description, instructions,
+                                  allowed_tools, max_steps, system_prompt_override=None):
+            calls.append(system_prompt_override)
+            # echo the sub-question back as the summary
+            q = system_prompt_override.rsplit("Sub-question: ", 1)[-1]
+            return {"sub_run_id": uuid.uuid4(), "summary": f"ans:{q}", "status": "completed"}
+
+        phase = _phase({"phase_type": "llm_batch_agents", "prompt": "Review.",
+                        "available_tools": ["search_documents"],
+                        "merge_strategy": "concat_numbered"})
+        acc = {"split": {"sub_questions": ["q1", "q2", "q3"]}}
+        with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+            out = await phase_types._exec_llm_batch_agents(phase, acc, _exec_ctx())
+        assert len(calls) == 3  # fanned out over the 3 sub-questions
+        assert out["text"] == "## Result 1\nans:q1\n\n## Result 2\nans:q2\n\n## Result 3\nans:q3"
+        assert len(out["sub_run_ids"]) == 3
+
+    @pytest.mark.asyncio
+    async def test_batch_agents_concat_merge(self):
+        from app.services.harness import phase_types
+
+        async def _fake_sub_agent(*, parent_ctx, description, instructions,
+                                  allowed_tools, max_steps, system_prompt_override=None):
+            q = system_prompt_override.rsplit("Sub-question: ", 1)[-1]
+            return {"sub_run_id": uuid.uuid4(), "summary": q, "status": "completed"}
+
+        phase = _phase({"phase_type": "llm_batch_agents", "prompt": "R.",
+                        "available_tools": ["search_documents"]})  # default concat
+        acc = {"split": {"sub_questions": ["a", "b"]}}
+        with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
+            out = await phase_types._exec_llm_batch_agents(phase, acc, _exec_ctx())
+        assert out["text"] == "a\n\nb"
+
+    @pytest.mark.asyncio
+    async def test_human_input_blocks_and_returns_answer(self):
+        from app.services.harness import phase_types
+
+        captured = {}
+
+        async def _fake_subscribe(redis, run_id, tool_call_id, timeout_seconds):
+            captured["tool_call_id"] = tool_call_id
+            captured["timeout"] = timeout_seconds
+            return {"kind": "response", "response_text": "Doc B", "choice_index": 1}
+
+        phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
+                        "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
+        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+        assert out["text"] == "Which doc?"
+        assert out["answer"] == "Doc B"
+        # tool_call_id is stored so Plan 04 resume can re-subscribe against it.
+        assert out["tool_call_id"] == captured["tool_call_id"]
+        assert captured["timeout"] == 300
+
+    @pytest.mark.asyncio
+    async def test_human_input_clamps_timeout_to_hard_cap(self):
+        from app.services.harness import phase_types
+        from app.config import settings
+
+        captured = {}
+
+        async def _fake_subscribe(redis, run_id, tool_call_id, timeout_seconds):
+            captured["timeout"] = timeout_seconds
+            return None  # timeout
+
+        # Request way above the 1800s hard cap.
+        phase = _phase({"phase_type": "llm_human_input", "prompt": "?",
+                        "timeout_seconds": 99999})
+        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+        assert captured["timeout"] == settings.ask_user_max_timeout_seconds
+        assert out["answer"] == ""  # no response on timeout
