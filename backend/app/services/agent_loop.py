@@ -1233,6 +1233,87 @@ async def run_agent_loop(
         # combo can't dodge the per-run cap.
         _per_run_task_semaphore = asyncio.Semaphore(settings.task_per_run_concurrency)
 
+        # Phase 092 (092-03 / SC#4) — CONSUME the persisted dropped tool calls.
+        # Continue (POST /runs/{id}/continue) re-enters the loop with
+        # resume_dropped_tool_calls=True + the carrier payload. We pre-dispatch
+        # those EXACT calls (re-execute them, feed results back into `messages`)
+        # so the model's FIRST iteration here continues from the dropped work —
+        # NOT a fresh restart, NOT a re-drop (the whole point of Continue vs the
+        # passive 075.4 warning). OFF at every other call site → Deep byte-identical.
+        if ctx.resume_dropped_tool_calls and ctx.dropped_tool_calls:
+            _resume_calls = [
+                {
+                    "id": dc.get("tool_call_id") or "",
+                    "name": dc.get("name", "?"),
+                    "arguments": dc.get("arguments") or "{}",
+                }
+                for dc in ctx.dropped_tool_calls
+            ]
+            messages.append({
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": rc["id"],
+                        "type": "function",
+                        "function": {"name": rc["name"], "arguments": rc["arguments"]},
+                    }
+                    for rc in _resume_calls
+                ],
+            })
+            _resume_ctx = ToolContext(
+                redis=redis,
+                run_id=run_id,
+                thread_id=thread_id,
+                supabase=supabase,
+                pool=await get_pg_pool(),
+                user_settings=user_settings,
+                current_user=current_user,
+                folder_subtree_ids=folder_subtree_ids,
+                scoped_folder_path=scoped_folder_path,
+                emit=_emit,
+                spawn=_spawn,
+                model=body.model or settings.llm_model,
+                previous_files_in_run=_previous_files_in_run,
+                iteration=0,
+                parent_run_id=None,
+                per_run_task_semaphore=_per_run_task_semaphore,
+                available_tools=[rc["name"] for rc in _resume_calls],
+            )
+            for _ti, rc in enumerate(_resume_calls):
+                _tool_name = rc["name"]
+                try:
+                    _args = json.loads(rc["arguments"])
+                    await _emit(redis, run_id, 'tool_start', name=_tool_name, args=_args)
+                    _resume_ctx.tool_index = _ti
+                    _resume_ctx.tool_call_id = rc["id"]
+                    _rr = await dispatch_tool(_tool_name, _args, _resume_ctx)
+                    _tres = _rr.result
+                    _llm_content = _rr.llm_content
+                    if _rr.source_refs:
+                        source_refs.extend(_rr.source_refs)
+                    if _rr.citations:
+                        retrieved_citations.extend(_rr.citations)
+                    if _rr.similarity_score is not None:
+                        similarity_scores.append(_rr.similarity_score)
+                except json.JSONDecodeError:
+                    _tres, _llm_content, _args = "Error parsing tool arguments", None, {}
+                except Exception as _e:  # noqa: BLE001 — mirror the main dispatch round
+                    logger.error("Resume tool %s failed: %s", _tool_name, _e)
+                    _tres, _llm_content = f"Tool execution failed: {_e}", None
+                await _emit(redis, run_id, 'tool_end', name=_tool_name, result=str(_tres)[:2000])
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": rc["id"],
+                    "content": _llm_content if _llm_content is not None else _tres,
+                })
+                persisted_tool_calls.append({
+                    "tool_call_id": rc["id"],
+                    "name": _tool_name,
+                    "args": _args,
+                    "result": str(_tres)[:2000],
+                    "status": "done",
+                })
+
         for iteration in range(max_iterations):
             # D-04 (Phase 56): emit iteration_start at the top of every iteration.
             # Frontend uses this to increment the "Step N" counter (D-03).

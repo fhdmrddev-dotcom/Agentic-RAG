@@ -1551,3 +1551,139 @@ async def get_thread_workflow(
         continues_used=continues_used,
         continues_remaining=max(0, _MAX_CONTINUES_PER_RUN - continues_used),
     )
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 092 (092-03 / CONT-01) — Deep-run continuation spawner.
+# POST /runs/{id}/continue (runs.py) calls this to re-drive the SAME run_id
+# within a FRESH bounded budget, CONSUMING the persisted dropped tool calls
+# (SC#4). NET-NEW (PATTERNS.md "No Analog Found"): the Deep-run continuation.
+# Mirrors agent_runner's _shielded_finalize ordering (persist → finalize_run →
+# sentinel → expire → zrem); the only twist is the cap_paused disposition —
+# if the continuation hits the cap AGAIN, it re-pauses (no terminal sentinel)
+# so the next Continue can resume, instead of finalizing terminal.
+# ───────────────────────────────────────────────────────────────────────
+async def spawn_continuation_run(
+    *,
+    run_id: _uuid_mod.UUID,
+    thread_id: str,
+    current_user: dict,
+    redis,
+    supabase,
+    dropped_tool_calls: list[dict],
+) -> None:
+    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4)."""
+
+    async def _continuation() -> None:
+        _terminal_status = "completed"
+        _terminal_error: str | None = None
+        _result_sink: dict = {}
+        try:
+            user_settings = load_user_settings(current_user["id"])
+            resolved_model = user_settings.llm_model
+            resolved_provider = user_settings.active_provider
+            # Minimal MessageCreate carrier — the loop reads body.model/.provider/
+            # .agent_mode/.content; a continuation carries no new user content.
+            body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
+            ctx = RunContext(
+                run_id=run_id,
+                thread_id=thread_id,
+                current_user=current_user,
+                user_settings=user_settings,
+                body=body,
+                redis=redis,
+                supabase=supabase,
+                resolved_model=resolved_model,
+                resolved_provider=resolved_provider,
+                resume_dropped_tool_calls=True,
+                dropped_tool_calls=tuple(dropped_tool_calls),
+            )
+            try:
+                await run_agent_loop(
+                    ctx,
+                    emit=_emit,
+                    emit_terminal=_emit_terminal,
+                    spawn=_spawn,
+                    result_sink=_result_sink,
+                )
+            except asyncio.CancelledError:
+                _terminal_status = "cancelled"
+                raise
+            except Exception as e:  # noqa: BLE001 — mirror agent_runner classifier
+                _terminal_status = "failed"
+                _terminal_error = f"failed: {type(e).__name__}: {(str(e) or '')[:200]}"
+                logger.exception("Continuation run %s failed", run_id)
+        finally:
+            # cap_disposition override — if the cap fired AGAIN, stay non-terminal.
+            _cap = _result_sink.get("cap_disposition")
+            if _cap == "cap_paused":
+                _terminal_status = "cap_paused"
+
+            async def _finalize() -> None:
+                _persist = _result_sink.get("persist")
+                _persist_sys = _result_sink.get("persist_system_warnings")
+                _sink_warnings = _result_sink.get("persisted_system_warnings") or []
+                _in_tok = _result_sink.get("input_tokens_total")
+                _out_tok = _result_sink.get("output_tokens_total")
+                _msg_id: str | None = None
+                try:
+                    if _persist is not None:
+                        _msg_id = await _persist()
+                except BaseException:
+                    logger.exception("Continuation persist failed for run %s", run_id)
+                try:
+                    if _persist_sys is not None and _sink_warnings:
+                        await _persist_sys(_sink_warnings)
+                except BaseException:
+                    logger.exception("Continuation sys-warning persist failed for run %s", run_id)
+                try:
+                    await finalize_run(
+                        await get_pg_pool(),
+                        run_id=run_id,
+                        status=_terminal_status,
+                        error=_terminal_error,
+                        completed_at=datetime.now(timezone.utc),
+                        message_id=UUID(_msg_id) if _msg_id else None,
+                        input_tokens=_in_tok,
+                        output_tokens=_out_tok,
+                    )
+                except BaseException:
+                    logger.exception("Continuation runs UPDATE failed for run %s", run_id)
+                # cap_paused is NON-terminal — NO terminal sentinel (Landmine 6).
+                # The agent_loop already emitted the non-terminal cap_paused event.
+                if _terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE:
+                    try:
+                        await _emit_terminal(
+                            redis, run_id,
+                            _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status],
+                            error=_terminal_error,
+                        )
+                    except BaseException:
+                        logger.exception("Continuation sentinel XADD failed for run %s", run_id)
+                _ttl = 600 if _terminal_status == "completed" else 60
+                try:
+                    await redis.expire(f"run:{run_id}", _ttl)
+                except BaseException:
+                    logger.exception("Continuation EXPIRE failed for run %s", run_id)
+                # cap_paused keeps the run in the active sorted sets (re-attachable);
+                # a true terminal status ZREMs them.
+                if _terminal_status != "cap_paused":
+                    try:
+                        await redis.zrem("runs:active", str(run_id))
+                        await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
+                    except BaseException:
+                        logger.exception("Continuation ZREM failed for run %s", run_id)
+
+            try:
+                await asyncio.shield(_finalize())
+            except asyncio.CancelledError:
+                raise
+            finally:
+                RUN_TASKS.pop(run_id, None)
+
+    task = asyncio.create_task(_continuation())
+    RUN_TASKS[run_id] = task
+
+    def _evict(_t, _rid=run_id):
+        RUN_TASKS.pop(_rid, None)
+    task.add_done_callback(_evict)

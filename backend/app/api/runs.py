@@ -589,6 +589,196 @@ async def submit_ask_user_response(
 
 
 # ───────────────────────────────────────────────────────────────────────
+# POST /runs/{run_id}/continue — CONT-01 / D-06 / D-08 (Phase 092 / 092-03).
+# At the iteration cap a run pauses cap_paused with its dropped tool calls
+# persisted (agent_loop.persist_cap_paused). Continue resumes the SAME run with
+# a FRESH bounded budget:
+#   - Deep run:    CONSUMES the persisted dropped calls (re-executes them) —
+#                  SC#4 (consume, not re-drop, not restart).
+#   - Harness run: re-reads the active phase's available_tools from the parsed
+#                  definition (D-08) + re-drives run_workflow.
+# The (max_continues_per_run)-th Continue is refused server-side (D-06). The
+# durable continues_used column (migration 063) survives WORKER_COUNT=2.
+# ───────────────────────────────────────────────────────────────────────
+def resolve_phase_available_tools(definition, active_slug: str) -> list:
+    """Re-read the active phase's available_tools from the parsed definition (D-08).
+
+    available_tools lives in the definition JSONB (per-phase config), NOT a
+    workflow_phases column — so a Harness Continue MUST re-read it from the parsed
+    WorkflowDefinition before resuming, never trust a stale row. Tool-bearing
+    phase configs (llm_agent / llm_batch_agents) carry the whitelist; other phase
+    types (llm_single / programmatic / llm_human_input) have none → empty list.
+    """
+    for ps in definition.phases:
+        if ps.slug == active_slug:
+            return list(getattr(ps.config, "available_tools", []) or [])
+    return []
+
+
+@router.post("/{run_id}/continue", status_code=200)
+async def continue_run(
+    run_id: UUID,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """Resume a cap_paused run within a fresh bounded budget (CONT-01)."""
+    # ── Step 1: ownership SELECT → 404 (never leak existence; T-092-09) ──
+    row_resp = await aexec(
+        supabase.table("runs")
+        .select("run_id, status, thread_id, continues_used")
+        .eq("run_id", str(run_id))
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    row = row_resp.data if row_resp is not None else None
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    thread_id = row["thread_id"]
+
+    # ── Step 2: detect Deep vs Harness — read continues_used from the row that
+    # carries the cap. A Harness run's cap lives on workflow_runs (via the
+    # thread anchor); a Deep run's cap lives on the runs row. ──
+    thread_resp = await aexec(
+        supabase.table("threads")
+        .select("active_workflow_run_id")
+        .eq("id", thread_id)
+        .eq("user_id", current_user["id"])
+        .maybe_single()
+    )
+    _thread = thread_resp.data if thread_resp is not None else None
+    active_workflow_run_id = (_thread or {}).get("active_workflow_run_id")
+
+    continues_used = row.get("continues_used") or 0
+    wf_row = None
+    if active_workflow_run_id is not None:
+        wf_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, continues_used, definition_id")
+            .eq("id", str(active_workflow_run_id))
+            .maybe_single()
+        )
+        wf_row = wf_resp.data if wf_resp is not None else None
+        if wf_row is not None:
+            continues_used = wf_row.get("continues_used") or 0
+
+    # ── Step 3: refuse the 4th Continue server-side (D-06 / T-092-10) ──
+    # Durable counter — never an in-memory count (WORKER_COUNT=2). No spawn.
+    if continues_used >= settings.max_continues_per_run:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "refused",
+                "message": (
+                    f"All {settings.max_continues_per_run} Continues used — "
+                    "this run is stopped. Start a new message to keep going."
+                ),
+                "continues_used": continues_used,
+                "continues_remaining": 0,
+            },
+        )
+
+    # ── Step 4: transactionally increment continues_used on the carrying row ──
+    _new_used = continues_used + 1
+    try:
+        if active_workflow_run_id is not None:
+            await aexec(
+                supabase.table("workflow_runs")
+                .update({"continues_used": _new_used})
+                .eq("id", str(active_workflow_run_id))
+            )
+        else:
+            await aexec(
+                supabase.table("runs")
+                .update({"continues_used": _new_used, "status": "streaming"})
+                .eq("run_id", str(run_id))
+            )
+    except Exception:
+        logger.exception("continue: continues_used increment failed for run %s", run_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record continue",
+        )
+
+    # ── Step 5: branch — Harness re-drive vs Deep consume ──
+    if active_workflow_run_id is not None:
+        # Harness: re-read available_tools from the definition (D-08) + re-drive.
+        from app.services.harness_engine import (  # noqa: PLC0415
+            run_workflow, _load_run_definition, _emit as _harness_emit,
+        )
+        from app.db.workflows import get_active_phase  # noqa: PLC0415
+        from types import SimpleNamespace  # noqa: PLC0415
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+        from app.api.threads import RUN_TASKS as _RUN_TASKS  # noqa: PLC0415
+        import asyncio as _asyncio  # noqa: PLC0415
+
+        pool = await get_pg_pool()
+        wf_run_uuid = (
+            UUID(active_workflow_run_id)
+            if isinstance(active_workflow_run_id, str)
+            else active_workflow_run_id
+        )
+        definition = await _load_run_definition(pool, wf_run_uuid)
+        active_phase = await get_active_phase(pool, wf_run_uuid)
+        # D-08: re-read the active phase's whitelist from the PARSED definition.
+        _available_tools = (
+            resolve_phase_available_tools(definition, active_phase["slug"])
+            if (definition is not None and active_phase is not None) else []
+        )
+        logger.info(
+            "continue: harness re-drive run=%s phase=%s available_tools=%s",
+            wf_run_uuid, (active_phase or {}).get("slug"), _available_tools,
+        )
+
+        async def _harness_continuation():
+            wf_ctx = SimpleNamespace(
+                run_id=wf_run_uuid,
+                thread_id=thread_id,
+                current_user=current_user,
+                user_settings=None,
+                redis=redis,
+                pool=pool,
+                emit=_harness_emit,
+                retry_feedback=None,
+            )
+            try:
+                await run_workflow(wf_run_uuid, definition, wf_ctx, pool=pool, redis=redis)
+            except Exception:
+                logger.exception("Harness continuation failed for run %s", wf_run_uuid)
+            finally:
+                _RUN_TASKS.pop(wf_run_uuid, None)
+
+        _t = _asyncio.create_task(_harness_continuation())
+        _RUN_TASKS[wf_run_uuid] = _t
+        _t.add_done_callback(lambda _x, _r=wf_run_uuid: _RUN_TASKS.pop(_r, None))
+    else:
+        # Deep: CONSUME the persisted dropped tool calls (SC#4).
+        from app.db.runs import load_cap_paused_tool_calls  # noqa: PLC0415
+        from app.api.threads import spawn_continuation_run  # noqa: PLC0415
+        from app.dependencies import get_pg_pool  # noqa: PLC0415
+
+        pool = await get_pg_pool()
+        thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
+        dropped = await load_cap_paused_tool_calls(pool, thread_uuid)
+        await spawn_continuation_run(
+            run_id=run_id,
+            thread_id=thread_id,
+            current_user=current_user,
+            redis=redis,
+            supabase=supabase,
+            dropped_tool_calls=dropped,
+        )
+
+    return {
+        "status": "ok",
+        "run_id": str(run_id),
+        "continues_used": _new_used,
+        "continues_remaining": max(0, settings.max_continues_per_run - _new_used),
+    }
+
+
+# ───────────────────────────────────────────────────────────────────────
 # DELETE /runs/{run_id}  — cancel verb (D-062-08/09/10/11/12/13).
 # Idempotent across all three sub-paths:
 #   - happy:      in-flight run (RUN_TASKS contains task) → task.cancel() → 204
