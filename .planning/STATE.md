@@ -3,11 +3,11 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: "092-07 Tasks 1-5 (F4 id-routing code + live-DB FK test) DONE sequentially; Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (backend restart required — F4 fixes are in backend code) — phase 092 NOT complete; MODE-01/02 + CONT-01 stay OPEN until UAT GREEN"
-last_updated: "2026-05-31T17:30:00.000Z"
+stopped_at: Phase 093 context gathered + rescoped (harness cross-provider hardening; 092.5 gateway inserted; PARITY-01 re-deferred)
+last_updated: "2026-05-31T21:05:27.483Z"
 last_activity: 2026-05-31
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 3
   total_plans: 22
   completed_plans: 21
@@ -144,6 +144,7 @@ Progress: [██████████] 95%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (D-093-RESCOPE, 2026-06-01, operator-confirmed at /gsd:discuss-phase 093): **Phase 093 rescoped** "Anthropic Cross-Provider Parity" → **"Harness Cross-Provider Parity + Phase-Type Hardening"**, grounded in the 092 comprehensive audit + a live-code verification sweep. The harness path works on **OpenAI only** (1 of 4 seed workflows, 1 of 7 providers) — a harness-substrate problem, NOT a Deep problem (Deep is provider-robust on all 7). **NEW Phase 092.5 (Provider Gateway Extraction)** inserted to ship FIRST (extract `agent_loop.py`'s provider dispatch into ONE shared gateway, Deep byte-identical; operator's "separate per feature" instinct). 093 then CONSUMES it: shared model-resolver (resolve, don't mutate), ask_user round-trip (Option (i) endpoint-detects-workflow_run), split_topic+batch+verify-gate fixes, 5 phase-types hardened safe-by-construction (reachability lint extended), resume/Continue answer surfacing + draft plumbing. **Phase 094 EXPANDED** → Workflow Legibility + Mode Clarity (audit Phase B + D-092-UX), renders 093's events, sketch-first. **PARITY-01 (Deep-mode Anthropic polish) RE-DEFERRED**; admin/settings-at-scale → SEED-024/012. RED LINE: investigate first, never break working things; Deep byte-identical. New reqs GATEWAY-01 + PARITY-02. Sources: 093-CONTEXT.md + 092-COMPREHENSIVE-AUDIT.md. **NOTE: 092 must close first (092-07 Task 6 UAT still pending), then 092.5, then 093.**
 - (D-092-UX, 2026-05-31, operator-approved after strategy-brief research): **Composer consolidation target = A+C** — fold Provider INTO Model (one grouped pill) AND move workflow-START out of the composer into the Phase 087 workspace panel ("▶ Run workflow"). Composer settles to `[ Model ▾ ] [ General/Explorer ▾ ]`. Rationale: Deep/Harness ⊥ General/Explorer are orthogonal axes (2×2), not 4 sibling modes; rendering them as identical pills is the confusion. Workflows stay THREAD-bound (shared run SSE/anchor/lock) — NOT a separate `/workflows` route (would fight 068/075.x reconciliation arch). G-2 sketch-before-plan FIRES → `/gsd:sketch` before any plan-phase. Moving workflow-start to the panel also SHRINKS the F3 lock-UX surface. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
 - (D-092-AUTHOR, 2026-05-31, operator-approved): **Workflow authoring = NL-describe→strict-parse→form-edit→lint-on-publish; NOT a visual drag-canvas** (the squeezed-dead middle per 2025-26 evidence). Phase 091 already shipped the back half (WorkflowDefinition validation + reachability lint + immutable-on-publish + RLS). **Ship Authoring Phase A (draft/edit/publish API only — reuses shipped validator+lint, no schema change) as a small late-v2.8 add** so the dual-mode picker shows user-authored workflows, not just the 4 seeds. NL-generate (B) + guided form editor (C, G-2 sketch) + optional read-only DAG (D) → v2.9 alongside the Plugin Contract. Differentiation thesis: KB-grounded phases (anti-Glean) + native sandbox-code phases + persistent shareable skills + NL-to-WorkflowDefinition safe-by-construction + first-class gates/human-input — no competitor combines these. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
 - (v2.8 roadmap): 8 phases (089-096) derived from 21 requirements; research A→G build order adopted with 2 polish riders sequenced after the extraction
@@ -288,9 +289,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T22:30:00.000Z
-Stopped at: 092-07 Tasks 1-5 (F4 id-routing fix + live-DB FK test) DONE sequentially; Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (backend restart required first) — phase 092 NOT complete
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-07-PLAN.md → Task 6 (operator UAT gate)
+Last session: --stopped-at
+Stopped at: Phase 093 context gathered + rescoped (harness cross-provider hardening; 092.5 gateway inserted; PARITY-01 re-deferred)
+Resume file: --resume-file
 
 **Plan 092-07 — ⏸ Tasks 1-5 DONE (code + tests); Task 6 UAT AWAITING OPERATOR (2026-05-31):** F4 id-routing gap-closure (sub-agent parent_run_id FK + SSE routing + resume/Continue-404). Ran SEQUENTIALLY on the main working tree.
 
