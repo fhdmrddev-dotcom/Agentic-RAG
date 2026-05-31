@@ -640,7 +640,15 @@ async def _build_resume_context(run, redis, pool):
         run_id=run["run_id"],
         producer_run_id=_producer_id,
         thread_id=str(run["thread_id"]),
-        current_user={"id": run.get("user_id")},
+        # 092-07: coerce to str, mirroring str(run["thread_id"]) above. On the
+        # resume path run["user_id"] is an asyncpg pgproto.UUID OBJECT (not a
+        # str like the live auth dict). task_service.insert_run does
+        # UUID(parent_ctx.current_user["id"]) — UUID(<UUID object>) raises
+        # AttributeError ('UUID' has no 'replace'). Match the live contract
+        # (current_user["id"] is a str). user_id None → resume can't proceed.
+        current_user={
+            "id": str(run["user_id"]) if run.get("user_id") is not None else None
+        },
         redis=redis,
         pool=pool,
         emit=_emit,

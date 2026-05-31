@@ -459,3 +459,73 @@ async def test_claim_run_sql_is_lease_cas_not_status_self_transition(mock_asyncp
     assert "claimed_at IS NULL OR claimed_at <" in sql, "lease-expiry predicate present"
     # The old no-op self-transition must be GONE.
     assert "SET status = 'active'" not in sql
+
+
+# ── 092-07 — resume-ctx current_user["id"] is a str (asyncpg UUID coercion) ───
+#
+# REGRESSION (startup-sweep crash): on the LIVE path wf_ctx.current_user["id"]
+# is the auth-dict STRING, so task_service.py:268 UUID(parent_ctx.current_user
+# ["id"]) works. On the RESUME path the run dict's user_id is an asyncpg
+# pgproto.UUID OBJECT — UUID(<UUID object>) raises AttributeError ('UUID' has
+# no attr 'replace'). _build_resume_context MUST coerce to str so the resumed
+# sub-agent insert (which re-wraps with UUID(...)) matches the live contract.
+# This was invisible to the mock-pool tests above (their run dicts already use
+# uuid.uuid4() objects but never round-tripped current_user["id"] through
+# UUID() the way task_service does on the insert path).
+
+
+@pytest.mark.asyncio
+async def test_build_resume_context_current_user_id_is_str(mock_asyncpg_pool, fake_redis):
+    """_build_resume_context coerces an asyncpg-UUID user_id to a str ctx field.
+
+    Feeds a run whose user_id is a real UUID OBJECT (as asyncpg returns) and
+    asserts the returned ctx.current_user["id"] is a `str` AND that
+    UUID(ctx.current_user["id"]) succeeds — exactly the call task_service makes
+    on the sub-agent insert (task_service.py:268). Guards the startup-sweep
+    crash from silently regressing.
+    """
+    from app.services import harness_engine
+
+    user_uuid_obj = uuid.uuid4()  # asyncpg returns pgproto.UUID *objects*, not str
+    run = {
+        "run_id": uuid.uuid4(),
+        "thread_id": uuid.uuid4(),
+        "user_id": user_uuid_obj,
+        "current_phase_id": None,
+    }
+
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+
+    assert isinstance(ctx.current_user["id"], str), (
+        "resume ctx current_user['id'] MUST be a str (task_service re-wraps it "
+        "with UUID(...) — UUID(<UUID object>) raises AttributeError)"
+    )
+    # The exact call task_service.py:268 makes — must not raise.
+    assert uuid.UUID(ctx.current_user["id"]) == user_uuid_obj
+    # thread_id is likewise a str (already coerced pre-092-07) — confirm no regress.
+    assert isinstance(ctx.thread_id, str)
+    assert uuid.UUID(ctx.thread_id) == run["thread_id"]
+
+
+def test_continuation_ctx_sources_current_user_from_auth_dict_not_row():
+    """/continue _harness_continuation uses the request auth dict (id already str).
+
+    Confirms the continuation builder's `current_user` is sourced from the
+    request `current_user` (FastAPI Depends(get_current_user) — id is a str),
+    NOT from an asyncpg row, so it needs no str() coercion (unlike the resume
+    path). A static-source assertion: the builder assigns `current_user=
+    current_user` (the request param), and the only row-sourced UUID — the
+    producer-shell insert — already guards `isinstance(current_user["id"], str)`.
+    """
+    import inspect
+    from app.api import runs as runs_mod
+
+    src = inspect.getsource(runs_mod.continue_run)
+    # The continuation ctx reuses the request auth dict verbatim (str id).
+    assert "current_user=current_user" in src, (
+        "continuation ctx must reuse the request auth dict (id is already a str)"
+    )
+    # The one row-target UUID (producer-shell insert) defends against a UUID obj.
+    assert 'isinstance(current_user["id"], str)' in src, (
+        "producer-shell insert must guard the str-vs-UUID-object boundary"
+    )
