@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import namedtuple
 from typing import Callable
 from uuid import UUID
@@ -63,6 +64,8 @@ from app.db.workflows import (
 )
 from app.models.harness import WorkflowDefinition
 from app.services.ask_user_service import resume_pending_prompt
+
+logger = logging.getLogger(__name__)
 
 # NOTE: ``run_gates`` (harness.validators) and ``parse_skip_target``
 # (harness.reachability) are imported LAZILY inside the functions that use them.
@@ -109,13 +112,21 @@ async def _emit(redis, run_id: UUID, type: str, **fields) -> None:
 
 
 def _persist_output(output: dict) -> dict:
-    """Return the inline output dict, or a path-only spill dict if it's too large.
+    """Return the output dict to durably persist — NEVER discarding the payload.
 
-    Large outputs spill to the ``workspace-files`` bucket (path-only) so
-    ``workflow_phases.output`` jsonb never bloats (Pattern 3 / T-091-07). The
-    bucket write itself is wired by the Plan 03 executors that produce large
-    blobs; here we keep the size gate + the path-only contract so the engine's
-    durable write stays bounded.
+    CR-02 fix (091-REVIEW): the prior version returned
+    ``{"_spilled_path": "workspace-files://pending"}`` for outputs > 64 KB, but NO
+    phase executor ever supplies a real ``_spilled_path`` (the bucket-write path
+    was never wired). The result silently DESTROYED any large phase output —
+    ``workflow_phases.output`` kept only a dead pointer string, and a resumed
+    downstream phase (or the final chat message) read the placeholder instead of
+    the real text. Correctness (no lost output) outranks jsonb size.
+
+    Policy: store the FULL output inline. jsonb can hold it — the 64 KB cap is an
+    OPTIMIZATION, not a hard storage limit. If a real ``_spilled_path`` is ever
+    supplied by a future bucket-spill path, honor it (path-only); otherwise keep
+    the payload inline and log a debug note that bucket spill is not yet wired.
+    Bucket spill remains a future optimization, NOT a correctness dependency.
     """
     try:
         serialized = json.dumps(output)
@@ -124,10 +135,18 @@ def _persist_output(output: dict) -> dict:
         # return shape); surface it rather than silently store nothing.
         raise
     if len(serialized) > _OUTPUT_INLINE_LIMIT:
-        # Path-only spill: the blob goes to workspace-files; output jsonb keeps
-        # only the pointer. Plan 03 supplies the concrete bucket path.
+        # A real spill pointer (future optimization) is honored if present...
         spilled_path = output.get("_spilled_path") if isinstance(output, dict) else None
-        return {"_spilled_path": spilled_path or "workspace-files://pending"}
+        if spilled_path:
+            return {"_spilled_path": spilled_path}
+        # ...otherwise store inline. NEVER drop the payload (CR-02).
+        logger.debug(
+            "harness phase output is %d bytes (> %d inline limit); storing inline "
+            "(bucket spill not yet wired — payload preserved, no data loss)",
+            len(serialized),
+            _OUTPUT_INLINE_LIMIT,
+        )
+        return output
     return output
 
 
@@ -174,18 +193,22 @@ def _parse_on_failure(on_failure: str) -> _OnFailure:
     return _OnFailure("fail_run", None)  # unknown → fail-safe
 
 
-def _failing_on_failure(phase, gate) -> str:
+def _failing_on_failure(phase, failed_idx: int | None) -> str:
     """The ``on_failure`` of the validator that produced this gate failure.
 
-    ``run_gates`` returns the first failing GateResult; we don't get the index back,
-    so we re-derive the disposition from the phase's validators. With the common
-    single-validator phase this is exact; with multiple validators we use the first
-    validator carrying a non-baseline disposition (skip_to_phase) when present, else
-    the first validator's on_failure — the routing intent of the gate set.
+    WR-03 (091-08): ``run_gates`` now threads the FAILING validator's index back
+    (``GateResult.validator_index``); the engine passes it here as ``failed_idx`` so
+    the disposition comes from the SAME validator whose ``max_retries`` bounded the
+    retry loop. When the index is known we index ``phase.validators[failed_idx]``
+    directly. When it is None (e.g. a wall-clock timeout — no gate ran) we fall back
+    to the prior heuristic: the first validator carrying a ``skip_to_phase``
+    disposition if any, else the first validator's ``on_failure``.
     """
     validators = list(getattr(phase, "validators", None) or [])
     if not validators:
         return "fail_run"
+    if failed_idx is not None and 0 <= failed_idx < len(validators):
+        return validators[failed_idx].on_failure
     for v in validators:
         if v.on_failure.startswith("skip_to_phase:"):
             return v.on_failure
@@ -223,10 +246,15 @@ async def _run_phase_with_gates(
     # Lazy import (breaks the harness-package import cycle — see module note).
     from app.services.harness.validators import run_gates
 
-    # max_retries comes from the failing validator (default 2). When the phase has
-    # validators they share the bound in practice; use the first validator's.
+    # WR-03 (091-08): the retry bound AND the on_failure disposition must come from
+    # the SAME failing validator. We don't know which validator fails until the gate
+    # runs, so seed the bound from validators[0] and REBIND it to the failing
+    # validator's max_retries the moment run_gates reports the failing index — so a
+    # multi-validator phase where validators[0].max_retries differs from the
+    # routing validator's no longer pairs a wrong bound with a wrong route.
     validators = list(getattr(phase, "validators", None) or [])
     phase_max_retries = validators[0].max_retries if validators else 2
+    failed_idx: int | None = None
 
     attempt = 0
     last_output = None
@@ -249,7 +277,10 @@ async def _run_phase_with_gates(
                 redis, run_id, "gate_failed",
                 phase=phase.slug, attempt=attempt, error=gate_error,
             )
-            return _route_on_failure(phase, gate_error, attempt)
+            # A wall-clock timeout has no failing-validator index (the phase hung
+            # before gates ran) → failed_idx stays None → routing uses the phase's
+            # disposition heuristic (skip_to_phase-bearing validator else first).
+            return _route_on_failure(phase, gate_error, attempt, failed_idx)
 
         gate = await run_gates(phase, output, ctx)
         if gate.passed:
@@ -260,6 +291,13 @@ async def _run_phase_with_gates(
             return PhaseOutcome("completed", output, None, None)
 
         # ── gate failed ──────────────────────────────────────────────────────
+        # WR-03: rebind the retry bound to the FAILING validator the first time we
+        # learn its index (run_gates threads it back on GateResult), so the bound
+        # and the route both come from the same validator.
+        if gate.validator_index is not None and 0 <= gate.validator_index < len(validators):
+            failed_idx = gate.validator_index
+            phase_max_retries = validators[failed_idx].max_retries
+
         # Consecutive-identical short-circuit: re-running produced the SAME output,
         # so retrying cannot help — treat as exhausted (T-091-16, the SC#3 net).
         identical = output == last_output
@@ -287,14 +325,20 @@ async def _run_phase_with_gates(
                 pass  # immutable stub ctx in some unit tests
             continue
 
-        # Exhausted → on_failure routing.
+        # Exhausted → on_failure routing (from the SAME failing validator, WR-03).
         _clear_retry_feedback(ctx)
-        return _route_on_failure(phase, gate.error_message, attempt)
+        return _route_on_failure(phase, gate.error_message, attempt, failed_idx)
 
 
-def _route_on_failure(phase, error_message: str, attempt: int) -> PhaseOutcome:
-    """Map an exhausted/timed-out gate failure to a :class:`PhaseOutcome`."""
-    disposition = _parse_on_failure(_failing_on_failure(phase, None))
+def _route_on_failure(
+    phase, error_message: str, attempt: int, failed_idx: int | None = None
+) -> PhaseOutcome:
+    """Map an exhausted/timed-out gate failure to a :class:`PhaseOutcome`.
+
+    ``failed_idx`` (WR-03) is the index of the validator that failed — both the
+    retry bound and this routing disposition derive from that same validator.
+    """
+    disposition = _parse_on_failure(_failing_on_failure(phase, failed_idx))
     reason = (
         f"Phase {phase.phase_index + 1} ({phase.slug}) gate failed after "
         f"{attempt + 1} attempt(s): {error_message}"
@@ -575,7 +619,10 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
     for run in runs:
         run_id = run["run_id"]
         # 1. CAS claim — single-producer-per-run (Pitfall 7). Loser skips.
-        if not await claim_run(pool, run_id):
+        #    The lease (claimed_at) is the real CAS (CR-01): the winner stamps it,
+        #    a racing sibling sees the fresh stamp → 0 rows → skips. A crash
+        #    mid-resume becomes re-claimable once harness_resume_lease_seconds expires.
+        if not await claim_run(pool, run_id, settings.harness_resume_lease_seconds):
             continue
 
         # 2. ask_user resume branch: answered → proceed; pending → re-emit + block.

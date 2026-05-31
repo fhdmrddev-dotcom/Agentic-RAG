@@ -43,10 +43,18 @@ __all__ = [
 ]
 
 
-# A gate result: ``passed`` bool + ``error_message`` (None when passed). The
-# error_message is fed back into the retry prompt by the engine (D-08 visible
-# self-correction).
-GateResult = namedtuple("GateResult", ["passed", "error_message"])
+# A gate result: ``passed`` bool + ``error_message`` (None when passed) +
+# ``validator_index`` (the index into ``phase.validators`` of the FAILING validator,
+# or None when passed / no validators). The error_message is fed back into the
+# retry prompt by the engine (D-08 visible self-correction); the validator_index
+# lets the engine derive BOTH the retry bound (max_retries) AND the on_failure
+# disposition from the SAME failing validator (WR-03 fix, 091-08).
+#
+# Default ``validator_index=None`` keeps every existing ``GateResult(passed, msg)``
+# call site (the 4 validator kinds + the programmatic registry fns) byte-identical.
+GateResult = namedtuple(
+    "GateResult", ["passed", "error_message", "validator_index"], defaults=[None]
+)
 
 
 # ── registries (mirror _TOOL_REGISTRY / PROGRAMMATIC_PHASE_REGISTRY) ──────────
@@ -210,15 +218,21 @@ async def run_gates(phase, output: dict, ctx) -> GateResult:
     validators). The engine's bounded-retry loop consumes the returned
     ``error_message`` (feeds it back into the retry prompt, audits + emits it).
     """
-    for spec in getattr(phase, "validators", None) or []:
+    for idx, spec in enumerate(getattr(phase, "validators", None) or []):
         validator = VALIDATOR_REGISTRY.get(spec.kind)
         if validator is None:
             # A kind not in the registry is a definition/runtime error — fail
             # closed rather than silently pass an unenforced gate.
             return GateResult(
-                False, f"unknown validator kind {spec.kind!r} (no registered validator)"
+                False,
+                f"unknown validator kind {spec.kind!r} (no registered validator)",
+                idx,
             )
         result = await validator(output, spec.config, ctx)
         if not result.passed:
-            return result
+            # Thread the FAILING validator's index back so the engine derives BOTH
+            # max_retries AND on_failure from this same validator (WR-03). A
+            # validator fn may return GateResult(False, msg) with validator_index
+            # defaulting to None — stamp the run_gates-level index here.
+            return result._replace(validator_index=idx)
     return GateResult(True, None)

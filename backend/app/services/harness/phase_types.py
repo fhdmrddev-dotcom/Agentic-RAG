@@ -206,10 +206,11 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     model = _effective_model(phase, ctx)
 
     # D-05 layer 1 — the model only SEES the whitelisted, budget-capped tools.
-    # (Built so the value is computed at the phase boundary; run_task_sub_agent
-    # filters its own schemas from allowed_tools, and the whitelist + budget are
-    # the authoritative per-phase tool set.)
-    _tools_override = apply_tool_budget(
+    # WR-04 (091-08): this list is now PASSED to run_task_sub_agent as
+    # tools_override (was previously computed-then-discarded), so the TOOL-05
+    # per-provider max_tools cap actually applies to the schemas the sub-agent
+    # model sees — not just the dispatch-time backstop (layer 2).
+    tools_override = apply_tool_budget(
         get_tools(getattr(ctx, "user_settings", None)), model, whitelist
     )
 
@@ -228,6 +229,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         allowed_tools=list(phase.config.available_tools),
         max_steps=max_steps,
         system_prompt_override=system_prompt,
+        tools_override=tools_override,
     )
     return {"text": result["summary"], "sub_run_id": str(result["sub_run_id"])}
 
@@ -249,7 +251,8 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
 
     whitelist = frozenset(phase.config.available_tools)
     model = _effective_model(phase, ctx)
-    _tools_override = apply_tool_budget(
+    # WR-04 (091-08): pass the budget-capped list to each sub-agent (was discarded).
+    tools_override = apply_tool_budget(
         get_tools(getattr(ctx, "user_settings", None)), model, whitelist
     )
 
@@ -270,6 +273,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
                 allowed_tools=list(phase.config.available_tools),
                 max_steps=max_steps,
                 system_prompt_override=f"{base_prompt}\n\nSub-question: {question}",
+                tools_override=tools_override,
             )
 
     results = await asyncio.gather(*[_one(q) for q in sub_questions])

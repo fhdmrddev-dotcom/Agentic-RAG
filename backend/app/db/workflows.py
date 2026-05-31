@@ -142,6 +142,15 @@ async def ask_user_response_exists(
     The scan is keyed off the run's thread via the workflow_runs FK so it stays
     owner-scoped. True ⇒ answered (resume must NOT re-ask); False ⇒ pending
     (resume re-subscribes + re-emits, subscribe-before-emit).
+
+    RUN-SCOPING (WR-06, 091-08): the response row (runs.py /ask_user_response)
+    stores ``kind``/``tool_call_id``/``response_text``/``choice_index`` but NOT a
+    ``run_id`` — so we cannot filter the response itself by run. Instead we require
+    that a matching PROMPT row (which DOES carry ``run_id`` —
+    phase_types.py:331) for the SAME ``tool_call_id`` belongs to THIS run
+    (``p.tool_calls->0->>'run_id' = $1::text``). This disambiguates a thread that
+    has had multiple workflow runs: the answer counts only when it answers a prompt
+    this run issued — not merely the latest answer in the thread.
     """
     found = await pool.fetchval(
         """
@@ -149,6 +158,12 @@ async def ask_user_response_exists(
             SELECT 1
             FROM messages r
             JOIN workflow_runs wr ON wr.thread_id = r.thread_id
+            JOIN messages p
+              ON p.thread_id = wr.thread_id
+             AND p.role = 'system'
+             AND p.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+             AND p.tool_calls->0->>'tool_call_id' = $2
+             AND p.tool_calls->0->>'run_id' = $1::text
             WHERE wr.id = $1
               AND r.role = 'system'
               AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
@@ -168,6 +183,13 @@ async def get_pending_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
     /snapshot path) for this run's thread and returns the LATEST prompt's
     ``tool_calls[0]`` payload (tool_call_id, prompt, options, timeout_seconds) so
     resume re-emits the SAME prompt. Returns ``None`` if no prompt row exists.
+
+    RUN-SCOPING (WR-05, 091-08): the prompt row stores the issuing ``run_id`` at
+    ``tool_calls->0->>'run_id'`` (phase_types.py:331). We filter on it
+    (``= $1::text``) so a thread with MULTIPLE workflow runs (or multiple prompts)
+    re-emits the prompt that actually belongs to THIS run — not merely the newest
+    prompt in the thread (which could be a different run's question, making resume
+    re-emit the wrong tool_call_id).
     """
     row = await pool.fetchrow(
         """
@@ -177,6 +199,7 @@ async def get_pending_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
         WHERE wr.id = $1
           AND m.role = 'system'
           AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND m.tool_calls->0->>'run_id' = $1::text
         ORDER BY m.created_at DESC
         LIMIT 1
         """,
@@ -272,22 +295,48 @@ async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
     )
 
 
-async def claim_run(pool: asyncpg.Pool, run_id: UUID) -> bool:
-    """CAS-claim a run for single-producer execution (Pitfall 7).
+async def claim_run(
+    pool: asyncpg.Pool, run_id: UUID, lease_seconds: int
+) -> bool:
+    """CAS-claim a run for single-producer execution via a ``claimed_at`` lease.
 
-    ``UPDATE ... SET status='active' WHERE id=$1 AND status IN ('active','paused')
-    RETURNING id``. Returns True iff a row came back (this worker won the claim).
-    Plan 04 calls this before a resume sweep re-runs the run so two workers never
-    double-execute it. workflow_runs table, keyed by its own ``id``.
+    CR-01 fix (091-REVIEW): the prior claim did ``SET status='active' WHERE status
+    IN ('active','paused')`` — but ``find_resumable_runs`` already returns ``active``
+    rows, so the status never left the claimable set and BOTH WORKER_COUNT=2 workers
+    matched the WHERE and got a RETURNING row → the run was re-driven twice (the
+    exact Pitfall-7 double-execution this is meant to prevent).
+
+    The real CAS stamps the migration-062 ``claimed_at`` lease and only matches when
+    the lease is UNSET or EXPIRED::
+
+        UPDATE workflow_runs
+        SET claimed_at = now()
+        WHERE id = $1
+          AND status IN ('active', 'paused')
+          AND (claimed_at IS NULL OR claimed_at < now() - $2::interval)
+        RETURNING id
+
+    The winner stamps a fresh ``claimed_at``; a racing loser sees that fresh value →
+    0 rows → returns False. A crash-mid-resume run becomes re-claimable once the
+    lease (``lease_seconds`` — a named engine/config constant, NOT a magic literal)
+    expires, so a dead worker's claim never strands the run forever. ``status`` is
+    untouched (the lease is orthogonal to status); ``find_resumable_runs`` keeps
+    anchoring on ``status IN ('active','paused')``. workflow_runs table, keyed by id.
+
+    ``lease_seconds`` is passed as a Postgres interval via ``make_interval`` so the
+    parameter stays a plain ``$N`` (no f-string on SQL — T-091-03).
     """
     row = await pool.fetchrow(
         """
         UPDATE workflow_runs
-        SET status = 'active'
-        WHERE id = $1 AND status IN ('active', 'paused')
+        SET claimed_at = now()
+        WHERE id = $1
+          AND status IN ('active', 'paused')
+          AND (claimed_at IS NULL OR claimed_at < now() - make_interval(secs => $2))
         RETURNING id
         """,
         run_id,
+        lease_seconds,
     )
     return row is not None
 

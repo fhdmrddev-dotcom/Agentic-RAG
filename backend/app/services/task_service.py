@@ -201,6 +201,7 @@ async def run_task_sub_agent(
     allowed_tools: list[str],
     max_steps: int,
     system_prompt_override: str | None = None,
+    tools_override: list[dict] | None = None,
 ) -> dict:
     """Spawn a sub-agent with its own runs row + stream + tool dispatch loop.
 
@@ -215,6 +216,16 @@ async def run_task_sub_agent(
     prompt is used unchanged. ``_build_sub_agent_system_prompt`` and
     ``resolve_sub_agent_model_safely`` (D-085-16 replicated footgun) are NOT
     touched.
+
+    Phase 091 WR-04 (091-08 / additive, backward-compatible): when ``tools_override``
+    is provided, it REPLACES the schema list the sub-agent model sees — the harness
+    ``llm_agent`` / ``llm_batch_agents`` phases pass the already-whitelisted +
+    TOOL-05-budget-capped list (``apply_tool_budget(...)``) so the per-provider
+    ``max_tools`` ceiling is actually applied to what the model sees (the layer-1 cap
+    was previously computed-then-discarded — a no-op). ``None`` (every existing
+    caller — tasks / sub-agents / Deep Mode) is byte-identical to pre-091: the
+    sub-agent rebuilds its own ``allowed_tools``-filtered schema list as before (no
+    cap on the Deep-Mode path — SC#2 / the Phase 089 byte-identical invariant).
 
     Flow:
       1. Resolve a provider-safe sub-agent model name (D-075.5-04 footgun).
@@ -311,12 +322,20 @@ async def run_task_sub_agent(
         available_tools=list(allowed_tools),
     )
 
-    # 4. Build the constrained tool-schema list once (subset of parent's tool schemas)
-    full_tool_schemas = get_tools(parent_ctx.user_settings)
-    sub_tool_schemas = [
-        t for t in full_tool_schemas
-        if t.get("function", {}).get("name") in allowed_tools
-    ]
+    # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).
+    #    WR-04 (091-08): a harness phase passes tools_override = the already
+    #    whitelist-filtered + TOOL-05-budget-capped list, so the per-provider
+    #    max_tools ceiling actually applies to what the model SEES. None (every
+    #    Deep-Mode / tasks caller) rebuilds the allowed_tools-filtered list exactly
+    #    as before — byte-identical, NO cap (SC#2 / Phase 089 invariant).
+    if tools_override is not None:
+        sub_tool_schemas = tools_override
+    else:
+        full_tool_schemas = get_tools(parent_ctx.user_settings)
+        sub_tool_schemas = [
+            t for t in full_tool_schemas
+            if t.get("function", {}).get("name") in allowed_tools
+        ]
 
     # 5. The minimal sub-agent loop
     #    OQ1 (Phase 091): system_prompt_override REPLACES the helper-built framing
