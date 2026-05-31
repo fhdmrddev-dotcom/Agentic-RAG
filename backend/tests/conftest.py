@@ -371,6 +371,16 @@ class _RecordingConnection:
     def __init__(self, pool: "_MockAsyncpgPool"):
         self._pool = pool
 
+    def transaction(self):
+        """No-op async-context transaction (Phase 092 — create_workflow_run uses
+        ``async with con.transaction():`` to wrap its 3-write atomic INSERT/UPDATE).
+
+        Records ``transaction_enter`` / ``transaction_exit`` markers on the owning
+        pool's ``.calls`` so a test can assert the run/phase/anchor writes all land
+        INSIDE one transaction span if it wants to.
+        """
+        return _TransactionCtx(self._pool)
+
     async def execute(self, sql, *args):
         self._pool.calls.append((sql, args))
         return self._pool._execute_result
@@ -386,6 +396,28 @@ class _RecordingConnection:
     async def fetchval(self, sql, *args):
         self._pool.calls.append((sql, args))
         return self._pool._fetchval_result
+
+
+class _TransactionCtx:
+    """No-op async-context-manager returned by ``con.transaction()``.
+
+    Phase 092 — ``create_workflow_run`` wraps its INSERT workflow_runs + INSERT
+    workflow_phases + UPDATE threads in one transaction. The mock connection
+    records the writes on ``pool.calls`` regardless of transaction state, so this
+    CM just appends span markers (``transaction_enter``/``transaction_exit``) and
+    otherwise no-ops.
+    """
+
+    def __init__(self, pool: "_MockAsyncpgPool"):
+        self._pool = pool
+
+    async def __aenter__(self):
+        self._pool.calls.append(("transaction_enter", ()))
+        return self
+
+    async def __aexit__(self, *exc):
+        self._pool.calls.append(("transaction_exit", ()))
+        return False
 
 
 class _AcquireCtx:

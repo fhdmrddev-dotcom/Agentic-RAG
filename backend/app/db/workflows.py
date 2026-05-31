@@ -35,6 +35,8 @@ from uuid import UUID
 
 import asyncpg
 
+from app.models.harness import WorkflowDefinition
+
 # harness_audit.event_type CHECK (migration 059, 9 kinds). Validate in code so a
 # typo fails fast in tests, not as a Postgres 23514 mid-run (Pitfall 6).
 _AUDIT_EVENT_TYPES = frozenset(
@@ -50,6 +52,97 @@ _AUDIT_EVENT_TYPES = frozenset(
         "run_failed",
     }
 )
+
+
+# ── run creation (Phase 092 MODE-01 / Q5 — the net-new atomic transaction) ───
+async def create_workflow_run(
+    pool: asyncpg.Pool,
+    *,
+    thread_id: UUID,
+    definition_id: UUID,
+    definition: WorkflowDefinition,
+    inputs: dict,
+    model: str | None,
+) -> UUID:
+    """Atomically create a workflow run + its phase rows + set the thread anchor.
+
+    The ONLY live-app path that creates a workflow run (RESEARCH Landmine 3 — no
+    ``INSERT INTO workflow_phases`` existed anywhere in ``backend/app`` before this).
+    All three writes run inside ONE transaction in FK-safe order (Landmine 9):
+
+      1. INSERT workflow_runs (status='active', persists ``inputs``+``model`` —
+         SEED-047) → RETURNING id
+      2. one INSERT workflow_phases per PhaseSpec, in ``phase_index`` order,
+         status='pending'
+      3. UPDATE threads.active_workflow_run_id = <new run id>  (the lock anchor)
+
+    The workflow_runs INSERT MUST precede the threads UPDATE because
+    ``threads.active_workflow_run_id`` FKs to ``workflow_runs.id`` (full-schema.sql).
+
+    This is a NET-NEW transaction mechanic — no in-file precedent existed; the
+    standard asyncpg ``acquire() -> transaction()`` form is lifted here and the
+    three writes go through the acquired connection (``con``), not the pool.
+
+    RLS (file header contract): this helper runs as service role; owner-scoping
+    lives UPSTREAM in the route (the send_message handler already ownership-checked
+    the thread and resolved the definition under the user's RLS). No user_id check
+    here. ``$N`` placeholders only; ``json.dumps(inputs)`` + ``$3::jsonb`` (this file
+    does NOT use a pool JSONB codec — mirror complete_phase :240).
+
+    Returns the new workflow_run id.
+    """
+    async with pool.acquire() as con:
+        async with con.transaction():
+            run_id = await con.fetchval(
+                """
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model)
+                VALUES ($1, $2, 'active', $3::jsonb, $4)
+                RETURNING id
+                """,
+                thread_id,
+                definition_id,
+                json.dumps(inputs),
+                model,
+            )
+            for ps in sorted(definition.phases, key=lambda p: p.phase_index):
+                await con.execute(
+                    """
+                    INSERT INTO workflow_phases (workflow_run_id, phase_index, slug, status)
+                    VALUES ($1, $2, $3, 'pending')
+                    """,
+                    run_id,
+                    ps.phase_index,
+                    ps.slug,
+                )
+            await con.execute(
+                "UPDATE threads SET active_workflow_run_id = $2 WHERE id = $1",
+                thread_id,
+                run_id,
+            )
+    return run_id
+
+
+async def list_published_workflows(
+    pool: asyncpg.Pool, *, user_id: UUID
+) -> list[dict]:
+    """Published workflow definitions visible to a user (the picker feed).
+
+    Mirrors the RESEARCH Q5 RLS-mirroring predicate: ``status='published'`` AND
+    (``is_global`` OR ``created_by = $1``) — a user never sees another user's
+    unpublished or private definitions (T-092-07). Returns the id/slug/name the
+    picker needs. ``$N`` placeholders only.
+    """
+    rows = await pool.fetch(
+        """
+        SELECT id, slug, name
+        FROM workflow_definitions
+        WHERE status = 'published'
+          AND (is_global = true OR created_by = $1)
+        ORDER BY name
+        """,
+        user_id,
+    )
+    return [dict(r) for r in rows]
 
 
 # ── workflow_phases reads (RUN-KEYED → workflow_run_id) ──────────────────────
