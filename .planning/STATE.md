@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: executing
-stopped_at: Phase 092 Plan 01 — COMPLETE (migration 063 applied live + full-schema.sql regenerated @e79acec7; SUMMARY written). Next is Plan 02 (Wave 2 — MODE-01 mode switch + workflow-run creation + MODE-02 server-side lock).
-last_updated: "2026-05-31T11:23:54.362Z"
-last_activity: 2026-05-31 -- Phase 092 Plan 01 COMPLETE (schema foundation: migration 063 live + 3 Wave-0 scaffolds + verify_092.sql)
+status: unknown
+stopped_at: Completed 092-02-PLAN.md
+last_updated: "2026-05-31T11:43:46.895Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 3
   total_plans: 19
-  completed_plans: 16
-  percent: 84
+  completed_plans: 17
+  percent: 89
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 ## Current Position
 
 Phase: 092 (dual-mode-wiring-continue-button) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -57,7 +57,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-05-31
 
-Progress: [████████░░] 84%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -100,6 +100,7 @@ Progress: [████████░░] 84%
 | Phase 091 P07 | ~14min | 3 tasks | 2 files |
 | Phase 091 P08 | ~20min | 3 tasks | 12 files |
 | Phase 092 P01 | 25min | 3 tasks | 6 files |
+| Phase 092 PP02 | ~40min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -170,6 +171,10 @@ Recent decisions affecting current work:
 - 091-04: resume sweep claims each stranded run via claim_run CAS before re-driving run_workflow (multi-worker safe, WORKER_COUNT=2)
 - 091-04: resume_pending_prompt re-emits inside a shared _subscribe_and_block on_subscribed hook -> subscribe-before-emit is structural (Pitfall 2)
 - 091-04: answered-vs-pending detection mirrors panel.py /pending raw scan inverted (role=system ask_user_response row by tool_call_id); answered -> skip re-ask
+- (092-02): create_workflow_run is the ONLY live-app run-creation path — one atomic txn (INSERT workflow_runs + one workflow_phases per PhaseSpec + threads anchor UPDATE, FK-ordered run-before-anchor); persists inputs+model (SEED-047 wired). Two-row model retained (RESEARCH A2) — producer-shell runs row for SSE-terminal consistency, workflow_runs is the engine row; single lock-clear deferred to Plan 03
+- (092-02): producer mode-branch is ONE additive if/else above run_agent_loop — harness builds a loose SimpleNamespace engine ctx (NEVER RunContext, Landmine 7), Deep else byte-identical, zero provider-branch edits. MODE-02 server-side 409 lock refuses a Deep/different-workflow send on a non-terminal anchor BEFORE the user-message INSERT (authoritative, grayed button is courtesy only)
+- (092-02): GET /threads/{id}/workflow is a PURE READ (D-v2.5-03) returning ThreadWorkflowState — never writes; lock_is_stale is diagnostic self-heal only (clear owned by cancel/terminal, Plan 03). cap_paused/continues reported from whichever run holds the pause (workflow_runs or latest cap_paused runs row). Published-workflows picker lives in a NEW /workflows router (avoids /{thread_id} param collision)
+- (092-02): requirements MODE-01/MODE-02 left OPEN (NOT marked complete) — MODE-02 also needs Plan 03 lock-clear half + Plan 04 frontend; closure deferred to phase verification per execution requirements_note
 
 ### Pending Todos
 
@@ -239,9 +244,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31
-Stopped at: Phase 092 Plan 01 — COMPLETE. Next is Plan 02 (Wave 2) — MODE-01 mode switch + workflow-run creation (INSERT INTO workflow_runs, persists inputs/model — closes SEED-047 + unblocks 091 cross-provider UAT) + MODE-02 server-side lock-refusal.
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-02-PLAN.md
+Last session: 2026-05-31T11:42:52.701Z
+Stopped at: Completed 092-02-PLAN.md
+Resume file: None
 
 **Planned Phase:** 092 (dual-mode-wiring-continue-button) — 4 plans — 2026-05-31T11:04:01.842Z
 
