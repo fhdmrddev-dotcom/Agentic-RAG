@@ -13,7 +13,7 @@
 - ✅ **v2.7 Agent Workspace & Panel** — Phases 083-088 (shipped 2026-05-30)
 - 🚧 **v2.8 Harness Engine & Workflow Mode** — Phases 089-096 (in progress, started 2026-05-30)
 
-> **Active milestone:** v2.8 (Harness Engine & Workflow Mode) — 8 phases (089-096), 21 requirements. Deterministic, auditable workflow runtime (locked ordered phases + dispatcher-enforced tool whitelists + validation gates) + Deep/Harness dual-mode, built on v2.7's proven primitives. Plugin Contract deferred to v2.9 (D-v2.8-01).
+> **Active milestone:** v2.8 (Harness Engine & Workflow Mode) — 9 phases (089-096 + the NEW 092.5 Provider Gateway Extraction), 22 active requirements (+1 re-deferred: PARITY-01). Deterministic, auditable workflow runtime (locked ordered phases + dispatcher-enforced tool whitelists + validation gates) + Deep/Harness dual-mode, built on v2.7's proven primitives. Plugin Contract deferred to v2.9 (D-v2.8-01). **Rescoped 2026-06-01 (discuss-093):** the harness only worked on OpenAI → 092.5 gateway + rescoped 093 (harness cross-provider hardening) + expanded 094 (legibility). See REQUIREMENTS Traceability + 092-COMPREHENSIVE-AUDIT.md.
 
 ---
 
@@ -22,7 +22,7 @@
 **Created:** 2026-05-30
 **Granularity:** standard (research-derived A→G build order + 2 polish riders)
 **Phase numbering:** continues from v2.7 (last phase 088) → v2.8 starts at **089**
-**Coverage:** 21/21 v2.8 requirements mapped (see Traceability in `.planning/REQUIREMENTS.md`)
+**Coverage:** 22/22 active v2.8 requirements mapped (+1 re-deferred: PARITY-01) — rescoped 2026-06-01 (discuss-093); see Traceability in `.planning/REQUIREMENTS.md`
 
 ### Goal
 
