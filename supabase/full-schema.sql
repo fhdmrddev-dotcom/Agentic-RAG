@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pszVGTSp55gaXeoX6NcTwTFxCrDe9M2ysHkrdczlUZjfaqfDPbIhIqcL0e9gEZd
+\restrict xQwDPcnweQpgKRByg6TpiSxJRE5P3KHJeM0hxGUEPFOYgrhdcv4XKtnQeu02IOO
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -757,6 +757,7 @@ CREATE TABLE public.workflow_runs (
     inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
     model text,
     continues_used integer DEFAULT 0 NOT NULL,
+    user_id uuid,
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -794,6 +795,14 @@ COMMENT ON COLUMN public.workflow_runs.model IS 'SEED-047: resolved model at run
 --
 
 COMMENT ON COLUMN public.workflow_runs.continues_used IS 'D-06: Continue cap counter, max 3/run. Durable (WORKER_COUNT=2) — the Continue-handling worker may differ from the one that hit the cap.';
+
+
+--
+-- Name: COLUMN workflow_runs.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.user_id IS '092-05 F1: run-owner (server-side current_user at creation). Sourced into harness_audit.user_id (NOT NULL) on every audit write and into the      
+  resume ctx (_build_resume_context). FK -> auth.users ON DELETE CASCADE. Nullable for legacy rows; new inserts always supply it.';
 
 
 --
@@ -1286,6 +1295,13 @@ CREATE INDEX idx_workflow_runs_thread ON public.workflow_runs USING btree (threa
 
 
 --
+-- Name: idx_workflow_runs_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_user_id ON public.workflow_runs USING btree (user_id);
+
+
+--
 -- Name: idx_workspace_files_thread; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1728,6 +1744,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 ALTER TABLE ONLY public.workflow_runs
     ADD CONSTRAINT workflow_runs_thread_id_fkey FOREIGN KEY (thread_id) REFERENCES public.threads(id) ON DELETE CASCADE;
+
+
+--
+-- Name: workflow_runs workflow_runs_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2439,5 +2463,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pszVGTSp55gaXeoX6NcTwTFxCrDe9M2ysHkrdczlUZjfaqfDPbIhIqcL0e9gEZd
+\unrestrict xQwDPcnweQpgKRByg6TpiSxJRE5P3KHJeM0hxGUEPFOYgrhdcv4XKtnQeu02IOO
 
