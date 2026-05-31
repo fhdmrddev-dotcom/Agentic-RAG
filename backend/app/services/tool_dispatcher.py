@@ -87,6 +87,14 @@ class ToolContext:
     per_run_task_semaphore: Any = None  # asyncio.Semaphore | None — keep Any to avoid module-level asyncio import surface
     available_tools: list[str] = field(default_factory=list)
     tool_call_id: str = ""
+    # Phase 091 HARNESS-05 — the active workflow phase's allowed tool set.
+    #   None  => Deep Mode (no active workflow): the dispatch guard is a literal
+    #            no-op so Explorer/General stay byte-identical (Phase 089 invariant).
+    #   set   => a locked workflow phase: a tool name NOT in this set is refused at
+    #            dispatch_tool() with the D-04 guiding tool_result + a D-06 tool_refused
+    #            audit. Set once per phase by the harness executor (Plan 03), never
+    #            queried per tool call.
+    phase_whitelist: "frozenset[str] | None" = None
 
 
 @dataclass
@@ -1492,8 +1500,46 @@ _TOOL_REGISTRY: dict[str, Callable] = {
 }
 
 
+def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[str]) -> None:
+    """D-06: fire-and-forget a harness_audit ``tool_refused`` row on a whitelist refusal.
+
+    Mirrors the existing handler audit pattern (``ctx.spawn(<coro>)``). NEVER blocks
+    dispatch on the write: a missing pool/run_id, an unset spawn hook, or a failing
+    spawn must not turn a clean refusal into an exception (the refusal is the point).
+    Only reached when ``ctx.phase_whitelist is not None`` (a workflow is active), so
+    in pure Deep-Mode calls this is never invoked.
+    """
+    run_id = ctx.parent_run_id or ctx.run_id
+    if ctx.pool is None or run_id is None:
+        return  # no harness substrate on this ctx — nothing to audit against
+    try:
+        from app.db.workflows import write_audit  # local import: avoid load-time cycle
+        ctx.spawn(write_audit(
+            ctx.pool, run_id, "tool_refused", {"tool": tool_name, "allowed": allowed},
+        ))
+    except Exception:  # noqa: BLE001 — audit is best-effort; never block the refusal
+        logger.exception("tool_refused audit spawn failed for tool=%s", tool_name)
+
+
 async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
     """Route a tool call to its handler. Unknown tools return an error string."""
+    # Phase 091 HARNESS-05 (D-05 layer 2 — hard backstop for hallucinated names).
+    # phase_whitelist is None in Deep Mode → this branch is skipped → byte-identical
+    # to pre-091 dispatch. The refusal is a normal ToolResult.result string (the most
+    # provider-agnostic surface); the agent loop attaches the matching tool_call_id
+    # itself, so NO provider branch is ever touched (Pitfall 3/4).
+    if ctx.phase_whitelist is not None and tool_name not in ctx.phase_whitelist:
+        allowed = sorted(ctx.phase_whitelist)
+        _spawn_tool_refused_audit(ctx, tool_name, allowed)  # D-06 (fire-and-forget)
+        return ToolResult(result=json.dumps({
+            "error": "tool_not_available_in_phase",
+            "tool": tool_name,
+            "message": (
+                f"Tool `{tool_name}` is not available in this phase. "
+                f"Available tools here: {allowed}"
+            ),
+            "allowed": allowed,
+        }))
     handler = _TOOL_REGISTRY.get(tool_name)
     if handler is None:
         return ToolResult(result=f"Unknown tool: {tool_name}")
