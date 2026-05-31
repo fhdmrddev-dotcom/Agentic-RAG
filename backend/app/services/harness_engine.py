@@ -15,13 +15,18 @@ The strict 2-phase write (HARNESS-03, the highest-risk surface) is delegated to
 A phase whose execution raises mid-work is left ``active`` (never ``completed``)
 so a later sweep re-runs it — the crash-leaves-active resume contract.
 
-SEAMS this plan establishes (filled by later plans):
+DISPATCH SEAM:
   - ``PHASE_TYPE_REGISTRY`` : dispatch-by-phase_type → Plan 03 registers the 5
     real executors. Empty here → :class:`PhaseTypeNotRegistered`.
-  - ``_run_gates``          : validation gates + bounded retry → Plan 05 fills it
-    (no-op pass here).
-  - wall-clock cap          : ``asyncio.wait_for`` around the execute call; the
-    default is ``_DEFAULT_PHASE_WALL_CLOCK`` (Plan 05 sizes it from real knobs).
+
+VALIDATION GATES (HARNESS-04 / Plan 05): ``_run_phase_with_gates`` wraps each
+phase in a bounded-retry loop — run under a wall-clock cap (``asyncio.wait_for``,
+``_DEFAULT_PHASE_WALL_CLOCK`` sized from real knobs), run the validation gates,
+and on failure retry up to the validator's ``max_retries`` (≤ 3 total, never
+loops — SC#3) feeding the error back via ``ctx.retry_feedback`` (PRODUCER side;
+Plan 03 executors CONSUME it). On exhaustion the ``on_failure`` routes: ``fail_run``
+(D-07, keep partials + plain reason) or ``skip_to_phase:<slug>`` (D-09); unknown
+→ fail_run (fail-safe). Every attempt audits + emits ``gate_failed`` (D-08).
 
 Completion semantics (D-10 / D-11): on success the FINAL phase's output IS the
 assistant chat message verbatim — there is NO extra synthesis LLM call. The
@@ -36,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import namedtuple
 from typing import Callable
 from uuid import UUID
 
@@ -133,12 +139,173 @@ async def _execute_phase(phase, accumulated_outputs: dict, ctx) -> dict:
     return await executor(phase, accumulated_outputs, ctx)
 
 
-async def _run_gates(phase, output: dict, ctx) -> bool:
-    """Validation-gate SEAM — Plan 05 implements gates + bounded retry.
+# ── on_failure routing (Plan 05 / D-07/D-08/D-09) ────────────────────────────
+# The outcome of running a phase through its bounded-retry gate loop.
+#   kind == "completed"  → output is durable-ready; advance to the next phase.
+#   kind == "skip_to"    → jump to target_slug (D-09); this phase is `skipped`.
+#   kind == "fail_run"   → the run is `failed`; stop cleanly keeping partials (D-07).
+PhaseOutcome = namedtuple("PhaseOutcome", ["kind", "output", "target_slug", "reason"])
 
-    No-op pass here so the transition loop is testable end-to-end this plan.
+# on_failure dispositions (ValidatorSpec.on_failure). UNKNOWN values route to
+# fail_run (fail-safe — T-091-18 mitigation).
+_OnFailure = namedtuple("_OnFailure", ["kind", "target_slug"])
+
+
+def _parse_on_failure(on_failure: str) -> _OnFailure:
+    """Parse a failing validator's ``on_failure`` disposition.
+
+    Recognizes ``fail_run`` (the D-07 baseline), ``retry`` (retry exhausted ⇒ falls
+    back to fail_run unless a skip_to_phase is configured), and
+    ``skip_to_phase:<slug>`` (D-09). ANY unrecognized value routes to ``fail_run``
+    (fail-safe, T-091-18).
     """
-    return True
+    from app.services.harness.reachability import parse_skip_target
+
+    target = parse_skip_target(on_failure)
+    if target is not None:
+        return _OnFailure("skip_to_phase", target)
+    if on_failure in ("fail_run", "retry"):
+        # `retry` here means "retries are exhausted" → D-07 baseline (fail_run).
+        return _OnFailure("fail_run", None)
+    return _OnFailure("fail_run", None)  # unknown → fail-safe
+
+
+def _failing_on_failure(phase, gate) -> str:
+    """The ``on_failure`` of the validator that produced this gate failure.
+
+    ``run_gates`` returns the first failing GateResult; we don't get the index back,
+    so we re-derive the disposition from the phase's validators. With the common
+    single-validator phase this is exact; with multiple validators we use the first
+    validator carrying a non-baseline disposition (skip_to_phase) when present, else
+    the first validator's on_failure — the routing intent of the gate set.
+    """
+    validators = list(getattr(phase, "validators", None) or [])
+    if not validators:
+        return "fail_run"
+    for v in validators:
+        if v.on_failure.startswith("skip_to_phase:"):
+            return v.on_failure
+    return validators[0].on_failure
+
+
+async def _run_phase_with_gates(
+    phase,
+    accumulated_outputs: dict,
+    ctx,
+    *,
+    run_id: UUID,
+    pool,
+    redis,
+    wall_clock: int,
+) -> PhaseOutcome:
+    """Execute a phase under a bounded-retry gate loop (HARNESS-04 — the SC#3 bar).
+
+    Runs the phase under a wall-clock cap (``asyncio.wait_for``), runs its
+    validation gates, and on failure retries up to the failing validator's
+    ``max_retries`` (default 2 → 3 total attempts) — feeding the validator error
+    back into the next attempt via ``ctx.retry_feedback`` (the PRODUCER side; the
+    Plan 03 LLM executors are the CONSUMER, round-trip proven in 07-T2). The bound
+    is HARD: a deterministically-failing gate reaches ``failed`` in ≤ 3 attempts and
+    NEVER loops; a consecutive-identical output short-circuits even faster (retrying
+    won't help). Every attempt writes a ``gate_failed`` audit row AND emits a
+    ``gate_failed`` SSE event (D-08 visible retries). On exhaustion the failing
+    validator's ``on_failure`` routes: ``fail_run`` (D-07 baseline) or
+    ``skip_to_phase:<slug>`` (D-09); an unknown value fails safe to ``fail_run``.
+
+    Returns a :class:`PhaseOutcome`; the caller (``run_workflow``) commits the
+    durable side-effects (complete/skip/fail) so the 2-phase write stays in the
+    main loop.
+    """
+    # Lazy import (breaks the harness-package import cycle — see module note).
+    from app.services.harness.validators import run_gates
+
+    # max_retries comes from the failing validator (default 2). When the phase has
+    # validators they share the bound in practice; use the first validator's.
+    validators = list(getattr(phase, "validators", None) or [])
+    phase_max_retries = validators[0].max_retries if validators else 2
+
+    attempt = 0
+    last_output = None
+    while True:
+        # Execute under the wall-clock cap. A hanging phase fails cleanly at the
+        # timeout and drives the SAME on_failure routing as a gate failure (D-12).
+        try:
+            output = await asyncio.wait_for(
+                _execute_phase(phase, accumulated_outputs, ctx),
+                timeout=wall_clock,
+            )
+        except asyncio.TimeoutError:
+            gate_error = f"wall_clock_timeout after {wall_clock}s"
+            # Treat the timeout as a terminal gate failure: audit + emit, then route.
+            await write_audit(
+                pool, run_id, "gate_failed",
+                {"phase": phase.slug, "attempt": attempt, "error": gate_error},
+            )
+            await _emit(
+                redis, run_id, "gate_failed",
+                phase=phase.slug, attempt=attempt, error=gate_error,
+            )
+            return _route_on_failure(phase, gate_error, attempt)
+
+        gate = await run_gates(phase, output, ctx)
+        if gate.passed:
+            if validators:
+                await write_audit(pool, run_id, "gate_passed", {"phase": phase.slug})
+            # Clear the retry feedback so a downstream phase isn't polluted.
+            _clear_retry_feedback(ctx)
+            return PhaseOutcome("completed", output, None, None)
+
+        # ── gate failed ──────────────────────────────────────────────────────
+        # Consecutive-identical short-circuit: re-running produced the SAME output,
+        # so retrying cannot help — treat as exhausted (T-091-16, the SC#3 net).
+        identical = output == last_output
+        last_output = output
+
+        await write_audit(
+            pool, run_id, "gate_failed",
+            {"phase": phase.slug, "attempt": attempt, "error": gate.error_message},
+        )
+        await _emit(
+            redis, run_id, "gate_failed",
+            phase=phase.slug, attempt=attempt, error=gate.error_message,
+        )
+
+        exhausted = identical or attempt >= phase_max_retries
+        if not exhausted:
+            attempt += 1
+            # PRODUCER side: feed the validator error into the next attempt's prompt
+            # (the Plan 03 executors append ctx.retry_feedback). D-08 visible.
+            try:
+                ctx.retry_feedback = (
+                    f"Previous output failed validation: {gate.error_message}. Fix it."
+                )
+            except (AttributeError, TypeError):
+                pass  # immutable stub ctx in some unit tests
+            continue
+
+        # Exhausted → on_failure routing.
+        _clear_retry_feedback(ctx)
+        return _route_on_failure(phase, gate.error_message, attempt)
+
+
+def _route_on_failure(phase, error_message: str, attempt: int) -> PhaseOutcome:
+    """Map an exhausted/timed-out gate failure to a :class:`PhaseOutcome`."""
+    disposition = _parse_on_failure(_failing_on_failure(phase, None))
+    reason = (
+        f"Phase {phase.phase_index + 1} ({phase.slug}) gate failed after "
+        f"{attempt + 1} attempt(s): {error_message}"
+    )
+    if disposition.kind == "skip_to_phase":
+        return PhaseOutcome("skip_to", None, disposition.target_slug, reason)
+    return PhaseOutcome("fail_run", None, None, reason)
+
+
+def _clear_retry_feedback(ctx) -> None:
+    """Clear ``ctx.retry_feedback`` so it never leaks into a later phase's prompt."""
+    try:
+        ctx.retry_feedback = None
+    except (AttributeError, TypeError):
+        pass
 
 
 async def run_workflow(
@@ -153,9 +320,14 @@ async def run_workflow(
 
     The 2-phase write (mark active before work, complete only after durable
     output) is the resumability core (HARNESS-03). A phase that raises mid-work
-    is left ``active`` — the exception propagates so the producer's finalizer
-    (Plan 05 owns the deliberate fail_run path) handles it; the engine never
-    marks a crashed phase ``completed`` or ``failed`` from the generic path.
+    is left ``active`` — the exception propagates so a later sweep re-runs it; the
+    engine never marks a crashed phase ``completed`` from the generic path.
+
+    Validation gates (HARNESS-04) run per phase via ``_run_phase_with_gates``: the
+    bounded-retry loop reaches ``failed`` in ≤ 3 attempts and NEVER loops (the SC#3
+    bar). On exhaustion the ``on_failure`` routing either fails the run cleanly
+    keeping completed phases' outputs with a plain reason (D-07), or jumps to a
+    ``skip_to_phase`` target (D-09).
     """
     rows = await load_run_phases(pool, run_id)
     # Resumed runs see prior outputs: seed accumulated_outputs from completed rows.
@@ -168,14 +340,19 @@ async def run_workflow(
     # config while iterating the durable rows in phase_index order.
     spec_by_slug = {p.slug: p for p in definition.phases}
     ordered = sorted(rows, key=lambda r: r["phase_index"])
+    index_by_slug = {row["slug"]: i for i, row in enumerate(ordered)}
 
     last_output: dict = {}
-    for i, row in enumerate(ordered):
+    # Index-driven loop (not a for-each) so skip_to_phase can jump the cursor (D-09).
+    i = 0
+    while i < len(ordered):
+        row = ordered[i]
         status = row.get("status")
         if status in ("completed", "skipped"):
             # Idempotent resume — already done, don't re-run.
             if status == "completed":
                 last_output = accumulated_outputs.get(row["slug"], {})
+            i += 1
             continue
 
         phase = spec_by_slug[row["slug"]]
@@ -202,17 +379,57 @@ async def run_workflow(
             phase_type=phase.config.phase_type,
         )
 
-        # 2. Execute under a wall-clock cap (the SEAM dispatches by phase_type).
-        #    A raise here propagates: the phase stays `active` (never completed).
-        output = await asyncio.wait_for(
-            _execute_phase(phase, accumulated_outputs, ctx),
-            timeout=wall_clock,
+        # 2. Execute under the bounded-retry gate loop (wall-clock cap + gates +
+        #    on_failure routing live inside). The step cap is enforced INSIDE the
+        #    executor (run_task_sub_agent max_steps, Plan 03) — both caps present.
+        outcome = await _run_phase_with_gates(
+            phase,
+            accumulated_outputs,
+            ctx,
+            run_id=run_id,
+            pool=pool,
+            redis=redis,
+            wall_clock=wall_clock,
         )
 
-        # Validation gates (Plan 05 fills this seam + the bounded retry around it).
-        await _run_gates(phase, output, ctx)
+        # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
+        if outcome.kind == "fail_run":
+            await fail_phase(pool, phase_id, outcome.reason)
+            # Completed phases' outputs are ALREADY durable — finish_run does NOT
+            # touch them (D-07). The run flips to `failed`; nothing silently dropped.
+            await finish_run(pool, run_id, "failed")
+            await write_audit(pool, run_id, "run_failed", {"reason": outcome.reason})
+            await _emit(redis, run_id, "run_failed", reason=outcome.reason)
+            return  # stop — no further phases
 
-        # 3. Complete ONLY after output is durable — ONE atomic UPDATE.
+        # ── skip_to_phase: mark this phase skipped, jump the cursor (D-09) ──────
+        if outcome.kind == "skip_to":
+            await skip_phase(pool, phase_id)
+            await write_audit(
+                pool, run_id, "phase_transition",
+                {"from": phase.slug, "to": outcome.target_slug, "via": "skip_to_phase"},
+            )
+            await _emit(
+                redis, run_id, "phase_transition",
+                from_phase=phase.slug, to_phase=outcome.target_slug, via="skip_to_phase",
+            )
+            target_i = index_by_slug.get(outcome.target_slug)
+            if target_i is None:
+                # Runtime guard: lint catches dangling skips at publish, but a
+                # target missing at runtime fails safe to fail_run (T-091-18).
+                reason = (
+                    f"skip_to_phase target {outcome.target_slug!r} does not exist "
+                    f"at runtime (phase {phase.slug})"
+                )
+                await finish_run(pool, run_id, "failed")
+                await write_audit(pool, run_id, "run_failed", {"reason": reason})
+                await _emit(redis, run_id, "run_failed", reason=reason)
+                return
+            i = target_i
+            continue
+
+        # ── completed: persist output (2-phase write step 2), advance ──────────
+        output = outcome.output
         durable_output = _persist_output(output)
         await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
@@ -248,6 +465,7 @@ async def run_workflow(
                 from_phase=phase.slug,
                 to_phase=ordered[i + 1]["slug"],
             )
+        i += 1
 
     # ── Completion (D-10 / D-11): final phase output IS the chat message ──────
     # No extra synthesis LLM call. Plan 03's executors return the chat-ready

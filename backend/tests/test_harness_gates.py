@@ -6,6 +6,7 @@ Plan 05. Each skip names Plan 05. One live assert pins the ValidatorSpec shape.
 """
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -103,37 +104,288 @@ async def test_run_gates_returns_first_failure(mock_asyncpg_pool):
     assert empty.passed and empty.error_message is None
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_bounded_retry_reaches_failed_after_3_attempts():
+# ════════════════════════════════════════════════════════════════════════════
+# Bounded retry loop + on_failure routing + caps (engine integration, Plan 05)
+# ════════════════════════════════════════════════════════════════════════════
+import uuid as _uuid  # noqa: E402
+
+from contextlib import contextmanager  # noqa: E402
+
+
+@contextmanager
+def _registry(**executors):
+    """Temporarily install stub executors into the engine PHASE_TYPE_REGISTRY.
+
+    The real executors call LLMs; these stubs return deterministic outputs so the
+    gate/retry/routing control flow is tested in isolation. Restores the registry
+    on exit so the live executors (Plan 03) aren't clobbered for other tests.
+    """
+    import app.services.harness_engine as eng
+
+    saved = dict(eng.PHASE_TYPE_REGISTRY)
+    eng.PHASE_TYPE_REGISTRY.clear()
+    eng.PHASE_TYPE_REGISTRY.update(executors)
+    try:
+        yield eng
+    finally:
+        eng.PHASE_TYPE_REGISTRY.clear()
+        eng.PHASE_TYPE_REGISTRY.update(saved)
+
+
+def _rows(*specs):
+    """Build phase rows the way load_run_phases returns them (status='pending')."""
+    out = []
+    for i, (slug, status) in enumerate(specs):
+        out.append({"id": _uuid.uuid4(), "slug": slug, "phase_index": i, "status": status, "output": None})
+    return out
+
+
+def _audit_failures(pool):
+    """Count gate_failed audit rows recorded on the mock pool."""
+    return sum(
+        1 for sql, args in pool.calls
+        if "INSERT INTO harness_audit" in sql and len(args) >= 2 and args[1] == "gate_failed"
+    )
+
+
+def _emitted(redis, event_type):
+    """All emitted SSE events of a given type (decoded)."""
+    import json as _json
+    out = []
+    for stream, fields in redis.xadds:
+        data = _json.loads(fields["data"])
+        if data.get("type") == event_type:
+            out.append(data)
+    return out
+
+
+@pytest.mark.asyncio
+async def test_bounded_retry_reaches_failed_after_3_attempts(
+    mock_asyncpg_pool, fake_redis, make_run_context, single_phase
+):
     """An always-failing gate (max_retries=2) terminates in exactly 3 attempts — never loops."""
-    raise NotImplementedError
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    rows = _rows(("p0", "pending"))
+    mock_asyncpg_pool.set_fetch_result(rows)
+
+    calls = {"n": 0}
+
+    async def _failing_exec(phase, accumulated, ctx):
+        calls["n"] += 1
+        # Distinct output each call so the consecutive-identical SC does NOT fire
+        # — we want to prove the HARD bound (3 attempts) independently.
+        return {"text": f"attempt {calls['n']}"}
+
+    # A regex gate that can never match → deterministically failing.
+    defn = single_phase(
+        {"phase_type": "llm_single", "prompt": "x"},
+        validators=[{"kind": "regex_match", "config": {"pattern": r"NEVER_MATCHES_ZZZ"}, "on_failure": "fail_run"}],
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_failing_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    assert calls["n"] == 3, "max_retries=2 → exactly 3 total attempts (HARD bound)"
+    assert _audit_failures(mock_asyncpg_pool) == 3  # every attempt audited (D-08)
+    assert len(_emitted(fake_redis, "gate_failed")) == 3  # every attempt emitted (D-08)
+    # Terminal: the run is failed with a plain reason (D-07).
+    run_failed = _emitted(fake_redis, "run_failed")
+    assert len(run_failed) == 1 and "gate failed" in run_failed[0]["reason"]
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_consecutive_identical_short_circuits():
-    """Identical consecutive output short-circuits the retry loop."""
-    raise NotImplementedError
+@pytest.mark.asyncio
+async def test_consecutive_identical_short_circuits(
+    mock_asyncpg_pool, fake_redis, make_run_context, single_phase
+):
+    """Identical consecutive output short-circuits the retry loop (faster than the bound)."""
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(_rows(("p0", "pending")))
+
+    calls = {"n": 0}
+
+    async def _identical_exec(phase, accumulated, ctx):
+        calls["n"] += 1
+        return {"text": "SAME OUTPUT"}  # identical every time
+
+    defn = single_phase(
+        {"phase_type": "llm_single", "prompt": "x"},
+        validators=[{"kind": "regex_match", "config": {"pattern": r"ZZZ"}, "on_failure": "fail_run"}],
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_identical_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    # First attempt fails; second attempt produces the SAME output → short-circuit
+    # (retrying won't help). Two executions, not three.
+    assert calls["n"] == 2
+    assert len(_emitted(fake_redis, "run_failed")) == 1
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_retry_feeds_error_into_prompt(make_run_context):
-    """The validator error is fed back into the retry prompt (visible self-correction)."""
-    raise NotImplementedError
+@pytest.mark.asyncio
+async def test_retry_feeds_error_into_prompt(
+    mock_asyncpg_pool, fake_redis, make_run_context, single_phase
+):
+    """The validator error is fed back via ctx.retry_feedback (PRODUCER side, D-08)."""
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(_rows(("p0", "pending")))
+
+    seen_feedback = []
+
+    async def _exec(phase, accumulated, ctx):
+        # Capture what the PRODUCER set on ctx before each attempt (CONSUMER read).
+        seen_feedback.append(getattr(ctx, "retry_feedback", None))
+        return {"text": "still bad"}
+
+    defn = single_phase(
+        {"phase_type": "llm_single", "prompt": "x"},
+        validators=[{"kind": "regex_match", "config": {"pattern": r"GOODGOOD"}, "on_failure": "fail_run"}],
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    # First attempt: no feedback. Retry attempts: the validator error fed back.
+    assert seen_feedback[0] is None
+    assert any(
+        f and "failed validation" in f for f in seen_feedback[1:]
+    ), "validator error fed into ctx.retry_feedback on retry"
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_skip_to_phase_routing(build_workflow_definition):
+@pytest.mark.asyncio
+async def test_skip_to_phase_routing(
+    mock_asyncpg_pool, fake_redis, make_run_context, build_workflow_definition
+):
     """on_failure='skip_to_phase:<slug>' routes to the named phase (D-9)."""
-    raise NotImplementedError
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    # 3 phases: p0 (gate fails → skip to p2), p1 (should be SKIPPED), p2 (runs).
+    rows = _rows(("p0", "pending"), ("p1", "pending"), ("p2", "pending"))
+    mock_asyncpg_pool.set_fetch_result(rows)
+
+    ran = []
+
+    async def _exec(phase, accumulated, ctx):
+        ran.append(phase.slug)
+        return {"text": phase.slug}
+
+    defn = build_workflow_definition(
+        [
+            {"slug": "p0", "phase_index": 0, "config": {"phase_type": "llm_single", "prompt": "a"},
+             "validators": [{"kind": "regex_match", "config": {"pattern": r"ZZZ"},
+                             "on_failure": "skip_to_phase:p2", "max_retries": 0}]},
+            {"slug": "p1", "phase_index": 1, "config": {"phase_type": "llm_single", "prompt": "b"}},
+            {"slug": "p2", "phase_index": 2, "config": {"phase_type": "llm_single", "prompt": "c"}},
+        ]
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    # p0 ran (and gate-failed), p1 was SKIPPED (never executed), p2 ran.
+    assert "p0" in ran and "p1" not in ran and "p2" in ran
+    # A skip_to_phase transition was emitted.
+    transitions = _emitted(fake_redis, "phase_transition")
+    assert any(t.get("via") == "skip_to_phase" and t.get("to_phase") == "p2" for t in transitions)
+    # The run completed (the skip recovered it), not failed.
+    assert len(_emitted(fake_redis, "run_completed")) == 1
+    assert len(_emitted(fake_redis, "run_failed")) == 0
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_caps_step_and_wall_clock(make_run_context):
-    """Per-phase step cap AND asyncio.wait_for wall-clock cap both enforced (D-12)."""
-    raise NotImplementedError
+@pytest.mark.asyncio
+async def test_caps_step_and_wall_clock(
+    mock_asyncpg_pool, fake_redis, make_run_context, single_phase
+):
+    """Per-phase wall-clock cap (asyncio.wait_for) fails a hanging phase → on_failure (D-12)."""
+    from app.services.harness_engine import run_workflow, _DEFAULT_PHASE_MAX_STEPS
+
+    # The step cap default is sourced from Settings (Explorer=8) and enforced
+    # inside the executor — assert the engine surfaces it (both caps present).
+    assert _DEFAULT_PHASE_MAX_STEPS == 8
+
+    run_id = _uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(_rows(("p0", "pending")))
+
+    async def _hanging_exec(phase, accumulated, ctx):
+        await asyncio.sleep(10)  # would hang far past the 0.05s wall-clock cap
+        return {"text": "never"}
+
+    # A tiny per-phase wall_clock_seconds override so the timeout fires instantly.
+    defn = single_phase(
+        {"phase_type": "llm_agent", "prompt": "x", "available_tools": [], "wall_clock_seconds": 1},
+        validators=[{"kind": "regex_match", "config": {"pattern": r"ok"}, "on_failure": "fail_run"}],
+    )
+    # Patch the wall_clock to a sub-second value via a config attribute mutation is
+    # not possible (frozen extra=forbid), so drive the timeout with a real sleep
+    # against the 1s override — but to keep the test fast we shrink it by monkeypatch.
+    import app.services.harness_engine as eng
+    orig_wait_for = asyncio.wait_for
+
+    async def _fast_wait_for(coro, timeout):
+        return await orig_wait_for(coro, timeout=0.05)
+
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+    with _registry(llm_agent=_hanging_exec):
+        eng.asyncio.wait_for = _fast_wait_for
+        try:
+            await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+        finally:
+            eng.asyncio.wait_for = orig_wait_for
+
+    # The hanging phase timed out → gate_failed(wall_clock_timeout) → fail_run.
+    gate_failed = _emitted(fake_redis, "gate_failed")
+    assert any("wall_clock_timeout" in g.get("error", "") for g in gate_failed)
+    assert len(_emitted(fake_redis, "run_failed")) == 1
 
 
-@pytest.mark.skip(reason="Wave 0 contract — flipped live by Plan 05")
-def test_fail_run_keeps_partial_outputs(mock_asyncpg_pool):
+@pytest.mark.asyncio
+async def test_fail_run_keeps_partial_outputs(
+    mock_asyncpg_pool, fake_redis, make_run_context, build_workflow_definition
+):
     """fail_run keeps completed phases' outputs + a plain-language chat reason (D-07)."""
-    raise NotImplementedError
+    from app.services.harness_engine import run_workflow
+
+    run_id = _uuid.uuid4()
+    rows = _rows(("p0", "pending"), ("p1", "pending"))
+    mock_asyncpg_pool.set_fetch_result(rows)
+
+    async def _exec(phase, accumulated, ctx):
+        return {"text": phase.slug}
+
+    # p0 has no gates (completes); p1's gate always fails → fail_run.
+    defn = build_workflow_definition(
+        [
+            {"slug": "p0", "phase_index": 0, "config": {"phase_type": "llm_single", "prompt": "a"}},
+            {"slug": "p1", "phase_index": 1, "config": {"phase_type": "llm_single", "prompt": "b"},
+             "validators": [{"kind": "regex_match", "config": {"pattern": r"ZZZ"}, "on_failure": "fail_run", "max_retries": 0}]},
+        ]
+    )
+    ctx = make_run_context(retry_feedback=None, final_output=None)
+
+    with _registry(llm_single=_exec):
+        await run_workflow(run_id, defn, ctx, pool=mock_asyncpg_pool, redis=fake_redis)
+
+    # p0 was completed (its output durably written) BEFORE p1 failed the run — the
+    # engine never deletes/rewrites completed-phase output on fail_run (D-07).
+    completed = [
+        args for sql, args in mock_asyncpg_pool.calls
+        if "SET status='completed'" in sql
+    ]
+    assert len(completed) == 1, "p0 completed durably and is kept on fail_run"
+    # finish_run('failed') + run_failed audit + emit with a plain reason.
+    run_failed = _emitted(fake_redis, "run_failed")
+    assert len(run_failed) == 1
+    reason = run_failed[0]["reason"]
+    assert "p1" in reason and "gate failed" in reason  # plain-language, names the phase
+    # No run_completed (the run stopped at the failure).
+    assert len(_emitted(fake_redis, "run_completed")) == 0
