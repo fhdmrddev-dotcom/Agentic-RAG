@@ -169,14 +169,22 @@ Cross-reference **`092-06-UAT-FINDINGS.md § Regression guardrails`**. The opera
 
 ---
 
-## Open questions for discuss/plan
+## Open questions for discuss/plan (RESOLVED)
+
+> All six resolved in `092-07-PLAN.md` (see the inline pointer under each).
 
 1. **Resume SSE re-attach contract.** If resume mints a fresh producer row, what id does the frontend re-subscribe to? The `/continue` response currently returns the OLD `run_id` (`runs.py:775`); `get_thread_workflow` reads `workflow_runs`, not the fresh producer id. Decide: return the new producer id from `/continue` and/or expose via reconcile.
+   - **RESOLVED (Task 3 + Task 4):** BOTH surfacing paths are guaranteed. `/continue` 200 returns `producer_run_id` (Task 3 edit #5b → Task 4 frontend re-subscribe), AND `get_thread_workflow` surfaces `latest_producer_run_id` by adding `run_id` to the EXISTING F2 self-heal SELECT (`threads.py:1551-1562` — pure additive read, no new query, no write) so the startup-sweep path re-attaches on mount/reconcile (Task 4 backend (B) + frontend reconcile). must_haves truth #7.
 2. **Continue 404 repair scope.** Is the post-reload Continue 404 (`workflowLock.runId` = workflow_run id) fixed inside F4's plan, or is it a separate defect? It is currently masked only because pre-reload kickoff seeds the producer id. The plan must decide whether `/runs/{id}/continue` accepts a workflow_run id (anchor lookup) or the frontend sends a `runs` id.
+   - **RESOLVED (Task 4 backend (A)):** fixed inside F4's plan. `continue_run` gets a two-stage owner-scoped resolve — the existing `runs` SELECT, then a `workflow_runs WHERE id=$1 AND user_id=current_user` resolve confirmed against the `threads.active_workflow_run_id` anchor — so a post-reload workflow_run id no longer 404s, with the IDOR mitigation preserved (T-092-07-02).
 3. **Placeholder model/provider on the minted resume shell.** `"unknown"/"unknown"` vs reading the persisted `workflow_runs` row. The shell is never used for an LLM call, so either is safe for routing — but must be NON-NULL.
+   - **RESOLVED (Task 3 edit #5):** mint with `model="unknown", provider="unknown"` (NON-NULL placeholders per `db/runs.py:42-43`); the shell never makes an LLM call so the placeholder cannot misroute any provider (acceptance criterion `model='unknown', provider='unknown'`).
 4. **Engine `_emit` refactor surface.** Confirm threading `stream_run_id` through `run_workflow` **and** `_run_phase_with_gates` does not couple `gate_failed` emit to `write_audit`'s `run_id` (they are separate call sites — verified clean, but assert in plan).
+   - **RESOLVED (Task 2 edit #3):** two independent `_emit` site groups are routed via `stream_run_id` (7 in `run_workflow` + 2 `gate_failed` in `_run_phase_with_gates` = 9 total), while every `write_audit` stays on `run_id`; the decoupling is asserted by the `gate_failed_stream` test and the acceptance criterion that no `write_audit(... stream_run_id ...)` exists.
 5. **Backfill.** In-flight `workflow_runs` created before this fix have no recoverable producer id — they MUST take the mint-fresh-row path (no migration recovers historical producer ids). Confirm no lookup is assumed.
+   - **RESOLVED (objective OUT OF SCOPE + Task 3):** no migration/persistence column is added; both resume paths take the mint-fresh producer-shell path (no historical-producer-id lookup is assumed anywhere).
 6. **Top-level assumption sweep.** `parent_run_id` was added in 055 for Phase 085 sub-agents (Deep already sets it), so the harness path is just a new caller. Verify `runs:active` cleanup, `runs_by_thread` ZADD, and snapshot-listing queries don't break when a harness sub-agent's parent is the short-lived (EXPIRE-able Redis, persisted Postgres) producer shell — including the transient extra producer-shell row a Deep thread snapshot could observe on a resume.
+   - **RESOLVED (Task 3 resume finalizer + sibling-escape audit):** the resume finalizer terminalizes the minted shell on every exit path (so it is a normal terminal `runs` row, not a stranded one — Task 2's sibling-escape audit + Task 3 confirm no cleanup/ZADD/snapshot query breaks); the transient extra shell is a terminalized `runs` row indistinguishable from any finalized run to `runs:active`/`runs_by_thread`/snapshot listings (Task 5 live-DB JOIN proves the FK target persists).
 
 ---
 
@@ -201,4 +209,4 @@ Seed real harness runs; do not defer "if data permits":
 - **Parallel-thread:** Thread A harness streaming while Thread B accepts a new prompt — confirm per-thread lock keying (BUG-260523-01) and no global lockout.
 - **Long-message:** ≥50 prior messages OR ≥5 KB prompt feeding the harness.
 - **ask_user phase (verdict-driven, mandatory):** a workflow with an `llm_human_input` phase — confirm the prompt RENDERS in the frontend (Facet B transport fix) and the answer round-trips (durable row + subscribe channel still on workflow_run id, no desync / no double-ask / no 1800s hang).
-- **Resume × Continue (verdict-driven, mandatory):** (a) kill the worker mid-harness-run → startup sweep resumes → the resumed `llm_agent` spawns a sub-agent → no FK crash, panel shows live events on the fresh producer stream; (b) reload the page mid-run → click Continue → no 404, re-drive succeeds; (c) crash a resume mid-flight → confirm the fresh producer row is terminalized (thread NOT wedged on reload — F2 self-heal still fires).
+- **Resume × Continue (verdict-driven, mandatory):** (a) kill the worker mid-harness-run → startup sweep resumes → the resumed `llm_agent` spawns a sub-agent → no FK crash, panel shows live events on the fresh producer stream (re-attached via `latest_producer_run_id` with no page action); (b) reload the page mid-run → click Continue → no 404, re-drive succeeds (frontend re-subscribes to the `/continue` 200 `producer_run_id`); (c) crash a resume mid-flight → confirm the fresh producer row is terminalized (thread NOT wedged on reload — F2 self-heal still fires).
