@@ -1254,6 +1254,88 @@ async def send_message(
                         # stream the frontend watches (run:{producer_run_id}).
                         stream_run_id=run_id,
                     )
+                    # ── F6 (092-07): surface the harness answer as the assistant reply ──
+                    # `run_workflow` returned normally → the workflow reached its
+                    # natural terminal. D-10 intent: "the FINAL phase's text becomes
+                    # the assistant message verbatim; the existing message-insert path
+                    # persists ctx.final_output." run_workflow set
+                    # wf_ctx.final_output = last_output (harness_engine.py:559), and
+                    # every phase executor returns {"text": <answer>}
+                    # (harness/phase_types.py:210) — so wf_ctx.final_output["text"] is
+                    # the chat-ready answer. Two hand-offs were never wired (F6 root
+                    # cause): the LIVE render (no `delta` ever emitted for harness, so
+                    # the assistant placeholder stays empty) AND the DURABLE persist
+                    # (`run_agent_loop` never ran → `_result_sink["persist"]` is empty
+                    # → _shielded_finalize persists nothing). Wire BOTH here, on the
+                    # SUCCESS path only (run_workflow raises on failure → the F2
+                    # terminalize path + the except branches below own that — UNCHANGED).
+                    # Harness-branch-only: the Deep `else` + run_agent_loop +
+                    # _result_sink-from-Deep stay byte-identical.
+                    _wf_final_text = (
+                        getattr(wf_ctx, "final_output", None) or {}
+                    ).get("text", "") or ""
+                    # 1. LIVE render: emit the answer as a `delta` on the PRODUCER
+                    # stream (run:{run_id}) so the frontend's api.ts:485
+                    # `type=="delta" → onDelta(content)` appends it to the assistant
+                    # placeholder's content WITHOUT a reload — mirrors exactly how the
+                    # Deep path streams its visible text (agent_loop.py:1479 etc.). The
+                    # harness engine only emits phase/gate/run_completed events, never a
+                    # content delta, so the persist path's row alone would render only
+                    # after a manual reload. We emit ONCE with the full final text
+                    # (the engine produced the answer atomically per-phase; there is no
+                    # token stream to mirror). _harness_emit is the same canonical XADD
+                    # the engine uses (harness_engine.py:105).
+                    if _wf_final_text:
+                        try:
+                            await _harness_emit(redis, run_id, "delta", content=_wf_final_text)
+                        except Exception:
+                            # Best-effort live render — a Redis hiccup here must not
+                            # abort the run; the persisted row (below) is the durable
+                            # source of truth and a reload still surfaces the answer.
+                            logger.exception(
+                                "harness final_output delta emit failed for run %s "
+                                "(answer still persisted below)", run_id,
+                            )
+
+                    # 2. DURABLE persist: populate _result_sink["persist"] with a
+                    # zero-arg async callable that inserts the assistant `messages`
+                    # row, mirroring the EXACT shape run_agent_loop installs
+                    # (agent_loop.py:2551 → _persist_assistant_message: returns the
+                    # inserted message_id as `str | None`; uses insert_assistant_message
+                    # with content=_strip_nul(text)). _shielded_finalize (which runs in
+                    # this middle-try `finally`) reads _result_sink.get("persist") at
+                    # :1359, awaits it, and threads the returned id into finalize_run's
+                    # message_id (:1424) — identical consumption to the Deep path. We
+                    # set ONLY `persist` (no tool_calls/source_refs/confidence — the
+                    # harness final answer is plain text; those slots stay absent, which
+                    # the persist consumer already treats as optional). Token totals stay
+                    # None (the engine owns its own audit; the producer-shell runs.usage
+                    # legitimately has no aggregated SDK usage here → NULL + the existing
+                    # :1413 warn, unchanged).
+                    if _wf_final_text:
+                        _wf_thread_id = thread_id
+                        _wf_user_id = current_user["id"]
+
+                        async def _persist_harness_message(
+                            _text=_wf_final_text,
+                            _tid=_wf_thread_id,
+                            _uid=_wf_user_id,
+                        ) -> str | None:
+                            try:
+                                _inserted_id = await insert_assistant_message(
+                                    await get_pg_pool(),
+                                    thread_id=UUID(_tid) if isinstance(_tid, str) else _tid,
+                                    user_id=UUID(_uid) if isinstance(_uid, str) else _uid,
+                                    content=_strip_nul(_text),
+                                )
+                                return str(_inserted_id) if _inserted_id else None
+                            except Exception as e:
+                                logger.error(
+                                    "Failed to persist harness assistant message: %s", e
+                                )
+                                return None
+
+                        _result_sink["persist"] = _persist_harness_message
                 else:                                          # Deep — byte-identical
                     ctx = RunContext(
                         run_id=run_id,

@@ -1587,3 +1587,245 @@ def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
     # _build_phase_tool_context lives in the harness package, not task_service —
     # the Deep loop never imports/calls it.
     assert "_build_phase_tool_context" not in src
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 092-07 — F6: surface the harness final_output as the assistant reply
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# F6: run_workflow sets wf_ctx.final_output = last_output ({"text": <answer>},
+# harness_engine.py:559 + harness/phase_types.py:210), but the producer-shell
+# finalizer (_shielded_finalize) persists from _result_sink["persist"], which is
+# populated ONLY by run_agent_loop (the Deep path). In the harness branch
+# run_agent_loop never runs → _result_sink stays empty → NO assistant message
+# persisted, and the engine never emits a `delta` content event → the chat stays
+# empty (the F6 live symptom: GET /threads/{id}/messages returns only the user
+# message). The fix wires BOTH hand-offs in the harness branch on the SUCCESS
+# path: (1) a `delta` emit on the producer stream for the live render, and (2)
+# _result_sink["persist"] = a callable mirroring run_agent_loop's persist shape
+# (zero-arg async → inserts the assistant messages row, returns the id) so the
+# UNCHANGED _shielded_finalize persists it durably. Harness-branch-only; Deep stays
+# byte-identical. The mock-pool tests + structural-skeleton SSE proof passed through
+# F1→F5 — these exercise the REAL _shielded_finalize → _result_sink["persist"]()
+# consumption (mock the persist insert; assert it carries the final_output text).
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_harness_final_output_persisted_as_assistant_message(
+    fake_redis, mock_asyncpg_pool
+):
+    """F6: after a SUCCESSFUL harness run whose wf_ctx.final_output == {"text": A},
+    the producer-shell finalizer persists an assistant `messages` row carrying A.
+
+    Drives a real kickoff send through the producer; stubs run_workflow to set
+    wf_ctx.final_output (the engine's natural-completion hand-off) and patches
+    insert_assistant_message (the persist path the REAL _shielded_finalize calls
+    via _result_sink["persist"]). Closes the mock-pool blind spot: the assertion
+    is end-to-end through the unchanged finalizer, not a sink-shape stub.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+    inserted_msg_id = uuid.uuid4()
+    ANSWER = "The DBA folder summarizes three theses on adaptive query optimization."
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    # The engine stub sets final_output on the wf_ctx (3rd positional arg) exactly
+    # as run_workflow does on natural completion (harness_engine.py:559).
+    async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
+        ctx.final_output = {"text": ANSWER}
+
+    # Spy on the persist insert (the path _shielded_finalize calls through
+    # _result_sink["persist"]()). Returns the inserted id (str|None contract).
+    insert_spy = AsyncMock(return_value=inserted_msg_id)
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.api.threads.insert_assistant_message", insert_spy), \
+             patch("app.services.harness_engine.run_workflow", _wf_stub), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "summarize the DBA folder",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            # F6: the REAL _shielded_finalize consumed _result_sink["persist"] and
+            # persisted the assistant row carrying the final_output text.
+            assert insert_spy.await_count == 1, (
+                "the harness branch must populate _result_sink['persist'] so the "
+                "producer-shell finalizer persists the assistant message"
+            )
+            persist_kwargs = insert_spy.await_args.kwargs
+            assert persist_kwargs["content"] == ANSWER, (
+                "the persisted assistant content must be wf_ctx.final_output['text']"
+            )
+            # the persisted row binds the run's thread + owner (RLS scope).
+            assert str(persist_kwargs["thread_id"]) == str(thread_id)
+            assert persist_kwargs["user_id"] is not None
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_harness_final_output_emits_delta_for_live_render(
+    fake_redis, mock_asyncpg_pool
+):
+    """F6 (live render): the harness branch emits the final_output text as a `delta`
+    SSE event on the PRODUCER stream (run:{producer_run_id}), so the frontend's
+    api.ts demux (type=='delta' → onDelta) appends it to the assistant placeholder
+    WITHOUT a reload — mirroring how the Deep path streams visible text.
+    """
+    import asyncio as _asyncio
+    import json as _json
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+    ANSWER = "Grounded answer streamed live to the chat."
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
+        ctx.final_output = {"text": ANSWER}
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.api.threads.insert_assistant_message",
+                   AsyncMock(return_value=uuid.uuid4())), \
+             patch("app.services.harness_engine.run_workflow", _wf_stub), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "answer me",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+            producer_run_id = resp.json()["run_id"]
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(producer_run_id)
+            task = RUN_TASKS.get(run_id)
+            if task is not None:
+                try:
+                    await _asyncio.wait_for(task, timeout=5.0)
+                except Exception:
+                    pass
+
+            # A `delta` event carrying the answer landed on the PRODUCER stream.
+            delta_events = [
+                (stream, _json.loads(fields["data"]))
+                for stream, fields in fake_redis.xadds
+                if _json.loads(fields["data"]).get("type") == "delta"
+            ]
+            assert delta_events, "harness branch must emit a `delta` for live render"
+            matching = [
+                stream for stream, payload in delta_events
+                if payload.get("content") == ANSWER
+            ]
+            assert matching, "the `delta` must carry wf_ctx.final_output['text']"
+            assert matching[0] == f"run:{producer_run_id}", (
+                "the `delta` must land on the producer stream the frontend watches"
+            )
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+def test_deep_path_does_not_install_harness_persist_in_source():
+    """F6 byte-identical guard: the F6 persist+emit wiring is harness-branch-only.
+    The Deep `else` continues to source its persist from run_agent_loop's
+    _result_sink — assert the source threads the harness persist via final_output
+    inside the harness branch (the wf_ctx build), never in the Deep RunContext path.
+    """
+    import inspect
+    from app.api import threads as threads_mod
+
+    src = inspect.getsource(threads_mod)
+    # The harness branch reads wf_ctx.final_output and routes it to the persist sink.
+    assert 'getattr(wf_ctx, "final_output"' in src, (
+        "the harness branch must source the assistant content from wf_ctx.final_output"
+    )
+    # The persist callable is installed into _result_sink (the path _shielded_finalize
+    # already consumes) — reusing the proven finalizer, not a parallel persist site.
+    assert '_result_sink["persist"] = _persist_harness_message' in src
+    # Deep stays byte-identical: run_agent_loop is still the sole Deep persist source.
+    assert "result_sink=_result_sink" in src
