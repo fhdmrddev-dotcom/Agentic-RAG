@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Completed 091-03-PLAN.md
-last_updated: "2026-05-31T05:36:19.984Z"
+stopped_at: Completed 091-05-PLAN.md
+last_updated: "2026-05-31T05:47:27.522Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
-  percent: 79
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -26,20 +26,20 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 ## Current Position
 
 Phase: 091 — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Plans: 7 plans / 5 waves — VERIFICATION PASSED (iteration 2, after 1 column-name blocker + 3 warnings fixed). RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
 
   - Wave 1: 091-01 ✅ (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
   - Wave 2: 091-02 ✅ (engine core + 2-phase write + db/workflows.py + reachability lint) ‖ 091-06 ✅ (dispatch_tool whitelist guard + get_tools budget + max_tools) — Wave 2 COMPLETE
-  - Wave 3: 091-03 (5 phase-type executors → substrate) ‖ 091-05 (validation gates + bounded retry + caps) — NEXT
-  - Wave 4: 091-04 (resumability: startup sweep + claim + ask_user re-subscribe)
+  - Wave 3: 091-03 ✅ (5 phase-type executors → substrate) ‖ 091-05 ✅ (validation gates + bounded retry + on_failure + caps) — Wave 3 COMPLETE
+  - Wave 4: 091-04 (resumability: startup sweep + claim + ask_user re-subscribe) — NEXT
   - Wave 5: 091-07 (4 seed templates / migration 061 + end-to-end + operator SQL-editor apply checkpoint)
 
 Reqs covered: HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-05 (all 6). Highest-risk surfaces isolated with deterministic proof: 2-phase write (Plans 02/04), ask_user re-subscribe subscribe-before-emit (Plan 04). Migration 061 = autonomous:false SQL-editor checkpoint (no db push). 4-axis UAT (SC#10) in VALIDATION manual-only rows.
 
 Prior phase: 090 (Harness Schema + RLS + Config Models) — ✅ COMPLETE. 3/3 plans + migration 060; substrate live (4 tables + threads.active_workflow_run_id), RLS + immutable-on-publish + INSERT-only audit confirmed against live DB.
 Scope: HARNESS-01..07 (state-machine workflow runtime, 5 phase types, validation gates, resumable runs, audit, seed templates) + MODE-01/02 + CONT-01 (Continue) + PANEL-08/09 + A11Y-03 + EVAL-01/02 + CONC-01 + TOOL-05 + FOUND-03 (G-5 extraction) + CF-01 (carry-forward sweep) + 2 polish riders (CHAT-04 chat-card unification, PARITY-01 Anthropic parity). PLUGIN-01..03 + `super_admin`/operator role tier DEFERRED to v2.9. See PROJECT.md D-v2.8-01.
-Next: Wave 3 — 091-03 (5 phase-type executors) ‖ 091-05 (validation gates + bounded retry + caps). Wave 1 + Wave 2 COMPLETE (091-01, 091-02, 091-06 shipped). HARNESS-05 + TOOL-05 closed by 091-06: dispatch_tool whitelist guard (D-04 refusal + D-06 audit, Deep-Mode no-op) + apply_tool_budget (D-05 layer-1 filter + max_tools cap, Google=16/SEED-035, NOT wired to Deep-Mode get_tools so byte-identical incl. Google). 091-03 wires apply_tool_budget(get_tools, model, phase_whitelist) into the per-phase tools_override.
+Next: Wave 4 — 091-04 (resumability: startup sweep + claim + ask_user re-subscribe). Waves 1–3 COMPLETE (091-01, 091-02, 091-06, 091-03, 091-05 shipped). HARNESS-04 closed by 091-05: VALIDATOR_REGISTRY (4 closed-registry kinds, all fail-closed) + run_gates + bounded retry (≤3 attempts, NEVER loops — SC#3) + consecutive-identical short-circuit + ctx.retry_feedback PRODUCER (Plan 03 consumes; 07-T2 round-trip) + gate_failed audit+emit per attempt (D-08) + on_failure routing (fail_run keep-partials+plain-reason D-07 / skip_to_phase D-09 / unknown→fail_run fail-safe T-091-18) + wall-clock TimeoutError→same routing (D-12); caps from existing knobs (Settings.harness_phase_max_steps=8 Explorer, harness_phase_wall_clock_seconds=2400=300×8). 091-04 owns the trickiest correctness surface (the 2-phase write resume + ask_user re-subscribe subscribe-before-emit).
 Phase order + dependencies: 089 (extract, BLOCKING, ships first) ‖ 090 (schema, parallels 089) → 091 (engine + 5 types + gates + whitelist; whitelist folds in here) → 092 (dual-mode + Continue) → 094 (panel timeline). 093 (Anthropic parity) after 089. 095 (chat-card) after 089. 096 (eval + verify) last, after all features.
 G-5: SATISFIED by Phase 089 (`threads.py` 3,186 LOC extraction).
 G-2 FIRES: Phase 094 (panel phase timeline) AND Phase 095 (chat tool-card unification) — `/gsd:sketch` before spec/plan; operator-approved mockup is the acceptance bar.
@@ -47,7 +47,7 @@ SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-messag
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
 Last activity: 2026-05-31
 
-Progress: [████████░░] 79%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Progress: [████████░░] 79%
 | Phase 091 P02 | 7min | 3 tasks | 7 files |
 | Phase 091 P06 | 5min | 2 tasks | 5 files |
 | Phase 091 P03 | 7min | 3 tasks | 6 files |
+| Phase 091 PP05 | 7min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,7 @@ Recent decisions affecting current work:
 - (091-06): HARNESS-05 whitelist guard at the single dispatch_tool() entry (above _TOOL_REGISTRY.get, below all provider branches) — out-of-phase tool returns the D-04 guiding ToolResult + D-06 tool_refused audit; phase_whitelist=None (Deep Mode) is a literal no-op so Explorer/General stay byte-identical (zero provider-branch edits)
 - (091-06): TOOL-05 apply_tool_budget = D-05 layer-1 whitelist filter + per-provider max_tools cap (whitelist tools always retained, soft ceiling yields); max_tools added to ModelCapability (absent=no cap), Google rows=16 (SEED-035). NOT wired into any Deep-Mode get_tools() call site — harness executor (Plan 03) is sole caller, so Deep Mode incl. Google is byte-identical (SC#2)
 - 091-03: 5 phase-type executors wrap shipped substrate (run_task_sub_agent / _stream_one_iteration / ask_user pub-sub / programmatic registry); both D-05 whitelist layers wired for LLM-agent phases; split_topic is pure/idempotent; system_prompt_override additive keyword-only on run_task_sub_agent (None=byte-identical)
+- 091-05: validation gates (4 closed-registry kinds, all fail-closed) + bounded retry (≤3 attempts, never loops — SC#3) + consecutive-identical short-circuit; on_failure routing fail_run(keep partials+plain reason D-07)/skip_to_phase(D-09)/unknown→fail_run(fail-safe); wall-clock TimeoutError drives same routing (D-12); ctx.retry_feedback PRODUCER (Plan 03 consumes, 07-T2 round-trip); caps sized from existing knobs (Explorer=8 step, 300×8=2400 wall-clock)
 
 ### Pending Todos
 
@@ -215,8 +217,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T05:36:19.978Z
-Stopped at: Completed 091-03-PLAN.md
+Last session: 2026-05-31T05:47:27.516Z
+Stopped at: Completed 091-05-PLAN.md
 Resume file: None
 
 **Planned Phase:** 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 7 plans — 2026-05-30T23:07:33.805Z

@@ -21,7 +21,8 @@
 - [ ] **HARNESS-02**: Workflow definitions are **versioned and immutable-on-publish** (`UNIQUE(slug, version)` + `BEFORE UPDATE` DB trigger + FK `ON DELETE RESTRICT`); a published workflow re-runs reproducibly.
 - [x] **HARNESS-03
 **: A workflow run is **resumable** — phase state persists to Postgres (`workflow_phases`) and survives a uvicorn restart and cross-worker resume via a two-phase write (mark `active` before work, `completed` only after output is durable).
-- [ ] **HARNESS-04**: Each phase can declare **validation gates** (`json_schema`, `regex_match`, `workspace_file_exists`, `programmatic`) with a **bounded** `on_failure` policy (`fail_run` / `retry` with `max_retries=2` + consecutive-identical-output short-circuit / `skip_to_phase:<slug>`) — a deterministically-failing gate reaches `failed`, never loops forever.
+- [x] **HARNESS-04
+**: Each phase can declare **validation gates** (`json_schema`, `regex_match`, `workspace_file_exists`, `programmatic`) with a **bounded** `on_failure` policy (`fail_run` / `retry` with `max_retries=2` + consecutive-identical-output short-circuit / `skip_to_phase:<slug>`) — a deterministically-failing gate reaches `failed`, never loops forever.
 - [x] **HARNESS-05
 **: Per-phase **tool-whitelist enforcement** lives in `dispatch_tool()` — a tool call outside the current phase's whitelist is refused with a clean `tool_result` on all 6 native providers (no crash, no provider 400); the guard is a literal no-op when no workflow is active (Deep Mode unaffected).
 - [ ] **HARNESS-06**: Every phase transition, gate result, and tool refusal is recorded to an **INSERT-only `harness_audit` trail** the user/operator can inspect.
