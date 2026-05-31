@@ -120,6 +120,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
                 isStreaming={isStreaming && isLastAssistant}
                 onSendMessage={showSuggestions && isLastAssistant ? onSendMessage : undefined}
                 onResume={onResume}
+                isLastAssistant={isLastAssistant}
               />
             )
           })

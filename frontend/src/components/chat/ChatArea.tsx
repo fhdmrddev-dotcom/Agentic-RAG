@@ -8,8 +8,15 @@ import {
   useLoadingForThread,
   useReconcileErrorForThread,
   useFallbackNoticeForThread,
+  useWorkflowLockForThread,
+  useStreamActions,
 } from "@/providers/StreamsProvider"
-import { getProviders } from "@/lib/api"
+import {
+  getProviders,
+  getThreadWorkflow,
+  listPublishedWorkflows,
+  type PublishedWorkflow,
+} from "@/lib/api"
 import type { Folder, Message, Thread } from "@/types"
 import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
 import { toolLabel } from "@/lib/toolMeta"
@@ -53,6 +60,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
+  // Phase 092 (MODE-01 — D-01/D-02): Deep/Harness toggle + published-workflow
+  // picker state. workflowMode toggles the composer between the Deep agent loop
+  // (General/Explorer) and the Harness picker; selectedWorkflowId is the staged
+  // kickoff id sent as workflow_definition_id on the next send.
+  const [workflowMode, setWorkflowMode] = useState<"deep" | "harness">("deep")
+  const [publishedWorkflows, setPublishedWorkflows] = useState<PublishedWorkflow[]>([])
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null)
 
   // Plan 075.4-01 D-075.4-A1: thread-scoped reads. The composer disable
   // (BUG-260523-01 close), MessageList streaming prop, and reconcile/
@@ -61,6 +75,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const isStreaming = useStreamingForThread(thread?.id ?? null)
   const fallbackNotice = useFallbackNoticeForThread(thread?.id ?? null)
   const reconcileError = useReconcileErrorForThread(thread?.id ?? null)
+  // Phase 092 (MODE-02 — SC#3): the per-thread workflow lock, keyed by the
+  // OWNING thread id (thread?.id) — never viewedThreadId or a global flag, so a
+  // background workflow on another thread cannot lock THIS composer. Drives the
+  // disable-with-tooltip on both selectors (D-03/D-05).
+  const workflowLock = useWorkflowLockForThread(thread?.id ?? null)
+  const workflowLocked = workflowLock !== null
+  const streamActions = useStreamActions()
   // Phase 068.5 Gap-01: true when this thread has a loadMessages fetch in
   // flight. Passed to MessageList so the cold-load skeleton only renders when
   // we're actually waiting on data (not on new/empty threads with no fetch).
@@ -93,6 +114,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   useEffect(() => {
     setAgentMode("default")
     setScopeFolderId(null)
+    // Phase 092: reset the picker on thread switch — the mount reconcile below
+    // re-derives the true Harness/Deep state from GET /threads/{id}/workflow.
+    setWorkflowMode("deep")
+    setSelectedWorkflowId(null)
   }, [thread?.id])
 
   useEffect(() => {
@@ -111,6 +136,46 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       })
       .catch(console.error)
   }, [])
+
+  // Phase 092 (D-01): load the published-workflow picker feed once on mount.
+  useEffect(() => {
+    listPublishedWorkflows()
+      .then(setPublishedWorkflows)
+      .catch(console.error)
+  }, [])
+
+  // Phase 092 (SC#5 / D-v2.5-03): mount-time reconcile of the workflow lock +
+  // Continue state from GET /threads/{id}/workflow — the SOURCE OF TRUTH, never
+  // a stale Realtime/SSE hint. Runs on every thread switch. A locked, non-stale
+  // run sets the per-thread lock (keyed by THIS thread id); a stale/terminal
+  // anchor or Deep mode clears it. This is what survives a page reload (SC#5).
+  useEffect(() => {
+    const tid = thread?.id
+    if (!tid) return
+    const controller = new AbortController()
+    getThreadWorkflow(tid, controller.signal)
+      .then((state) => {
+        if (controller.signal.aborted) return
+        if (state.locked && !state.lock_is_stale && state.active_workflow_run_id) {
+          streamActions.setWorkflowLockForThread(tid, {
+            runId: state.active_workflow_run_id,
+            mode: "harness",
+            capPaused: state.cap_paused,
+            continuesRemaining: state.continues_remaining,
+          })
+        } else {
+          // Deep, or a stale/terminal anchor (SC#5 self-heal) — never leave a
+          // dangling lock on this thread.
+          streamActions.clearWorkflowLockForThread(tid)
+        }
+      })
+      .catch((err) => {
+        if (!(err instanceof Error && err.name === "AbortError")) {
+          console.error("getThreadWorkflow reconcile failed:", err)
+        }
+      })
+    return () => controller.abort()
+  }, [thread?.id, streamActions])
 
   // Update model list when provider changes
   const handleProviderChange = (providerId: string) => {
@@ -234,6 +299,11 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       // dropped — the empty-until-end-of-run user-observable failure.
       setViewingThread(activeThread.id)
     }
+    // Phase 092 (D-02): a Harness send carries the picked workflow id as the
+    // kickoff field; a Deep send omits it (byte-identical). Stage-then-clear so
+    // a workflow only starts once per pick.
+    const kickoffWorkflowId =
+      workflowMode === "harness" && selectedWorkflowId ? selectedWorkflowId : undefined
     await sendMessage(
       activeThread.id,
       content,
@@ -241,8 +311,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onTitleUpdate,
       agentMode,
       selectedProvider || undefined,
+      kickoffWorkflowId,
     )
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
+    if (kickoffWorkflowId) {
+      // The workflow is now running; clear the staged pick so the next send is
+      // a normal turn (the lock — derived from the mount/SSE reconcile — keeps
+      // the picker disabled while the run is live).
+      setSelectedWorkflowId(null)
+    }
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, workflowMode, selectedWorkflowId])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend
@@ -282,6 +359,12 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onAgentModeChange={setAgentMode}
       prefillMessage={prefillMessage}
       onClearPrefill={onClearPrefill}
+      workflowMode={workflowMode}
+      onWorkflowModeChange={setWorkflowMode}
+      publishedWorkflows={publishedWorkflows}
+      selectedWorkflowId={selectedWorkflowId}
+      onWorkflowSelect={setSelectedWorkflowId}
+      workflowLocked={workflowLocked}
     />
   )
 

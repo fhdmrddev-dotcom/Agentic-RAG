@@ -1,7 +1,13 @@
-import { memo, useRef } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Zap } from "lucide-react"
+import { memo, useRef, useState } from "react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
+// Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
+// workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
+// thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered
+// from /messages, BUG-260528-01) via the cap_paused SSE + the mount reconcile.
+import { useWorkflowLockForThread } from "@/providers/StreamsProvider"
+import { continueRun } from "@/lib/api"
 import { RunCard } from "./RunCard"
 import { WorkingBadge } from "./WorkingBadge"
 import { MarkdownRenderer } from "./MarkdownRenderer"
@@ -96,6 +102,11 @@ interface Props {
   onSendMessage?: (content: string) => void
   /** Phase 063 (Pattern 4 / D-063-04): handler for the Resume button shown only on failed assistant runs. */
   onResume?: (message: Message) => void
+  /** Phase 092 (CONT-01 / D-07): true when this is the last assistant message —
+   *  gates the inline Continue card (cap_paused is delivered out-of-band on the
+   *  thread lock, not on this message's runStatus) so it appears once, at the
+   *  bottom where the run paused. */
+  isLastAssistant?: boolean
 }
 
 /**
@@ -150,8 +161,14 @@ function dedupParagraphs(text: string): string {
 // only when the message actually changed. Named inner function preserves
 // DevTools display name. Target: ≥30% MessageItem render-cost reduction on
 // 50-message thread during streaming (verified via React DevTools profiler).
-export const MessageItem = memo(function MessageItem({ message, isStreaming, onSendMessage, onResume }: Props) {
+export const MessageItem = memo(function MessageItem({ message, isStreaming, onSendMessage, onResume, isLastAssistant }: Props) {
   const isUser = message.role === "user"
+  // Phase 092 (CONT-01 / D-07): the per-thread workflow lock for THIS message's
+  // owning thread (out-of-band cap_paused state). The Continue card renders only
+  // on the last assistant message when the lock reports cap_paused.
+  const workflowLock = useWorkflowLockForThread(message.thread_id ?? null)
+  const [continuePending, setContinuePending] = useState(false)
+  const [continueExhausted, setContinueExhausted] = useState(false)
 
   if (isUser) {
     return (
@@ -350,6 +367,58 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 Resume
               </Button>
             )}
+
+            {/* Phase 092 (CONT-01 / D-07): inline Continue card — ADDITIVE
+                SIBLING of the Resume button. Gated on cap_paused delivered
+                OUT-OF-BAND via the thread lock (NOT message.runStatus — the
+                role='system' carrier row is filtered from /messages,
+                BUG-260528-01). Renders once, on the last assistant message
+                where the run paused. Amber = paused/needs-you (design skill).
+                When 0 continues remain, show the stop message instead of a
+                clickable button (the 3-cap, D-06). */}
+            {message.role === "assistant" &&
+              isLastAssistant &&
+              workflowLock?.capPaused && (
+                <div className="mt-2 flex flex-col gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2">
+                  <span className="text-xs text-amber-400">
+                    {continueExhausted || workflowLock.continuesRemaining <= 0
+                      ? "Reached the Continue limit — this run is stopped. Start a new message to keep going."
+                      : "Reached the iteration limit — some tools haven't run yet."}
+                  </span>
+                  {!continueExhausted && workflowLock.continuesRemaining > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={continuePending}
+                      onClick={async () => {
+                        if (!workflowLock.runId) return
+                        setContinuePending(true)
+                        try {
+                          const res = await continueRun(workflowLock.runId)
+                          if (res.status === "refused") {
+                            // D-06: the 3-cap was hit — show the stop message, no throw.
+                            setContinueExhausted(true)
+                          }
+                        } catch (err) {
+                          console.error("continueRun failed:", err)
+                        } finally {
+                          setContinuePending(false)
+                        }
+                      }}
+                      className="self-start text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-400/10"
+                      aria-label="Continue run"
+                      data-testid="continue-run"
+                    >
+                      {continuePending ? (
+                        <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                      ) : (
+                        <Play className="w-3 h-3 mr-1.5" />
+                      )}
+                      Continue ({workflowLock.continuesRemaining} left)
+                    </Button>
+                  )}
+                </div>
+              )}
           </div>
         ) : isStreaming && !hasAnyTools ? (
           // No tools yet — first LLM call is thinking
