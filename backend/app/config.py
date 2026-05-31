@@ -869,6 +869,15 @@ class Settings(BaseSettings):
     # magic literal; env-overridable via pydantic-settings.
     harness_resume_lease_seconds: int = 300  # 5 min
 
+    # Phase 092 (092-03 / D-06) — Continue cap. At the iteration cap a run pauses
+    # cap_paused and offers a Continue affordance; each Continue resumes the SAME
+    # run with a fresh bounded budget and increments the DURABLE continues_used
+    # column (migration 063). The (continues_used >= max_continues_per_run)-th
+    # Continue is refused server-side. Durable, never an in-memory count — under
+    # WORKER_COUNT=2 the Continue-handling worker may differ from the one that hit
+    # the cap. Named knob, not a magic literal; env-overridable via pydantic-settings.
+    max_continues_per_run: int = 3
+
     # Observability
     langsmith_api_key: str = ""
     langsmith_project: str = "agentic-rag-module2"

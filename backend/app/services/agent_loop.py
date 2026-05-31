@@ -99,6 +99,15 @@ class RunContext:
     supabase: Any  # supabase Client
     resolved_model: str
     resolved_provider: str
+    # Phase 092 (092-03 / CONT-01) — ADDITIVE Continue-resume inputs. OFF by
+    # default at EVERY existing call site → Deep Mode byte-identical (075.x
+    # cascade rule). The Continue endpoint constructs a RunContext with
+    # ``resume_dropped_tool_calls=True`` and ``dropped_tool_calls=<persisted
+    # carrier payload>`` so the continuation CONSUMES the dropped calls (SC#4)
+    # instead of re-dropping/restarting. A frozen tuple keeps the dataclass
+    # hashable/immutable; the loop reads it as the first dispatch round.
+    resume_dropped_tool_calls: bool = False
+    dropped_tool_calls: tuple = ()
 
 
 @dataclass
@@ -129,6 +138,97 @@ class AgentLoopResult:
     full_content_final: str = ""
     # 6th field (089-03): bound _persist_system_messages — see class docstring.
     persist_system_warnings: Callable[..., Awaitable[Any]] | None = None
+    # Phase 092 (092-03 / SC#4): 'cap_paused' when the iteration cap fired WITH a
+    # non-empty buffer (the producer writes this non-terminal status); else None.
+    cap_disposition: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Phase 092 (092-03 / SC#4) — iteration-cap PERSIST (was DROP). The cap site
+# used to DESTROY the buffered tool calls (``tool_calls_buffer = {}``); SC#4
+# turns that into PERSIST-then-pause so a Continue can CONSUME them. These
+# helpers keep the carrier-row shape + the non-terminal cap_paused event
+# deterministically testable without driving the whole streaming loop.
+# ---------------------------------------------------------------------------
+
+def build_cap_paused_carrier_tool_calls(tool_calls_buffer: dict) -> list[dict]:
+    """The durable ``messages.tool_calls`` jsonb payload for a cap-paused run.
+
+    Mirrors the ask_user_response carrier shape (runs.py:531-543) — one entry
+    per buffered tool call, tagged ``kind='iteration_cap_paused'`` so the
+    Continue endpoint can read it OUT-OF-BAND (it is BUG-260528-01-filtered from
+    /messages). Preserves the EXACT name + arguments + id of every dropped call
+    so the continuation re-executes them (consume, not re-drop — SC#4).
+    """
+    carrier: list[dict] = []
+    for tc in tool_calls_buffer.values():
+        carrier.append({
+            "kind": "iteration_cap_paused",
+            "tool_call_id": tc.get("id"),
+            "name": tc.get("name", "?"),
+            "arguments": tc.get("arguments"),
+        })
+    return carrier
+
+
+async def persist_cap_paused(
+    *,
+    redis,
+    run_id: UUID,
+    thread_id: str,
+    user_id: str,
+    supabase,
+    tool_calls_buffer: dict,
+    continues_used: int,
+    emit: Callable[..., Awaitable[Any]],
+) -> str:
+    """Persist the dropped tool calls + emit the NON-terminal cap_paused event.
+
+    Called at the iteration cap (force_no_tools WITH a non-empty buffer) BEFORE
+    the caller clears ``tool_calls_buffer`` — so the calls are durable first
+    (SC#4). Order: (1) durable role='system' carrier row, (2) distinct
+    NON-terminal ``cap_paused`` SSE event (Landmine 6 — NOT a terminal sentinel,
+    so the frontend keeps the stream attachable for Continue). Returns the
+    terminal disposition (``cap_paused``) the producer's finalizer writes.
+    """
+    tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
+    carrier = build_cap_paused_carrier_tool_calls(tool_calls_buffer)
+
+    # (1) DURABLE persist FIRST (the Continue endpoint reads this row).
+    try:
+        await aexec(
+            supabase.table("messages").insert({
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "role": "system",
+                "content": (
+                    f"⏸ Reached the iteration limit with {len(tool_names)} "
+                    f"tool(s) still queued. Continue to run them."
+                ),
+                "tool_calls": carrier,
+            })
+        )
+    except Exception:
+        logger.exception(
+            "cap_paused carrier persist failed for run %s (%d tools dropped)",
+            run_id, len(tool_names),
+        )
+
+    # (2) NON-terminal cap_paused SSE event — carries names + continue counters.
+    max_continues = settings.max_continues_per_run
+    continues_remaining = max(0, max_continues - continues_used)
+    await emit(
+        redis, run_id, 'cap_paused',
+        kind="iteration_cap_paused",
+        message=(
+            f"⏸ Reached the iteration limit — {len(tool_names)} tool(s) "
+            f"weren't run yet. Continue to run them."
+        ),
+        tool_names=tool_names,
+        continues_used=continues_used,
+        continues_remaining=continues_remaining,
+    )
+    return "cap_paused"
 
 
 # ---------------------------------------------------------------------------
@@ -964,6 +1064,11 @@ async def run_agent_loop(
     # Pre-migration the INSERT fails-silent (logged) and the SSE
     # event remains the user-visible signal.
     _persisted_system_warnings: list[dict] = []
+    # Phase 092 (092-03 / SC#4) — terminal disposition override. Stays None for
+    # every byte-identical Deep run; set to 'cap_paused' ONLY when the cap fires
+    # WITH a non-empty buffer (Landmine 8). Surfaced via result_sink so the
+    # producer's _shielded_finalize writes cap_paused instead of completed.
+    _cap_disposition: str | None = None
     # Phase 073 TOKEN-COL-01 (D-073-07): per-run usage accumulators.
     # Both default to None — D-073-09 NULL sentinel if NO iteration produced
     # a usage payload. First successful usage event flips None to int; subsequent
@@ -1843,17 +1948,41 @@ async def run_agent_loop(
                 _dropped_count = len(tool_calls_buffer)
                 _tool_names = [tc.get("name", "?") for tc in tool_calls_buffer.values()]
                 logger.warning(
-                    "iteration_cap_dropped_tool_calls run=%s iteration=%d dropped=%d tool_names=%s",
+                    "iteration_cap_paused run=%s iteration=%d queued=%d tool_names=%s",
                     run_id, iteration, _dropped_count, _tool_names,
                 )
-                await _emit(redis, run_id, 'system_warning',
-                            kind="iteration_cap_dropped_tool_calls",
-                            message=f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.")
-                _persisted_system_warnings.append({
-                    "kind": "iteration_cap_dropped_tool_calls",
-                    "message": f"⚠ Reached iteration limit — didn't run the last {_dropped_count} tool(s) the model requested.",
-                })
-                tool_calls_buffer = {}   # belt-and-suspenders — skip the tool execution round
+                # Phase 092 (092-03 / SC#4) — PERSIST, don't DESTROY. The cap
+                # used to zero the buffer (dropping the calls on the floor); now
+                # we persist them durably to a role='system' carrier row + emit a
+                # NON-terminal cap_paused event so a Continue can CONSUME them
+                # within a fresh budget. Read continues_used from the DURABLE
+                # runs column (migration 063) — never an in-memory count
+                # (WORKER_COUNT=2). PERSIST happens BEFORE the buffer clear.
+                _continues_used = 0
+                try:
+                    _cu_row = await aexec(
+                        supabase.table("runs")
+                        .select("continues_used")
+                        .eq("run_id", str(run_id))
+                        .maybe_single()
+                    )
+                    if _cu_row is not None and _cu_row.data:
+                        _continues_used = _cu_row.data.get("continues_used") or 0
+                except Exception:
+                    logger.exception(
+                        "cap_paused: continues_used read failed for run %s", run_id
+                    )
+                _cap_disposition = await persist_cap_paused(
+                    redis=redis,
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    user_id=current_user["id"],
+                    supabase=supabase,
+                    tool_calls_buffer=tool_calls_buffer,
+                    continues_used=_continues_used,
+                    emit=_emit,
+                )
+                tool_calls_buffer = {}   # persisted above — now skip the tool execution round
 
             if finish_reason == "length" and tool_calls_buffer:
                 # length limit hit while streaming tool arguments — discard partial call
@@ -2344,6 +2473,11 @@ async def run_agent_loop(
             result_sink["input_tokens_total"] = input_tokens_total
             result_sink["output_tokens_total"] = output_tokens_total
             result_sink["full_content_final"] = full_content
+            # Phase 092 (092-03 / SC#4) — cap-pause disposition. None on every
+            # byte-identical Deep run; 'cap_paused' only when the cap fired with
+            # a non-empty buffer. _shielded_finalize reads this to override the
+            # terminal status (cap_paused is non-terminal → no terminal sentinel).
+            result_sink["cap_disposition"] = _cap_disposition
 
     # Phase 089 Plan 03 — the finalizer-needed outputs (Category E). The
     # shielded finalizer in threads.py reads these AFTER the loop returns and
@@ -2356,4 +2490,5 @@ async def run_agent_loop(
         persisted_system_warnings=_persisted_system_warnings,
         full_content_final=full_content,
         persist_system_warnings=_persist_system_messages,
+        cap_disposition=_cap_disposition,
     )
