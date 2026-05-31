@@ -225,6 +225,7 @@ async def _run_phase_with_gates(
     redis,
     wall_clock: int,
     _audit_user_id: UUID | None,
+    stream_run_id: UUID | None = None,
 ) -> PhaseOutcome:
     """Execute a phase under a bounded-retry gate loop (HARNESS-04 — the SC#3 bar).
 
@@ -244,6 +245,14 @@ async def _run_phase_with_gates(
     durable side-effects (complete/skip/fail) so the 2-phase write stays in the
     main loop.
     """
+    # Facet B (092-07): gate_failed events are engine _emit sites too — route them
+    # to the producer stream (run:{stream_run_id}) while gate_failed write_audit
+    # stays keyed on the workflow ``run_id`` (the _emit / write_audit pair are
+    # separate call sites taking distinct ids — the decoupling is mechanically
+    # clean). Default to the workflow run_id when called without the kwarg
+    # (back-compat for direct unit callers).
+    stream_run_id = stream_run_id or run_id
+
     # Lazy import (breaks the harness-package import cycle — see module note).
     from app.services.harness.validators import run_gates
 
@@ -274,8 +283,7 @@ async def _run_phase_with_gates(
                 pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
                 metadata={"phase": phase.slug, "attempt": attempt, "error": gate_error},
             )
-            await _emit(
-                redis, run_id, "gate_failed",
+            await _emit(redis, stream_run_id, "gate_failed",
                 phase=phase.slug, attempt=attempt, error=gate_error,
             )
             # A wall-clock timeout has no failing-validator index (the phase hung
@@ -311,8 +319,7 @@ async def _run_phase_with_gates(
             pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
             metadata={"phase": phase.slug, "attempt": attempt, "error": gate.error_message},
         )
-        await _emit(
-            redis, run_id, "gate_failed",
+        await _emit(redis, stream_run_id, "gate_failed",
             phase=phase.slug, attempt=attempt, error=gate.error_message,
         )
 
@@ -367,6 +374,7 @@ async def run_workflow(
     *,
     pool,
     redis,
+    stream_run_id: UUID | None = None,
 ) -> None:
     """Drive a run through its phases in ``phase_index`` order (HARNESS-01).
 
@@ -390,6 +398,16 @@ async def run_workflow(
         if getattr(ctx, "current_user", None)
         else None
     )
+
+    # Facet B (092-07): every engine SSE event must reach the PRODUCER stream the
+    # frontend watches (run:{producer_run_id}), NOT run:{workflow_run_id} (a stream
+    # nobody subscribes to). The explicit ``stream_run_id`` (passed by the live
+    # kickoff + both resume paths) wins; otherwise resolve it from
+    # ``ctx.producer_run_id`` (live/resume safe once the producer row is minted),
+    # falling back to ``run_id`` only for legacy unit stubs with no producer id.
+    # write_audit / finish_run / load_run_phases / _load_run_definition STAY on the
+    # workflow ``run_id`` (F1/F2 shape preserved).
+    stream_run_id = stream_run_id or getattr(ctx, "producer_run_id", None) or run_id
 
     rows = await load_run_phases(pool, run_id)
     # Resumed runs see prior outputs: seed accumulated_outputs from completed rows.
@@ -433,9 +451,7 @@ async def run_workflow(
             event_type="phase_started",
             metadata={"phase": phase.slug, "phase_index": phase.phase_index},
         )
-        await _emit(
-            redis,
-            run_id,
+        await _emit(redis, stream_run_id,
             "phase_started",
             phase=phase.slug,
             phase_index=phase.phase_index,
@@ -454,6 +470,7 @@ async def run_workflow(
             redis=redis,
             wall_clock=wall_clock,
             _audit_user_id=_audit_user_id,
+            stream_run_id=stream_run_id,
         )
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
@@ -466,7 +483,7 @@ async def run_workflow(
                 pool, run_id, user_id=_audit_user_id,
                 event_type="run_failed", metadata={"reason": outcome.reason},
             )
-            await _emit(redis, run_id, "run_failed", reason=outcome.reason)
+            await _emit(redis, stream_run_id, "run_failed", reason=outcome.reason)
             return  # stop — no further phases
 
         # ── skip_to_phase: mark this phase skipped, jump the cursor (D-09) ──────
@@ -476,8 +493,7 @@ async def run_workflow(
                 pool, run_id, user_id=_audit_user_id, event_type="phase_transition",
                 metadata={"from": phase.slug, "to": outcome.target_slug, "via": "skip_to_phase"},
             )
-            await _emit(
-                redis, run_id, "phase_transition",
+            await _emit(redis, stream_run_id, "phase_transition",
                 from_phase=phase.slug, to_phase=outcome.target_slug, via="skip_to_phase",
             )
             target_i = index_by_slug.get(outcome.target_slug)
@@ -493,7 +509,7 @@ async def run_workflow(
                     pool, run_id, user_id=_audit_user_id,
                     event_type="run_failed", metadata={"reason": reason},
                 )
-                await _emit(redis, run_id, "run_failed", reason=reason)
+                await _emit(redis, stream_run_id, "run_failed", reason=reason)
                 return
             i = target_i
             continue
@@ -515,9 +531,7 @@ async def run_workflow(
             event_type="phase_completed",
             metadata={"phase": phase.slug, "phase_index": phase.phase_index},
         )
-        await _emit(
-            redis,
-            run_id,
+        await _emit(redis, stream_run_id,
             "phase_completed",
             phase=phase.slug,
             phase_index=phase.phase_index,
@@ -530,9 +544,7 @@ async def run_workflow(
                 event_type="phase_transition",
                 metadata={"from": phase.slug, "to": ordered[i + 1]["slug"]},
             )
-            await _emit(
-                redis,
-                run_id,
+            await _emit(redis, stream_run_id,
                 "phase_transition",
                 from_phase=phase.slug,
                 to_phase=ordered[i + 1]["slug"],
@@ -554,7 +566,7 @@ async def run_workflow(
         pool, run_id, user_id=_audit_user_id,
         event_type="run_completed", metadata={"run_id": str(run_id)},
     )
-    await _emit(redis, run_id, "run_completed", status="completed")
+    await _emit(redis, stream_run_id, "run_completed", status="completed")
 
 
 # ── HARNESS-03 startup sweep (Plan 04) ────────────────────────────────────────

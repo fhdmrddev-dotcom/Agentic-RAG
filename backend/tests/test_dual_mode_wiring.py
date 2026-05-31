@@ -766,6 +766,246 @@ def test_phase_tool_context_fail_closed_when_producer_run_id_missing():
         _build_phase_tool_context(_llm_agent_phase(), ctx)
 
 
+# ── Task 2 / Facet B: route engine _emit to the producer stream + ask_user ─────
+
+def _xadd_streams_by_type(fake_redis):
+    """Map each emitted event ``type`` -> the XADD stream key it landed on."""
+    import json as _json
+
+    out: dict[str, str] = {}
+    for stream, fields in fake_redis.xadds:
+        payload = _json.loads(fields["data"])
+        out[payload["type"]] = stream
+    return out
+
+
+def _three_phase_def(build_workflow_definition):
+    return build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": "first"}},
+            {"config": {"phase_type": "llm_single", "prompt": "second"}},
+            {"config": {"phase_type": "llm_single", "prompt": "third"}},
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_emits_on_stream_run_id_audit_on_run_id(
+    build_workflow_definition, mock_asyncpg_pool, fake_redis
+):
+    """Facet B: run_workflow accepts a keyword-only ``stream_run_id`` and routes
+    EVERY engine _emit to ``run:{stream_run_id}`` (the producer stream the frontend
+    watches), while every write_audit stays keyed on the workflow ``run_id``.
+    """
+    from app.services import harness_engine
+
+    wf = _three_phase_def(build_workflow_definition)
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in range(3)]
+    mock_asyncpg_pool.set_fetch_result(
+        [
+            {"id": ids[0], "slug": "p0", "phase_index": 0, "status": "pending", "output": {}},
+            {"id": ids[1], "slug": "p1", "phase_index": 1, "status": "pending", "output": {}},
+            {"id": ids[2], "slug": "p2", "phase_index": 2, "status": "pending", "output": {}},
+        ]
+    )
+
+    async def _stub(phase, accumulated, ctx):
+        return {"text": phase.slug}
+
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        await harness_engine.run_workflow(
+            wf_run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis,
+            stream_run_id=producer_id,
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    streams = _xadd_streams_by_type(fake_redis)
+    expected_stream = f"run:{producer_id}"
+    for evt in ("phase_started", "phase_completed", "phase_transition", "run_completed"):
+        assert streams.get(evt) == expected_stream, (
+            f"{evt} must XADD to the producer stream {expected_stream}, got {streams.get(evt)}"
+        )
+    # No engine event leaked onto the orphan workflow_run stream.
+    assert all(s != f"run:{wf_run_id}" for s in streams.values())
+
+    # write_audit rows stay keyed on the workflow_run id (F1 shape preserved).
+    audit_calls = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls
+        if "harness_audit" in sql
+    ]
+    assert audit_calls, "expected harness_audit INSERTs"
+    for _sql, args in audit_calls:
+        assert args[0] == wf_run_id, "write_audit run_id must be the workflow_run id"
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_stream_run_id_defaults_to_producer_then_run_id(
+    build_workflow_definition, mock_asyncpg_pool, fake_redis
+):
+    """When ``stream_run_id`` is omitted, the engine resolves it from
+    ctx.producer_run_id (live/resume safe), falling back to the workflow run_id
+    only when no producer id is present (back-compat for the legacy unit stubs).
+    """
+    from app.services import harness_engine
+
+    wf = _three_phase_def(build_workflow_definition)
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in range(3)]
+    mock_asyncpg_pool.set_fetch_result(
+        [
+            {"id": ids[0], "slug": "p0", "phase_index": 0, "status": "pending", "output": {}},
+            {"id": ids[1], "slug": "p1", "phase_index": 1, "status": "pending", "output": {}},
+            {"id": ids[2], "slug": "p2", "phase_index": 2, "status": "pending", "output": {}},
+        ]
+    )
+
+    async def _stub(phase, accumulated, ctx):
+        return {"text": phase.slug}
+
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        # No stream_run_id kwarg → resolved from ctx.producer_run_id.
+        await harness_engine.run_workflow(
+            wf_run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis,
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    streams = _xadd_streams_by_type(fake_redis)
+    assert streams.get("run_completed") == f"run:{producer_id}"
+
+
+@pytest.mark.asyncio
+async def test_gate_failed_emits_on_stream_run_id_not_audit_run_id(
+    build_workflow_definition, mock_asyncpg_pool, fake_redis
+):
+    """Facet B (the verdict hole): ``_run_phase_with_gates`` also threads
+    ``stream_run_id`` and its gate_failed _emit lands on the producer stream, while
+    its gate_failed write_audit stays keyed on the workflow run_id — proving the
+    two _emit site groups (run_workflow + gate loop) decouple cleanly from audit.
+    """
+    from app.services import harness_engine
+    from app.models.harness import PhaseSpec, ValidatorSpec
+
+    # One llm_single phase carrying an always-failing regex gate (bounded retry → fail).
+    phase = PhaseSpec.model_validate(
+        {
+            "slug": "p0",
+            "phase_index": 0,
+            "config": {"phase_type": "llm_single", "prompt": "x"},
+            "validators": [
+                {"kind": "regex_match", "config": {"pattern": "ZZZ_NEVER_MATCHES"},
+                 "on_failure": "fail_run", "max_retries": 1},
+            ],
+        }
+    )
+    wf_run_id = uuid.uuid4()
+    producer_id = uuid.uuid4()
+
+    async def _stub(_phase, _accumulated, _ctx):
+        return {"text": "always fails the gate"}
+
+    outcome = None
+    harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        outcome = await harness_engine._run_phase_with_gates(
+            phase, {}, ctx,
+            run_id=wf_run_id, pool=mock_asyncpg_pool, redis=fake_redis,
+            wall_clock=30, _audit_user_id=None, stream_run_id=producer_id,
+        )
+    finally:
+        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+
+    assert outcome.kind == "fail_run"
+    streams = _xadd_streams_by_type(fake_redis)
+    assert streams.get("gate_failed") == f"run:{producer_id}"
+    # gate_failed audit rows stay on the workflow_run id.
+    audit_calls = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls if "harness_audit" in sql
+    ]
+    assert audit_calls
+    for _sql, args in audit_calls:
+        assert args[0] == wf_run_id
+
+
+@pytest.mark.asyncio
+async def test_ask_user_prompt_emits_on_producer_transport_keeps_value_on_run_id(
+    fake_redis, mock_asyncpg_pool
+):
+    """Facet B / edit #4: _exec_llm_human_input emits ``ask_user_prompt`` on the
+    producer transport (run:{producer}) — a DIRECT executor emit not reached by the
+    engine's stream_run_id threading — while the durable prompt-row run_id VALUE and
+    the subscribe_for_response channel stay on ctx.run_id (the workflow_run id).
+    """
+    from app.services.harness import phase_types
+
+    producer_id = uuid.uuid4()
+    phase = PhaseSpec_human()
+
+    captured = {}
+
+    async def _fake_emit(redis, run_id, evt_type, **fields):
+        await redis.xadd(f"run:{run_id}", {"data": _json_dumps({"type": evt_type, **fields})})
+
+    async def _fake_subscribe(redis, run_id, tool_call_id, timeout):
+        captured["subscribe_run_id"] = run_id
+        captured["subscribe_tcid"] = tool_call_id
+        return None  # timeout → no answer (we only assert the transport routing)
+
+    import app.services.harness.phase_types as pt
+    _orig_sub = pt.subscribe_for_response
+    pt.subscribe_for_response = _fake_subscribe
+    try:
+        ctx = _harness_ctx(producer_run_id=producer_id)
+        ctx.redis = fake_redis
+        ctx.emit = _fake_emit
+        ctx.supabase = None  # skip the durable prompt-row insert path in this unit
+        ctx.thread_id = str(uuid.uuid4())
+        out = await phase_types._exec_llm_human_input(phase, {}, ctx)
+    finally:
+        pt.subscribe_for_response = _orig_sub
+
+    streams = _xadd_streams_by_type(fake_redis)
+    # The ask_user_prompt event lands on the PRODUCER transport.
+    assert streams.get("ask_user_prompt") == f"run:{producer_id}"
+    # The subscribe_for_response channel stays on the workflow_run id VALUE.
+    assert captured["subscribe_run_id"] == ctx.run_id
+    assert ctx.run_id != producer_id
+    # The tool_call_id round-trips through the output (resume matcher anchor).
+    assert out["tool_call_id"] == captured["subscribe_tcid"]
+
+
+def PhaseSpec_human():
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec.model_validate(
+        {
+            "slug": "ask",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "llm_human_input",
+                "prompt": "Which option?",
+                "options": ["a", "b"],
+                "timeout_seconds": 5,
+            },
+        }
+    )
+
+
+def _json_dumps(obj):
+    import json as _json
+
+    return _json.dumps(obj)
+
+
 def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
     """Deep-path guard: _build_phase_tool_context is harness-executor-only. The
     Deep path builds its ToolContext in task_service from a producer runs id and

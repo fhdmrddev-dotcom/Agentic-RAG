@@ -494,6 +494,12 @@ def _exec_ctx(**overrides):
     defaults = dict(
         redis=_NoopRedis(),
         run_id=uuid.uuid4(),
+        # Facet A (092-07): the harness ctx carries the producer runs.run_id as the
+        # FK target for sub-agent parent_run_id (run_id stays the workflow_run id).
+        # _build_phase_tool_context now sources the parent id from this fail-closed,
+        # so the executor-path ctx MUST set it (the live producer + both resume
+        # paths do). A distinct value asserts the two ids never collapse.
+        producer_run_id=uuid.uuid4(),
         thread_id=str(uuid.uuid4()),
         supabase=None,
         pool=None,

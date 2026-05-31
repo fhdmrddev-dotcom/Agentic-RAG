@@ -363,11 +363,18 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
             )
 
     # Emit the ask_user prompt so the frontend renders the question.
+    # Facet B / edit #4 (092-07): this is a DIRECT executor emit (NOT an engine
+    # _emit site reached by run_workflow's stream_run_id threading), so route it on
+    # the PRODUCER stream transport (run:{producer}) the frontend watches — while
+    # the durable prompt-row run_id VALUE (above), the subscribe_for_response
+    # channel (below), and the get_pending_ask_user resume matcher all stay on
+    # ctx.run_id (the workflow_run id) for live↔resume answer-channel consistency.
+    _stream_id = getattr(ctx, "producer_run_id", None) or run_id
     emit = getattr(ctx, "emit", None)
     if emit is not None and redis is not None:
         try:
             await emit(
-                redis, run_id, "ask_user_prompt",
+                redis, _stream_id, "ask_user_prompt",
                 tool_call_id=tool_call_id,
                 prompt=prompt,
                 options=options,

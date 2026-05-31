@@ -1175,6 +1175,9 @@ async def send_message(
                         wf_ctx,
                         pool=_wf_pool,
                         redis=redis,
+                        # Facet B (092-07): route engine SSE events to the producer
+                        # stream the frontend watches (run:{producer_run_id}).
+                        stream_run_id=run_id,
                     )
                 else:                                          # Deep — byte-identical
                     ctx = RunContext(
