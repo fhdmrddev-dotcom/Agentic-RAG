@@ -779,6 +779,16 @@ def _xadd_streams_by_type(fake_redis):
     return out
 
 
+def _restore_registry(harness_engine, key, original):
+    """Restore the original PHASE_TYPE_REGISTRY entry (or remove it if there was
+    none) so a stubbed executor never leaks into a later test's registry-shape
+    assertion (test-ordering state pollution)."""
+    if original is not None:
+        harness_engine.PHASE_TYPE_REGISTRY[key] = original
+    else:
+        harness_engine.PHASE_TYPE_REGISTRY.pop(key, None)
+
+
 def _three_phase_def(build_workflow_definition):
     return build_workflow_definition(
         [
@@ -814,6 +824,7 @@ async def test_run_workflow_emits_on_stream_run_id_audit_on_run_id(
     async def _stub(phase, accumulated, ctx):
         return {"text": phase.slug}
 
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
     harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
     try:
         ctx = _harness_ctx(producer_run_id=producer_id)
@@ -822,7 +833,7 @@ async def test_run_workflow_emits_on_stream_run_id_audit_on_run_id(
             stream_run_id=producer_id,
         )
     finally:
-        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+        _restore_registry(harness_engine, "llm_single", _orig)
 
     streams = _xadd_streams_by_type(fake_redis)
     expected_stream = f"run:{producer_id}"
@@ -868,6 +879,7 @@ async def test_run_workflow_stream_run_id_defaults_to_producer_then_run_id(
     async def _stub(phase, accumulated, ctx):
         return {"text": phase.slug}
 
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
     harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
     try:
         ctx = _harness_ctx(producer_run_id=producer_id)
@@ -876,7 +888,7 @@ async def test_run_workflow_stream_run_id_defaults_to_producer_then_run_id(
             wf_run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis,
         )
     finally:
-        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+        _restore_registry(harness_engine, "llm_single", _orig)
 
     streams = _xadd_streams_by_type(fake_redis)
     assert streams.get("run_completed") == f"run:{producer_id}"
@@ -913,6 +925,7 @@ async def test_gate_failed_emits_on_stream_run_id_not_audit_run_id(
         return {"text": "always fails the gate"}
 
     outcome = None
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
     harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
     try:
         ctx = _harness_ctx(producer_run_id=producer_id)
@@ -922,7 +935,7 @@ async def test_gate_failed_emits_on_stream_run_id_not_audit_run_id(
             wall_clock=30, _audit_user_id=None, stream_run_id=producer_id,
         )
     finally:
-        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+        _restore_registry(harness_engine, "llm_single", _orig)
 
     assert outcome.kind == "fail_run"
     streams = _xadd_streams_by_type(fake_redis)
