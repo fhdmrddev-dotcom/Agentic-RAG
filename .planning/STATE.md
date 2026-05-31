@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: executing
-stopped_at: Phase 092 Plan 04 code-complete; Wave 4 UAT FAILED (F1 critical) — gap-closure 092-05 pending
-last_updated: "2026-05-31T13:30:00.000Z"
-last_activity: 2026-05-31 -- 092-04 Tasks 1-3 shipped; Chrome MCP UAT found critical harness_audit.user_id blocker (see 092-04-UAT-FINDINGS.md)
+status: unknown
+stopped_at: "092-05-PLAN.md COMPLETE (F1+F2 backend gap-closure shipped, Tasks 1-4) — next is 092-06 (F3 frontend + UAT gate)"
+last_updated: "2026-05-31T19:20:00.000Z"
+last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 19
-  completed_plans: 18
-  percent: 95
+  total_plans: 21
+  completed_plans: 20
+  percent: 91
 ---
 
 # Project State
@@ -21,27 +21,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 092 — dual-mode-wiring-continue-button
+**Current focus:** Phase --phase — 092
 
 ## Current Position
 
-Phase: 092 (dual-mode-wiring-continue-button) — EXECUTING
-Plan: 4 of 4
+Phase: --phase (092) — EXECUTING
+Plan: 1 of --name
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
   - Wave 2: 092-02 (MODE-01 mode switch + workflow-run creation + MODE-02 server-side lock-refusal — autonomous)
   - Wave 3: 092-03 (MODE-02 cancel/terminal lock-clear + CONT-01 Continue — autonomous)
   - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint) — CODE SHIPPED (Tasks 1-3), UAT FAILED at Task 4
+  - Gap 1: 092-05 (F1 audit-owner crash + F2 wedged lock — backend) — ✅ COMPLETE 2026-05-31 (4 tasks; F1+F2 closed; live-DB audit test green; zero net-new full-suite failures)
+  - Gap 2: 092-06 (F3 client lock-UX + UAT re-run gate) — NEXT
+
+**092-05 (gap-closure) verdict (2026-05-31): ✅ COMPLETE.** F1 closed — `workflow_runs.user_id` persisted (migration 064), `write_audit` binds the run-owner, all 11 audit sites pass it (10 harness_engine + 1 tool_dispatcher); a harness run executes end-to-end with no `NotNullViolationError`. F2 closed — `_shielded_finalize` terminalizes `workflow_runs` + clears the anchor on any non-completed harness escape; `lock_is_stale` self-heals on a terminal producer run (pure read). Live-DB integration test (`test_092_harness_audit_live.py`) closes the 091 mock blind spot — both gates green vs local Postgres. Full backend suite: 103-failed/1014-passed vs 102/1008 baseline = +6 new passing tests, ZERO net-new failures (the one "new" entry, `test_bounded_retry_reaches_failed_after_3_attempts`, is a pre-existing isolation failure unrelated to this plan). Requirements MODE-01/MODE-02/CONT-01 stay OPEN — 092-06 (F3) + phase verification own closure. Operator live F1 proof (backend kickoff of a Research→Summarize workflow) still pending per VERIFICATION.
 
 **Wave 4 UAT verdict (2026-05-31, Chrome MCP, operator-confirmed): FAILED — see `092-04-UAT-FINDINGS.md`.**
 Verified working: MODE-01 toggle/picker/gating, MODE-01 atomic workflow-run creation (INSERT workflow_runs + anchor + lock; correct ThreadWorkflowState — the trigger that unblocks 091's parked UAT), MODE-02 server-side 409 lock-refusal.
 Findings → gap-closure **092-05**:
+
 - **F1 CRITICAL** — `write_audit` omits `user_id`; `harness_audit.user_id` NOT NULL; `workflow_runs` has no `user_id` column; `create_workflow_run` never persists one. First `run_started` audit write throws `NotNullViolationError` → run dies before any phase → empty assistant / no tool calls / no workspace. Harness mode end-to-end non-functional. (Missed in 091: audit write was mock-only; 092 is the first live run.)
 - **F2 HIGH** — failure leaves `workflow_runs.status='active'` → thread stuck `locked`/`lock_is_stale:false`, no UI recovery.
 - **F3 MEDIUM (UX)** — composer not disabled-while-locked on active thread (toggle/agent-selector/textarea/Send live); 409'd send added optimistically, no error toast, orphaned assistant placeholder.
-Blocked by F1: SC#5 reload-reconcile, SC#2 DB-NULL, CONT-01 cap-drive, SC#10 scoreboard.
-NEXT: `/gsd:plan-phase 092 --gaps` (or plan 092-05) — fix F1 (migration: workflow_runs.user_id + persist + write_audit user_id + live-DB audit test), F2 (terminal lock-clear on run failure + lock_is_stale considers underlying run), F3 (client disable-while-locked + 409 toast + optimistic rollback). Do NOT mark phase 092 complete until 092-05 ships + UAT re-runs GREEN.
+
+Previously blocked by F1 (now UNBLOCKED): SC#5 reload-reconcile, SC#2 DB-NULL, CONT-01 cap-drive, SC#10 scoreboard — all ride the now-working live workflow run.
+NEXT: `/gsd:execute-phase 092 06` — 092-06 closes F3 (client disable-while-locked + 409 toast + optimistic rollback) and owns the UAT re-run gate. Do NOT mark phase 092 complete until 092-06 ships + UAT re-runs GREEN (incl. the operator live F1 proof + SC#10 native-7 4-axis scoreboard, now seedable since runs execute).
 
 ### Phase 091 (prior) — ✅ COMPLETE
 
@@ -67,6 +73,11 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 Last activity: 2026-05-31
 
 Progress: [██████████] 95%
+<!-- v2.8 plan-count progress: 20/21 plans complete (092-05 shipped; 092-06 remaining) -->
+
+### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
+
+4 tasks (Task 1 operator-migration checkpoint resolved; Tasks 2-4 executed). F1 (harness_audit.user_id crash) + F2 (wedged lock) closed; live-DB audit integration test added (closes 091 mock blind spot). Commits: 160bb729 + 88e05f07 (migration 064 + full-schema), cd592935 (F1), 27afae18 (F2), c5388ec0 (live test). Deviation: 1 auto-fix (Rule 3 — tool_dispatcher 11th write_audit caller). See 092-05-SUMMARY.md.
 
 ## Performance Metrics
 
@@ -111,6 +122,7 @@ Progress: [██████████] 95%
 | Phase 092 P01 | 25min | 3 tasks | 6 files |
 | Phase 092 PP02 | ~40min | 3 tasks | 9 files |
 | Phase 092 P03 | 75min | 3 tasks | 9 files |
+| Phase 092 P05 | ~45min | 4 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -263,9 +275,18 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T12:37:27.233Z
-Stopped at: 092-04-PLAN.md Tasks 1-3 done (committed) — PAUSED at Task 4 blocking checkpoint:human-verify (Chrome MCP UAT)
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-04-PLAN.md (Task 4)
+Last session: 2026-05-31T19:20:00.000Z
+Stopped at: 092-05-PLAN.md COMPLETE (Tasks 1-4 shipped; F1+F2 closed; live-DB audit test green) — next is 092-06 (F3 frontend + UAT re-run gate)
+Resume file: None
+
+**Plan 092-05 — ✅ COMPLETE (2026-05-31):** backend gap-closure for the 092-04 UAT.
+
+- Task 1 ✅ migration 064 (workflow_runs.user_id + backfill + FK + index) authored, operator-applied LIVE via SQL editor, full-schema regenerated (commits 160bb729 + 88e05f07)
+- Task 2 ✅ F1 — create_workflow_run persists user_id; write_audit keyword-only user_id + 4-col INSERT; all 11 audit sites pass the owner (commit cd592935)
+- Task 3 ✅ F2 — _shielded_finalize terminalize-and-clear on harness escape; lock_is_stale producer self-heal (commit 27afae18)
+- Task 4 ✅ live-DB harness_audit integration test (closes 091 mock blind spot) — both gates green vs local Postgres (commit c5388ec0)
+- Verify: wave gate 28/28 green; full backend suite 103-failed/1014-passed vs 102/1008 baseline = +6 new passing, ZERO net-new failures. Requirements MODE-01/MODE-02/CONT-01 left OPEN (092-06 + phase verification own closure).
+- Deviation: 1 auto-fix (Rule 3 — tool_dispatcher._spawn_tool_refused_audit was the 11th write_audit caller, broke on the new keyword-only signature; fixed additively).
 
 **Plan 092-04 — ⏸ IN PROGRESS (Tasks 1-3 done, awaiting Task 4 UAT):**
 
@@ -276,7 +297,7 @@ Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-04-PLAN.m
 - Verify status: `vite build` PASSES clean; `tsc -b` has 54 PRE-EXISTING baseline errors (0 net new — see deferred-items.md). Frontend Deep chat byte-identical when no workflow active (lock Map empty = no behavioral change).
 - SUMMARY (092-04-SUMMARY.md) DEFERRED until the UAT checkpoint resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN (phase verification owns closure; SDK requirements.mark-complete intentionally skipped).
 
-**Planned Phase:** 092 (dual-mode-wiring-continue-button) — 4 plans — 2026-05-31T11:04:01.842Z
+**Planned Phase:** 092 (Dual-Mode Wiring + Continue Button) — 6 plans — 2026-05-31T14:51:10.150Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 

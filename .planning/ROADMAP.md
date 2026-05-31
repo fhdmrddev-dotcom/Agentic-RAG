@@ -121,7 +121,7 @@ Plans:
 - [x] 092-02-PLAN.md — Backend MODE-01/02: create_workflow_run atomic txn + producer mode-branch + server-side lock + GET /threads/{id}/workflow + published-workflows list (wave 2) ✅ 2026-05-31
 - [x] 092-03-PLAN.md — Backend MODE-02 cancel/terminal lock-clear + CONT-01: persist-at-cap (consume not drop) + POST /runs/{id}/continue + 3-cap (wave 3) ✅ 2026-05-31
 - [x] 092-04-PLAN.md — Frontend: Deep/Harness toggle + picker + per-thread keyed lock + inline Continue card + mount reconcile (Tasks 1-3) ✅ 2026-05-31; Task 4 Chrome MCP UAT FAILED → gap-closure 092-05/06
-- [ ] 092-05-PLAN.md — Gap-closure (F1+F2): migration 064 workflow_runs.user_id + write_audit/create_workflow_run/harness_engine user_id threading + failure-path terminalize + lock_is_stale self-heal + live-DB audit test (wave 1)
+- [x] 092-05-PLAN.md — Gap-closure (F1+F2): migration 064 workflow_runs.user_id + write_audit/create_workflow_run/harness_engine user_id threading + failure-path terminalize + lock_is_stale self-heal + live-DB audit test (wave 1) ✅ 2026-05-31
 - [ ] 092-06-PLAN.md — Gap-closure (F3) + verification: disable-while-locked textarea/Send + 409 toast/rollback + lock seed-at-kickoff/reconcile + the F1-unblocked Manual-Only UAT gate (SC#2/3/5 + CONT-01 + SC#10 native-7 + Deep byte-identical) (wave 2)
 **Notes**: Deep/Harness is ORTHOGONAL to the existing `agent_mode` (General/Explorer) — Deep Mode is keyed on `active_workflow_run_id IS NULL` and is the umbrella for "not in a workflow," covering BOTH General and Explorer unchanged; the per-phase whitelist (091) is a no-op in Deep Mode so Explorer's tool-set is untouched when no workflow runs. **Discuss-phase decision:** the General/Explorer selector's behavior DURING an active workflow (stays visible / disabled / hidden until the run completes) — a workflow's phase whitelist is authoritative while active, so the selector is moot mid-run; pick the least-confusing affordance. No conflict; this is a UX-composition call, not an architectural one.
 
@@ -184,7 +184,7 @@ Plans:
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
-| 092. Dual-Mode Wiring + Continue Button | 3/4 | In progress | - |
+| 092. Dual-Mode Wiring + Continue Button | 5/6 | In progress (092-05 gap-closure shipped; 092-06 F3+UAT remaining) | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |
