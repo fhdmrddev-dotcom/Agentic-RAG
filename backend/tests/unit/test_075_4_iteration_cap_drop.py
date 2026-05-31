@@ -1,20 +1,21 @@
-"""Phase 075.4 Plan 03 Task 2 — iteration-cap drop guard (T-075.4-05).
+"""Phase 075.4 Plan 03 Task 2 — iteration-cap guard (T-075.4-05).
 
-When the agent loop reaches the final iteration (force_no_tools = True) AND
-the chunk-drain populated tool_calls_buffer, the buffer is silently dropped
-under the legacy flow (the tool_choice='none' on the next iteration means
-none of the buffered tools ever run). This is a trust-erosion class — the
-user sees a completed run but never finds out their last requested tool
-was dropped.
+ORIGINAL (075.4): on the final iteration (force_no_tools=True) with a non-empty
+tool_calls_buffer, the buffered tools were silently DROPPED — a trust-erosion
+class. 075.4's fix surfaced an `iteration_cap_dropped_tool_calls` warning + log
+and cleared the buffer.
 
-Plan 03 fix: on iteration-cap exit, if buffer non-empty:
-  - emit SSE system_warning kind='iteration_cap_dropped_tool_calls'
-  - logger.warning(...identifier-only fields...)
-  - clear the buffer (belt-and-suspenders; force_no_tools already true)
+SUPERSEDED by Phase 092 (092-03 / SC#4): the DROP is replaced with PERSIST. The
+cap site now persists the buffered calls to a durable role='system' carrier row
+(kind='iteration_cap_paused') BEFORE clearing the buffer, finalizes the run
+'cap_paused' (non-terminal), and emits a NON-terminal cap_paused SSE event so a
+Continue (POST /runs/{id}/continue) can CONSUME them. These source-text
+assertions track the 092 contract — the buffer is no longer "dropped on the
+floor", it is PERSISTED-then-paused.
 
-Source-text assertion (the guard lives deep in send_message; the relevant
-locals are bound to a per-iteration scope that is hard to drive directly
-without a full agent loop fixture).
+Source-text assertion (the guard lives deep in run_agent_loop; the relevant
+locals are bound to a per-iteration scope that is hard to drive directly without
+a full agent loop fixture).
 """
 from __future__ import annotations
 
@@ -22,53 +23,49 @@ import re
 from pathlib import Path
 
 
-def test_iteration_cap_guard_emits_system_warning_and_log() -> None:
-    """The end-of-stream drain path MUST guard on force_no_tools + non-empty
-    tool_calls_buffer and emit both the SSE system_warning and a
-    logger.warning with the canonical format."""
+def _agent_loop_src() -> str:
     src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
-    text = src.read_text(encoding="utf-8")
+    return src.read_text(encoding="utf-8")
 
-    # Canonical kind identifier present
-    assert "iteration_cap_dropped_tool_calls" in text, (
-        "iteration-cap drop guard must use the canonical kind identifier "
-        "'iteration_cap_dropped_tool_calls' (FORWARD-REF #6 Phase 082.5 hook)."
+
+def test_iteration_cap_guard_persists_then_pauses() -> None:
+    """092 SC#4: the cap guard PERSISTS the buffered calls (cap_paused) instead of
+    dropping them. The guard must call persist_cap_paused (durable carrier +
+    non-terminal cap_paused event) on the force_no_tools + non-empty-buffer path."""
+    text = _agent_loop_src()
+
+    # 092 canonical kind identifier present (replaces the 075.4 drop kind).
+    assert "iteration_cap_paused" in text, (
+        "092 SC#4: the cap path must use the 'iteration_cap_paused' kind "
+        "(durable carrier + non-terminal pause) — the buffered tools are "
+        "PERSISTED for Continue, not dropped."
     )
 
-    # Structured log format string MUST contain identifier-only fields:
-    # run_id, iteration, dropped count, tool_names. No prompt content / no
-    # raw arguments leak (T-073-04 norm extended here).
+    # The guard region invokes persist_cap_paused (the consume-not-drop entry).
     assert re.search(
-        r'logger\.warning\(\s*\n?\s*"iteration_cap_dropped_tool_calls\s+run=%s\s+iteration=%d\s+dropped=%d\s+tool_names=%s"',
+        r"if\s+force_no_tools\s+and\s+tool_calls_buffer:[\s\S]{0,2000}?persist_cap_paused\(",
         text,
     ), (
-        "Structured log line must match `iteration_cap_dropped_tool_calls "
-        "run=%s iteration=%d dropped=%d tool_names=%s` exactly so future log "
-        "consumers (Phase 082.5) can pattern-match."
+        "The force_no_tools + non-empty-buffer guard must call "
+        "persist_cap_paused() to persist the dropped calls before clearing the "
+        "buffer (092 SC#4 — consume, not re-drop)."
     )
 
-    # SSE emit must be present with kind+message
-    assert re.search(
-        r"await _emit\(redis, run_id, ['\"]system_warning['\"],\s*\n?\s*kind=['\"]iteration_cap_dropped_tool_calls['\"]",
-        text,
-    ), "SSE emit must use kind='iteration_cap_dropped_tool_calls'"
 
+def test_iteration_cap_guard_clears_buffer_after_persist() -> None:
+    """The buffer is still cleared AFTER the persist (belt-and-suspenders) so the
+    downstream `if not tool_calls_buffer:` short-circuit skips the tool round —
+    the calls are durable in the carrier row, not re-executed in this iteration."""
+    text = _agent_loop_src()
 
-def test_iteration_cap_guard_clears_buffer_after_warning() -> None:
-    """Belt-and-suspenders: after warning, the buffer is cleared so any
-    later code path that inspects tool_calls_buffer sees an empty dict."""
-    src = Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
-    text = src.read_text(encoding="utf-8")
-
-    # Look for the canonical clear pattern in the guard region
-    # The guard is `if force_no_tools and tool_calls_buffer:` followed by
-    # the emit + log, then `tool_calls_buffer = {}` somewhere within.
+    # persist_cap_paused(...) must be followed by `tool_calls_buffer = {}` within
+    # the guard region (persist FIRST, then clear — SC#4 ordering).
     m = re.search(
-        r"if\s+force_no_tools\s+and\s+tool_calls_buffer:[\s\S]{0,1200}?tool_calls_buffer\s*=\s*\{\}",
+        r"persist_cap_paused\([\s\S]{0,800}?tool_calls_buffer\s*=\s*\{\}",
         text,
     )
     assert m, (
-        "Buffer clear (`tool_calls_buffer = {}`) must follow the "
-        "iteration-cap drop warning within ~1200 chars (belt-and-suspenders "
-        "guard against any downstream code that re-inspects the buffer)."
+        "`tool_calls_buffer = {}` must follow the persist_cap_paused() call "
+        "(persist BEFORE clear — the dropped calls are durable first, then the "
+        "in-memory buffer is zeroed; 092 SC#4)."
     )
