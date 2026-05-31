@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: "092-06 Tasks 1-2 SHIPPED (F3 frontend lock-UX) — PAUSED at Task 3 checkpoint:human-action (Chrome-MCP + native-7 cross-provider UAT, orchestrator+operator owned)"
-last_updated: "2026-05-31T20:05:00.000Z"
+status: gaps_found
+stopped_at: "092-06 code-complete (F3 frontend lock-UX, Tasks 1-2 shipped); Task 3 UAT = gaps_found — F1/F2 VERIFIED CLOSED live + SC#2 PASS, but NEW blocker F4 (harness sub-agent parent_run_id FK) blocks a workflow running end-to-end → phase 092 NOT complete, routed to gap plan 092-07"
+last_updated: "2026-05-31T21:00:00.000Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
@@ -34,7 +34,8 @@ Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connect
   - Wave 3: 092-03 (MODE-02 cancel/terminal lock-clear + CONT-01 Continue — autonomous)
   - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint) — CODE SHIPPED (Tasks 1-3), UAT FAILED at Task 4
   - Gap 1: 092-05 (F1 audit-owner crash + F2 wedged lock — backend) — ✅ COMPLETE 2026-05-31 (4 tasks; F1+F2 closed; live-DB audit test green; zero net-new full-suite failures)
-  - Gap 2: 092-06 (F3 client lock-UX + UAT re-run gate) — NEXT
+  - Gap 2: 092-06 (F3 client lock-UX + UAT re-run gate) — ⚠️ CODE-COMPLETE 2026-05-31 (Tasks 1-2 shipped, tsc+build clean); Task 3 UAT = gaps_found → NEW blocker F4 (harness sub-agent parent_run_id FK) blocks end-to-end workflow → phase NOT complete
+  - Gap 3: 092-07 (F4 harness sub-agent parent_run_id FK mismatch — backend) — NEXT: `/gsd:plan-phase 092 --gaps`. Re-runs UAT rows 4-10 (SC#3/SC#5/CONT-01/SC#10 native-7/Deep byte-identical + SC#2 natural-completion/Cancel variants + F3 live lock observation)
 
 **092-05 (gap-closure) verdict (2026-05-31): ✅ COMPLETE.** F1 closed — `workflow_runs.user_id` persisted (migration 064), `write_audit` binds the run-owner, all 11 audit sites pass it (10 harness_engine + 1 tool_dispatcher); a harness run executes end-to-end with no `NotNullViolationError`. F2 closed — `_shielded_finalize` terminalizes `workflow_runs` + clears the anchor on any non-completed harness escape; `lock_is_stale` self-heals on a terminal producer run (pure read). Live-DB integration test (`test_092_harness_audit_live.py`) closes the 091 mock blind spot — both gates green vs local Postgres. Full backend suite: 103-failed/1014-passed vs 102/1008 baseline = +6 new passing tests, ZERO net-new failures (the one "new" entry, `test_bounded_retry_reaches_failed_after_3_attempts`, is a pre-existing isolation failure unrelated to this plan). Requirements MODE-01/MODE-02/CONT-01 stay OPEN — 092-06 (F3) + phase verification own closure. Operator live F1 proof (backend kickoff of a Research→Summarize workflow) still pending per VERIFICATION.
 
@@ -46,8 +47,20 @@ Findings → gap-closure **092-05**:
 - **F2 HIGH** — failure leaves `workflow_runs.status='active'` → thread stuck `locked`/`lock_is_stale:false`, no UI recovery.
 - **F3 MEDIUM (UX)** — composer not disabled-while-locked on active thread (toggle/agent-selector/textarea/Send live); 409'd send added optimistically, no error toast, orphaned assistant placeholder.
 
-Previously blocked by F1 (now UNBLOCKED): SC#5 reload-reconcile, SC#2 DB-NULL, CONT-01 cap-drive, SC#10 scoreboard — all ride the now-working live workflow run.
-NEXT: `/gsd:execute-phase 092 06` — 092-06 closes F3 (client disable-while-locked + 409 toast + optimistic rollback) and owns the UAT re-run gate. Do NOT mark phase 092 complete until 092-06 ships + UAT re-runs GREEN (incl. the operator live F1 proof + SC#10 native-7 4-axis scoreboard, now seedable since runs execute).
+Previously blocked by F1 (now UNBLOCKED at the audit layer): SC#5 reload-reconcile, SC#2 DB-NULL, CONT-01 cap-drive, SC#10 scoreboard — but now re-BLOCKED at the phase-execution layer by F4 (see 092-06 verdict below).
+
+**092-06 (gap-closure F3) verdict (2026-05-31): ⚠️ CODE-COMPLETE, phase verification gaps_found — see `092-06-UAT-FINDINGS.md` + `092-06-SUMMARY.md`.**
+F3 frontend lock-UX SHIPPED (Tasks 1-2): typed status-carrying 409 ApiError; per-thread workflow lock seeded at Harness kickoff + seeded/cleared on the mount-time getThreadWorkflow reconcile (D-v2.5-03 / F2 self-heal); textarea+Send+canSend gate on workflowLocked with the D-05 running hint; a 409 rolls back BOTH optimistic bubbles + surfaces a fixed per-thread lock banner (no internals leaked). tsc -b = 54 baseline (0 net-new), vite build clean. Commits 3b21f230 + 4546b5bb. Deviation: 1 auto-fix (Rule 3 — ApiError as explicit class field not a TS parameter-property, erasableSyntaxOnly-safe).
+Task 3 lived-experience UAT (orchestrator Chrome MCP + operator live Supabase + uvicorn console) = **gaps_found**:
+
+- **F1 ✅ VERIFIED CLOSED live** — workflow_runs row created with non-null user_id; harness_audit phase_started row with non-null user_id; no NotNullViolationError.
+- **F2 ✅ VERIFIED CLOSED live** + **SC#2 ✅ PASS (failure path)** — failed run → workflow_runs.status='failed' + threads.active_workflow_run_id=NULL; no wedged lock. (Natural-completion + explicit-Cancel SC#2 variants still owed once F4 lets a workflow finish.)
+- **F3 ⚠️ CODE-COMPLETE, LIVE-UNVERIFIED** — live lock-honored / 409-rollback unobservable because the workflow dies in ~2s (F4) so no thread stays locked. Composer correctly showed unlocked for the already-terminal run (anchor NULL) — consistent, not a defect.
+- **F4 NEW BLOCKER** — harness LLM-agent phase sub-agent insert fails with `ForeignKeyViolationError: runs_parent_run_id_fkey`: the engine ctx.run_id is the workflow_run id (threads.py:1158) which isn't a `runs` row, but `run_task_sub_agent` (task_service.py:272) uses it as `runs.parent_run_id`. Workflow cannot run end-to-end. OUT OF SCOPE for 092-05/092-06 → routed to gap plan **092-07**. Fix shape: thread the producer-shell `runs` id into the engine ctx as a distinct `producer_run_id` and use THAT for `runs.parent_run_id`, keeping ctx.run_id = workflow_run id for audit/SSE/resume — cover BOTH the live producer ctx (threads.py) AND the resume ctx (harness_engine._build_resume_context). Cross-provider + agent-loop-adjacent → needs its own scoped UAT.
+- **SC#3 / SC#5 / CONT-01 / SC#10 native-7 / Deep byte-identical: ⛔ BLOCKED by F4** — they ride a workflow that runs end-to-end.
+
+Requirements **MODE-01 / MODE-02 / CONT-01 REMAIN OPEN** — the binding criterion "a Harness workflow runs end-to-end" is NOT met. **Phase 092 is NOT complete.**
+NEXT: `/gsd:plan-phase 092 --gaps` — gap-closure **092-07** for F4 (harness sub-agent parent_run_id). Do NOT mark phase 092 complete and do NOT mark MODE-01/MODE-02/CONT-01 validated until 092-07 ships + the re-run UAT (rows 4-10 + SC#2 variants) goes GREEN.
 
 ### Phase 091 (prior) — ✅ COMPLETE
 
@@ -275,16 +288,16 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T20:05:00.000Z
-Stopped at: 092-06 Tasks 1-2 SHIPPED (F3 frontend lock-UX) — PAUSED at Task 3 checkpoint:human-action UAT gate
-Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-06-PLAN.md (Task 3)
+Last session: 2026-05-31T21:00:00.000Z
+Stopped at: 092-06 code-complete (F3 frontend lock-UX shipped); Task 3 UAT gaps_found (F1/F2 closed live + SC#2 pass, NEW blocker F4 blocks end-to-end workflow) — phase 092 NOT complete
+Resume file: .planning/phases/092-dual-mode-wiring-continue-button/092-06-UAT-FINDINGS.md → plan gap 092-07
 
-**Plan 092-06 — ⏸ IN PROGRESS (Tasks 1-2 done, awaiting Task 3 UAT):** F3 client lock-UX gap-closure.
+**Plan 092-06 — ⚠️ CODE-COMPLETE (Tasks 1-2 shipped); Task 3 UAT gaps_found:** F3 client lock-UX gap-closure. See `092-06-SUMMARY.md` + `092-06-UAT-FINDINGS.md`.
 
 - Task 1 ✅ api.ts ApiError (status-carrying 409) + StreamsProvider: per-thread workflow lock SEEDED at kickoff (Harness send) + SEEDED/CLEARED on the mount-time getThreadWorkflow reconcile (D-v2.5-03; clears on stale/terminal anchor = F2 self-heal). tsc --noEmit clean (commit 3b21f230)
 - Task 2 ✅ MessageInput: textarea + Send + canSend now gate on workflowLocked (toggle + selector already did); locked textarea shows the D-05 "Workflow running — Cancel to switch back" hint. StreamsProvider sendMessage catch: a 409 ApiError rolls back BOTH optimistic bubbles (user + orphaned assistant placeholder) and surfaces a fixed per-thread error via the existing reconcileErrors Map (T-092-06-03 — no internals leaked). ChatArea: per-thread banner message-aware — 409 renders fixed lock copy (data-testid=workflow-lock-error-banner, Dismiss only); reconcile-failure keeps cached-version copy + Retry. api.ts ApiError uses an explicit field (not a TS parameter-property) so tsc -b erasableSyntaxOnly accepts it. Verify: tsc -b = exactly 54 baseline (ZERO net-new), vite build clean (commit 4546b5bb)
-- All changes per-thread keyed + additive; no provider streaming branch touched (SC#3 / BUG-260523-01 / 075.x cascade rules honored).
-- Task 3 ⏸ BLOCKING checkpoint:human-action — the F1-unblocked lived-experience UAT (9 steps: F1 end-to-end, SC#2 anchor→NULL, SC#3 parallel-thread, SC#5 reload-reconcile + Stop-unlock, F2 no-wedge, F3 composer+409, CONT-01 cap-drive→Continue→3-cap, SC#10 native-7 4-axis scoreboard, Deep byte-identical). Operator starts the backend uvicorn + npm run dev; orchestrator drives Chrome DevTools MCP + live Supabase/LangSmith. Results → 092-06-UAT-FINDINGS.md. SUMMARY (092-06-SUMMARY.md) DEFERRED until UAT resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN — phase verification + this UAT gate own closure.
+- All changes per-thread keyed + additive; no provider streaming branch touched (SC#3 / BUG-260523-01 / 075.x cascade rules honored). Deviation: 1 auto-fix (Rule 3 — ApiError explicit class field, erasableSyntaxOnly-safe).
+- Task 3 ✅ RESOLVED (orchestrator Chrome MCP + operator live Supabase + uvicorn console) = **gaps_found**. F1 ✅ VERIFIED CLOSED live (workflow_runs + harness_audit non-null user_id, no NotNullViolationError). F2 ✅ VERIFIED CLOSED + SC#2 ✅ PASS (failure path: status='failed' + anchor=NULL, no wedge). F3 ⚠️ code-complete but live-unverified (workflow dies in ~2s, no thread stays locked to observe; composer correctly unlocked for the terminal run = consistent). **NEW blocker F4** (harness sub-agent runs_parent_run_id_fkey — ctx.run_id is the workflow_run id, not a `runs` row) blocks any workflow running end-to-end → SC#3/SC#5/CONT-01/SC#10 native-7/Deep byte-identical all ⛔ BLOCKED. Routed to gap plan **092-07** (out of scope for 092-05/06). Requirements MODE-01/MODE-02/CONT-01 stay OPEN; phase 092 NOT complete.
 
 **Plan 092-05 — ✅ COMPLETE (2026-05-31):** backend gap-closure for the 092-04 UAT.
 

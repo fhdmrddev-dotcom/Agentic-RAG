@@ -115,14 +115,15 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   3. The lock state is per-thread keyed (a `Map`/`Set`, never a global boolean — BUG-260523-01 pattern): SC#10 parallel-thread UAT confirms Thread A streaming a workflow does NOT lock Thread B's mode toggle or composer.
   4. When a run hits its step cap (a Deep run OR a Harness phase), a Continue affordance resumes the SAME run/phase with a bounded additional step budget — re-reading `workflow_phases.available_tools` from Postgres for a Harness phase — and consumes the previously-dropped tool calls rather than re-dropping them; it never blindly bumps a global cap unbounded.
   5. The panel reconciles true mode/lock state via `GET /threads/{id}/workflow` on mount (D-v2.5-03), never trusting a Realtime/SSE hint alone; a thread is never stuck Harness-locked with a terminal/absent run.
-**Plans**: 6 plans (4 + 2 gap-closure for the Wave 4 UAT F1/F2/F3 findings)
+**Plans**: 7 plans (4 + 3 gap-closure: F1/F2 → 092-05, F3 → 092-06, F4 → 092-07 from successive UAT findings)
 Plans:
 - [x] 092-01-PLAN.md — Migration 063 (inputs/model/continues_used + cap_paused) + Wave-0 test scaffolds + operator SQL-editor apply (wave 1) ✅ 2026-05-31
 - [x] 092-02-PLAN.md — Backend MODE-01/02: create_workflow_run atomic txn + producer mode-branch + server-side lock + GET /threads/{id}/workflow + published-workflows list (wave 2) ✅ 2026-05-31
 - [x] 092-03-PLAN.md — Backend MODE-02 cancel/terminal lock-clear + CONT-01: persist-at-cap (consume not drop) + POST /runs/{id}/continue + 3-cap (wave 3) ✅ 2026-05-31
 - [x] 092-04-PLAN.md — Frontend: Deep/Harness toggle + picker + per-thread keyed lock + inline Continue card + mount reconcile (Tasks 1-3) ✅ 2026-05-31; Task 4 Chrome MCP UAT FAILED → gap-closure 092-05/06
 - [x] 092-05-PLAN.md — Gap-closure (F1+F2): migration 064 workflow_runs.user_id + write_audit/create_workflow_run/harness_engine user_id threading + failure-path terminalize + lock_is_stale self-heal + live-DB audit test (wave 1) ✅ 2026-05-31
-- [ ] 092-06-PLAN.md — Gap-closure (F3) + verification: disable-while-locked textarea/Send + 409 toast/rollback + lock seed-at-kickoff/reconcile + the F1-unblocked Manual-Only UAT gate (SC#2/3/5 + CONT-01 + SC#10 native-7 + Deep byte-identical) (wave 2)
+- [x] 092-06-PLAN.md — Gap-closure (F3) code-complete (disable-while-locked textarea/Send + 409 rollback + lock seed-at-kickoff/reconcile; commits 3b21f230 + 4546b5bb, tsc+build clean). Task 3 UAT = gaps_found: F1/F2 VERIFIED CLOSED live + SC#2 PASS (failure path), but NEW blocker F4 (harness sub-agent runs_parent_run_id_fkey) blocks end-to-end workflow → SC#3/5 + CONT-01 + SC#10 native-7 + Deep byte-identical BLOCKED. Phase NOT complete; routed to 092-07 (wave 2) ⚠️ 2026-05-31
+- [ ] 092-07-PLAN.md — Gap-closure (F4): thread producer-shell `runs` id into engine ctx as a distinct producer_run_id for runs.parent_run_id (cover live producer ctx threads.py:1158 + resume ctx _build_resume_context); re-run UAT rows 4-10 (SC#2 natural/Cancel variants + SC#3 + SC#5 + CONT-01 + SC#10 native-7 + Deep byte-identical) (wave 3)
 **Notes**: Deep/Harness is ORTHOGONAL to the existing `agent_mode` (General/Explorer) — Deep Mode is keyed on `active_workflow_run_id IS NULL` and is the umbrella for "not in a workflow," covering BOTH General and Explorer unchanged; the per-phase whitelist (091) is a no-op in Deep Mode so Explorer's tool-set is untouched when no workflow runs. **Discuss-phase decision:** the General/Explorer selector's behavior DURING an active workflow (stays visible / disabled / hidden until the run completes) — a workflow's phase whitelist is authoritative while active, so the selector is moot mid-run; pick the least-confusing affordance. No conflict; this is a UX-composition call, not an architectural one.
 
 #### Phase 093: Anthropic Cross-Provider Parity
@@ -184,7 +185,7 @@ Plans:
 | 089. Agent-Loop Extraction (G-5) + Kickoff UAT | 4/4 | Complete    | 2026-05-30 |
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
-| 092. Dual-Mode Wiring + Continue Button | 5/6 | In progress (092-05 gap-closure shipped; 092-06 F3+UAT remaining) | - |
+| 092. Dual-Mode Wiring + Continue Button | 6/7 | In progress (092-06 F3 code-complete + UAT gaps_found → NEW blocker F4 blocks end-to-end workflow; 092-07 F4 gap-closure remaining; MODE-01/02 + CONT-01 stay OPEN) | - |
 | 093. Anthropic Cross-Provider Parity | 0/0 | Not started | - |
 | 094. Panel Phase Timeline | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |
