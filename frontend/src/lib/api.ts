@@ -8,6 +8,21 @@ export interface SkillImportResult {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
+/** Phase 092 (092-06 / F3): a status-carrying error so the send path can
+ *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
+ *  from a generic failure. Mirrors the existing DownloadError idiom (status +
+ *  name). Thrown only by postMessage — the rest of api.ts keeps its generic
+ *  throws (additive, minimal diff). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
@@ -376,7 +391,10 @@ export async function postMessage(
         : {}),
     }),
   })
-  if (!res.ok) throw new Error("Failed to send message")
+  // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
+  // distinguishable in StreamsProvider.sendMessage's catch (roll back both
+  // optimistic bubbles + surface a per-thread error instead of leaving ghosts).
+  if (!res.ok) throw new ApiError("Failed to send message", res.status)
   return (await res.json()) as PostMessageResponse
 }
 

@@ -76,6 +76,8 @@ import {
   getThreadWorkspaceFiles,
   getThreadPendingAsks,
   getThreadTasks,
+  getThreadWorkflow,
+  ApiError,
   type StreamCallbacks,
   type ThreadSnapshot,
 } from "@/lib/api"
@@ -1128,6 +1130,33 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     .catch(console.error)
                 })
             }
+
+            // Phase 092 (092-06 / F3 — SC#5 / D-v2.5-03): reconcile the per-thread
+            // workflow lock from the AUTHORITATIVE GET /threads/{id}/workflow read
+            // (Realtime/SSE is a hint, not truth). A reload mid-workflow rehydrates
+            // the composer lock here; a stale/terminal anchor (F2 self-heal) CLEARS
+            // it so the composer re-enables. Own try/catch — a workflow-state fetch
+            // failure must NOT break message reconcile. Keyed by the OWNING
+            // `threadId` (closure) — never a global flag (SC#3 / BUG-260523-01).
+            if (activeThreadIdRef.current === threadId) {
+              try {
+                const wf = await getThreadWorkflow(threadId)
+                const actions = useStreamsStore.getState().actions
+                if (wf.locked && !wf.lock_is_stale && wf.active_workflow_run_id) {
+                  actions.setWorkflowLockForThread(threadId, {
+                    runId: wf.active_workflow_run_id,
+                    mode: "harness",
+                    capPaused: wf.cap_paused,
+                    continuesRemaining: wf.continues_remaining,
+                  })
+                } else {
+                  // Stale / terminal / Deep → unlock (honors the F2 self-heal).
+                  actions.clearWorkflowLockForThread(threadId)
+                }
+              } catch (err) {
+                console.error("reconcile workflow-state failed:", err)
+              }
+            }
           } finally {
             // Phase 063.1 (D-063.1-11 / Gap-005): ALWAYS reset in finally.
             reconcileInFlightRef.current = false
@@ -1194,6 +1223,21 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               workflowDefinitionId: opts?.workflowDefinitionId,
             })
             registeredRunId = run_id
+
+            // Phase 092 (092-06 / F3 — SC#3): seed the per-thread workflow lock
+            // at KICKOFF so the composer disables IMMEDIATELY on a Harness send,
+            // not only when a cap_paused SSE arrives. Keyed by the OWNING
+            // `threadId` (closure) — never a global flag (BUG-260523-01). A fresh
+            // run has the full Continue budget (D-06: max 3/run); a real terminal
+            // (onTerminal) or the mount reconcile clears/refreshes it.
+            if (opts?.workflowDefinitionId && run_id) {
+              useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
+                runId: run_id,
+                mode: "harness",
+                capPaused: false,
+                continuesRemaining: 3,
+              })
+            }
 
             // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages.
             // L-068-07 (open side): track in subscriptionsByThread mirror.
