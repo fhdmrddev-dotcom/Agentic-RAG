@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Completed 091-01-PLAN.md
-last_updated: "2026-05-31T05:06:51.010Z"
+stopped_at: Completed 091-02-PLAN.md
+last_updated: "2026-05-31T05:16:48.021Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 14
-  completed_plans: 8
-  percent: 57
+  completed_plans: 9
+  percent: 64
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 ## Current Position
 
 Phase: 091 — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Plans: 7 plans / 5 waves — VERIFICATION PASSED (iteration 2, after 1 column-name blocker + 3 warnings fixed). RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
 
   - Wave 1: 091-01 (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
@@ -47,7 +47,7 @@ SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-messag
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
 Last activity: 2026-05-31
 
-Progress: [██████░░░░] 57%
+Progress: [██████░░░░] 64%
 
 ## Performance Metrics
 
@@ -81,6 +81,7 @@ Progress: [██████░░░░] 57%
 | Phase 089 P02 | 6min | 3 tasks | 3 files |
 | Phase 089 P03 | ~3h | 3 tasks | 35 files |
 | Phase 091 P01 | 7min | 3 tasks | 10 files |
+| Phase 091 P02 | 7min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,8 @@ Recent decisions affecting current work:
 - 089-03: module-level loop helpers + _reconstruct_history moved to agent_loop.py and re-imported into threads.py (cycle-free, one canonical copy); AgentLoopResult gained persist_system_warnings + run_agent_loop gained timeout_ctx/result_sink kw-only params (Rule-3 structural, behavior-preserving)
 - (091-01): harness.py PhaseConfig fields FINALIZED — input_keys (programmatic), model/temperature (llm_single), wall_clock_seconds+model (llm_agent/batch), merge_strategy Literal[concat,concat_numbered], ask_user options+timeout; discriminator/union/extra=forbid/Literals LOCKED; no final_output (D-11)
 - (091-01): Wave-0 scaffold = 7 test files + 5 shared fixtures (mock_asyncpg_pool UPDATE-recorder, fake_redis pub/sub+XADD events log, make_tool_context w/ phase_whitelist, make_run_context, build_workflow_definition/four_seed_defs); 22 live anchors green, 27 skipped contracts each name owning plan; ctx factory uses SimpleNamespace so phase_whitelist exists pre-Plan-06
+- (091-02): harness_engine.run_workflow drives phases in phase_index order via PHASE_TYPE_REGISTRY seam (LLM never picks next); 2-phase write delegated to db/workflows.py (mark_phase_active before work, complete_phase status+output ONE atomic UPDATE after durable); crash leaves phase active (propagates, never completed); final phase output IS chat message (D-10, no synthesis LLM call)
+- (091-02): reachability lint edge model links by phase_index VALUE +1 (not sorted position) so non-contiguous gaps genuinely orphan/strand terminal; 4 seeds lint clean; run-keyed workflow_phases reads use workflow_run_id (42703 guard)
 
 ### Pending Todos
 
@@ -207,8 +210,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T05:06:51.005Z
-Stopped at: Completed 091-01-PLAN.md
+Last session: 2026-05-31T05:16:39.360Z
+Stopped at: Completed 091-02-PLAN.md
 Resume file: None
 
 **Planned Phase:** 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 7 plans — 2026-05-30T23:07:33.805Z

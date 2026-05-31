@@ -95,7 +95,7 @@ The harness is ~80% composition of already-shipped, cross-provider-tested code. 
   6. 2–3 seed workflow templates (e.g. Research→Summarize, Plan→Execute→Verify) ship and run end-to-end as UAT fixtures; the tool-count budget guard (TOOL-05) caps the schema list at the `get_tools()` composition site with a per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES`.
 **Plans**: 7 plans (2-3 tasks each), 5 waves
 - [x] 091-01-PLAN.md — Finalize harness.py models + Wave-0 test scaffold & shared fixtures (wave 1)
-- [ ] 091-02-PLAN.md — Engine core: run_workflow loop + 2-phase write + db/workflows.py + reachability lint (wave 2)
+- [x] 091-02-PLAN.md — Engine core: run_workflow loop + 2-phase write + db/workflows.py + reachability lint (wave 2) ✅ 2026-05-31
 - [ ] 091-06-PLAN.md — Whitelist guard at dispatch_tool + get_tools budget + max_tools (wave 2)
 - [ ] 091-03-PLAN.md — 5 phase-type executors wired to substrate + system_prompt_override (wave 3)
 - [ ] 091-05-PLAN.md — Validation gates (4 kinds) + bounded retry + on_failure + caps (wave 3)
