@@ -40,6 +40,24 @@ import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } f
 
 export type SurfaceId = string
 
+/**
+ * Phase 092 (MODE-01/02 — SC#3) — the per-thread workflow-lock record. Held in
+ * `workflowLockByThread` keyed by the OWNING thread id. Presence of a key means
+ * the thread is Harness-locked (a non-terminal workflow run owns its anchor);
+ * absence means Deep (unlocked). `capPaused`/`continuesRemaining` carry the
+ * Continue affordance state surfaced by the cap_paused SSE event + the
+ * getThreadWorkflow reconcile.
+ */
+export interface WorkflowLock {
+  /** The workflow_runs.id (active_workflow_run_id) that owns the lock. */
+  runId: string
+  mode: "harness"
+  /** True when the run is cap_paused (a Continue card is pending). */
+  capPaused: boolean
+  /** Continues remaining (max_continues_per_run - continues_used, D-06). */
+  continuesRemaining: number
+}
+
 export interface StreamsState {
   bucketsBySurface: Map<SurfaceId, Map<string, Message[]>>
   viewedThreadId: string | null
@@ -100,6 +118,21 @@ export interface StreamsState {
   /** Per-thread sub-agent task run index (keyed-by-sub_run_id upsert/status on
    *  the TASK-variant sub_agent_start / sub_agent_done SSE). */
   tasksByThread: Map<string, TaskRunIndexItem[]>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 092 (MODE-01 / MODE-02 — SC#3, the single highest-regression-risk
+  // surface). Per-thread keyed workflow-lock state. A thread holds a lock iff a
+  // non-terminal Harness workflow run owns its `active_workflow_run_id` anchor.
+  // MUST be a Map keyed by thread_id — NEVER a global boolean (a global flag here
+  // is the BUG-260523-01-class regression: Thread A's workflow would lock Thread
+  // B's composer). Mirrors the streamingThreads/subscriptionsByThread shape; the
+  // useWorkflowLockForThread selector (StreamsProvider.tsx) reads it keyed by the
+  // OWNING thread id (useMessages.ts:80-86 lesson). Populated by the mount-time
+  // getThreadWorkflow reconcile (D-v2.5-03 source of truth) + the live SSE
+  // (cap_paused / terminal); cleared (GC delete-the-key) on unlock. Ephemeral —
+  // never persisted (reconciled from the backend on every mount).
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Per-thread workflow lock. Absent key = Deep (unlocked). */
+  workflowLockByThread: Map<string, WorkflowLock>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -117,6 +150,10 @@ export interface StreamsState {
         agentMode?: string
         surfaceId?: SurfaceId
         onTitleUpdate?: (t: string) => void
+        /** Phase 092 (MODE-01 / D-02) — Harness kickoff: when set, the backend
+         *  creates a workflow run + the producer drives run_workflow. Omitted on
+         *  a Deep send (byte-identical). */
+        workflowDefinitionId?: string
       },
     ) => Promise<void>
     reconcile: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
@@ -157,6 +194,17 @@ export interface StreamsState {
     ) => void
     /** Full-state-replace of a thread's task run index (GET reconcile). */
     replaceTasksForThread: (threadId: string, tasks: TaskRunIndexItem[]) => void
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 092 (MODE-01/02 — SC#3) — per-thread workflow-lock mutators.
+    // Both copy-then-mutate the workflowLockByThread Map (new Map → set / GC
+    // delete-the-key). NEVER touch a global flag. Called from the mount-time
+    // getThreadWorkflow reconcile (D-v2.5-03) + the live SSE (cap_paused /
+    // terminal). No-op stubs here; the provider registers real bodies.
+    // ──────────────────────────────────────────────────────────────────────────
+    /** Set/replace a thread's workflow lock (mount reconcile + cap_paused SSE). */
+    setWorkflowLockForThread: (threadId: string, lock: WorkflowLock) => void
+    /** Clear a thread's workflow lock — GC delete-the-key (unlock / terminal). */
+    clearWorkflowLockForThread: (threadId: string) => void
   }
 }
 
@@ -204,6 +252,10 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   pendingAsksByThread: new Map<string, PendingAsk[]>(),
   // Type: tasksByThread: Map<string, TaskRunIndexItem[]>
   tasksByThread: readTasksSyncOrEmpty(),
+  // Phase 092 (SC#3): per-thread workflow lock — fresh empty Map. Ephemeral
+  // (never persisted); reconciled from getThreadWorkflow on every mount.
+  // Type: workflowLockByThread: Map<string, WorkflowLock>
+  workflowLockByThread: new Map<string, WorkflowLock>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -228,5 +280,9 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     setTaskForThread: () => {},
     updateTaskStatusForThread: () => {},
     replaceTasksForThread: () => {},
+    // Phase 092 (SC#3): synchronous no-op stubs — the cap_paused SSE / reconcile
+    // can fire before the provider's mount-time useEffect registers real bodies.
+    setWorkflowLockForThread: () => {},
+    clearWorkflowLockForThread: () => {},
   },
 })))

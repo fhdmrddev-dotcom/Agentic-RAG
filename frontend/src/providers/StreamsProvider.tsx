@@ -84,6 +84,7 @@ import {
   useStreamsStore,
   type SurfaceId,
   type StreamsState,
+  type WorkflowLock,
 } from "@/stores/streamsStore"
 import { makeThrottle } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
@@ -699,6 +700,18 @@ export function makeStreamCallbacks(opts: {
       useStreamsStore
         .getState()
         .actions.updateTaskStatusForThread(threadId, subRunId, status, summary),
+    // Phase 092 (CONT-01 / D-07 — SC#3): live cap_paused SSE → set the OWNING
+    // thread's lock to capPaused so the inline Continue card appears out-of-band
+    // (the durable carrier row is filtered from /messages — BUG-260528-01).
+    // Closes over the factory's `threadId` (the owning thread), so a background
+    // thread's cap_paused never touches the viewed thread's lock.
+    onCapPaused: (info) =>
+      useStreamsStore.getState().actions.setWorkflowLockForThread(threadId, {
+        runId: info.runId,
+        mode: "harness",
+        capPaused: true,
+        continuesRemaining: info.continuesRemaining,
+      }),
   }
 }
 
@@ -744,6 +757,35 @@ function _removeRunFromThread(
   } else {
     next.set(threadId, inner)
   }
+  return next
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 092 (MODE-01/02 — SC#3) — per-thread workflow-lock copy-then-mutate
+// helpers. EXACT shape as _addRunToThread / _removeRunFromThread above (new Map
+// → set / GC delete-the-key). NEVER a global boolean — a global flag here is the
+// BUG-260523-01-class regression (Thread A's workflow locking Thread B). Returns
+// the NEXT Map so callers fold it into a setState partial.
+// ─────────────────────────────────────────────────────────────────────────────
+function _setWorkflowLock(
+  current: Map<string, WorkflowLock>,
+  threadId: string,
+  lock: WorkflowLock,
+): Map<string, WorkflowLock> {
+  const next = new Map(current)
+  next.set(threadId, lock)
+  return next
+}
+
+function _clearWorkflowLock(
+  current: Map<string, WorkflowLock>,
+  threadId: string,
+): Map<string, WorkflowLock> {
+  if (!current.has(threadId)) return current
+  const next = new Map(current)
+  // GC: drop the key entirely on unlock — absence of a key IS "Deep/unlocked",
+  // so size stays correct without a sentinel.
+  next.delete(threadId)
   return next
 }
 
@@ -1148,6 +1190,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               model: opts?.model,
               provider: opts?.provider,
               agentMode: opts?.agentMode,
+              // Phase 092 (D-02): kickoff field — only present on a Harness send.
+              workflowDefinitionId: opts?.workflowDefinitionId,
             })
             registeredRunId = run_id
 
@@ -1250,6 +1294,13 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   subscriptionsByThread: _removeRunFromThread(s.subscriptionsByThread, threadId, runIdToRemove),
                 }))
               }
+              // Phase 092 (SC#3 / MODE-02): a TERMINAL kind unlocks the thread
+              // (the lock-clear is also authoritative server-side — finish_run
+              // clears the anchor; the mount reconcile is the source of truth).
+              // cap_paused is NON-terminal and is delivered via onCapPaused, NOT
+              // onTerminal — so the lock survives a pause and only clears here on
+              // a real terminal (done / error / timed_out / cancelled / reader_done).
+              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
               // Pitfall 8: TTL-expired buffer fallback.
               if (errorPayload === "buffer_expired") {
                 useStreamsStore
@@ -1641,6 +1692,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             next.set(threadId, tasks)
             return { tasksByThread: next }
           }),
+        // --- Phase 092 (SC#3): per-thread workflow-lock mutators ---
+        // Copy-then-mutate via the _setWorkflowLock / _clearWorkflowLock helpers
+        // (new Map → set / GC delete-the-key). Keyed strictly by the passed
+        // threadId — never a global flag.
+        setWorkflowLockForThread: (threadId, lock) =>
+          useStreamsStore.setState((s) => ({
+            workflowLockByThread: _setWorkflowLock(s.workflowLockByThread, threadId, lock),
+          })),
+        clearWorkflowLockForThread: (threadId) =>
+          useStreamsStore.setState((s) => ({
+            workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
+          })),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
@@ -1894,3 +1957,14 @@ export const useReconcileErrorForThread = (threadId: string | null): Error | nul
 
 export const useFallbackNoticeForThread = (threadId: string | null): string | null =>
   useStreamsStore((s) => (threadId ? (s.fallbackNotices.get(threadId) ?? null) : null))
+
+// Phase 092 (MODE-01/02 — SC#3): the per-thread workflow-lock reader. Returns the
+// lock record (or null) for the OWNING thread id. Every composer/selector
+// `disabled` derivation MUST read this keyed by the thread the composer SENDS to
+// (the owning thread, e.g. thread?.id), NEVER viewedThreadId or a global flag —
+// a background workflow thread must not lock an unrelated thread's composer
+// (useMessages.ts:80-86 lesson; the parallel-thread UAT is the binding gate).
+// Copy-then-mutate keeps the per-key object reference stable, so Object.is
+// equality re-renders only the threads whose lock actually changed.
+export const useWorkflowLockForThread = (threadId: string | null): WorkflowLock | null =>
+  useStreamsStore((s) => (threadId ? (s.workflowLockByThread.get(threadId) ?? null) : null))

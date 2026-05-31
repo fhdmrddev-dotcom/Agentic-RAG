@@ -46,6 +46,15 @@ import {
   useFallbackNoticeForThread,
 } from "@/providers/StreamsProvider"
 
+// Phase 092 (MODE-01/02 — SC#3): re-export the per-thread workflow-lock reader
+// from the canonical StreamsProvider selector surface so chat-composer consumers
+// (MessageInput) have a single import home alongside the other thread-scoped
+// hooks. ALWAYS read it keyed by the OWNING thread id (the thread the composer
+// sends to), never viewedThreadId or a global flag (useMessages.ts:80-86 lesson;
+// the parallel-thread UAT is the SC#3 binding gate).
+export { useWorkflowLockForThread } from "@/providers/StreamsProvider"
+export type { WorkflowLock } from "@/stores/streamsStore"
+
 interface UseMessages {
   messages: Message[]
   isStreaming: boolean
@@ -58,6 +67,10 @@ interface UseMessages {
     onTitleUpdate?: (title: string) => void,
     agentMode?: string,
     provider?: string,
+    /** Phase 092 (MODE-01 / D-02) — Harness kickoff: the picked published-
+     *  workflow id. When set, this send creates a workflow run; omitted on a
+     *  Deep send (byte-identical). */
+    workflowDefinitionId?: string,
   ) => Promise<void>
   /** Phase 063 (D-063-03): server-side Stop via DELETE /runs/{rid}; now async. */
   stopStreaming: () => Promise<void>
@@ -92,13 +105,15 @@ export function useMessages(): UseMessages {
       isStreaming,
       fallbackNotice,
       loadMessages: (threadId) => actions.loadMessages(threadId, "chat"),
-      sendMessage: (threadId, content, model, onTitleUpdate, agentMode, provider) =>
+      sendMessage: (threadId, content, model, onTitleUpdate, agentMode, provider, workflowDefinitionId) =>
         actions.sendMessage(threadId, content, {
           model,
           provider,
           agentMode,
           onTitleUpdate,
           surfaceId: "chat",
+          // Phase 092 (D-02): forward the picked workflow id (undefined = Deep).
+          workflowDefinitionId,
         }),
       stopStreaming: actions.stopStream,
       abortStream: () => {}, // legacy no-op (D-063.1-07 — call site removed from ChatArea)
