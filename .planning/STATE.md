@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: Phase 092 context gathered
-last_updated: "2026-05-31T11:04:01.851Z"
-last_activity: 2026-05-31
+status: executing
+stopped_at: Phase 092 execution started
+last_updated: "2026-05-31T11:11:29.103Z"
+last_activity: 2026-05-31 -- Phase 092 execution started
 progress:
   total_phases: 8
   completed_phases: 3
@@ -21,20 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 092 — dual-mode wiring + Continue button (Phase 091 ✅ COMPLETE 2026-05-31)
+**Current focus:** Phase 092 — dual-mode-wiring-continue-button
 
 ## Current Position
 
-Phase: 092
-Plan: Not started
-Plans: 8 plans / 6 waves COMPLETE — VERIFICATION PASSED (iteration 2). Gap-closure plan 091-08 (wave 6) closed all code-review Criticals + actionable Warnings; 091-REVIEW.md status → resolved. RESEARCH.md (713 lines, HIGH conf) + VALIDATION.md (Nyquist, nyquist_compliant:true) shipped.
+Phase: 092 (dual-mode-wiring-continue-button) — EXECUTING
+Plan: 1 of 4
+Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
-  - Wave 1: 091-01 ✅ (finalize harness.py models + Wave-0 test scaffold + shared fixtures)
-  - Wave 2: 091-02 ✅ (engine core + 2-phase write + db/workflows.py + reachability lint) ‖ 091-06 ✅ (dispatch_tool whitelist guard + get_tools budget + max_tools) — Wave 2 COMPLETE
-  - Wave 3: 091-03 ✅ (5 phase-type executors → substrate) ‖ 091-05 ✅ (validation gates + bounded retry + on_failure + caps) — Wave 3 COMPLETE
-  - Wave 4: 091-04 ✅ (resumability: startup sweep + claim + ask_user re-subscribe) — COMPLETE
-  - Wave 5: 091-07 ✅ (4 seed templates / migration 061 + end-to-end + operator SQL-editor apply checkpoint) — COMPLETE
-  - Wave 6: 091-08 ✅ (GAP CLOSURE for 091-REVIEW: CR-01 real claim CAS via claimed_at lease/migration 062 + CR-02 inline >64KB output + WR-03 same-validator routing + WR-04 sub-agent budget cap + WR-05/06 run-scoped ask_user + IN-01) — full harness suite 95 passed/0 skipped against the live claimed_at column; operator applied migration 062 via SQL editor; full-schema.sql regenerated — COMPLETE
+  - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
+  - Wave 2: 092-02 (MODE-01 mode switch + workflow-run creation + MODE-02 server-side lock-refusal — autonomous)
+  - Wave 3: 092-03 (MODE-02 cancel/terminal lock-clear + CONT-01 Continue — autonomous)
+  - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint)
+
+### Phase 091 (prior) — ✅ COMPLETE
+
+8 plans / 6 waves — VERIFICATION PASSED (iteration 2). Gap-closure plan 091-08 (wave 6) closed all code-review Criticals + actionable Warnings; 091-REVIEW.md status → resolved.
 
 Reqs covered: HARNESS-01, HARNESS-03, HARNESS-04, HARNESS-05, HARNESS-07, TOOL-05 (all 6). Highest-risk surfaces isolated with deterministic proof: 2-phase write (Plans 02/04), ask_user re-subscribe subscribe-before-emit (Plan 04). Migration 061 (4 seed templates) applied LIVE via the operator SQL-editor checkpoint (no db push) — all 4 rows present, published, global; full-schema.sql unchanged (data-only migration; tables already present from migration 060). 4-axis UAT (SC#10) in VALIDATION manual-only rows — owned by the verifier.
 
@@ -53,7 +55,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-05-31
+Last activity: 2026-05-31 -- Phase 092 execution started
 
 Progress: [█████████░] 93%
 
