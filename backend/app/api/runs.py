@@ -902,6 +902,25 @@ async def cancel_run(
             "Zombie heal Postgres UPDATE failed for run %s", run_id
         )
 
+    # Phase 092 (092-03 / SC#2, MODE-02) — clear the per-thread workflow lock
+    # anchor on cancel so a cancelled Harness/cap_paused run never strands the
+    # thread Harness-locked. Keyed by the thread (a cancel knows its thread_id,
+    # not necessarily the workflow_runs id the anchor points at). Best-effort,
+    # symmetric with the zombie-heal Redis ops (D-062-13). The happy-path live
+    # cancel reaches the same clear via the engine's finish_run (the single
+    # authoritative workflow_runs-side site); this is the zombie-heal sibling.
+    try:
+        await aexec(
+            supabase.table("threads")
+            .update({"active_workflow_run_id": None})
+            .eq("id", thread_id)
+        )
+    except Exception:
+        logger.exception(
+            "Zombie heal anchor-clear failed for thread %s (run %s)",
+            thread_id, run_id,
+        )
+
     # 2. Synthetic terminal sentinel — gives any attached consumer the event
     # it needs to break out of the XREAD loop. Only emitted if the buffer
     # still exists (TTL-expired runs have nothing to attach to).

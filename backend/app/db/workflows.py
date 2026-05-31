@@ -376,16 +376,35 @@ async def advance_current_phase(
 
 
 async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
-    """Terminal run status write (``completed`` / ``failed``).
+    """Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2).
 
     workflow_runs table, keyed by its own ``id``. Mirror ``_shielded_finalize``:
     this durable UPDATE happens BEFORE the terminal SSE sentinel.
+
+    Phase 092 (092-03 / SC#2, MODE-02): this is the SINGLE authoritative clear
+    site for the ``threads.active_workflow_run_id`` anchor on the workflow_runs
+    side (Landmine 5 — clear exactly once across the two run rows). The producer's
+    runs-row ``finalize_run`` does NOT also clear it for a harness send — the
+    anchor FKs to ``workflow_runs.id``, so this run_id IS the FK target. Both
+    writes ride ONE transaction so a terminal run can never leave a dangling
+    Harness lock (a crash between the two would otherwise strand the thread). The
+    anchor-clear is idempotent: a re-run finds 0 matching rows and no-ops.
     """
-    await pool.execute(
-        "UPDATE workflow_runs SET status = $2 WHERE id = $1",
-        run_id,
-        status,
-    )
+    async with pool.acquire() as con:
+        async with con.transaction():
+            await con.execute(
+                "UPDATE workflow_runs SET status = $2 WHERE id = $1",
+                run_id,
+                status,
+            )
+            # Clear the per-thread lock anchor in the SAME transaction — no
+            # dangling lock survives a terminal run (SC#2). Keyed by the FK
+            # target (= this run id), so it only clears the thread this run owns.
+            await con.execute(
+                "UPDATE threads SET active_workflow_run_id = NULL "
+                "WHERE active_workflow_run_id = $1",
+                run_id,
+            )
 
 
 async def claim_run(

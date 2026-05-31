@@ -436,6 +436,13 @@ def test_cap_paused_is_not_in_cancel_idempotency_terminal_set():
     from app.api import runs as runs_mod
 
     src = inspect.getsource(runs_mod.cancel_run)
-    # the idempotency guard lists the genuinely-terminal statuses.
-    assert '"completed", "failed", "cancelled", "timed_out"' in src
-    assert "cap_paused" not in src
+    # the idempotency guard lists the genuinely-terminal statuses verbatim.
+    assert '("completed", "failed", "cancelled", "timed_out")' in src
+    # cap_paused must NOT appear inside that terminal idempotency tuple — find the
+    # guard line and assert cap_paused is absent from it (so a cap_paused run
+    # falls THROUGH to the cancel write + anchor clear, staying cancellable).
+    guard_line = next(
+        ln for ln in src.splitlines()
+        if 'row["status"] in (' in ln
+    )
+    assert "cap_paused" not in guard_line
