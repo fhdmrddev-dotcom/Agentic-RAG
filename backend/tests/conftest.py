@@ -672,51 +672,97 @@ def build_workflow_definition():
         return _build([phase], slug=slug)
 
     def _four_seed_defs():
-        """The 4 canonical seed shapes (parsed). Mirrors Plan 07's migration 061.
+        """The 4 canonical seed shapes (parsed). SINGLE SOURCE OF TRUTH for the
+        definition JSONB shipped as migration 061 (Plan 07 Task 1 — the migration's
+        ``definition`` column is byte-equal in shape to these dicts; the test asserts
+        parity). Each is TERMINAL-by-design (D-10 — the last phase output is the chat
+        answer) and lints clean (reachability).
 
-        Covers all 5 phase types across the 4 seeds:
-          1. research_summarize     : llm_agent -> llm_single
-          2. plan_execute_verify    : llm_single -> llm_agent -> llm_single
-          3. literature_review_batch: programmatic -> llm_batch_agents -> llm_single
-          4. doc_qa_human           : llm_human_input -> llm_agent
+        Covers all 5 phase types across the 4 seeds (SC#1):
+          1. research_summarize  : llm_agent -> llm_single                         (PRIMARY)
+          2. plan_execute_verify : llm_single -> llm_agent -> llm_single + gate    (PRIMARY)
+          3. literature_review   : programmatic -> llm_batch_agents -> llm_single  (COVERAGE)
+          4. doc_qa_human        : llm_agent -> llm_human_input -> llm_single       (COVERAGE)
+        Union across all 4 = {programmatic, llm_single, llm_agent, llm_batch_agents,
+        llm_human_input} = all 5 phase types.
         """
         research_summarize = _build(
             [
-                {"config": {"phase_type": "llm_agent", "prompt": "Research the topic.",
+                {"slug": "research", "phase_index": 0,
+                 "config": {"phase_type": "llm_agent",
+                            "prompt": "Research the user's topic. Search the knowledge "
+                                      "base and the web for the most relevant sources.",
                             "available_tools": ["search_documents", "web_search"]}},
-                {"config": {"phase_type": "llm_single", "prompt": "Summarize the findings."}},
+                {"slug": "summarize", "phase_index": 1,
+                 "config": {"phase_type": "llm_single",
+                            "prompt": "Write a clear, cited summary of the prior research "
+                                      "findings for the user."}},
             ],
             slug="research_summarize",
             name="Research -> Summarize",
         )
         plan_execute_verify = _build(
             [
-                {"config": {"phase_type": "llm_single", "prompt": "Draft a plan."}},
-                {"config": {"phase_type": "llm_agent", "prompt": "Execute the plan.",
+                {"slug": "plan", "phase_index": 0,
+                 "config": {"phase_type": "llm_single",
+                            "prompt": "Draft a concise step-by-step plan for the user's "
+                                      "request."}},
+                {"slug": "execute", "phase_index": 1,
+                 "config": {"phase_type": "llm_agent",
+                            "prompt": "Execute the plan. Run code and gather results as "
+                                      "needed.",
                             "available_tools": ["search_documents", "execute_code"]}},
-                {"config": {"phase_type": "llm_single", "prompt": "Verify the result."}},
+                {"slug": "verify", "phase_index": 2,
+                 "config": {"phase_type": "llm_single",
+                            "prompt": "Verify the executed result satisfies the plan. "
+                                      "If it does, include the word VERIFIED in your "
+                                      "answer to the user."},
+                 "validators": [
+                     {"kind": "regex_match",
+                      "config": {"pattern": "VERIFIED"},
+                      "on_failure": "retry",
+                      "max_retries": 2}
+                 ]},
             ],
             slug="plan_execute_verify",
             name="Plan -> Execute -> Verify",
         )
-        literature_review_batch = _build(
+        literature_review = _build(
             [
-                {"config": {"phase_type": "programmatic", "fn": "split_topic",
+                {"slug": "split", "phase_index": 0,
+                 "config": {"phase_type": "programmatic", "fn": "split_topic",
                             "input_keys": ["topic"]}},
-                {"config": {"phase_type": "llm_batch_agents", "prompt": "Review each subtopic.",
+                {"slug": "review", "phase_index": 1,
+                 "config": {"phase_type": "llm_batch_agents",
+                            "prompt": "Review the literature for this subtopic and "
+                                      "summarize the key findings.",
                             "available_tools": ["search_documents"],
+                            "max_parallel_agents": 5,
                             "merge_strategy": "concat_numbered"}},
-                {"config": {"phase_type": "llm_single", "prompt": "Synthesize the reviews."}},
+                {"slug": "merge", "phase_index": 2,
+                 "config": {"phase_type": "llm_single",
+                            "prompt": "Merge the per-subtopic reviews into one coherent "
+                                      "literature review for the user."}},
             ],
-            slug="literature_review_batch",
-            name="Literature review batch",
+            slug="literature_review",
+            name="Literature review",
         )
         doc_qa_human = _build(
             [
-                {"config": {"phase_type": "llm_human_input", "prompt": "Which document?",
-                            "options": ["Doc A", "Doc B"]}},
-                {"config": {"phase_type": "llm_agent", "prompt": "Answer from the chosen doc.",
+                {"slug": "draft", "phase_index": 0,
+                 "config": {"phase_type": "llm_agent",
+                            "prompt": "Draft an answer to the user's question using the "
+                                      "knowledge base.",
                             "available_tools": ["search_documents"]}},
+                {"slug": "confirm", "phase_index": 1,
+                 "config": {"phase_type": "llm_human_input",
+                            "prompt": "Does this draft answer your question? Add any "
+                                      "corrections.",
+                            "options": ["Looks good", "Needs changes"]}},
+                {"slug": "finalize", "phase_index": 2,
+                 "config": {"phase_type": "llm_single",
+                            "prompt": "Finalize the answer for the user, incorporating "
+                                      "the human's input."}},
             ],
             slug="doc_qa_human",
             name="Doc Q&A",
@@ -724,7 +770,7 @@ def build_workflow_definition():
         return [
             research_summarize,
             plan_execute_verify,
-            literature_review_batch,
+            literature_review,
             doc_qa_human,
         ]
 
