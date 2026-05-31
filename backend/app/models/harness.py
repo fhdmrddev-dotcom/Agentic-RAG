@@ -9,9 +9,11 @@ consumes it (threat T-090-01 / V5 input validation).
 
 The 5 phase-type literals and the 4 validator ``kind`` literals are FIRM (they
 mirror Phase 091 SC#1/#3 verbatim). The individual per-phase field names
-(``prompt``, ``available_tools``, ``max_steps``, ``merge_strategy``, ...) are
-PROVISIONAL per RESEARCH A1 — Phase 091 is the consumer and may refine them.
-The discriminator mechanism + ``extra='forbid'`` + union structure are LOCKED.
+(``input_keys``, ``model``/``temperature`` overrides, ``wall_clock_seconds``,
+ask_user ``options``/``timeout_seconds``, ...) are FINALIZED in Phase 091 — the
+engine is the consumer and these are the fields it reads. The discriminator
+mechanism + ``extra='forbid'`` + union structure + the two Literal sets remain
+LOCKED (do NOT change them).
 """
 
 from __future__ import annotations
@@ -30,12 +32,19 @@ class _StrictBase(BaseModel):
 # ── 5 phase-type configs (HARNESS-01 / 091 SC#1) ────────────────────────────
 class ProgrammaticPhaseConfig(_StrictBase):
     phase_type: Literal["programmatic"]
-    fn: str  # PROGRAMMATIC_PHASE_REGISTRY key — input mapping fields coordinate with 091
+    fn: str  # PROGRAMMATIC_PHASE_REGISTRY key
+    # Keys this fn reads from the accumulated phase-output context (e.g. the
+    # Literature-review `split_topic` fn reads the run's `topic`). Default [] =
+    # reads nothing from prior phases.
+    input_keys: list[str] = Field(default_factory=list)
 
 
 class LlmSinglePhaseConfig(_StrictBase):
     phase_type: Literal["llm_single"]
-    prompt: str  # model/temperature overrides coordinate with 091
+    prompt: str
+    # Per-phase overrides; None = inherit the thread's effective settings.
+    model: str | None = None
+    temperature: float | None = None
 
 
 class LlmAgentPhaseConfig(_StrictBase):
@@ -43,6 +52,9 @@ class LlmAgentPhaseConfig(_StrictBase):
     prompt: str
     available_tools: list[str]  # the per-phase whitelist (091 Pattern 1)
     max_steps: int = 10
+    # None → engine default (sized in Plan 05 from existing cap knobs).
+    wall_clock_seconds: int | None = None
+    model: str | None = None  # None = inherit thread settings
 
 
 class LlmBatchAgentsPhaseConfig(_StrictBase):
@@ -51,12 +63,21 @@ class LlmBatchAgentsPhaseConfig(_StrictBase):
     available_tools: list[str]
     max_steps: int = 10
     max_parallel_agents: int = 5  # scaling cap (ARCHITECTURE.md)
-    merge_strategy: str = "concat"
+    # Only the strategies Plan 03 implements parse (extra='forbid' blocks typos;
+    # the Literal blocks invalid strategy values). T-091-01/02 mitigation.
+    merge_strategy: Literal["concat", "concat_numbered"] = "concat"
+    wall_clock_seconds: int | None = None  # None → engine default (Plan 05)
+    model: str | None = None  # None = inherit thread settings
 
 
 class LlmHumanInputPhaseConfig(_StrictBase):
     phase_type: Literal["llm_human_input"]
     prompt: str  # the ask_user prompt
+    # The ask_user choice menu; empty = free-text input.
+    options: list[str] = Field(default_factory=list)
+    # Per-call default; the 1800s hard cap lives in
+    # Settings.ask_user_max_timeout_seconds (enforced in Plan 03).
+    timeout_seconds: int = 300
 
 
 PhaseConfig = Annotated[
