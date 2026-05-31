@@ -217,6 +217,9 @@ async def test_each_seed_runs_end_to_end_mocked_llm(
 
     ctx = SimpleNamespace(
         run_id=run_id,
+        # Facet A (092-07): producer runs.run_id is the sub-agent parent_run_id FK
+        # target; _build_phase_tool_context sources it fail-closed.
+        producer_run_id=_uuid.uuid4(),
         thread_id=str(_uuid.uuid4()),
         current_user={"id": "00000000-0000-0000-0000-000000000001"},
         redis=fake_redis,
@@ -364,7 +367,11 @@ async def test_retry_feedback_producer_consumer_round_trip(
         return {"sub_run_id": _uuid.uuid4(), "summary": "executed", "status": "completed"}
 
     ctx = SimpleNamespace(
-        run_id=run_id, thread_id=str(_uuid.uuid4()),
+        run_id=run_id,
+        # Facet A (092-07): producer runs.run_id is the sub-agent parent_run_id FK
+        # target; _build_phase_tool_context sources it fail-closed.
+        producer_run_id=_uuid.uuid4(),
+        thread_id=str(_uuid.uuid4()),
         current_user={"id": "00000000-0000-0000-0000-000000000001"},
         redis=fake_redis, pool=mock_asyncpg_pool, supabase=None, user_settings=None,
         emit=harness_engine._emit, model="gpt-4o", retry_feedback=None, inputs={},

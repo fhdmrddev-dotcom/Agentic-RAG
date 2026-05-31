@@ -174,7 +174,12 @@ async def test_llm_agent_passes_budget_capped_tools_override():
         return {"sub_run_id": uuid.uuid4(), "summary": "done", "status": "completed"}
 
     ctx = SimpleNamespace(
-        redis=None, run_id=uuid.uuid4(), thread_id=str(uuid.uuid4()), supabase=None,
+        redis=None, run_id=uuid.uuid4(),
+        # Facet A (092-07): the harness ctx carries the producer runs.run_id as the
+        # sub-agent parent_run_id FK target; _build_phase_tool_context sources it
+        # fail-closed, so the executor-path ctx MUST set it.
+        producer_run_id=uuid.uuid4(),
+        thread_id=str(uuid.uuid4()), supabase=None,
         pool=None, user_settings=None, current_user={"id": "u"}, folder_subtree_ids=None,
         scoped_folder_path=None, emit=AsyncMock(), spawn=None, model=google_model,
         per_run_task_semaphore=None, retry_feedback=None,
