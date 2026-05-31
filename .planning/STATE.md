@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_plan
-stopped_at: Completed 091-08-PLAN.md (Phase 091 gap closure — all code-review criticals resolved; 8/8 plans done — awaiting verify)
-last_updated: "2026-05-31T07:15:00.000Z"
+status: unknown
+stopped_at: Phase 092 context gathered
+last_updated: "2026-05-31T09:39:20.099Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 8
   completed_phases: 3
-  total_plans: 14
-  completed_plans: 14
-  percent: 38
+  total_plans: 15
+  completed_plans: 15
+  percent: 100
 ---
 
 # Project State
@@ -50,7 +50,9 @@ SC#10 4-axis UAT (cross-provider × multi-tool × parallel-thread × long-messag
 Carry-forwards into v2.8 (verify at kickoff via CF-01 in Phase 089): BUG-260527-01 title-gen (DeepSeek/Moonshot/Google, fixed-but-unverified), Google secondary-model 404, download-link payload. 087 panel deferrals SEED-037/038/039 (037 download → standalone `/gsd:quick`).
 
 v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
+
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
+
 Last activity: 2026-05-31
 
 Progress: [█████████░] 93%
@@ -234,8 +236,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-05-31T07:15:00.000Z
-Stopped at: Completed 091-08-PLAN.md (gap closure) — Phase 091 all 8 plans done, all code-review criticals resolved (awaiting /gsd:verify-work 091)
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 092 context gathered
+Resume file: --resume-file
 
 **Planned Phase:** 091 (Harness Engine + 5 Phase Types + Gates + Whitelist) — 7 plans — 2026-05-30T23:07:33.805Z
