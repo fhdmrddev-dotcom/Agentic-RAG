@@ -656,3 +656,131 @@ def test_cap_paused_is_not_in_cancel_idempotency_terminal_set():
         if 'row["status"] in (' in ln
     )
     assert "cap_paused" not in guard_line
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 092-07 — F4 id-routing gap-closure (producer_run_id / stream_run_id / resume)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# F4: the harness engine threads the workflow_runs.id as ctx.run_id, but the
+# sub-agent parent_run_id FK (runs.parent_run_id → runs.run_id) and the SSE
+# transport both require the producer runs.run_id. The fix is ADDITIVE — a second
+# `producer_run_id` field on the harness ctx bag + a `stream_run_id` engine arg —
+# WITHOUT reassigning ctx.run_id (still the workflow_run id for audit/terminal/
+# definition/resume-match). These tests are the unit/contract backstop; the
+# live-DB FK proof is tests/integration/test_092_subagent_parent_fk_live.py.
+
+
+def _harness_ctx(producer_run_id="__set__", **overrides):
+    """A harness-shaped engine ctx bag (SimpleNamespace, NOT a RunContext).
+
+    By default carries BOTH run_id (the workflow_run id) and producer_run_id (the
+    producer runs id). Pass producer_run_id=None to model an unpatched/missing
+    site (the fail-closed guard target).
+    """
+    from types import SimpleNamespace
+
+    wf_run_id = uuid.uuid4()
+    if producer_run_id == "__set__":
+        producer_run_id = uuid.uuid4()
+    defaults = dict(
+        run_id=wf_run_id,
+        thread_id=str(uuid.uuid4()),
+        current_user={"id": str(uuid.uuid4())},
+        user_settings=None,
+        redis=None,
+        pool=None,
+        emit=None,
+        retry_feedback=None,
+        model="gpt-5.4-mini",
+    )
+    if producer_run_id is not None:
+        defaults["producer_run_id"] = producer_run_id
+    defaults.update(overrides)
+    return SimpleNamespace(**defaults)
+
+
+def _llm_agent_phase():
+    """A minimal llm_agent PhaseSpec the phase-tool-context builder reads."""
+    from app.models.harness import PhaseSpec
+
+    return PhaseSpec.model_validate(
+        {
+            "slug": "research",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "llm_agent",
+                "prompt": "do research",
+                "available_tools": ["search_documents"],
+            },
+        }
+    )
+
+
+# ── Task 1 / Facet A: producer_run_id on wf_ctx + fail-closed parent sourcing ──
+
+def test_producer_run_id_distinct_from_run_id_on_wf_ctx():
+    """The harness producer branch (threads.py) builds wf_ctx with BOTH run_id (the
+    workflow_run id) AND producer_run_id (the producer runs id). The edit is a
+    source-level addition; assert the SimpleNamespace shape contract here and the
+    threads.py source carries `producer_run_id=run_id`.
+    """
+    import inspect
+    from app.api import threads as threads_mod
+
+    # The agent_runner harness branch must add producer_run_id=run_id to wf_ctx.
+    src = inspect.getsource(threads_mod)
+    assert "producer_run_id=run_id" in src, (
+        "wf_ctx must carry producer_run_id=run_id (the producer runs.run_id is the "
+        "FK target for sub-agent parent_run_id; ctx.run_id stays the workflow_run id)"
+    )
+    # Contract: the two ids are distinct values on the bag.
+    ctx = _harness_ctx()
+    assert ctx.producer_run_id != ctx.run_id
+
+
+def test_phase_tool_context_sources_run_id_from_producer_run_id():
+    """_build_phase_tool_context sources the sub-agent parent ToolContext.run_id
+    from ctx.producer_run_id (NOT ctx.run_id). This is the FK fix chokepoint for
+    BOTH _exec_llm_agent and _exec_llm_batch_agents.
+    """
+    from app.services.harness.phase_types import _build_phase_tool_context
+
+    ctx = _harness_ctx()
+    tool_ctx = _build_phase_tool_context(_llm_agent_phase(), ctx)
+    assert tool_ctx.run_id == ctx.producer_run_id
+    assert tool_ctx.run_id != ctx.run_id
+    # This ToolContext IS the parent — its own parent_run_id stays None.
+    assert tool_ctx.parent_run_id is None
+
+
+def test_phase_tool_context_fail_closed_when_producer_run_id_missing():
+    """The fail-closed guard: a harness ctx WITHOUT producer_run_id RAISES rather
+    than silently falling back to ctx.run_id (the workflow_run id) and re-triggering
+    runs_parent_run_id_fkey for all 7 providers on any unpatched site.
+    """
+    from app.services.harness.phase_types import _build_phase_tool_context
+
+    ctx = _harness_ctx(producer_run_id=None)
+    with pytest.raises(ValueError, match="producer_run_id"):
+        _build_phase_tool_context(_llm_agent_phase(), ctx)
+
+
+def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
+    """Deep-path guard: _build_phase_tool_context is harness-executor-only. The
+    Deep path builds its ToolContext in task_service from a producer runs id and
+    NEVER reaches this fn. Assert the Deep parent-id source (task_service) is
+    unchanged: parent_run_id=parent_ctx.run_id (the producer runs id), so Deep is
+    byte-identical and independent of producer_run_id.
+    """
+    import inspect
+    from app.services import task_service as ts_mod
+
+    src = inspect.getsource(ts_mod)
+    assert "parent_run_id=parent_ctx.run_id" in src, (
+        "task_service must remain UNCHANGED — Deep already threads the producer "
+        "runs id end-to-end; the Facet A fix is upstream (phase_types) only"
+    )
+    # _build_phase_tool_context lives in the harness package, not task_service —
+    # the Deep loop never imports/calls it.
+    assert "_build_phase_tool_context" not in src

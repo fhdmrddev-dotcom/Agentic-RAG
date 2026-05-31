@@ -1157,6 +1157,10 @@ async def send_message(
                     )
                     wf_ctx = SimpleNamespace(
                         run_id=_active_workflow_run_id,
+                        # Facet A (092-07): the producer runs.run_id is the FK target
+                        # for sub-agent parent_run_id; ctx.run_id stays the workflow_run
+                        # id for audit/terminal/definition/resume-match.
+                        producer_run_id=run_id,
                         thread_id=thread_id,
                         current_user=current_user,
                         user_settings=user_settings,

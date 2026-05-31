@@ -116,10 +116,28 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
     backstop). ``run_task_sub_agent`` forks its OWN sub_run_id + stream off this
     context, so the ``run_id`` here is the harness run; the sub-agent's own events
     emit on its forked stream.
+
+    Facet A (092-07): the sub-agent's ``parent_run_id`` FKs ``runs.run_id`` (the
+    producer runs row), NOT ``workflow_runs.id`` (= ctx.run_id). So this parent
+    ToolContext's ``run_id`` MUST be the producer runs id carried on
+    ``ctx.producer_run_id``. We source it FAIL-CLOSED: if a harness ctx reaches
+    here without ``producer_run_id`` we RAISE rather than silently fall back to
+    ``ctx.run_id`` (the workflow_run id) — a silent fallback re-triggers
+    ``runs_parent_run_id_fkey`` for all 7 providers on any unpatched ctx build site
+    (live producer / startup-sweep resume / POST /continue resume).
     """
+    _producer_id = getattr(ctx, "producer_run_id", None)
+    if _producer_id is None:
+        raise ValueError(
+            "harness sub-agent parent context is missing producer_run_id — refusing "
+            "to fall back to ctx.run_id (the workflow_run id is NOT a runs row and "
+            "would raise runs_parent_run_id_fkey). Every harness ctx build site (live "
+            "producer, startup-sweep resume, POST /continue resume) MUST set "
+            "producer_run_id."
+        )
     return ToolContext(
         redis=getattr(ctx, "redis", None),
-        run_id=getattr(ctx, "run_id", None),
+        run_id=_producer_id,
         thread_id=getattr(ctx, "thread_id", ""),
         supabase=getattr(ctx, "supabase", None),
         pool=getattr(ctx, "pool", None),
