@@ -48,15 +48,21 @@ from uuid import UUID
 from app.config import settings
 from app.db.workflows import (
     advance_current_phase,
+    ask_user_response_exists,
+    claim_run,
     complete_phase,
     fail_phase,
+    find_resumable_runs,
     finish_run,
+    get_active_phase,
+    get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
     skip_phase,
     write_audit,
 )
 from app.models.harness import WorkflowDefinition
+from app.services.ask_user_service import resume_pending_prompt
 
 # NOTE: ``run_gates`` (harness.validators) and ``parse_skip_target``
 # (harness.reachability) are imported LAZILY inside the functions that use them.
@@ -64,8 +70,6 @@ from app.models.harness import WorkflowDefinition
 # that package's ``__init__`` → ``phase_types.register_all()`` → which imports
 # back from THIS module before ``PHASE_TYPE_REGISTRY`` is bound (circular import).
 # The lazy import (the same pattern phase_types uses for the engine) breaks it.
-
-__all__ = ["run_workflow", "PHASE_TYPE_REGISTRY", "PhaseTypeNotRegistered"]
 
 
 # ── SEAMS ────────────────────────────────────────────────────────────────────
@@ -480,3 +484,157 @@ async def run_workflow(
     await finish_run(pool, run_id, "completed")
     await write_audit(pool, run_id, "run_completed", {"run_id": str(run_id)})
     await _emit(redis, run_id, "run_completed", status="completed")
+
+
+# ── HARNESS-03 startup sweep (Plan 04) ────────────────────────────────────────
+async def _load_run_definition(pool, run_id: UUID) -> WorkflowDefinition | None:
+    """Parse a run's published :class:`WorkflowDefinition` from the DB.
+
+    Joins ``workflow_runs.definition_id`` → ``workflow_definitions.definition``
+    (the FULL WorkflowDefinition jsonb, migration 056:23) and parses it. Returns
+    ``None`` if the run or its definition is gone (a defensively-handled edge —
+    the sweep skips it rather than crashing startup).
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT wd.definition
+        FROM workflow_runs wr
+        JOIN workflow_definitions wd ON wd.id = wr.definition_id
+        WHERE wr.id = $1
+        """,
+        run_id,
+    )
+    if row is None or not row.get("definition"):
+        return None
+    definition = row["definition"]
+    if isinstance(definition, str):
+        definition = json.loads(definition)
+    return WorkflowDefinition.model_validate(definition)
+
+
+async def _build_resume_context(run, redis, pool):
+    """Build the minimal run-identity ctx bag the engine threads through on resume.
+
+    Mirrors the live producer ctx surface (run_id / thread_id / redis / pool /
+    user / emit) so ``run_workflow`` and the phase executors find their substrate.
+    The executors read this bag via ``getattr`` with safe defaults (Plan 03), so a
+    minimal bag is sufficient for the index-driven loop; richer per-run fields
+    (folder scope, user_settings) are absent on resume and default to None — the
+    re-run reads its inputs from the durable accumulated phase outputs.
+    """
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        run_id=run["run_id"],
+        thread_id=str(run["thread_id"]),
+        current_user={"id": run.get("user_id")},
+        redis=redis,
+        pool=pool,
+        emit=_emit,
+        retry_feedback=None,
+    )
+
+
+async def _resume_run(run_id: UUID, definition: WorkflowDefinition, ctx, *, pool, redis) -> None:
+    """Re-drive a claimed stranded run through the engine (rides run_workflow).
+
+    ``run_workflow`` skips ``completed``/``skipped`` phases and re-runs the ``active``
+    one from the top (Plan 02 idempotent load) — an active phase's output was never
+    durable, so re-running is the correct resume point with no double side-effect
+    (an llm_agent re-run forks a fresh sub_run_id; the old partial is orphaned
+    harmlessly — Pitfall 5). The completion/failure path inside run_workflow already
+    mirrors ``_shielded_finalize`` (durable terminal status BEFORE the terminal emit).
+    """
+    await run_workflow(run_id, definition, ctx, pool=pool, redis=redis)
+
+
+async def resume_stranded_workflows(*, pool, redis) -> int:
+    """Startup sweep: re-run runs left ``active`` by a restart (HARNESS-03).
+
+    For each stranded run (``find_resumable_runs`` — anchored on the per-thread
+    ``threads.active_workflow_run_id``, with a ``status='active'`` workflow_phases
+    row):
+
+      1. ``claim_run`` (CAS) — only ONE worker resumes each run (Pitfall 7); with
+         WORKER_COUNT=2 the loser skips. Idempotent + atomic.
+      2. Inspect the active phase. If it is an ``llm_human_input`` phase mid-ask:
+           - ANSWERED (``ask_user_response_exists`` True): the answer is durable →
+             do NOT re-ask; let ``run_workflow`` re-run the phase, which re-reads
+             the durable answer and proceeds.
+           - PENDING (False): ``resume_pending_prompt`` re-SUBSCRIBES + re-SADDs +
+             re-EMITs the SAME prompt (subscribe-before-emit, Pitfall 2) and blocks
+             on the answer BEFORE handing back to the loop.
+      3. Re-drive via ``_resume_run`` → ``run_workflow``, riding the same engine
+         machinery a fresh run uses (single producer per run).
+
+    Returns the count of runs this worker resumed (for the lifespan log). Never
+    re-runs a run it did not claim (the OQ6 anti-pattern: no unclaimed re-run loop).
+    """
+    resumed = 0
+    runs = await find_resumable_runs(pool)
+    for run in runs:
+        run_id = run["run_id"]
+        # 1. CAS claim — single-producer-per-run (Pitfall 7). Loser skips.
+        if not await claim_run(pool, run_id):
+            continue
+
+        # 2. ask_user resume branch: answered → proceed; pending → re-emit + block.
+        active = await get_active_phase(pool, run_id)
+        if active is not None and _is_llm_human_input(active):
+            tool_call_id = _active_tool_call_id(active)
+            if tool_call_id is not None:
+                answered = await ask_user_response_exists(pool, run_id, tool_call_id)
+                if not answered:
+                    pending = await get_pending_ask_user(pool, run_id)
+                    if pending is not None and pending.get("tool_call_id"):
+                        await resume_pending_prompt(
+                            redis,
+                            run_id,
+                            pending["tool_call_id"],
+                            pending.get("prompt") or "",
+                            pending.get("options") or [],
+                            pending.get("timeout_seconds")
+                            or settings.ask_user_max_timeout_seconds,
+                        )
+                # answered → fall through; run_workflow re-reads the durable answer.
+
+        # 3. Load the definition + ctx and re-drive (rides run_workflow).
+        definition = await _load_run_definition(pool, run_id)
+        ctx = await _build_resume_context(run, redis, pool)
+        await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
+        resumed += 1
+
+    return resumed
+
+
+def _is_llm_human_input(active_phase: dict) -> bool:
+    """True if the active phase row is an ``llm_human_input`` phase.
+
+    The row may carry a ``config`` dict (phase_type) or expose the type via its
+    stored output; we check the config phase_type first, then fall back to the
+    presence of a stored ``tool_call_id`` in the output (the llm_human_input
+    executor stores it — Plan 03).
+    """
+    config = active_phase.get("config")
+    if isinstance(config, dict) and config.get("phase_type") == "llm_human_input":
+        return True
+    output = active_phase.get("output")
+    if isinstance(output, dict) and "tool_call_id" in output:
+        return True
+    return False
+
+
+def _active_tool_call_id(active_phase: dict) -> str | None:
+    """The ask_user ``tool_call_id`` stored by the llm_human_input executor (Plan 03)."""
+    output = active_phase.get("output")
+    if isinstance(output, dict):
+        return output.get("tool_call_id")
+    return None
+
+
+__all__ = [
+    "run_workflow",
+    "PHASE_TYPE_REGISTRY",
+    "PhaseTypeNotRegistered",
+    "resume_stranded_workflows",
+]
