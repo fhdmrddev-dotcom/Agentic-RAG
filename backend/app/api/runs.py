@@ -713,6 +713,10 @@ async def continue_run(
         from app.api.threads import RUN_TASKS as _RUN_TASKS  # noqa: PLC0415
         import asyncio as _asyncio  # noqa: PLC0415
 
+        from app.db.runs import insert_run as _insert_run, finalize_run as _finalize_run  # noqa: PLC0415
+        from uuid import uuid4 as _uuid4  # noqa: PLC0415
+        from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
+
         pool = await get_pg_pool()
         wf_run_uuid = (
             UUID(active_workflow_run_id)
@@ -731,9 +735,30 @@ async def continue_run(
             wf_run_uuid, (active_phase or {}).get("slug"), _available_tools,
         )
 
+        # Facet C (092-07): mint a fresh producer-shell `runs` row (same as the
+        # startup-sweep resume) so the re-driven sub-agents' parent_run_id FK
+        # resolves (Facet A) and events route to run:{producer} (Facet B). The
+        # original producer id is finalized/EXPIREd; no producer-id column persists.
+        _thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
+        _producer_id = _uuid4()
+        await _insert_run(
+            pool,
+            run_id=_producer_id,
+            thread_id=_thread_uuid,
+            user_id=(
+                UUID(current_user["id"])
+                if isinstance(current_user["id"], str) else current_user["id"]
+            ),
+            status="streaming",
+            model="unknown", provider="unknown",  # NOT NULL; shell makes no LLM call
+            parent_run_id=None,
+        )
+
         async def _harness_continuation():
             wf_ctx = SimpleNamespace(
                 run_id=wf_run_uuid,
+                # Facet C (092-07): the fresh producer runs id (FK target + stream).
+                producer_run_id=_producer_id,
                 thread_id=thread_id,
                 current_user=current_user,
                 user_settings=None,
@@ -742,11 +767,34 @@ async def continue_run(
                 emit=_harness_emit,
                 retry_feedback=None,
             )
+            _failed = False
             try:
-                await run_workflow(wf_run_uuid, definition, wf_ctx, pool=pool, redis=redis)
+                await run_workflow(
+                    wf_run_uuid, definition, wf_ctx, pool=pool, redis=redis,
+                    stream_run_id=_producer_id,
+                )
             except Exception:
+                _failed = True
                 logger.exception("Harness continuation failed for run %s", wf_run_uuid)
             finally:
+                # Facet C: terminalize the fresh producer shell on EVERY exit path
+                # (no stranded streaming row → the F2 self-heal is never defeated),
+                # BEFORE the _RUN_TASKS.pop.
+                try:
+                    await _finalize_run(
+                        pool,
+                        run_id=_producer_id,
+                        status="failed" if _failed else "completed",
+                        error="continuation failed" if _failed else None,
+                        completed_at=_dt.now(_tz.utc),
+                        message_id=None,
+                        input_tokens=None,
+                        output_tokens=None,
+                    )
+                except Exception:
+                    logger.exception(
+                        "continue: producer-shell finalize failed for %s", _producer_id
+                    )
                 _RUN_TASKS.pop(wf_run_uuid, None)
 
         _t = _asyncio.create_task(_harness_continuation())
@@ -770,12 +818,18 @@ async def continue_run(
             dropped_tool_calls=dropped,
         )
 
-    return {
+    _resp = {
         "status": "ok",
         "run_id": str(run_id),
         "continues_used": _new_used,
         "continues_remaining": max(0, settings.max_continues_per_run - _new_used),
     }
+    # Facet C (092-07): surface the fresh producer id so the frontend re-subscribes
+    # GET /runs/{producer_run_id}/stream (the original producer stream EXPIREd). Only
+    # the Harness re-drive mints one; the Deep consume path keeps the same run_id.
+    if active_workflow_run_id is not None:
+        _resp["producer_run_id"] = str(_producer_id)
+    return _resp
 
 
 # ───────────────────────────────────────────────────────────────────────

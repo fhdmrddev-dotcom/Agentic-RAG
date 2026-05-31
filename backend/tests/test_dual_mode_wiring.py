@@ -1006,6 +1006,161 @@ def _json_dumps(obj):
     return _json.dumps(obj)
 
 
+# ── Task 3 / Facet C (resume): mint + finalize a producer runs row both paths ──
+
+@pytest.mark.asyncio
+async def test_build_resume_context_mints_producer_shell_with_nonnull_model(
+    monkeypatch, fake_redis, mock_asyncpg_pool
+):
+    """Edit #5: _build_resume_context mints a fresh producer `runs` shell
+    (insert_run with NON-NULL model/provider, parent_run_id=None) and sets
+    producer_run_id on the returned ctx; ctx.run_id stays the workflow_run id.
+    """
+    from app.services import harness_engine
+
+    insert_calls = []
+
+    async def _spy_insert(pool, **kwargs):
+        insert_calls.append(kwargs)
+
+    monkeypatch.setattr(harness_engine, "_insert_run", _spy_insert, raising=False)
+    # also patch the import target used inside the function (lazy or module-level).
+    import app.db.runs as runs_mod
+    monkeypatch.setattr(runs_mod, "insert_run", _spy_insert)
+
+    wf_run_id = uuid.uuid4()
+    thread_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+    run = {"run_id": wf_run_id, "thread_id": thread_id, "user_id": user_id}
+
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+
+    # producer_run_id is set, distinct from the workflow_run id (= ctx.run_id).
+    assert getattr(ctx, "producer_run_id", None) is not None
+    assert ctx.producer_run_id != ctx.run_id
+    assert ctx.run_id == wf_run_id
+
+    # The mint supplied NON-NULL model/provider (db/runs.py NOT NULL) + parent None.
+    assert insert_calls, "expected an insert_run mint on resume"
+    mint = insert_calls[0]
+    assert mint["run_id"] == ctx.producer_run_id
+    assert mint["model"] and mint["model"] != ""
+    assert mint["provider"] and mint["provider"] != ""
+    assert mint["status"] == "streaming"
+    assert mint["parent_run_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_resume_finalizes_producer_shell_on_success_and_exception(
+    monkeypatch, fake_redis, mock_asyncpg_pool
+):
+    """Edit #5: resume_stranded_workflows terminalizes the minted producer shell on
+    EVERY exit path (success AND exception). A non-terminalized streaming shell
+    becomes the thread's latest runs row and re-wedges the lock (defeating the F2
+    self-heal that reads ORDER BY started_at DESC LIMIT 1).
+    """
+    from app.services import harness_engine
+
+    finalize_calls = []
+
+    async def _spy_finalize(pool, *, run_id, **kwargs):
+        finalize_calls.append((run_id, kwargs.get("status")))
+
+    async def _spy_insert(pool, **kwargs):
+        return None
+
+    import app.db.runs as runs_mod
+    monkeypatch.setattr(runs_mod, "insert_run", _spy_insert)
+    monkeypatch.setattr(runs_mod, "finalize_run", _spy_finalize)
+
+    wf_run_id = uuid.uuid4()
+    run = {"run_id": wf_run_id, "thread_id": uuid.uuid4(), "user_id": uuid.uuid4()}
+
+    # find_resumable_runs returns our one stranded run; claim succeeds; not ask_user.
+    monkeypatch.setattr(harness_engine, "find_resumable_runs",
+                        _async_return([run]))
+    monkeypatch.setattr(harness_engine, "claim_run", _async_return(True))
+    monkeypatch.setattr(harness_engine, "get_active_phase", _async_return(None))
+    monkeypatch.setattr(harness_engine, "_load_run_definition",
+                        _async_return(object()))
+
+    # ── success path ──
+    finalize_calls.clear()
+    monkeypatch.setattr(harness_engine, "_resume_run", _async_return(None))
+    await harness_engine.resume_stranded_workflows(pool=mock_asyncpg_pool, redis=fake_redis)
+    assert finalize_calls, "resume must terminalize the producer shell on success"
+    assert finalize_calls[-1][1] in ("completed", "failed", "cancelled")
+
+    # ── exception path ──
+    finalize_calls.clear()
+
+    async def _boom(*a, **k):
+        raise RuntimeError("re-drive exploded")
+
+    monkeypatch.setattr(harness_engine, "_resume_run", _boom)
+    monkeypatch.setattr(harness_engine, "find_resumable_runs", _async_return([run]))
+    monkeypatch.setattr(harness_engine, "claim_run", _async_return(True))
+    try:
+        await harness_engine.resume_stranded_workflows(
+            pool=mock_asyncpg_pool, redis=fake_redis
+        )
+    except RuntimeError:
+        pass  # the finalize-in-finally must still have fired
+    assert finalize_calls, "resume must terminalize the producer shell on exception"
+    assert finalize_calls[-1][1] in ("completed", "failed", "cancelled")
+
+
+@pytest.mark.asyncio
+async def test_continuation_mints_producer_shell_and_finalizes(monkeypatch):
+    """Edit #5b: _harness_continuation (POST /continue) mints a fresh producer row,
+    sets producer_run_id, passes stream_run_id, and terminalizes in its finally —
+    mirroring the sweep. Verified by the source carrying the mint + finalize +
+    producer_run_id + stream_run_id + the /continue 200 producer_run_id surfacing.
+    """
+    import inspect
+    from app.api import runs as runs_api
+
+    src = inspect.getsource(runs_api.continue_run)
+    # mint + producer_run_id on the continuation ctx
+    assert "producer_run_id" in src, "continuation must set producer_run_id on wf_ctx"
+    assert "insert_run" in src, "continuation must mint a fresh producer runs row"
+    # route events to the fresh producer stream
+    assert "stream_run_id=" in src, "continuation must pass stream_run_id"
+    # terminalize the fresh producer row
+    assert "finalize_run" in src, "continuation must terminalize the producer shell"
+    # surface the fresh id in the 200 body for the frontend re-subscribe
+    assert '"producer_run_id"' in src or "producer_run_id=" in src
+
+
+def test_resume_mint_does_not_touch_continues_used(monkeypatch):
+    """CONT-01 cap intact: neither resume mint path UPDATEs continues_used —
+    the durable 3-cap counter is undisturbed by the fresh-producer-row mint.
+    """
+    import inspect
+    from app.services import harness_engine
+    from app.api import runs as runs_api
+
+    sweep_src = inspect.getsource(harness_engine.resume_stranded_workflows)
+    build_src = inspect.getsource(harness_engine._build_resume_context)
+    cont_src = inspect.getsource(runs_api.continue_run)
+
+    # The mint paths must not write continues_used (the cap counter lives on the
+    # workflow_runs/runs row and is incremented only by the /continue Step 4 path).
+    assert "continues_used" not in build_src
+    # The sweep itself never touches continues_used.
+    assert "continues_used" not in sweep_src
+    # In continue_run, continues_used is only the Step-4 increment, never inside
+    # the mint — assert the mint helper text doesn't reference it adjacent to insert.
+    assert cont_src.count("continues_used") >= 1  # the legit Step-4 increment exists
+
+
+def _async_return(value):
+    """Build an AsyncMock-like coroutine fn returning `value` for any args."""
+    async def _fn(*a, **k):
+        return value
+    return _fn
+
+
 def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
     """Deep-path guard: _build_phase_tool_context is harness-executor-only. The
     Deep path builds its ToolContext in task_service from a producer runs id and

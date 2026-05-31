@@ -271,12 +271,16 @@ async def test_ask_user_pending_resubscribes_and_reemits(fake_redis):
 # ── HARNESS-03 Plan 04 Task 3 — startup sweep + answered-not-reasked (LIVE) ──
 
 @pytest.mark.asyncio
-async def test_sweep_reruns_active_phase(monkeypatch, fake_redis):
+async def test_sweep_reruns_active_phase(monkeypatch, fake_redis, mock_asyncpg_pool):
     """Startup sweep claims each stranded run, then re-runs it (idempotent claim).
 
     Stubs find_resumable_runs + claim_run + get_active_phase + run_workflow so the
     deterministic proof is offline: assert claim happens BEFORE the re-run, and a
     run whose claim LOSES (False) is never re-run (2-worker safety).
+
+    092-07: the sweep now mints + terminalizes a producer-shell `runs` row per
+    resumed run (Facet C) — so the run dicts carry valid UUID user_id and the
+    sweep runs against the recording mock pool (insert_run/finalize_run execute).
     """
     from app.services import harness_engine
 
@@ -286,8 +290,8 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis):
 
     async def _find(pool):
         return [
-            {"run_id": won, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": "u"},
-            {"run_id": lost, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": "u"},
+            {"run_id": won, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4()},
+            {"run_id": lost, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4()},
         ]
 
     async def _claim(pool, run_id, lease_seconds):
@@ -312,7 +316,9 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis):
 
     monkeypatch.setattr(harness_engine, "_load_run_definition", _load_def, raising=False)
 
-    count = await harness_engine.resume_stranded_workflows(pool=object(), redis=fake_redis)
+    count = await harness_engine.resume_stranded_workflows(
+        pool=mock_asyncpg_pool, redis=fake_redis
+    )
 
     # Only the won run is re-run; the lost claim is skipped.
     assert count == 1
@@ -323,7 +329,7 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis):
+async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis, mock_asyncpg_pool):
     """A durably-answered ask_user prompt is NOT re-emitted on resume."""
     from app.services import harness_engine
     from app.models.harness import LlmHumanInputPhaseConfig  # noqa: F401  (shape doc)
@@ -332,7 +338,7 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis):
 
     async def _find(pool):
         return [{"run_id": run_id, "thread_id": uuid.uuid4(),
-                 "current_phase_id": None, "user_id": "u"}]
+                 "current_phase_id": None, "user_id": uuid.uuid4()}]
 
     async def _claim(pool, run_id, lease_seconds):
         return True
@@ -366,7 +372,9 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis):
 
     monkeypatch.setattr(harness_engine, "_load_run_definition", _load_def, raising=False)
 
-    await harness_engine.resume_stranded_workflows(pool=object(), redis=fake_redis)
+    await harness_engine.resume_stranded_workflows(
+        pool=mock_asyncpg_pool, redis=fake_redis
+    )
     assert resume_called["n"] == 0, "answered prompt must NOT be re-asked"
 
 

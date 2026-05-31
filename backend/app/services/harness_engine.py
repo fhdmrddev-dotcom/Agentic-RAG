@@ -43,6 +43,7 @@ import asyncio
 import json
 import logging
 from collections import namedtuple
+from datetime import datetime, timezone
 from typing import Callable
 from uuid import UUID
 
@@ -604,11 +605,40 @@ async def _build_resume_context(run, redis, pool):
     minimal bag is sufficient for the index-driven loop; richer per-run fields
     (folder scope, user_settings) are absent on resume and default to None — the
     re-run reads its inputs from the durable accumulated phase outputs.
+
+    Facet C (092-07): the original producer ``runs`` row was finalized at the
+    crash and its ``run:{id}`` stream EXPIREd; no producer-id column persists, so
+    we MINT a fresh producer-shell ``runs`` row here (status='streaming',
+    parent_run_id=None, NON-NULL placeholder model/provider — the shell never makes
+    an LLM call) and set ``producer_run_id`` to it. The resumed sub-agents'
+    ``parent_run_id`` FK now resolves (Facet A) and resumed events route to
+    ``run:{producer_run_id}`` (Facet B). ``ctx.run_id`` stays the workflow_run id
+    (audit/terminal/definition/resume-match). The caller (``resume_stranded_workflows``)
+    MUST terminalize this shell on every exit path (no stranded streaming row → the
+    F2 self-heal is never defeated).
     """
     from types import SimpleNamespace
+    from uuid import uuid4
+    from app.db.runs import insert_run
+
+    _producer_id = uuid4()
+    _thread_id = run["thread_id"]
+    _user_id = run.get("user_id")
+    await insert_run(
+        pool,
+        run_id=_producer_id,
+        thread_id=_thread_id if isinstance(_thread_id, UUID) else UUID(str(_thread_id)),
+        user_id=_user_id if isinstance(_user_id, UUID) else UUID(str(_user_id)),
+        status="streaming",
+        # model/provider are NOT NULL (db/runs.py); the shell is never used for an
+        # LLM call so the placeholder cannot misroute any provider's sub-agent.
+        model="unknown", provider="unknown",
+        parent_run_id=None,
+    )
 
     return SimpleNamespace(
         run_id=run["run_id"],
+        producer_run_id=_producer_id,
         thread_id=str(run["thread_id"]),
         current_user={"id": run.get("user_id")},
         redis=redis,
@@ -687,7 +717,39 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
         # 3. Load the definition + ctx and re-drive (rides run_workflow).
         definition = await _load_run_definition(pool, run_id)
         ctx = await _build_resume_context(run, redis, pool)
-        await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
+        # Facet C (092-07): MANDATORY resume finalizer — terminalize the
+        # producer-shell minted in _build_resume_context on EVERY exit path
+        # (success/exception/cancel), mirroring the F2 terminalize at
+        # threads.py. Without it a crashed/cancelled resume strands a
+        # status='streaming' row that becomes the thread's latest runs row, so the
+        # reconcile F2 self-heal (ORDER BY started_at DESC LIMIT 1) reads
+        # 'streaming' → lock_is_stale=False → re-wedges the thread (the exact class
+        # F2 closed). The point is TERMINAL (not the exact status).
+        _redrive_failed = False
+        try:
+            await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
+        except Exception:
+            _redrive_failed = True
+            raise
+        finally:
+            _pid = getattr(ctx, "producer_run_id", None)
+            if _pid is not None:
+                try:
+                    from app.db.runs import finalize_run
+                    await finalize_run(
+                        pool,
+                        run_id=_pid,
+                        status="failed" if _redrive_failed else "completed",
+                        error="resume re-drive failed" if _redrive_failed else None,
+                        completed_at=datetime.now(timezone.utc),
+                        message_id=None,
+                        input_tokens=None,
+                        output_tokens=None,
+                    )
+                except Exception:
+                    logger.exception(
+                        "resume producer-shell finalize failed for %s", _pid
+                    )
         resumed += 1
 
     return resumed
