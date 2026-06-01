@@ -10,6 +10,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from app.config import _SUB_AGENT_MODEL_DEFAULTS
 
 
@@ -113,3 +115,48 @@ def test_output_ceiling_respects_slider_when_higher():
     with patch.object(settings, "sub_agent_max_output_tokens", 65536):
         ceiling = max(32768, settings.sub_agent_max_output_tokens)
         assert ceiling == 65536
+
+
+# ===========================================================================
+# Phase 093 / Plan 03 — model resolver field fix (D-06) — RED contract
+#
+# resolve_sub_agent_model_safely (sub_agent_models.py:70) reads a NON-EXISTENT
+# field user_settings.llm_models; the real field on UserEffectiveSettings is
+# available_models: list[str] (models/user_settings.py:100). Dead since Phase 085
+# → _SUB_AGENT_MODEL_DEFAULTS never fires → stale cross-provider model ids leak.
+#
+# These cases stay skipped until 093-03 flips the read to available_models. 093-03
+# removes the class-level skip and the cases assert the resolved model. Authored
+# here as the named RED contract (D-13 Layer-1).
+# ===========================================================================
+
+@pytest.mark.skip(reason="093-03 owns the available_models field fix (D-06)")
+class Test093ModelResolver:
+    """RED contract for 093-03 — resolve_sub_agent_model_safely reads available_models."""
+
+    def test_stale_cross_provider_model_falls_back_to_provider_default(self):
+        """A STALE saved llm_model from a DIFFERENT provider that is NOT in
+        available_models falls back to the active provider's default (not the stale
+        name). Build a UserEffectiveSettings-like object with
+        available_models=['claude-haiku-4-5-20251001'], active_provider='anthropic',
+        and a stale cross-provider llm_model='gpt-5.4-mini' → expect the anthropic
+        default 'claude-haiku-4-5-20251001'."""
+        from app.services.sub_agent_models import resolve_sub_agent_model_safely
+        us = SimpleNamespace(
+            active_provider="anthropic",
+            llm_model="gpt-5.4-mini",  # stale cross-provider — NOT in available_models
+            available_models=["claude-haiku-4-5-20251001"],
+        )
+        resolved = resolve_sub_agent_model_safely(us, override_model="gpt-5.4-mini")
+        assert resolved == _SUB_AGENT_MODEL_DEFAULTS["anthropic"]
+
+    def test_candidate_in_available_models_passes_through(self):
+        """A candidate that IS in available_models is returned as-is."""
+        from app.services.sub_agent_models import resolve_sub_agent_model_safely
+        us = SimpleNamespace(
+            active_provider="anthropic",
+            llm_model="claude-sonnet-4-6",
+            available_models=["claude-haiku-4-5-20251001", "claude-sonnet-4-6"],
+        )
+        resolved = resolve_sub_agent_model_safely(us, override_model="claude-sonnet-4-6")
+        assert resolved == "claude-sonnet-4-6"

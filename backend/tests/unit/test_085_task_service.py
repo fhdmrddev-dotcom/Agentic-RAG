@@ -503,3 +503,58 @@ def test_registry_size_after_plan_02():
     """Task 4: after this plan ships, registry must contain at least 23 entries."""
     from app.services.tool_dispatcher import _TOOL_REGISTRY
     assert len(_TOOL_REGISTRY) >= 23
+
+
+# ===========================================================================
+# Phase 093 / Plan 02 — gateway consumption (F9 core fix) — RED contract
+#
+# These cases pin the contract Plan 02 must satisfy: _stream_one_iteration drives
+# the SHARED provider gateway (open_stream) instead of the OpenAI-only
+# create_adaptive_streaming_chat path that discards calling_mode
+# (task_service.py:177, the F9 bug-site). They stay skipped until 093-02 lands the
+# gateway-consumption rewrite — then 093-02 removes the class-level skip and wires
+# the real monkeypatch/assert bodies. Authored here so the downstream plan has a
+# NAMED RED contract to flip (D-13 Layer-1).
+#
+# Contract surface (from 093-PATTERNS.md Finding 1 + 093-CONTEXT.md D-02/D-03):
+#   - open_stream(provider, GatewayRequest) -> (SYNC stream, CallingMode); the
+#     stream is driven `for chunk in stream:` in run_in_threadpool (IN-05 trap —
+#     NEVER `async for`).
+#   - calling_mode is HONORED: on CallingMode.STRUCTURED the consumer injects
+#     TOOL_USAGE_INSTRUCTIONS once + post-parses with parse_structured_tool_calls
+#     (search_documents-shaped call extracted, content cleared).
+#   - the tool_calls buffer is built from BOTH families: tool_preparing +
+#     tool_args_progress (openai-compat) AND tool_start (anthropic/google).
+# ===========================================================================
+
+@pytest.mark.skip(reason="093-02 owns the task_service gateway-consumption rewrite (F9)")
+class Test093GatewayConsumption:
+    """RED contract for 093-02 — _stream_one_iteration consumes the gateway."""
+
+    @pytest.mark.asyncio
+    async def test_stream_one_iteration_drives_gateway_open_stream(self):
+        """_stream_one_iteration awaits open_stream with a GatewayRequest and drives
+        the returned SYNC stream in a threadpool (NEVER async for — IN-05)."""
+        # 093-02 wires: monkeypatch app.services.task_service.open_stream with an
+        # async stub returning (iter([...GatewayEvent dicts...]), CallingMode.NATIVE);
+        # assert it was awaited with a GatewayRequest and the content drained.
+        raise NotImplementedError("093-02 flips this GREEN")
+
+    @pytest.mark.asyncio
+    async def test_honors_structured_calling_mode(self):
+        """When open_stream returns CallingMode.STRUCTURED and the drained content is
+        a structured tool-call block, parse_structured_tool_calls is applied and the
+        returned tool_calls are non-empty (search_documents-shaped), content cleared."""
+        raise NotImplementedError("093-02 flips this GREEN")
+
+    @pytest.mark.asyncio
+    async def test_buffer_built_from_openai_compat_family(self):
+        """tool_preparing + tool_args_progress (openai-compat) rebuild the tool_calls
+        buffer (full cumulative arguments — L-4)."""
+        raise NotImplementedError("093-02 flips this GREEN")
+
+    @pytest.mark.asyncio
+    async def test_buffer_built_from_native_family(self):
+        """tool_start (anthropic/google) rebuilds the tool_calls buffer — the two
+        families are non-colliding (one stream emits only one family)."""
+        raise NotImplementedError("093-02 flips this GREEN")
