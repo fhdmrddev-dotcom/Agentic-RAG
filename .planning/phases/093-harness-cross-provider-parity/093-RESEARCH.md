@@ -467,17 +467,22 @@ The `draft` carry (D-12): the `llm_human_input` executor sets `_first_phase_user
 
 ## Open Questions
 
+> **Status after planning (2026-06-02):** all 3 resolved/gated in the plans — Q1 → Plan 093-03 Task 2, Q2 → Plan 093-05 Task 2, Q3 → Plan 093-01 Task 3. See the per-question `→ RESOLVED` lines.
+
 1. **Is `gemini-2.5-flash` (the Google sub-agent default) still served, or should it be `gemini-3.5-flash`?**
+   - **→ RESOLVED (Plan 093-03 Task 2):** gated on a live Google `/models` probe at execution; lock to the confirmed-served representative, or defer the one-line config edit via `/gsd:quick` if the probe isn't runnable (integrity-preserving, no guessing).
    - What we know: the registry has both; the eval (`PROVIDERS`) and CONTEXT D-03 use `gemini-3.5-flash` as the representative; the `_SUB_AGENT_MODEL_DEFAULTS` default is the older `gemini-2.5-flash`.
    - What's unclear: whether `gemini-2.5-flash` still resolves at the live Google endpoint, and which to lock as the default.
    - Recommendation: at plan time, verify against a live Google `/models` probe (the eval's presence/route helpers can drive it) and update the default to the confirmed-served representative. This is a one-line config edit gated on a live check (matches `feedback_prioritize_newest_models` + `feedback_model_names_representative`).
 
 2. **Should resume + Continue load `user_settings` for the run owner to resolve a fresh model, or accept `phase.config.model`-only?**
+   - **→ RESOLVED (Plan 093-05 Task 2):** prefer loading the owner's effective settings on resume/Continue (owner known via `run["user_id"]`/`current_user["id"]`) so the resolver fires there too; documented fallback to `phase.config.model` if loading is too heavy on the startup sweep.
    - What we know: both paths currently set `user_settings=None` (harness_engine.py:803, runs.py:822). The resolver returns "" without user_settings, so `phase.config.model` is the only model source on those paths.
    - What's unclear: whether D-04 ("thread onto wf_ctx.model at all 3 build sites") requires loading user_settings on resume/Continue, or whether the durable-outputs-driven re-run is fine with phase-level model only.
    - Recommendation: prefer loading the owner's effective settings on resume/Continue (the run owner is known: `run["user_id"]` / `current_user["id"]`) so the resolver fires there too — this is the root-cause fix D-04 intends and closes part of SEED-047. Confirm with the operator at plan time; if loading settings is too heavy on the startup sweep, accept phase-level model and document the limitation.
 
 3. **Does the 056 immutability trigger permit a corrective UPDATE of the seed `definition` JSONB?**
+   - **→ RESOLVED (PATTERNS.md + Plan 093-01 Task 3):** NO — `056_workflow_definitions.sql:85-91` raises on ANY update to a `status='published'` row. The migration uses the **disable-trigger → UPDATE → re-enable** approach in one transaction (operator SQL-editor checkpoint, never `db push`). Seed UUIDs preserved, so the UAT/engine references are unaffected.
    - What we know: published definitions are immutable-on-publish (HARNESS-02 / 056 BEFORE-UPDATE trigger + FK ON DELETE RESTRICT). The seeds use fixed UUIDs.
    - What's unclear: whether the trigger blocks ALL updates to a `status='published'` row, or only specific columns; whether a corrective fix must be a new version (`UNIQUE(slug, version)` → version 2).
    - Recommendation: read `056_workflow_definitions.sql` trigger body at plan time. If it blocks the UPDATE, ship the seed fix as a new version row and confirm the engine selects the latest published version per slug (or the seed UUIDs are referenced directly by the UAT — adjust accordingly).
