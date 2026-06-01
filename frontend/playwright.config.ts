@@ -11,6 +11,32 @@
 // scenario, not in the test runner.
 
 import { defineConfig } from "@playwright/test"
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+
+// E2E env bootstrap (092.5 de-rot). The db-teardown fixture needs SUPABASE_URL +
+// SUPABASE_SERVICE_ROLE_KEY (the LOCAL service-role key) to clean the test user's
+// rows between scenarios. They live in backend/.env (local-pointed by default).
+// Load them here — only if not already set — so a plain `npx playwright test`
+// works without manually exporting them first (the prior failure: all 17 specs
+// died on "SUPABASE_URL ... (unset)"). SAFETY: the db-teardown LOCALHOST_RE guard
+// still INDEPENDENTLY refuses any non-localhost SUPABASE_URL, so this can never
+// target a production DB; CI / an explicit env always wins (we never overwrite).
+for (const key of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]) {
+  if (process.env[key]) continue
+  for (const candidate of ["../backend/.env", "backend/.env"]) {
+    try {
+      const file = readFileSync(resolve(process.cwd(), candidate), "utf-8")
+      const line = file.split(/\r?\n/).find((l) => l.startsWith(`${key}=`))
+      if (line) {
+        process.env[key] = line.slice(key.length + 1).trim().replace(/^["']|["']$/g, "")
+        break
+      }
+    } catch {
+      // candidate path absent — try the next, else env must come from the runner
+    }
+  }
+}
 
 export default defineConfig({
   testDir: "./tests/e2e",
