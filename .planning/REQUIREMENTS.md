@@ -55,7 +55,7 @@
 
 > Live UAT (092-07) + the 092 comprehensive audit + a 2026-06-01 live-code verification proved the **harness path only works on OpenAI** (1 of 4 seed workflows, 1 of 7 providers) — a harness-substrate problem, NOT a Deep problem (Deep is provider-robust on all 7). These two requirements replace the original PARITY-01 polish rider as the milestone-blocking parity work.
 
-- [ ] **GATEWAY-01** *(Phase 092.5 — NEW)*: `agent_loop.py`'s per-provider dispatch + chunk-normalization is extracted into ONE **shared provider gateway** that Deep AND the harness consume — Deep verified **byte-identical** in isolation (089-style eval + E2E + SSE-diff GREEN before/after), every per-provider round-trip invariant preserved verbatim (Anthropic `end_turn`, Google `thought_signature`, DeepSeek `reasoning_content`, Moonshot `<think>`/empty-retry, `force_no_tools`, iteration cap). One home for all provider logic; the seam Phase 093 consumes.
+- [x] **GATEWAY-01** *(Phase 092.5 — NEW)*: `agent_loop.py`'s per-provider dispatch + chunk-normalization is extracted into ONE **shared provider gateway** that Deep AND the harness consume — Deep verified **byte-identical** in isolation (089-style eval + E2E + SSE-diff GREEN before/after), every per-provider round-trip invariant preserved verbatim (Anthropic `end_turn`, Google `thought_signature`, DeepSeek `reasoning_content`, Moonshot `<think>`/empty-retry, `force_no_tools`, iteration cap). One home for all provider logic; the seam Phase 093 consumes.
 - [ ] **PARITY-02** *(Phase 093 — NEW; the milestone-blocking parity req)*: The Harness path reaches cross-provider parity by **consuming the gateway** — all 5 phase-types + all 4 seed workflows run end-to-end on the **native-7**: a shared **model-resolver** (resolve from the provider, never mutate saved settings) kills the stale-id class; the **ask_user round-trip** works (workflow_run-id namespace reconciled, Option (i)); the 3 never-run phase-types are completed (`split_topic` code fix → `llm_batch_agents` fan-out; verify-gate routes forward) and the 5 phase-types are **safe-by-construction** validated primitives (publish-time reachability lint extended to input/output-contract breaks); resume/Continue **surface the answer** + the ask_user **draft** (plumbing — chrome is Phase 094). **Deep byte-identical** (red line). Acceptance = **native-7 × 5-phase-type × 4-workflow LIVE UAT** + live-DB/real-provider tests (closes the mock blind spot).
 
 ### Polish Riders
@@ -112,7 +112,7 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | MODE-01 | Phase 092 | Complete |
 | MODE-02 | Phase 092 | Complete |
 | CONT-01 | Phase 092 | Complete (live cap-drive code-verified; F9/F10 → 093) |
-| GATEWAY-01 | Phase 092.5 | Pending |
+| GATEWAY-01 | Phase 092.5 | Complete |
 | PARITY-02 | Phase 093 | Pending |
 | PARITY-01 | (re-deferred 2026-06-01) | Deferred |
 | PANEL-08 | Phase 094 | Pending |

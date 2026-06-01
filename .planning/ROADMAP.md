@@ -139,9 +139,9 @@ Plans:
 - [x] 092.5-01-PLAN.md — Gateway scaffold: events.py canonical schema + dispatcher open_stream + D-08 seam-test scaffold (RED) [Wave 1, autonomous] ✅ 2026-06-01
 - [x] 092.5-02-PLAN.md — Operator captures native-7 BEFORE baselines against the pre-extraction loop (the byte-identical reference) [Wave 1, autonomous:false] ✅ 2026-06-01 (8/8 SSE baselines `BASELINE CAPTURED` + eval reference)
 - [x] 092.5-03-PLAN.md — Extract clean providers (Anthropic+Google adapters) + wire agent_loop + collapse 2 _on_chunk into 1 + stream_* monkeypatch repoint [Wave 2, autonomous] ✅ 2026-06-01 (adapters return bare SYNC gen verbatim; ONE merged gateway branch + ONE shared _on_chunk; I2 preserved consumer-side + asserted; seam Anthropic/Google GREEN; full suite ZERO net-new failures vs Plan-02 baseline)
-- [ ] 092.5-04-PLAN.md — Operator byte-identical gate #1: --mode after native-7 + eval + E2E after clean providers [Wave 3, autonomous:false]
-- [ ] 092.5-05-PLAN.md — Extract the entangled OpenAI-compat adapter (<think>/reasoning/usage/5KB boundary) verbatim + fold 3rd _on_chunk + repoint create_adaptive/_accumulate sweep [Wave 4, autonomous]
-- [ ] 092.5-06-PLAN.md — Operator byte-identical gate #2: --mode after FULL native-7 + I1-I8 named in VERIFICATION + eval + E2E [Wave 5, autonomous:false]
+- [x] 092.5-04-PLAN.md — Operator byte-identical gate #1: --mode after native-7 + eval + E2E after clean providers [Wave 3, autonomous:false]
+- [x] 092.5-05-PLAN.md — Extract the entangled OpenAI-compat adapter (<think>/reasoning/usage/5KB boundary) verbatim + fold 3rd _on_chunk + repoint create_adaptive/_accumulate sweep [Wave 4, autonomous]
+- [x] 092.5-06-PLAN.md — Operator byte-identical gate #2: --mode after FULL native-7 + I1-I8 named in VERIFICATION + eval + E2E [Wave 5, autonomous:false]
 **Notes**: G-1/G-5 by SPIRIT, not by the literal ledger (counts are 2–3, not ≥3 prior) — chosen because a 2nd OpenAI-shaped accumulator already exists (`task_service._consume_sync_stream`) and a harness-local native branch would be a 3rd copy. Operator-chosen "separate per feature" structure (discuss-093, 2026-06-01). Extraction risk = MEDIUM (Anthropic/Google branches clean; the OpenAI branch is entangled with reasoning/think-tag + structured post-parse + nonlocal accumulators + mid-stream emit). SEED-028 (native Google service) is a future enhancement BEHIND this gateway — NOT in 092.5 (which extracts the existing proven dispatch verbatim).
 
 #### Phase 093: Harness Cross-Provider Parity + Phase-Type Hardening
@@ -210,7 +210,7 @@ Plans:
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
 | 092. Dual-Mode Wiring + Continue Button | 6/7 | In progress (092-06 F3 code-complete + UAT gaps_found → NEW blocker F4 blocks end-to-end workflow; 092-07 F4 gap-closure remaining; MODE-01/02 + CONT-01 stay OPEN) | - |
-| 092.5. Provider Gateway Extraction (NEW — refactor) | 3/6 | Executing (Wave 2 done — clean Anthropic/Google extracted; Wave 3 operator SSE-diff next) | - |
+| 092.5. Provider Gateway Extraction (NEW — refactor) | 6/6 | Complete    | 2026-06-01 |
 | 093. Harness Cross-Provider Parity + Phase-Type Hardening | 0/0 | Not started (CONTEXT ready 2026-06-01) | - |
 | 094. Workflow Legibility + Mode Clarity | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |

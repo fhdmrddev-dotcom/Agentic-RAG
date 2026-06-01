@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: in_progress
+status: ready_to_plan
 stopped_at: Phase 092.5 Plan 05 complete — Plan 06 operator PROOF GATE #2 next
 last_updated: "2026-06-01T21:10:00.000Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 28
   completed_plans: 27
-  percent: 96
+  percent: 56
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (Plans 01-05 ✅ done / 6; **Plan 06 = operator PROOF GATE #2 next**)
+Phase: 093
 **Phase 092.5 Plan 05 — ✅ COMPLETE 2026-06-01.** The entangled OpenAI/OpenRouter/Ollama branch extracted VERBATIM into `provider_gateway/openai_compat.py`; third `_on_chunk` folded into the ONE shared consumer handler; `calling_mode` surfaced through the seam (structurally fixes the harness-OpenAI-only bug). All 3 provider families now dispatch through one gateway home. Verified non-regressing 3 ways: seam+chunk_handler 17 passed/0 skipped; full-suite ZERO net-new attributable to Plan 05 (worktree A/B vs 4a4bd327 — 6 comm-deltas proven flaky live-infra); adversarial 6-lens byte-identical review = ZERO breaking deltas. 2 suspicious (non-breaking) deltas → Plan 06 live gate. Commits 8635d989 (T1) + 14b75c96 (T2) + dfc2c915 (T3) + 3d115112 (summary). See 092.5-05-SUMMARY.md.
 
 **Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
@@ -33,7 +33,7 @@ Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (Plans 01-05 ✅ done /
 --- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
-Plan: 1 of --name
+Plan: Not started
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -102,7 +102,7 @@ Progress: [█████████░] 93%
 
 **Velocity:**
 
-- Total plans completed: 37 (v2.7)
+- Total plans completed: 43 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -117,6 +117,7 @@ Progress: [█████████░] 93%
 | 088 | 5 | - | - |
 | 089 | 4 | - | - |
 | 091 | 8 | - | - |
+| 092.5 | 6 | - | - |
 
 **Recent Trend:**
 
@@ -231,7 +232,8 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Plan 06 live-gate carry-forward (from the 092.5-05 adversarial review):** the operator PROOF GATE #2 (`scripts/capture_sse_baseline.py --mode after`, native-7) MUST also confirm the 2 suspicious-but-non-breaking deltas hold on live traffic — (1) the assistant-message `tool_call_id` is non-empty + round-trips on a live MULTI-TOOL turn per compat provider (esp. OpenRouter-proxied, where name-before-id can't be ruled out from code); (2) token totals are non-zero + equal across a normal multi-iteration run per provider. Moonshot also needs the OpenAI-org TPD rate-limit window reset (it 429'd at the Plan 04 gate).
+- **Plan 06 FINAL PROOF GATE — 2nd run 2026-06-01 (OpenAI credits restored): NEAR-PASS, residuals are LLM tool-path noise. Phase still OPEN pending one confirmation lap + e2e env fix.** SSE diff dropped 7→6 BLOCK; **anthropic now byte-IDENTICAL (0 edits)**; the other 6 collapsed to tiny residuals (openai 2, google 3, deepseek/moonshot/minimax 1, zhipu 2) that are EXCLUSIVELY (a) `search_documents`/`grep`/`query_documents` call-COUNT/order variance and (b) `tool_args_progress`/`reasoning_delta` chunk cadence — both the explicitly-volatile categories the skeleton docstring says to JUDGE not auto-fail. Zero regression signature on any provider (terminal `done:error=False` everywhere, no orphaned tool lifecycle, no renamed/unknown event, no `<think>` leak). Edits SHRANK + SHIFTED vs run 1 (non-persistent = noise, not regression). **EVAL backstop PASSES:** native-7 aggregate **16/28 = 16/28 BEFORE** (non-regressing; `factual-doc-search` PASS on all 7; no provider collapsed). Total 17/32 vs 19/32 BEFORE is ONLY OpenRouter losing credit (best-effort, out of gate). **E2E:** all 17 specs failed on the db-teardown guard because `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are UNSET in the Playwright shell (config, not regression) — set both from backend/.env then re-run. REMAINING TO CLOSE: (1) one more clean `--mode after` run to confirm residuals stay non-persistent noise → PASS-by-noise-judgment; (2) e2e env fix + re-run GREEN. Then write 092.5-06-SUMMARY + I1-I8 + close. Earlier note (1st run, env down): operator ran `capture_sse_baseline.py --mode after` → `SSE_DIFF_RESULT: BLOCK` on all 7 native providers. **Triaged to 100% ENVIRONMENTAL, NOT a gateway regression** (8-agent adversarial workflow `wf_b45e948c-45a`, ~561K tokens, all 7 providers + root-cause = unanimous `has_real_regression:false / environmental_fully_explains:true / confidence:high`). Root cause: **OpenAI account out of credits (`429 insufficient_quota`)** → `search_documents` embeddings are hardwired to OpenAI with no fallback (`retrieval_service.py:36` → `openai_service.embed_texts` `:1288`) → document search broke for EVERY chat provider → every skeleton edit = lost `sources/citations/confidence` trailer + LLM fallback tool-path (grep/read_document). Every byte-identical invariant held (tool prep→start→end balanced, code-exec lifecycle intact, no terminal flip except the openai 429 carve-out, no renamed/dropped events, no `<think>` leak, `calling_mode` surfaced — Pitfall 3 honored). Full evidence: **`092.5-06-BLOCK-TRIAGE.md`**. Resilience SPOF captured as **SEED-048** (out of scope for this byte-identical refactor). **NEXT ACTION: operator restores OpenAI billing, then re-runs the gate** (`--mode after` → expect PASS; eval; `cd frontend ; npx playwright test`). Offline re-triage tool: `scripts/_diag_skeleton_diff.py` (pure, no network).
+- **Plan 06 live-gate carry-forward (still owed at the CLEAN re-run, from the 092.5-05 adversarial review):** the operator PROOF GATE #2 MUST also confirm the 2 suspicious-but-non-breaking deltas hold on live traffic — (1) the assistant-message `tool_call_id` is non-empty + round-trips on a live MULTI-TOOL turn per compat provider (esp. OpenRouter-proxied, where name-before-id can't be ruled out from code); (2) token totals are non-zero + equal across a normal multi-iteration run per provider. (These need a CLEAN run — Supabase `messages.tool_calls` + `runs` token columns — so they roll to the re-run.)
 - **Pre-existing test-infra defect `test_066_langsmith_clean` (2 tests, NOT a Plan 05 regression):** fails in BOTH the pre- and post-extraction trees. Root cause (review-reproduced): `tests/integration/_run_helpers.py:69-88` build bare `MagicMock()` chunks that never set `.usage` → `getattr(chunk,"usage",None)` auto-vivifies a non-JSON-serializable MagicMock → `_accumulate_chunk_usage` poisons `json.dumps` → run finalizes `failed` not `timed_out`; compounded by a stale sync-vs-async timeout monkeypatch (`get_per_call_timeout` vs the `get_per_call_timeout_async` actually called). Fix (test-only, ~2 lines, matches `feedback_mock_completeness`): set `chunk.usage=None` in both `_run_helpers` chunk factories + repoint the timeout monkeypatch to `app.config.get_per_call_timeout_async`. Candidate for a `/gsd:fast` follow-up; intentionally NOT folded into Plan 05 (out of scope + pre-existing).
 - Phase 089 (G-5 extraction) is the highest-risk-if-done-wrong phase of v2.8 — a careless "while-I-am-in-here" cleanup re-opens the entire 075.x cross-provider cascade. Acceptance bar is byte-identical SSE per provider (eval + E2E GREEN before AND after), NOT just "tests pass". Carry forward EVERY per-provider round-trip fix verbatim (named checklist in VERIFICATION).
 - Phase 091 highest-risk implementation details: the 2-phase write (mark active before work, completed only after durable output) and the `ask_user` resume re-subscription (re-SUBSCRIBE + re-emit pending prompt on startup sweep). Resumability is the trickiest correctness surface.
