@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_plan
-stopped_at: Phase 092.5 complete (passed_with_overrides) — Phase 093 next (CONTEXT.md present → plan-phase)
+status: ready_to_execute
+stopped_at: Phase 093 PLANNED (5 plans / 3 waves, 2026-06-02) — next /gsd:execute-phase 093
 last_updated: "2026-06-02T00:00:00.000Z"
 last_activity: 2026-06-02
 progress:
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 093 — Harness Cross-Provider Parity (consumes the 092.5 gateway; CONTEXT.md present → `/gsd:plan-phase 093`)
+**Current focus:** Phase 093 — Harness Cross-Provider Parity (PLANNED 2026-06-02 — 5 plans / 3 waves; next `/gsd:execute-phase 093`)
 
 ## Current Position
 
@@ -97,6 +97,8 @@ Progress: [█████████░] 93%
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
 4 tasks (Task 1 operator-migration checkpoint resolved; Tasks 2-4 executed). F1 (harness_audit.user_id crash) + F2 (wedged lock) closed; live-DB audit integration test added (closes 091 mock blind spot). Commits: 160bb729 + 88e05f07 (migration 064 + full-schema), cd592935 (F1), 27afae18 (F2), c5388ec0 (live test). Deviation: 1 auto-fix (Rule 3 — tool_dispatcher 11th write_audit caller). See 092-05-SUMMARY.md.
+
+**Phase 093 PLANNED (2026-06-02):** Harness Cross-Provider Parity + Phase-Type Hardening — **5 plans / 3 waves**, single req PARITY-02. CONSUMPTION + plumbing phase (~zero net-new logic; 092.5 gateway shipped). Wave 0: 093-01 (autonomous:false — 7 RED test scaffolds + split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint [D-10] + migration 065 seed fixes via the operator SQL-editor trigger-disable approach [056 immutability trigger BLOCKS a plain UPDATE — RESOLVED]). Wave 1: 093-02 (task_service gateway-consumption rewrite = F9 core, the highest-risk task, carries the byte-identical-Deep guard D-14 + IN-05 sync-generator trap) ‖ 093-03 (model-resolver field fix available_models [D-06, dead since Phase 085] + resolve_workflow_ctx_model wrapper [D-04/D-05] + Google default Open-Q1 probe). Wave 2: 093-04 (ask_user F10 workflow_run-id fallback [D-07/D-08, mirrors runs.py:645-670; T-093-IDOR HIGH] + Continue ctx-model thread) ‖ 093-05 (shared surfacing helper [D-11, Pitfall-5 single-persist-owner] + live/resume ctx-model thread + ask_user draft carry [D-12]). Zero within-wave file overlap (verified). The native-7 × 5-phase-type × 4-workflow LIVE UAT (D-13/SC#6) is authored in 093-VALIDATION.md, owned by the verifier — NOT plan tasks. Open Q1 (Google served-model) resolved in 093-03; Open Q2 (resume/Continue user_settings load) decided in-plan (093-04/05); Open Q3 (056 trigger) resolved (trigger-disable migration). RED LINE: Deep byte-identical on all 7 (only 093-02's task_service rewrite touches a shared LLM path — guarded). Next: `/gsd:execute-phase 093`.
 
 ## Performance Metrics
 
