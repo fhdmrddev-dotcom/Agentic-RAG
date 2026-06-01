@@ -45,13 +45,16 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import (
-    create_adaptive_streaming_chat,
     get_explorer_tools,
     EXPLORER_SYSTEM_PROMPT,
     CallingMode,
     get_tools,
-    normalize_finish_reason,
 )
+# Phase 092.5 Wave 4 (D-04): create_adaptive_streaming_chat + normalize_finish_reason
+# moved BEHIND the gateway — the OpenAI-compat adapter
+# (app.services.provider_gateway.openai_compat) wraps create_adaptive_streaming_chat
+# and calls normalize_finish_reason internally; run_agent_loop dispatches via
+# open_stream and no longer references either directly.
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
@@ -685,49 +688,12 @@ def _deduplicate_citations(citations: list[dict]) -> list[dict]:
     return unique
 
 
-def _accumulate_chunk_usage(
-    chunk,
-    provider: str,
-    input_total: int | None,
-    output_total: int | None,
-) -> tuple[int | None, int | None]:
-    """Provider-aware usage accumulator for OpenAI-compat streaming chunks.
-
-    Phase 075.3 D-075.3-03 + D-075.3-01-probe-locked (2026-05-22, verdict =
-    CUMULATIVE, pinned in 075.3-01-PLAN.md ``<probe_result>``).
-
-    - **Google** (OpenAI-compat) emits ``chunk.usage`` with **cumulative
-      running totals** on every chunk (alongside ``delta.content`` /
-      ``delta.tool_calls``). The Google branch **overwrites** the running
-      total each chunk (last-wins). Summing via ``+=`` would over-count
-      by 2-3× (silent billing-accounting corruption).
-    - **OpenAI** emits ``chunk.usage`` only on the final chunk with empty
-      ``choices=[]`` (Phase 073 D-073-08). The OpenAI branch sums via
-      ``+=`` (initialised from None on first usage chunk).
-    - **OpenRouter** is forward-compatible per Pitfall 8 (deprecation 2026
-      — always returns usage now). Same ``+=`` branch — if a stray
-      mid-stream usage chunk ever appears alongside the final emission,
-      the sum is correct.
-    - Unknown / ollama / empty / anthropic-via-compat / made-up provider
-      names fall through to ``+=`` (safe default matching OpenAI shape).
-
-    Pure function: no I/O, no closure capture. Trivially unit-testable;
-    see ``backend/tests/unit/test_chunk_handler_provider_aware.py``.
-    """
-    u = getattr(chunk, "usage", None)
-    if u is None:
-        return input_total, output_total
-    _i = getattr(u, "prompt_tokens", 0) or 0
-    _o = getattr(u, "completion_tokens", 0) or 0
-    if provider == "google":
-        # D-075.3-01 probe-locked: cumulative running totals → overwrite-last-wins.
-        # Re-flip to the ``+=`` branch ONLY if the probe verdict in
-        # 075.3-01-PLAN.md <probe_result> changes to DELTA on a future re-run.
-        return _i, _o
-    # OpenAI / OpenRouter / Ollama / Anthropic-via-compat / unknown → += sum.
-    if input_total is None:
-        return _i, _o
-    return input_total + _i, (output_total or 0) + _o
+# NOTE (Phase 092.5 Wave 4 / D-04): ``_accumulate_chunk_usage`` MOVED to
+# ``app.services.provider_gateway.openai_compat`` (it is the OpenAI-compat adapter's
+# pure provider-aware usage helper — Google-cumulative-overwrite vs OpenAI-``+=``).
+# The OpenAI normalization now lives in the adapter; the consumer accumulates token
+# totals from the canonical ``usage`` events the adapter emits. The unit test
+# (``test_chunk_handler_provider_aware.py``) imports it from the new home.
 
 
 def _reconstruct_history(history_rows: list[dict], active_provider: str = "") -> list[dict]:
@@ -1387,6 +1353,158 @@ async def run_agent_loop(
                 try:
                     active_provider_name = getattr(user_settings, "active_provider", "") or ""
 
+                    # Phase 092.5 Wave 4 (D-02 / D-04): the gateway (open_stream)
+                    # now serves ALL providers — anthropic/google AND the
+                    # OpenAI-compat else-branch. ONE shared _on_chunk consumes the
+                    # canonical events ALL three adapters emit (a verbatim collapse
+                    # of the former _on_chunk_anthropic / _on_chunk_google /
+                    # _on_chunk_openai). The accumulators + handler are lifted here
+                    # (above the provider dispatch) so both branches share them.
+                    #
+                    # ``_build_from_progress`` is the per-branch buffer-build mode:
+                    #   - anthropic/google emit ``tool_start`` (complete args) →
+                    #     buffer built there (``len()``-keyed, byte-identical).
+                    #   - the OpenAI-compat adapter emits NO synthetic ``tool_start``
+                    #     (Open Q2); it builds the buffer from ``tool_preparing``
+                    #     (id+name, index-keyed) + ``tool_args_progress``
+                    #     (full ``code_so_far`` args). Each stream emits only ONE
+                    #     family, so the two build paths never collide.
+                    from app.services.provider_gateway import (
+                        GatewayRequest,
+                        open_stream,
+                    )
+
+                    tool_calls_buffer: dict = {}
+                    finish_reason: str | None = None
+                    _announced_tools_shared: set[int] = set()
+                    _build_from_progress: bool = False
+
+                    async def _on_chunk(_event):
+                        """ONE provider-agnostic consumer handler (D-02 / D-04) for
+                        the anthropic + google native paths AND the OpenAI-compat
+                        else-branch. Consumes the canonical events the gateway
+                        adapters yield, mutates the STAY accumulators + calls _emit —
+                        a verbatim collapse of the former _on_chunk_anthropic /
+                        _on_chunk_google / _on_chunk_openai."""
+                        nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total
+                        _etype = _event.get("type")
+                        # Phase 073 TOKEN-COL-01 (D-073-08): usage events. Anthropic
+                        # yields message_start->"usage" + message_delta->"usage_delta";
+                        # Google's SDK emits cumulative usage_metadata normalized into
+                        # one initial 'usage' + per-chunk 'usage_delta'; the
+                        # OpenAI-compat adapter accumulates per-stream via
+                        # _accumulate_chunk_usage and emits ONE 'usage' at stream end
+                        # (the consumer SUMs across iterations — byte-identical to the
+                        # pre-extraction per-chunk += for the OpenAI-path providers).
+                        if _etype == "usage":
+                            _i = _event.get("input_tokens", 0) or 0
+                            _o = _event.get("output_tokens", 0) or 0
+                            if input_tokens_total is None:
+                                input_tokens_total = _i
+                                output_tokens_total = _o
+                            else:
+                                input_tokens_total += _i
+                                output_tokens_total += _o
+                            return
+                        elif _etype == "usage_delta":
+                            _o = _event.get("output_tokens", 0) or 0
+                            if output_tokens_total is None:
+                                # rare: usage_delta without prior message_start (partial stream)
+                                output_tokens_total = _o
+                            else:
+                                output_tokens_total += _o
+                            return
+                        if _etype == "delta":
+                            _text = _event.get("content", "")
+                            if _text:
+                                full_content += _text
+                                await _emit(redis, run_id, 'delta', content=_text)
+                        elif _etype == "reasoning_delta":
+                            # OpenAI-path only today (DeepSeek reasoning_content +
+                            # <think>-stripped Kimi/MiniMax/GLM). The adapter routes
+                            # think/reasoning content here; the consumer accumulates
+                            # full_reasoning_content (round-tripped on tool-call turns,
+                            # I3) + emits the reasoning_delta SSE event. No-op for
+                            # anthropic/google (they never emit reasoning_delta).
+                            _rtext = _event.get("content", "")
+                            if _rtext:
+                                full_reasoning_content += _rtext
+                                await _emit(redis, run_id, 'reasoning_delta', content=_rtext)
+                        elif _etype == "tool_preparing":
+                            # D-01 (Phase 56.1, corrected): fired when tool name is
+                            # first known — before arguments finish streaming.
+                            _idx = _event.get("index", len(tool_calls_buffer))
+                            if _idx not in _announced_tools_shared:
+                                _announced_tools_shared.add(_idx)
+                                await _emit(redis, run_id, 'tool_preparing', name=_event['name'], index=_idx)
+                            # Open Q2: for the OpenAI-compat path build the buffer
+                            # entry HERE (the adapter yields NO synthetic tool_start).
+                            # The event carries id+name; args accrue via
+                            # tool_args_progress below.
+                            if _build_from_progress and _idx not in tool_calls_buffer:
+                                tool_calls_buffer[_idx] = {
+                                    "id": _event.get("id", "") or "",
+                                    "name": _event.get("name", "") or "",
+                                    "arguments": "",
+                                }
+                        elif _etype == "tool_args_progress":
+                            # Phase 075 D-075-10: route the adapter's
+                            # tool_args_progress yields to _emit. Phase 075.6 Plan 01
+                            # / Req #1: forward `code_so_far`. WR-01 (2026-05-24):
+                            # defensive .get for the additive field.
+                            #
+                            # Open Q2 / L-4: for the OpenAI-compat path the buffer
+                            # args are built HERE from the full cumulative
+                            # ``code_so_far`` (every args-bearing delta yields one so
+                            # sub-boundary tools are never lost), keyed by tool_index.
+                            # The SSE _emit is gated on ``emit_sse`` (boundary-crossed
+                            # — byte-identical wire cadence). anthropic/google omit
+                            # ``emit_sse`` (their boundary walk is internal — they only
+                            # yield on boundary) so it defaults True → emit always,
+                            # byte-identical.
+                            if _build_from_progress:
+                                _tidx = _event["tool_index"]
+                                if _tidx not in tool_calls_buffer:
+                                    tool_calls_buffer[_tidx] = {"id": "", "name": "", "arguments": ""}
+                                if _event.get("name"):
+                                    tool_calls_buffer[_tidx]["name"] = _event["name"]
+                                tool_calls_buffer[_tidx]["arguments"] = _event.get("code_so_far", "")
+                            if _event.get("emit_sse", True):
+                                await _emit(
+                                    redis, run_id, "tool_args_progress",
+                                    tool_index=_event["tool_index"],
+                                    name=_event["name"],
+                                    args_so_far=_event["args_so_far"],
+                                    total_args_bytes_so_far=_event["total_args_bytes_so_far"],
+                                    code_so_far=_event.get("code_so_far", ""),
+                                )
+                        elif _etype == "tool_start":
+                            # Fired at content_block_stop — arguments now complete
+                            # (anthropic/google native paths only; the OpenAI-compat
+                            # adapter never emits this — Open Q2). tool_preparing was
+                            # already emitted above; just populate buffer.
+                            _idx = len(tool_calls_buffer)
+                            tool_calls_buffer[_idx] = {
+                                "id": _event["id"],
+                                "name": _event["name"],
+                                "arguments": json.dumps(_event.get("args", {})),
+                            }
+                        elif _etype == "finish":
+                            finish_reason = _event.get("finish_reason", "stop")
+                            # D-075.5-01 (I2 / D-07): hydrate thought_signature onto
+                            # each tool_calls_buffer entry from the finish event's
+                            # tool_calls list so the NEXT iteration's
+                            # _convert_messages_to_google call can round-trip it
+                            # (else Gemini-3 400s on round 2+). NO-OP for Anthropic
+                            # (its tool_calls carry no thought_signature) AND for the
+                            # OpenAI-compat path (its finish tool_calls carry no sig).
+                            # STAYS consumer-side — mutates tool_calls_buffer (a
+                            # consumer accumulator); the adapter only EMITS the sig.
+                            _fin_tcs = _event.get("tool_calls", []) or []
+                            for _i, _ftc in enumerate(_fin_tcs):
+                                if _i in tool_calls_buffer and _ftc.get("thought_signature"):
+                                    tool_calls_buffer[_i]["thought_signature"] = _ftc["thought_signature"]
+
                     # Plan 075.4-02 audit (Site 4): gate is operator-intent via
                     # active_provider. Models routed through OpenRouter that
                     # happen to be Claude variants are intentionally NOT pushed
@@ -1396,26 +1514,13 @@ async def run_agent_loop(
                     if active_provider_name in ("anthropic", "google"):
                         # --- Native SDK paths (Anthropic GEN-02 / Google
                         # D-075.5-01) — Phase 092.5 Wave 2: dispatched through the
-                        # provider gateway (GATEWAY-01 / D-01). The two branches
-                        # collapsed into ONE: their stream constructions moved into
-                        # provider_gateway/anthropic.py + google.py (the bare SYNC
-                        # generator is returned so the drain + close_fn=stream.close
-                        # below stay byte-identical), and their two near-identical
-                        # _on_chunk_anthropic / _on_chunk_google callbacks collapse
-                        # into the ONE provider-agnostic _on_chunk below (D-02).
-                        #
-                        # The Google _on_chunk was documented as "structurally a copy
-                        # of the Anthropic branch"; the ONLY divergence was the
-                        # thought_signature hydration in the finish branch — and that
-                        # is a NO-OP for Anthropic (its tool_calls carry no
-                        # thought_signature), so running it on both paths is
-                        # byte-identical (I2 / D-07 preserved CONSUMER-side: it
-                        # mutates tool_calls_buffer, a consumer accumulator; the
-                        # adapter only EMITS the finish event carrying the sig).
-                        from app.services.provider_gateway import (
-                            GatewayRequest,
-                            open_stream,
-                        )
+                        # provider gateway (GATEWAY-01 / D-01). Their stream
+                        # constructions live in provider_gateway/anthropic.py +
+                        # google.py (the bare SYNC generator is returned so the drain
+                        # + close_fn=stream.close stay byte-identical); the two
+                        # near-identical _on_chunk_anthropic / _on_chunk_google
+                        # callbacks collapse into the ONE shared _on_chunk above (D-02
+                        # / Wave 4 — now also serving the OpenAI-compat path).
 
                         # Phase 066 D-066-03 + 081.1: 4-tier async resolution
                         # (DB > env > static > default). STAYS consumer-side — it
@@ -1454,118 +1559,19 @@ async def run_agent_loop(
                             active_provider_name, _gw_request
                         )
 
-                        tool_calls_buffer: dict = {}
-                        finish_reason: str | None = None
-                        _announced_tools_shared: set[int] = set()
+                        # Anthropic/Google emit ``tool_start`` (complete args) — the
+                        # shared _on_chunk builds the buffer there (len()-keyed,
+                        # byte-identical). NOT the progress-build path.
+                        _build_from_progress = False
 
-                        # Phase 067.1 Plan 01 Track A: drain-into-queue
-                        # parity with the OpenAI branch (PATTERNS.md
-                        # parity rule). The Anthropic/Google paths are NOT
-                        # langsmith-wrapped here (the raw-SDK generators
-                        # handle their own tracing), so the
-                        # GeneratorExit-trace pollution is OpenAI-only;
-                        # but symmetric structure prevents future
-                        # langsmith adoption from regressing to the
-                        # inline-for-loop shape.
-                        #
-                        # On timeout the helper closes the underlying SYNC
-                        # generator (``_stream.close()`` raises GeneratorExit
-                        # inside the raw-SDK service's `with` block →
-                        # MessageStream.__exit__ → response.close()); SYNC
-                        # method; do NOT `await`. The outer agent_runner's
-                        # `except asyncio.TimeoutError` catches the propagated
-                        # TimeoutError and sets _terminal_status='timed_out'
+                        # Phase 067.1 Plan 01 Track A: drain-into-queue parity. On
+                        # timeout the helper closes the underlying SYNC generator
+                        # (``_stream.close()`` raises GeneratorExit inside the raw-SDK
+                        # service's `with` block → MessageStream.__exit__ →
+                        # response.close()); SYNC method; do NOT `await`. The outer
+                        # agent_runner's `except asyncio.TimeoutError` catches the
+                        # propagated TimeoutError and sets _terminal_status='timed_out'
                         # (Phase 066 D-066-06/07).
-                        async def _on_chunk(_event):
-                            """ONE provider-agnostic consumer handler (D-02) for the
-                            Anthropic + Google native paths. Consumes the canonical
-                            events the gateway adapters yield and mutates the STAY
-                            accumulators + calls _emit — a verbatim collapse of the
-                            former _on_chunk_anthropic / _on_chunk_google.
-                            """
-                            nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                            _etype = _event.get("type")
-                            # Phase 073 TOKEN-COL-01 (D-073-08): usage events. Anthropic
-                            # yields message_start->"usage" + message_delta->"usage_delta";
-                            # Google's SDK emits cumulative usage_metadata normalized into
-                            # one initial 'usage' + per-chunk 'usage_delta' (Pitfall 9:
-                            # output_tokens added ONCE per Message, which the adapters
-                            # guarantee).
-                            if _etype == "usage":
-                                _i = _event.get("input_tokens", 0) or 0
-                                _o = _event.get("output_tokens", 0) or 0
-                                if input_tokens_total is None:
-                                    input_tokens_total = _i
-                                    output_tokens_total = _o
-                                else:
-                                    input_tokens_total += _i
-                                    output_tokens_total += _o
-                                return
-                            elif _etype == "usage_delta":
-                                _o = _event.get("output_tokens", 0) or 0
-                                if output_tokens_total is None:
-                                    # rare: usage_delta without prior message_start (partial stream)
-                                    output_tokens_total = _o
-                                else:
-                                    output_tokens_total += _o
-                                return
-                            if _etype == "delta":
-                                _text = _event.get("content", "")
-                                if _text:
-                                    full_content += _text
-                                    await _emit(redis, run_id, 'delta', content=_text)
-                            elif _etype == "tool_preparing":
-                                # D-01 (Phase 56.1, corrected): fired at content_block_start when
-                                # tool name is first known — before arguments finish streaming.
-                                _idx = _event.get("index", len(tool_calls_buffer))
-                                if _idx not in _announced_tools_shared:
-                                    _announced_tools_shared.add(_idx)
-                                    await _emit(redis, run_id, 'tool_preparing', name=_event['name'], index=_idx)
-                            elif _etype == "tool_args_progress":
-                                # Phase 075 D-075-10: route the adapter's
-                                # tool_args_progress yields to _emit. Filter
-                                # logic (execute_code skip) already applied at
-                                # the producer side; this dispatch is a straight
-                                # pass-through.
-                                # Phase 075.6 Plan 01 / Req #1: forward
-                                # `code_so_far` so the additive field rides the
-                                # wire end-to-end.
-                                # WR-01 (2026-05-24): defensive .get for the
-                                # additive field — if a future adapter drops
-                                # code_so_far from its yield, the consumer sees
-                                # "" instead of a KeyError tearing down the run.
-                                await _emit(
-                                    redis, run_id, "tool_args_progress",
-                                    tool_index=_event["tool_index"],
-                                    name=_event["name"],
-                                    args_so_far=_event["args_so_far"],
-                                    total_args_bytes_so_far=_event["total_args_bytes_so_far"],
-                                    code_so_far=_event.get("code_so_far", ""),
-                                )
-                            elif _etype == "tool_start":
-                                # Fired at content_block_stop — arguments now complete.
-                                # tool_preparing was already emitted above; just populate buffer.
-                                _idx = len(tool_calls_buffer)
-                                tool_calls_buffer[_idx] = {
-                                    "id": _event["id"],
-                                    "name": _event["name"],
-                                    "arguments": json.dumps(_event.get("args", {})),
-                                }
-                            elif _etype == "finish":
-                                finish_reason = _event.get("finish_reason", "stop")
-                                # D-075.5-01 (I2 / D-07): hydrate thought_signature onto
-                                # each tool_calls_buffer entry from the finish event's
-                                # tool_calls list so the NEXT iteration's
-                                # _convert_messages_to_google call can round-trip it
-                                # (else Gemini-3 400s on round 2+). NO-OP for Anthropic
-                                # (its tool_calls carry no thought_signature). STAYS
-                                # consumer-side — mutates tool_calls_buffer (a consumer
-                                # accumulator); the adapter only EMITS the sig.
-                                _fin_tcs = _event.get("tool_calls", []) or []
-                                for _i, _ftc in enumerate(_fin_tcs):
-                                    if _i in tool_calls_buffer and _ftc.get("thought_signature"):
-                                        tool_calls_buffer[_i]["thought_signature"] = _ftc["thought_signature"]
-
                         await _drain_stream_with_close_on_cancel(
                             _stream,
                             per_call_budget,
@@ -1575,13 +1581,57 @@ async def run_agent_loop(
                         break  # stream completed
 
                     else:
-                        # --- OpenAI / OpenRouter / Ollama path (unchanged) ---
-                        stream, calling_mode = create_adaptive_streaming_chat(
+                        # --- OpenAI / OpenRouter / Ollama path — Phase 092.5 Wave 4
+                        # (D-04, the entangled unit): dispatched through the provider
+                        # gateway (GATEWAY-01). The entangled normalization (<think>
+                        # state machine, reasoning_content routing,
+                        # _accumulate_chunk_usage, per-provider 5KB boundary dicts)
+                        # MOVED into provider_gateway/openai_compat.py and now EMITS
+                        # canonical events the shared _on_chunk above consumes. The
+                        # STRUCTURED messages injection (L-1) + parse_structured_tool_calls
+                        # post-parse (L-3) + provider-error retry (L-5) STAY here. The
+                        # adapter SURFACES calling_mode (Pitfall 3) — KEPT below.
+
+                        # Phase 066 D-066-03 + 081.1: 4-tier async resolution
+                        # (DB > env > static > default). STAYS consumer-side — loop
+                        # machinery, not stream construction.
+                        _model_id = body.model or user_settings.llm_model
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        # Phase 066 D-066-07: capture for outer-except error format
+                        _last_iteration = iteration
+                        _last_model_id = _model_id
+                        _last_per_call_budget = per_call_budget
+                        # 089-03: surface per-iteration timeout context to the
+                        # producer-shell classifier (see run_agent_loop docstring).
+                        if timeout_ctx is not None:
+                            timeout_ctx["last_iteration"] = _last_iteration
+                            timeout_ctx["last_model_id"] = _last_model_id
+                            timeout_ctx["last_per_call_budget"] = _last_per_call_budget
+
+                        # Phase 075.3 D-075.3-03: the registry-derived provider name
+                        # (NOT user_settings.active_provider) drives the adapter's
+                        # <think>/usage/boundary logic — VERBATIM from the
+                        # pre-extraction agent_loop.py:1667-1668. Carried into the
+                        # request so the adapter keys on it (byte-identical).
+                        _active_cap = await get_model_capability_async(_model_id) or {}
+                        _adapter_provider = (_active_cap.get("provider") or "unknown").lower()
+
+                        # Build the request envelope; the adapter wraps
+                        # create_adaptive_streaming_chat(messages, model=body.model,
+                        # user_settings, tool_choice, tools_override=active_tools)
+                        # VERBATIM and SURFACES calling_mode.
+                        _gw_request = GatewayRequest(
                             messages=messages,
                             model=body.model,
+                            active_provider_name=_adapter_provider,
+                            tools=active_tools,
+                            system_prompt=active_system_prompt,
+                            force_no_tools=force_no_tools,
                             user_settings=user_settings,
                             tool_choice=tool_choice,
-                            tools_override=active_tools,
+                        )
+                        stream, calling_mode = await open_stream(
+                            active_provider_name, _gw_request
                         )
 
                         # Fallback: inject for other structured-mode models (unknown models).
@@ -1597,263 +1647,27 @@ async def run_agent_loop(
                                     _structured_tools_injected = True
                                     break
 
-                        tool_calls_buffer: dict = {}
-                        finish_reason: str | None = None
-                        _in_think_block: bool = False  # BUG-260526-02: Kimi/Moonshot <think> tag state machine
-                        _announced_tools: set[int] = set()
-                        # Phase 075 D-075-10 + Pitfall 3: per-tool_index 5KB-boundary
-                        # counter for tool_args_progress emits. Resets alongside
-                        # tool_calls_buffer / _announced_tools at each agent-loop
-                        # iteration to prevent cross-round leakage (a stale boundary
-                        # from iteration N would silence the emit in iteration N+1).
-                        #
-                        # Phase 075.6 Plan 01 / Req #3 / RESEARCH L1 mitigation:
-                        # OpenAI native and OpenRouter share this _on_chunk_openai
-                        # callback (both go through the OpenAI Python SDK with
-                        # different base_url) but MUST maintain INDEPENDENT
-                        # 5KB-boundary state per SPEC §Constraints:
-                        # "OpenRouter adapter remains independent of the OpenAI
-                        # adapter (no shared code path) so upstream format
-                        # divergence doesn't silently break". A dedicated
-                        # OpenRouter service module does NOT exist —
-                        # independence is achieved via per-provider boundary
-                        # dicts branched on active_provider_name captured at
-                        # L:2100 below.
-                        _emit_boundary_openai_native: dict[int, int] = {}
-                        _emit_boundary_openrouter: dict[int, int] = {}
-                        # Phase 075.10: tool_args_progress emit boundary now
-                        # config-backed via
-                        # app_settings.chat_tool_args_progress_emit_boundary_bytes
-                        # (default 256). Captured ONCE per iteration (alongside
-                        # the per-provider boundary state above) so the
-                        # async chunk callback below reads a local int
-                        # instead of re-walking the settings cache per chunk.
-                        # Defensive helper falls back to pre-075.10 5120 if
-                        # the settings read fails. Tail slice widens
-                        # proportionally so `args_so_far` still ships
-                        # meaningful cumulative context (full cumulative
-                        # buffer continues to flow via `code_so_far`
-                        # per Plan 075.6 Req #1).
-                        from app.models.user_settings import tool_args_progress_emit_boundary_bytes  # noqa: PLC0415 — narrow runtime import to avoid module-load-time cycle
-                        _emit_boundary_bytes = tool_args_progress_emit_boundary_bytes()
-                        _emit_tail_bytes = max(5120, _emit_boundary_bytes * 4)
+                        # Open Q2 / L-4: the OpenAI-compat adapter emits NO synthetic
+                        # tool_start — the shared _on_chunk builds tool_calls_buffer
+                        # from tool_preparing (id+name) + tool_args_progress (full
+                        # code_so_far args). The <think> machine + reasoning routing +
+                        # _accumulate_chunk_usage + per-provider 5KB boundary dicts all
+                        # MOVED into provider_gateway/openai_compat.py (the adapter is
+                        # one-stream-one-tracker). This branch is now pure consumer
+                        # residue: STRUCTURED injection (above) + post-parse (below) +
+                        # provider-error retry stay here.
+                        _build_from_progress = True
 
-                        # Phase 066 D-066-02 + D-066-03 + D-066-11: per-LLM-call
-                        # timer + close-then-raise. Resolve budget before each
-                        # iteration so per-iteration reset is honored
-                        # (asyncio.timeout creates a fresh deadline per `async with`).
-                        # Phase 066 D-066-03 + 081.1: 4-tier async resolution
-                        _model_id = body.model or user_settings.llm_model
-                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
-                        # Phase 066 D-066-07: capture for outer-except error format
-                        _last_iteration = iteration
-                        _last_model_id = _model_id
-                        _last_per_call_budget = per_call_budget
-                        # 089-03: surface per-iteration timeout context to the
-                        # producer-shell classifier (see run_agent_loop docstring).
-                        if timeout_ctx is not None:
-                            timeout_ctx["last_iteration"] = _last_iteration
-                            timeout_ctx["last_model_id"] = _last_model_id
-                            timeout_ctx["last_per_call_budget"] = _last_per_call_budget
-
-                        # Phase 075.3 D-075.3-03: capture the active provider name
-                        # ONCE here (outside the per-chunk closure) so
-                        # ``_accumulate_chunk_usage`` can branch on it without
-                        # re-looking up MODEL_CAPABILITIES per chunk. Sourced
-                        # from the same registry used elsewhere in this file
-                        # for provider gating (mirrors the
-                        # ``get_model_capability(_resolved_model).get("provider", "unknown")``
-                        # pattern at line ~1160).
-                        _active_cap = await get_model_capability_async(_model_id) or {}
-                        active_provider_name = (_active_cap.get("provider") or "unknown").lower()
-
-                        # Phase 067.1 Plan 01 Track A: drain-into-queue.
-                        # Wraps the per-chunk body so that the sync
-                        # `for chunk in stream:` loop runs in a thread
-                        # pool worker — when timeout fires, we close
-                        # the underlying SDK stream from outside the
-                        # for-loop, so _TracedStream.__iter__ takes
-                        # the `else: self._end_trace()` clean-closure
-                        # branch (no GeneratorExit recorded). Variables
-                        # `_last_iteration` / `_last_model_id` /
-                        # `_last_per_call_budget` (captured above) are
-                        # consumed by the outer agent_runner's
-                        # `except asyncio.TimeoutError` formatter.
-                        async def _on_chunk_openai(chunk):
-                            nonlocal full_content, full_reasoning_content, finish_reason, input_tokens_total, output_tokens_total, _in_think_block
-                            # Phase 075.3 D-075.3-03 + D-075.3-04: defensive provider-aware
-                            # accumulator. Google emits ``usage`` on EVERY chunk alongside
-                            # ``delta.content`` / ``delta.tool_calls`` (per quick-task
-                            # 260522-gdg live capture + D-075.3-01 probe verdict CUMULATIVE).
-                            # OpenAI / OpenRouter / Anthropic-via-compat emit ``usage`` only
-                            # on the final ``choices=[]`` chunk (Phase 073 D-073-08).
-                            # Branch inside ``_accumulate_chunk_usage``; DO NOT early-return
-                            # on ``chunk.usage`` — chunks with both ``usage`` and
-                            # ``delta.content`` / ``delta.tool_calls`` must flow through to
-                            # the delta processing below (Google's shape).
-                            input_tokens_total, output_tokens_total = _accumulate_chunk_usage(
-                                chunk,
-                                active_provider_name,
-                                input_tokens_total,
-                                output_tokens_total,
-                            )
-                            if not chunk.choices:
-                                return
-                            choice = chunk.choices[0]
-                            delta = choice.delta
-
-                            if choice.finish_reason:
-                                finish_reason = normalize_finish_reason(choice.finish_reason)
-
-                            if delta.content:
-                                _content = delta.content
-                                # BUG-260526-02 (D-06): Kimi/Moonshot thinking content filter.
-                                # Kimi wraps chain-of-thought reasoning inside <think>...</think>
-                                # tags in delta.content (unlike DeepSeek which uses a separate
-                                # reasoning_content field). Strip thinking tags from visible
-                                # content and route to reasoning_content instead.
-                                # DeepSeek included for defense-in-depth (some models via
-                                # OpenRouter may also use <think> tags in content).
-                                # minimax + zhipu added 2026-05-30: MiniMax M2 emits <think>
-                                # inline in content by default (reasoning_split off, per
-                                # platform.minimax.io docs) and GLM-4.6+ can too; live-confirmed
-                                # a minimax <think> leak into visible content. No-op when the
-                                # provider instead uses a separate reasoning_content field.
-                                if active_provider_name in ("moonshot", "deepseek", "minimax", "zhipu"):
-                                    _visible = ""
-                                    _reasoning = ""
-                                    _remaining = _content
-                                    while _remaining:
-                                        if _in_think_block:
-                                            end_idx = _remaining.find("</think>")
-                                            if end_idx != -1:
-                                                _reasoning += _remaining[:end_idx]
-                                                _remaining = _remaining[end_idx + len("</think>"):]
-                                                _in_think_block = False
-                                            else:
-                                                _reasoning += _remaining
-                                                _remaining = ""
-                                        else:
-                                            start_idx = _remaining.find("<think>")
-                                            if start_idx != -1:
-                                                _visible += _remaining[:start_idx]
-                                                _remaining = _remaining[start_idx + len("<think>"):]
-                                                _in_think_block = True
-                                            else:
-                                                _visible += _remaining
-                                                _remaining = ""
-                                    if _reasoning:
-                                        full_reasoning_content += _reasoning
-                                        await _emit(redis, run_id, 'reasoning_delta', content=_reasoning)
-                                    if _visible:
-                                        full_content += _visible
-                                        await _emit(redis, run_id, 'delta', content=_visible)
-                                else:
-                                    full_content += _content
-                                    await _emit(redis, run_id, 'delta', content=_content)
-
-                            # DeepSeek thinking mode: accumulate reasoning_content + emit SSE
-                            _rc = getattr(delta, 'reasoning_content', None)
-                            if _rc:
-                                full_reasoning_content += _rc
-                                await _emit(redis, run_id, 'reasoning_delta', content=_rc)
-
-                            if delta.tool_calls:
-                                for tc in delta.tool_calls:
-                                    idx = tc.index
-                                    if idx not in tool_calls_buffer:
-                                        tool_calls_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                                    if tc.id:
-                                        tool_calls_buffer[idx]["id"] = tc.id
-                                    if tc.function and tc.function.name:
-                                        tool_calls_buffer[idx]["name"] = tc.function.name
-                                        # D-01 (Phase 56.1): emit tool_preparing as soon as name is known,
-                                        # before arguments finish streaming. Fires exactly once per tool index.
-                                        if idx not in _announced_tools:
-                                            _announced_tools.add(idx)
-                                            await _emit(redis, run_id, 'tool_preparing', name=tc.function.name, index=idx)
-                                    # Phase 075.5 D-075.5-03: the OpenAI-compat
-                                    # extra_content.google.thought_signature
-                                    # capture is REMOVED. Google now goes through
-                                    # the native SDK path at line ~1918 above —
-                                    # this branch only handles OpenAI / OpenRouter /
-                                    # Ollama, none of which use thought_signature.
-                                    if tc.function and tc.function.arguments:
-                                        tool_calls_buffer[idx]["arguments"] += tc.function.arguments
-                                        # Phase 075 D-075-09/10/11: emit tool_args_progress
-                                        # on every 5KB cumulative-byte boundary. STRUCTURED
-                                        # mode is still skipped (args arrive at
-                                        # finish_reason parse time, not progressively —
-                                        # there's no streaming accumulator to walk).
-                                        #
-                                        # Phase 075.6 Plan 01 / Req #2: the prior
-                                        # execute_code-tool-name skip filter is REMOVED.
-                                        # The frontend live panel (Plan 02
-                                        # <ToolArgsLivePanel>) renders streaming
-                                        # execute_code args as the LLM types them — the
-                                        # exact moment users most need progress feedback.
-                                        _tool_name = tool_calls_buffer[idx]["name"]
-                                        if (
-                                            _tool_name
-                                            and calling_mode != CallingMode.STRUCTURED
-                                        ):
-                                            # Phase 075.6 Plan 01 / Req #3: select
-                                            # per-provider boundary dict so OpenRouter
-                                            # aggregation cadence cannot be polluted by
-                                            # OpenAI native boundary state and vice versa.
-                                            # `active_provider_name` is captured at L:2100
-                                            # (outside this closure) and closure-captured.
-                                            _emit_boundary = (
-                                                _emit_boundary_openrouter
-                                                if active_provider_name == "openrouter"
-                                                else _emit_boundary_openai_native
-                                            )
-                                            _bytes_total = len(
-                                                tool_calls_buffer[idx]["arguments"].encode("utf-8")
-                                            )
-                                            # Phase 075.10: boundary lowered from
-                                            # hardcoded 5120 to config-backed default
-                                            # 256 via
-                                            # chat_tool_args_progress_emit_boundary_bytes.
-                                            # Resolved once outside the closure into
-                                            # _emit_boundary_bytes (closure-captured).
-                                            _new_boundary = _bytes_total // _emit_boundary_bytes
-                                            _last_boundary = _emit_boundary.get(idx, 0)
-                                            if _new_boundary > _last_boundary:
-                                                _emit_boundary[idx] = _new_boundary
-                                                # D-075-09 + Phase 075.10: args_so_far is
-                                                # the LAST _emit_tail_bytes of the
-                                                # cumulative accumulator (sliding-window
-                                                # tail, capped at max(5120, boundary*4)).
-                                                # UTF-8-aware byte slice + decode
-                                                # errors="ignore" drops any invalid
-                                                # trailing codepoint bytes left by the
-                                                # byte boundary.
-                                                _tail_bytes = tool_calls_buffer[idx]["arguments"].encode("utf-8")[-_emit_tail_bytes:]
-                                                _args_so_far = _tail_bytes.decode("utf-8", errors="ignore")
-                                                await _emit(
-                                                    redis, run_id, "tool_args_progress",
-                                                    tool_index=idx,
-                                                    name=_tool_name,
-                                                    args_so_far=_args_so_far,
-                                                    total_args_bytes_so_far=_bytes_total,
-                                                    # Phase 075.6 Plan 01 / Req #1: full
-                                                    # cumulative concatenated args (not
-                                                    # the 5 KB tail) — additive field.
-                                                    code_so_far=tool_calls_buffer[idx]["arguments"],
-                                                )
-
+                        # Phase 067.1 Plan 01 Track A: drain-into-queue. openai 2.28.0
+                        # Stream.close() is sync + idempotent (closes underlying httpx
+                        # response); the adapter's _ClosableEventStream.close delegates
+                        # to it. Bound here so the helper's except-block closes from the
+                        # main thread BEFORE the producer's for-loop cleanup propagates
+                        # GeneratorExit into _TracedStream.__iter__.
                         await _drain_stream_with_close_on_cancel(
                             stream,
                             per_call_budget,
-                            _on_chunk_openai,
-                            # openai 2.28.0 Stream.close() is sync and
-                            # idempotent (closes underlying httpx
-                            # response). Bound here so the helper's
-                            # except-block calls it from the main
-                            # thread BEFORE the producer's for-loop
-                            # cleanup ever propagates GeneratorExit
-                            # into _TracedStream.__iter__.
+                            _on_chunk,
                             close_fn=stream.close,
                         )
 

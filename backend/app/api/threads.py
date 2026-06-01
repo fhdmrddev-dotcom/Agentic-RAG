@@ -77,7 +77,6 @@ from app.services.agent_loop import (
     CONFIDENCE_DISCLAIMER,
     _compute_confidence,
     _deduplicate_citations,
-    _accumulate_chunk_usage,
     _reconstruct_history,
 )
 
@@ -178,10 +177,13 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
 
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
 # SYSTEM_PROMPT, TOOL_USAGE_INSTRUCTIONS, _format_tool_list, CONFIDENCE_DISCLAIMER,
-# _compute_confidence, _deduplicate_citations, and _accumulate_chunk_usage MOVED
-# verbatim to app.services.agent_loop and are re-imported at the top of this module
-# (see the agent_loop import block). Definitions removed here to keep one canonical
-# copy (no duplicate). _reconstruct_history (further down) moved with them.
+# _compute_confidence, _deduplicate_citations MOVED verbatim to
+# app.services.agent_loop and are re-imported at the top of this module (see the
+# agent_loop import block). Definitions removed here to keep one canonical copy (no
+# duplicate). _reconstruct_history (further down) moved with them.
+# Phase 092.5 Wave 4 (D-04): _accumulate_chunk_usage moved AGAIN — from agent_loop
+# into app.services.provider_gateway.openai_compat (the OpenAI-compat adapter owns
+# the provider-aware usage helper now); no longer re-exported through threads.py.
 
 
 # Phase 063 (D-063-01): the module-level `event_consumer` async generator that
