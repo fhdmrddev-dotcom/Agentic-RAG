@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: ready_to_plan
-stopped_at: Phase 092.5 Plan 05 complete — Plan 06 operator PROOF GATE #2 next
-last_updated: "2026-06-01T21:10:00.000Z"
-last_activity: 2026-06-01
+stopped_at: Phase 092.5 complete (passed_with_overrides) — Phase 093 next (CONTEXT.md present → plan-phase)
+last_updated: "2026-06-02T00:00:00.000Z"
+last_activity: 2026-06-02
 progress:
   total_phases: 9
   completed_phases: 5
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 092.5
+**Current focus:** Phase 093 — Harness Cross-Provider Parity (consumes the 092.5 gateway; CONTEXT.md present → `/gsd:plan-phase 093`)
 
 ## Current Position
 
