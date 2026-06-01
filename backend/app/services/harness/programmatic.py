@@ -70,14 +70,14 @@ _CLAUSE_SPLIT_RE = re.compile(r"[;\n]|(?:,?\s+and\s+)|(?:\s+vs\.?\s+)", re.IGNOR
 
 @register_programmatic("split_topic")
 async def split_topic(input: dict, ctx: object) -> dict:
-    """Split a research ``topic`` into N sub-questions for the batch phase to fan out.
+    """Split a research ``topic`` or ``kickoff_prompt`` into N sub-questions for the batch phase to fan out.
 
     The sole v1 consumer of the programmatic registry — the "Literature review
-    (batch)" seed's split step. It reads the run's ``topic`` (the executor supplies
-    it under that key from ``config.input_keys``) and splits on natural clause
-    boundaries (``;``, newlines, ``" and "``, ``" vs "``). When the topic has no
-    clause boundaries it falls back to the single whole-topic question, so the batch
-    phase always fans out over ≥ 1 sub-question.
+    (batch)" seed's split step. It reads the run's ``topic`` or ``kickoff_prompt``
+    (the executor supplies them under those keys from ``config.input_keys``) and
+    splits on natural clause boundaries (``;``, newlines, ``" and "``, ``" vs "``).
+    When the topic has no clause boundaries it falls back to the single whole-topic
+    question, so the batch phase always fans out over ≥ 1 sub-question.
 
     PURE + IDEMPOTENT (Pattern 3): no LLM, no side effects, deterministic output —
     the same ``topic`` always yields the same ``sub_questions`` list, so re-running
@@ -86,7 +86,11 @@ async def split_topic(input: dict, ctx: object) -> dict:
     Returns ``{"sub_questions": [str, ...]}`` — the shape the ``llm_batch_agents``
     executor reads to derive its N parallel sub-agents.
     """
-    topic = (input.get("topic") or "").strip()
+    # D-09a (093): the executor builds fn_input only for keys in config.input_keys.
+    # Live runs carry run_inputs["kickoff_prompt"]; the legacy seed key was "topic".
+    # Read BOTH so the seed input_keys edit (migration 065) actually surfaces the
+    # user's question to this fn. topic precedence preserved (backward compatible).
+    topic = (input.get("topic") or input.get("kickoff_prompt") or "").strip()
     if not topic:
         return {"sub_questions": []}
 

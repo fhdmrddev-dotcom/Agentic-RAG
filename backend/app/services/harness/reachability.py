@@ -12,6 +12,9 @@ rejects definition graphs which would hang or strand a run at runtime
                          that can never reach the final index).
   - BAD_INDEX          : duplicate slug or non-contiguous ``phase_index`` (the
                          well-formedness floor).
+  - INPUT_UNSATISFIED  : a phase whose ``config.input_keys`` reads a key that no
+                         upstream phase produces and is not a known run input
+                         (D-10 / T-093-DOS — strands the run at runtime).
 
 The graph: nodes = phases; edges = the sequential ``i -> i+1`` link PLUS every
 ``skip_to_phase:<slug>`` parsed out of each phase's ``validators[].on_failure``.
@@ -29,6 +32,30 @@ class LintError(NamedTuple):
     code: str
     phase_slug: str | None
     message: str
+
+
+# D-10 (093): keys create_workflow_run stores on workflow_runs.inputs (threads.py:1233
+# wf_ctx.inputs={"kickoff_prompt": ...}; the legacy seed key "topic" stays accepted).
+_KNOWN_RUN_INPUT_KEYS = frozenset({"kickoff_prompt", "topic"})
+
+
+def _check_input_contracts(phases) -> list[LintError]:
+    """D-10 INPUT_UNSATISFIED: a phase's input_keys must be satisfiable by an
+    upstream phase output (its slug, or a declared output_key) OR a known run input.
+    Mirrors the executor's resolution (accumulated_outputs key OR run_inputs key)."""
+    errors: list[LintError] = []
+    produced: set[str] = set()
+    for p in sorted(phases, key=lambda q: q.phase_index):
+        input_keys = list(getattr(p.config, "input_keys", []) or [])
+        for k in input_keys:
+            if k not in produced and k not in _KNOWN_RUN_INPUT_KEYS:
+                errors.append(LintError(
+                    "input_unsatisfied", p.slug,
+                    f"input_key {k!r} is never produced by an upstream phase or a run input",
+                ))
+        produced.add(p.slug)
+        produced.update(getattr(p.config, "output_keys", []) or [])
+    return errors
 
 
 def parse_skip_target(on_failure: str) -> str | None:
@@ -142,5 +169,10 @@ def lint_workflow(definition: WorkflowDefinition) -> list[LintError]:
                 "no terminal phase is reachable (cycle never reaches completion)",
             )
         )
+
+    # ── INPUT_UNSATISFIED: a phase reading a never-produced input_key strands ─
+    # the run at runtime (D-10, T-093-DOS). Pure check, mirrors the executor's
+    # resolution (accumulated_outputs slug/output_key OR a known run input).
+    errors.extend(_check_input_contracts(phases))
 
     return errors

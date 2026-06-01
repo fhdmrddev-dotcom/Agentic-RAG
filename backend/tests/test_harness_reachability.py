@@ -110,3 +110,69 @@ def test_4_seeds_lint_clean(four_seed_defs):
     for wf in defs:
         errors = lint_workflow(wf)
         assert errors == [], f"{wf.slug} should lint clean, got {errors}"
+
+
+# ── Phase 093 / D-10 — INPUT_UNSATISFIED lint rule (T-093-DOS) ───────────────
+
+
+def test_lint_flags_input_unsatisfied_unproduced_key(build_workflow_definition):
+    """A programmatic phase reading an input_key no upstream phase produces is flagged.
+
+    'never_produced' is neither an upstream phase slug/output nor a known run input
+    (kickoff_prompt/topic) -> the run would strand at runtime, so publish-time lint
+    rejects it (safe-by-construction, D-10).
+    """
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": "entry"}},
+            {"config": {"phase_type": "programmatic", "fn": "split_topic",
+                        "input_keys": ["never_produced"]}},
+        ]
+    )
+    findings = [e for e in lint_workflow(wf) if e.code == "input_unsatisfied"]
+    assert findings, "expected an input_unsatisfied finding"
+    # phase_slug points at the offending phase (auto-slug 'p1' for the 2nd phase).
+    assert findings[0].phase_slug == wf.phases[1].slug
+
+
+def test_lint_accepts_kickoff_prompt_as_known_run_input(build_workflow_definition):
+    """A phase reading the run input 'kickoff_prompt' produces NO input_unsatisfied error."""
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "programmatic", "fn": "split_topic",
+                        "input_keys": ["kickoff_prompt"]}},
+            {"config": {"phase_type": "llm_single", "prompt": "merge"}},
+        ]
+    )
+    codes = [e.code for e in lint_workflow(wf)]
+    assert "input_unsatisfied" not in codes, codes
+
+
+def test_lint_accepts_upstream_produced_slug(build_workflow_definition):
+    """A phase reading an UPSTREAM phase's slug as its input_key is satisfied."""
+    wf = build_workflow_definition(
+        [
+            {"slug": "gather", "phase_index": 0,
+             "config": {"phase_type": "llm_single", "prompt": "gather"}},
+            {"slug": "use", "phase_index": 1,
+             "config": {"phase_type": "programmatic", "fn": "split_topic",
+                        "input_keys": ["gather"]}},
+        ]
+    )
+    codes = [e.code for e in lint_workflow(wf)]
+    assert "input_unsatisfied" not in codes, codes
+
+
+def test_4_seeds_lint_clean_after_split_topic_fix(four_seed_defs):
+    """After the migration-065 seed shape (split phase input_keys includes
+    'kickoff_prompt'), all 4 seeds STILL lint clean — including the new
+    INPUT_UNSATISFIED rule. Mirrors the migration in-test so the seed fix + lint
+    rule land together (D-10: seeds must lint clean after the fix)."""
+    defs = four_seed_defs()
+    for wf in defs:
+        if wf.slug == "literature_review":
+            # Mirror migration 065: split phase reads kickoff_prompt as well as topic.
+            wf.phases[0].config.input_keys = ["topic", "kickoff_prompt"]
+    for wf in defs:
+        errors = lint_workflow(wf)
+        assert errors == [], f"{wf.slug} should lint clean after the fix, got {errors}"
