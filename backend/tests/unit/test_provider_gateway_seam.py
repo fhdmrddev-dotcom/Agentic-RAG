@@ -100,11 +100,24 @@ def _mk_request(provider: str) -> GatewayRequest:
 
 
 async def _collect(stream) -> list[GatewayEvent]:
-    """Drain an adapter's async event stream into a list (the seam assertion)."""
+    """Drain an adapter's async event stream into a list (the seam assertion).
+
+    Used by the Wave-4 openai_compat tests (async-iterable adapter)."""
     events: list[GatewayEvent] = []
     async for ev in stream:
         events.append(ev)
     return events
+
+
+def _collect_sync(stream) -> list[GatewayEvent]:
+    """Drain a SYNC event stream into a list.
+
+    The Anthropic/Google adapters return the bare ``stream_*`` SYNC generator
+    VERBATIM (the consumer's ``_drain_stream_with_close_on_cancel`` drives it
+    with ``for chunk in stream:`` in a threadpool and closes it via
+    ``stream.close`` on timeout — the byte-identical RED LINE). The seam test
+    mirrors that sync drive."""
+    return list(stream)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -137,35 +150,33 @@ def test_calling_mode_is_reexported_not_redefined():
     assert CallingMode.STRUCTURED.value == "structured"
 
 
-async def test_open_stream_routes_unimplemented_adapters_to_notimplemented():
-    """Wave-0 routing skeleton: anthropic/google/openai-compat branches exist and
-    each currently raises NotImplementedError (adapter bodies land Waves 2/4).
-    This pins the provider->adapter routing SHAPE the seam depends on."""
-    for provider in ("anthropic", "google", "openai", "openrouter"):
+async def test_open_stream_openai_compat_still_unimplemented():
+    """092.5 Wave 2: anthropic + google adapters are LIVE (see the per-adapter
+    tests below); the openai-compat ``else`` branch (OpenAI / OpenRouter / Ollama
+    / native-7 fallbacks) STILL raises NotImplementedError until Wave 4 lands it.
+    This pins the routing SHAPE the seam depends on — and proves Wave 2 did NOT
+    touch the OpenAI branch."""
+    for provider in ("openai", "openrouter"):
         with pytest.raises(NotImplementedError):
             await open_stream(provider, _mk_request(provider))
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Anthropic adapter contract — SKIPS until Wave 2 lands provider_gateway/anthropic
+# Anthropic adapter contract — LIVE (provider_gateway/anthropic landed Wave 2)
 #
-# NOTE: importorskip is called INSIDE each adapter test (function scope), NOT at
-# module level. A module-level importorskip aborts collection of the WHOLE file
-# (including the shape tests above) — so the per-test gate is the correct scope:
-# the shape tests collect + PASS today, the adapter tests SKIP until their module
-# lands, and the file still "COLLECTS green / exits 0".
+# The adapter returns the bare ``stream_anthropic`` SYNC generator VERBATIM, so
+# the fakes here are SYNC generators (matching the real
+# ``stream_anthropic: Generator[dict, None, None]``) and the assertion sync-drives
+# the returned stream — exactly how the consumer's drain does.
 # ════════════════════════════════════════════════════════════════════════════
 
 
 async def test_anthropic_adapter_yields_canonical_events(monkeypatch):
     """Anthropic adapter wraps stream_anthropic (already canonical) and yields the
-    delta -> tool_start -> finish -> usage sequence verbatim."""
-    _anthropic = pytest.importorskip(
-        "app.services.provider_gateway.anthropic",
-        reason="anthropic adapter lands in Wave 2",
-    )
+    delta -> tool_start -> finish -> usage sequence VERBATIM (no re-shaping)."""
+    import app.services.provider_gateway.anthropic as _anthropic
 
-    async def _fake_stream_anthropic(**kwargs):
+    def _fake_stream_anthropic(**kwargs):
         yield {"type": "delta", "content": "Hello"}
         yield {"type": "tool_start", "id": "t1", "name": "search_documents", "args": {"q": "x"}}
         yield {"type": "finish", "finish_reason": "tool_calls", "tool_calls": [{"id": "t1"}]}
@@ -173,26 +184,23 @@ async def test_anthropic_adapter_yields_canonical_events(monkeypatch):
 
     monkeypatch.setattr(_anthropic, "stream_anthropic", _fake_stream_anthropic, raising=False)
     stream, calling_mode = await open_stream("anthropic", _mk_request("anthropic"))
-    events = await _collect(stream)
+    events = _collect_sync(stream)
     types = [e["type"] for e in events]
     assert types == ["delta", "tool_start", "finish", "usage"]
     assert calling_mode == CallingMode.NATIVE
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# Google adapter contract — SKIPS until Wave 2 lands provider_gateway/google
+# Google adapter contract — LIVE (provider_gateway/google landed Wave 2)
 # ════════════════════════════════════════════════════════════════════════════
 
 
 async def test_google_adapter_yields_canonical_events_with_thought_signature(monkeypatch):
     """I2 / D-07: the Google adapter carries the base64 thought_signature on
     finish.tool_calls[] so the consumer can hydrate it (else Gemini-3 400s round 2)."""
-    _google = pytest.importorskip(
-        "app.services.provider_gateway.google",
-        reason="google adapter lands in Wave 2",
-    )
+    import app.services.provider_gateway.google as _google
 
-    async def _fake_stream_google(**kwargs):
+    def _fake_stream_google(**kwargs):
         yield {"type": "delta", "content": "thinking..."}
         yield {
             "type": "finish",
@@ -202,7 +210,7 @@ async def test_google_adapter_yields_canonical_events_with_thought_signature(mon
 
     monkeypatch.setattr(_google, "stream_google", _fake_stream_google, raising=False)
     stream, calling_mode = await open_stream("google", _mk_request("google"))
-    events = await _collect(stream)
+    events = _collect_sync(stream)
     finish = next(e for e in events if e["type"] == "finish")
     assert finish["tool_calls"][0]["thought_signature"] == "BASE64SIG=="
     assert calling_mode == CallingMode.NATIVE

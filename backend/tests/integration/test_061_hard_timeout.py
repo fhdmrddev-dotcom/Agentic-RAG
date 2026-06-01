@@ -113,13 +113,20 @@ def test_sdk_close_methods_present():
     """D-066-11 + Phase 067.1 Plan 01 Track A: SDK close() bind reaches both branches.
 
     Track A binds the close call via ``close_fn=`` keyword on the helper
-    invocation: ``close_fn=stream.close`` (OpenAI) and
-    ``close_fn=_ant_gen.close`` (Anthropic). The helper invokes the bound
-    callable from the main thread on cancel BEFORE the producer's
-    for-loop cleanup propagates GeneratorExit into _TracedStream.__iter__.
+    invocation: ``close_fn=stream.close`` (OpenAI) and ``close_fn=_stream.close``
+    (the gateway-dispatched native path). The helper invokes the bound callable
+    from the main thread on cancel BEFORE the producer's for-loop cleanup
+    propagates GeneratorExit into _TracedStream.__iter__.
 
     Phase 089-03: the provider branches (and thus these close_fn binds) moved
     with the loop body into agent_loop.py::run_agent_loop — grep there.
+
+    Phase 092.5 Wave 2: the Anthropic + Google branches collapsed into ONE
+    gateway-dispatched native branch whose stream is the bare ``stream_*`` SYNC
+    generator returned by ``open_stream`` — bound to the local ``_stream``. The
+    close bind is byte-identical (the underlying ``.close`` is the SAME
+    sync-generator close that was ``_ant_gen.close`` / ``_g_gen.close``), now
+    spelled ``close_fn=_stream.close`` after the collapse.
     """
     src = _AGENT_LOOP_PY.read_text(encoding="utf-8")
     assert "close_fn=stream.close" in src, (
@@ -127,7 +134,8 @@ def test_sdk_close_methods_present():
         "_drain_stream_with_close_on_cancel call. LangSmith would record "
         "GeneratorExit on TimeoutError without this."
     )
-    assert "close_fn=_ant_gen.close" in src, (
-        "D-066-11 regression: Anthropic _ant_gen.close() bind missing on the "
-        "_drain_stream_with_close_on_cancel call."
+    assert "close_fn=_stream.close" in src, (
+        "D-066-11 regression: native-path (Anthropic/Google) sync-generator "
+        "close bind missing on the _drain_stream_with_close_on_cancel call "
+        "(092.5 collapsed _ant_gen/_g_gen.close -> _stream.close)."
     )

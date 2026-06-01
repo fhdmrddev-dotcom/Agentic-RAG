@@ -25,7 +25,7 @@ stay passed-in callables consumer-side).
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, AsyncIterator
 
 # Re-export the EXISTING CallingMode enum — do NOT define a new one (Pitfall 3).
@@ -57,13 +57,7 @@ class GatewayRequest:
     messages: list[dict]
     model: str
     active_provider_name: str
-    # ``tools`` carries the consumer's ``active_tools`` value VERBATIM — including
-    # its ``None`` signal ("no override → fall back to get_tools(user_settings)").
-    # The Anthropic/Google adapters do the exact live select
-    # ``active_tools if active_tools is not None else get_tools(user_settings)``
-    # (agent_loop.py:1401 / :1540) so the tool-select moves with the construction
-    # byte-identically.
-    tools: list[dict] | None = None
+    tools: list[dict] = field(default_factory=list)
     system_prompt: str = ""
     force_no_tools: bool = False
     max_tokens: int | None = None
@@ -85,22 +79,12 @@ async def open_stream(
     Anthropic/Google return ``CallingMode.NATIVE``; the OpenAI-compat adapter
     surfaces the ``calling_mode`` ``create_adaptive_streaming_chat`` returns.
 
-    Wave 2 (this plan): the anthropic + google adapters are live (clean
-    stream-construction moves; they return the bare ``stream_*`` SYNC generator
-    so the consumer's ``_drain_stream_with_close_on_cancel`` drives + closes it
-    byte-identically). The openai_compat ``else`` branch stays a stub until
-    Wave 4.
+    Wave 0 (this plan): the adapter bodies are NotImplementedError stubs — the
+    job here is to fix the SHAPE (signature, routing, CallingMode surfacing).
     """
     if provider == "anthropic":
-        # Lazy import: keep the raw-SDK service module out of the dispatcher's
-        # import-time graph (matches the consumer's inline-import pattern; the
-        # adapter module imports anthropic_service, which is BELOW the gateway).
-        from .anthropic import open_anthropic_stream
-
-        return open_anthropic_stream(request), CallingMode.NATIVE
+        raise NotImplementedError("anthropic adapter lands in Wave 2")
     elif provider == "google":
-        from .google import open_google_stream
-
-        return open_google_stream(request), CallingMode.NATIVE
+        raise NotImplementedError("google adapter lands in Wave 2")
     else:
         raise NotImplementedError("openai_compat adapter lands in Wave 4")

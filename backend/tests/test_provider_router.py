@@ -243,7 +243,9 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
             "app.services.agent_loop.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_fast_chunks()), CallingMode.NATIVE),
         ), patch(
-            "app.services.agent_loop.stream_anthropic",
+            # 092.5 Wave 2: the Anthropic adapter now owns the stream_anthropic
+            # call (imported into provider_gateway.anthropic) — patch it THERE.
+            "app.services.provider_gateway.anthropic.stream_anthropic",
             side_effect=lambda *a, **k: iter([]),
         ), patch(
             "app.api.threads.generate_thread_title",

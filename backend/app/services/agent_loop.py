@@ -1393,35 +1393,13 @@ async def run_agent_loop(
                     # through the native Anthropic path (operator chose OpenRouter
                     # for a reason — routing, billing, fallbacks). Registry-aware
                     # secondary gate considered + rejected; no code change required.
-                    if active_provider_name in ("anthropic", "google"):
-                        # --- Native SDK paths (Anthropic GEN-02 / Google
-                        # D-075.5-01) — Phase 092.5 Wave 2: dispatched through the
-                        # provider gateway (GATEWAY-01 / D-01). The two branches
-                        # collapsed into ONE: their stream constructions moved into
-                        # provider_gateway/anthropic.py + google.py (the bare SYNC
-                        # generator is returned so the drain + close_fn=stream.close
-                        # below stay byte-identical), and their two near-identical
-                        # _on_chunk_anthropic / _on_chunk_google callbacks collapse
-                        # into the ONE provider-agnostic _on_chunk below (D-02).
-                        #
-                        # The Google _on_chunk was documented as "structurally a copy
-                        # of the Anthropic branch"; the ONLY divergence was the
-                        # thought_signature hydration in the finish branch — and that
-                        # is a NO-OP for Anthropic (its tool_calls carry no
-                        # thought_signature), so running it on both paths is
-                        # byte-identical (I2 / D-07 preserved CONSUMER-side: it
-                        # mutates tool_calls_buffer, a consumer accumulator; the
-                        # adapter only EMITS the finish event carrying the sig).
-                        from app.services.provider_gateway import (
-                            GatewayRequest,
-                            open_stream,
-                        )
-
-                        # Phase 066 D-066-03 + 081.1: 4-tier async resolution
-                        # (DB > env > static > default). STAYS consumer-side — it
-                        # drives the per-call drain budget + the timeout_ctx the
-                        # producer-shell classifier reads (loop machinery, not
-                        # stream construction).
+                    if active_provider_name == "anthropic":
+                        # --- Anthropic native SDK path (GEN-02) ---
+                        from app.services.openai_service import _resolve_max_tokens
+                        _ant_max_tokens = _resolve_max_tokens(None, user_settings)
+                        _ant_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
+                        _ant_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                        # Phase 066 D-066-03 + 081.1: 4-tier async resolution (DB > env > static > default)
                         _model_id = body.model or user_settings.llm_model
                         per_call_budget = await get_per_call_timeout_async(_model_id, settings)
                         # Phase 066 D-066-07: capture for outer-except error format
@@ -1434,66 +1412,51 @@ async def run_agent_loop(
                             timeout_ctx["last_iteration"] = _last_iteration
                             timeout_ctx["last_model_id"] = _last_model_id
                             timeout_ctx["last_per_call_budget"] = _last_per_call_budget
-
-                        # Build the request envelope from in-scope loop values. The
-                        # adapter does the inline kwargs-assembly verbatim (api_key
-                        # resolution + _resolve_max_tokens + the
-                        # ``active_tools if active_tools is not None else get_tools``
-                        # select) — ``tools`` carries active_tools' None signal.
-                        _gw_request = GatewayRequest(
+                        _ant_gen = stream_anthropic(
                             messages=messages,
-                            model=_model_id,
-                            active_provider_name=active_provider_name,
-                            tools=active_tools,
+                            tools=_ant_tools,
                             system_prompt=active_system_prompt,
+                            model=_model_id,
+                            api_key=_ant_api_key,
+                            max_tokens=_ant_max_tokens,
                             force_no_tools=force_no_tools,
-                            user_settings=user_settings,
-                            tool_choice=tool_choice,
                         )
-                        _stream, _calling_mode = await open_stream(
-                            active_provider_name, _gw_request
-                        )
-
                         tool_calls_buffer: dict = {}
                         finish_reason: str | None = None
-                        _announced_tools_shared: set[int] = set()
+                        _announced_tools_ant: set[int] = set()
 
                         # Phase 067.1 Plan 01 Track A: drain-into-queue
                         # parity with the OpenAI branch (PATTERNS.md
-                        # parity rule). The Anthropic/Google paths are NOT
-                        # langsmith-wrapped here (the raw-SDK generators
-                        # handle their own tracing), so the
+                        # parity rule). The Anthropic path is NOT
+                        # langsmith-wrapped today (anthropic_service.py
+                        # uses raw anthropic.Anthropic — see
+                        # SUMMARY.md "Symmetry check"), so the
                         # GeneratorExit-trace pollution is OpenAI-only;
                         # but symmetric structure prevents future
-                        # langsmith adoption from regressing to the
-                        # inline-for-loop shape.
+                        # langsmith-anthropic adoption from regressing
+                        # to the inline-for-loop shape.
                         #
-                        # On timeout the helper closes the underlying SYNC
-                        # generator (``_stream.close()`` raises GeneratorExit
-                        # inside the raw-SDK service's `with` block →
-                        # MessageStream.__exit__ → response.close()); SYNC
-                        # method; do NOT `await`. The outer agent_runner's
-                        # `except asyncio.TimeoutError` catches the propagated
-                        # TimeoutError and sets _terminal_status='timed_out'
-                        # (Phase 066 D-066-06/07).
-                        async def _on_chunk(_event):
-                            """ONE provider-agnostic consumer handler (D-02) for the
-                            Anthropic + Google native paths. Consumes the canonical
-                            events the gateway adapters yield and mutates the STAY
-                            accumulators + calls _emit — a verbatim collapse of the
-                            former _on_chunk_anthropic / _on_chunk_google.
-                            """
+                        # On timeout the helper closes _ant_gen
+                        # (`_ant_gen.close()` raises GeneratorExit
+                        # inside anthropic_service.py's `with` block
+                        # → MessageStream.__exit__ → response.close());
+                        # SYNC method (anthropic 0.97.0); do NOT
+                        # `await`. The outer agent_runner's
+                        # `except asyncio.TimeoutError` catches the
+                        # propagated TimeoutError and sets
+                        # _terminal_status='timed_out' (Phase 066
+                        # D-066-06/07).
+                        async def _on_chunk_anthropic(_ant_event):
                             nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
-                            _etype = _event.get("type")
-                            # Phase 073 TOKEN-COL-01 (D-073-08): usage events. Anthropic
-                            # yields message_start->"usage" + message_delta->"usage_delta";
-                            # Google's SDK emits cumulative usage_metadata normalized into
-                            # one initial 'usage' + per-chunk 'usage_delta' (Pitfall 9:
-                            # output_tokens added ONCE per Message, which the adapters
-                            # guarantee).
+                            _etype = _ant_event.get("type")
+                            # Phase 073 TOKEN-COL-01 (D-073-08): usage events from Plan 03's
+                            # anthropic_service.stream_anthropic yields. message_start to "usage";
+                            # message_delta to "usage_delta" (Pitfall 9: usage_delta.output_tokens
+                            # is FINAL CUMULATIVE for THAT Message; accumulator adds it ONCE per
+                            # Message, which is what stream_anthropic guarantees).
                             if _etype == "usage":
-                                _i = _event.get("input_tokens", 0) or 0
-                                _o = _event.get("output_tokens", 0) or 0
+                                _i = _ant_event.get("input_tokens", 0) or 0
+                                _o = _ant_event.get("output_tokens", 0) or 0
                                 if input_tokens_total is None:
                                     input_tokens_total = _i
                                     output_tokens_total = _o
@@ -1502,7 +1465,7 @@ async def run_agent_loop(
                                     output_tokens_total += _o
                                 return
                             elif _etype == "usage_delta":
-                                _o = _event.get("output_tokens", 0) or 0
+                                _o = _ant_event.get("output_tokens", 0) or 0
                                 if output_tokens_total is None:
                                     # rare: usage_delta without prior message_start (partial stream)
                                     output_tokens_total = _o
@@ -1510,67 +1473,184 @@ async def run_agent_loop(
                                     output_tokens_total += _o
                                 return
                             if _etype == "delta":
-                                _text = _event.get("content", "")
+                                _text = _ant_event.get("content", "")
                                 if _text:
                                     full_content += _text
                                     await _emit(redis, run_id, 'delta', content=_text)
                             elif _etype == "tool_preparing":
                                 # D-01 (Phase 56.1, corrected): fired at content_block_start when
                                 # tool name is first known — before arguments finish streaming.
-                                _idx = _event.get("index", len(tool_calls_buffer))
-                                if _idx not in _announced_tools_shared:
-                                    _announced_tools_shared.add(_idx)
-                                    await _emit(redis, run_id, 'tool_preparing', name=_event['name'], index=_idx)
+                                _idx = _ant_event.get("index", len(tool_calls_buffer))
+                                if _idx not in _announced_tools_ant:
+                                    _announced_tools_ant.add(_idx)
+                                    await _emit(redis, run_id, 'tool_preparing', name=_ant_event['name'], index=_idx)
                             elif _etype == "tool_args_progress":
-                                # Phase 075 D-075-10: route the adapter's
-                                # tool_args_progress yields to _emit. Filter
-                                # logic (execute_code skip) already applied at
-                                # the producer side; this dispatch is a straight
-                                # pass-through.
+                                # Phase 075 D-075-10: route Anthropic-path
+                                # tool_args_progress yields from
+                                # anthropic_service.stream_anthropic to
+                                # _emit. Filter logic (execute_code skip)
+                                # already applied at the producer side;
+                                # this dispatch is a straight pass-through.
                                 # Phase 075.6 Plan 01 / Req #1: forward
-                                # `code_so_far` so the additive field rides the
-                                # wire end-to-end.
-                                # WR-01 (2026-05-24): defensive .get for the
-                                # additive field — if a future adapter drops
-                                # code_so_far from its yield, the consumer sees
-                                # "" instead of a KeyError tearing down the run.
+                                # `code_so_far` so the additive field
+                                # rides the wire end-to-end.
+                                # WR-01 (2026-05-24): defensive .get for
+                                # the additive field — if a future
+                                # adapter drops code_so_far from its
+                                # yield, the consumer sees "" instead
+                                # of a KeyError tearing down the run.
                                 await _emit(
                                     redis, run_id, "tool_args_progress",
-                                    tool_index=_event["tool_index"],
-                                    name=_event["name"],
-                                    args_so_far=_event["args_so_far"],
-                                    total_args_bytes_so_far=_event["total_args_bytes_so_far"],
-                                    code_so_far=_event.get("code_so_far", ""),
+                                    tool_index=_ant_event["tool_index"],
+                                    name=_ant_event["name"],
+                                    args_so_far=_ant_event["args_so_far"],
+                                    total_args_bytes_so_far=_ant_event["total_args_bytes_so_far"],
+                                    code_so_far=_ant_event.get("code_so_far", ""),
                                 )
                             elif _etype == "tool_start":
                                 # Fired at content_block_stop — arguments now complete.
                                 # tool_preparing was already emitted above; just populate buffer.
                                 _idx = len(tool_calls_buffer)
                                 tool_calls_buffer[_idx] = {
-                                    "id": _event["id"],
-                                    "name": _event["name"],
-                                    "arguments": json.dumps(_event.get("args", {})),
+                                    "id": _ant_event["id"],
+                                    "name": _ant_event["name"],
+                                    "arguments": json.dumps(_ant_event.get("args", {})),
                                 }
                             elif _etype == "finish":
-                                finish_reason = _event.get("finish_reason", "stop")
-                                # D-075.5-01 (I2 / D-07): hydrate thought_signature onto
-                                # each tool_calls_buffer entry from the finish event's
-                                # tool_calls list so the NEXT iteration's
-                                # _convert_messages_to_google call can round-trip it
-                                # (else Gemini-3 400s on round 2+). NO-OP for Anthropic
-                                # (its tool_calls carry no thought_signature). STAYS
-                                # consumer-side — mutates tool_calls_buffer (a consumer
-                                # accumulator); the adapter only EMITS the sig.
-                                _fin_tcs = _event.get("tool_calls", []) or []
+                                finish_reason = _ant_event.get("finish_reason", "stop")
+
+                        await _drain_stream_with_close_on_cancel(
+                            _ant_gen,
+                            per_call_budget,
+                            _on_chunk_anthropic,
+                            close_fn=_ant_gen.close,
+                        )
+                        break  # stream completed
+
+                    elif active_provider_name == "google":
+                        # --- Google native SDK path (Phase 075.5 D-075.5-01) ---
+                        # Mirrors the Anthropic branch above. Native google-genai
+                        # SDK round-trips thought_signature automatically — no more
+                        # extra_content.google.thought_signature serialization hack
+                        # through openai-python (which silently dropped it through
+                        # Google's OpenAI-compat endpoint).
+                        from app.services.openai_service import _resolve_max_tokens
+                        _g_max_tokens = _resolve_max_tokens(None, user_settings)
+                        _g_api_key = user_settings.llm_api_key or settings.llm_api_key or ""
+                        _g_tools = active_tools if active_tools is not None else get_tools(user_settings)
+                        # Phase 066 D-066-03 + 081.1: 4-tier async resolution
+                        _model_id = body.model or user_settings.llm_model
+                        per_call_budget = await get_per_call_timeout_async(_model_id, settings)
+                        _last_iteration = iteration
+                        _last_model_id = _model_id
+                        _last_per_call_budget = per_call_budget
+                        # 089-03: surface per-iteration timeout context to the
+                        # producer-shell classifier (see run_agent_loop docstring).
+                        if timeout_ctx is not None:
+                            timeout_ctx["last_iteration"] = _last_iteration
+                            timeout_ctx["last_model_id"] = _last_model_id
+                            timeout_ctx["last_per_call_budget"] = _last_per_call_budget
+                        _g_gen = stream_google(
+                            messages=messages,
+                            tools=_g_tools,
+                            system_prompt=active_system_prompt,
+                            model=_model_id,
+                            api_key=_g_api_key,
+                            max_tokens=_g_max_tokens,
+                            force_no_tools=force_no_tools,
+                        )
+                        tool_calls_buffer: dict = {}
+                        finish_reason: str | None = None
+                        _announced_tools_g: set[int] = set()
+
+                        async def _on_chunk_google(_g_event):
+                            """Normalized-event callback mirroring _on_chunk_anthropic.
+
+                            Event schema is identical (see google_service.py docstring),
+                            so this is structurally a copy of the Anthropic branch — kept
+                            inline for readability and so future provider-specific event
+                            additions can branch without touching the Anthropic path.
+                            """
+                            nonlocal full_content, finish_reason, input_tokens_total, output_tokens_total
+                            _etype = _g_event.get("type")
+                            # Phase 073 TOKEN-COL-01 — usage / usage_delta accounting.
+                            # Google's SDK emits cumulative usage_metadata on every chunk;
+                            # google_service.py normalizes that into one initial 'usage'
+                            # + per-chunk 'usage_delta' (output_tokens incremental).
+                            if _etype == "usage":
+                                _i = _g_event.get("input_tokens", 0) or 0
+                                _o = _g_event.get("output_tokens", 0) or 0
+                                if input_tokens_total is None:
+                                    input_tokens_total = _i
+                                    output_tokens_total = _o
+                                else:
+                                    input_tokens_total += _i
+                                    output_tokens_total += _o
+                                return
+                            elif _etype == "usage_delta":
+                                _o = _g_event.get("output_tokens", 0) or 0
+                                if output_tokens_total is None:
+                                    output_tokens_total = _o
+                                else:
+                                    output_tokens_total += _o
+                                return
+                            if _etype == "delta":
+                                _text = _g_event.get("content", "")
+                                if _text:
+                                    full_content += _text
+                                    await _emit(redis, run_id, 'delta', content=_text)
+                            elif _etype == "tool_preparing":
+                                _idx = _g_event.get("index", len(tool_calls_buffer))
+                                if _idx not in _announced_tools_g:
+                                    _announced_tools_g.add(_idx)
+                                    await _emit(redis, run_id, 'tool_preparing', name=_g_event['name'], index=_idx)
+                            elif _etype == "tool_args_progress":
+                                # Phase 075 D-075-10 parity — pass-through to SSE.
+                                # Phase 075.6 Plan 01 / Req #1: forward
+                                # `code_so_far` so the additive field
+                                # rides the wire end-to-end (Google axis).
+                                # WR-01 (2026-05-24): defensive .get for
+                                # the additive field — mirrors the
+                                # Anthropic dispatch hardening above.
+                                await _emit(
+                                    redis, run_id, "tool_args_progress",
+                                    tool_index=_g_event["tool_index"],
+                                    name=_g_event["name"],
+                                    args_so_far=_g_event["args_so_far"],
+                                    total_args_bytes_so_far=_g_event["total_args_bytes_so_far"],
+                                    code_so_far=_g_event.get("code_so_far", ""),
+                                )
+                            elif _etype == "tool_start":
+                                _idx = len(tool_calls_buffer)
+                                # Preserve thought_signature on the buffer entry so the
+                                # NEXT iteration's _convert_messages_to_google call can
+                                # attach it to the function_call Part for the SDK to
+                                # round-trip. Without this, Gemini-3 400s on round 2+.
+                                tool_calls_buffer[_idx] = {
+                                    "id": _g_event["id"],
+                                    "name": _g_event["name"],
+                                    "arguments": json.dumps(_g_event.get("args", {})),
+                                    # google_service.stream_google attaches the sig to
+                                    # the corresponding finish event's tool_calls list,
+                                    # but we also include it here as a hint. The
+                                    # authoritative copy is set below in the finish branch.
+                                }
+                            elif _etype == "finish":
+                                finish_reason = _g_event.get("finish_reason", "stop")
+                                # D-075.5-01: hydrate thought_signature onto each
+                                # tool_calls_buffer entry from the finish event's
+                                # tool_calls list. stream_google guarantees the order
+                                # matches insertion order (idx == position).
+                                _fin_tcs = _g_event.get("tool_calls", []) or []
                                 for _i, _ftc in enumerate(_fin_tcs):
                                     if _i in tool_calls_buffer and _ftc.get("thought_signature"):
                                         tool_calls_buffer[_i]["thought_signature"] = _ftc["thought_signature"]
 
                         await _drain_stream_with_close_on_cancel(
-                            _stream,
+                            _g_gen,
                             per_call_budget,
-                            _on_chunk,
-                            close_fn=_stream.close,
+                            _on_chunk_google,
+                            close_fn=_g_gen.close,
                         )
                         break  # stream completed
 
