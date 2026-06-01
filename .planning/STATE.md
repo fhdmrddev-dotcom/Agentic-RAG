@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: Phase 092.5 Wave 1 complete (Plans 01+02) — Wave 2 / Plan 03 next (extract clean Anthropic+Google)
-last_updated: "2026-06-01T06:24:07.426Z"
+stopped_at: Phase 092.5 Wave 2 complete (Plan 03 — clean Anthropic+Google extracted) — Wave 3 / Plan 04 next (operator byte-identical SSE-diff)
+last_updated: "2026-06-01T13:45:00.000Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 28
-  completed_plans: 24
-  percent: 86
+  completed_plans: 26
+  percent: 93
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (sequential, no worktrees; 3 operator checkpoints). **Wave 1 ✅ COMPLETE 2026-06-01.** Plan 01 (gateway skeleton — events.py canonical schema + dispatcher open_stream + D-08 seam test, no agent_loop edit). Plan 02 (operator BEFORE baselines) — 8/8 SSE baselines captured (`BASELINE CAPTURED`) against the live pre-extraction loop + full-matrix eval reference `EVAL_SUMMARY 19/32` recorded (noisy backstop; SSE-diff is the primary gate). Eval re-run learning: harness ReadTimeout crash was worker-pileup (abandoned slow kimi runs × single `--reload` worker); fixed via backend restart + `EVAL_RUN_TIMEOUT_S=600`. NEXT: Wave 2 / Plan 03 (autonomous — extract CLEAN providers Anthropic+Google into gateway adapters; first byte-identical-risk step, proven by operator in Wave 3).
+Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (sequential, no worktrees; 3 operator checkpoints). **Wave 1 ✅ COMPLETE 2026-06-01.** Plan 01 (gateway skeleton — events.py canonical schema + dispatcher open_stream + D-08 seam test, no agent_loop edit). Plan 02 (operator BEFORE baselines) — 8/8 SSE baselines captured (`BASELINE CAPTURED`) against the live pre-extraction loop + full-matrix eval reference `EVAL_SUMMARY 19/32` recorded (noisy backstop; SSE-diff is the primary gate). Eval re-run learning: harness ReadTimeout crash was worker-pileup (abandoned slow kimi runs × single `--reload` worker); fixed via backend restart + `EVAL_RUN_TIMEOUT_S=600`. **Wave 2 ✅ COMPLETE 2026-06-01 (Plan 03).** The two CLEAN branches (Anthropic + Google) extracted VERBATIM into `provider_gateway/anthropic.py` + `google.py` (adapters wrap stream_anthropic/stream_google and return the bare SYNC generator so the consumer's drain + `close_fn=stream.close` stay byte-identical); agent_loop's two branches collapsed into ONE `if active_provider_name in ("anthropic","google")` gateway-dispatched branch + ONE shared `_on_chunk` (D-02); I2 Google thought_signature hydration preserved consumer-side + asserted live in the seam test; OpenAI `else` UNTOUCHED (create_adaptive_streaming_chat still direct — Wave 4); no import cycle; no task_service/sub_agent edit. Seam test Anthropic/Google groups GREEN (incl. I2); 3 stream_* monkeypatch targets repointed to the adapter namespaces; full backend suite ZERO net-new failures vs the Plan-02 baseline (103 FAILED node-ids, identical set). Commits: d4e0b83d (adapters) + 89037ae7 (wire+collapse) + 71a5baf3 (tests) + ecf8119d (staging-accident fix — Task 3 commit had staged a baseline-revert of agent_loop/dispatcher; working tree was always correct, HEAD now matches). See 092.5-03-SUMMARY.md. **NEXT: Wave 3 / Plan 04 (operator AFTER SSE-diff — `capture_sse_baseline.py --mode after` vs the 092.5-02 baselines for anthropic.json/google.json; a persistent skeleton diff BLOCKS).**
 **Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
 
 --- (historical 092 execution trace below — retained for audit) ---
@@ -89,8 +89,8 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-01
 
-Progress: [████████░░] 82%
-<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 EXECUTING (Plan 01/6 done — gateway skeleton); 093/094/095/096 remaining -->
+Progress: [█████████░] 93%
+<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 EXECUTING (Plans 01+02+03/6 done — skeleton + baselines + clean Anthropic/Google extracted; Plan 04 operator SSE-diff next); 093/094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -141,6 +141,7 @@ Progress: [████████░░] 82%
 | Phase 092 P03 | 75min | 3 tasks | 9 files |
 | Phase 092 P05 | ~45min | 4 tasks | 8 files |
 | Phase 092.5 P01 | 18min | 3 tasks | 4 files |
+| Phase 092.5 P03 | ~35min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,8 @@ Progress: [████████░░] 82%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (092.5-03, 2026-06-01): clean-provider gateway adapters return the BARE `stream_*` SYNC generator (NOT an async wrapper) — `stream_anthropic`/`stream_google` are `Generator[dict,None,None]` driven by the consumer's threadpool `_drain_stream_with_close_on_cancel` (`for chunk in stream:`) + `close_fn=stream.close`; a bare passthrough is the ONLY design that keeps drain/close byte-identical (an async re-wrap would change the cascade-surface machinery). Plan-01's async-generator seam-test fakes were a scaffold assumption; the real boundary is sync, so the seam test was adapted to sync-drive.
+- (092.5-03, 2026-06-01): the two clean branches collapse into ONE `if active_provider_name in ("anthropic","google")` gateway-dispatched branch + ONE shared `_on_chunk` — byte-identical because the Google `_on_chunk` was a structural copy of Anthropic's and the only divergence (thought_signature hydration in the finish branch) is a NO-OP for Anthropic (its tool_calls carry no sig). I2/D-07 hydration STAYS consumer-side (mutates tool_calls_buffer); adapter only EMITS the finish sig. `GatewayRequest.tools` widened to `list|None` to carry active_tools' None signal verbatim.
 - (D-093-RESCOPE, 2026-06-01, operator-confirmed at /gsd:discuss-phase 093): **Phase 093 rescoped** "Anthropic Cross-Provider Parity" → **"Harness Cross-Provider Parity + Phase-Type Hardening"**, grounded in the 092 comprehensive audit + a live-code verification sweep. The harness path works on **OpenAI only** (1 of 4 seed workflows, 1 of 7 providers) — a harness-substrate problem, NOT a Deep problem (Deep is provider-robust on all 7). **NEW Phase 092.5 (Provider Gateway Extraction)** inserted to ship FIRST (extract `agent_loop.py`'s provider dispatch into ONE shared gateway, Deep byte-identical; operator's "separate per feature" instinct). 093 then CONSUMES it: shared model-resolver (resolve, don't mutate), ask_user round-trip (Option (i) endpoint-detects-workflow_run), split_topic+batch+verify-gate fixes, 5 phase-types hardened safe-by-construction (reachability lint extended), resume/Continue answer surfacing + draft plumbing. **Phase 094 EXPANDED** → Workflow Legibility + Mode Clarity (audit Phase B + D-092-UX), renders 093's events, sketch-first. **PARITY-01 (Deep-mode Anthropic polish) RE-DEFERRED**; admin/settings-at-scale → SEED-024/012. RED LINE: investigate first, never break working things; Deep byte-identical. New reqs GATEWAY-01 + PARITY-02. Sources: 093-CONTEXT.md + 092-COMPREHENSIVE-AUDIT.md. **NOTE: 092 must close first (092-07 Task 6 UAT still pending), then 092.5, then 093.**
 - (D-092-UX, 2026-05-31, operator-approved after strategy-brief research): **Composer consolidation target = A+C** — fold Provider INTO Model (one grouped pill) AND move workflow-START out of the composer into the Phase 087 workspace panel ("▶ Run workflow"). Composer settles to `[ Model ▾ ] [ General/Explorer ▾ ]`. Rationale: Deep/Harness ⊥ General/Explorer are orthogonal axes (2×2), not 4 sibling modes; rendering them as identical pills is the confusion. Workflows stay THREAD-bound (shared run SSE/anchor/lock) — NOT a separate `/workflows` route (would fight 068/075.x reconciliation arch). G-2 sketch-before-plan FIRES → `/gsd:sketch` before any plan-phase. Moving workflow-start to the panel also SHRINKS the F3 lock-UX surface. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
 - (D-092-AUTHOR, 2026-05-31, operator-approved): **Workflow authoring = NL-describe→strict-parse→form-edit→lint-on-publish; NOT a visual drag-canvas** (the squeezed-dead middle per 2025-26 evidence). Phase 091 already shipped the back half (WorkflowDefinition validation + reachability lint + immutable-on-publish + RLS). **Ship Authoring Phase A (draft/edit/publish API only — reuses shipped validator+lint, no schema change) as a small late-v2.8 add** so the dual-mode picker shows user-authored workflows, not just the 4 seeds. NL-generate (B) + guided form editor (C, G-2 sketch) + optional read-only DAG (D) → v2.9 alongside the Plugin Contract. Differentiation thesis: KB-grounded phases (anti-Glean) + native sandbox-code phases + persistent shareable skills + NL-to-WorkflowDefinition safe-by-construction + first-class gates/human-input — no competitor combines these. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
