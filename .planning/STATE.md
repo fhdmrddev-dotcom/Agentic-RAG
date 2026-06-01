@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready-to-execute
-stopped_at: Phase 092 closed (passed_with_overrides); Phase 092.5 planned, ready to execute
-last_updated: "2026-06-01T12:00:00.000Z"
+status: executing
+stopped_at: Phase 092.5 Plan 01 complete (Wave 1) — Plan 02 next (operator BEFORE baselines)
+last_updated: "2026-06-01T06:24:07.426Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 28
-  completed_plans: 22
-  percent: 79
+  completed_plans: 23
+  percent: 82
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 092.5 — Provider Gateway Extraction (Phase 092 ✅ CLOSED 2026-06-01)
+**Current focus:** Phase 092.5 — Provider Gateway Extraction
 
 ## Current Position
 
-Phase: 092.5 — Provider Gateway Extraction — ✅ PLANNED, READY TO EXECUTE (6 plans / 5 waves; plan-checker PASSED iter 1). NEXT: `/gsd:execute-phase 092.5`.
+Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (sequential, no worktrees; 3 operator checkpoints). **Plan 01 (gateway skeleton) ✅ COMPLETE 2026-06-01** — events.py canonical schema + dispatcher open_stream + D-08 seam test (RED scaffold); no agent_loop edit, Deep trivially byte-identical. NEXT: Plan 02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines against the pre-extraction loop).
 **Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
 
 --- (historical 092 execution trace below — retained for audit) ---
@@ -87,10 +87,10 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-05-31
+Last activity: 2026-06-01
 
-Progress: [█████████░] 92% (092 closed; 092.5 planned, ready to execute)
-<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 planned-ready; 093/094/095/096 remaining -->
+Progress: [████████░░] 82%
+<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 EXECUTING (Plan 01/6 done — gateway skeleton); 093/094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -140,6 +140,7 @@ Progress: [█████████░] 92% (092 closed; 092.5 planned, ready
 | Phase 092 PP02 | ~40min | 3 tasks | 9 files |
 | Phase 092 P03 | 75min | 3 tasks | 9 files |
 | Phase 092 P05 | ~45min | 4 tasks | 8 files |
+| Phase 092.5 P01 | 18min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -331,6 +332,16 @@ Resume file: --resume-file
 - Task 4 ⏸ BLOCKING checkpoint:human-verify — Chrome MCP lived-experience UAT (SC#3 parallel-thread + SC#5 reconcile + SC#2 DB-NULL + CONT-01 Continue + SC#10 native-7 4-axis scoreboard). Operator must run backend uvicorn + frontend dev server. Resume signal: "approved" or describe the failing scenario.
 - Verify status: `vite build` PASSES clean; `tsc -b` has 54 PRE-EXISTING baseline errors (0 net new — see deferred-items.md). Frontend Deep chat byte-identical when no workflow active (lock Map empty = no behavioral change).
 - SUMMARY (092-04-SUMMARY.md) DEFERRED until the UAT checkpoint resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN (phase verification owns closure; SDK requirements.mark-complete intentionally skipped).
+
+**Plan 092.5-01 — ✅ COMPLETE (2026-06-01):** gateway package SKELETON (pure new-file authoring; NO agent_loop edit → Deep trivially byte-identical). Ran SEQUENTIALLY on the main working tree.
+
+- Task 1 ✅ `provider_gateway/events.py` — canonical `GatewayEvent` TypedDict union (8 event types, D-02 seam contract). Lossless superset: `code_so_far` (075.6) on `ToolArgsProgressEvent`, `thought_signature` (`NotRequired`) on `ToolStartEvent` + `FinishEvent.tool_calls` (Google I2), `reasoning_delta` first-class. py3.12 → native `typing.NotRequired` (no `typing_extensions`). `__init__.py` package marker. Commit `325a5422`.
+- Task 2 ✅ `provider_gateway/dispatcher.py` — `open_stream(provider, request) -> (AsyncIterator[GatewayEvent], CallingMode)` skeleton mirroring `create_adaptive_streaming_chat`'s tuple contract; provider→adapter routing (anthropic/google explicit, OpenAI-compat `else`) matching agent_loop.py:1396/:1530/:1657; adapter bodies = `NotImplementedError` stubs (Waves 2/4 fill). `GatewayRequest` dataclass envelope. `CallingMode` RE-EXPORTED from openai_service (no new enum — Pitfall 3). `__init__.py` exports. Commit `9cdbbd91`.
+- Task 3 ✅ `tests/unit/test_provider_gateway_seam.py` — D-08 seam-contract test (RED scaffold). 3 shape tests PASS today (lossless-superset, CallingMode-re-export, routing skeleton); 6 adapter tests SKIP via **function-scope** `importorskip` (anthropic/google Wave 2, openai_compat Wave 4) → RED→GREEN as adapters land. Asserts I4 `<think>`-routing, I2 `thought_signature`, Pitfall-3 `calling_mode` surfacing. `pytest -x -q` → `3 passed, 6 skipped`, exit 0. Commit `2fb4f59e`.
+- SC#3 zero import cycle confirmed package-wide (no agent_loop/threads import). Full backend suite: **103 failed (= 092-05 documented baseline) / 1062 passed — ZERO net-new failures** (no agent_loop edit; +3 new shape tests pass; zero `provider_gateway`/`seam` references in the failure set).
+- Deviations: 3 auto-fixed — (1, Rule 1) module-level `importorskip` collapsed the whole test file → moved to function scope; (2, Rule 1) wrong `TYPE_CHECKING` import path for `UserEffectiveSettings` → `app.models.user_settings`; (3, Rule 3) added `__all__` to events.py so `grep -c GatewayEvent >= 2`. All within plan intent; no scope creep.
+- **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
+- SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
 **Planned Phase:** 092.5 (Provider Gateway Extraction) — 6 plans — 2026-06-01T03:44:02.337Z
 

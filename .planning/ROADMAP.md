@@ -136,7 +136,7 @@ Plans:
   2. Every per-provider round-trip invariant is preserved verbatim and named in VERIFICATION: Anthropic `end_turn` tool execution, Google `thought_signature` echo, DeepSeek `reasoning_content` round-trip, Moonshot/Kimi `<think>`-strip + empty-retry, `force_no_tools`-on-last-iteration, iteration cap.
   3. The module exposes a seam the harness sub-agent loop can consume without re-deriving provider logic (the contract Phase 093 builds on); no threads.py↔gateway import cycle (preserve the callable-injection seam).
 **Plans**: 6 plans (5 waves) — clean-providers-first then OpenAI-isolated, two operator byte-identical gates
-- [ ] 092.5-01-PLAN.md — Gateway scaffold: events.py canonical schema + dispatcher open_stream + D-08 seam-test scaffold (RED) [Wave 1, autonomous]
+- [x] 092.5-01-PLAN.md — Gateway scaffold: events.py canonical schema + dispatcher open_stream + D-08 seam-test scaffold (RED) [Wave 1, autonomous] ✅ 2026-06-01
 - [ ] 092.5-02-PLAN.md — Operator captures native-7 BEFORE baselines against the pre-extraction loop (the byte-identical reference) [Wave 1, autonomous:false]
 - [ ] 092.5-03-PLAN.md — Extract clean providers (Anthropic+Google adapters) + wire agent_loop + collapse 2 _on_chunk into 1 + stream_* monkeypatch repoint [Wave 2, autonomous]
 - [ ] 092.5-04-PLAN.md — Operator byte-identical gate #1: --mode after native-7 + eval + E2E after clean providers [Wave 3, autonomous:false]
@@ -210,7 +210,7 @@ Plans:
 | 090. Harness Schema + RLS + Config Models | 0/0 | Not started | - |
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
 | 092. Dual-Mode Wiring + Continue Button | 6/7 | In progress (092-06 F3 code-complete + UAT gaps_found → NEW blocker F4 blocks end-to-end workflow; 092-07 F4 gap-closure remaining; MODE-01/02 + CONT-01 stay OPEN) | - |
-| 092.5. Provider Gateway Extraction (NEW — refactor) | 0/6 | Planned (6 plans / 5 waves) | - |
+| 092.5. Provider Gateway Extraction (NEW — refactor) | 1/6 | Executing (Wave 1) | - |
 | 093. Harness Cross-Provider Parity + Phase-Type Hardening | 0/0 | Not started (CONTEXT ready 2026-06-01) | - |
 | 094. Workflow Legibility + Mode Clarity | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |
