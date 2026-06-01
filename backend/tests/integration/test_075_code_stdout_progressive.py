@@ -191,7 +191,7 @@ async def _capture_sandbox_run(chunks_factory, timeout: float = 60.0):
     events = []
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (chunks_factory(), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

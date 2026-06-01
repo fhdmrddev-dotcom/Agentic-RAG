@@ -324,7 +324,7 @@ async def test_agent_task_SURVIVES_on_disconnect(redis_client):
     # key. Same rationale as 059 (these are NOT the surface under test).
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=_make_counted_chat(counter),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -436,7 +436,7 @@ async def test_normal_stream_unchanged():
     # generate_suggestions / generate_thread_title patches — same need.
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             return_value=(iter(_fast_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

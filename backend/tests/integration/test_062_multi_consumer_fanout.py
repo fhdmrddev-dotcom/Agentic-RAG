@@ -104,7 +104,7 @@ async def test_two_consumers_receive_identical_sequences(redis_client):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_slow_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

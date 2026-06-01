@@ -186,7 +186,7 @@ async def test_run_agent_loop_returns_agent_loop_result_with_valid_persist():
     result_sink: dict = {}
 
     with patch(
-        "app.services.agent_loop.create_adaptive_streaming_chat",
+        "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
         side_effect=lambda *a, **k: (iter(_clean_chunks()), CallingMode.NATIVE),
     ), patch(
         "app.services.agent_loop.get_pg_pool",
@@ -297,7 +297,7 @@ async def test_finalizer_receives_persisted_id_and_terminal_order_holds():
             "app.api.threads.override_provider",
             side_effect=_override_provider_passthrough,
         ), patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_clean_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.api.threads.generate_thread_title",

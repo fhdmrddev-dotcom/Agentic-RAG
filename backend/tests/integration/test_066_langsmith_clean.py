@@ -254,7 +254,7 @@ async def test_no_generator_exit_on_timeout(redis_client, monkeypatch, caplog):
     insert_message_mock = AsyncMock(return_value=uuid4())
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_stalling_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -346,7 +346,7 @@ async def test_track_a_clean_trace_exception(redis_client, monkeypatch):
     insert_message_mock = AsyncMock(return_value=uuid4())
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (fake_stream, CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",

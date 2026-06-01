@@ -71,7 +71,7 @@ async def test_per_call_timer_fires_at_budget(redis_client, monkeypatch):
     try:
         start = time.monotonic()
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_stalling_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -128,7 +128,7 @@ async def test_quick_call_within_budget_completes(redis_client, monkeypatch):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_quick_then_done_chunks()), CallingMode.NATIVE),
         ), patch(
             "app.services.suggestion_service.generate_suggestions",
@@ -253,7 +253,7 @@ async def test_timer_resets_per_iteration(redis_client, monkeypatch):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: streams.pop(0),
         ), patch(
             # Patch the module-level web_search import in threads.py.
@@ -343,7 +343,7 @@ async def test_tool_exec_outside_timer(redis_client, monkeypatch):
     app.dependency_overrides[get_supabase] = lambda: mock_supabase
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: streams.pop(0),
         ), patch(
             "app.api.threads.web_search",

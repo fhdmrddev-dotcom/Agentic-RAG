@@ -253,7 +253,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -278,7 +278,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -310,7 +310,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "explorer"},
@@ -335,7 +335,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -360,7 +360,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi"},
@@ -385,7 +385,7 @@ class TestSendMessageAgentModeBranching:
             from app.services.openai_service import CallingMode
             return iter([_make_simple_stream_chunk()]), CallingMode.NATIVE
 
-        with patch("app.services.agent_loop.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
+        with patch("app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat", side_effect=mock_create_streaming_chat):
             resp = client.post(
                 "/threads/thread-123/messages",
                 json={"content": "hi", "agent_mode": "default"},

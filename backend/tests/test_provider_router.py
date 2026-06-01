@@ -240,7 +240,7 @@ async def _run_post_and_capture(active_provider: str, body: dict) -> dict:
             "app.api.threads.override_provider",
             side_effect=_override_provider_passthrough,
         ), patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_fast_chunks()), CallingMode.NATIVE),
         ), patch(
             # 092.5 Wave 2: the Anthropic adapter now owns the stream_anthropic

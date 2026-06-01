@@ -19,7 +19,7 @@ NOT migrate the existing TestClient-based suites — those remain valuable for
 non-concurrency assertions.
 
 Patch targets (verified against the actual repo):
-  - app.services.agent_loop.create_adaptive_streaming_chat — the streaming entry point
+  - app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat — the streaming entry point
     looked up inside event_stream's OpenAI/OpenRouter branch (NOT
     create_streaming_chat — that name is not imported into threads.py).
     The function returns a (stream_iterator, calling_mode) tuple.
@@ -224,7 +224,7 @@ async def test_cross_tab_unblocked_during_sse():
         # Patch the actual streaming entrypoint looked up inside event_stream.
         # NOTE: it returns (stream, calling_mode) — must mock the tuple.
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             return_value=(iter(_fast_chunks()), CallingMode.NATIVE),
         ):
             async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as c:

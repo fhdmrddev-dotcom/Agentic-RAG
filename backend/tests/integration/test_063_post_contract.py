@@ -199,7 +199,7 @@ async def test_post_returns_before_producer_first_xadd(redis_client):
 
     try:
         with patch(
-            "app.services.agent_loop.create_adaptive_streaming_chat",
+            "app.services.provider_gateway.openai_compat.create_adaptive_streaming_chat",
             side_effect=lambda *a, **k: (iter(_slow_chunks(delay=0.3, count=10)),
                                          CallingMode.NATIVE),
         ), patch(
