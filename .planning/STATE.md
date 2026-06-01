@@ -269,6 +269,11 @@ Surfaced for any reconcile/snapshot/message-list change (relevant to Phase 089 e
 - **Authoring Phase A (NEW small phase, late v2.8):** D-092-AUTHOR — draft/edit/publish API over shipped validator+lint; picker shows user workflows. Re-open trigger: after 092-05 ships (a workflow runs end-to-end), insert before v2.8 close.
 - **Authoring B/C/D → v2.9:** NL-generate (eval-gated) + guided form editor (G-2 sketch) + optional read-only DAG. Plant alongside Plugin Contract.
 
+### Phase 094 sketch inputs (operator-raised 2026-06-02 during 093 plan-phase — capture so 094's sketch/discuss addresses them; G-2 sketch-first)
+
+- **When does the agent WRITE to the workspace panel vs just chat?** Operator finds it unclear when content should land in the right-side panel (files/todos/workspace — the 087 surface) vs the chat transcript. Part legibility (make the panel's role obvious), part agent-behavior/prompting (when to use workspace tools) — the behavioral half may predate 094 and need a system-prompt nudge, not just chrome.
+- **Completed-step lifecycle in an ongoing thread.** After a workflow completes and the user keeps chatting (Deep) in the SAME thread: how are completed phase steps maintained / updated / hidden, and can a NEW chat message accidentally re-trigger them? 094 SC#1 (completed glyphs) + SC#2 (phasesByThread isolation) cover the rendering; the sketch must explicitly decide the completed-run lifecycle (persist / collapse / hide) + a no-accidental-re-trigger rule. Tie-in: SEED-050 + the `sketch-findings-agentic-rag` panel skill.
+
 ### v2.8 in-flight deferrals
 
 - **SEED-047 (resume ctx missing inputs/model)** — planted 2026-05-31 at 091-08 gap closure (091-REVIEW WR-01/WR-02). Resume context omits run `inputs` (top-level `programmatic` inputs lost on resume → empty splits) and `model`/`user_settings` (resumed `llm_*` phases run with `model=""`). Not fixable in 091 (no `INSERT INTO workflow_runs` in `backend/app`). Deferred to **Phase 092** (dual-mode + Continue owns run creation). Re-open trigger: Phase 092 run-creation persists `workflow_runs.inputs` + `model` → rehydrate into resume ctx; **Phase 096 EVAL-02 (live kill-and-resume)** is the proof gate. Until then, resumed LLM / top-level-input phases are a known live-resume limitation (deterministic unit proof for resume mechanics stands).

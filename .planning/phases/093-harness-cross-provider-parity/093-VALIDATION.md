@@ -95,6 +95,15 @@ created: 2026-06-02
 
 **Dimension 4 — Deep-parity regression row (RED LINE D-14):** run the 092.5 SSE-diff driver on Deep — Anthropic byte-identical (0 skeleton edits); other 6 within tool-path-noise. Plus the eval `task` prompt (Deep `task()` sub-agent) to confirm the `task_service` rewrite didn't regress Deep sub-agents.
 
+**Dimension 5 — result-quality (operator pass/fail, the "as-intended" gate — added 2026-06-02).** Functionality ≠ quality: a workflow can run, dispatch tools, and surface an answer while still doing the wrong thing (the "asks me to share the research" defect). For each of the 4 seed workflows (sampled across ≥2 providers, including at least one OpenAI-compat native), the operator records a simple **pass/fail** judgment on a real KB folder:
+| Workflow | Quality pass criterion (operator judgment) |
+|----------|---------------------------------------------|
+| `research_summarize` | The summarize phase **produces a grounded summary of the found research** — it does NOT ask the user to supply/share the research (the migration-065 Fix-3 prompt). Sources attach. |
+| `literature_review` | The merge phase **integrates the per-subtopic reviews** into one coherent review — does not ask the user to supply the reviews; subtopics are actually distinct. |
+| `plan_execute_verify` | The plan is real, the execute phase actually runs (code/search), and the answer reflects the executed result (not a hollow "VERIFIED"). |
+| `doc_qa_human` | The finalize phase **incorporates the user's correction** into the answer — does not restart from scratch or re-ask. |
+> This is a thin human yes/no per cell on runs you are ALREADY doing in Dimensions 1–3 — NOT a golden-output/rubric framework. The deeper repeatable quality measurement (golden expected-outputs, an automated rubric judge, restart-quality) is **SEED-050 → Phase 096 eval**.
+
 ### How to detect a REAL regression on this non-deterministic surface (inherit 092.5's method)
 - **Structural-skeleton diff, not raw diff** — `scripts/_diag_skeleton_diff.py` (gate on event-type order + tool names/sequence + code-exec lifecycle + terminal classification, NOT raw stream).
 - **run1-vs-run2 noise isolation** — re-run BEFORE+AFTER 2–3×; a residual that changes run1↔run2 is noise, a PERSISTENT structural diff is a regression.
@@ -132,6 +141,7 @@ created: 2026-06-02
 4. **STRUCTURED residue is consumer-side, not in the gateway.** The harness consumer MUST replicate inject (TOOL_USAGE_INSTRUCTIONS) + post-parse (`parse_structured_tool_calls`) gated on `calling_mode`, or DeepSeek/Moonshot/GLM/MiniMax narrate tools as text (the F9 symptom).
 5. **Surfacing single-owner.** Don't let both the live `_shielded_finalize` persist AND the new shared helper persist — one persist owner per entry path; remove the inline `threads.py` surfacing block in the same commit as the helper extraction.
 6. **resume/Continue set `user_settings=None` today.** The model-resolver fires only when user_settings is present — if D-04's "all 3 build sites" needs a live resolve on resume/Continue, those paths need owner settings loaded (Open Question 2).
+7. **`input_keys` is INERT on llm phases (corrected 2026-06-02).** Only `_exec_programmatic` reads `config.input_keys` (phase_types.py:205); `_exec_llm_single`/`_exec_llm_agent` ignore it and instead chain the prior phase output as the user turn via `_prior_output_text` (phase_types.py:116/231). So the "asks me to share the research" defect is a PROMPT-quality issue, not a missing-input_keys wiring break — the fix is the migration-065 Fix-3 prompt rewrite, NOT binding input_keys on the summarize/merge/finalize phases (which would be a no-op). The `split_topic` input_keys fix stays valid because that phase IS programmatic.
 
 ---
 
