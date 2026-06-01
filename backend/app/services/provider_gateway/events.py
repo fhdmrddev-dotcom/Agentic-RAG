@@ -62,6 +62,13 @@ class ToolArgsProgressEvent(TypedDict):
 
     ``code_so_far`` is 075.6-additive — MANDATORY for losslessness (the consumer
     does ``.get("code_so_far", "")`` in all 3 branches).
+
+    ``emit_sse`` is the boundary-gated wire-emit flag set by the OpenAI-compat
+    adapter (``openai_compat.py``) and read by the consumer to gate SSE cadence
+    (``agent_loop.py`` ``if _event.get("emit_sse", True)``). NotRequired because
+    Anthropic/Google never set it (their consumer default of True applies). Part
+    of the lossless superset — emitted AND consumed, so it belongs in the contract
+    Phase 093 types against (092.5-06 WR-01).
     """
 
     type: Literal["tool_args_progress"]
@@ -70,6 +77,7 @@ class ToolArgsProgressEvent(TypedDict):
     args_so_far: str
     total_args_bytes_so_far: int
     code_so_far: str
+    emit_sse: NotRequired[bool]
 
 
 class ToolStartEvent(TypedDict):
