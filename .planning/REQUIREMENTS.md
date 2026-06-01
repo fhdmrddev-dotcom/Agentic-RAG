@@ -30,9 +30,9 @@
 
 ### Workflow Mode (Deep / Harness)
 
-- [ ] **MODE-01**: A user can switch a thread between **Deep Mode** (default, unchanged free chat) and **Harness Mode** (locked workflow); mode is per-thread (`threads.active_workflow_run_id IS NULL` = Deep).
-- [ ] **MODE-02**: Once a workflow starts, the thread is **workflow-locked** — switching back to Deep is refused server-side until the run completes or the user cancels; Cancel clears the lock in the same transaction as the terminal-status write; lock state is **per-thread** (never a global boolean — BUG-260523-01 pattern).
-- [ ] **CONT-01**: When an agent run hits its step cap (a Deep run OR a Harness phase), a **"Continue" affordance** resumes the same run/phase with a bounded additional step budget instead of silently dropping tool calls. *(SEED-029)*
+- [x] **MODE-01**: A user can switch a thread between **Deep Mode** (default, unchanged free chat) and **Harness Mode** (locked workflow); mode is per-thread (`threads.active_workflow_run_id IS NULL` = Deep). ✅ Validated 2026-06-01 (Phase 092, live on OpenAI).
+- [x] **MODE-02**: Once a workflow starts, the thread is **workflow-locked** — switching back to Deep is refused server-side until the run completes or the user cancels; Cancel clears the lock in the same transaction as the terminal-status write; lock state is **per-thread** (never a global boolean — BUG-260523-01 pattern). ✅ Validated 2026-06-01 (Phase 092; 409 lock-refusal + failure-path terminalize verified live).
+- [x] **CONT-01**: When an agent run hits its step cap (a Deep run OR a Harness phase), a **"Continue" affordance** resumes the same run/phase with a bounded additional step budget instead of silently dropping tool calls. *(SEED-029)* ✅ Validated 2026-06-01 (Phase 092; persist-at-cap + `/continue` + bounded 3-cap shipped, FK-unblocked; live cap-drive accepted as code-verified at close).
 
 ### Panel — Phase Timeline
 
@@ -109,9 +109,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | HARNESS-05 | Phase 091 | Complete |
 | HARNESS-07 | Phase 091 | Complete |
 | TOOL-05 | Phase 091 | Complete |
-| MODE-01 | Phase 092 | Pending |
-| MODE-02 | Phase 092 | Pending |
-| CONT-01 | Phase 092 | Pending |
+| MODE-01 | Phase 092 | Complete |
+| MODE-02 | Phase 092 | Complete |
+| CONT-01 | Phase 092 | Complete (live cap-drive code-verified; F9/F10 → 093) |
 | GATEWAY-01 | Phase 092.5 | Pending |
 | PARITY-02 | Phase 093 | Pending |
 | PARITY-01 | (re-deferred 2026-06-01) | Deferred |

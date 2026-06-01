@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: Phase 092.5 context gathered
-last_updated: "2026-06-01T03:01:00.765Z"
-last_activity: 2026-05-31
+status: ready-to-execute
+stopped_at: Phase 092 closed (passed_with_overrides); Phase 092.5 planned, ready to execute
+last_updated: "2026-06-01T12:00:00.000Z"
+last_activity: 2026-06-01
 progress:
   total_phases: 9
-  completed_phases: 3
-  total_plans: 22
-  completed_plans: 21
-  percent: 95
+  completed_phases: 4
+  total_plans: 28
+  completed_plans: 22
+  percent: 79
 ---
 
 # Project State
@@ -21,9 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 092
+**Current focus:** Phase 092.5 — Provider Gateway Extraction (Phase 092 ✅ CLOSED 2026-06-01)
 
 ## Current Position
+
+Phase: 092.5 — Provider Gateway Extraction — ✅ PLANNED, READY TO EXECUTE (6 plans / 5 waves; plan-checker PASSED iter 1). NEXT: `/gsd:execute-phase 092.5`.
+**Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
+
+--- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
 Plan: 1 of --name
@@ -35,7 +40,7 @@ Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connect
   - Wave 4: 092-04 (frontend: Deep/Harness toggle + published-workflow picker + Continue button — autonomous:false, UAT checkpoint) — CODE SHIPPED (Tasks 1-3), UAT FAILED at Task 4
   - Gap 1: 092-05 (F1 audit-owner crash + F2 wedged lock — backend) — ✅ COMPLETE 2026-05-31 (4 tasks; F1+F2 closed; live-DB audit test green; zero net-new full-suite failures)
   - Gap 2: 092-06 (F3 client lock-UX + UAT re-run gate) — ⚠️ CODE-COMPLETE 2026-05-31 (Tasks 1-2 shipped, tsc+build clean); Task 3 UAT = gaps_found → NEW blocker F4 (harness sub-agent parent_run_id FK) blocks end-to-end workflow → phase NOT complete
-  - Gap 3: 092-07 (F4 harness sub-agent parent_run_id FK mismatch — backend + frontend) — ⏸ Tasks 1-5 DONE 2026-05-31 (sequential exec; F4 id-routing closed in code + live-DB FK test green); Task 6 binding 4-axis native-7 UAT gate AWAITING OPERATOR (re-runs UAT rows 4-10: SC#3/SC#5/CONT-01/SC#10 native-7/Deep byte-identical + SC#2 natural/Cancel + ask_user render + resume×Continue). **Operator MUST restart the backend (uvicorn) before the UAT — the F4 fixes are in backend code.** Commits: fa14a1c3 (Facet A), ca0ee5c5 (Facet B), 0f6a66df (Facet C resume), cdd775f6 (Facet C Continue-404 + surfacing + frontend), ec9dd4f4 (live FK test), 69e01300 + 2aa25777 (test-pollution fixes). Backend full-suite ZERO net-new failures vs 092-03 baseline; frontend tsc -b 54 baseline (0 net-new) + vite build clean. SUMMARY.md deferred until the UAT gate resolves.
+  - Gap 3: 092-07 (F4 harness sub-agent parent_run_id FK mismatch — backend + frontend) — ✅ CLOSED 2026-06-01. Tasks 1-5 (code+tests) DONE 2026-05-31; Task 6 binding UAT resolved by operator close decision 2026-06-01 → **passed_with_overrides**. F4 id-routing closed across 3 facets + the unblocked F5/F6/F7/F8 dominoes closed → a Harness workflow runs end-to-end + renders a grounded sources+confidence answer (live on OpenAI). Commits: fa14a1c3 (Facet A), ca0ee5c5 (Facet B), 0f6a66df (Facet C resume), cdd775f6 (Facet C Continue-404 + surfacing + frontend), ec9dd4f4 (live FK test), 69e01300 + 2aa25777 (test-pollution); F5–F8: a7be6423/803aafd3/ba5949c4/95da3032/27b12c37. Backend full-suite ZERO net-new failures vs 092-03 baseline; frontend tsc -b 54 baseline (0 net-new) + vite build clean. **F9 (harness OpenAI-only) + F10 (ask_user round-trip) → Phase 093 (operator directive, UPDATE 5).** See 092-07-SUMMARY.md + 092-VERIFICATION.md.
 
 **092-05 (gap-closure) verdict (2026-05-31): ✅ COMPLETE.** F1 closed — `workflow_runs.user_id` persisted (migration 064), `write_audit` binds the run-owner, all 11 audit sites pass it (10 harness_engine + 1 tool_dispatcher); a harness run executes end-to-end with no `NotNullViolationError`. F2 closed — `_shielded_finalize` terminalizes `workflow_runs` + clears the anchor on any non-completed harness escape; `lock_is_stale` self-heals on a terminal producer run (pure read). Live-DB integration test (`test_092_harness_audit_live.py`) closes the 091 mock blind spot — both gates green vs local Postgres. Full backend suite: 103-failed/1014-passed vs 102/1008 baseline = +6 new passing tests, ZERO net-new failures (the one "new" entry, `test_bounded_retry_reaches_failed_after_3_attempts`, is a pre-existing isolation failure unrelated to this plan). Requirements MODE-01/MODE-02/CONT-01 stay OPEN — 092-06 (F3) + phase verification own closure. Operator live F1 proof (backend kickoff of a Research→Summarize workflow) still pending per VERIFICATION.
 
@@ -59,8 +64,7 @@ Task 3 lived-experience UAT (orchestrator Chrome MCP + operator live Supabase + 
 - **F4 NEW BLOCKER** — harness LLM-agent phase sub-agent insert fails with `ForeignKeyViolationError: runs_parent_run_id_fkey`: the engine ctx.run_id is the workflow_run id (threads.py:1158) which isn't a `runs` row, but `run_task_sub_agent` (task_service.py:272) uses it as `runs.parent_run_id`. Workflow cannot run end-to-end. OUT OF SCOPE for 092-05/092-06 → routed to gap plan **092-07**. Fix shape: thread the producer-shell `runs` id into the engine ctx as a distinct `producer_run_id` and use THAT for `runs.parent_run_id`, keeping ctx.run_id = workflow_run id for audit/SSE/resume — cover BOTH the live producer ctx (threads.py) AND the resume ctx (harness_engine._build_resume_context). Cross-provider + agent-loop-adjacent → needs its own scoped UAT.
 - **SC#3 / SC#5 / CONT-01 / SC#10 native-7 / Deep byte-identical: ⛔ BLOCKED by F4** — they ride a workflow that runs end-to-end.
 
-Requirements **MODE-01 / MODE-02 / CONT-01 REMAIN OPEN** — the binding criterion "a Harness workflow runs end-to-end" is NOT met. **Phase 092 is NOT complete.**
-NEXT: `/gsd:plan-phase 092 --gaps` — gap-closure **092-07** for F4 (harness sub-agent parent_run_id). Do NOT mark phase 092 complete and do NOT mark MODE-01/MODE-02/CONT-01 validated until 092-07 ships + the re-run UAT (rows 4-10 + SC#2 variants) goes GREEN.
+~~Requirements MODE-01 / MODE-02 / CONT-01 REMAIN OPEN~~ → **RESOLVED 2026-06-01.** 092-07 shipped (F4 + the F5–F8 dominoes); a Harness workflow runs end-to-end on OpenAI. **Phase 092 ✅ CLOSED (passed_with_overrides); MODE-01 / MODE-02 / CONT-01 = Validated.** The two remaining BINDING defects (F9 cross-provider harness parity, F10 ask_user round-trip) were operator-routed to a comprehensive follow-on phase (UPDATE 5) → **Phase 093** (Harness Cross-Provider Parity), built on **Phase 092.5** (Provider Gateway Extraction, planned). NEXT: `/gsd:execute-phase 092.5`. See 092-VERIFICATION.md.
 
 ### Phase 091 (prior) — ✅ COMPLETE
 
@@ -85,8 +89,8 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-05-31
 
-Progress: [██████████] 95%
-<!-- v2.8 plan-count progress: 20/21 plans complete (092-05 shipped; 092-06 remaining) -->
+Progress: [█████████░] 92% (092 closed; 092.5 planned, ready to execute)
+<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 planned-ready; 093/094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -328,7 +332,7 @@ Resume file: --resume-file
 - Verify status: `vite build` PASSES clean; `tsc -b` has 54 PRE-EXISTING baseline errors (0 net new — see deferred-items.md). Frontend Deep chat byte-identical when no workflow active (lock Map empty = no behavioral change).
 - SUMMARY (092-04-SUMMARY.md) DEFERRED until the UAT checkpoint resolves. Requirements MODE-01/MODE-02/CONT-01 left OPEN (phase verification owns closure; SDK requirements.mark-complete intentionally skipped).
 
-**Planned Phase:** 092 (dual-mode-wiring-continue-button) — 7 plans — 2026-05-31T16:52:00.016Z
+**Planned Phase:** 092.5 (Provider Gateway Extraction) — 6 plans — 2026-06-01T03:44:02.337Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
