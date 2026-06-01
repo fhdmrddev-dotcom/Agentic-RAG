@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: Phase 092.5 Plan 01 complete (Wave 1) — Plan 02 next (operator BEFORE baselines)
+stopped_at: Phase 092.5 Wave 1 complete (Plans 01+02) — Wave 2 / Plan 03 next (extract clean Anthropic+Google)
 last_updated: "2026-06-01T06:24:07.426Z"
 last_activity: 2026-06-01
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 28
-  completed_plans: 23
-  percent: 82
+  completed_plans: 24
+  percent: 86
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (sequential, no worktrees; 3 operator checkpoints). **Plan 01 (gateway skeleton) ✅ COMPLETE 2026-06-01** — events.py canonical schema + dispatcher open_stream + D-08 seam test (RED scaffold); no agent_loop edit, Deep trivially byte-identical. NEXT: Plan 02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines against the pre-extraction loop).
+Phase: 092.5 (Provider Gateway Extraction) — EXECUTING (sequential, no worktrees; 3 operator checkpoints). **Wave 1 ✅ COMPLETE 2026-06-01.** Plan 01 (gateway skeleton — events.py canonical schema + dispatcher open_stream + D-08 seam test, no agent_loop edit). Plan 02 (operator BEFORE baselines) — 8/8 SSE baselines captured (`BASELINE CAPTURED`) against the live pre-extraction loop + full-matrix eval reference `EVAL_SUMMARY 19/32` recorded (noisy backstop; SSE-diff is the primary gate). Eval re-run learning: harness ReadTimeout crash was worker-pileup (abandoned slow kimi runs × single `--reload` worker); fixed via backend restart + `EVAL_RUN_TIMEOUT_S=600`. NEXT: Wave 2 / Plan 03 (autonomous — extract CLEAN providers Anthropic+Google into gateway adapters; first byte-identical-risk step, proven by operator in Wave 3).
 **Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
 
 --- (historical 092 execution trace below — retained for audit) ---
