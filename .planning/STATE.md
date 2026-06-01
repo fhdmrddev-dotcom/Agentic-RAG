@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Phase 093 context gathered + rescoped (harness cross-provider hardening; 092.5 gateway inserted; PARITY-01 re-deferred)
-last_updated: "2026-05-31T21:05:27.483Z"
+stopped_at: Phase 092.5 context gathered
+last_updated: "2026-06-01T03:01:00.765Z"
 last_activity: 2026-05-31
 progress:
   total_phases: 9
@@ -290,7 +290,7 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 ## Session Continuity
 
 Last session: --stopped-at
-Stopped at: Phase 093 context gathered + rescoped (harness cross-provider hardening; 092.5 gateway inserted; PARITY-01 re-deferred)
+Stopped at: Phase 092.5 context gathered
 Resume file: --resume-file
 
 **Plan 092-07 — ⏸ Tasks 1-5 DONE (code + tests); Task 6 UAT AWAITING OPERATOR (2026-05-31):** F4 id-routing gap-closure (sub-agent parent_run_id FK + SSE routing + resume/Continue-404). Ran SEQUENTIALLY on the main working tree.
