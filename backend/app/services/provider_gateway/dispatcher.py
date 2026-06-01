@@ -103,4 +103,13 @@ async def open_stream(
 
         return open_google_stream(request), CallingMode.NATIVE
     else:
-        raise NotImplementedError("openai_compat adapter lands in Wave 4")
+        # OpenAI-compat else-branch (OpenAI / OpenRouter / Ollama / native-7
+        # fallbacks) — Phase 092.5 Wave 4 (D-04, the entangled unit). The adapter
+        # wraps create_adaptive_streaming_chat and SURFACES the calling_mode it
+        # returns (Pitfall 3 / L-3 — never buried). It keys its internal
+        # <think>/usage/boundary logic on ``request.active_provider_name`` (the
+        # consumer populates that with the registry-derived provider for this
+        # branch — agent_loop.py:1667-1668 — so the move is byte-identical).
+        from .openai_compat import open_openai_compat_stream
+
+        return open_openai_compat_stream(request)
