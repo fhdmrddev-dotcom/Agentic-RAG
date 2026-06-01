@@ -10,7 +10,35 @@ SC#3 — NO IMPORT CYCLE: this package MAY import the raw-SDK service modules
 — they are BELOW it in the dependency graph today. It MUST NEVER import
 ``agent_loop`` or ``threads.py`` (the callable-injection seam exists precisely
 to avoid that cycle; ``_emit`` / ``spawn`` stay passed-in callables consumer-side).
-
-Task 2 (this plan) fills the package exports (open_stream, GatewayRequest,
-GatewayEvent + per-type TypedDicts, CallingMode re-export). Task 1 lands events.py.
 """
+from __future__ import annotations
+
+from .dispatcher import CallingMode, GatewayRequest, open_stream
+from .events import (
+    DeltaEvent,
+    FinishEvent,
+    GatewayEvent,
+    ReasoningDeltaEvent,
+    ToolArgsProgressEvent,
+    ToolPreparingEvent,
+    ToolStartEvent,
+    UsageDeltaEvent,
+    UsageEvent,
+)
+
+__all__ = [
+    # Dispatcher entrypoint + request envelope + re-exported calling-mode carrier
+    "open_stream",
+    "GatewayRequest",
+    "CallingMode",
+    # Canonical event schema (D-02 seam contract)
+    "GatewayEvent",
+    "DeltaEvent",
+    "ReasoningDeltaEvent",
+    "ToolPreparingEvent",
+    "ToolArgsProgressEvent",
+    "ToolStartEvent",
+    "FinishEvent",
+    "UsageEvent",
+    "UsageDeltaEvent",
+]
