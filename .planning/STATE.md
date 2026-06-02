@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: Phase 093 gap-closure context captured (D-15..D-21) — post-LIVE-UAT re-discuss; plans 093-06+ next
-last_updated: "2026-06-02T19:34:49.667Z"
-last_activity: 2026-06-02
+status: ready_to_execute
+stopped_at: Phase 093 gap-closure PLANNED — 4 plans (093-06..09) verified PASSED iter 1; ready for /gsd:execute-phase 093 (starts at 093-06)
+last_updated: "2026-06-03T00:00:00.000Z"
+last_activity: 2026-06-03
 progress:
   total_phases: 9
-  completed_phases: 6
-  total_plans: 33
+  completed_phases: 5
+  total_plans: 37
   completed_plans: 33
-  percent: 100
+  percent: 89
 ---
 
 # Project State
@@ -406,7 +406,7 @@ Resume file: --resume-file
 - **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
 - SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
-**Planned Phase:** 092.5 (Provider Gateway Extraction) — 6 plans — 2026-06-01T03:44:02.337Z
+**Planned Phase:** 093 (harness-cross-provider-parity) — 9 plans — 2026-06-02T20:02:30.286Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
