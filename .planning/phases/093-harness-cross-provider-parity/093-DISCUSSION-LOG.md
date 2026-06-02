@@ -107,3 +107,65 @@ input/output-contract breaks (so bad workflows fail validation, not at runtime).
 
 ## Deferred Ideas
 - Phase 092.5 (gateway extraction, ships first), Phase 094 (legibility chrome, sketch-first), PARITY-01 (re-deferred), SEED-024/012 (admin settings at scale), SEED-028 (native Google service behind the gateway).
+
+---
+
+# Re-discuss session — Gap-Closure (post-LIVE-UAT)
+
+**Date:** 2026-06-02
+**Trigger:** `/gsd:discuss-phase 093` re-invoked after the mandatory LIVE cross-provider UAT (D-13) surfaced real backend gaps. Original D-01…D-14 unchanged + executed (5 plans shipped + verified `human_needed`).
+**Areas discussed:** Gap-closure structure, Provider round-trip (Google+Moonshot), GLM/zhipu max_steps, S3 gpt-4o sub-agent default + S4 token persistence, Log-sink + re-UAT gate, Per-provider sub-agent setup (operator-added).
+
+## Pre-work: code grounding
+Read `task_service.py` (the `:299-300` ignored-`finish` site + `:271-273` ignored `reasoning_delta` + the `run_task_sub_agent` model resolution `:390-394`), `sub_agent_models.py` (resolver + `resolve_workflow_ctx_model`), and `config.py` (`_SUB_AGENT_MODEL_DEFAULTS` `:594-604` + `settings.llm_model="gpt-4o"` `:635`). Key insight: ONE ignored `finish` event causes the Google round-trip, the Moonshot round-trip, AND S4 — fixed together by consuming it.
+
+## Q1 — Gap-closure structure
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Gap-closure plans in 093 (093-06+) | Stay in 093; PARITY-02 owned by 093; mirrors 092-05/06/07 | ✓ |
+| New decimal phase 093.1 | Fresh insert phase; PARITY-02 spans two dirs | |
+
+**User's choice:** Gap-closure plans in 093 (093-06+). → **D-15**
+
+## Q2 — Areas to discuss
+**User's choice (multiSelect):** ALL four (provider round-trip, GLM, S3+S4, log-sink+re-UAT) PLUS a free-text addition: *"how are you planning to set up sub-agent for each provider?"* — answered with the per-provider table in CONTEXT `<gap_closure>`.
+
+## Q3 — Sub-agent model default (per provider)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Fast per-provider tier (current design intent) | `_SUB_AGENT_MODEL_DEFAULTS`; user `sub_agent_model` override; fix the gpt-4o-bounce wiring | ✓ |
+| Mirror the run's main model | Sub-agents use the user's picked model; higher cost/quality | |
+
+**User's choice:** Fast per-provider tier. → **D-18**
+
+## Q4 — GLM/zhipu max_steps gate
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Diagnose-first; fix if bounded, defer-with-trigger if deep | Live GLM run + LangSmith + DB; don't block PARITY-02 indefinitely on one provider | ✓ |
+| Hard gate — 093 doesn't close until GLM green | All-7 must pass, open-ended scope | |
+
+**User's choice:** Diagnose-first; fix if bounded, defer-with-trigger if deep. → **D-19**
+
+## Q5 — Backend log-sink
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Add now in 093 (small task) | uvicorn → logfile; agent self-scans re-UAT signals; reusable by 096 | ✓ |
+| Defer to 096 | Lands with the automated UAT harness | |
+
+**User's choice:** Add now in 093. → **D-20**
+
+## Locked on evidence (not asked)
+- Provider round-trip fix = consume the gateway `finish` event (mirror Deep's `_on_chunk` finish-branch + `_reconstruct_history`), provider-scoped + additive, D-14 byte-identical-Deep guard (`task_service.py` is shared). → **D-16**
+- S4 token persistence = the same finish-event `usage` persisted to `runs.usage`. → **D-17**
+- Re-UAT gate = per-workflow 2×2 rotation (findings-doc §9), backend-truth focus, PARITY-02 closes only when it passes; inherits the D-13 proof method. → **D-21**
+
+## Reported-bugs cross-check (touchpoint)
+- 3 open `surface: Agentic-RAG` reports (chat-tool-cards-scroll-collapse-duplicate, step-count-mismatch-timer-vs-panel, timer-disappears-long-runs) = all frontend; none overlap the 093 backend domain → left open, owned by 094/095.
+- 2 closed twins (gemini-3-thought-signature, sub-agent-cross-provider-model-default-404) = the harness-path versions are now folded into 093 via D-16/D-18; the Deep-path closures still hold (not re-opened).
+
+## Findings routed out of 093
+S1 → 095 / 096 CONC-01; S2 + S5 → 094 (D-094-UNIFY); automated per-workflow UAT → 096.

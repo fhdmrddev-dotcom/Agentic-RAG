@@ -2,7 +2,8 @@
 
 **Gathered:** 2026-06-01
 **Refreshed:** 2026-06-02 — post-092.5 execution facts folded in (tagged **[092.5]**); no decision changed
-**Status:** Ready for planning (Phase 092.5 — Provider Gateway Extraction — ✅ SHIPPED 2026-06-01 `passed_with_overrides`; gateway live at `backend/app/services/provider_gateway/`)
+**Re-discussed:** 2026-06-02 — post-LIVE-UAT gap-closure scope added (see `<gap_closure>`, **D-15…D-21**). Original D-01…D-14 are unchanged AND executed (5 plans shipped + verified `human_needed`, 28/28 must-haves, Deep byte-identical). PARITY-02 stays **OPEN** pending the gap-closure fixes + the per-workflow re-UAT.
+**Status:** Gap-closure planning (close as plans **093-06+** within this phase — D-15). Phase 092.5 (Provider Gateway Extraction) ✅ SHIPPED 2026-06-01 `passed_with_overrides`; gateway live at `backend/app/services/provider_gateway/`.
 
 > **RESCOPED at discuss-phase (2026-06-01).** The roadmap originally titled this phase
 > "Anthropic Cross-Provider Parity" (requirement PARITY-01 — a Deep-mode polish for 3 reported
@@ -91,10 +92,61 @@ This phase closes that gap so all 5 phase-types and all 4 seed workflows run on 
 
 </decisions>
 
+<gap_closure>
+## Gap-Closure (post-LIVE-UAT — re-discussed 2026-06-02)
+
+**Why this section exists:** Phase 093's 5 plans shipped + verified (`human_needed`, 28/28 must-haves, Deep byte-identical). The mandatory LIVE cross-provider UAT (D-13) — run across all native-7 + Deep — then surfaced real **backend** gaps that keep **PARITY-02** from closing. These close as **gap-closure plans WITHIN Phase 093 (093-06+)**, not a decimal phase (D-15). Primary source: `093-CROSS-PROVIDER-UAT-FINDINGS-AND-NEXT.md`.
+
+**LIVE UAT verdict (native-7, harness tool-using workflow):** OpenAI / Anthropic / DeepSeek / MiniMax ✅ PASS · **Google** 🔴 (`400 thought_signature missing in functionCall parts`) · **Moonshot** 🔴 (`400 thinking enabled but reasoning_content missing`) · **GLM/zhipu** 🟡 (native tools fire — 36 src — but the sub-agent hits max_steps with no terminal answer).
+
+### Per-provider sub-agent setup (the operator's "how is each provider set up?" — answered from code 2026-06-02)
+ONE shared path: `run_task_sub_agent` → `_stream_one_iteration` drives the **092.5 gateway** (`open_stream`); per-provider behavior is resolved at that single boundary. Three things vary:
+
+| Provider | Tool calling | Sub-agent default model (`_SUB_AGENT_MODEL_DEFAULTS`) | Reasoning echo needed | Today → after gap-closure |
+|---|---|---|---|---|
+| OpenAI | native `tool_calls` | `gpt-5.4-mini` | no | ✅ → ✅ |
+| Anthropic | native SDK | `claude-haiku-4-5-20251001` | no (tool_calls carry no sig) | ✅ → ✅ |
+| **Google** | native SDK | `gemini-3.5-flash` | **yes — `thought_signature`** | 🔴 → ✅ (D-16) |
+| DeepSeek | STRUCTURED | `deepseek-v4-flash` | no | ✅ → ✅ |
+| **Moonshot** | STRUCTURED | `kimi-k2.6` | **yes — `reasoning_content`** | 🔴 → ✅ (D-16) |
+| **GLM/zhipu** | STRUCTURED | `glm-4.6` | **TBD (diagnose)** | 🟡 → ? (D-19) |
+| MiniMax | STRUCTURED | `MiniMax-M2.5-highspeed` | no | ✅ → ✅ |
+
+### Structure
+- **D-15:** Post-UAT gaps close as **gap-closure plans within Phase 093 (093-06+)**, NOT a decimal phase. PARITY-02 stays owned by 093 and closes only when these fixes land AND the per-workflow re-UAT (D-21) passes. Mirrors the 092-05/06/07 gap-closure pattern. (Operator-chosen at re-discuss 2026-06-02.)
+
+### The finish-event root (unifies the round-trip gaps + S4 in ONE additive change)
+- **D-16:** **Provider round-trip = consume the gateway `finish` event** in the harness sub-agent consumer (`task_service._stream_one_iteration`, currently ignored at `:299-300` — `reasoning_delta` also dropped at `:271-273`), mirroring Deep's `agent_loop._on_chunk` finish-branch + `_reconstruct_history` (`agent_loop.py:776`). Hydrate **`thought_signature`** (Google) and **`reasoning_content`** (Moonshot/Kimi) back onto the assistant tool-call message so the NEXT iteration echoes the per-turn reasoning metadata the provider requires (the gateway adapters `google.py`/`openai_compat.py` already EMIT them; the harness drops them). **Provider-scoped + additive**; MUST NOT touch the 4 passing providers or the Deep byte-identical path (D-14 RED LINE — `task_service.py` is the shared Deep+harness file; Deep `task()` rides the same path with `None`-defaults). `reasoning_content` is not referenced in `task_service.py` at all today.
+- **D-17:** **S4 token persistence** — the SAME ignored `finish` event carries `usage`; persist it to `runs.usage` (input/output tokens) on the harness path. Deep already persists; harness drops it (the `:299-300` "needs no token SUM" assumption). LangSmith confirms the data exists in-stream → pure persistence gap, closed by the same finish-event consumption (D-16).
+
+### Sub-agent model per provider (S3 — wiring bug, not a design change)
+- **D-18:** **Sub-agents default to the fast per-provider tier** (the `_SUB_AGENT_MODEL_DEFAULTS` map above), with the user's `sub_agent_model` Settings field as the override. **The bug is the WIRING, not the design:** `run_task_sub_agent` (`task_service.py:390-394`) resolves `fallback_model=parent_ctx.model`; when the harness phase ctx reaches it WITHOUT the owner's `llm_model`/a real `model`, the candidate falls through to `settings.llm_model="gpt-4o"` (`config.py:635`) → the now-live (D-06) safety net bounces gpt-4o to the provider default tier **by accident**, and the user's selection is never honored. **Fix:** thread the run owner's effective settings + resolved model into the harness sub-agent's `parent_ctx` so resolution is INTENTIONAL — `sub_agent_model` (user) → resolved run/ctx model → fast default — never the gpt-4o global bounce. Resolve-never-mutate (D-05) preserved. (Operator-chose "fast per-provider tier" over "mirror the run's main model" at re-discuss 2026-06-02.)
+
+### GLM/zhipu max_steps (separate; root cause unconfirmed)
+- **D-19:** GLM is a **separate** issue (NOT the reasoning-metadata class — no 400). **Diagnose-first:** the first gap-closure task drives a live GLM run + LangSmith trace + DB read to pin the root cause (step-cap too low? STRUCTURED parse re-loop never emitting a terminal answer? a softer reasoning-handling manifestation?). If **bounded** → fix in-phase. If a **deep GLM-provider** issue → close 093 at **6/7 solid** and **defer GLM with a concrete re-open trigger** so PARITY-02 is not blocked indefinitely by one provider's edge. (Operator-chosen at re-discuss 2026-06-02.)
+
+### Enabler + gate
+- **D-20:** **Backend file log-sink** (uvicorn → logfile) added in 093 (small task) so the agent can self-scan the re-UAT for the `gpt-4o`-fallback / `runs.usage missing` / `400` round-trip signals instead of needing the operator's live terminal; reusable by 096's automated harness. (Operator-chosen "add now" at re-discuss 2026-06-02.)
+- **D-21:** **Re-UAT gate (per-workflow, post-fix):** after the fixes land, re-run the previously-broken cells **per-workflow** (the findings-doc §9 2×2 rotation — pair a fixed provider with a known-good control on the shared **DBA** dissertation): Google + Moonshot COMPLETE, GLM converges (or deferred-with-trigger per D-19), sub-agents use the correct per-provider model (NOT gpt-4o), `runs.usage` recorded — PLUS non-regression on the 4 passing providers + Deep byte-identical. Backend-truth focus (DB + LangSmith + the D-20 log-sink). **PARITY-02 closes only when this passes.** Authored in VALIDATION (verifier + operator-owned), not plan tasks. Inherits the D-13 proof method (skeleton-diff + Anthropic-twin + SEED-048 false-alarm guard; do NOT lean on the rotted Playwright suite — SEED-049).
+
+### Reported-bugs cross-check (discuss-phase touchpoint, 2026-06-02)
+- **Open `surface: Agentic-RAG` reports reviewed:** `chat-tool-cards-scroll-collapse-duplicate`, `step-count-mismatch-timer-vs-panel`, `timer-disappears-long-runs` — all **frontend/legibility**; **none overlap the 093 backend gap-closure domain** → left **open**, owned by **094/095**. NOT folded into 093.
+- **Closed twins (reference, not re-opened):** `gemini-3-thought-signature-missing-on-tool-rounds` (closed for the **Deep** path — the harness now has the same class; **D-16 is the harness-path fix**) and `sub-agent-cross-provider-model-default-404` (closed; **S3/D-18 is its re-manifestation on the harness sub-agent**). The Deep-path closures still hold; these are the harness twins, now folded into 093 via D-16/D-18.
+
+### Findings routed OUT of 093 (recorded so they aren't lost)
+- **S1** duplicate final answer (UI re-render; DB has exactly 1 assistant msg — data clean) → **095** (and/or 096 CONC-01).
+- **S2** ghost empty-avatar sub-agent bubbles + no run-card for harness · **S5** no workflow live-execution surface → **094** (+ **D-094-UNIFY**: the workspace panel becomes the SINGLE live-execution surface for BOTH Deep AND Harness — operator-signed-off 2026-06-02; deliberately reverses sketch-001's in-chat run-card for Deep).
+- **Automated cross-cutting per-workflow UAT** (assertions A1–A9 + scoreboard) → **096**.
+
+</gap_closure>
+
 <canonical_refs>
 ## Canonical References
 
 **Downstream agents MUST read these before planning or implementing.**
+
+### Gap-closure (read FIRST for 093-06+)
+- `.planning/phases/093-harness-cross-provider-parity/093-CROSS-PROVIDER-UAT-FINDINGS-AND-NEXT.md` — **the gap-closure scope source.** The live native-7 UAT verdict, the finish-event root (§4a), the GLM separation (§4b), S1–S5, the phase-mapping table, and the per-workflow testing rotation (§9). Read alongside `<gap_closure>` above.
 
 ### Phase scope + diagnosis (read first)
 - `.planning/phases/092-dual-mode-wiring-continue-button/092-COMPREHENSIVE-AUDIT.md` — the 34-defect → 4-root-cause landscape; the 2-phase recommendation (Phase A backend = this phase; Phase B UI = 094). **Primary scope source.**
