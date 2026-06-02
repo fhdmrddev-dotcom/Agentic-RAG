@@ -41,3 +41,27 @@
   the 093 live test). Left untouched per the executor scope boundary. Likely the same
   live-DB test-data hygiene class already noted for Phase 091; candidate for a dedicated
   integration-test-fixture revival pass (relates to SEED-049 E2E-suite revival).
+
+## From Plan 093-05 (shared surfacing helper + D-04 sites 1/2 + D-12 draft)
+
+### Pre-existing test-ordering pollution (NOT caused by 093-05) — harness registry leak
+
+- **Files:** `test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts`
+  (and, in some orderings, `test_harness_engine.py::test_phase_dispatch_routes_each_of_5_types`).
+- **Symptom:** `test_bounded_retry...` → `assert _audit_failures(...) == 3` fails with
+  `0 == 3`; `test_phase_dispatch...` → `set(PHASE_TYPE_REGISTRY) == {5 types}` differs
+  when run AFTER the gate/resume tests that override the registry.
+- **Discovered:** during the 093-05 regression sweep. **Confirmed PRE-EXISTING** by
+  stashing ALL 093-05 edits and re-running the same 3-file set — both failures reproduce
+  identically on baseline (commit `a7828abb`). `test_bounded_retry...` also fails in
+  ISOLATION on baseline (independent of my change).
+- **Why NOT a 093-05 regression:** the failures are cross-file `PHASE_TYPE_REGISTRY`
+  state pollution (the `_registry`/`_restore_registry` helpers in the gate/resume tests)
+  + a gate-audit recording mismatch in the mock pool — neither is in 093-05's files_modified
+  (harness_engine.py, threads.py, phase_types.py, panel.py, api.ts, test_093_surfacing.py)
+  and neither relates to the surfacing helper / ctx-model threading / draft carry. Every
+  093-05 file passes in isolation and the full touched-surface sweep shows 0 net-new
+  failures vs baseline.
+- **Scope:** out of scope for 093-05 (test-isolation hygiene, not a behavioral regression).
+  Candidate for a `/gsd:quick` test-isolation pass (registry reset autouse fixture) —
+  relates to the broader test-fixture-hygiene class already noted for 093-04.
