@@ -620,9 +620,16 @@ class Test093GatewayConsumption:
 
     @pytest.mark.asyncio
     async def test_honors_structured_calling_mode(self):
-        """When open_stream returns CallingMode.STRUCTURED and the drained content is
-        a structured tool-call block, parse_structured_tool_calls is applied and the
-        returned tool_calls are non-empty (search_documents-shaped), content cleared."""
+        """When open_stream returns CallingMode.STRUCTURED, the phase HAS tools, and
+        the drained content is a structured tool-call block, parse_structured_tool_calls
+        is applied and the returned tool_calls are non-empty (search_documents-shaped),
+        content cleared.
+
+        WR-01 (093 REVIEW): the STRUCTURED post-parse is now gated on bool(tools) — a
+        no-tools call (llm_single) must NOT run it. So this STRUCTURED-recovery-fires
+        case passes a real tool schema (the sub-agent loop always does); the no-tools
+        guard is pinned separately by test_no_tools_structured_call_preserves_content.
+        """
         from app.services import task_service
         from app.services.openai_service import CallingMode
 
@@ -643,11 +650,15 @@ class Test093GatewayConsumption:
         async def _fake_cap(model):
             return {"provider": "deepseek"}
 
+        tools = [
+            {"function": {"name": "search_documents", "description": "d",
+                          "parameters": {"properties": {}, "required": []}}}
+        ]
         with patch.object(task_service, "open_stream", stub), \
             patch("app.config.get_model_capability_async", _fake_cap):
             content, tool_calls = await task_service._stream_one_iteration(
                 messages=[{"role": "system", "content": "sys"}],
-                tools=[],
+                tools=tools,
                 model="deepseek-v4-flash",
                 user_settings=None,
                 provider="deepseek",
@@ -658,6 +669,53 @@ class Test093GatewayConsumption:
         assert len(tool_calls) == 1
         assert tool_calls[0]["name"] == "search_documents"
         assert "neural nets" in tool_calls[0]["arguments"]
+
+    # -- WR-01 (093 REVIEW): no-tools STRUCTURED call must NOT blank the answer --
+    # llm_single passes tools=[] and a STRUCTURED-mode provider would otherwise (a)
+    # inject the FULL tool catalog into a tool-free phase and (b) post-parse prose
+    # into a spurious tool call, BLANKING the phase answer. The fix gates both the
+    # inject and the post-parse on bool(tools).
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("empty_tools", [None, []])
+    async def test_no_tools_structured_call_preserves_content(self, empty_tools):
+        """WR-01: tools=None/[] + STRUCTURED → NO inject into the system message AND
+        the returned content equals the streamed text verbatim (no parse, no blank)."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        # Content that LOOKS like a structured tool call — if the post-parse ran it
+        # would extract this and blank the answer. With no tools it must NOT run.
+        prose = (
+            "Summary of the literature:\n"
+            '```json\n{"tool": "search_documents", "arguments": {"query": "x"}}\n```\n'
+            "(the model is just narrating an example, not calling a tool)"
+        )
+        events = [{"type": "delta", "content": prose}]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.STRUCTURED, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "deepseek"}
+
+        messages = [{"role": "system", "content": "SYS"}]
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=messages,
+                tools=empty_tools,
+                model="deepseek-v4-flash",
+                user_settings=None,
+                provider="deepseek",
+            )
+
+        # The answer is preserved verbatim — NOT blanked by a spurious parse.
+        assert content == prose
+        assert tool_calls == []
+        # No TOOL_USAGE_INSTRUCTIONS dumped into a tool-free phase's system message.
+        assert messages[0]["content"] == "SYS"
 
     @pytest.mark.asyncio
     async def test_structured_injection_is_idempotent_across_iterations(self):

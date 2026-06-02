@@ -216,11 +216,21 @@ async def _stream_one_iteration(
     )
     stream, calling_mode = await open_stream(_provider, _gw_request)
 
+    # WR-01 (093 REVIEW) — only do the STRUCTURED tool-recovery dance when the
+    # phase actually HAS tools. A no-tools call (llm_single passes tools=[]) can
+    # never legitimately fire a tool, so the inject would dump the FULL get_tools
+    # catalog into a tool-free phase AND the post-parse could extract a spurious
+    # tool-call-shaped block from the model's prose and BLANK the answer (silently
+    # losing the research_summarize / literature_review / doc_qa_human finalize
+    # output). The sub-agent loop (run_task_sub_agent) passes the harness tool set
+    # → _has_tools True → recovery runs unchanged.
+    _has_tools = bool(tools)
+
     # D-03 half b — STRUCTURED inject ONCE (Pitfall 2), BEFORE the drain, into the
     # system message. The gateway's openai_compat adapter SKIPS tool emission on
     # STRUCTURED and does NOT inject (openai_compat.py) — the consumer must. Mirrors
     # the Deep residue at agent_loop.py:1639-1648 (inject-once flag).
-    if calling_mode == CallingMode.STRUCTURED and not structured_injected[0]:
+    if _has_tools and calling_mode == CallingMode.STRUCTURED and not structured_injected[0]:
         from app.services.agent_loop import (
             TOOL_USAGE_INSTRUCTIONS,
             _format_tool_list,
@@ -301,8 +311,10 @@ async def _stream_one_iteration(
 
     # D-03 half b — STRUCTURED post-parse AFTER the drain (agent_loop.py:1675-1696).
     # The compat natives narrate the tool call as a JSON block in content; recover
-    # it so search_documents actually fires.
-    if calling_mode == CallingMode.STRUCTURED:
+    # it so search_documents actually fires. WR-01 (093 REVIEW): gated on _has_tools
+    # — a no-tools llm_single phase must NEVER run this (it would blank the answer
+    # by misreading prose as a tool call).
+    if _has_tools and calling_mode == CallingMode.STRUCTURED:
         from app.services.tool_parser import parse_structured_tool_calls
 
         structured = parse_structured_tool_calls(content)
