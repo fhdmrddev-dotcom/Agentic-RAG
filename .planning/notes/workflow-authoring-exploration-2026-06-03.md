@@ -112,3 +112,37 @@ pre-commit schema; the migration risk is low (JSONB + optional Pydantic fields g
 Finish v2.8 (094 → 095 → 096), open v2.9 with a throwaway spike on a real case, design the
 `inputs` + `assets` schema from the evidence. See SEED-051 + the companion spike todo + the open
 decisions in `.planning/research/questions.md`.
+
+## Session 2 addendum (2026-06-03) — modes/skills ground truth + UI-surface refinement
+
+Backed by a 4-agent investigation (workflow `wf_a2e14a82-a53`).
+
+**Skills ↔ Workflows — verified ORTHOGONAL today (zero overlap, no contradiction):**
+- Deep mode injects the skills catalog into the system prompt (`agent_loop.py:930-951`, General
+  only) and `load_skill` is always in `get_tools()`.
+- A harness phase **REPLACES** the global prompt with `phase.config.prompt`
+  (`phase_types.py:288`, `system_prompt_override`) → no skills catalog reaches the model; and
+  `load_skill` is whitelisted in **none** of the 4 seeds. **A phase cannot use a skill today.**
+  Two separate subsystems, not competitors. Decision: keep separate in v2.8; design a `skill_ref`
+  authoring seam for v2.9 (research/questions.md #4).
+
+**Deep mode — verified it is NOT a toggle/capability:**
+- Exactly ONE branch (`threads.py:1146`): `active_workflow_run_id` non-null → Harness; else Deep
+  (`run_agent_loop`). "Deep" = "not running a workflow." No `deep_mode` flag exists anywhere.
+- True model = a 2×2: Deep/Harness ⟂ General/Explorer. General = 24 tools + skills + memory + 15
+  iters; Explorer = `EXPLORER_SYSTEM_PROMPT` + 6 KB-nav tools + 8 iters (`agent_loop.py:909`).
+- Operator's "Deep shouldn't be a mandatory pill" = D-092-UX exactly. His "execute with vs
+  without Deep and compare" is a category error (Deep IS the baseline); the meaningful A/B is
+  **Deep-vs-Harness** on a real KB task (and optionally General-vs-Explorer). Worth running live.
+
+**Current composer (pre-094) for reference:** `MessageInput.tsx` renders THREE sibling dropdowns —
+General/Explorer (275-321), Deep/Harness (323-371), workflow-picker (373-423); state in
+`ChatArea.tsx:61,68`. This is the confusing surface 094 / D-092-UX fixes.
+
+**UI surface (operator refinement) → captured in SEED-051's "Authoring surface & builder UX":**
+Workflows become a nav PAGE (like Skills) = library + build + launch; execution lands in a
+thread (no separate run route — D-092-UX preserved); composer loses the picker + the Deep/Harness
+pill; builder = AI-led + HITL (observe/approve/suggest) + a LIVE, transparent, view-not-drag
+visualization (renders the WorkflowDefinition + reachability graph we already compute). This
+RESOLVES the earlier page-vs-panel tension by splitting library/builder (page) from execution
+(thread). The visual is a /gsd:sketch deliverable (G-2).

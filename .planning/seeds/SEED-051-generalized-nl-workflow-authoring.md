@@ -81,6 +81,39 @@ right place) — the reliability-from-grounding lever; search is whole-KB today.
   sketch-first) → D (read-mostly DAG, optional). This seed = the **generalized + asset-driven +
   AI-derived-inputs** elaboration of B/C.
 
+## Authoring surface & builder UX (operator refinement, 2026-06-03 session 2)
+
+- **Workflows = a first-class PAGE in the nav (like Skills), not a chat dropdown.** Nav →
+  "Automation / Workflows" → library (your drafts + published + shared/seed) + "Build new" +
+  Run/Edit. The operator: picking a workflow from a composer menu "is not user-friendly nor
+  practical." This is the home authoring always needed (you can't build from a dropdown/panel).
+- **Two surfaces, cleanly split — this RESOLVES the earlier page-vs-panel tension:**
+  - **Library + builder = the page** (browse, build, edit, publish, launch).
+  - **Execution = in a thread** (Run → opens/redirects to a normal chat-style thread, streams
+    there; shares run SSE/lock/anchor). NO separate execution route. Operator is explicitly fine
+    running in the existing thread UI "without any risk or architectural changes."
+  - Reconciliation with D-092-UX: that decision rejected a separate route for where a workflow
+    *runs/lives* (must stay thread-bound) — it never rejected a library/builder PAGE. So this is
+    the missing piece, NOT a conflict (D-092-AUTHOR Phase A/B/C authoring always implied a
+    management surface; this names it).
+- **Composer simplifies further than D-092-UX planned:** the workflow-picker dropdown AND the
+  Deep/Harness pill leave the composer. You never "switch to Harness" — you Run a workflow from
+  the page, which puts THAT thread into workflow mode; Deep is the resting default (Deep =
+  `active_workflow_run_id IS NULL`, not a toggle — verified `threads.py:1146`). Composer can
+  settle to `[Model ▾] [General/Explorer ▾]` with launch moved to the page.
+- **Builder = AI heavy-lifts, human observes/approves/suggests (HITL).** Drafts never
+  auto-publish; user role = observe + approve, optionally suggest changes — NOT manual-first.
+- **Visualization = live, transparent, engaging — but VIEW, not drag-to-build.** The operator
+  wants the workflow's shape visible as it's built ("transparent building process… clarity +
+  simplification + engagement + innovation + transparency"), explicitly "without
+  over-complicating or over-engineering." KEY distinction (preserves D-092-AUTHOR's rejection of
+  the drag-canvas "squeezed dead middle"): a **read-mostly diagram that updates LIVE as the AI
+  proposes phases** — phase cards in sequence; tools/folder-scope/template attaching to each;
+  data-flow arrows; per-card approve / tweak(form) / add — steered by TALKING, not wiring. Editing
+  stays describe + form-tweak + approve. **Cheap to build:** it renders the `WorkflowDefinition`
+  + the reachability graph (`reachability.py` already computes nodes+edges) as it changes —
+  reusing existing data, not new backend. This is a **/gsd:sketch** deliverable (G-2 fires).
+
 ## Recommended approach: SPIKE-FIRST (operator-agreed)
 
 Do NOT pre-commit schema. The migration fear is low (the format is JSONB + a Pydantic model;
