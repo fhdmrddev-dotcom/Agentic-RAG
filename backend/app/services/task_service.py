@@ -586,6 +586,12 @@ async def run_task_sub_agent(
     # the system message at most once (the message never accumulates blocks).
     structured_injected: list[bool] = [False]
 
+    # Phase 093 (D-17): cross-iteration usage sink — _stream_one_iteration SUMs each
+    # turn's usage into this dict; persisted to runs.input_tokens/output_tokens on
+    # finalize (S4 — was always NULL on the harness path). Keys input_tokens /
+    # output_tokens; absent → None on finalize (graceful for providers emitting none).
+    _sub_usage: dict = {}
+
     # F7 (092-07): accumulate the grounding off every ToolResult so the harness
     # final answer can SHOW its sources (a harness research phase gathers them via
     # search_documents here, but the FINAL phase is summarize — llm_single with no
@@ -607,6 +613,10 @@ async def run_task_sub_agent(
             except Exception:  # noqa: BLE001
                 logger.debug("iteration_start emit failed", exc_info=True)
 
+            # D-16: fresh per-iteration reasoning sink (mirror the Deep per-iteration
+            # reset agent_loop.py:1907-1908 — iteration 2's reasoning must NOT carry
+            # iteration 1's). _sub_usage is the cross-iteration SUM (NOT reset).
+            _reasoning_box: list[str] = [""]
             content, tool_calls = await _stream_one_iteration(
                 messages=messages,
                 tools=sub_tool_schemas,
@@ -614,6 +624,8 @@ async def run_task_sub_agent(
                 user_settings=parent_ctx.user_settings,
                 provider=provider,
                 structured_injected=structured_injected,
+                reasoning_box=_reasoning_box,
+                usage_box=_sub_usage,
             )
 
             if not tool_calls:
@@ -652,7 +664,13 @@ async def run_task_sub_agent(
                     if tr.similarity_score is not None:
                         sub_similarity_scores.append(tr.similarity_score)
 
-            # Replay assistant + tool messages for next iteration
+            # Replay assistant + tool messages for next iteration.
+            # D-16 (mirror agent_loop.py:1866-1901): the conditional spreads
+            # round-trip the per-turn reasoning metadata onto the NEXT round's
+            # request so reasoning-model providers don't 400 — thought_signature
+            # per tool_call dict (Google) + reasoning_content on the assistant
+            # message (Moonshot/Kimi/DeepSeek-thinking). Both are NO-OPs when absent
+            # (non-reasoning providers / Deep) → byte-identical to pre-093-07.
             messages.append({
                 "role": "assistant",
                 "content": content,
@@ -664,9 +682,19 @@ async def run_task_sub_agent(
                             "name": tc.get("name", ""),
                             "arguments": tc.get("arguments", ""),
                         },
+                        **(
+                            {"thought_signature": tc["thought_signature"]}
+                            if tc.get("thought_signature")
+                            else {}
+                        ),
                     }
                     for tc in tool_calls
                 ],
+                **(
+                    {"reasoning_content": _reasoning_box[0]}
+                    if _reasoning_box[0]
+                    else {}
+                ),
             })
             messages.extend(tool_results_to_append)
         else:
@@ -684,6 +712,18 @@ async def run_task_sub_agent(
         summary = f"Sub-agent failed: {e}"
     finally:
         # 6a. Finalize the sub-agent's runs row.
+        # D-17 (S4): persist the accumulated usage instead of the old None/None.
+        # _sub_usage.get(...) is None when the provider emitted no usage (graceful —
+        # the pre-093-07 NULL behavior is preserved for that case). finalize_run
+        # writes these to runs.input_tokens/output_tokens (db/runs.py:98-99). Mirror
+        # the Deep TOKEN-COL-01 contract: warn BEFORE finalize when usage is missing.
+        _sub_in = _sub_usage.get("input_tokens")
+        _sub_out = _sub_usage.get("output_tokens")
+        if _sub_in is None and _sub_out is None:
+            logger.warning(
+                "runs.usage missing for run=%s provider=%s model=%s",
+                sub_run_id, provider, effective_model,
+            )
         try:
             await finalize_run(
                 pool=pool,
@@ -692,8 +732,8 @@ async def run_task_sub_agent(
                 error=error_msg,
                 completed_at=datetime.now(timezone.utc),
                 message_id=None,
-                input_tokens=None,
-                output_tokens=None,
+                input_tokens=_sub_in,
+                output_tokens=_sub_out,
             )
         except Exception:  # noqa: BLE001
             logger.exception("finalize_run failed for sub_run_id=%s", sub_run_id)

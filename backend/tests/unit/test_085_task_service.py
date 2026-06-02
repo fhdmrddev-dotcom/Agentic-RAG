@@ -1136,3 +1136,210 @@ class Test093FinishEvent:
 
         assert content == "answer"
         assert tool_calls == []
+
+    # -- Task 2: assistant replay-message round-trip + usage persistence -------
+
+    @pytest.mark.asyncio
+    async def test_replay_message_carries_thought_signature_google(self):
+        """A Google sub-agent iteration produces tool_calls carrying thought_signature
+        → the assistant replay message (built for the NEXT iteration) carries
+        thought_signature on each tool_call dict (so Google does NOT 400 on round 2)."""
+        from app.services import task_service
+
+        ctx = _build_sub_agent_ctx()
+        snapshots: list = []
+        finalize_capture: dict = {}
+        _call = {"n": 0}
+
+        async def _fake_stream(*, messages, tools, model, user_settings,
+                               provider=None, structured_injected=None,
+                               reasoning_box=None, usage_box=None, **_kwargs):
+            snapshots.append([dict(m) for m in messages])
+            i = _call["n"]
+            _call["n"] += 1
+            if i == 0:
+                if usage_box is not None:
+                    usage_box["input_tokens"] = 80
+                    usage_box["output_tokens"] = 20
+                return "", [{
+                    "id": "fn_1", "name": "search_documents",
+                    "arguments": '{"query": "x"}', "thought_signature": "SIG_G",
+                }]
+            return "Final.", []
+
+        async def _fake_dispatch(name, args, sub_ctx):
+            from app.services.tool_dispatcher import ToolResult
+            return ToolResult(result="r")
+
+        async def _capture_finalize(**kwargs):
+            finalize_capture.update(kwargs)
+
+        with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+            patch.object(task_service, "insert_run", AsyncMock()), \
+            patch.object(task_service, "finalize_run", _capture_finalize), \
+            patch.object(task_service, "resolve_sub_agent_model_safely", lambda *a, **k: "m"), \
+            patch.object(task_service, "get_tools", lambda us: []), \
+            patch.object(task_service, "dispatch_tool", _fake_dispatch), \
+            patch.object(task_service, "_stream_one_iteration", _fake_stream):
+            await task_service.run_task_sub_agent(
+                parent_ctx=ctx, description="go", instructions=None,
+                allowed_tools=["search_documents"], max_steps=3,
+            )
+
+        # The SECOND iteration's inbound messages must include the assistant
+        # tool-call message carrying thought_signature on the tool_call dict.
+        second_inbound = snapshots[1]
+        assistant_msgs = [m for m in second_inbound if m.get("role") == "assistant"
+                          and m.get("tool_calls")]
+        assert assistant_msgs, "no assistant tool-call message replayed"
+        tc = assistant_msgs[-1]["tool_calls"][0]
+        assert tc.get("thought_signature") == "SIG_G"
+
+    @pytest.mark.asyncio
+    async def test_replay_message_carries_reasoning_content_moonshot(self):
+        """A Moonshot sub-agent iteration accumulates reasoning_content → the assistant
+        replay message carries reasoning_content (so Moonshot does NOT 400 on round 2)."""
+        from app.services import task_service
+
+        ctx = _build_sub_agent_ctx()
+        snapshots: list = []
+        finalize_capture: dict = {}
+        _call = {"n": 0}
+
+        async def _fake_stream(*, messages, tools, model, user_settings,
+                               provider=None, structured_injected=None,
+                               reasoning_box=None, usage_box=None, **_kwargs):
+            snapshots.append([dict(m) for m in messages])
+            i = _call["n"]
+            _call["n"] += 1
+            if i == 0:
+                if reasoning_box is not None:
+                    reasoning_box[0] = "I will search the corpus."
+                return "narration", [{
+                    "id": "c1", "name": "search_documents", "arguments": '{"query":"x"}',
+                }]
+            return "Final.", []
+
+        async def _fake_dispatch(name, args, sub_ctx):
+            from app.services.tool_dispatcher import ToolResult
+            return ToolResult(result="r")
+
+        async def _capture_finalize(**kwargs):
+            finalize_capture.update(kwargs)
+
+        with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+            patch.object(task_service, "insert_run", AsyncMock()), \
+            patch.object(task_service, "finalize_run", _capture_finalize), \
+            patch.object(task_service, "resolve_sub_agent_model_safely", lambda *a, **k: "m"), \
+            patch.object(task_service, "get_tools", lambda us: []), \
+            patch.object(task_service, "dispatch_tool", _fake_dispatch), \
+            patch.object(task_service, "_stream_one_iteration", _fake_stream):
+            await task_service.run_task_sub_agent(
+                parent_ctx=ctx, description="go", instructions=None,
+                allowed_tools=["search_documents"], max_steps=3,
+            )
+
+        second_inbound = snapshots[1]
+        assistant_msgs = [m for m in second_inbound if m.get("role") == "assistant"
+                          and m.get("tool_calls")]
+        assert assistant_msgs, "no assistant tool-call message replayed"
+        assert assistant_msgs[-1].get("reasoning_content") == "I will search the corpus."
+
+    @pytest.mark.asyncio
+    async def test_replay_message_no_metadata_for_plain_provider(self):
+        """A plain OpenAI sub-agent's replay message carries NEITHER thought_signature
+        NOR reasoning_content (conditional spread → byte-identical)."""
+        from app.services import task_service
+
+        ctx = _build_sub_agent_ctx()
+        snapshots: list = []
+        finalize_capture: dict = {}
+        _call = {"n": 0}
+
+        async def _fake_stream(*, messages, tools, model, user_settings,
+                               provider=None, structured_injected=None,
+                               reasoning_box=None, usage_box=None, **_kwargs):
+            snapshots.append([dict(m) for m in messages])
+            i = _call["n"]
+            _call["n"] += 1
+            if i == 0:
+                # No reasoning, no thought_signature, no usage (plain provider).
+                return "", [{"id": "c1", "name": "search_documents",
+                             "arguments": '{"query":"x"}'}]
+            return "Final.", []
+
+        async def _fake_dispatch(name, args, sub_ctx):
+            from app.services.tool_dispatcher import ToolResult
+            return ToolResult(result="r")
+
+        async def _capture_finalize(**kwargs):
+            finalize_capture.update(kwargs)
+
+        with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+            patch.object(task_service, "insert_run", AsyncMock()), \
+            patch.object(task_service, "finalize_run", _capture_finalize), \
+            patch.object(task_service, "resolve_sub_agent_model_safely", lambda *a, **k: "m"), \
+            patch.object(task_service, "get_tools", lambda us: []), \
+            patch.object(task_service, "dispatch_tool", _fake_dispatch), \
+            patch.object(task_service, "_stream_one_iteration", _fake_stream):
+            await task_service.run_task_sub_agent(
+                parent_ctx=ctx, description="go", instructions=None,
+                allowed_tools=["search_documents"], max_steps=3,
+            )
+
+        second_inbound = snapshots[1]
+        assistant_msgs = [m for m in second_inbound if m.get("role") == "assistant"
+                          and m.get("tool_calls")]
+        assert assistant_msgs
+        am = assistant_msgs[-1]
+        assert "reasoning_content" not in am
+        assert "thought_signature" not in am["tool_calls"][0]
+        # finalize_run was called with None tokens (no usage emitted — graceful).
+        assert finalize_capture.get("input_tokens") is None
+        assert finalize_capture.get("output_tokens") is None
+
+    @pytest.mark.asyncio
+    async def test_finalize_run_persists_accumulated_usage(self):
+        """When usage was emitted across the loop, finalize_run is called with the
+        SUMMED input/output tokens (NOT None) — S4 closed (D-17)."""
+        from app.services import task_service
+
+        ctx = _build_sub_agent_ctx()
+        finalize_capture: dict = {}
+        _call = {"n": 0}
+
+        async def _fake_stream(*, messages, tools, model, user_settings,
+                               provider=None, structured_injected=None,
+                               reasoning_box=None, usage_box=None, **_kwargs):
+            i = _call["n"]
+            _call["n"] += 1
+            if usage_box is not None:
+                usage_box["input_tokens"] = (usage_box.get("input_tokens") or 0) + 100
+                usage_box["output_tokens"] = (usage_box.get("output_tokens") or 0) + 30
+            if i == 0:
+                return "", [{"id": "c1", "name": "search_documents",
+                             "arguments": '{"query":"x"}'}]
+            return "Final.", []
+
+        async def _fake_dispatch(name, args, sub_ctx):
+            from app.services.tool_dispatcher import ToolResult
+            return ToolResult(result="r")
+
+        async def _capture_finalize(**kwargs):
+            finalize_capture.update(kwargs)
+
+        with patch.object(task_service, "get_pg_pool", AsyncMock(return_value=MagicMock())), \
+            patch.object(task_service, "insert_run", AsyncMock()), \
+            patch.object(task_service, "finalize_run", _capture_finalize), \
+            patch.object(task_service, "resolve_sub_agent_model_safely", lambda *a, **k: "m"), \
+            patch.object(task_service, "get_tools", lambda us: []), \
+            patch.object(task_service, "dispatch_tool", _fake_dispatch), \
+            patch.object(task_service, "_stream_one_iteration", _fake_stream):
+            await task_service.run_task_sub_agent(
+                parent_ctx=ctx, description="go", instructions=None,
+                allowed_tools=["search_documents"], max_steps=3,
+            )
+
+        # Two iterations each added (100, 30) → summed.
+        assert finalize_capture.get("input_tokens") == 200
+        assert finalize_capture.get("output_tokens") == 60
