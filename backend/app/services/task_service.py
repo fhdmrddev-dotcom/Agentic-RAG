@@ -35,7 +35,7 @@ from uuid import UUID, uuid4
 
 from starlette.concurrency import run_in_threadpool
 
-from app.config import settings
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.db.runs import finalize_run, insert_run
 from app.dependencies import get_pg_pool
 from app.services.openai_service import get_tools
@@ -44,6 +44,64 @@ from app.services.sub_agent_models import resolve_sub_agent_model_safely
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_sub_agent_effective_model(
+    user_settings: Any | None,
+    ctx_model: str | None,
+) -> str:
+    """Resolve the sub-agent model INTENTIONALLY (D-18 / S3) — never the gpt-4o bounce.
+
+    The resolution chain, in priority order:
+      1. the user's explicit ``sub_agent_model`` (the override — their pick wins);
+      2. the resolved run/ctx model (``ctx_model`` — threaded by D-04 onto
+         ``parent_ctx.model``);
+      3. the active provider's FAST per-provider default (``_SUB_AGENT_MODEL_DEFAULTS``)
+         — NEVER the global ``settings.llm_model="gpt-4o"`` bounce (config.py:635) for
+         a non-openai provider.
+
+    This REUSES the shipped ``resolve_sub_agent_model_safely`` (no new resolver) and
+    only adds a narrow per-provider-default guard that closes the empty-available_models
+    leak the shipped resolver does NOT catch: when ``available_models`` is empty (a
+    fresh/sparse settings row) the resolver passes the global default ``gpt-4o`` straight
+    through (sub_agent_models.py:111-134 — the documented empty-list passthrough), so a
+    Google/Moonshot/GLM sub-agent silently runs on gpt-4o. The guard prefers the active
+    provider's fast default in exactly that case — and ONLY for a non-openai / non-flexible
+    / known provider (openai / openrouter / ollama / unknown keep their legitimate
+    candidate passthrough). When ``sub_agent_model`` or ``ctx_model`` is valid the chain
+    never reaches the guard.
+
+    Resolve-never-mutate (D-05): reads ``user_settings`` + config only; writes nothing.
+    """
+    provider = (
+        (user_settings.active_provider if user_settings else "") or "unknown"
+    )
+    # D-18 (S3): the user's explicit sub_agent_model is the override; the resolved
+    # run/ctx model is the fallback.
+    _user_sub_agent_model = (
+        getattr(user_settings, "sub_agent_model", None) if user_settings else None
+    )
+    effective_model = resolve_sub_agent_model_safely(
+        user_settings,
+        override_model=_user_sub_agent_model or None,  # honor the user's explicit pick
+        fallback_model=ctx_model or None,
+    )
+    # D-18 — close the gpt-4o leak the shipped resolver does NOT catch (empty
+    # available_models passthrough). NEVER override openai / flexible / unknown
+    # providers (their gpt-4o / candidate-passthrough is legitimate).
+    if (
+        effective_model == settings.llm_model  # the global "gpt-4o" bounce
+        and provider not in ("openai", "openrouter", "ollama", "unknown")
+        and _SUB_AGENT_MODEL_DEFAULTS.get(provider)
+    ):
+        logger.info(
+            "task_service: sub-agent model fell through to the global default %r for "
+            "provider=%r (no valid sub_agent_model/ctx model + empty available_models); "
+            "using the per-provider fast default %r instead (D-18/S3).",
+            effective_model, provider, _SUB_AGENT_MODEL_DEFAULTS[provider],
+        )
+        effective_model = _SUB_AGENT_MODEL_DEFAULTS[provider]
+    return effective_model
 
 
 # ---------------------------------------------------------------------------
@@ -474,10 +532,15 @@ async def run_task_sub_agent(
     sub_run_id = uuid4()
     pool = await get_pg_pool()
 
-    effective_model = resolve_sub_agent_model_safely(
+    # D-18 (S3): resolve the sub-agent model INTENTIONALLY — the user's explicit
+    # sub_agent_model → the resolved run/ctx model (parent_ctx.model, threaded by
+    # D-04) → the active provider's FAST default. NEVER the gpt-4o global bounce for
+    # a non-openai provider (the LIVE-UAT S3 leak: an empty available_models row let
+    # the shipped resolver pass settings.llm_model="gpt-4o" through to a
+    # Google/Moonshot/GLM sub-agent). resolve-never-mutate (D-05) preserved.
+    effective_model = _resolve_sub_agent_effective_model(
         parent_ctx.user_settings,
-        override_model=None,  # D-085-11 — no LLM-controlled model override in v1
-        fallback_model=parent_ctx.model or None,
+        ctx_model=parent_ctx.model or None,
     )
 
     provider = (
