@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: "Phase 093 Plan 02 complete (task_service gateway-consumption rewrite = F9 core/SC#1; byte-identical-Deep guard deterministic net-new=0); next = execute 093-03 (Wave 1 sibling, model-resolver)"
-last_updated: "2026-06-02T00:00:00.000Z"
+stopped_at: "Phase 093 Plan 03 complete (sub-agent model-resolver field fix available_models [D-06, dead since Phase 085] + resolve_workflow_ctx_model resolve-never-mutate wrapper [D-04/D-05] + Google default→gemini-3.5-flash [Open Q1, live-probed]); Wave 1 fully done (093-02 ‖ 093-03); next = execute Wave 2 (093-04 ‖ 093-05)"
+last_updated: "2026-06-02T14:42:35.857Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 9
-  completed_phases: 6
-  total_plans: 38
-  completed_plans: 36
-  percent: 93
+  completed_phases: 5
+  total_plans: 33
+  completed_plans: 31
+  percent: 94
 ---
 
 # Project State
@@ -25,7 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 093 — EXECUTING (Wave 0 done; Wave 1 in progress — 093-02 done, 093-03 next)
+Phase: 093 — EXECUTING (Wave 0 done; Wave 1 done — 093-02 ‖ 093-03 both complete; Wave 2 next — 093-04 ‖ 093-05)
+
+**Phase 093 Plan 03 — ✅ COMPLETE 2026-06-02 (Wave 1 sibling; sequential on main working tree, normal commits WITH hooks).** The stale-model root fix (D-06) + the Wave-2 ctx-model resolver. `resolve_sub_agent_model_safely` (`sub_agent_models.py`) now reads the REAL field **`available_models: list[str]`** instead of the non-existent `user_settings.llm_models` — the cross-provider safety net was **silently dead since Phase 085** (`getattr` always returned None → `_active_models_list` always [] → the validation branch never fired → `_SUB_AGENT_MODEL_DEFAULTS` never engaged). Now a stale cross-provider `llm_model` (a `gpt-*` id saved under `active_provider=anthropic`) falls back to the provider default instead of leaking to the wrong client; the fallback fires **ONLY** on a genuine mismatch (a non-empty `available_models` excluding the candidate) — an empty list passes through (backward compatible) and flexible providers (openrouter/ollama) keep the candidate best-effort. **NEW `resolve_workflow_ctx_model(user_settings) -> str`** (D-04/D-05, resolve-never-mutate): `None`→`""` (resume/Continue user_settings=None case, Open Q2 → Wave 2); otherwise delegates to `resolve_sub_agent_model_safely(..., override_model=None, fallback_model=llm_model)` — reads only, never writes saved settings (proven by a before/after no-mutation assertion). **Open Q1 RESOLVED via a LIVE Google `/models` probe (2026-06-02):** both `gemini-2.5-flash` AND `gemini-3.5-flash` are served (neither 404s) → locked the newer 3.x+ representative (matches eval/registry representative + newest-first; gemini-2.5 narrates tools without emitting, D-03). `Test093ModelResolver` flipped GREEN + expanded 2→7 cases (16/16 in file pass). Commits **8355f144** (Task 1 — field fix + wrapper + tests) + **1247896d** (Task 2 — Google default + 2 Rule-1 stale-test absorbs). Deviations: 2 auto-fixed (both Rule 1 — Phase-085 `_StubUserSettings` switched to the real `available_models` field [it was green for the wrong reason against the dead `llm_models`]; 2 google-default assertions repinned to gemini-3.5-flash). Pre-existing out-of-scope failure (`test_infer_openai_from_gpt_prefix`, timeout 300 vs 90 — config capability inference, NOT this plan) logged to `deferred-items.md`; net-new failures = 0. PARITY-02 stays OPEN (phase verification owns the native-7 × 5-type × 4-workflow LIVE UAT). See 093-03-SUMMARY.md (self-check PASSED). **NEXT: execute Wave 2 (093-04 ask_user F10 + Continue ctx-model thread ‖ 093-05 shared surfacing helper + live/resume ctx-model thread + ask_user draft); both import `resolve_workflow_ctx_model` from this plan.**
 
 **Phase 093 Plan 02 — ✅ COMPLETE 2026-06-02 (Wave 1; sequential on main working tree, normal commits WITH hooks).** The F9 core fix + the highest-risk task of the phase (SHARED Deep+harness file). `task_service._stream_one_iteration` now drives the Phase 092.5 provider gateway (`await open_stream(provider, GatewayRequest(...))`) and **HONORS `calling_mode`** (it was discarded — the exact F9 bug): native Anthropic/Google sub-agents reach their SDK adapters; STRUCTURED-mode compat natives (DeepSeek/Moonshot/GLM/MiniMax) get TOOL_USAGE_INSTRUCTIONS inject-once (single-element box, Pitfall 2) + `parse_structured_tool_calls` post-parse so `search_documents` fires instead of being narrated as text. The bare SYNC generator is driven `for event in stream:` in `run_in_threadpool` (IN-05 trap honored — never async iteration). tool_calls built from BOTH families (openai-compat tool_preparing+tool_args_progress full code_so_far; anthropic/google tool_start). Dead `_consume_sync_stream` deleted (sole caller). `Test093GatewayConsumption` flipped GREEN (4 cases) + 1 inject-once idempotency case → test_085 **30 passed**. **D-14 byte-identical-Deep guard (deterministic half):** full-suite **105 failed / 1079 passed = ZERO net-new attributable to the rewrite** (failure set filtered for task_service/test_085/sub_agent/gateway = EMPTY; 105 = top of the documented 99-105 flaky band); `sub_agent_service.py` byte-frozen (D-085-16); Deep `task()`/`analyze_document` ride the SAME gateway path (the correct path) with None-default semantics + run_task_sub_agent ordering preserved. The LIVE native-7 × multi-tool SSE proof + the eval `task`-cell Anthropic-twin skeleton diff stay **verifier-owned** (093-VALIDATION.md Dimension 4). Commit 498e8b8d (Task 1 feat; Task 2 = verification-only, no production code). Deviations: 2 auto-fixed (Rule 1 fixture-kwargs absorb, Rule 3 docstring grep-token reword). PARITY-02 stays OPEN. See 093-02-SUMMARY.md (self-check PASSED). **NEXT: execute 093-03 (Wave 1 sibling — model-resolver field fix + resolve_workflow_ctx_model wrapper).**
 
@@ -96,8 +98,8 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-01
 
-Progress: [█████████░] 93%
-<!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 EXECUTING (Plans 01-02/5 done — Wave-0 substrate + 093-02 task_service gateway-consumption rewrite [F9 core/SC#1, byte-identical-Deep guard net-new=0]; Wave 1 next = 093-03 model-resolver); 094/095/096 remaining -->
+Progress: [█████████░] 94%
+<!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 EXECUTING (Plans 01-02-03/5 done — Wave-0 substrate + Wave-1 093-02 task_service gateway-consumption rewrite [F9 core/SC#1, byte-identical-Deep guard net-new=0] + 093-03 model-resolver field fix [available_models, D-06] + resolve_workflow_ctx_model wrapper [D-04/D-05] + Google default→gemini-3.5-flash [Open Q1 live-probed]; Wave 2 next = 093-04 ‖ 093-05); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -152,6 +154,7 @@ Progress: [█████████░] 93%
 | Phase 092 P05 | ~45min | 4 tasks | 8 files |
 | Phase 092.5 P01 | 18min | 3 tasks | 4 files |
 | Phase 092.5 P03 | ~35min | 3 tasks | 10 files |
+| Phase 093 P03 | 22min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -160,6 +163,7 @@ Progress: [█████████░] 93%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (093-03, 2026-06-02): the cross-provider sub-agent safety net is REVIVED — `resolve_sub_agent_model_safely` (`sub_agent_models.py`) now reads the REAL field `available_models: list[str]` (D-06); it read the non-existent `user_settings.llm_models` and was silently dead since Phase 085 (`getattr`→None→empty list→validation never fired→`_SUB_AGENT_MODEL_DEFAULTS` never engaged). The fallback fires ONLY on a genuine mismatch (non-empty `available_models` excluding the candidate); empty list = passthrough (backward compatible); flexible providers (openrouter/ollama, empty default) keep the candidate best-effort. NEW `resolve_workflow_ctx_model(user_settings) -> str` (D-04/D-05, resolve-never-mutate): `None`→`""`, else `resolve_sub_agent_model_safely(..., override_model=None, fallback_model=llm_model)` — reads only, never writes saved settings; the importable contract Wave-2 (093-04/05) threads onto `wf_ctx.model` at the 3 ctx-build sites (phase-level precedence stays `phase.config.model or ctx.model`). Open Q1 RESOLVED: live Google `/models` probe (2026-06-02) confirms BOTH gemini-2.5-flash + gemini-3.5-flash serve → `_SUB_AGENT_MODEL_DEFAULTS["google"]` locked to gemini-3.5-flash (eval representative + newest-first; 2.5 narrates tools w/o emitting, D-03). 2 Rule-1 deviations: Phase-085 `_StubUserSettings` switched to the real `available_models` field (it was green for the wrong reason against the dead field), 2 google-default assertions repinned. Net-new failures = 0; `test_infer_openai_from_gpt_prefix` (timeout 300 vs 90) is pre-existing/out-of-scope → deferred-items.md.
 - (093-02, 2026-06-02): the harness sub-agent LLM call site (`task_service._stream_one_iteration`) now CONSUMES the provider gateway (`await open_stream(provider, GatewayRequest(...))`) and HONORS `calling_mode` — the F9 core fix (SC#1). STRUCTURED-mode compat natives (DeepSeek/Moonshot/GLM/MiniMax) get TOOL_USAGE_INSTRUCTIONS inject-ONCE (single-element mutable box threaded from `run_task_sub_agent`, Pitfall 2) + `parse_structured_tool_calls` post-parse (the residue 092.5-05 kept consumer-side). The bare SYNC generator is driven `for event in stream:` in `run_in_threadpool`, `close_fn=stream.close` (IN-05 trap — NEVER async iteration). `provider`+`structured_injected` are ADDITIVE None-defaults (not required) so the second direct caller `harness/phase_types.py:_exec_llm_single` + all `_fake_stream` fixtures route byte-identically; only `run_task_sub_agent` threads the real values. Dead `_consume_sync_stream` deleted (sole caller). D-14 byte-identical-Deep guard held at the deterministic layer: full-suite net-new=0 (filtered failure set EMPTY of task_service/sub_agent/gateway), `sub_agent_service.py` byte-frozen, Deep `task()`/`analyze_document` ride the same (correct) gateway path. LIVE Deep-parity row verifier-owned.
 - (092.5-03, 2026-06-01): clean-provider gateway adapters return the BARE `stream_*` SYNC generator (NOT an async wrapper) — `stream_anthropic`/`stream_google` are `Generator[dict,None,None]` driven by the consumer's threadpool `_drain_stream_with_close_on_cancel` (`for chunk in stream:`) + `close_fn=stream.close`; a bare passthrough is the ONLY design that keeps drain/close byte-identical (an async re-wrap would change the cascade-surface machinery). Plan-01's async-generator seam-test fakes were a scaffold assumption; the real boundary is sync, so the seam test was adapted to sync-drive.
 - (092.5-03, 2026-06-01): the two clean branches collapse into ONE `if active_provider_name in ("anthropic","google")` gateway-dispatched branch + ONE shared `_on_chunk` — byte-identical because the Google `_on_chunk` was a structural copy of Anthropic's and the only divergence (thought_signature hydration in the finish branch) is a NO-OP for Anthropic (its tool_calls carry no sig). I2/D-07 hydration STAYS consumer-side (mutates tool_calls_buffer); adapter only EMITS the finish sig. `GatewayRequest.tools` widened to `list|None` to carry active_tools' None signal verbatim.
