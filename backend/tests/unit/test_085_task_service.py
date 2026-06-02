@@ -907,3 +907,232 @@ class Test093GatewayConsumption:
         assert req.messages[0]["content"] == sys_text
         # …and system_prompt is set too (additive; ignored by the compat adapter).
         assert req.system_prompt == sys_text
+
+
+# ===========================================================================
+# Phase 093 / Plan 07 — gateway FINISH-event consumption (D-16) + usage
+# persistence (D-17). The harness sub-agent consumer used to DROP reasoning_delta
+# and IGNORE finish/usage (task_service.py:271-273 + :299-300). The LIVE
+# cross-provider UAT disproved the "no round-trip needed" assumption: Google needs
+# thought_signature echoed on the NEXT assistant tool-call message; Moonshot/Kimi
+# (thinking) needs reasoning_content echoed — else round 2 400s. The gateway
+# adapters ALREADY emit this on the finish event + reasoning_delta; the harness
+# just dropped it. The SAME finish/usage events carry usage → the sub-agent's
+# runs row is NULL on every harness run (S4).
+#
+# Contract (mirror agent_loop.py:1399-1416 usage + :1422-1432 reasoning +
+# :1492-1506 finish-branch hydrate + :1866-1901 assistant-message build):
+#   - _stream_one_iteration threads two ADDITIVE caller-supplied accumulator
+#     boxes (reasoning_box: list[str] | None, usage_box: dict | None) alongside
+#     structured_injected — None defaults → byte-identical for the lone
+#     llm_single caller + every _fake_stream fixture. Public return stays
+#     (content, tool_calls).
+#   - _drain consumes the finish event (hydrate thought_signature onto the
+#     buffer), accumulates reasoning_content (into reasoning_box[0]), and sums
+#     usage (into usage_box) — verbatim Deep semantics.
+#   - run_task_sub_agent hydrates thought_signature + reasoning_content onto the
+#     assistant replay message (conditional spread → no-op when absent) and
+#     persists the accumulated usage to the sub-agent runs row (S4 closed).
+# ===========================================================================
+
+
+class Test093FinishEvent:
+    """093-07 — finish-event consumption (thought_signature + reasoning_content
+    hydration) + usage accumulation + token persistence on the sub-agent run."""
+
+    # -- Task 1: _drain finish-branch + reasoning + usage accumulation ---------
+
+    @pytest.mark.asyncio
+    async def test_finish_event_hydrates_thought_signature_onto_tool_calls(self):
+        """Google shape: a finish event whose tool_calls carry thought_signature
+        hydrates it onto the matching buffer entry; the returned tool_calls each
+        carry thought_signature; the usage_box is populated."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "tool_start", "id": "fn_1", "name": "search_documents",
+             "args": {"query": "graphs"}},
+            {"type": "usage", "input_tokens": 120, "output_tokens": 45},
+            {"type": "finish", "finish_reason": "tool_calls",
+             "tool_calls": [{"thought_signature": "SIG_ABC"}]},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        reasoning_box: list[str] = [""]
+        usage_box: dict = {}
+        with patch.object(task_service, "open_stream", stub):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="gemini-3.5-flash",
+                user_settings=None,
+                provider="google",
+                reasoning_box=reasoning_box,
+                usage_box=usage_box,
+            )
+
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["thought_signature"] == "SIG_ABC"
+        # No reasoning was streamed → reasoning_box stays empty.
+        assert reasoning_box[0] == ""
+        # usage accumulated.
+        assert usage_box.get("input_tokens") == 120
+        assert usage_box.get("output_tokens") == 45
+
+    @pytest.mark.asyncio
+    async def test_reasoning_delta_accumulated_into_box_not_content(self):
+        """Moonshot/Kimi/DeepSeek shape: reasoning_delta events accumulate into
+        reasoning_box[0] (NOT into the answer content)."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "reasoning_delta", "content": "Let me think. "},
+            {"type": "reasoning_delta", "content": "Step 2."},
+            {"type": "delta", "content": "Final answer."},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "moonshot"}
+
+        reasoning_box: list[str] = [""]
+        usage_box: dict = {}
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="kimi-thinking-preview",
+                user_settings=None,
+                provider="moonshot",
+                reasoning_box=reasoning_box,
+                usage_box=usage_box,
+            )
+
+        # Reasoning went to the box; content is ONLY the answer delta.
+        assert reasoning_box[0] == "Let me think. Step 2."
+        assert content == "Final answer."
+
+    @pytest.mark.asyncio
+    async def test_usage_and_usage_delta_sum_into_box(self):
+        """usage + usage_delta accumulate; the usage_box sums across the stream
+        (and across iterations when the same box is reused)."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "usage", "input_tokens": 100, "output_tokens": 10},
+            {"type": "usage_delta", "output_tokens": 5},
+            {"type": "usage_delta", "output_tokens": 7},
+            {"type": "delta", "content": "ok"},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "openai"}
+
+        usage_box: dict = {}
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="gpt-5.4-mini",
+                user_settings=None,
+                provider="openai",
+                usage_box=usage_box,
+            )
+            # Reuse the SAME box for a second iteration → sums.
+            await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="gpt-5.4-mini",
+                user_settings=None,
+                provider="openai",
+                usage_box=usage_box,
+            )
+
+        # First iter: in=100, out=10+5+7=22. Second iter doubles it.
+        assert usage_box["input_tokens"] == 200
+        assert usage_box["output_tokens"] == 44
+
+    @pytest.mark.asyncio
+    async def test_plain_provider_no_signature_no_reasoning_no_usage(self):
+        """OpenAI/Anthropic/DeepSeek/MiniMax happy path: no thought_signature, no
+        reasoning_delta, no usage → returned tool_calls carry NO thought_signature
+        key, reasoning_box[0]=="", usage_box stays empty (byte-identical)."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "tool_start", "id": "toolu_1", "name": "search_documents",
+             "args": {"query": "x"}},
+            {"type": "finish", "finish_reason": "tool_calls", "tool_calls": [{}]},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        reasoning_box: list[str] = [""]
+        usage_box: dict = {}
+        with patch.object(task_service, "open_stream", stub):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="claude-haiku-4-5-20251001",
+                user_settings=None,
+                provider="anthropic",
+                reasoning_box=reasoning_box,
+                usage_box=usage_box,
+            )
+
+        assert len(tool_calls) == 1
+        assert "thought_signature" not in tool_calls[0]
+        assert reasoning_box[0] == ""
+        assert usage_box == {}
+
+    @pytest.mark.asyncio
+    async def test_boxes_optional_none_default_byte_identical(self):
+        """The boxes are ADDITIVE None-defaults: calling without them (the lone
+        llm_single caller + _fake_stream fixtures) drives identically — finish/usage
+        are consumed harmlessly into local accumulators and discarded."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "delta", "content": "answer"},
+            {"type": "usage", "input_tokens": 5, "output_tokens": 3},
+            {"type": "finish", "finish_reason": "stop", "tool_calls": []},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "openai"}
+
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="gpt-5.4-mini",
+                user_settings=None,
+                provider="openai",
+            )
+
+        assert content == "answer"
+        assert tool_calls == []

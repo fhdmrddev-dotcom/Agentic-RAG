@@ -125,6 +125,8 @@ async def _stream_one_iteration(
     user_settings: Any,
     provider: str | None = None,
     structured_injected: list[bool] | None = None,
+    reasoning_box: list[str] | None = None,
+    usage_box: dict | None = None,
 ) -> tuple[str, list[dict]]:
     """Run one streaming LLM iteration through the provider gateway.
 
@@ -164,6 +166,31 @@ async def _stream_one_iteration(
     accumulates repeated ``TOOL_USAGE_INSTRUCTIONS`` blocks across iterations.
     When ``None`` (the ``llm_single`` direct caller, which never loops) a local
     one-shot box is used.
+
+    Phase 093 (D-16/D-17 — finish-event consumption + usage persistence):
+    ``reasoning_box`` and ``usage_box`` are ADDITIVE caller-supplied accumulator
+    boxes (the same None-default pattern as ``structured_injected``) so the public
+    return stays ``(content, tool_calls)`` and the lone direct caller
+    (``harness/phase_types.py:_exec_llm_single``, no loop / no round-trip) keeps
+    routing byte-identically by passing neither.
+
+      - ``reasoning_box``: a single-element ``list[str]`` sink for the PER-TURN
+        ``reasoning_content`` (accumulated from ``reasoning_delta`` events —
+        Moonshot/Kimi(thinking)/DeepSeek). The caller hydrates it onto the
+        assistant tool-call replay message so the NEXT iteration round-trips it
+        (else Moonshot 400s "reasoning_content missing"). The caller RESETS it per
+        iteration (mirror ``agent_loop.py:1907-1908``); this function only WRITES
+        the per-turn accumulation. When ``None`` a local sink is used and dropped.
+      - ``usage_box``: a ``dict`` (keys ``input_tokens`` / ``output_tokens``) the
+        sub-agent loop accumulates ACROSS iterations (SUM — verbatim
+        ``agent_loop.py:1399-1416``) then persists to ``runs.input_tokens /
+        output_tokens`` on finalize (S4). When ``None`` a local dict is used and
+        dropped (the byte-identical pre-093-07 telemetry-NULL behavior).
+
+    The ``finish`` event's ``tool_calls`` carry Google's ``thought_signature``,
+    which ``_drain`` hydrates onto the matching ``tool_calls_buffer`` entry (verbatim
+    ``agent_loop.py:1503-1506``) so the returned ``tool_calls`` round-trip it.
+    NO-OP for Anthropic/OpenAI-compat (their finish tool_calls carry no sig).
     """
     from app.services.openai_service import CallingMode
 
@@ -175,6 +202,13 @@ async def _stream_one_iteration(
 
     if structured_injected is None:
         structured_injected = [False]
+    # Phase 093 (D-16/D-17): the boxes default to throwaway locals → byte-identical
+    # for the llm_single direct caller (passes neither) and the _fake_stream test
+    # fixtures (**_kwargs-absorbing).
+    if reasoning_box is None:
+        reasoning_box = [""]
+    if usage_box is None:
+        usage_box = {}
 
     # The openai-compat else-branch keys its <think>/usage/boundary logic on the
     # REGISTRY-derived provider for this model (agent_loop.py:1616-1617 verbatim),
@@ -254,12 +288,19 @@ async def _stream_one_iteration(
     # build paths never collide (agent_loop.py:1364-1371).
     _build_from_progress = _provider not in ("anthropic", "google")
 
-    def _drain() -> tuple[str, list[dict]]:
+    def _drain() -> tuple[str, list[dict], str, int | None, int | None]:
         # IN-05: the gateway annotation says AsyncIterator but the adapters return
         # BARE SYNC generators — drive `for event in stream:` here inside the
         # threadpool, NEVER the async-iteration form (mirrors
         # _drain_stream_with_close_on_cancel + the old sync stream drive).
         content_parts: list[str] = []
+        # Phase 093 (D-16): per-turn reasoning_content accumulation (Moonshot/Kimi/
+        # DeepSeek) — surfaced to reasoning_box for the assistant-message round-trip.
+        reasoning_parts: list[str] = []
+        # Phase 093 (D-17): per-turn usage totals — surfaced to usage_box for the
+        # cross-iteration SUM (verbatim agent_loop.py:1399-1416).
+        in_tok: int | None = None
+        out_tok: int | None = None
         buffer: dict[int, dict] = {}
         try:
             for event in stream:
@@ -269,8 +310,13 @@ async def _stream_one_iteration(
                     if _text:
                         content_parts.append(_text)
                 elif et == "reasoning_delta":
-                    # Sub-agent ignores reasoning text — not round-tripped here.
-                    pass
+                    # D-16 (mirror agent_loop.py:1422-1432): accumulate the per-turn
+                    # reasoning_content (NOT into answer content). The caller hydrates
+                    # it onto the assistant tool-call message so the NEXT round
+                    # round-trips it (else Moonshot/Kimi 400 "reasoning_content missing").
+                    _r = event.get("content", "")
+                    if _r:
+                        reasoning_parts.append(_r)
                 elif et == "tool_preparing":
                     if _build_from_progress:
                         idx = event.get("index", len(buffer))
@@ -296,8 +342,34 @@ async def _stream_one_iteration(
                         "name": event["name"],
                         "arguments": json.dumps(event.get("args", {})),
                     }
-                # usage / usage_delta / finish ignored — the sub-agent return
-                # needs no token SUM or thought_signature round-trip (A1).
+                elif et == "finish":
+                    # D-16 (mirror agent_loop.py:1492-1506): hydrate Google's
+                    # thought_signature onto each matching buffer entry so the
+                    # returned tool_calls round-trip it on the NEXT round (else
+                    # Gemini 400 "thought_signature missing in functionCall parts").
+                    # NO-OP for Anthropic + OpenAI-compat (their finish tool_calls
+                    # carry no sig). Mutates the buffer (a consumer accumulator).
+                    _fin_tcs = event.get("tool_calls", []) or []
+                    for _i, _ftc in enumerate(_fin_tcs):
+                        if _i in buffer and _ftc.get("thought_signature"):
+                            buffer[_i]["thought_signature"] = _ftc["thought_signature"]
+                elif et == "usage":
+                    # D-17 (verbatim agent_loop.py:1399-1408): SUM usage.
+                    _i = event.get("input_tokens", 0) or 0
+                    _o = event.get("output_tokens", 0) or 0
+                    if in_tok is None:
+                        in_tok = _i
+                        out_tok = _o
+                    else:
+                        in_tok += _i
+                        out_tok = (out_tok or 0) + _o
+                elif et == "usage_delta":
+                    # D-17 (verbatim agent_loop.py:1409-1416): incremental output.
+                    _o = event.get("output_tokens", 0) or 0
+                    if out_tok is None:
+                        out_tok = _o
+                    else:
+                        out_tok += _o
         finally:
             close = getattr(stream, "close", None)
             if close is not None:
@@ -305,9 +377,24 @@ async def _stream_one_iteration(
                     close()
                 except Exception:  # noqa: BLE001
                     logger.debug("stream close failed; ignoring", exc_info=True)
-        return "".join(content_parts), [buffer[i] for i in sorted(buffer)]
+        return (
+            "".join(content_parts),
+            [buffer[i] for i in sorted(buffer)],
+            "".join(reasoning_parts),
+            in_tok,
+            out_tok,
+        )
 
-    content, tool_calls = await run_in_threadpool(_drain)
+    content, tool_calls, _reasoning, _in_tok, _out_tok = await run_in_threadpool(_drain)
+
+    # D-16: surface the per-turn reasoning_content to the caller box (single-element
+    # — the caller resets it per iteration, mirror agent_loop.py:1907-1908).
+    reasoning_box[0] = _reasoning
+    # D-17: accumulate this turn's usage into the cross-iteration usage_box (SUM).
+    if _in_tok is not None:
+        usage_box["input_tokens"] = (usage_box.get("input_tokens") or 0) + _in_tok
+    if _out_tok is not None:
+        usage_box["output_tokens"] = (usage_box.get("output_tokens") or 0) + _out_tok
 
     # D-03 half b — STRUCTURED post-parse AFTER the drain (agent_loop.py:1675-1696).
     # The compat natives narrate the tool call as a JSON block in content; recover
