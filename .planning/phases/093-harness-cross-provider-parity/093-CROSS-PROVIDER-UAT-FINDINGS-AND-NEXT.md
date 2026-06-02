@@ -83,3 +83,31 @@ The roadmap order **093 → 094 → 095 → 096** already covers all of this. Do
 ## 8. Operator's report (`screenshots/Workflow test.docx`) — cross-checked & confirmed
 
 Operator tested Literature Review on DeepSeek-v4-pro, DeepSeek-v4-flash, Anthropic-sonnet-4-6. Their backend logs surfaced S3 (`gpt-4o` fallback) and S4 (`runs.usage missing`); their screenshots surfaced S1 (duplicate) and S2 (ghost avatars). DB cross-check (threads f4990f15, 1cf88e93, ec2a4f69) confirmed: 1 persisted message each (S1 = UI-only), NULL tokens (S4), subs on flash/haiku via gpt-4o fallback (S3). Strong reporting method — backend logs + screenshots + quality judgment per cell.
+
+---
+
+## 9. Testing strategy — when, who, and the operator manual-test rotation
+
+**Three test gates (testing is continuous, not one big event at the end):**
+
+1. **Post-093-gap-closure — backend re-verify.** The moment the provider round-trip + S3/S4 + GLM fixes land, re-run the *previously-broken* cells to confirm: Google + Moonshot now COMPLETE, GLM converges (no max_steps dead-end), sub-agents use the correct per-provider model (not gpt-4o), `runs.usage` tokens recorded — plus non-regression on the 4 already-passing providers. **Backend-truth** focus (DB + LangSmith). UI will still be messy (ghost avatars S2 / duplicate S1) — expected; that's 094/095.
+2. **Post-094/095 — experience re-verify.** Once execution moves to the panel and duplicates are gone, test the *felt* experience (clean panel timeline, no dup, legibility). **Operator lived-experience judgment essential** here (Chrome-MCP misses "feels broken").
+3. **Phase 096 — automated, formalized.** The per-workflow cross-cutting harness becomes the standing regression backstop (assertions A1–A9, scoreboard).
+
+**Division of labor (do NOT duplicate):**
+- **Operator manual pass provides what only it can:** the **backend logs** (operator's uvicorn terminal — how S3/S4 surfaced; the agent cannot see it live) and the **lived-experience / quality judgment** (academic-grade? duplicate appeared minutes later? panel reads clearly?).
+- **Agent automates breadth:** drive cells in Chrome → cross-match **DB + LangSmith + UI** vs A1–A9 → scoreboard (this is 096).
+- ⇒ Operator does NOT need to run all 7×4 manually; the 2×2-per-workflow human spot-check + agent automated breadth = full coverage.
+
+**Operator manual-test rotation (per-workflow · 2 providers · shared DBA doc).** Pair one **fixed** provider (confirm the fix lived) with one **known-good control** (confirm no regression); rotate so all native-7 are covered across the 4 workflows. Prefer two **different providers** over two models of the same provider (parity signal is in crossing providers). Keep the **same shared document (DBA dissertation)** so quality is directly comparable. Same prompt style as the literature_review report (final-quality + source count + confidence + anomalies + the exact prompt + screenshots + **backend log slice**).
+
+| Workflow | Provider A (was broken → confirm fixed) | Provider B (known-good control) |
+|----------|------------------------------------------|----------------------------------|
+| research_summarize | **Google** (gemini — thought_signature) | OpenAI |
+| plan_execute_verify | **Moonshot** (kimi — reasoning_content) | Anthropic |
+| literature_review | **GLM/zhipu** (max_steps) | DeepSeek |
+| doc_qa_human | MiniMax | (2nd reasoning provider, e.g. Google) |
+
+→ covers all 7, every run pairs a fix with a control, each workflow tested with 2 providers, clean 2-cell comparison. Time these passes **after each fix gate** (not on the current broken state — already mapped).
+
+**Enabler — backend log sink (small task in 093 or 096).** The only thing keeping the automated UAT from being fully self-sufficient is live backend-log access (the agent can't see the operator's terminal). Add a **file log sink** (uvicorn → a logfile) so the 096 harness can scan for `gpt-4o` fallback / `runs.usage missing` / `400` round-trip signals itself — then operator manual runs become a *quality/felt* spot-check rather than a *log-gathering* chore.
