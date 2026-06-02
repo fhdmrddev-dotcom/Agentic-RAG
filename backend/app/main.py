@@ -22,6 +22,16 @@ logging.getLogger("asyncio").setLevel(logging.ERROR)
 
 logger = logging.getLogger(__name__)
 
+# Phase 093 D-20 — opt-in backend file log-sink. Runs AFTER load_dotenv (so
+# os.environ carries LOG_FILE_PATH) and AFTER the asyncio suppressor above. Unset
+# env var = no handler = byte-identical console-only logging. Imports only stdlib
+# + os, so a top-level import forms no cycle.
+from app.services.logging_sink import install_file_log_sink
+
+_log_sink_path = install_file_log_sink()
+if _log_sink_path:
+    logger.info("backend file log-sink active: %s", _log_sink_path)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
