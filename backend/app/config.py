@@ -594,7 +594,7 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
     "openai":     "gpt-5.4-mini",
-    "google":     "gemini-2.5-flash",
+    "google":     "gemini-3.5-flash",   # 093 Open Q1: confirmed served via live /models probe 2026-06-02 (both 2.5 & 3.5 serve; lock 3.x+ — 2.5 narrates tools w/o emitting, D-03; matches eval representative + newest-first)
     "openrouter": "",   # Unknown routing — fall back to user's selected model
     "ollama":     "",   # Local, user manages their own models
     "deepseek":  "deepseek-v4-flash",

@@ -48,13 +48,27 @@ def test_global_slot_helpers_importable():
 
 class _StubUserSettings:
     """Minimal stand-in for UserEffectiveSettings (the real one is a Pydantic
-    model with many fields). The helper only reads .active_provider,
-    .llm_model, and .llm_models."""
+    model with many fields). The helper reads .active_provider, .llm_model, and
+    .available_models (list[str]).
+
+    Phase 093-03 (D-06): the resolver now reads the REAL field
+    ``available_models`` (list[str]) — NOT the non-existent ``llm_models``
+    (which was always None on the real model, so the safety net was silently
+    dead since Phase 085). These tests passed the model list as a
+    comma-separated ``llm_models`` string, which the resolver never actually
+    read — so the cross-provider-fallback cases were green for the WRONG reason
+    (validation never fired). The stub now splits that string into the real
+    ``available_models`` list so the tests exercise the genuinely-fixed path;
+    the constructor keyword stays ``llm_models`` to avoid churning every call
+    site, and ``.llm_models`` is preserved (unread) for back-compat."""
 
     def __init__(self, *, active_provider: str, llm_model: str, llm_models: str):
         self.active_provider = active_provider
         self.llm_model = llm_model
+        # Back-compat attribute (no longer read by the resolver — D-06).
         self.llm_models = llm_models
+        # The REAL field the resolver reads (models/user_settings.py:100).
+        self.available_models = [m.strip() for m in llm_models.split(",") if m.strip()]
 
 
 def test_resolve_no_override_returns_user_model():

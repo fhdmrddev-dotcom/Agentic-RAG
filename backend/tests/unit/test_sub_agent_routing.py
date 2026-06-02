@@ -42,8 +42,10 @@ def test_openai_sub_agent_uses_mini():
 
 
 def test_google_sub_agent_uses_flash():
-    """Google sub-agent uses gemini-2.5-flash."""
-    assert _SUB_AGENT_MODEL_DEFAULTS["google"] == "gemini-2.5-flash"
+    """Google sub-agent uses gemini-3.5-flash (093 Open Q1 — locked to the
+    confirmed-served 3.x+ representative; gemini-2.5 narrates tools without
+    emitting the call, D-03)."""
+    assert _SUB_AGENT_MODEL_DEFAULTS["google"] == "gemini-3.5-flash"
 
 
 # ---------------------------------------------------------------------------

@@ -64,11 +64,13 @@ def test_sub_agent_model_provider_default_openai():
 
 
 def test_sub_agent_model_provider_default_google():
-    """When provider=google, default to gemini-2.5-flash."""
+    """When provider=google, default to gemini-3.5-flash (093 Open Q1 — locked
+    to the confirmed-served 3.x+ representative; gemini-2.5 narrates tools
+    without emitting the call, D-03)."""
     from app.services import sub_agent_service
 
     provider_default = sub_agent_service._SUB_AGENT_MODEL_DEFAULTS.get("google", "")
-    assert provider_default == "gemini-2.5-flash"
+    assert provider_default == "gemini-3.5-flash"
 
 
 # ---------------------------------------------------------------------------
