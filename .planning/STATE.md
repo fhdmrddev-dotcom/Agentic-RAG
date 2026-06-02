@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: executing
-stopped_at: "Phase 093 Plan 01 complete (Wave-0 substrate + migration 065 applied live); next = execute 093-02 ‖ 093-03 (Wave 1)"
+stopped_at: "Phase 093 Plan 02 complete (task_service gateway-consumption rewrite = F9 core/SC#1; byte-identical-Deep guard deterministic net-new=0); next = execute 093-03 (Wave 1 sibling, model-resolver)"
 last_updated: "2026-06-02T00:00:00.000Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 38
-  completed_plans: 35
-  percent: 92
+  completed_plans: 36
+  percent: 93
 ---
 
 # Project State
@@ -25,7 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 093 — EXECUTING (Wave 0 done; Wave 1 next)
+Phase: 093 — EXECUTING (Wave 0 done; Wave 1 in progress — 093-02 done, 093-03 next)
+
+**Phase 093 Plan 02 — ✅ COMPLETE 2026-06-02 (Wave 1; sequential on main working tree, normal commits WITH hooks).** The F9 core fix + the highest-risk task of the phase (SHARED Deep+harness file). `task_service._stream_one_iteration` now drives the Phase 092.5 provider gateway (`await open_stream(provider, GatewayRequest(...))`) and **HONORS `calling_mode`** (it was discarded — the exact F9 bug): native Anthropic/Google sub-agents reach their SDK adapters; STRUCTURED-mode compat natives (DeepSeek/Moonshot/GLM/MiniMax) get TOOL_USAGE_INSTRUCTIONS inject-once (single-element box, Pitfall 2) + `parse_structured_tool_calls` post-parse so `search_documents` fires instead of being narrated as text. The bare SYNC generator is driven `for event in stream:` in `run_in_threadpool` (IN-05 trap honored — never async iteration). tool_calls built from BOTH families (openai-compat tool_preparing+tool_args_progress full code_so_far; anthropic/google tool_start). Dead `_consume_sync_stream` deleted (sole caller). `Test093GatewayConsumption` flipped GREEN (4 cases) + 1 inject-once idempotency case → test_085 **30 passed**. **D-14 byte-identical-Deep guard (deterministic half):** full-suite **105 failed / 1079 passed = ZERO net-new attributable to the rewrite** (failure set filtered for task_service/test_085/sub_agent/gateway = EMPTY; 105 = top of the documented 99-105 flaky band); `sub_agent_service.py` byte-frozen (D-085-16); Deep `task()`/`analyze_document` ride the SAME gateway path (the correct path) with None-default semantics + run_task_sub_agent ordering preserved. The LIVE native-7 × multi-tool SSE proof + the eval `task`-cell Anthropic-twin skeleton diff stay **verifier-owned** (093-VALIDATION.md Dimension 4). Commit 498e8b8d (Task 1 feat; Task 2 = verification-only, no production code). Deviations: 2 auto-fixed (Rule 1 fixture-kwargs absorb, Rule 3 docstring grep-token reword). PARITY-02 stays OPEN. See 093-02-SUMMARY.md (self-check PASSED). **NEXT: execute 093-03 (Wave 1 sibling — model-resolver field fix + resolve_workflow_ctx_model wrapper).**
 
 **Phase 093 Plan 01 — ✅ COMPLETE 2026-06-02 (continuation: schema regen + sanity + closeout).** The Wave-0 deterministic substrate landed: (1) `split_topic` reads `topic or kickoff_prompt` (D-09a code half, topic precedence preserved) — `programmatic.py`; (2) the `INPUT_UNSATISFIED` publish-time reachability lint (D-10, T-093-DOS) — `reachability.py` `_check_input_contracts` + `_KNOWN_RUN_INPUT_KEYS`; the 4 seeds lint clean after the fix; (3) **migration 065** (3 corrective seed fixes — literature_review input_keys + plan_execute_verify verify-gate drop + 3 anti-delegation downstream `llm_single` prompts) **operator-applied LIVE via the SQL editor** (trigger-disable→5×jsonb_set→trigger-enable, T-093-SEED); live-verified: lit_review `phases[0].config.input_keys=["topic","kickoff_prompt"]`, plan_execute_verify `phases[2].validators=[]`, Fix 3 prompts applied. **full-schema.sql NOT committed** — data-only migration; the regen diff was only the random pg_dump `\restrict` session nonce (schema byte-identical), reverted to avoid a misleading commit. (4) 7 Wave-0 RED test scaffolds authored/extended — each names its downstream owner (093-02 task_service / 093-03 model-resolver / 093-04 ask_user-live / 093-05 surfacing / 065 verify-gate). Task-1 sanity: `pytest test_093_split_topic.py test_harness_reachability.py` → **13 passed**. Commits c0ea0367 (T1) + 93b482a5 (T2) + afd9a60f (T3 author). PARITY-02 stays OPEN (substrate plan; phase verification owns the native-7 × 5-type × 4-workflow LIVE UAT closure). See 093-01-SUMMARY.md. **NEXT: `/gsd:execute-phase 093` (Wave 1 — 093-02 ‖ 093-03).**
 
@@ -94,8 +96,8 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-01
 
-Progress: [█████████░] 92%
-<!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 EXECUTING (Plan 01/5 done — Wave-0 substrate: split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint + migration 065 applied live + 7 RED scaffolds; Wave 1 next = 093-02 ‖ 093-03); 094/095/096 remaining -->
+Progress: [█████████░] 93%
+<!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 EXECUTING (Plans 01-02/5 done — Wave-0 substrate + 093-02 task_service gateway-consumption rewrite [F9 core/SC#1, byte-identical-Deep guard net-new=0]; Wave 1 next = 093-03 model-resolver); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -158,6 +160,7 @@ Progress: [█████████░] 92%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- (093-02, 2026-06-02): the harness sub-agent LLM call site (`task_service._stream_one_iteration`) now CONSUMES the provider gateway (`await open_stream(provider, GatewayRequest(...))`) and HONORS `calling_mode` — the F9 core fix (SC#1). STRUCTURED-mode compat natives (DeepSeek/Moonshot/GLM/MiniMax) get TOOL_USAGE_INSTRUCTIONS inject-ONCE (single-element mutable box threaded from `run_task_sub_agent`, Pitfall 2) + `parse_structured_tool_calls` post-parse (the residue 092.5-05 kept consumer-side). The bare SYNC generator is driven `for event in stream:` in `run_in_threadpool`, `close_fn=stream.close` (IN-05 trap — NEVER async iteration). `provider`+`structured_injected` are ADDITIVE None-defaults (not required) so the second direct caller `harness/phase_types.py:_exec_llm_single` + all `_fake_stream` fixtures route byte-identically; only `run_task_sub_agent` threads the real values. Dead `_consume_sync_stream` deleted (sole caller). D-14 byte-identical-Deep guard held at the deterministic layer: full-suite net-new=0 (filtered failure set EMPTY of task_service/sub_agent/gateway), `sub_agent_service.py` byte-frozen, Deep `task()`/`analyze_document` ride the same (correct) gateway path. LIVE Deep-parity row verifier-owned.
 - (092.5-03, 2026-06-01): clean-provider gateway adapters return the BARE `stream_*` SYNC generator (NOT an async wrapper) — `stream_anthropic`/`stream_google` are `Generator[dict,None,None]` driven by the consumer's threadpool `_drain_stream_with_close_on_cancel` (`for chunk in stream:`) + `close_fn=stream.close`; a bare passthrough is the ONLY design that keeps drain/close byte-identical (an async re-wrap would change the cascade-surface machinery). Plan-01's async-generator seam-test fakes were a scaffold assumption; the real boundary is sync, so the seam test was adapted to sync-drive.
 - (092.5-03, 2026-06-01): the two clean branches collapse into ONE `if active_provider_name in ("anthropic","google")` gateway-dispatched branch + ONE shared `_on_chunk` — byte-identical because the Google `_on_chunk` was a structural copy of Anthropic's and the only divergence (thought_signature hydration in the finish branch) is a NO-OP for Anthropic (its tool_calls carry no sig). I2/D-07 hydration STAYS consumer-side (mutates tool_calls_buffer); adapter only EMITS the finish sig. `GatewayRequest.tools` widened to `list|None` to carry active_tools' None signal verbatim.
 - (092.5-05, 2026-06-01): the entangled OpenAI/OpenRouter/Ollama unit (D-04) extracted VERBATIM into `provider_gateway/openai_compat.py` — the adapter OWNS + EMITS (`<think>` machine, `reasoning_content` routing, `_accumulate_chunk_usage` with BOTH Google-cumulative + OpenAI-`+=` branches intact, per-provider 5KB boundary dicts kept INDEPENDENT) and SURFACES `calling_mode` via the `(stream, calling_mode)` tuple (Pitfall 3 — the structural fix for harness-OpenAI-only). The consumer KEEPS verbatim: `parse_structured_tool_calls(full_content)` post-parse (L-3, reads full_content post-drain), STRUCTURED messages injection (L-1), provider-error retry/cap-pause/end_turn/empty-retry/round-trip persistence (L-5). NO synthetic `tool_start` (Open Q2) — adapter emits `tool_preparing`+`tool_args_progress`, consumer rebuilds `tool_calls_buffer`. Per-stream adapter-local state (`_in_think_block`, usage totals) replaces the original per-iteration nonlocal reset (verified equivalent: one stream = one tracker). NO "while-I'm-in-here" cleanup (075.x-cascade guard). Verbatim-ness proven by a 6-lens adversarial byte-identical review (ZERO breaking deltas) + worktree A/B full-suite (ZERO net-new). 2 suspicious-but-non-breaking deltas (tool_call `id` last-write→frozen-at-`tool_preparing`; failed-mid-stream usage nonlocal→dropped-on-raise) deferred to the Plan 06 live SSE gate.
@@ -318,9 +321,16 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-02 — finished Phase 093 Plan 01 (continuation: regen schema, sanity tests 13 GREEN, SUMMARY + STATE + ROADMAP closeout) after the operator applied migration 065
-Stopped at: Phase 093 Plan 01 complete (Wave-0 substrate + migration 065 applied live); next = /gsd:execute-phase 093 Wave 1 (093-02 task_service gateway rewrite ‖ 093-03 model-resolver)
+Last session: 2026-06-02 — finished Phase 093 Plan 02 (task_service gateway-consumption rewrite = F9 core/SC#1; flipped Test093GatewayConsumption GREEN; byte-identical-Deep guard deterministic net-new=0; SUMMARY + STATE + ROADMAP closeout). Ran SEQUENTIALLY on the main working tree, normal commits WITH hooks.
+Stopped at: Phase 093 Plan 02 complete; next = /gsd:execute-phase 093 (093-03 model-resolver — Wave 1 sibling, zero file overlap with 093-02)
 Resume file: --resume-file
+
+**Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
+
+- Task 1 ✅ `_stream_one_iteration` rewritten to consume the gateway (`await open_stream(provider, GatewayRequest(...))`) + honor `calling_mode`: STRUCTURED inject-once (`structured_injected` box, Pitfall 2) + `parse_structured_tool_calls` post-parse; bare SYNC generator driven `for event in stream:` in `run_in_threadpool` (IN-05 honored); buffer built from both families; dead `_consume_sync_stream` deleted; `provider`+`structured_injected` threaded from `run_task_sub_agent` (additive None-defaults keep the llm_single direct caller + fixtures byte-identical). `Test093GatewayConsumption` flipped GREEN (4) + inject-once idempotency case → test_085 30 passed; harness-caller suites 109 passed. Commit 498e8b8d. Acceptance greps: `await open_stream(`=1, `parse_structured_tool_calls`=2, `TOOL_USAGE_INSTRUCTIONS`=4, `async for`=0, `create_adaptive_streaming_chat`=0, `stream, _calling_mode`=0.
+- Task 2 ✅ D-14 deterministic guard (no production code): full backend suite 105 failed/1079 passed = ZERO net-new attributable (failure set filtered for task_service/test_085/sub_agent/gateway = EMPTY; 105 = top of the 99-105 documented flaky band); `sub_agent_service.py` byte-frozen (D-085-16, git diff empty); Deep `task()`/`analyze_document` ride the same gateway path with None-default semantics + run_task_sub_agent ordering/F7 grounding preserved. The LIVE Deep-parity row (Anthropic-twin skeleton diff + eval `task` cell) stays verifier-owned (093-VALIDATION.md Dimension 4).
+- Deviations: 2 auto-fixed — (Rule 1) `_capture_sub_agent_system_prompt._fake_stream` gained `**_kwargs` (signature change broke the fixture); (Rule 3) reworded 2 docstring/comment references so the literal acceptance-grep `== 0` for `async for` / `create_adaptive_streaming_chat` passes (explanatory text only, no code used either).
+- PARITY-02 stays OPEN — phase verification owns the native-7 × 5-type × 4-workflow LIVE UAT. SUMMARY: 093-02-SUMMARY.md (self-check PASSED). NEXT: 093-03 (model-resolver, Wave 1 sibling).
 
 **Plan 093-01 — ✅ COMPLETE (2026-06-02):** Wave-0 deterministic substrate + the 3-fix corrective seed migration. Ran with an operator SQL-editor checkpoint (Task 3 migration apply), resolved; closeout ran SEQUENTIALLY on the main working tree.
 
