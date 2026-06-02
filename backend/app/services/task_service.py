@@ -130,11 +130,17 @@ async def _stream_one_iteration(
 
     Phase 093 (F9 core fix — SC#1): this drives the SHARED provider gateway
     (``open_stream``) instead of calling the OpenAI-only adaptive-stream helper
-    directly and discarding ``calling_mode`` (the old F9 bug — the harness
-    sub-agent path never reached the native Anthropic/Google SDK adapters and
-    the OpenAI-compat natives — DeepSeek/Moonshot/GLM/MiniMax — never got
-    STRUCTURED-mode tool recovery, so they narrated ``search_documents`` as text
-    and it never fired).
+    directly and discarding ``calling_mode`` (the old F9 bug). Honoring
+    ``calling_mode`` fixes harness tool-firing on BOTH axes: native
+    Anthropic/Google now reach their SDK adapters, and tools are sent per the
+    RESOLVED mode. NATIVE providers — including the registered-default compat
+    natives DeepSeek/Moonshot/GLM/MiniMax, which are ``native_tools:True`` →
+    NATIVE — emit tools via the API param and fire natively (the happy path);
+    a STRUCTURED-mode provider (``native_tools:False`` / registry-miss /
+    OpenRouter-xml — the case-sensitive-registry trap) gets the inject-once +
+    ``parse_structured_tool_calls`` recovery below (the safety net). The old
+    path discarded the mode, so the native SDK adapters were never reached and
+    STRUCTURED providers never recovered (narrated ``search_documents`` as text).
 
     This is the SAME drive mechanism the Deep agent-loop uses post-092.5
     (``agent_loop.py:1352-1708``); routing Deep ``task()``/``analyze_document``

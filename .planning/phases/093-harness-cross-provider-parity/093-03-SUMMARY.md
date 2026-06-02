@@ -41,7 +41,7 @@ patterns-established:
   - "resolve_workflow_ctx_model: thin precedence wrapper (override_model=None, fallback_model=llm_model) over resolve_sub_agent_model_safely; None -> '' for the resume/Continue user_settings=None case (Open Q2)"
   - "Field-fix-reveals-false-passing-tests: when a dead-field read is corrected, audit every test that exercised the dead path — they were validating nothing"
 
-requirements-completed: [PARITY-02]
+requirements-completed: []  # PARITY-02 stays OPEN — phase verification owns closure (corrected post-093 adversarial review: previously read [PARITY-02], contradicting the REQUIREMENTS.md ledger + the other 4 plans)
 
 # Metrics
 duration: ~22min
