@@ -309,9 +309,10 @@ async def test_caps_step_and_wall_clock(
     """Per-phase wall-clock cap (asyncio.wait_for) fails a hanging phase → on_failure (D-12)."""
     from app.services.harness_engine import run_workflow, _DEFAULT_PHASE_MAX_STEPS
 
-    # The step cap default is sourced from Settings (Explorer=8) and enforced
-    # inside the executor — assert the engine surfaces it (both caps present).
-    assert _DEFAULT_PHASE_MAX_STEPS == 8
+    # The step cap default is sourced from Settings (093-09: raised 8 → 12, D-19
+    # headroom) and enforced inside the executor — assert the engine surfaces it
+    # (both caps present).
+    assert _DEFAULT_PHASE_MAX_STEPS == 12
 
     run_id = _uuid.uuid4()
     mock_asyncpg_pool.set_fetch_result(_rows(("p0", "pending")))

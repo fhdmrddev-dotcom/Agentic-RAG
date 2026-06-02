@@ -87,7 +87,7 @@ class TestModelsFinalized:
         )
         assert cfg.wall_clock_seconds is None
         assert cfg.model is None
-        assert cfg.max_steps == 10  # LOCKED default
+        assert cfg.max_steps == 12  # LOCKED default (093-09: 10 → 12, D-19 headroom)
 
     def test_models_batch_agents_has_wall_clock_model_and_merge_literal(self):
         cfg = LlmBatchAgentsPhaseConfig.model_validate(
@@ -592,7 +592,8 @@ class TestPhaseExecutors:
             captured["system_prompt_override"] = system_prompt_override
             return {"sub_run_id": uuid.uuid4(), "summary": "agent done", "status": "completed"}
 
-        # max_steps omitted -> model default 10 -> clamps to Explorer=8 (D-12).
+        # max_steps omitted -> model default 12 -> substitutes to the harness
+        # per-phase cap (093-09: 10/8 → 12/12 in lockstep, D-19 headroom).
         phase = _phase({"phase_type": "llm_agent", "prompt": "Research it.",
                         "available_tools": ["search_documents"]})
         with patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent):
@@ -601,7 +602,7 @@ class TestPhaseExecutors:
         assert captured["whitelist"] == frozenset({"search_documents"})  # D-05 layer 2
         assert captured["allowed_tools"] == ["search_documents"]
         assert captured["system_prompt_override"] == "Research it."  # OQ1
-        assert captured["max_steps"] == 8  # Explorer clamp (D-12)
+        assert captured["max_steps"] == 12  # harness per-phase cap (093-09 / D-19)
 
     @pytest.mark.asyncio
     async def test_llm_agent_respects_explicit_max_steps(self):
