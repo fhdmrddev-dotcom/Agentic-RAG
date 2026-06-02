@@ -517,6 +517,55 @@ async def submit_ask_user_response(
         .maybe_single()
     )
     row = row_resp.data if row_resp is not None else None
+
+    if not row:
+        # ── F10 (093 / D-07 / D-08): harness ask_user workflow_run-id fallback ──
+        # A harness ``llm_human_input`` prompt's durable row carries
+        # ``run_id = ctx.run_id`` — the WORKFLOW_RUN id (NOT a ``runs`` row) — and
+        # the executor subscribes on ``ask_user:{workflow_run_id}:{tcid}``
+        # (phase_types.py passes ctx.run_id to subscribe_for_response). The Step-1
+        # SELECT above therefore MISSES for harness. Resolve the id as a
+        # ``workflow_runs`` row UNDER THE CALLER'S OWNERSHIP + thread-anchor confirm
+        # (T-093-IDOR: never trust the path id; owner-scoped + the row's thread must
+        # have this id as its live ``active_workflow_run_id``). 404 — NEVER 403 — on
+        # missing / not-yours / non-anchor, so the response is INDISTINGUISHABLE for
+        # "doesn't exist" and "not yours" (no existence leak). This is the EXACT
+        # owner-scoped, anchor-confirmed pattern the Continue endpoint already uses
+        # (see continue_run Step-1 fallback). BRANCH, never replace (D-08): the
+        # Step-1 ``runs`` SELECT above stays FIRST and unchanged — Deep's runs-keyed
+        # ask_user path is byte-identical and still returns 200; this fallback only
+        # engages AFTER that SELECT misses. Once ``row`` is synthesized, Steps 2-4
+        # (persist / emit / PUBLISH) run UNCHANGED under ``run_id`` = the workflow_run
+        # id, so ``publish_response`` hits ``ask_user:{workflow_run_id}:{tcid}`` —
+        # the SAME channel ``subscribe_for_response`` blocks on (and the same channel
+        # ``resume_pending_prompt`` re-subscribes on after a worker restart).
+        wf_self_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, thread_id")
+            .eq("id", str(run_id))
+            .eq("user_id", current_user["id"])  # owner-scoped — no existence leak
+            .maybe_single()
+        )
+        wf_self = wf_self_resp.data if wf_self_resp is not None else None
+        if wf_self:
+            anchor_resp = await aexec(
+                supabase.table("threads")
+                .select("active_workflow_run_id")
+                .eq("id", wf_self["thread_id"])
+                .eq("user_id", current_user["id"])  # thread-anchor confirm
+                .maybe_single()
+            )
+            _anchor = (anchor_resp.data if anchor_resp is not None else None) or {}
+            if str(_anchor.get("active_workflow_run_id")) == str(run_id):
+                # Synthesize the Step-1 row so Steps 2-4 persist/emit/PUBLISH under
+                # the workflow_run id (status is never read post-Step-1, but mirror
+                # the SELECT shape for parity with the Continue fallback).
+                row = {
+                    "run_id": str(run_id),
+                    "thread_id": wf_self["thread_id"],
+                    "status": None,
+                }
+
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
