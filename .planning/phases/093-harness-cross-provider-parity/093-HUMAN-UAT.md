@@ -4,22 +4,36 @@ phase: 093-harness-cross-provider-parity
 source: [093-VERIFICATION.md]
 spec: 093-VALIDATION.md
 started: 2026-06-02T21:30:00Z
-updated: 2026-06-02T17:05:00Z
+updated: 2026-06-02T17:25:00Z
 driver: Claude (Chrome-MCP smart-sample live UAT) + operator follow-up
 ---
 
 ## Current Test
 
-[smart-sample live UAT complete — 1 confirmed issue (Google thought_signature) routed to gaps; operator-only dimensions (durability, parallel-thread, long-message, Moonshot/MiniMax/GLM breadth) remain]
+[smart-sample live UAT complete — ALL native-7 now sampled. 2 confirmed hard failures (Google + Moonshot, ONE shared root cause) + 1 degradation (GLM max_steps) routed to gaps; operator-only dimensions (durability, parallel-thread, long-message) remain]
 
-> **Live sample driven 2026-06-02** against the running stack (frontend :5173 + backend :8000, login fhdmrd@gmail.com, KB folder **DBA** = the "Fahed Mrad Chapters 1 to 4" dissertation, 441+402 chunks). 8 live workflow/Deep runs across **4 of native-7 providers** (DeepSeek, Google, OpenAI, Anthropic) covering **all 4 seed workflows + all 5 phase types**. Evidence = Supabase `runs`/`workflow_runs`/`messages` rows + UI/panel + network 200s. Moonshot, MiniMax, zhipu(GLM) NOT live-sampled (operator breadth).
+> **Live sample driven 2026-06-02** against the running stack (frontend :5173 + backend :8000, login fhdmrd@gmail.com, KB folder **DBA** = the "Fahed Mrad Chapters 1 to 4" dissertation, 441+402 chunks). **11 live workflow/Deep runs across ALL native-7 providers** covering **all 4 seed workflows + all 5 phase types**. Evidence = Supabase `runs`/`workflow_runs`/`messages` rows + UI/panel + network 200s.
+>
+> **Harness tool-using-workflow cross-provider matrix (research_summarize / multi-turn tool use):**
+>
+> | Provider | Result | Evidence |
+> |----------|--------|----------|
+> | OpenAI | ✅ PASS | plan_execute_verify (9 src) + doc_qa_human ask_user round-trip; correct model |
+> | Anthropic | ✅ PASS | research_summarize grounded 48 src (CR-01 confirmed); Deep 8-tool loop intact |
+> | DeepSeek | ✅ PASS | research_summarize + literature_review N=3 fan-out (96 src); NATIVE tool fire |
+> | MiniMax | ✅ PASS | research_summarize grounded 35 src; NATIVE tool fire (M2.7 parent / M2.5-highspeed sub) |
+> | Google | 🔴 FAIL | 400 — `thought_signature` missing on 2nd tool turn (functionCall) |
+> | Moonshot | 🔴 FAIL | 400 — `reasoning_content` missing on assistant tool call at index 2 |
+> | zhipu (GLM) | 🟡 PARTIAL | NATIVE tool fire works (36 src) but sub-agent reached **max_steps without a final answer** → no deliverable |
+>
+> **4/7 fully pass. Google + Moonshot share ONE root cause (harness consumer drops the finish-event reasoning metadata that must round-trip on multi-turn tool calls — the Deep path preserves it). GLM is a separate convergence/step-cap issue.**
 
 ## Tests
 
 ### 1. Dimension 1 — native-7 × 5-phase-type × 4-seed-workflow headline gate
 expected: Each of research_summarize / plan_execute_verify / literature_review / doc_qa_human runs end-to-end on ALL native-7; runs + sub-agent runs record the CORRECT per-provider model; tools ACTUALLY dispatch (not narrated); both llm_agent and llm_single phases complete.
 result: issue
-reported: "3 of 4 sampled providers PASS end-to-end (DeepSeek, OpenAI, Anthropic) with correct per-provider models recorded and real tool dispatch. GOOGLE FAILS: literature_review on gemini-3.5-flash errored with 400 INVALID_ARGUMENT 'Function call is missing a thought_signature in functionCall parts ... default_api:search_documents, position 2' — the harness sub-agent's multi-turn Gemini tool call omits the required thought_signature. Moonshot/MiniMax/zhipu(GLM) not live-sampled."
+reported: "ALL native-7 sampled. 4 PASS (OpenAI, Anthropic, DeepSeek, MiniMax) — correct per-provider models, real NATIVE tool dispatch, grounded. 2 HARD FAIL with ONE shared root cause: GOOGLE (gemini-3.5-flash) 400 'Function call is missing a thought_signature in functionCall parts ... position 2' AND MOONSHOT (kimi-k2.6) 400 'thinking is enabled but reasoning_content is missing in assistant tool call message at index 2' — both = the harness sub-agent's 2nd tool turn omits provider-specific reasoning metadata the Deep path round-trips. 1 DEGRADED: GLM/zhipu (glm-5.1) fires tools natively (36 sources) but the sub-agent reached max_steps without a final answer → no deliverable. So 3 of 7 native providers cannot complete a tool-using harness workflow."
 severity: major
 evidence: |
   PASS — per-provider model resolution + NATIVE tool fire confirmed in Supabase:
@@ -28,13 +42,18 @@ evidence: |
   - OpenAI plan_execute_verify (wf 3964deb1): gpt-5.4-mini, completed, 9 sources, verify-gate routed forward.
   - OpenAI doc_qa_human (wf 9d3ee63b): gpt-5.4-mini, full ask_user round-trip, completed.
   - Anthropic research_summarize (wf 7e35e33d): claude-haiku-4-5, parent+sub-agent provider=anthropic, grounded w/ 48 sources.
-  FAIL — Google: run 2f54f88e error verbatim: "400 INVALID_ARGUMENT. ... 'Function call is missing a thought_signature in functionCall parts. This is required for tools to work correctly ... function call default_api:search_documents, position 2.'" The merge phase then 'completed' by NARRATING the failure (no review delivered) — workflow_run status misleadingly 'completed'.
+  - MiniMax research_summarize (wf fdc9ad7a): MiniMax-M2.7 parent / MiniMax-M2.5-highspeed sub-agent, provider=minimax, grounded w/ 35 sources. NATIVE tool fire.
+  FAIL —
+  - Google literature_review (run 2f54f88e): "400 INVALID_ARGUMENT. ... 'Function call is missing a thought_signature in functionCall parts ... default_api:search_documents, position 2.'" Merge phase 'completed' by NARRATING the failure (no review). workflow_run status misleadingly 'completed'.
+  - Moonshot research_summarize (run child of 7ad0027f): "Error code: 400 - 'thinking is enabled but reasoning_content is missing in assistant tool call message at index 2'". Summarize phase narrated the API error (no deliverable).
+  PARTIAL —
+  - GLM/zhipu research_summarize (wf ad0af8ea, thread 09643962): glm-5.1 parent / glm-4.6 sub-agent, provider=zhipu, both completed (NO 400), 36 sources retrieved (tool fire works) — but final msg: "Sub-agent reached max_steps without producing a final answer ... no research findings are available." Distinct from the reasoning round-trip bug.
 
 ### 2. Dimension 2 — 4-axis bandwidth (SC#10 MANDATORY scoreboard recipe)
 expected: Cross-provider = all native-7; Multi-tool = ≥1 row firing search_documents + execute_code; Parallel-thread = Thread A streaming while Thread B kicks off; Long-message = ≥5KB prompt OR ≥50 prior messages.
 result: blocked
 blocked_by: other
-reason: "Cross-provider PARTIAL (4/7 live: DeepSeek/Google/OpenAI/Anthropic). search_documents dispatch confirmed on all 4. Multi-tool (search + execute_code in ONE prompt) NOT cleanly demonstrated — plan_execute_verify did search (9 sources) but the trivial arithmetic did not force execute_code (1 sub-agent, no code-exec run). Parallel-thread NOT tested. Long-message NOT tested. These 3 axes + the remaining 3 providers are operator follow-up."
+reason: "Cross-provider now ALL 7 sampled (4 PASS / 2 hard-fail / 1 degraded — see Test 1). Multi-tool (search + execute_code in ONE prompt) NOT cleanly demonstrated — plan_execute_verify did search (9 sources) but the trivial arithmetic did not force execute_code (1 sub-agent, no code-exec run). Parallel-thread NOT tested. Long-message NOT tested. These 3 axes are operator follow-up."
 
 ### 3. Dimension 3 — durability (resume / resume-mid-ask_user / Continue / reload)
 expected: Resume after uvicorn kill re-drives + surfaces; resume-mid-ask_user; Continue at step cap; reload reconcile no stale lock.
@@ -65,36 +84,51 @@ reported: "No mis-routing observed. user_settings is EMPTY (no saved row) → re
 
 ### 7. STRUCTURED-recovery mechanism split (clarified 2026-06-02)
 expected: (a) default-model compat-natives (DeepSeek/Moonshot/GLM/MiniMax) fire search_documents via NATIVE mode; (b) a deliberately registry-MISSING / native_tools:False model triggers the STRUCTURED inject+post-parse recovery and STILL fires the tool.
-result: blocked
-blocked_by: other
-reason: "(a) CONFIRMED for DeepSeek — search_documents fires NATIVELY (grounded results across 3 DeepSeek runs, never narrated). Moonshot/GLM/MiniMax NATIVE path not live-sampled. (b) Requires a deliberately mis-cased/unregistered model id, which the UI does not expose (it only offers registered models) — code-verified (task_service.py:233-248 inject + :317-330 post-parse, gated on calling_mode==STRUCTURED + bool(tools)) but not live-exercisable from the UI. Operator/edge-config follow-up."
+result: issue
+reported: "(a) NATIVE happy path CONFIRMED for DeepSeek (3 runs) AND MiniMax (35 src) — search_documents fires NATIVELY, never narrated. GLM/zhipu also fires tools natively (36 src) but its sub-agent loops to max_steps without finalizing. Google + Moonshot DO reach NATIVE mode but hard-fail on the 2nd tool turn (reasoning-metadata round-trip — see Gap 1), so their NATIVE multi-turn tool path is broken. (b) The registry-MISSING STRUCTURED-recovery branch needs a deliberately mis-cased/unregistered model id, which the UI does not expose — code-verified (task_service.py:233-248 inject + :317-330 post-parse, gated on calling_mode==STRUCTURED + bool(tools)) but not live-exercisable from the UI. Operator/edge-config follow-up."
+severity: minor
 
 ## Summary
 
 total: 7
 passed: 2
-issues: 2
+issues: 3
 pending: 0
 skipped: 0
-blocked: 3
+blocked: 2
 
 ## Gaps
 
-- truth: "literature_review (and any tool-using harness workflow) runs end-to-end on Google/Gemini — search_documents dispatches across multi-turn"
+- truth: "Any tool-using harness workflow runs end-to-end on the reasoning-model native providers (Google, Moonshot) — the sub-agent's multi-turn tool calls round-trip the provider's required reasoning metadata"
   status: failed
-  reason: "User-equivalent (agent-driven live UAT): Google gemini-3.5-flash harness sub-agent 400 INVALID_ARGUMENT 'Function call is missing a thought_signature in functionCall parts ... default_api:search_documents, position 2' on the SECOND tool turn. Workflow 'completes' by narrating the failure (no deliverable)."
+  reason: "Live UAT: TWO native providers hard-fail on the 2nd sub-agent tool turn, same root cause. GOOGLE (gemini-3.5-flash): 400 'Function call is missing a thought_signature in functionCall parts ... default_api:search_documents, position 2'. MOONSHOT (kimi-k2.6): 400 'thinking is enabled but reasoning_content is missing in assistant tool call message at index 2'. Both workflows 'complete' by narrating the API error (no deliverable). 4/7 providers (OpenAI, Anthropic, DeepSeek, MiniMax) pass — they don't require echoing reasoning metadata."
   severity: major
   test: 1
-  root_cause: "The harness/task_service sub-agent iteration consumer DELIBERATELY ignores the gateway `finish` event's thought_signature (task_service.py:299-300 comment: 'finish ignored — the sub-agent return needs no token SUM or thought_signature round-trip (A1)'). Gemini REQUIRES the base64 thought_signature emitted on a functionCall to be echoed back on the assistant's functionCall parts in the NEXT request. The DEEP consumer hydrates it (agent_loop.py _on_chunk finish-branch; google.py SEAM notes the hydration is consumer-side); the HARNESS consumer does not. So Google sub-agent turn-2 tool calls go out without thought_signature → 400. Google-only (no other provider emits/requires thought_signature)."
+  root_cause: "The harness/task_service sub-agent iteration consumer DELIBERATELY ignores the gateway `finish` event (task_service.py:299-300 comment: 'finish ignored — the sub-agent return needs no token SUM or thought_signature round-trip (A1)'). For reasoning models, the provider REQUIRES its per-turn reasoning metadata echoed back on the assistant tool-call parts in the NEXT request: Gemini → base64 `thought_signature` on functionCall; Moonshot/Kimi (thinking on) → `reasoning_content` on the assistant tool-call message. The DEEP consumer (agent_loop.py _on_chunk finish-branch) hydrates BOTH (the gateway adapters google.py / openai_compat.py already EMIT them on `finish`); the HARNESS consumer drops them. So the reasoning-provider sub-agent's turn-2 tool call is rejected. ONE fix unblocks both; reasoning_content is NOT referenced in task_service.py at all (confirmed)."
   artifacts:
     - path: "backend/app/services/task_service.py"
-      issue: "iteration consumer ignores `finish` event → drops Gemini thought_signature (A1 assumption wrong for Google); ~line 299-300 + the tool_calls buffer it rebuilds for the next assistant turn"
+      issue: "iteration consumer ignores `finish` event → drops BOTH Gemini thought_signature AND Moonshot reasoning_content (A1 assumption wrong for reasoning models); ~line 299-300 + the tool_calls buffer it rebuilds for the next assistant turn"
     - path: "backend/app/services/agent_loop.py"
-      issue: "reference: Deep consumer hydrates thought_signature onto tool_calls_buffer (the working path to mirror)"
+      issue: "reference: Deep consumer hydrates thought_signature + reasoning_content onto tool_calls_buffer (the working path to mirror)"
     - path: "backend/app/services/provider_gateway/google.py"
-      issue: "SEAM doc confirms thought_signature hydration is consumer-side, not in the adapter"
+      issue: "SEAM doc confirms thought_signature hydration is consumer-side; the adapter EMITS it on finish"
+    - path: "backend/app/services/provider_gateway/openai_compat.py"
+      issue: "emits reasoning_content on finish (Moonshot/Kimi); harness consumer must echo it back"
   missing:
-    - "In the harness/task_service consumer, capture thought_signature from the `finish` event's tool_calls[] and echo it back onto the assistant functionCall parts on the next iteration (Google-only, additive, mirrors agent_loop.py). Must NOT change other providers' behavior or the Deep byte-identical path."
+    - "In the harness/task_service consumer, capture the provider reasoning metadata (thought_signature for Gemini, reasoning_content for Moonshot/Kimi) from the `finish` event and echo it onto the assistant tool-call parts on the next iteration — mirror agent_loop.py. Provider-scoped + additive; MUST NOT change OpenAI/Anthropic/DeepSeek/MiniMax behavior or the Deep byte-identical path."
+  debug_session: ""
+
+- truth: "GLM/zhipu completes a tool-using harness workflow with a real deliverable"
+  status: failed
+  reason: "GLM/zhipu (glm-5.1 parent / glm-4.6 sub-agent) fires search_documents NATIVELY (36 sources, NO 400 error) but the research sub-agent reached max_steps without producing a final answer, so the summarize phase had no findings → narrated the failure. Distinct from the reasoning round-trip bug (no API error)."
+  severity: major
+  test: 1
+  root_cause: "UNCONFIRMED — needs diagnosis. Candidates: (a) GLM tool-loop behavior (keeps searching, never emits a final text answer) possibly tied to how its reasoning/tool-call turns are fed back; (b) sub-agent max_steps cap too low for GLM's style; (c) a softer manifestation of the same reasoning-metadata handling. The sub-agent run completed without error but never produced a terminal answer."
+  artifacts:
+    - path: "backend/app/services/task_service.py"
+      issue: "sub-agent iteration loop / max_steps handling for GLM — investigate whether GLM's tool turns converge to a final answer"
+  missing:
+    - "Diagnose why the GLM sub-agent loops to max_steps without finalizing; confirm whether it shares the reasoning-metadata cause or is a separate step-cap/convergence issue."
   debug_session: ""
 
 - truth: "plan_execute_verify execute phase grounds its numbers in the documents (not 'figures you provided'); doc_qa_human finalize faithfully applies the user's explicit correction"
