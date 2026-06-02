@@ -860,6 +860,31 @@ async def continue_run(
         if not isinstance(_wf_inputs, dict):
             _wf_inputs = {}
 
+        # D-04 (site 3 — Continue) + Open Q2: thread the resolved ctx model onto the
+        # continuation wf_ctx. The continuation previously set user_settings=None +
+        # no model, so the resolver never fired on Continue (only phase.config.model
+        # applied). Load the run OWNER's effective settings (the owner is verified at
+        # the Step-1 ownership SELECT — current_user["id"]) using the SAME loader the
+        # kickoff path uses (threads.py:900 load_user_settings), then resolve via the
+        # resolve-never-mutate wrapper (D-05): a stale cross-provider llm_model falls
+        # back to the active provider's default instead of leaking to the wrong client
+        # (T-093-MISROUTE). Phase-level precedence is unchanged downstream:
+        # phase.config.model or ctx.model (phase_types._effective_model) — this only
+        # sets ctx.model. If loading the owner's settings fails for any reason, fall
+        # back to None settings + "" model (resolve_workflow_ctx_model(None) -> "");
+        # phase-level model still applies — never block the Continue on this.
+        from app.models.user_settings import load_user_settings  # noqa: PLC0415
+        from app.services.sub_agent_models import resolve_workflow_ctx_model  # noqa: PLC0415
+        try:
+            _owner_settings = load_user_settings(current_user["id"])
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "continue: owner effective-settings load failed for run %s "
+                "(falling back to phase-level model only)", wf_run_uuid,
+            )
+            _owner_settings = None
+        _ctx_model = resolve_workflow_ctx_model(_owner_settings)
+
         async def _harness_continuation():
             wf_ctx = SimpleNamespace(
                 run_id=wf_run_uuid,
@@ -867,7 +892,10 @@ async def continue_run(
                 producer_run_id=_producer_id,
                 thread_id=thread_id,
                 current_user=current_user,
-                user_settings=None,
+                # D-04 (site 3): owner effective settings + resolved ctx model so the
+                # re-driven phases resolve a non-stale model from the active provider.
+                user_settings=_owner_settings,
+                model=_ctx_model,
                 # F8 (092-07): the persisted inputs (kickoff_prompt) for the re-driven run.
                 inputs=_wf_inputs,
                 redis=redis,
