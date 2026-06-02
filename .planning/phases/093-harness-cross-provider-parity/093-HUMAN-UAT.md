@@ -4,13 +4,15 @@ phase: 093-harness-cross-provider-parity
 source: [093-VERIFICATION.md]
 spec: 093-VALIDATION.md
 started: 2026-06-02T21:30:00Z
-updated: 2026-06-02T17:25:00Z
+updated: 2026-06-03T06:30:00Z
 driver: Claude (Chrome-MCP smart-sample live UAT) + operator follow-up
+reuat_pending: true
+reuat_note: "Gap-closure plans 06-09 (D-16..D-21) SHIPPED + code-verified 41/41 (093-VERIFICATION.md, status human_needed). Gap 1 (Google+Moonshot reasoning round-trip) -> 093-07; Gap 2 (GLM max_steps) -> 093-09 (force-synthesis + cap 8->12); Gap 3 (result-quality) -> SEED-050/Phase 096. BINDING re-confirmation = the operator D-21 native-7 LIVE re-UAT (full 11-item matrix in 093-VERIFICATION.md human_verification + 093-VALIDATION.md runbook). PARITY-02 stays Pending until that passes."
 ---
 
 ## Current Test
 
-[smart-sample live UAT complete — ALL native-7 now sampled. 2 confirmed hard failures (Google + Moonshot, ONE shared root cause) + 1 degradation (GLM max_steps) routed to gaps; operator-only dimensions (durability, parallel-thread, long-message) remain]
+[post-gap-closure re-UAT PENDING — see "## Re-UAT (post-gap-closure 06-09)" below. The pre-fix sample (this file's Tests/Gaps) DROVE plans 06-09, which are now shipped + code-verified; the binding live re-confirmation across the native-7 is the remaining operator gate.]
 
 > **Live sample driven 2026-06-02** against the running stack (frontend :5173 + backend :8000, login fhdmrd@gmail.com, KB folder **DBA** = the "Fahed Mrad Chapters 1 to 4" dissertation, 441+402 chunks). **11 live workflow/Deep runs across ALL native-7 providers** covering **all 4 seed workflows + all 5 phase types**. Evidence = Supabase `runs`/`workflow_runs`/`messages` rows + UI/panel + network 200s.
 >
@@ -100,7 +102,8 @@ blocked: 2
 ## Gaps
 
 - truth: "Any tool-using harness workflow runs end-to-end on the reasoning-model native providers (Google, Moonshot) — the sub-agent's multi-turn tool calls round-trip the provider's required reasoning metadata"
-  status: failed
+  status: fix_shipped_pending_reuat
+  fixed_by: "093-07 (D-16/D-17) — task_service._drain now CONSUMES the gateway finish event: hydrates Google thought_signature + accumulates Moonshot/Kimi reasoning_content onto the assistant tool-call replay message. Code-verified + 43/43 unit GREEN; LIVE 400-elimination re-confirmation owed (re-UAT Test 2)."
   reason: "Live UAT: TWO native providers hard-fail on the 2nd sub-agent tool turn, same root cause. GOOGLE (gemini-3.5-flash): 400 'Function call is missing a thought_signature in functionCall parts ... default_api:search_documents, position 2'. MOONSHOT (kimi-k2.6): 400 'thinking is enabled but reasoning_content is missing in assistant tool call message at index 2'. Both workflows 'complete' by narrating the API error (no deliverable). 4/7 providers (OpenAI, Anthropic, DeepSeek, MiniMax) pass — they don't require echoing reasoning metadata."
   severity: major
   test: 1
@@ -119,7 +122,8 @@ blocked: 2
   debug_session: ""
 
 - truth: "GLM/zhipu completes a tool-using harness workflow with a real deliverable"
-  status: failed
+  status: fix_shipped_pending_reuat
+  fixed_by: "093-09 (D-19) — root cause PINNED via the live GLM run + LangSmith trace (thread 71502600 / wf f3cffe56): NOT a stuck loop or structured re-loop — Branch B (cap-too-low), the sub-agent did 8 DISTINCT progressive searches and was cut off mid-research (CSF sibling converged at exactly step 8). Fix: force-synthesis fallback on max_steps exhaustion (any provider returns a real answer, never the placeholder) + effective cap raise 8->12. Code-verified + 3/3 GREEN; LIVE convergence re-confirmation owed (re-UAT Test 3)."
   reason: "GLM/zhipu (glm-5.1 parent / glm-4.6 sub-agent) fires search_documents NATIVELY (36 sources, NO 400 error) but the research sub-agent reached max_steps without producing a final answer, so the summarize phase had no findings → narrated the failure. Distinct from the reasoning round-trip bug (no API error)."
   severity: major
   test: 1
@@ -132,7 +136,8 @@ blocked: 2
   debug_session: ""
 
 - truth: "plan_execute_verify execute phase grounds its numbers in the documents (not 'figures you provided'); doc_qa_human finalize faithfully applies the user's explicit correction"
-  status: failed
+  status: deferred
+  re_open_trigger: "SEED-050 / Phase 096 EVAL — result-quality (execute-phase grounding fidelity + finalize correction-incorporation) is a deeper prompt/eval surface NOT in 06-09 scope. Re-open when Phase 096 builds the harness result-quality eval. Operator Dimension-5 judgment (re-UAT Test 9) still samples it live."
   reason: "Dim-5 quality: OpenAI plan_execute_verify used N=165 (doc reports 309) + 'Using the figures you provided'; OpenAI doc_qa_human finalize ignored the explicit 'exactly 4 RQ1–RQ4 mapping to 6 objectives' correction and listed 6 items."
   severity: minor
   test: 5
@@ -141,3 +146,26 @@ blocked: 2
   missing:
     - "Operator final pass/fail on result-quality across ≥2 providers (the Dimension-5 'as-intended' gate). Consider a code-forcing multi-tool prompt to exercise execute_code (Dim-2 multi-tool)."
   debug_session: ""
+
+## Re-UAT (post-gap-closure 06-09)
+
+**Status: PENDING (operator-run).** Plans 06-09 shipped + code-verified (093-VERIFICATION.md = human_needed, 41/41 code must-haves; RED LINE held — agent_loop.py + sub_agent_service.py zero-diff; 99/99 deterministic tests). Code review of the gap-closure: 0 critical / 3 warning — WR-02 (log-sink startup-safe) + WR-03 (connection-string/secret redaction) FIXED (commit 94fcd141); WR-01 (093-08 makes Deep task() honor sub_agent_model — a deliberate, more-correct behavior change) = operator sign-off (re-UAT Test 8).
+
+**Already re-confirmed LIVE this session** (the operator's GLM diagnosis run — thread `71502600-4c65-4ab9-9f6c-42b51ef93940`, wf `f3cffe56`, glm-4.6, completed end-to-end with a full ~8,118-char review):
+- ✅ 093-08 model resolution — all sub-agent runs recorded `glm-4.6`, NOT gpt-4o.
+- ✅ 093-07 S4 usage — sub-agent runs rows have non-NULL input/output tokens (16705/1789, 64060/210, 60636/2139).
+- ✅ 093-01 split_topic — 3 sub-questions produced.
+- ⚠️ This run PRE-DATES the 093-09 force-synthesis fix (it surfaced the symptom: 1 of 3 sub-agents hit max_steps). The post-fix GLM convergence is re-UAT Test 3.
+
+**Remaining live re-confirmation (the binding PARITY-02 gate — full 11-item matrix in 093-VERIFICATION.md `human_verification` + the runbook in 093-VALIDATION.md §"Manual-Only Verifications"):**
+- Test 2 — Google + Moonshot multi-tool harness sub-agent completes with NO round-2 400 (093-07 live proof).
+- Test 3 — GLM literature_review fan-out: NO "reached max_steps" placeholder in the merged review (093-09 live proof; re-run the same prompt the diagnosis used).
+- Tests 1, 4, 5 — the native-7 × workflow rotation (§9): correct per-provider model, tools dispatch, usage non-NULL.
+- Tests 6-7 — 4-axis bandwidth (multi-tool + parallel-thread + long-message) + durability (resume / resume-mid-ask_user / Continue / reload).
+- Test 8 — Deep-parity skeleton-diff regression + WR-01 sub_agent_model sign-off.
+- Test 9 — Dimension-5 result-quality (the migration-065 anti-delegation prompts on a real KB folder; the residual Gap-3 quality concerns).
+- Tests 10-11 — model-resolver casing-trap data check + STRUCTURED-recovery NATIVE/safety-net split.
+
+**Activate the D-20 log-sink first** (already done this session): `LOG_FILE_PATH=logs/backend.log` in `backend/.env` + uvicorn restart → grep `backend/logs/backend.log` for `gpt-4o … falling back`, `runs.usage missing`, `400 thought_signature`/`reasoning_content` during the re-UAT.
+
+On a clean live pass across all 11 dimensions → flip PARITY-02 to Validated and phase status to passed.
