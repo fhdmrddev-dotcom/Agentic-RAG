@@ -95,3 +95,31 @@
   `test_infer_openai_from_gpt_prefix` deferral). Fix = update this integration test's fixture
   to the real `available_models` field (same one-line shape 093-03 applied to the unit stub).
   Candidate for the same `/gsd:quick` test-pin pass as the other 093-03 deferral.
+
+## From Plan 093-08 (intentional harness sub-agent model resolution — D-18/S3)
+
+### Still-pre-existing model-resolver failures (NOT caused by 093-08) — `test_085_sub_agent_cross_provider`
+
+- **File:** `backend/tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun`
+  — the SAME 4 parametrized cases (`anthropic`, `google`, `deepseek`, `moonshot`) already
+  logged under 093-07 above. Carried forward — still the only touched-surface failures.
+- **Symptom (unchanged):** `AssertionError: BUG-260528-01 reproduced for provider='...':
+  resolver returned stale cross-provider model 'gpt-4.1'` — stale `llm_models` CSV fixture
+  the resolver no longer reads (the real field is `available_models`, migrated in 093-03).
+- **RE-PROVEN PRE-EXISTING relative to 093-08:** reverted `task_service.py` to the plan's
+  parent (commit `893de428~1` = `ed57e258` head, BEFORE the Task-1 `_resolve_sub_agent_effective_model`
+  helper) and re-ran — all 4 cases fail IDENTICALLY (4 failed / 3 passed). So they are NOT a
+  093-08 regression. The full-suite delta is **111 failed / 1119 passed** (vs the documented
+  093-07 baseline of 111 failed / 1110 passed — the +9 passing are 093-08's new
+  `Test093IntentionalSubAgentResolution` cases; ZERO net-new failures).
+- **Why NOT a 093-08 regression:** 093-08 added a PURE helper (`_resolve_sub_agent_effective_model`)
+  that wraps the SHIPPED `resolve_sub_agent_model_safely` + a narrow per-provider-default guard,
+  and rewired `run_task_sub_agent` to call it. It did NOT change `resolve_sub_agent_model_safely`
+  itself (`git diff ed57e258..HEAD` on `sub_agent_models.py` = ZERO) nor the integration test's
+  stale fixture. The guard only fires when the candidate equals the global default AND the
+  provider is non-openai/flexible/unknown — orthogonal to the `gpt-4.1` stale-fixture path the
+  integration test exercises.
+- **Scope:** out of scope for 093-08 (files_modified = task_service.py + test_sub_agent_routing.py).
+  Same model-resolver fixture-hygiene class as the 093-03 + 093-07 deferrals — fix is the same
+  one-line `available_models` fixture update. Candidate for the consolidated `/gsd:quick` test-pin
+  pass covering all three model-resolver deferrals.
