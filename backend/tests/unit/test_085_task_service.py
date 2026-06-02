@@ -447,7 +447,9 @@ async def _capture_sub_agent_system_prompt(**override_kwargs) -> str:
     ctx = _build_sub_agent_ctx()
     captured: dict = {}
 
-    async def _fake_stream(*, messages, tools, model, user_settings):
+    async def _fake_stream(*, messages, tools, model, user_settings, **_kwargs):
+        # **_kwargs absorbs the Phase 093 additions (provider, structured_injected)
+        # that run_task_sub_agent now threads through.
         captured["messages"] = messages
         # No tool calls -> the loop breaks with this content as the summary.
         return ("done", [])
@@ -527,34 +529,235 @@ def test_registry_size_after_plan_02():
 #     tool_args_progress (openai-compat) AND tool_start (anthropic/google).
 # ===========================================================================
 
-@pytest.mark.skip(reason="093-02 owns the task_service gateway-consumption rewrite (F9)")
+class _SyncEventStream:
+    """A bare SYNC generator-like stream (the IN-05 shape the gateway adapters
+    return): iterable + a sync ``.close()``. ``_stream_one_iteration`` MUST drive
+    it with ``for event in stream:`` (never ``async for``)."""
+
+    def __init__(self, events):
+        self._events = list(events)
+        self.closed = False
+
+    def __iter__(self):
+        yield from self._events
+
+    def close(self):
+        self.closed = True
+
+
+def _make_open_stream_stub(events, calling_mode, *, captured: dict):
+    """Build an async stub for app.services.task_service.open_stream that records
+    the (provider, GatewayRequest) it was awaited with and returns
+    (SYNC stream, calling_mode)."""
+    stream = _SyncEventStream(events)
+
+    async def _stub(provider, request):
+        captured["provider"] = provider
+        captured["request"] = request
+        captured["stream"] = stream
+        return stream, calling_mode
+
+    return _stub, stream
+
+
 class Test093GatewayConsumption:
-    """RED contract for 093-02 — _stream_one_iteration consumes the gateway."""
+    """093-02 — _stream_one_iteration consumes the SHARED provider gateway (F9 fix).
+
+    Flipped GREEN from the Plan 01 RED scaffold: the function now awaits
+    open_stream(provider, GatewayRequest), drives the returned SYNC stream in a
+    threadpool (IN-05 — never async for), and HONORS calling_mode (STRUCTURED →
+    inject-once + parse_structured_tool_calls post-parse).
+    """
 
     @pytest.mark.asyncio
     async def test_stream_one_iteration_drives_gateway_open_stream(self):
         """_stream_one_iteration awaits open_stream with a GatewayRequest and drives
         the returned SYNC stream in a threadpool (NEVER async for — IN-05)."""
-        # 093-02 wires: monkeypatch app.services.task_service.open_stream with an
-        # async stub returning (iter([...GatewayEvent dicts...]), CallingMode.NATIVE);
-        # assert it was awaited with a GatewayRequest and the content drained.
-        raise NotImplementedError("093-02 flips this GREEN")
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+        from app.services.provider_gateway import GatewayRequest
+
+        captured: dict = {}
+        events = [
+            {"type": "delta", "content": "Hello "},
+            {"type": "delta", "content": "world"},
+        ]
+        stub, stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        with patch.object(task_service, "open_stream", stub):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="claude-haiku-4-5-20251001",
+                user_settings=None,
+                provider="anthropic",
+            )
+
+        # open_stream was awaited with the provider + a GatewayRequest envelope.
+        assert captured["provider"] == "anthropic"
+        assert isinstance(captured["request"], GatewayRequest)
+        assert captured["request"].model == "claude-haiku-4-5-20251001"
+        # Content drained from the SYNC stream; stream was closed (resource cleanup).
+        assert content == "Hello world"
+        assert tool_calls == []
+        assert stream.closed is True
 
     @pytest.mark.asyncio
     async def test_honors_structured_calling_mode(self):
         """When open_stream returns CallingMode.STRUCTURED and the drained content is
         a structured tool-call block, parse_structured_tool_calls is applied and the
         returned tool_calls are non-empty (search_documents-shaped), content cleared."""
-        raise NotImplementedError("093-02 flips this GREEN")
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        # A STRUCTURED-mode compat native narrates the tool call as a JSON block in
+        # the text content (NOT a native tool_call) — the consumer must recover it.
+        structured_block = (
+            '```json\n{"tool": "search_documents", '
+            '"arguments": {"query": "neural nets"}}\n```'
+        )
+        events = [{"type": "delta", "content": structured_block}]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.STRUCTURED, captured=captured
+        )
+
+        # deepseek routes through the openai-compat branch → a registry cap lookup
+        # happens; stub it so the test is offline + deterministic.
+        async def _fake_cap(model):
+            return {"provider": "deepseek"}
+
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="deepseek-v4-flash",
+                user_settings=None,
+                provider="deepseek",
+            )
+
+        # parse_structured_tool_calls fired → tool_calls non-empty, content cleared.
+        assert content == ""
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["name"] == "search_documents"
+        assert "neural nets" in tool_calls[0]["arguments"]
+
+    @pytest.mark.asyncio
+    async def test_structured_injection_is_idempotent_across_iterations(self):
+        """STRUCTURED inject-once: a shared structured_injected box appends
+        TOOL_USAGE_INSTRUCTIONS to the system message at most once across calls."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        stub, _stream = _make_open_stream_stub(
+            [{"type": "delta", "content": "ok"}],
+            CallingMode.STRUCTURED,
+            captured=captured,
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "deepseek"}
+
+        messages = [{"role": "system", "content": "SYS"}]
+        box = [False]
+        tools = [
+            {"function": {"name": "search_documents", "description": "d",
+                          "parameters": {"properties": {}, "required": []}}}
+        ]
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            for _ in range(3):
+                await task_service._stream_one_iteration(
+                    messages=messages,
+                    tools=tools,
+                    model="deepseek-v4-flash",
+                    user_settings=None,
+                    provider="deepseek",
+                    structured_injected=box,
+                )
+
+        assert box[0] is True
+        # The TOOL_USAGE_INSTRUCTIONS header appears exactly once (no accumulation).
+        assert messages[0]["content"].count("## Tool Usage Format") == 1
 
     @pytest.mark.asyncio
     async def test_buffer_built_from_openai_compat_family(self):
         """tool_preparing + tool_args_progress (openai-compat) rebuild the tool_calls
         buffer (full cumulative arguments — L-4)."""
-        raise NotImplementedError("093-02 flips this GREEN")
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "tool_preparing", "id": "call_1", "name": "search_documents", "index": 0},
+            {"type": "tool_args_progress", "tool_index": 0, "name": "search_documents",
+             "args_so_far": '{"query":', "total_args_bytes_so_far": 9,
+             "code_so_far": '{"query":'},
+            # full cumulative args land in code_so_far (L-4) — last write wins.
+            {"type": "tool_args_progress", "tool_index": 0, "name": "search_documents",
+             "args_so_far": '{"query": "rag"}', "total_args_bytes_so_far": 16,
+             "code_so_far": '{"query": "rag"}'},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "openai"}
+
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="gpt-5.4-mini",
+                user_settings=None,
+                provider="openai",
+            )
+
+        assert content == ""
+        assert len(tool_calls) == 1
+        assert tool_calls[0]["id"] == "call_1"
+        assert tool_calls[0]["name"] == "search_documents"
+        # Full cumulative arguments (code_so_far), not concatenated fragments.
+        assert tool_calls[0]["arguments"] == '{"query": "rag"}'
 
     @pytest.mark.asyncio
     async def test_buffer_built_from_native_family(self):
         """tool_start (anthropic/google) rebuilds the tool_calls buffer — the two
         families are non-colliding (one stream emits only one family)."""
-        raise NotImplementedError("093-02 flips this GREEN")
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        events = [
+            {"type": "tool_start", "id": "toolu_1", "name": "search_documents",
+             "args": {"query": "graphs"}},
+            {"type": "tool_start", "id": "toolu_2", "name": "read_document",
+             "args": {"doc_id": "d1"}},
+        ]
+        stub, _stream = _make_open_stream_stub(
+            events, CallingMode.NATIVE, captured=captured
+        )
+
+        with patch.object(task_service, "open_stream", stub):
+            content, tool_calls = await task_service._stream_one_iteration(
+                messages=[{"role": "system", "content": "sys"}],
+                tools=[],
+                model="claude-haiku-4-5-20251001",
+                user_settings=None,
+                provider="anthropic",
+            )
+
+        assert content == ""
+        assert len(tool_calls) == 2
+        assert tool_calls[0]["id"] == "toolu_1"
+        assert tool_calls[0]["name"] == "search_documents"
+        # tool_start args are JSON-encoded (the shape dispatch_tool re-parses).
+        assert json.loads(tool_calls[0]["arguments"]) == {"query": "graphs"}
+        assert tool_calls[1]["id"] == "toolu_2"
+        assert json.loads(tool_calls[1]["arguments"]) == {"doc_id": "d1"}

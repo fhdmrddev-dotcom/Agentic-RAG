@@ -27,6 +27,7 @@ Concurrency caps:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -37,10 +38,8 @@ from starlette.concurrency import run_in_threadpool
 from app.config import settings
 from app.db.runs import finalize_run, insert_run
 from app.dependencies import get_pg_pool
-from app.services.openai_service import (
-    create_adaptive_streaming_chat,
-    get_tools,
-)
+from app.services.openai_service import get_tools
+from app.services.provider_gateway import GatewayRequest, open_stream
 from app.services.sub_agent_models import resolve_sub_agent_model_safely
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 
@@ -118,79 +117,182 @@ def _build_sub_agent_system_prompt(
     return base
 
 
-def _consume_sync_stream(stream: Any) -> tuple[str, list[dict]]:
-    """Drain a sync OpenAI-shaped stream into (content_text, tool_calls).
-
-    This runs inside ``run_in_threadpool`` (see ``_stream_one_iteration``)
-    because ``create_adaptive_streaming_chat`` returns a SYNC iterator
-    (not async-iterable). Mirrors the tool_calls_buffer accumulation
-    pattern from ``threads.py:_on_chunk_openai`` at lines 2294-2311 but
-    without provider-specific branching — sub-agents always go through
-    the OpenAI-style path because they inherit the parent's provider via
-    ``resolve_sub_agent_model_safely``.
-    """
-    content_parts: list[str] = []
-    # tool_calls_buffer keyed by stream-emitted index; values are accumulated dicts.
-    buffer: dict[int, dict] = {}
-    for chunk in stream:
-        if not getattr(chunk, "choices", None):
-            continue
-        choice = chunk.choices[0]
-        delta = getattr(choice, "delta", None)
-        if delta is None:
-            continue
-        if getattr(delta, "content", None):
-            content_parts.append(delta.content)
-        tcs = getattr(delta, "tool_calls", None) or []
-        for tc in tcs:
-            idx = getattr(tc, "index", 0) or 0
-            if idx not in buffer:
-                buffer[idx] = {"id": "", "name": "", "arguments": ""}
-            if getattr(tc, "id", None):
-                buffer[idx]["id"] = tc.id
-            fn = getattr(tc, "function", None)
-            if fn is not None:
-                if getattr(fn, "name", None):
-                    buffer[idx]["name"] = fn.name
-                if getattr(fn, "arguments", None):
-                    buffer[idx]["arguments"] += fn.arguments
-    # Convert buffer dict to ordered list by index
-    tool_calls = [buffer[i] for i in sorted(buffer.keys())]
-    return "".join(content_parts), tool_calls
-
-
 async def _stream_one_iteration(
     *,
     messages: list[dict],
     tools: list[dict],
     model: str,
     user_settings: Any,
+    provider: str | None = None,
+    structured_injected: list[bool] | None = None,
 ) -> tuple[str, list[dict]]:
-    """Run one streaming LLM iteration in a worker thread.
+    """Run one streaming LLM iteration through the provider gateway.
+
+    Phase 093 (F9 core fix — SC#1): this drives the SHARED provider gateway
+    (``open_stream``) instead of calling the OpenAI-only adaptive-stream helper
+    directly and discarding ``calling_mode`` (the old F9 bug — the harness
+    sub-agent path never reached the native Anthropic/Google SDK adapters and
+    the OpenAI-compat natives — DeepSeek/Moonshot/GLM/MiniMax — never got
+    STRUCTURED-mode tool recovery, so they narrated ``search_documents`` as text
+    and it never fired).
+
+    This is the SAME drive mechanism the Deep agent-loop uses post-092.5
+    (``agent_loop.py:1352-1708``); routing Deep ``task()``/``analyze_document``
+    sub-agents through the gateway is the CORRECT path for them too — it makes
+    them cross-provider-robust as a bonus while staying non-regressing (D-14
+    byte-identical-Deep guard; the eval ``task``-cell skeleton diff is the
+    verifier-owned LIVE proof, the deterministic full-suite net-new=0 is Task 2).
 
     Returns ``(content_text, tool_calls_list)`` where each ``tool_calls`` entry
     is the shape consumed by ``dispatch_tool`` later in this module: a dict
     with ``id`` / ``name`` / ``arguments`` (the raw JSON string from the LLM)
     — the loop parses arguments before each ``dispatch_tool`` call.
+
+    ``provider`` is the active provider routing key (sub-agents inherit the
+    parent provider; ``run_task_sub_agent`` threads it in). When ``None`` it is
+    derived from ``user_settings.active_provider`` so the lone direct caller
+    (``harness/phase_types.py:_exec_llm_single``) keeps routing correctly.
+
+    ``structured_injected`` is a single-element mutable box (the inject-once
+    flag — Pitfall 2) the sub-agent loop owns so the system message never
+    accumulates repeated ``TOOL_USAGE_INSTRUCTIONS`` blocks across iterations.
+    When ``None`` (the ``llm_single`` direct caller, which never loops) a local
+    one-shot box is used.
     """
-    def _run_sync() -> tuple[str, list[dict]]:
-        stream, _calling_mode = create_adaptive_streaming_chat(
-            messages=messages,
-            model=model,
-            user_settings=user_settings,
-            tools_override=tools,
+    from app.services.openai_service import CallingMode
+
+    # Route key: sub-agents inherit the parent provider; the lone direct caller
+    # (llm_single) passes provider=None → derive from active_provider.
+    _provider = provider or (
+        getattr(user_settings, "active_provider", "") if user_settings else ""
+    ) or "unknown"
+
+    if structured_injected is None:
+        structured_injected = [False]
+
+    # The openai-compat else-branch keys its <think>/usage/boundary logic on the
+    # REGISTRY-derived provider for this model (agent_loop.py:1616-1617 verbatim),
+    # so the adapter normalizes correctly. anthropic/google route on the active
+    # provider directly.
+    _adapter_provider = _provider
+    if _provider not in ("anthropic", "google"):
+        from app.config import get_model_capability_async
+
+        _cap = await get_model_capability_async(model) or {}
+        _adapter_provider = (_cap.get("provider") or _provider or "unknown").lower()
+
+    _gw_request = GatewayRequest(
+        messages=messages,
+        model=model,
+        active_provider_name=_adapter_provider,
+        tools=tools,
+        user_settings=user_settings,
+        tool_choice="auto",
+    )
+    stream, calling_mode = await open_stream(_provider, _gw_request)
+
+    # D-03 half b — STRUCTURED inject ONCE (Pitfall 2), BEFORE the drain, into the
+    # system message. The gateway's openai_compat adapter SKIPS tool emission on
+    # STRUCTURED and does NOT inject (openai_compat.py) — the consumer must. Mirrors
+    # the Deep residue at agent_loop.py:1639-1648 (inject-once flag).
+    if calling_mode == CallingMode.STRUCTURED and not structured_injected[0]:
+        from app.services.agent_loop import (
+            TOOL_USAGE_INSTRUCTIONS,
+            _format_tool_list,
         )
+
+        _tl = _format_tool_list(tools if tools else get_tools(user_settings))
+        for _i, _m in enumerate(messages):
+            if _m.get("role") == "system":
+                messages[_i] = {
+                    "role": "system",
+                    "content": _m["content"]
+                    + TOOL_USAGE_INSTRUCTIONS.format(tool_list=_tl),
+                }
+                structured_injected[0] = True
+                break
+
+    # anthropic/google emit tool_start (complete args) → buffer built there
+    # (len()-keyed). The openai-compat adapter emits NO synthetic tool_start; it
+    # builds the buffer from tool_preparing (id+name) + tool_args_progress (full
+    # cumulative code_so_far args). Each stream emits only ONE family, so the two
+    # build paths never collide (agent_loop.py:1364-1371).
+    _build_from_progress = _provider not in ("anthropic", "google")
+
+    def _drain() -> tuple[str, list[dict]]:
+        # IN-05: the gateway annotation says AsyncIterator but the adapters return
+        # BARE SYNC generators — drive `for event in stream:` here inside the
+        # threadpool, NEVER the async-iteration form (mirrors
+        # _drain_stream_with_close_on_cancel + the old sync stream drive).
+        content_parts: list[str] = []
+        buffer: dict[int, dict] = {}
         try:
-            return _consume_sync_stream(stream)
+            for event in stream:
+                et = event.get("type")
+                if et == "delta":
+                    _text = event.get("content", "")
+                    if _text:
+                        content_parts.append(_text)
+                elif et == "reasoning_delta":
+                    # Sub-agent ignores reasoning text — not round-tripped here.
+                    pass
+                elif et == "tool_preparing":
+                    if _build_from_progress:
+                        idx = event.get("index", len(buffer))
+                        if idx not in buffer:
+                            buffer[idx] = {
+                                "id": event.get("id", "") or "",
+                                "name": event.get("name", "") or "",
+                                "arguments": "",
+                            }
+                elif et == "tool_args_progress":
+                    if _build_from_progress:
+                        tidx = event["tool_index"]
+                        b = buffer.setdefault(
+                            tidx, {"id": "", "name": "", "arguments": ""}
+                        )
+                        if event.get("name"):
+                            b["name"] = event["name"]
+                        # L-4: full cumulative args live in code_so_far.
+                        b["arguments"] = event.get("code_so_far", "")
+                elif et == "tool_start":
+                    buffer[len(buffer)] = {
+                        "id": event["id"],
+                        "name": event["name"],
+                        "arguments": json.dumps(event.get("args", {})),
+                    }
+                # usage / usage_delta / finish ignored — the sub-agent return
+                # needs no token SUM or thought_signature round-trip (A1).
         finally:
-            # Best-effort close — SDK streams expose .close() (sync) for resource cleanup.
-            try:
-                close = getattr(stream, "close", None)
-                if close is not None:
+            close = getattr(stream, "close", None)
+            if close is not None:
+                try:
                     close()
-            except Exception:  # noqa: BLE001
-                logger.debug("stream close failed; ignoring", exc_info=True)
-    return await run_in_threadpool(_run_sync)
+                except Exception:  # noqa: BLE001
+                    logger.debug("stream close failed; ignoring", exc_info=True)
+        return "".join(content_parts), [buffer[i] for i in sorted(buffer)]
+
+    content, tool_calls = await run_in_threadpool(_drain)
+
+    # D-03 half b — STRUCTURED post-parse AFTER the drain (agent_loop.py:1675-1696).
+    # The compat natives narrate the tool call as a JSON block in content; recover
+    # it so search_documents actually fires.
+    if calling_mode == CallingMode.STRUCTURED:
+        from app.services.tool_parser import parse_structured_tool_calls
+
+        structured = parse_structured_tool_calls(content)
+        if structured:
+            tool_calls = [
+                {
+                    "id": c.id,
+                    "name": c.function.name,
+                    "arguments": c.function.arguments,
+                }
+                for c in structured
+            ]
+            content = ""
+
+    return content, tool_calls
 
 
 async def run_task_sub_agent(
@@ -355,6 +457,11 @@ async def run_task_sub_agent(
     final_status = "completed"
     error_msg: str | None = None
 
+    # Phase 093 (Pitfall 2): inject-once flag for STRUCTURED-mode compat natives,
+    # shared across the loop iterations so TOOL_USAGE_INSTRUCTIONS is appended to
+    # the system message at most once (the message never accumulates blocks).
+    structured_injected: list[bool] = [False]
+
     # F7 (092-07): accumulate the grounding off every ToolResult so the harness
     # final answer can SHOW its sources (a harness research phase gathers them via
     # search_documents here, but the FINAL phase is summarize — llm_single with no
@@ -381,6 +488,8 @@ async def run_task_sub_agent(
                 tools=sub_tool_schemas,
                 model=effective_model,
                 user_settings=parent_ctx.user_settings,
+                provider=provider,
+                structured_injected=structured_injected,
             )
 
             if not tool_calls:
