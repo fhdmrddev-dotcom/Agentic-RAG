@@ -55,7 +55,7 @@ Sub-agent (glm-4.6) loops to max_steps without a terminal answer (no 400). Diagn
 ## 6. Decisions locked this session
 
 - **D-092-UX reconfirmed** (operator-approved, 2026-05-31): workflow execution → **workspace panel** timeline (**Phase 094**, not started); workflow **start** moves out of composer → panel; composer simplifies to **`[ Model ▾ ] [ General/Explorer ▾ ]`**. NOT a separate `/route` (would fight the shared SSE/anchor/lock architecture from 068/075.x).
-- **NEW — UNIFY (operator, 2026-06-02):** the workspace panel becomes the **SINGLE live-execution surface for BOTH Deep AND Harness**. Deep's agent-loop steps + tool calls move OUT of the chat into the panel too (**deliberately reverses sketch-001's in-chat Run-Card for Deep**). Chat keeps only prompt + final answer + a quiet "ran in workspace ▸" pointer. This is the correct fix for **S2 across all modes**.
+- **NEW — UNIFY (D-094-UNIFY, operator-SIGNED-OFF 2026-06-02 → Phase 094 scope expansion):** the workspace panel becomes the **SINGLE live-execution surface for BOTH Deep AND Harness**. Deep's agent-loop steps + tool calls move OUT of the chat into the panel too (**deliberately reverses sketch-001's in-chat Run-Card for Deep**). Chat keeps only prompt + final answer + a quiet "ran in workspace ▸" pointer. This is the correct fix for **S2 across all modes**.
 - **Separate SURFACE (panel), thread-bound — NOT a separate route.** Confirmed.
 - **Testing approach (operator, 2026-06-02):** run UAT **per-workflow** (one workflow × providers at a time), not all workflows at once — cleaner.
 
@@ -78,7 +78,7 @@ The roadmap order **093 → 094 → 095 → 096** already covers all of this. Do
 3. **Phase 095 (sketch-first):** chat tool-card unification incl. S1 duplicate (if not already dissolved by 094's chat rework).
 4. **Phase 096:** the automated cross-cutting UAT harness — **per-workflow** (one workflow × providers at a time, operator's structure). Drive Chrome → cross-match Supabase + LangSmith + logs → assertions **A1** single-answer/no-dup · **A2** no ghost avatars · **A3** grounded (UI sources ∧ DB source_refs ∧ LangSmith search_documents) · **A4** correct models (not gpt-4o) · **A5** tokens present · **A6** real deliverable (not narrated error) · **A7** tool round-trip ok · **A8** confidence + anti-delegation · **A9** optional LLM-judge. Architecture: drive sequentially (one browser) → fan-out workflow agents to cross-check threads in parallel → scoreboard. CONC-01 (multi-stream saturation) lands here too.
 
-**Open item to confirm next session:** operator sign-off that "unify Deep+Harness into the panel" is an accepted **094 scope expansion** (it changes a prior sketch-001 decision).
+**✅ SIGNED OFF (operator, 2026-06-02) — D-094-UNIFY:** "unify Deep+Harness into the panel" is an ACCEPTED Phase 094 scope expansion (deliberately reverses the sketch-001 in-chat Run-Card for Deep). Recorded in `ROADMAP.md` Phase 094 entry. No longer an open question.
 
 ## 8. Operator's report (`screenshots/Workflow test.docx`) — cross-checked & confirmed
 
