@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: ready_to_execute
-stopped_at: Phase 093 gap-closure PLANNED — 4 plans (093-06..09) verified PASSED iter 1; ready for /gsd:execute-phase 093 (starts at 093-06)
-last_updated: "2026-06-03T00:00:00.000Z"
-last_activity: 2026-06-03
+stopped_at: Phase 093 gap-closure 093-06 (D-20 backend file log-sink) COMPLETE — NEXT = execute 093-07 (D-16/D-17 hydration + runs.usage) ‖ 093-08 (D-18/S3 sub-agent model) [Wave 4/5]
+last_updated: "2026-06-02T20:18:00.000Z"
+last_activity: 2026-06-02
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 37
-  completed_plans: 33
-  percent: 89
+  total_plans: 41
+  completed_plans: 35
+  percent: 92
 ---
 
 # Project State
@@ -25,7 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-Phase: 093 — ✅ ALL 5 PLANS EXECUTED + ✅ VERIFIED `human_needed` (2026-06-02). NEXT = operator LIVE UAT (`093-HUMAN-UAT.md` / `093-VALIDATION.md`) → then phase close. PARITY-02 stays Pending until the LIVE UAT passes.
+Phase: 093 — GAP-CLOSURE IN PROGRESS (post-LIVE-UAT, D-15..D-21). Initial 5 plans EXECUTED + VERIFIED `human_needed` (2026-06-02); 4 gap-closure plans (093-06..09) planned + first one (093-06) now SHIPPED. NEXT = execute 093-07 (D-16/D-17 hydration + runs.usage) ‖ 093-08 (D-18/S3 sub-agent model resolution); then 093-09 (D-19 GLM diagnose-first) → phase close. PARITY-02 stays Pending until the native-7 LIVE UAT passes.
+
+**Phase 093 Plan 06 (gap-closure, Wave 3, D-20) — ✅ COMPLETE 2026-06-02 (sequential on main working tree, normal commits WITH hooks).** The re-UAT enabler: an opt-in, secret-redacting backend file log-sink so the agent can self-scan the post-fix re-UAT (D-21) for the signals it cannot see in the operator's live uvicorn terminal — `gpt-4o` sub-agent fallback (S3/D-18), `runs.usage missing` (S4/D-17), and the `400 thought_signature/reasoning_content missing` round-trip errors (D-16). **`backend/app/services/logging_sink.py` (new):** `install_file_log_sink() -> str | None` adds a `RotatingFileHandler` (10 MB × 3 backups, utf-8) to the ROOT logger ONLY when `LOG_FILE_PATH` (or `BACKEND_LOG_FILE`) is set — else returns `None` and installs NO handler (byte-identical pre-093-06 console-only logging, T-093-06-DEFAULT-ON). Idempotent via a `_gsd_093_sink` handler sentinel (a 2nd call adds no 2nd sink). Root level lowered to INFO only if currently HIGHER (or NOTSET); never raises a deliberately-lower level; never touches the `asyncio` logger (main.py keeps it at ERROR). `_RedactingFilter` rewrites `record.msg` post-`%`-interpolation: strips `sk-…` keys, `Authorization`/`Bearer` values, JWT-shaped tokens, then the live VALUES of all provider key env vars (length≥8 guard) → secrets never reach the file (T-093-06-LEAK-SECRET, unit-tested ABSENT). The sink only MIRRORS existing `logging` calls — adds NO new body/PII logging (T-093-06-LEAK-PII). Best-effort `os.chmod(path, 0o600)` (Windows may ignore; gitignore is the real protection — T-093-06-PERMS accepted). **`main.py` (wired):** top-level `from app.services.logging_sink import install_file_log_sink` + call at import-time AFTER `load_dotenv` (so `os.environ` carries the knob) and AFTER the asyncio suppressor; logs the active path when set. **`.env.example`:** documented the opt-in `LOG_FILE_PATH` knob (no real value) in a new observability section. **`.gitignore`:** confirmed the default `logs/backend.log` is covered by the existing `logs/` + `*.log` rules — NO new rule (the load-bearing secret-leak mitigation, T-093-06-COMMIT). **Verification:** `pytest backend/tests/test_093_log_sink.py` = **8/8 GREEN** (opt-in / redaction sk-/Bearer/JWT/env-value / clean-record passthrough / idempotency); `py_compile` clean on both files; opt-in assertion (no env → `install_file_log_sink() is None`) passes from `backend/`. Commits **0ea32b32** (Task 1 — sink + tests) + **a0c0603e** (Task 2 — wiring + knob + gitignore confirm). Deviations: NONE — plan executed exactly as written (one CWD nuance: the Task-2 `-c` opt-in assert resolves `app.*` from `backend/`, not the repo root — not a code change). TDD-gate note: `logging_sink.py` was a new module so impl+8-test contract shipped together in 0ea32b32 (no discrete RED commit — this is a `type: execute` gap-closure plan, not `type: tdd`). **TO ACTIVATE: operator sets `LOG_FILE_PATH=logs/backend.log` in `backend/.env` + restarts uvicorn before the D-21 re-UAT.** See 093-06-SUMMARY.md (self-check PASSED).
 
 **Phase 093 post-execution gates (2026-06-02):** All 5 plans executed SEQUENTIALLY on the main working tree (no worktrees — dodged the documented stale-base bug; Phase 091 precedent). 18 plan commits + 4 doc/fix commits. Gates: (1) cumulative harness + 093 + touched-surface suite = **136 passed, 0 failed**; (2) schema-drift clean (migration 065 data-only, operator SQL-editor applied + verified live, full-schema.sql no-diff); (3) a **6-dimension adversarial verification workflow** (byte-identical-Deep / IDOR / single-persist-owner / cross-provider parity / seed+lint / traceability) = ZERO confirmed high/critical, one CONCERN (cross-provider tool-firing narrative misframed → corrected in **35d20ea5**); (4) an **independent DEEP gsd code-review** caught a CRITICAL the adversarial pass MISSED — **CR-01: `task_service._stream_one_iteration` built GatewayRequest WITHOUT `system_prompt`, so the native Anthropic adapter (strips role=system + reads top-level system param) DROPPED the sub-agent/phase system prompt on Anthropic** = byte-identical-Deep RED-LINE regression + defeats cross-provider parity for Anthropic. **FIXED 63e9f6c6** (extract system msg → GatewayRequest.system_prompt, mirrors agent_loop.py:1553/1628; no-op for openai_compat which ignores system_prompt) + **WR-01 FIXED f93c61fd** (STRUCTURED inject+post-parse gated on bool(tools) so a no-tools llm_single answer is never blanked). REVIEW.md status=fixed; WR-02 (model-resolver casing-trap) deferred to LIVE UAT; IN-01/02/03 acknowledged. (5) Verifier independently re-confirmed CR-01's fix + the byte-identical-Deep RED LINE at FILE level (**agent_loop.py + sub_agent_service.py = ZERO diff across the phase**). **LESSON: the adversarial drive-mechanism review reported the RED LINE "held" but missed the request-envelope completeness (system_prompt threading) — the standalone deep review caught it; a semantic loss the LIVE eval skeleton-diff alone would not surface. Running BOTH reviews was load-bearing.** See 093-VERIFICATION.md + 093-REVIEW.md.
 
@@ -163,6 +165,7 @@ Progress: [█████████░] 97%
 | Phase 093 P03 | 22min | 2 tasks | 5 files |
 | Phase 093 P04 | ~9min | 2 tasks | 3 files |
 | Phase 093 P05 | ~20min | 3 tasks | 8 files |
+| Phase 093 P093-06 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -250,6 +253,7 @@ Recent decisions affecting current work:
 - (092-02): producer mode-branch is ONE additive if/else above run_agent_loop — harness builds a loose SimpleNamespace engine ctx (NEVER RunContext, Landmine 7), Deep else byte-identical, zero provider-branch edits. MODE-02 server-side 409 lock refuses a Deep/different-workflow send on a non-terminal anchor BEFORE the user-message INSERT (authoritative, grayed button is courtesy only)
 - (092-02): GET /threads/{id}/workflow is a PURE READ (D-v2.5-03) returning ThreadWorkflowState — never writes; lock_is_stale is diagnostic self-heal only (clear owned by cancel/terminal, Plan 03). cap_paused/continues reported from whichever run holds the pause (workflow_runs or latest cap_paused runs row). Published-workflows picker lives in a NEW /workflows router (avoids /{thread_id} param collision)
 - (092-02): requirements MODE-01/MODE-02 left OPEN (NOT marked complete) — MODE-02 also needs Plan 03 lock-clear half + Plan 04 frontend; closure deferred to phase verification per execution requirements_note
+- (093-06, 2026-06-02): D-20 opt-in backend file log-sink shipped — install_file_log_sink() adds a redacting RotatingFileHandler to the root logger ONLY when LOG_FILE_PATH/BACKEND_LOG_FILE is set (else None + no handler = byte-identical console-only); _RedactingFilter strips sk-/Bearer/Authorization/JWT + live provider key env VALUES before write; idempotent via _gsd_093_sink sentinel; wired at main.py startup after load_dotenv; default logs/backend.log gitignore-covered by existing logs/+*.log (no new rule); 8/8 tests GREEN. The D-21 re-UAT enabler + Phase 096 automated-UAT substrate; operator sets the env var + restarts uvicorn to activate.
 
 ### Pending Todos
 
