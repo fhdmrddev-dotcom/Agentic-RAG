@@ -1265,157 +1265,23 @@ async def send_message(
                         # stream the frontend watches (run:{producer_run_id}).
                         stream_run_id=run_id,
                     )
-                    # ── F6 (092-07): surface the harness answer as the assistant reply ──
-                    # `run_workflow` returned normally → the workflow reached its
-                    # natural terminal. D-10 intent: "the FINAL phase's text becomes
-                    # the assistant message verbatim; the existing message-insert path
-                    # persists ctx.final_output." run_workflow set
-                    # wf_ctx.final_output = last_output (harness_engine.py:559), and
-                    # every phase executor returns {"text": <answer>}
-                    # (harness/phase_types.py:210) — so wf_ctx.final_output["text"] is
-                    # the chat-ready answer. Two hand-offs were never wired (F6 root
-                    # cause): the LIVE render (no `delta` ever emitted for harness, so
-                    # the assistant placeholder stays empty) AND the DURABLE persist
-                    # (`run_agent_loop` never ran → `_result_sink["persist"]` is empty
-                    # → _shielded_finalize persists nothing). Wire BOTH here, on the
-                    # SUCCESS path only (run_workflow raises on failure → the F2
-                    # terminalize path + the except branches below own that — UNCHANGED).
-                    # Harness-branch-only: the Deep `else` + run_agent_loop +
-                    # _result_sink-from-Deep stay byte-identical.
-                    _wf_final_text = (
-                        getattr(wf_ctx, "final_output", None) or {}
-                    ).get("text", "") or ""
-                    # ── F7 (092-07): the run-level grounding union the engine exposed ──
-                    # run_workflow accumulated source_refs/citations/confidence across
-                    # ALL phases (the research phase gathers them via search_documents;
-                    # the summarize phase has none) and set ctx.final_source_refs /
-                    # ctx.final_citations / ctx.final_confidence. We thread them onto BOTH
-                    # the persisted assistant message (so references render on reload) and
-                    # the live SSE stream (so they render WITHOUT reload) — mirroring the
-                    # Deep path's persist params + SSE event vocabulary EXACTLY.
-                    _wf_source_refs = getattr(wf_ctx, "final_source_refs", None) or []
-                    _wf_citations = getattr(wf_ctx, "final_citations", None) or []
-                    _wf_confidence = getattr(wf_ctx, "final_confidence", None) or None
-                    # 1. LIVE render: emit the answer as a `delta` on the PRODUCER
-                    # stream (run:{run_id}) so the frontend's api.ts:485
-                    # `type=="delta" → onDelta(content)` appends it to the assistant
-                    # placeholder's content WITHOUT a reload — mirrors exactly how the
-                    # Deep path streams its visible text (agent_loop.py:1479 etc.). The
-                    # harness engine only emits phase/gate/run_completed events, never a
-                    # content delta, so the persist path's row alone would render only
-                    # after a manual reload. We emit ONCE with the full final text
-                    # (the engine produced the answer atomically per-phase; there is no
-                    # token stream to mirror). _harness_emit is the same canonical XADD
-                    # the engine uses (harness_engine.py:105).
-                    if _wf_final_text:
-                        try:
-                            await _harness_emit(redis, run_id, "delta", content=_wf_final_text)
-                        except Exception:
-                            # Best-effort live render — a Redis hiccup here must not
-                            # abort the run; the persisted row (below) is the durable
-                            # source of truth and a reload still surfaces the answer.
-                            logger.exception(
-                                "harness final_output delta emit failed for run %s "
-                                "(answer still persisted below)", run_id,
-                            )
-
-                    # F7 (092-07): emit the grounding SSE events on the PRODUCER stream
-                    # so reference chips + confidence render LIVE (no reload), mirroring
-                    # the Deep path's event vocabulary + ordering EXACTLY
-                    # (agent_loop.py:2412-2435): `sources` (sources=<list>), then
-                    # `citations` (citations=<list>, passage truncated to 400 chars like
-                    # Deep's SSE payload), then `confidence` (level/avg_similarity/
-                    # disclaimer). The frontend handlers (api.ts:566-575) onSources /
-                    # onCitations / onConfidence are the SAME ones the Deep stream drives.
-                    # Best-effort: a Redis hiccup must not abort the run (the persisted
-                    # row below is the durable truth; a reload still surfaces sources).
-                    try:
-                        if _wf_source_refs:
-                            await _harness_emit(
-                                redis, run_id, "sources", sources=_wf_source_refs
-                            )
-                        if _wf_citations:
-                            _sse_citations = []
-                            for _c in _wf_citations:
-                                _sse_c = dict(_c)
-                                _passage = _sse_c.get("passage")
-                                if _passage and len(_passage) > 400:
-                                    _sse_c["passage"] = _passage[:400]
-                                _sse_citations.append(_sse_c)
-                            await _harness_emit(
-                                redis, run_id, "citations", citations=_sse_citations
-                            )
-                        if _wf_confidence:
-                            await _harness_emit(
-                                redis, run_id, "confidence",
-                                level=_wf_confidence["level"],
-                                avg_similarity=_wf_confidence["avg_similarity"],
-                                disclaimer=_wf_confidence.get("disclaimer"),
-                            )
-                    except Exception:
-                        logger.exception(
-                            "harness grounding SSE emit failed for run %s "
-                            "(sources still persisted below)", run_id,
-                        )
-
-                    # 2. DURABLE persist: populate _result_sink["persist"] with a
-                    # zero-arg async callable that inserts the assistant `messages`
-                    # row, mirroring the EXACT shape run_agent_loop installs
-                    # (agent_loop.py:2551 → _persist_assistant_message: returns the
-                    # inserted message_id as `str | None`; uses insert_assistant_message
-                    # with content=_strip_nul(text)). _shielded_finalize (which runs in
-                    # this middle-try `finally`) reads _result_sink.get("persist") at
-                    # :1359, awaits it, and threads the returned id into finalize_run's
-                    # message_id (:1424) — identical consumption to the Deep path. F7
-                    # (092-07) now ALSO threads source_refs + confidence into the persist
-                    # via the EXACT Deep insert_assistant_message param shape (so the
-                    # grounding renders on reload); tool_calls stays absent (the harness
-                    # final answer is plain prose, no per-tool cards on the answer — the
-                    # tool-call panel is Phase 094). Token totals stay None (the engine
-                    # owns its own audit; the producer-shell runs.usage
-                    # legitimately has no aggregated SDK usage here → NULL + the existing
-                    # :1413 warn, unchanged).
-                    if _wf_final_text:
-                        _wf_thread_id = thread_id
-                        _wf_user_id = current_user["id"]
-
-                        # F7 (092-07): bind the grounding into the persist closure using
-                        # the EXACT Deep param shape (agent_loop.py:1136-1145 →
-                        # insert_assistant_message): source_refs (full deduped citation
-                        # objects, Deep D-13 → messages.source_refs), confidence_level /
-                        # confidence_avg_similarity / confidence_disclaimer (the
-                        # _confidence_slot fields Deep persists). Absent grounding leaves
-                        # the params None (a non-RAG workflow) — identical to a Deep turn
-                        # that searched nothing.
-                        _wf_persist_source_refs = _wf_source_refs or None
-                        _wf_persist_conf = _wf_confidence or {}
-
-                        async def _persist_harness_message(
-                            _text=_wf_final_text,
-                            _tid=_wf_thread_id,
-                            _uid=_wf_user_id,
-                            _src_refs=_wf_persist_source_refs,
-                            _conf=_wf_persist_conf,
-                        ) -> str | None:
-                            try:
-                                _inserted_id = await insert_assistant_message(
-                                    await get_pg_pool(),
-                                    thread_id=UUID(_tid) if isinstance(_tid, str) else _tid,
-                                    user_id=UUID(_uid) if isinstance(_uid, str) else _uid,
-                                    content=_strip_nul(_text),
-                                    source_refs=_src_refs,
-                                    confidence_level=_conf.get("level"),
-                                    confidence_avg_similarity=_conf.get("avg_similarity"),
-                                    confidence_disclaimer=_conf.get("disclaimer"),
-                                )
-                                return str(_inserted_id) if _inserted_id else None
-                            except Exception as e:
-                                logger.error(
-                                    "Failed to persist harness assistant message: %s", e
-                                )
-                                return None
-
-                        _result_sink["persist"] = _persist_harness_message
+                    # ── 093-05 D-11: answer surfacing now lives in run_workflow ──────
+                    # The F6/F7 surfacing (delta + sources/citations/confidence emit +
+                    # the assistant-message persist) was moved INTO the shared helper
+                    # `harness_engine._surface_final_answer`, which run_workflow invokes
+                    # on its success terminal BEFORE the terminal `run_completed` (D-11,
+                    # Pitfall 5). That helper is THE single surfacing site + single
+                    # persist owner for ALL THREE entry paths (live kickoff here, resume
+                    # via _build_resume_context, Continue via _harness_continuation) —
+                    # so resumed/Continue'd workflows surface identically and there is
+                    # exactly ONE persisted assistant message per path (Landmine 5).
+                    # Therefore the live-kickoff branch surfaces NOTHING inline and
+                    # installs NO harness persist callable into `_result_sink`:
+                    # `_shielded_finalize` reads `_result_sink.get("persist")` and is a
+                    # no-op when it is absent (threads.py:1529) → no double-persist /
+                    # duplicate assistant message. The Deep `else` branch +
+                    # run_agent_loop + the Deep `_result_sink` flow stay byte-identical
+                    # (D-14).
                 else:                                          # Deep — byte-identical
                     ctx = RunContext(
                         run_id=run_id,

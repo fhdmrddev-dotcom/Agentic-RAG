@@ -231,6 +231,125 @@ def _finalize_run_grounding(
     return final_source_refs, unique_citations, final_confidence
 
 
+# ── D-11: the SHARED answer-surfacing helper (Pitfall 5 / Landmine 5) ─────────
+async def _surface_final_answer(ctx, run_id: UUID, stream_run_id, redis, pool) -> str | None:
+    """Surface the harness final answer (delta + grounding) + persist it — ONCE.
+
+    THE single surfacing site + the single persist owner for ALL THREE entry
+    paths (live kickoff, resume, Continue). Previously the F6/F7 surfacing lived
+    INLINE in the live-kickoff branch of ``threads.py`` only (≈:1268-1418), so
+    resume (``_build_resume_context`` → ``run_workflow``) and Continue
+    (``_harness_continuation`` → ``run_workflow``) NEVER reached it and lost their
+    answer. ``run_workflow`` now calls this on its success terminal so all three
+    surface identically (D-11).
+
+    Ordering (mirror ``_shielded_finalize`` / D-v2.5-03): the caller has already
+    done the durable ``finish_run`` UPDATE; this helper emits ``delta`` +
+    ``sources`` / ``citations`` / ``confidence`` AND persists the assistant
+    ``messages`` row, and the caller emits the terminal ``run_completed`` AFTER —
+    so the visible answer + grounding land BEFORE the terminal sentinel.
+
+    Single persist owner (Landmine 5): this helper persists the assistant message
+    DIRECTLY (resume/Continue have no ``_result_sink``/``_shielded_finalize``).
+    The live-kickoff path no longer installs a harness persist callable, so there
+    is no double-persist / duplicate assistant message (the 075.x defect).
+
+    Emits on the PRODUCER stream (``stream_run_id``) using the SAME canonical
+    event vocabulary + 400-char citation-passage truncation the inline block used
+    (mirroring the Deep path). Each emit is best-effort (a Redis hiccup must not
+    abort the run — the persisted row below is the durable source of truth).
+
+    Returns the inserted assistant ``messages`` id (str) or ``None`` (no text /
+    persist failure). The producer-shell ``runs.message_id`` legitimately stays
+    NULL (the durable answer is the ``messages`` row, not the producer shell) — we
+    do NOT add a runs.message_id write that did not exist (the engine path's
+    producer-shell ``runs`` row has no aggregated SDK usage either).
+    """
+    # The engine already set these on ctx at the completion block (:665-687).
+    final_text = (getattr(ctx, "final_output", None) or {}).get("text", "") or ""
+    source_refs = getattr(ctx, "final_source_refs", None) or []
+    citations = getattr(ctx, "final_citations", None) or []
+    confidence = getattr(ctx, "final_confidence", None) or None
+
+    # 1. LIVE render: emit the final answer as ONE `delta` (the engine produces the
+    #    answer atomically per-phase — there is no token stream to mirror). Same
+    #    canonical XADD the engine uses; frontend api.ts `delta → onDelta(content)`
+    #    appends it to the assistant placeholder WITHOUT a reload.
+    if final_text:
+        try:
+            await _emit(redis, stream_run_id, "delta", content=final_text)
+        except Exception:
+            logger.exception(
+                "harness final_output delta emit failed for run %s "
+                "(answer still persisted below)", run_id,
+            )
+
+    # 2. Grounding SSE on the producer stream — sources → citations (passage ≤400)
+    #    → confidence, mirroring the Deep event vocabulary + ordering EXACTLY.
+    try:
+        if source_refs:
+            await _emit(redis, stream_run_id, "sources", sources=source_refs)
+        if citations:
+            _sse_citations = []
+            for _c in citations:
+                _sse_c = dict(_c)
+                _passage = _sse_c.get("passage")
+                if _passage and len(_passage) > 400:
+                    _sse_c["passage"] = _passage[:400]
+                _sse_citations.append(_sse_c)
+            await _emit(redis, stream_run_id, "citations", citations=_sse_citations)
+        if confidence:
+            await _emit(
+                redis, stream_run_id, "confidence",
+                level=confidence["level"],
+                avg_similarity=confidence["avg_similarity"],
+                disclaimer=confidence.get("disclaimer"),
+            )
+    except Exception:
+        logger.exception(
+            "harness grounding SSE emit failed for run %s "
+            "(sources still persisted below)", run_id,
+        )
+
+    # 3. DURABLE persist — the SINGLE persist owner. Insert the assistant `messages`
+    #    row directly (resume/Continue have no _result_sink), using the EXACT Deep
+    #    insert_assistant_message param shape (so grounding renders on reload).
+    #    tool_calls stays absent (the harness final answer is plain prose — the
+    #    tool-call panel is Phase 094); token totals stay None (the engine owns its
+    #    own audit; the producer-shell has no aggregated SDK usage). Lazy-import the
+    #    Deep persist helpers to keep the harness-package import cycle broken (the
+    #    engine already lazy-imports the Deep grounding helpers — match that).
+    if not final_text:
+        return None
+    _thread_id = getattr(ctx, "thread_id", None)
+    _user_id = ((getattr(ctx, "current_user", None) or {}).get("id"))
+    if not _thread_id or not _user_id:
+        logger.warning(
+            "harness surfacing: missing thread_id/user_id on ctx for run %s "
+            "(answer emitted but not persisted)", run_id,
+        )
+        return None
+    from app.db.runs import insert_assistant_message
+    from app.services.agent_loop import _strip_nul
+
+    _conf = confidence or {}
+    try:
+        _inserted_id = await insert_assistant_message(
+            pool,
+            thread_id=UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
+            user_id=UUID(_user_id) if isinstance(_user_id, str) else _user_id,
+            content=_strip_nul(final_text),
+            source_refs=source_refs or None,
+            confidence_level=_conf.get("level"),
+            confidence_avg_similarity=_conf.get("avg_similarity"),
+            confidence_disclaimer=_conf.get("disclaimer"),
+        )
+        return str(_inserted_id) if _inserted_id else None
+    except Exception as e:
+        logger.error("Failed to persist harness assistant message: %s", e)
+        return None
+
+
 async def _execute_phase(phase, accumulated_outputs: dict, ctx) -> dict:
     """Dispatch a phase to its executor via the registry SEAM (Plan 03 fills it)."""
     phase_type = phase.config.phase_type
@@ -693,6 +812,14 @@ async def run_workflow(
         pool, run_id, user_id=_audit_user_id,
         event_type="run_completed", metadata={"run_id": str(run_id)},
     )
+    # D-11: surface the answer (delta + grounding emit + persist) on the success
+    # terminal — THE single surfacing site + single persist owner for live + resume
+    # + Continue (Pitfall 5 / Landmine 5). Emits on the PRODUCER stream BEFORE the
+    # terminal `run_completed` below (mirrors _shielded_finalize: durable UPDATE
+    # first, then surfacing, then terminal sentinel). The live-kickoff branch in
+    # threads.py no longer surfaces inline (removed in the same change) — no
+    # double-persist / duplicate assistant message.
+    await _surface_final_answer(ctx, run_id, stream_run_id, redis, pool)
     await _emit(redis, stream_run_id, "run_completed", status="completed")
 
 
