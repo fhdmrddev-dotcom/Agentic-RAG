@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_execute
-stopped_at: Phase 093 PLANNED (5 plans / 3 waves, 2026-06-02) — next /gsd:execute-phase 093
+status: executing
+stopped_at: "Phase 093 Plan 01 complete (Wave-0 substrate + migration 065 applied live); next = execute 093-02 ‖ 093-03 (Wave 1)"
 last_updated: "2026-06-02T00:00:00.000Z"
 last_activity: 2026-06-02
 progress:
   total_phases: 9
-  completed_phases: 5
-  total_plans: 28
-  completed_plans: 27
-  percent: 56
+  completed_phases: 6
+  total_plans: 38
+  completed_plans: 35
+  percent: 92
 ---
 
 # Project State
@@ -21,11 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 093 — Harness Cross-Provider Parity (PLANNED 2026-06-02 — 5 plans / 3 waves; next `/gsd:execute-phase 093`)
+**Current focus:** Phase --phase — 093
 
 ## Current Position
 
-Phase: 093
+Phase: 093 — EXECUTING (Wave 0 done; Wave 1 next)
+
+**Phase 093 Plan 01 — ✅ COMPLETE 2026-06-02 (continuation: schema regen + sanity + closeout).** The Wave-0 deterministic substrate landed: (1) `split_topic` reads `topic or kickoff_prompt` (D-09a code half, topic precedence preserved) — `programmatic.py`; (2) the `INPUT_UNSATISFIED` publish-time reachability lint (D-10, T-093-DOS) — `reachability.py` `_check_input_contracts` + `_KNOWN_RUN_INPUT_KEYS`; the 4 seeds lint clean after the fix; (3) **migration 065** (3 corrective seed fixes — literature_review input_keys + plan_execute_verify verify-gate drop + 3 anti-delegation downstream `llm_single` prompts) **operator-applied LIVE via the SQL editor** (trigger-disable→5×jsonb_set→trigger-enable, T-093-SEED); live-verified: lit_review `phases[0].config.input_keys=["topic","kickoff_prompt"]`, plan_execute_verify `phases[2].validators=[]`, Fix 3 prompts applied. **full-schema.sql NOT committed** — data-only migration; the regen diff was only the random pg_dump `\restrict` session nonce (schema byte-identical), reverted to avoid a misleading commit. (4) 7 Wave-0 RED test scaffolds authored/extended — each names its downstream owner (093-02 task_service / 093-03 model-resolver / 093-04 ask_user-live / 093-05 surfacing / 065 verify-gate). Task-1 sanity: `pytest test_093_split_topic.py test_harness_reachability.py` → **13 passed**. Commits c0ea0367 (T1) + 93b482a5 (T2) + afd9a60f (T3 author). PARITY-02 stays OPEN (substrate plan; phase verification owns the native-7 × 5-type × 4-workflow LIVE UAT closure). See 093-01-SUMMARY.md. **NEXT: `/gsd:execute-phase 093` (Wave 1 — 093-02 ‖ 093-03).**
+
 **Phase 092.5 Plan 05 — ✅ COMPLETE 2026-06-01.** The entangled OpenAI/OpenRouter/Ollama branch extracted VERBATIM into `provider_gateway/openai_compat.py`; third `_on_chunk` folded into the ONE shared consumer handler; `calling_mode` surfaced through the seam (structurally fixes the harness-OpenAI-only bug). All 3 provider families now dispatch through one gateway home. Verified non-regressing 3 ways: seam+chunk_handler 17 passed/0 skipped; full-suite ZERO net-new attributable to Plan 05 (worktree A/B vs 4a4bd327 — 6 comm-deltas proven flaky live-infra); adversarial 6-lens byte-identical review = ZERO breaking deltas. 2 suspicious (non-breaking) deltas → Plan 06 live gate. Commits 8635d989 (T1) + 14b75c96 (T2) + dfc2c915 (T3) + 3d115112 (summary). See 092.5-05-SUMMARY.md.
 
 **Phase 092 — ✅ CLOSED 2026-06-01 (passed_with_overrides).** Dual-mode wiring (MODE-01/MODE-02/CONT-01) proven end-to-end on OpenAI; F1–F8 closed; the 2 cross-provider/transport defects F9 (harness OpenAI-only) + F10 (ask_user round-trip) operator-routed to Phase 093 (built on 092.5). See `092-VERIFICATION.md` + `092-07-SUMMARY.md`.
@@ -33,7 +36,7 @@ Phase: 093
 --- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
-Plan: Not started
+Plan: 1 of --name
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -91,8 +94,8 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-01
 
-Progress: [█████████░] 93%
-<!-- v2.8 phase progress: 089/090/091/092 complete (4/9); 092.5 EXECUTING (Plans 01-05/6 done — skeleton + baselines + clean Anthropic/Google + entangled OpenAI-compat all extracted, Deep verified byte-identical; Plan 06 = operator PROOF GATE #2 (final native-7 SSE diff) next); 093/094/095/096 remaining -->
+Progress: [█████████░] 92%
+<!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 EXECUTING (Plan 01/5 done — Wave-0 substrate: split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint + migration 065 applied live + 7 RED scaffolds; Wave 1 next = 093-02 ‖ 093-03); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
 
@@ -158,6 +161,9 @@ Recent decisions affecting current work:
 - (092.5-03, 2026-06-01): clean-provider gateway adapters return the BARE `stream_*` SYNC generator (NOT an async wrapper) — `stream_anthropic`/`stream_google` are `Generator[dict,None,None]` driven by the consumer's threadpool `_drain_stream_with_close_on_cancel` (`for chunk in stream:`) + `close_fn=stream.close`; a bare passthrough is the ONLY design that keeps drain/close byte-identical (an async re-wrap would change the cascade-surface machinery). Plan-01's async-generator seam-test fakes were a scaffold assumption; the real boundary is sync, so the seam test was adapted to sync-drive.
 - (092.5-03, 2026-06-01): the two clean branches collapse into ONE `if active_provider_name in ("anthropic","google")` gateway-dispatched branch + ONE shared `_on_chunk` — byte-identical because the Google `_on_chunk` was a structural copy of Anthropic's and the only divergence (thought_signature hydration in the finish branch) is a NO-OP for Anthropic (its tool_calls carry no sig). I2/D-07 hydration STAYS consumer-side (mutates tool_calls_buffer); adapter only EMITS the finish sig. `GatewayRequest.tools` widened to `list|None` to carry active_tools' None signal verbatim.
 - (092.5-05, 2026-06-01): the entangled OpenAI/OpenRouter/Ollama unit (D-04) extracted VERBATIM into `provider_gateway/openai_compat.py` — the adapter OWNS + EMITS (`<think>` machine, `reasoning_content` routing, `_accumulate_chunk_usage` with BOTH Google-cumulative + OpenAI-`+=` branches intact, per-provider 5KB boundary dicts kept INDEPENDENT) and SURFACES `calling_mode` via the `(stream, calling_mode)` tuple (Pitfall 3 — the structural fix for harness-OpenAI-only). The consumer KEEPS verbatim: `parse_structured_tool_calls(full_content)` post-parse (L-3, reads full_content post-drain), STRUCTURED messages injection (L-1), provider-error retry/cap-pause/end_turn/empty-retry/round-trip persistence (L-5). NO synthetic `tool_start` (Open Q2) — adapter emits `tool_preparing`+`tool_args_progress`, consumer rebuilds `tool_calls_buffer`. Per-stream adapter-local state (`_in_think_block`, usage totals) replaces the original per-iteration nonlocal reset (verified equivalent: one stream = one tracker). NO "while-I'm-in-here" cleanup (075.x-cascade guard). Verbatim-ness proven by a 6-lens adversarial byte-identical review (ZERO breaking deltas) + worktree A/B full-suite (ZERO net-new). 2 suspicious-but-non-breaking deltas (tool_call `id` last-write→frozen-at-`tool_preparing`; failed-mid-stream usage nonlocal→dropped-on-raise) deferred to the Plan 06 live SSE gate.
+- (093-01, 2026-06-02): **migration 065 applied LIVE** (operator SQL editor) — 3 corrective seed fixes in ONE transaction via the 056 immutability-trigger DISABLE→5×jsonb_set→ENABLE pattern (T-093-SEED, published rows stay app-immutable after). Fix 1 (D-09a) literature_review split `input_keys` ["topic"]→["topic","kickoff_prompt"]; Fix 2 (D-09b) plan_execute_verify verify-gate `validators`→[] (verify is the terminal phase, no successor, so route-forward = DROP the dead-ending hard VERIFIED regex → a non-VERIFIED output completes instead of fail_run); Fix 3 (D-09 result-quality, "asks me to share the research") rewrote the 3 downstream `llm_single` prompts (research_summarize phases[1] / literature_review phases[2] / doc_qa_human phases[2]) to the self-sufficient anti-delegation form — because the llm_single executor IGNORES input_keys (only programmatic reads it, phase_types.py:205) so binding input_keys would be a no-op; the fix is the `system` framing, prior-phase output is the `user` turn. Live-verified all 3.
+- (093-01, 2026-06-02): **full-schema.sql NOT committed** after migration 065 — it is DATA-ONLY (jsonb_set on seed rows + trigger toggle, no table DDL), so the regen diff was exclusively the random `\restrict`/`\unrestrict` pg_dump session nonce (schema DDL byte-identical). Reverted the noise-only change (`git checkout -- supabase/full-schema.sql`) to avoid a misleading commit. Same call as the 091 data-only migration 061.
+- (093-01, 2026-06-02): **split_topic alias is code+seed PAIRED** (D-09a) — `programmatic.split_topic` reads `input.get("topic") or input.get("kickoff_prompt")` (topic precedence, backward compatible) AND migration 065 Fix 1 adds `kickoff_prompt` to the seed `input_keys` (the executor only builds fn_input for keys in config.input_keys). Editing either alone is insufficient. This revives Literature Review + the llm_batch_agents fan-out (same root cause). **INPUT_UNSATISFIED lint (D-10):** pure produced-set walk in phase_index order; a phase's input_keys must be an upstream slug, a declared output_key, OR `_KNOWN_RUN_INPUT_KEYS={"kickoff_prompt","topic"}` — getattr-guarded (not every PhaseConfig variant carries input/output keys); the ONLY new lint dimension (no contract-validation framework — D-10 scope guard). 4 seeds lint clean after the fix.
 - (D-093-RESCOPE, 2026-06-01, operator-confirmed at /gsd:discuss-phase 093): **Phase 093 rescoped** "Anthropic Cross-Provider Parity" → **"Harness Cross-Provider Parity + Phase-Type Hardening"**, grounded in the 092 comprehensive audit + a live-code verification sweep. The harness path works on **OpenAI only** (1 of 4 seed workflows, 1 of 7 providers) — a harness-substrate problem, NOT a Deep problem (Deep is provider-robust on all 7). **NEW Phase 092.5 (Provider Gateway Extraction)** inserted to ship FIRST (extract `agent_loop.py`'s provider dispatch into ONE shared gateway, Deep byte-identical; operator's "separate per feature" instinct). 093 then CONSUMES it: shared model-resolver (resolve, don't mutate), ask_user round-trip (Option (i) endpoint-detects-workflow_run), split_topic+batch+verify-gate fixes, 5 phase-types hardened safe-by-construction (reachability lint extended), resume/Continue answer surfacing + draft plumbing. **Phase 094 EXPANDED** → Workflow Legibility + Mode Clarity (audit Phase B + D-092-UX), renders 093's events, sketch-first. **PARITY-01 (Deep-mode Anthropic polish) RE-DEFERRED**; admin/settings-at-scale → SEED-024/012. RED LINE: investigate first, never break working things; Deep byte-identical. New reqs GATEWAY-01 + PARITY-02. Sources: 093-CONTEXT.md + 092-COMPREHENSIVE-AUDIT.md. **NOTE: 092 must close first (092-07 Task 6 UAT still pending), then 092.5, then 093.**
 - (D-092-UX, 2026-05-31, operator-approved after strategy-brief research): **Composer consolidation target = A+C** — fold Provider INTO Model (one grouped pill) AND move workflow-START out of the composer into the Phase 087 workspace panel ("▶ Run workflow"). Composer settles to `[ Model ▾ ] [ General/Explorer ▾ ]`. Rationale: Deep/Harness ⊥ General/Explorer are orthogonal axes (2×2), not 4 sibling modes; rendering them as identical pills is the confusion. Workflows stay THREAD-bound (shared run SSE/anchor/lock) — NOT a separate `/workflows` route (would fight 068/075.x reconciliation arch). G-2 sketch-before-plan FIRES → `/gsd:sketch` before any plan-phase. Moving workflow-start to the panel also SHRINKS the F3 lock-UX surface. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
 - (D-092-AUTHOR, 2026-05-31, operator-approved): **Workflow authoring = NL-describe→strict-parse→form-edit→lint-on-publish; NOT a visual drag-canvas** (the squeezed-dead middle per 2025-26 evidence). Phase 091 already shipped the back half (WorkflowDefinition validation + reachability lint + immutable-on-publish + RLS). **Ship Authoring Phase A (draft/edit/publish API only — reuses shipped validator+lint, no schema change) as a small late-v2.8 add** so the dual-mode picker shows user-authored workflows, not just the 4 seeds. NL-generate (B) + guided form editor (C, G-2 sketch) + optional read-only DAG (D) → v2.9 alongside the Plugin Contract. Differentiation thesis: KB-grounded phases (anti-Glean) + native sandbox-code phases + persistent shareable skills + NL-to-WorkflowDefinition safe-by-construction + first-class gates/human-input — no competitor combines these. Source: 092-WORKFLOW-UX-STRATEGY-BRIEF.md.
@@ -312,9 +318,16 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-01 — finished Phase 092.5 Plan 05 (verify + commit Task 3 tests + SUMMARY)
-Stopped at: Phase 092.5 Plan 05 complete (Plans 01-05/6 done); next = Plan 06 operator PROOF GATE #2
+Last session: 2026-06-02 — finished Phase 093 Plan 01 (continuation: regen schema, sanity tests 13 GREEN, SUMMARY + STATE + ROADMAP closeout) after the operator applied migration 065
+Stopped at: Phase 093 Plan 01 complete (Wave-0 substrate + migration 065 applied live); next = /gsd:execute-phase 093 Wave 1 (093-02 task_service gateway rewrite ‖ 093-03 model-resolver)
 Resume file: --resume-file
+
+**Plan 093-01 — ✅ COMPLETE (2026-06-02):** Wave-0 deterministic substrate + the 3-fix corrective seed migration. Ran with an operator SQL-editor checkpoint (Task 3 migration apply), resolved; closeout ran SEQUENTIALLY on the main working tree.
+
+- Task 1 ✅ split_topic kickoff_prompt alias (D-09a code half, topic precedence) + INPUT_UNSATISFIED reachability lint (D-10, `_check_input_contracts` + `_KNOWN_RUN_INPUT_KEYS`, 4 seeds lint clean) + their unit tests → 13 passed. Commit c0ea0367.
+- Task 2 ✅ 4 NEW Wave-0 RED scaffolds (test_093_surfacing / test_093_ask_user_workflow_run_live / test_093_verify_gate_route_forward + extend test_085_task_service `Test093GatewayConsumption` + test_sub_agent_routing `Test093ModelResolver`) — each names its downstream owner; live-DB tests skip cleanly without PG. Commit 93b482a5.
+- Task 3 ✅ migration 065 authored (trigger-disable→5×jsonb_set→enable) + **operator-applied LIVE via SQL editor** (checkpoint resolved). Live-verified: lit_review input_keys include kickoff_prompt, plan_execute_verify validators=[], 3 anti-delegation prompts applied; immutability trigger re-enabled. Commit afd9a60f. **full-schema.sql NOT committed** (data-only; regen diff = pg_dump nonce only, reverted).
+- Verify: Task-1 sanity 13 passed (re-confirmed continuation); the 5 RED scaffolds correctly skip until their owning plan/migration flips them. PARITY-02 stays OPEN — phase verification owns the native-7 × 5-type × 4-workflow LIVE UAT (D-13/SC#6, 093-VALIDATION.md). SUMMARY: 093-01-SUMMARY.md (self-check PASSED). Deviations: none.
 
 **Plan 092.5-05 — ✅ COMPLETE (2026-06-01):** entangled OpenAI-compat adapter extracted byte-identically (the high-risk Wave-4 step). 3 tasks.
 

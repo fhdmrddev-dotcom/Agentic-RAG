@@ -157,7 +157,7 @@ Plans:
   5. **Red line:** Deep is byte-identical (no edits to `agent_loop.py`'s provider branches/invariants, the byte-frozen `sub_agent_service.py`, the shared `_emit`, `task_service` None-defaults, or the MODE-01 Deep `else`); all harness additions are service-boundary/additive. F1–F8 not re-litigated.
   6. **The gate (MANDATORY — what 092-07 lacked):** native-7 × all-5-phase-types × all-4-seed-workflows LIVE + the 4-axis bandwidth + resume/Continue/reload rows + a Deep-parity regression row — seed the runs, no "if data permits" deferrals; wire-format checks INSUFFICIENT. Add live-DB / real-provider tests to close the mock blind spot.
 **Plans**: 5 plans (3 waves) — planned 2026-06-02
-- [ ] 093-01-PLAN.md — Wave 0: 7 test scaffolds + split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint + migration 065 seed fixes (operator SQL-editor checkpoint, autonomous:false) [SC#3]
+- [x] 093-01-PLAN.md — Wave 0: 7 test scaffolds + split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint + migration 065 seed fixes (operator SQL-editor checkpoint, autonomous:false) [SC#3] ✅ 2026-06-02
 - [ ] 093-02-PLAN.md — Wave 1: task_service gateway-consumption rewrite (F9 core) + byte-identical-Deep guard [SC#1]
 - [ ] 093-03-PLAN.md — Wave 1: model-resolver field fix (available_models) + resolve_workflow_ctx_model wrapper + Google default Open-Q1 probe [SC#1]
 - [ ] 093-04-PLAN.md — Wave 2: ask_user F10 workflow_run-id fallback + Continue ctx-model threading (D-04 site 3) [SC#2]
@@ -216,7 +216,7 @@ Plans:
 | 091. Harness Engine + 5 Phase Types + Gates + Whitelist | 8/8 | Complete    | 2026-05-31 |
 | 092. Dual-Mode Wiring + Continue Button | 6/7 | In progress (092-06 F3 code-complete + UAT gaps_found → NEW blocker F4 blocks end-to-end workflow; 092-07 F4 gap-closure remaining; MODE-01/02 + CONT-01 stay OPEN) | - |
 | 092.5. Provider Gateway Extraction (NEW — refactor) | 6/6 | Complete    | 2026-06-01 |
-| 093. Harness Cross-Provider Parity + Phase-Type Hardening | 0/5 | Planned (5 plans / 3 waves, 2026-06-02) | - |
+| 093. Harness Cross-Provider Parity + Phase-Type Hardening | 1/5 | In progress (093-01 Wave-0 substrate complete 2026-06-02: split_topic kickoff_prompt alias + INPUT_UNSATISFIED lint + migration 065 seed fixes applied live + 7 RED scaffolds; PARITY-02 stays OPEN — phase verification owns closure) | - |
 | 094. Workflow Legibility + Mode Clarity | 0/0 | Not started | - |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |
 | 096. Eval Harness + Cross-Provider Verification + Concurrency | 0/0 | Not started | - |
