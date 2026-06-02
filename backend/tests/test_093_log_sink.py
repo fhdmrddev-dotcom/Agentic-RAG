@@ -37,11 +37,22 @@ def _sink_handlers() -> list[logging.Handler]:
 
 @pytest.fixture
 def clean_sink(monkeypatch):
-    """Ensure no env var leaks in, and remove any sink handler on teardown."""
+    """Ensure no env var leaks in, and remove any sink handler on setup + teardown.
+
+    main.py installs the sink at IMPORT time when the ambient backend/.env carries
+    LOG_FILE_PATH (the operator sets it to activate the D-20 sink for a live re-UAT).
+    That import-time handler is present before any test runs, so the opt-in
+    assertion (`_sink_handlers() == []`) must strip pre-existing sink handlers on
+    SETUP too — otherwise the test is non-hermetic and fails purely because the
+    developer's .env happens to set the var. (WR-03 / gap-closure review.)
+    """
     monkeypatch.delenv("LOG_FILE_PATH", raising=False)
     monkeypatch.delenv("BACKEND_LOG_FILE", raising=False)
     root = logging.getLogger()
     pre_level = root.level
+    for handler in _sink_handlers():  # strip any import-time sink handler
+        handler.close()
+        root.removeHandler(handler)
     yield
     for handler in _sink_handlers():
         handler.close()
@@ -133,6 +144,59 @@ def test_redacts_live_provider_env_value(clean_sink, tmp_path, monkeypatch):
     contents = _read(str(tmp_path / "backend.log"))
     assert env_value not in contents
     assert "REDACTED-KEY" in contents
+
+
+def test_redacts_url_embedded_credentials(clean_sink, tmp_path, monkeypatch):
+    """WR-03 — scheme://user:PASSWORD@host: redact the password, keep host visible."""
+    monkeypatch.setenv("LOG_FILE_PATH", str(tmp_path / "backend.log"))
+    install_file_log_sink()
+
+    redis_pw = "SuperSecretRedisPw123"
+    pg_pw = "pgPassw0rdLongEnough"
+    logging.getLogger("test093").error(
+        "redis at rediss://default:%s@cache.example.com:6379 and "
+        "postgres postgresql://app:%s@db.example.com:5432/prod",
+        redis_pw, pg_pw,
+    )
+    for h in _sink_handlers():
+        h.flush()
+
+    contents = _read(str(tmp_path / "backend.log"))
+    assert redis_pw not in contents
+    assert pg_pw not in contents
+    assert "REDACTED" in contents
+    # host/scheme remain for diagnostics
+    assert "cache.example.com" in contents
+    assert "db.example.com" in contents
+
+
+def test_redacts_dynamic_secret_named_env_value(clean_sink, tmp_path, monkeypatch):
+    """WR-03 — a NEW secret-named env var (not in the explicit list) is redacted via the suffix scan."""
+    monkeypatch.setenv("LOG_FILE_PATH", str(tmp_path / "backend.log"))
+    rerank_value = "rerank-future-key-1a2b3c4d5e6f"
+    monkeypatch.setenv("RERANK_API_KEY", rerank_value)  # NOT in _SECRET_ENV_VARS
+    install_file_log_sink()
+
+    logging.getLogger("test093").error("rerank call used %s", rerank_value)
+    for h in _sink_handlers():
+        h.flush()
+
+    contents = _read(str(tmp_path / "backend.log"))
+    assert rerank_value not in contents
+    assert "REDACTED-KEY" in contents
+
+
+def test_unwritable_path_returns_none_and_does_not_raise(clean_sink, tmp_path, monkeypatch):
+    """WR-02 — an unopenable LOG_FILE_PATH degrades to console-only (None), never crashes startup."""
+    # Make the parent a FILE so os.makedirs(parent) raises (portable across OSes).
+    blocker = tmp_path / "blocker"
+    blocker.write_text("i am a file, not a dir")
+    monkeypatch.setenv("LOG_FILE_PATH", str(blocker / "sub" / "backend.log"))
+
+    result = install_file_log_sink()  # must NOT raise
+
+    assert result is None
+    assert _sink_handlers() == []
 
 
 def test_clean_record_is_not_mangled(clean_sink, tmp_path, monkeypatch):

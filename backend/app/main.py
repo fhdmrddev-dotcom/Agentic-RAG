@@ -28,9 +28,19 @@ logger = logging.getLogger(__name__)
 # + os, so a top-level import forms no cycle.
 from app.services.logging_sink import install_file_log_sink
 
-_log_sink_path = install_file_log_sink()
-if _log_sink_path:
-    logger.info("backend file log-sink active: %s", _log_sink_path)
+# WR-02 (093 gap-closure review): belt-and-suspenders — the installer is itself
+# fail-safe (returns None on a filesystem error), but guard the call site too so
+# a diagnostic sink can never block startup, matching the best-effort posture of
+# every other hook in this module.
+try:
+    _log_sink_path = install_file_log_sink()
+    if _log_sink_path:
+        logger.info("backend file log-sink active: %s", _log_sink_path)
+except Exception:  # noqa: BLE001
+    logger.warning(
+        "backend file log-sink failed to install; continuing console-only",
+        exc_info=True,
+    )
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
