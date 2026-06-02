@@ -1153,6 +1153,14 @@ async def send_message(
                         _load_run_definition,
                         _emit as _harness_emit,
                     )
+                    # D-04 (site 1): the shared resolve-never-mutate (D-05) wrapper —
+                    # resolve the effective ctx model from the run owner's active
+                    # provider (a stale cross-provider llm_model falls back to the
+                    # provider default rather than leaking to the wrong client). Lazy
+                    # import inside the harness branch (matches the pattern above);
+                    # threaded onto wf_ctx.model below. Phase-level precedence is
+                    # unchanged downstream: phase.config.model or ctx.model.
+                    from app.services.sub_agent_models import resolve_workflow_ctx_model
                     _wf_pool = await get_pg_pool()
                     _wf_definition = await _load_run_definition(
                         _wf_pool, _active_workflow_run_id
@@ -1222,6 +1230,13 @@ async def send_message(
                         thread_id=thread_id,
                         current_user=current_user,
                         user_settings=user_settings,
+                        # D-04 (site 1): the effective ctx model resolved from the run
+                        # owner's active provider (resolve-never-mutate, D-05). user_settings
+                        # is the live request's effective settings — resolve from it so a
+                        # stale cross-provider llm_model cannot leak to the wrong client.
+                        # Phase-level precedence stays phase.config.model or ctx.model
+                        # (phase_types._effective_model) — this only sets ctx.model.
+                        model=resolve_workflow_ctx_model(user_settings),
                         # F8 (092-07): the consumption half of SEED-047. create_workflow_run
                         # STORED the user's kickoff question in workflow_runs.inputs.kickoff_prompt
                         # (:995 above) but the phase executors never read it — the FIRST phase

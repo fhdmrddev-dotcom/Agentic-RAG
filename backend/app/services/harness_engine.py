@@ -915,10 +915,44 @@ async def _build_resume_context(run, redis, pool):
     if not isinstance(_resume_inputs, dict):
         _resume_inputs = {}
 
+    # D-04 (site 2): thread the resolved ctx model onto the resumed wf_ctx so a
+    # resumed run resolves a non-stale model from the active provider (closes part
+    # of SEED-047). Per Open Q2's recommendation, load the run OWNER's effective
+    # settings from the durable run["user_id"] (the same verified owner the
+    # service-role retrieval is scoped to above) and resolve via the
+    # resolve-never-mutate wrapper (D-05) — a stale cross-provider llm_model falls
+    # back to the active provider's default rather than leaking to the wrong client.
+    # load_user_settings is a cheap in-memory cache read (models/user_settings.py:527
+    # → load_app_settings reads the _settings_cache, no blocking DB I/O), so it is
+    # safe on the startup sweep that runs for every stranded run. Phase-level
+    # precedence is unchanged downstream: phase.config.model or ctx.model. If loading
+    # fails for any reason, fall back to None settings + "" model (the resolver
+    # returns "" for None) so phase.config.model still applies — never block resume.
+    from app.models.user_settings import load_user_settings
+    from app.services.sub_agent_models import resolve_workflow_ctx_model
+
+    _owner_settings = None
+    if run.get("user_id") is not None:
+        try:
+            _owner_settings = load_user_settings(str(run["user_id"]))
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "resume: owner effective-settings load failed for run %s "
+                "(falling back to phase-level model only)", run.get("run_id"),
+            )
+            _owner_settings = None
+    _ctx_model = resolve_workflow_ctx_model(_owner_settings)
+
     return SimpleNamespace(
         run_id=run["run_id"],
         producer_run_id=_producer_id,
         thread_id=str(run["thread_id"]),
+        # D-04 (site 2): the run owner's effective settings + the resolved ctx model
+        # (resolve-never-mutate, D-05) so resumed phases route to the active provider's
+        # model instead of an empty/stale one. Previously user_settings=None → model
+        # absent → only phase.config.model applied.
+        user_settings=_owner_settings,
+        model=_ctx_model,
         # F8 (092-07): the persisted inputs (kickoff_prompt) for the resumed run.
         inputs=_resume_inputs,
         # 092-07: coerce to str, mirroring str(run["thread_id"]) above. On the
