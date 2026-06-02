@@ -113,7 +113,7 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | MODE-02 | Phase 092 | Complete |
 | CONT-01 | Phase 092 | Complete (live cap-drive code-verified; F9/F10 → 093) |
 | GATEWAY-01 | Phase 092.5 | Complete |
-| PARITY-02 | Phase 093 | Pending |
+| PARITY-02 | Phase 093 | Pending (deterministic half COMPLETE — all 9 plans incl. 093-06..09 gap-closure shipped; GLM cell closed via 093-09 force-synthesis + cap 8→12, posture 7/7; the BINDING native-7 LIVE D-21 re-UAT is verifier-owned — flips to Complete at phase close) |
 | PARITY-01 | (re-deferred 2026-06-01) | Deferred |
 | PANEL-08 | Phase 094 | Pending |
 | PANEL-09 | Phase 094 | Pending |
