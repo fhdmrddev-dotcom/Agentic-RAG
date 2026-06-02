@@ -850,16 +850,32 @@ class Settings(BaseSettings):
     # NOT invent arbitrary numbers). Both a STEP cap and a WALL-CLOCK cap are
     # enforced on every phase (a hanging phase fails cleanly at its timeout).
     #   - step cap: aligned to the existing agent-loop Explorer convention
-    #     (max_iterations=8, agent_loop.py:846); llm_batch_agents reuses the same
+    #     (max_iterations, agent_loop.py:846); llm_batch_agents reuses the same
     #     per-agent step cap.
     #   - wall-clock cap: a phase that makes up to N bounded LLM calls must allow
     #     >= N x the per-call timeout, so the default is
-    #     DEFAULT_LLM_CALL_TIMEOUT_SECONDS (300) x harness_phase_max_steps (8) = 2400.
+    #     DEFAULT_LLM_CALL_TIMEOUT_SECONDS (300) x harness_phase_max_steps.
     #     A per-phase config.wall_clock_seconds (harness.py) overrides this when set.
     # Both get the standard pydantic-settings env override for free — no new env
     # var beyond these two Settings fields.
-    harness_phase_max_steps: int = 8
-    harness_phase_wall_clock_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 8  # 300 x 8 = 2400
+    #
+    # Phase 093 (D-19, 093-09): raised 8 → 12. The LIVE-UAT GLM literature_review
+    # run showed a thorough 3-way batch sub-agent issuing 8 DISTINCT progressively-
+    # refined search queries (LangSmith trace, project agentic-rag-module2) and
+    # hitting the 8-step cap WHILE STILL RESEARCHING — genuine thorough research,
+    # not a stuck loop (the other two GLM agents converged at step ~5 and EXACTLY
+    # step 8, on the cap edge). 12 gives the headroom a thorough agent needs to
+    # finish NATURALLY before the force-synthesis fallback (task_service.py
+    # else-branch) fires. _MODEL_DEFAULT_MAX_STEPS (phase_types.py:71) +
+    # LlmAgentPhaseConfig/LlmBatchAgentsPhaseConfig.max_steps (models/harness.py)
+    # are raised to 12 IN LOCKSTEP so the sentinel-substitution
+    # (`if config.max_steps == _MODEL_DEFAULT_MAX_STEPS: -> _EXPLORER_STEP_CAP`)
+    # keeps firing and the EFFECTIVE per-phase cap is genuinely 12 (not 10). The
+    # bounded `for step in range(max_steps)` + the graceful synthesis fallback keep
+    # the run always-terminating (T-093-09-DOS); the wall-clock product stays
+    # coupled at 300 x 12 = 3600.
+    harness_phase_max_steps: int = 12
+    harness_phase_wall_clock_seconds: int = DEFAULT_LLM_CALL_TIMEOUT_SECONDS * 12  # 300 x 12 = 3600
 
     # Phase 091 (091-08 / CR-01) — resume-claim lease window. claim_run stamps
     # workflow_runs.claimed_at on the winning CAS; a racing WORKER_COUNT=2 sibling

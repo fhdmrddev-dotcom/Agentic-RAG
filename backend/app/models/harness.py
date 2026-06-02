@@ -51,7 +51,11 @@ class LlmAgentPhaseConfig(_StrictBase):
     phase_type: Literal["llm_agent"]
     prompt: str
     available_tools: list[str]  # the per-phase whitelist (091 Pattern 1)
-    max_steps: int = 10
+    # Phase 093 (D-19, 093-09): 10 → 12, IN LOCKSTEP with
+    # phase_types._MODEL_DEFAULT_MAX_STEPS and Settings.harness_phase_max_steps, so
+    # the sentinel-substitution keeps firing and the effective per-phase cap is
+    # genuinely 12 (the headroom for thorough sub-agents; see phase_types.py:64-83).
+    max_steps: int = 12
     # None → engine default (sized in Plan 05 from existing cap knobs).
     wall_clock_seconds: int | None = None
     model: str | None = None  # None = inherit thread settings
@@ -61,7 +65,10 @@ class LlmBatchAgentsPhaseConfig(_StrictBase):
     phase_type: Literal["llm_batch_agents"]
     prompt: str
     available_tools: list[str]
-    max_steps: int = 10
+    # Phase 093 (D-19, 093-09): 10 → 12, IN LOCKSTEP — same invariant as
+    # LlmAgentPhaseConfig above (the literature_review review phase is an
+    # llm_batch_agents fan-out — this is the exact phase that hit the cap in UAT).
+    max_steps: int = 12
     max_parallel_agents: int = 5  # scaling cap (ARCHITECTURE.md)
     # Only the strategies Plan 03 implements parse (extra='forbid' blocks typos;
     # the Literal blocks invalid strategy values). T-091-01/02 mitigation.

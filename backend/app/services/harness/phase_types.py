@@ -62,13 +62,28 @@ __all__ = [
 ]
 
 # The Explorer agent-loop step convention (D-12): an llm_agent phase whose config
-# carries the model default (LlmAgentPhaseConfig.max_steps == 10) clamps to the
-# harness per-phase step cap (Settings.harness_phase_max_steps, default 8 — the
-# Explorer max_iterations convention, agent_loop.py:846) so bounded harness
-# sub-agents match the shipped Explorer cap rather than running long. Read off
-# Settings (sized in Plan 05 / config.py) so an operator can override via env.
+# carries the model default (LlmAgentPhaseConfig.max_steps == _MODEL_DEFAULT_MAX_STEPS)
+# is SUBSTITUTED to the harness per-phase step cap (Settings.harness_phase_max_steps)
+# so bounded harness sub-agents use the operator-tunable cap rather than running
+# long. Read off Settings (config.py) so an operator can override via env. NOTE:
+# this is a sentinel-EQUALITY substitution, NOT a min() clamp — the config default
+# (models/harness.py LlmAgentPhaseConfig.max_steps / LlmBatchAgentsPhaseConfig.max_steps)
+# MUST equal _MODEL_DEFAULT_MAX_STEPS for the substitution to fire; an explicit
+# non-default config.max_steps passes through UNCHANGED.
+#
+# Phase 093 (D-19, 093-09): _MODEL_DEFAULT_MAX_STEPS raised 10 → 12 IN LOCKSTEP with
+# Settings.harness_phase_max_steps (8 → 12, config.py) and the two Pydantic config
+# defaults (models/harness.py, 10 → 12). With all three at 12 the sentinel
+# substitution still fires (config default 12 == _MODEL_DEFAULT_MAX_STEPS 12 →
+# _EXPLORER_STEP_CAP 12) so the EFFECTIVE per-phase cap is genuinely 12 (NOT 10 —
+# raising _EXPLORER_STEP_CAP alone while leaving the sentinel at 10 would have left
+# the default-config seed phases substituting to the new cap correctly, but raising
+# the Pydantic default to 12 without the sentinel would have STOPPED the substitution
+# and pinned the cap at 10; keeping all three aligned is the load-bearing invariant).
+# The headroom lets a thorough sub-agent finish naturally before the force-synthesis
+# fallback (task_service.py run_task_sub_agent else-branch) guarantees a real answer.
 _EXPLORER_STEP_CAP = settings.harness_phase_max_steps
-_MODEL_DEFAULT_MAX_STEPS = 10  # LlmAgentPhaseConfig.max_steps LOCKED default
+_MODEL_DEFAULT_MAX_STEPS = 12  # LlmAgentPhaseConfig.max_steps LOCKED default (093-09: 10 → 12)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
