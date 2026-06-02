@@ -775,3 +775,77 @@ class Test093GatewayConsumption:
         assert json.loads(tool_calls[0]["arguments"]) == {"query": "graphs"}
         assert tool_calls[1]["id"] == "toolu_2"
         assert json.loads(tool_calls[1]["arguments"]) == {"doc_id": "d1"}
+
+    # -- CR-01 (093 REVIEW): native Anthropic system prompt must survive --------
+    # The native Anthropic adapter STRIPS role="system" from messages and builds
+    # the top-level system block from request.system_prompt ONLY. So
+    # _stream_one_iteration MUST extract the system message and pass it as
+    # system_prompt on the GatewayRequest — else the sub-agent / phase system
+    # prompt is silently dropped on Anthropic (RED-LINE regression).
+
+    @pytest.mark.asyncio
+    async def test_anthropic_gateway_request_carries_system_prompt(self):
+        """CR-01: when the active provider is anthropic, the GatewayRequest passed
+        to open_stream carries system_prompt == the system message text (not "")."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        stub, _stream = _make_open_stream_stub(
+            [{"type": "delta", "content": "ok"}], CallingMode.NATIVE, captured=captured
+        )
+
+        sys_text = "You are a focused sub-agent. Investigate the corpus thoroughly."
+        with patch.object(task_service, "open_stream", stub):
+            await task_service._stream_one_iteration(
+                messages=[
+                    {"role": "system", "content": sys_text},
+                    {"role": "user", "content": "go"},
+                ],
+                tools=[],
+                model="claude-haiku-4-5-20251001",
+                user_settings=None,
+                provider="anthropic",
+            )
+
+        # The native adapter reads request.system_prompt; it MUST be the system
+        # message text, not the "" default that silently drops the prompt.
+        assert captured["request"].system_prompt == sys_text
+        assert captured["request"].system_prompt != ""
+
+    @pytest.mark.asyncio
+    async def test_openai_compat_system_stays_in_messages_unchanged(self):
+        """CR-01 companion: the openai-compat path is byte-identical. system_prompt
+        is additively set on the request (the compat adapter ignores it), and the
+        system entry remains in the messages array the adapter actually reads."""
+        from app.services import task_service
+        from app.services.openai_service import CallingMode
+
+        captured: dict = {}
+        stub, _stream = _make_open_stream_stub(
+            [{"type": "delta", "content": "ok"}], CallingMode.NATIVE, captured=captured
+        )
+
+        async def _fake_cap(model):
+            return {"provider": "openai"}
+
+        sys_text = "system framing for an openai-compat phase"
+        with patch.object(task_service, "open_stream", stub), \
+            patch("app.config.get_model_capability_async", _fake_cap):
+            await task_service._stream_one_iteration(
+                messages=[
+                    {"role": "system", "content": sys_text},
+                    {"role": "user", "content": "go"},
+                ],
+                tools=[],
+                model="gpt-5.4-mini",
+                user_settings=None,
+                provider="openai",
+            )
+
+        req = captured["request"]
+        # system stays in the messages array (the compat adapter's source of truth)…
+        assert req.messages[0]["role"] == "system"
+        assert req.messages[0]["content"] == sys_text
+        # …and system_prompt is set too (additive; ignored by the compat adapter).
+        assert req.system_prompt == sys_text

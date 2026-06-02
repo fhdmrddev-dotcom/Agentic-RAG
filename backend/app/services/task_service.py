@@ -187,11 +187,30 @@ async def _stream_one_iteration(
         _cap = await get_model_capability_async(model) or {}
         _adapter_provider = (_cap.get("provider") or _provider or "unknown").lower()
 
+    # CR-01 (093 REVIEW) — pull the system framing out of messages so the native
+    # Anthropic/Google adapters receive it. Their message-converters STRIP every
+    # role="system" entry (anthropic_service.py:60/72-74) and build the top-level
+    # system block from system_prompt ONLY (anthropic_service.py:174) — so without
+    # this the sub-agent / phase system prompt is silently dropped on Anthropic
+    # (breaching the byte-identical-Deep RED LINE). The openai_compat adapter does
+    # NOT read system_prompt (it sends the messages array, system included) → this
+    # is a NO-OP there (byte-identical for OpenAI / compat-natives / OpenRouter /
+    # Ollama). Mirrors agent_loop.py:1553 / :1628, which set system_prompt on the
+    # request REDUNDANTLY alongside messages[0] precisely so the native adapters
+    # receive it. Captured BEFORE the STRUCTURED inject mutates messages[_i] below —
+    # correct because Anthropic/Google are native_tools:True → NATIVE → the inject
+    # never runs for them.
+    _system_prompt = next(
+        (m.get("content", "") for m in messages if m.get("role") == "system"),
+        "",
+    )
+
     _gw_request = GatewayRequest(
         messages=messages,
         model=model,
         active_provider_name=_adapter_provider,
         tools=tools,
+        system_prompt=_system_prompt,
         user_settings=user_settings,
         tool_choice="auto",
     )
