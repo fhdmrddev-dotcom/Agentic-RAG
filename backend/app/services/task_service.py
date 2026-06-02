@@ -761,10 +761,67 @@ async def run_task_sub_agent(
             })
             messages.extend(tool_results_to_append)
         else:
-            # max_steps exhausted without producing a tool-free final answer.
-            # Not an error — the sub-agent just ran out of steps. D-085-13:
-            # we return the last content as the summary.
-            summary = content or "Sub-agent reached max_steps without producing a final answer."
+            # Phase 093 (D-19, 093-09): max_steps exhausted WITHOUT a tool-free
+            # final answer. The pre-093-09 behavior returned the useless placeholder
+            # "Sub-agent reached max_steps without producing a final answer." which
+            # leaked into the merged output as a thin/empty section (the LIVE-UAT GLM
+            # symptom: a thorough sub-agent still searching at the cap produced no
+            # written section). FORCE one final TOOL-FREE synthesis turn so the
+            # sub-agent ALWAYS returns a real answer from everything it gathered.
+            #
+            # This is the GENERAL silent-failure fix (NOT GLM-scoped): ANY provider
+            # whose sub-agent exhausts the step budget while still researching now
+            # synthesizes an answer instead of returning a placeholder. It fires ONLY
+            # in this exhaustion branch — sub-agents that converge early hit
+            # `if not tool_calls: break` above and NEVER reach this code, so they are
+            # byte-identical to pre-093-09 (the 4 passing providers + Google +
+            # Moonshot + the converging GLM agents + Deep).
+            #
+            # KEY (the 093-05 WR-01 gate): the synthesis call passes tools=[] →
+            # inside _stream_one_iteration `_has_tools = bool(tools)` is False → the
+            # STRUCTURED inject + parse_structured_tool_calls post-parse are SKIPPED,
+            # so the synthesized answer is NEVER blanked by a spurious tool-call
+            # parse. The accumulated `messages` already hold every tool result, so a
+            # no-tools turn lets the model write its final answer from what it found.
+            summary = content or ""
+            try:
+                _synth_messages = messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "You have gathered sufficient information. Do not call "
+                            "any more tools. Write your complete final answer now, "
+                            "synthesizing everything you found above."
+                        ),
+                    }
+                ]
+                # Fresh reasoning_box (this is a new turn); SAME _sub_usage so the
+                # synthesis call's tokens keep accumulating (S4 — D-17). tools=[] is
+                # the load-bearing argument (the WR-01 gate above).
+                _synth_content, _ = await _stream_one_iteration(
+                    messages=_synth_messages,
+                    tools=[],
+                    model=effective_model,
+                    user_settings=parent_ctx.user_settings,
+                    provider=provider,
+                    structured_injected=structured_injected,
+                    reasoning_box=[""],
+                    usage_box=_sub_usage,
+                )
+                if _synth_content:
+                    summary = _synth_content
+            except Exception:  # noqa: BLE001
+                # Never let the force-synthesis crash the sub-agent — fall back to
+                # the last content, then the original placeholder, so the run still
+                # terminates cleanly (the bounded-loop guarantee, T-093-09-DOS).
+                logger.exception(
+                    "task_service: force-synthesis turn failed (sub_run_id=%s)",
+                    sub_run_id,
+                )
+            if not summary:
+                summary = (
+                    "Sub-agent reached max_steps without producing a final answer."
+                )
 
     except Exception as e:  # noqa: BLE001
         logger.exception(
