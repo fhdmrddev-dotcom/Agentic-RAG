@@ -406,6 +406,12 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     timeout_seconds = min(
         phase.config.timeout_seconds, settings.ask_user_max_timeout_seconds
     )
+    # D-12: the prior phase's text is the DRAFT the user is being asked to confirm
+    # (the doc_qa_human flow's `draft` phase produces {"text": <answer>}). Carry it
+    # through the durable prompt row + the SSE event + the /pending replay so the
+    # Phase 094 frame can render "here's what I'd answer — confirm?" without
+    # re-deriving it. Empty string when there is no upstream text (harmless).
+    draft = _latest_phase_text(accumulated_outputs)
 
     # Durable prompt row (D-085-05) — Plan 04 resume re-subscribes against this
     # tool_call_id. Best-effort: a failed insert only affects the /pending replay
@@ -432,6 +438,9 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
                                 "options": options,
                                 "timeout_seconds": timeout_seconds,
                                 "run_id": str(run_id),
+                                # D-12: the prior phase's draft (the thing being
+                                # confirmed) — additive; older rows have no draft.
+                                "draft": draft,
                             }
                         ],
                     }
@@ -460,6 +469,9 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
                 prompt=prompt,
                 options=options,
                 timeout_seconds=timeout_seconds,
+                # D-12: carry the prior-phase draft on the live SSE event too, so the
+                # frontend PendingAsk shape gets it without a /pending round-trip.
+                draft=draft,
             )
         except Exception:  # noqa: BLE001
             logger.exception("llm_human_input: ask_user_prompt emit failed")
@@ -482,6 +494,19 @@ def _collect_sub_questions(accumulated_outputs: dict) -> list[str]:
         if isinstance(out, dict) and isinstance(out.get("sub_questions"), list):
             return list(out["sub_questions"])
     return []
+
+
+def _latest_phase_text(accumulated_outputs: dict) -> str:
+    """The most-recent upstream phase's answer text — the draft an llm_human_input
+    phase asks the user to confirm (D-12). Mirrors ``_collect_sub_questions``'
+    reverse scan: every phase executor returns ``{"text": <answer>}``, so the
+    latest non-empty ``text`` is the prior phase's output (the doc_qa_human flow's
+    ``draft`` phase produces ``{"text": <answer>}`` — that is the thing being
+    confirmed). Returns ``""`` when there is no upstream text (harmless)."""
+    for out in reversed(list(accumulated_outputs.values())):
+        if isinstance(out, dict) and isinstance(out.get("text"), str) and out["text"].strip():
+            return out["text"]
+    return ""
 
 
 # ── registration ──────────────────────────────────────────────────────────

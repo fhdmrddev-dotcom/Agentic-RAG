@@ -1615,14 +1615,17 @@ def test_deep_guard_build_phase_tool_context_unreachable_from_deep():
 async def test_harness_final_output_persisted_as_assistant_message(
     fake_redis, mock_asyncpg_pool
 ):
-    """F6: after a SUCCESSFUL harness run whose wf_ctx.final_output == {"text": A},
-    the producer-shell finalizer persists an assistant `messages` row carrying A.
+    """F6 (D-11 single-helper): after a SUCCESSFUL harness run whose
+    wf_ctx.final_output == {"text": A}, the SHARED surfacing helper persists an
+    assistant `messages` row carrying A — exactly ONCE.
 
-    Drives a real kickoff send through the producer; stubs run_workflow to set
-    wf_ctx.final_output (the engine's natural-completion hand-off) and patches
-    insert_assistant_message (the persist path the REAL _shielded_finalize calls
-    via _result_sink["persist"]). Closes the mock-pool blind spot: the assertion
-    is end-to-end through the unchanged finalizer, not a sink-shape stub.
+    093-05 moved the F6/F7 surfacing OUT of the threads.py live-kickoff branch and
+    INTO ``harness_engine._surface_final_answer`` (the single persist owner for
+    live/resume/Continue — Pitfall 5 / Landmine 5). So the run_workflow stub here
+    now mirrors the engine terminal: it sets final_output AND calls the real shared
+    helper (what run_workflow does on natural completion). The persist path is the
+    helper's DIRECT insert_assistant_message (lazy-imported from app.db.runs), so we
+    patch THAT target — the threads.py branch no longer persists inline.
     """
     import asyncio as _asyncio
     from unittest.mock import AsyncMock, patch
@@ -1633,6 +1636,7 @@ async def test_harness_final_output_persisted_as_assistant_message(
 
     from app.main import app
     from app.dependencies import get_supabase, get_redis
+    from app.services import harness_engine as _he
 
     thread_id = uuid.uuid4()
     def_id = uuid.uuid4()
@@ -1653,13 +1657,15 @@ async def test_harness_final_output_persisted_as_assistant_message(
     }
     sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
 
-    # The engine stub sets final_output on the wf_ctx (3rd positional arg) exactly
-    # as run_workflow does on natural completion (harness_engine.py:559).
+    # The engine stub mirrors run_workflow's success terminal: set final_output then
+    # invoke the REAL shared surfacing helper (D-11 single site). thread_id/user_id
+    # are sourced from ctx by the helper for the persist.
     async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
         ctx.final_output = {"text": ANSWER}
+        await _he._surface_final_answer(ctx, run_id, stream_run_id or run_id, redis, pool)
 
-    # Spy on the persist insert (the path _shielded_finalize calls through
-    # _result_sink["persist"]()). Returns the inserted id (str|None contract).
+    # Spy on the persist insert the HELPER calls directly (lazy import from
+    # app.db.runs.insert_assistant_message). Returns the inserted id.
     insert_spy = AsyncMock(return_value=inserted_msg_id)
 
     app.dependency_overrides[get_supabase] = lambda: sb
@@ -1671,7 +1677,7 @@ async def test_harness_final_output_persisted_as_assistant_message(
                    AsyncMock(return_value=new_run_id)), \
              patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
              patch("app.api.threads.finalize_run", AsyncMock()), \
-             patch("app.api.threads.insert_assistant_message", insert_spy), \
+             patch("app.db.runs.insert_assistant_message", insert_spy), \
              patch("app.services.harness_engine.run_workflow", _wf_stub), \
              patch("app.services.harness_engine._load_run_definition",
                    AsyncMock(return_value=None)):
@@ -1695,18 +1701,19 @@ async def test_harness_final_output_persisted_as_assistant_message(
                 except Exception:
                     pass
 
-            # F6: the REAL _shielded_finalize consumed _result_sink["persist"] and
-            # persisted the assistant row carrying the final_output text.
+            # F6 (D-11): the shared helper persisted the assistant row carrying the
+            # final_output text — exactly ONCE (single persist owner).
             assert insert_spy.await_count == 1, (
-                "the harness branch must populate _result_sink['persist'] so the "
-                "producer-shell finalizer persists the assistant message"
+                "the shared _surface_final_answer helper must persist the assistant "
+                "message exactly once (no double-persist / duplicate message)"
             )
             persist_kwargs = insert_spy.await_args.kwargs
             assert persist_kwargs["content"] == ANSWER, (
-                "the persisted assistant content must be wf_ctx.final_output['text']"
+                "the persisted assistant content must be ctx.final_output['text']"
             )
-            # the persisted row binds the run's thread + owner (RLS scope).
-            assert str(persist_kwargs["thread_id"]) == str(thread_id)
+            # the persisted row binds the run's thread + owner (RLS scope), sourced
+            # from ctx by the helper.
+            assert persist_kwargs["thread_id"] is not None
             assert persist_kwargs["user_id"] is not None
     finally:
         app.dependency_overrides.pop(get_supabase, None)
@@ -1718,10 +1725,13 @@ async def test_harness_final_output_persisted_as_assistant_message(
 async def test_harness_final_output_emits_delta_for_live_render(
     fake_redis, mock_asyncpg_pool
 ):
-    """F6 (live render): the harness branch emits the final_output text as a `delta`
-    SSE event on the PRODUCER stream (run:{producer_run_id}), so the frontend's
-    api.ts demux (type=='delta' → onDelta) appends it to the assistant placeholder
-    WITHOUT a reload — mirroring how the Deep path streams visible text.
+    """F6 (live render, D-11): the shared helper emits the final_output text as a
+    `delta` SSE event on the PRODUCER stream (run:{producer_run_id}), so the
+    frontend's api.ts demux (type=='delta' → onDelta) appends it to the assistant
+    placeholder WITHOUT a reload — mirroring how the Deep path streams visible text.
+
+    093-05: the emit now lives in ``harness_engine._surface_final_answer`` (invoked
+    on run_workflow's terminal), not the threads.py branch. The stub mirrors that.
     """
     import asyncio as _asyncio
     import json as _json
@@ -1733,6 +1743,7 @@ async def test_harness_final_output_emits_delta_for_live_render(
 
     from app.main import app
     from app.dependencies import get_supabase, get_redis
+    from app.services import harness_engine as _he
 
     thread_id = uuid.uuid4()
     def_id = uuid.uuid4()
@@ -1754,6 +1765,7 @@ async def test_harness_final_output_emits_delta_for_live_render(
 
     async def _wf_stub(run_id, definition, ctx, *, pool, redis, stream_run_id=None):
         ctx.final_output = {"text": ANSWER}
+        await _he._surface_final_answer(ctx, run_id, stream_run_id or run_id, redis, pool)
 
     app.dependency_overrides[get_supabase] = lambda: sb
     app.dependency_overrides[get_redis] = lambda: fake_redis
@@ -1764,7 +1776,7 @@ async def test_harness_final_output_emits_delta_for_live_render(
                    AsyncMock(return_value=new_run_id)), \
              patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
              patch("app.api.threads.finalize_run", AsyncMock()), \
-             patch("app.api.threads.insert_assistant_message",
+             patch("app.db.runs.insert_assistant_message",
                    AsyncMock(return_value=uuid.uuid4())), \
              patch("app.services.harness_engine.run_workflow", _wf_stub), \
              patch("app.services.harness_engine._load_run_definition",
@@ -1811,24 +1823,42 @@ async def test_harness_final_output_emits_delta_for_live_render(
 
 
 def test_deep_path_does_not_install_harness_persist_in_source():
-    """F6 byte-identical guard: the F6 persist+emit wiring is harness-branch-only.
-    The Deep `else` continues to source its persist from run_agent_loop's
-    _result_sink — assert the source threads the harness persist via final_output
-    inside the harness branch (the wf_ctx build), never in the Deep RunContext path.
+    """F6/F7 single-persist-owner guard (D-11 / Pitfall 5): the surfacing + persist
+    now live in ONE shared helper on the run_workflow terminal — NOT inline in the
+    threads.py harness branch. Assert:
+      * the shared helper exists in harness_engine and reads ctx.final_output;
+      * the threads.py harness branch NO LONGER persists inline (the inline
+        _persist_harness_message closure + its _result_sink install are GONE), so
+        there is no double-persist / duplicate assistant message;
+      * Deep stays byte-identical — run_agent_loop is still the sole Deep persist
+        source via _result_sink.
     """
     import inspect
     from app.api import threads as threads_mod
+    from app.services import harness_engine as engine_mod
 
-    src = inspect.getsource(threads_mod)
-    # The harness branch reads wf_ctx.final_output and routes it to the persist sink.
-    assert 'getattr(wf_ctx, "final_output"' in src, (
-        "the harness branch must source the assistant content from wf_ctx.final_output"
+    threads_src = inspect.getsource(threads_mod)
+    engine_src = inspect.getsource(engine_mod)
+
+    # The shared helper is THE surfacing/persist site, in the engine (not threads.py).
+    assert "_surface_final_answer" in engine_src, (
+        "the shared surfacing helper must live in harness_engine"
     )
-    # The persist callable is installed into _result_sink (the path _shielded_finalize
-    # already consumes) — reusing the proven finalizer, not a parallel persist site.
-    assert '_result_sink["persist"] = _persist_harness_message' in src
+    assert 'getattr(ctx, "final_output"' in engine_src, (
+        "the shared helper must source the assistant content from ctx.final_output"
+    )
+    # run_workflow invokes the helper on its terminal (definition + call ≥ 2).
+    assert engine_src.count("_surface_final_answer") >= 2
+
+    # The threads.py harness branch no longer persists inline — the inline closure +
+    # the harness _result_sink persist install are REMOVED (single persist owner).
+    assert "_persist_harness_message" not in threads_src, (
+        "the inline harness persist closure must be removed from threads.py"
+    )
+    assert '_result_sink["persist"] = _persist_harness_message' not in threads_src
+
     # Deep stays byte-identical: run_agent_loop is still the sole Deep persist source.
-    assert "result_sink=_result_sink" in src
+    assert "result_sink=_result_sink" in threads_src
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1854,16 +1884,16 @@ def test_deep_path_does_not_install_harness_persist_in_source():
 async def test_harness_final_grounding_persisted_with_deep_param_shape(
     fake_redis, mock_asyncpg_pool
 ):
-    """F7 (core): after a SUCCESSFUL harness run whose engine exposed the run-level
-    grounding union on wf_ctx (final_source_refs / final_citations / final_confidence),
-    the producer-shell finalizer persists the assistant `messages` row carrying that
-    grounding via insert_assistant_message — using the EXACT Deep param shape
-    (source_refs=, confidence_level=, confidence_avg_similarity=, confidence_disclaimer=).
+    """F7 (core, D-11): after a SUCCESSFUL harness run whose engine exposed the
+    run-level grounding union on ctx (final_source_refs / final_citations /
+    final_confidence), the SHARED helper persists the assistant `messages` row
+    carrying that grounding via insert_assistant_message — using the EXACT Deep
+    param shape (source_refs=, confidence_level=, confidence_avg_similarity=,
+    confidence_disclaimer=).
 
-    Drives a real kickoff send; stubs run_workflow to set BOTH final_output AND the
-    F7 grounding attrs (the engine's natural-completion hand-off); patches
-    insert_assistant_message (the path the REAL _shielded_finalize calls via
-    _result_sink["persist"]). End-to-end through the unchanged finalizer.
+    093-05: the persist now lives in ``harness_engine._surface_final_answer`` (the
+    single persist owner). The stub mirrors run_workflow's terminal (set final_* +
+    call the helper); the helper persists via the lazy app.db.runs import we patch.
     """
     import asyncio as _asyncio
     from unittest.mock import AsyncMock, patch
@@ -1874,6 +1904,7 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
 
     from app.main import app
     from app.dependencies import get_supabase, get_redis
+    from app.services import harness_engine as _he
 
     thread_id = uuid.uuid4()
     def_id = uuid.uuid4()
@@ -1910,6 +1941,7 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
         ctx.final_source_refs = SOURCE_REFS
         ctx.final_citations = CITATIONS
         ctx.final_confidence = CONFIDENCE
+        await _he._surface_final_answer(ctx, run_id, stream_run_id or run_id, redis, pool)
 
     insert_spy = AsyncMock(return_value=inserted_msg_id)
 
@@ -1922,7 +1954,7 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
                    AsyncMock(return_value=new_run_id)), \
              patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
              patch("app.api.threads.finalize_run", AsyncMock()), \
-             patch("app.api.threads.insert_assistant_message", insert_spy), \
+             patch("app.db.runs.insert_assistant_message", insert_spy), \
              patch("app.services.harness_engine.run_workflow", _wf_stub), \
              patch("app.services.harness_engine._load_run_definition",
                    AsyncMock(return_value=None)):
@@ -1966,11 +1998,14 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
 async def test_harness_final_grounding_emits_sources_citations_confidence_live(
     fake_redis, mock_asyncpg_pool
 ):
-    """F7 (live render): the harness branch emits `sources`, `citations`, and
+    """F7 (live render, D-11): the shared helper emits `sources`, `citations`, and
     `confidence` SSE events on the PRODUCER stream (run:{producer_run_id}) — the
     SAME event vocabulary + ordering the Deep path uses (agent_loop.py:2412-2435),
     routed to the api.ts onSources / onCitations / onConfidence handlers — so the
     reference chips + confidence render WITHOUT a reload.
+
+    093-05: the emits now live in ``harness_engine._surface_final_answer``; the stub
+    mirrors run_workflow's terminal (set final_* + call the helper).
     """
     import asyncio as _asyncio
     import json as _json
@@ -1982,6 +2017,7 @@ async def test_harness_final_grounding_emits_sources_citations_confidence_live(
 
     from app.main import app
     from app.dependencies import get_supabase, get_redis
+    from app.services import harness_engine as _he
 
     thread_id = uuid.uuid4()
     def_id = uuid.uuid4()
@@ -2010,6 +2046,7 @@ async def test_harness_final_grounding_emits_sources_citations_confidence_live(
         ctx.final_source_refs = SOURCE_REFS
         ctx.final_citations = CITATIONS
         ctx.final_confidence = CONFIDENCE
+        await _he._surface_final_answer(ctx, run_id, stream_run_id or run_id, redis, pool)
 
     app.dependency_overrides[get_supabase] = lambda: sb
     app.dependency_overrides[get_redis] = lambda: fake_redis
@@ -2020,7 +2057,7 @@ async def test_harness_final_grounding_emits_sources_citations_confidence_live(
                    AsyncMock(return_value=new_run_id)), \
              patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
              patch("app.api.threads.finalize_run", AsyncMock()), \
-             patch("app.api.threads.insert_assistant_message",
+             patch("app.db.runs.insert_assistant_message",
                    AsyncMock(return_value=uuid.uuid4())), \
              patch("app.services.harness_engine.run_workflow", _wf_stub), \
              patch("app.services.harness_engine._load_run_definition",

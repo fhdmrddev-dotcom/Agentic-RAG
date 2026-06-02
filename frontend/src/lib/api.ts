@@ -605,6 +605,9 @@ export async function subscribeToRun(
             prompt: parsed.prompt as string,
             options: (parsed.options ?? []) as string[],
             timeout_seconds: parsed.timeout_seconds as number,
+            // D-12 (Phase 093): additive — the prior-phase draft the user confirms.
+            // Optional; absent on older streams → undefined (harmless).
+            draft: parsed.draft as string | undefined,
           })
         else if (t === "ask_user_response" && callbacks.onAskUserResponse)
           callbacks.onAskUserResponse(parsed.tool_call_id as string)

@@ -279,13 +279,16 @@ def test_get_pending_ask_user_extracts_payload_from_tool_calls(
 
     assert resp.status_code == 200
     row = resp.json()[0]
+    # D-12 (Phase 093): the additive `draft` field is now part of the /pending
+    # payload (None on rows without an upstream draft — like this seed).
     assert set(row.keys()) == {
         "message_id", "tool_call_id", "prompt", "options",
-        "timeout_seconds", "run_id", "created_at",
+        "timeout_seconds", "run_id", "draft", "created_at",
     }
     assert row["tool_call_id"] == "tcid-2"
     assert row["prompt"] == "what?"
     assert row["options"] is None
+    assert row["draft"] is None  # additive: absent on this seed row → None
 
 
 # ---------------------------------------------------------------------------

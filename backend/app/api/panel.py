@@ -148,6 +148,9 @@ async def get_pending_ask_user(
             "options": payload.get("options"),
             "timeout_seconds": payload.get("timeout_seconds"),
             "run_id": payload.get("run_id"),
+            # D-12: the prior-phase draft the user is confirming (defensive .get —
+            # older prompt rows predate the draft field → None, harmless).
+            "draft": payload.get("draft"),
             "created_at": r["created_at"].isoformat() if r["created_at"] else None,
         })
     return result

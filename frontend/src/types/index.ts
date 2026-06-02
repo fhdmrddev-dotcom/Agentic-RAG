@@ -304,6 +304,11 @@ export interface PendingAsk {
   message_id?: string
   run_id?: string
   created_at?: string
+  /** D-12 (Phase 093): the prior phase's draft answer the user is being asked to
+   *  confirm. Additive + optional — present on the /pending GET (panel.py) and the
+   *  ask_user_prompt SSE event; absent on older rows. The visible render is Phase 094;
+   *  093 only plumbs it onto the shape. */
+  draft?: string
 }
 
 /** GET /threads/{tid}/tasks (panel.py:156) + SSE sub_agent_start/done TASK
