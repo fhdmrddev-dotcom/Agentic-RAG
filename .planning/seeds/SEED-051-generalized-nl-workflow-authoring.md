@@ -4,7 +4,7 @@ title: Generalized NL→Workflow authoring — describe-it + upload-assets → A
 status: planted
 planted: 2026-06-03
 planted_by: orchestrator (/gsd:explore session with operator — "create workflows naturally by describing to the AI; how it differs from skills")
-trigger_when: v2.9 milestone kickoff (/gsd:new-milestone), OR D-092-AUTHOR Authoring Phase B (NL-to-draft) / Phase C (guided form editor), OR any phase that touches WorkflowDefinition input/asset shape
+trigger_when: v2.9 milestone kickoff (/gsd:new-milestone), OR D-092-AUTHOR Authoring Phase B (NL-to-draft) / Phase C (guided form editor), OR any phase that touches WorkflowDefinition input/asset shape, OR **Phase 094 (Workflow Legibility + Mode Clarity) discuss/sketch** — the "Authoring surface & builder UX" section below carries a 094-relevant subset (composer simplification, Deep-not-a-toggle/mode-clarity, and the workflows-as-a-page-vs-launch-from-panel refinement to D-092-UX) that this CURRENT-milestone phase needs, not just v2.9
 priority: high
 tags: [harness, workflows, authoring, nl-generate, templates, dynamic-inputs, rag, kb-grounding, plugin-contract, v2.9, D-092-AUTHOR, SEED-050]
 ---
@@ -82,6 +82,15 @@ right place) — the reliability-from-grounding lever; search is whole-KB today.
   AI-derived-inputs** elaboration of B/C.
 
 ## Authoring surface & builder UX (operator refinement, 2026-06-03 session 2)
+
+> **⚠ PHASE 094 (next phase, CURRENT milestone) needs a subset of this NOW.** The bullets below
+> on composer simplification, Deep-not-a-toggle / mode clarity, and **workflows-as-a-page → launch
+> from the page (NOT from the composer/panel)** REFINE the existing **D-092-UX** (which had
+> workflow-start moving to the panel). Pull these into `/gsd:sketch 094` + `/gsd:discuss-phase
+> 094`. NOTE the v2.8/v2.9 sequencing question they raise: the full Workflows *page* is v2.9
+> authoring — so what does 094 do for launch in the interim (panel "Run workflow" per D-092-UX,
+> or defer the launcher to v2.9)? Decide at 094 discuss. (Not recorded in STATE/ROADMAP here to
+> avoid a lost-update race with the concurrent 093 session.)
 
 - **Workflows = a first-class PAGE in the nav (like Skills), not a chat dropdown.** Nav →
   "Automation / Workflows" → library (your drafts + published + shared/seed) + "Build new" +
