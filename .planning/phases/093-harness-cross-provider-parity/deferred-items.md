@@ -65,3 +65,33 @@
 - **Scope:** out of scope for 093-05 (test-isolation hygiene, not a behavioral regression).
   Candidate for a `/gsd:quick` test-isolation pass (registry reset autouse fixture) —
   relates to the broader test-fixture-hygiene class already noted for 093-04.
+
+## From Plan 093-07 (finish-event hydration + runs.usage persistence)
+
+### Pre-existing model-resolver failures (NOT caused by 093-07) — `test_085_sub_agent_cross_provider`
+
+- **File:** `backend/tests/integration/test_085_sub_agent_cross_provider.py::test_cross_provider_default_path_no_footgun`
+  — 4 parametrized cases (`anthropic`, `google`, `deepseek`, `moonshot`).
+- **Symptom:** `AssertionError: BUG-260528-01 reproduced for provider='moonshot': resolver
+  returned stale cross-provider model 'gpt-4.1'` — `assert 'gpt-4.1' != 'gpt-4.1'`.
+- **Discovered:** during the 093-07 Task 3 full-suite net-new audit.
+- **PROVEN PRE-EXISTING (relative to this plan):** checked out the pre-plan `task_service.py`
+  (commit `a0c0603e`, the 093-06 head, BEFORE any 093-07 edit) and re-ran the test — all 4
+  cases fail IDENTICALLY. So these are NOT a 093-07 regression.
+- **Root cause:** the SAME 093-03 model-resolver field migration already logged above
+  (`available_models` is now the real field the resolver reads). This integration test's
+  `_StubSettings`/fixture still feeds the model list as a `llm_models` CSV string the
+  resolver no longer reads — so the safety net can't see the active model list and the
+  stale `gpt-4.1` candidate passes through. The companion UNIT test (`test_085_task_service.py`)
+  was already fixed in 093-03 to the real `available_models` field; this INTEGRATION sibling
+  was missed. It is in the model-resolver surface (093-03's territory), NOT in 093-07's
+  `_drain` / assistant-replay / `finalize_run`-usage diff.
+- **Why NOT a 093-07 regression:** 093-07 touched only the finish/usage consumption in
+  `_drain`, the assistant tool-call replay message round-trip, and the `finalize_run` usage
+  args — none of which affect `resolve_sub_agent_model_safely`. `git diff a0c0603e~1..HEAD`
+  on `sub_agent_models.py` shows ZERO 093-07 change there; the full `test_085_task_service.py`
+  suite (43 cases incl. the new Test093FinishEvent) is GREEN.
+- **Scope:** out of scope for 093-07 (model-resolver fixture hygiene — extends the 093-03
+  `test_infer_openai_from_gpt_prefix` deferral). Fix = update this integration test's fixture
+  to the real `available_models` field (same one-line shape 093-03 applied to the unit stub).
+  Candidate for the same `/gsd:quick` test-pin pass as the other 093-03 deferral.
