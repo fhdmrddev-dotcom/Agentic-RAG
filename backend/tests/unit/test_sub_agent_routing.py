@@ -130,9 +130,11 @@ def test_output_ceiling_respects_slider_when_higher():
 # here as the named RED contract (D-13 Layer-1).
 # ===========================================================================
 
-@pytest.mark.skip(reason="093-03 owns the available_models field fix (D-06)")
 class Test093ModelResolver:
-    """RED contract for 093-03 — resolve_sub_agent_model_safely reads available_models."""
+    """093-03 — resolve_sub_agent_model_safely reads the REAL field
+    ``available_models`` (D-06), so the dead safety net (silent since Phase 085)
+    actually fires and ``_SUB_AGENT_MODEL_DEFAULTS`` engages. Plus the new
+    ``resolve_workflow_ctx_model`` resolve-never-mutate wrapper (D-04/D-05)."""
 
     def test_stale_cross_provider_model_falls_back_to_provider_default(self):
         """A STALE saved llm_model from a DIFFERENT provider that is NOT in
@@ -160,3 +162,73 @@ class Test093ModelResolver:
         )
         resolved = resolve_sub_agent_model_safely(us, override_model="claude-sonnet-4-6")
         assert resolved == "claude-sonnet-4-6"
+
+    def test_empty_available_models_returns_candidate_unchanged(self):
+        """Fresh/empty settings (available_models=[]) → no list to validate
+        against → the candidate passes through as-is (backward compatible —
+        the fallback must fire ONLY on a genuine cross-provider mismatch, never
+        on an unvalidatable empty list)."""
+        from app.services.sub_agent_models import resolve_sub_agent_model_safely
+        us = SimpleNamespace(
+            active_provider="anthropic",
+            llm_model="claude-sonnet-4-6",
+            available_models=[],  # fresh row — nothing to validate against
+        )
+        resolved = resolve_sub_agent_model_safely(us, override_model="some-unknown-model")
+        assert resolved == "some-unknown-model"
+
+    def test_flexible_provider_mismatch_keeps_candidate_best_effort(self):
+        """A flexible provider (openrouter/ollama — empty default) with a mismatch
+        keeps the candidate as best-effort (the flexible-provider contract: those
+        providers route by arbitrary model id / locally-pulled models)."""
+        from app.services.sub_agent_models import resolve_sub_agent_model_safely
+        assert _SUB_AGENT_MODEL_DEFAULTS["openrouter"] == ""  # flexible by design
+        us = SimpleNamespace(
+            active_provider="openrouter",
+            llm_model="z-ai/glm-5.1",
+            available_models=["openai/gpt-5.4", "anthropic/claude-haiku-4-5"],
+        )
+        # candidate not in available_models, but provider default is empty →
+        # keep the candidate best-effort (no hard provider default to fall back to).
+        resolved = resolve_sub_agent_model_safely(us, override_model="z-ai/glm-5.1")
+        assert resolved == "z-ai/glm-5.1"
+
+    def test_resolve_workflow_ctx_model_none_returns_empty(self):
+        """resolve_workflow_ctx_model(None) → "" (the resume/Continue
+        user_settings=None case — Open Q2, deferred to the Wave-2 plans). With
+        no settings only phase.config.model applies downstream."""
+        from app.services.sub_agent_models import resolve_workflow_ctx_model
+        assert resolve_workflow_ctx_model(None) == ""
+
+    def test_resolve_workflow_ctx_model_resolves_without_mutating(self):
+        """resolve_workflow_ctx_model(settings) → the safely-resolved model string,
+        and NEVER mutates the passed settings object (D-05: resolve, never mutate).
+        A stale cross-provider llm_model resolves to the provider default while the
+        saved llm_model on the object stays UNCHANGED."""
+        from app.services.sub_agent_models import resolve_workflow_ctx_model
+        us = SimpleNamespace(
+            active_provider="anthropic",
+            llm_model="gpt-5.4-mini",  # stale cross-provider
+            available_models=["claude-haiku-4-5-20251001"],
+        )
+        before_llm_model = us.llm_model
+        before_provider = us.active_provider
+        before_available = list(us.available_models)
+        resolved = resolve_workflow_ctx_model(us)
+        # resolves to the provider default (the stale gpt name is filtered out)
+        assert resolved == _SUB_AGENT_MODEL_DEFAULTS["anthropic"]
+        # D-05 — saved settings are untouched
+        assert us.llm_model == before_llm_model
+        assert us.active_provider == before_provider
+        assert list(us.available_models) == before_available
+
+    def test_resolve_workflow_ctx_model_passes_through_valid_model(self):
+        """resolve_workflow_ctx_model resolves a same-provider valid llm_model
+        as-is (the fallback fires ONLY on a genuine cross-provider mismatch)."""
+        from app.services.sub_agent_models import resolve_workflow_ctx_model
+        us = SimpleNamespace(
+            active_provider="anthropic",
+            llm_model="claude-sonnet-4-6",
+            available_models=["claude-haiku-4-5-20251001", "claude-sonnet-4-6"],
+        )
+        assert resolve_workflow_ctx_model(us) == "claude-sonnet-4-6"
