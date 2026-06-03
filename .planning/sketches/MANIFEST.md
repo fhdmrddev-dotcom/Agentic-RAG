@@ -42,3 +42,16 @@ The acceptance bar for every variant is the **long execution in progress** momen
 | 005 | file-and-diff | In a narrow ~30% column, how does browse → preview → version-diff flow? | **A — Full-replace + in-column unified diff** ★ | files, diff, versions |
 | 006 | pending-question | When `ask_user` pauses the agent, how loud is the panel + how does answering resume it? | **C — Dual-surface (calm pin + chat cue)** ★ | ask_user, interrupt, pause-resume |
 | 007 | chat-panel-seam | When a panel-owned tool fires, what shows in chat vs panel (live & on reload)? | **C — Live-pointer / reload-resolved** ★ | seam, reload, transcript |
+
+### Phase 094 session — Workflow Legibility + Mode Clarity (2026-06-04)
+
+Grounded by `094-grounding/BRIEF.md` (real harness SSE events, real seed-workflow content, competitive viz patterns, WCAG 2.1 AA spec). Sessions: 008–013.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 008 | phase-timeline | What does a live harness run look like IN THE PANEL — real steps/tasks, not a spinner? (operator's #1 bar) | **D — Synthesis: RunCards on a spine** ★ | panel, harness, timeline, a11y |
+| 009 | unified-surface | D-094-UNIFY: how do Deep AND Harness both live in the panel; what's left in chat? | **C — Live-status → resolves** ★ | panel, unify, seam, deep |
+| 010 | honesty-and-drafts | Failed-as-failed-with-a-reason; visible draft-before-ask_user; batch results; provenance answer card | **C — Pin-while-active → fold** ★ (+ long-draft wide overlay) | honesty, draft, rc-4 |
+| 011 | mode-and-composer | General/Explorer × Deep/Harness clarity; simplified composer; no "Deep" label mid-Harness-run | **A — Status chip + Cancel** ★ | composer, mode, d-092-ux |
+| 012 | workflows-page | Library + launcher (build now); renders existing workflow_definitions; Run → opens a thread | **A — Card grid** ★ (landed thread reuses 008-D/009-C/011-A) | page, launcher, nav |
+| 013 | workflow-builder | NL authoring vision (design now, build v2.9); read-mostly live diagram, describe→refine→publish | **A — Talk-led** ★ | builder, nl, v2.9, design-ahead |
