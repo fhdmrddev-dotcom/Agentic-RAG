@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: awaiting_human_uat
-stopped_at: Phase 093 ALL 9 plans executed + gap-closure code-reviewed (0 crit / 3 warn; WR-02+WR-03 FIXED 94fcd141, WR-01 = operator sign-off) + re-verified human_needed (41/41 code must-haves, RED LINE held, 99/99 deterministic). BINDING gate = operator D-21 native-7 LIVE re-UAT (093-HUMAN-UAT.md). PARITY-02 Pending.
-last_updated: "2026-06-03T06:45:00.000Z"
+status: phase_complete
+stopped_at: Phase 093 CLOSED 2026-06-03 (passed_with_overrides). D-21 native-7 LIVE re-UAT PASSED — 8/8 cells, all 4 gap-closure fixes proven live, 4-axis ✓, Deep-regression ✓. PARITY-02 Validated. Overrides: Dim-3 abrupt-resume retest deferred (Windows kill-friction); Dim-5 quality (kimi/MiniMax) → SEED-050/096; WR-01 accepted. UI legibility findings → Phase 094 (sketch-first). NEXT = /gsd:sketch 094.
+last_updated: "2026-06-03T19:10:00.000Z"
 last_activity: 2026-06-03
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 38
   completed_plans: 38
   percent: 97
@@ -24,6 +24,10 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 **Current focus:** Phase --phase — 093
 
 ## Current Position
+
+**Phase 093 ✅ CLOSED 2026-06-03 (passed_with_overrides).** The operator-run **D-21 native-7 LIVE re-UAT PASSED** (Claude Chrome-MCP + log-sink + Supabase + LangSmith): **8/8 Dimension-1 cells**; all **4 gap-closure fixes proven live** (Google `thought_signature` / Moonshot `reasoning_content` round-trips, GLM `max_steps` convergence, sub-agent model+tokens — no gpt-4o); 4-axis ✓ (incl. **no global isStreaming lockout**, 5188-char long-message); Deep-regression ✓ (eval 8/8, Anthropic twin byte-identical ×2, task() pass). **PARITY-02 → Validated.** **Overrides:** (1) Dim-3 abrupt-resume retest deferred — Windows Ctrl+C is graceful (cancels→fails the run; resume sweep had nothing stranded); resume infra pre-existing/unchanged by 093. (2) Dim-5 result-quality (kimi fabricated n=247; MiniMax finalize reviewed-not-applied) → SEED-050/096. (3) WR-01 accepted (eval task cell passed). **UI legibility findings → Phase 094** (sketch-first, G-2): draft-before-ask_user invisible (094 SC#6/Deferred#1); no live in-chat/panel steps during runs — operator-specified 094 bar = show real steps (sub-agents/searches/tool-calls/phase-transitions/merge); RC-4 failed-run-renders-empty; generated-files-not-shown-in-panel → SEED-037/038. New bug filed: `general-chat-intermittent-silent-send-drop`. Graceful-shutdown ops findings (hang-on-open-SSE; fails-in-flight-human-input-run) noted. See **093-HUMAN-UAT.md**. **NEXT = `/gsd:sketch 094`.**
+
+--- (prior `human_needed` trace retained for audit) ---
 
 Phase: 093 — ALL 9 PLANS EXECUTED + GAP-CLOSURE CODE-REVIEWED + RE-VERIFIED `human_needed` (2026-06-03). **Post-execution gates (orchestrator, 2026-06-03):** (1) deep gap-closure code review of the 06-09 production surface (task_service.py/phase_types.py/harness.py/logging_sink.py/main.py) = **0 critical / 3 warning / 4 info**, RED LINE confirmed (no Deep regression; "verbatim agent_loop.py" claims checked against the real source); **WR-02** (log-sink crashes startup on an unwritable LOG_FILE_PATH) + **WR-03** (redaction missed connection-string/secret-env values) **FIXED commit 94fcd141** (startup-safe installer + URL-credential + dynamic secret-name redaction; 11/11 log-sink tests incl. 3 new + the import-time-handler hermeticity fix that closes the lone +1 net-new the 093-09 executor flagged → net-new now truly 0); **WR-01** (093-08 makes Deep `task()` honor `sub_agent_model` — deliberate, more-correct, matches analyze_document) = operator sign-off at re-UAT Test 8; original 01-05 review archived → 093-REVIEW-01-05-batch.md. (2) regression gate = 99/99 on the 093 + shared task_service + sub-agent + harness surface, app imports clean. (3) schema-drift gate clean (no migration in 06-09). (4) **re-verification `human_needed` — 41/41 codebase must-haves, RED LINE held (agent_loop.py + sub_agent_service.py zero-diff), 99/99 deterministic** (093-VERIFICATION.md). BINDING gate = the operator **D-21 native-7 × 5-type × 4-workflow LIVE re-UAT** (11-item matrix in 093-VERIFICATION.md `human_verification` + 093-HUMAN-UAT.md "Re-UAT" section + 093-VALIDATION.md runbook). **Live evidence already in hand** (the GLM diagnosis run, thread 71502600): 093-08 (glm-4.6 not gpt-4o) + 093-07/S4 (non-NULL tokens) + 093-01 (3-way split) all re-confirmed; still owed = Google/Moonshot 400-elimination (093-07), GLM convergence post-09-fix (093-09), + the operator-only dims. **PARITY-02 stays Pending → flips Validated + phase status passed on a clean LIVE re-UAT.** NEXT = operator runs the D-21 re-UAT (backend running + log-sink active) → report results → phase close (or gap-closure if a cell fails).
 

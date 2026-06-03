@@ -1,12 +1,12 @@
 ---
-status: partial
+status: passed
 phase: 093-harness-cross-provider-parity
 source: [093-VERIFICATION.md]
 spec: 093-VALIDATION.md
 started: 2026-06-02T21:30:00Z
-updated: 2026-06-03T06:30:00Z
+updated: 2026-06-03T19:00:00Z
 driver: Claude (Chrome-MCP smart-sample live UAT) + operator follow-up
-reuat_pending: true
+reuat_pending: false
 reuat_note: "Gap-closure plans 06-09 (D-16..D-21) SHIPPED + code-verified 41/41 (093-VERIFICATION.md, status human_needed). Gap 1 (Google+Moonshot reasoning round-trip) -> 093-07; Gap 2 (GLM max_steps) -> 093-09 (force-synthesis + cap 8->12); Gap 3 (result-quality) -> SEED-050/Phase 096. BINDING re-confirmation = the operator D-21 native-7 LIVE re-UAT (full 11-item matrix in 093-VERIFICATION.md human_verification + 093-VALIDATION.md runbook). PARITY-02 stays Pending until that passes."
 ---
 
@@ -169,3 +169,48 @@ blocked: 2
 **Activate the D-20 log-sink first** (already done this session): `LOG_FILE_PATH=logs/backend.log` in `backend/.env` + uvicorn restart → grep `backend/logs/backend.log` for `gpt-4o … falling back`, `runs.usage missing`, `400 thought_signature`/`reasoning_content` during the re-UAT.
 
 On a clean live pass across all 11 dimensions → flip PARITY-02 to Validated and phase status to passed.
+
+---
+
+## Re-UAT (D-21) — EXECUTED 2026-06-03 (Claude Chrome-MCP + log-sink + Supabase + LangSmith) → **PASSED (passed_with_overrides)**
+
+Live stack: frontend :5173 + backend :8000 (log-sink active), KB folder **DBA** (Mrad RPA/BPM dissertation, N=309). Evidence = `runs`/`workflow_runs` rows + `backend/logs/backend.log` deltas + UI + screenshots `screenshots/093-reuat-*`.
+
+### Dimension 1 — native-7 × 4-workflow (8 cells) — **8/8 PASS**
+| # | Workflow | Provider/model | workflow_run | Result |
+|---|---|---|---|---|
+| 1 | research_summarize | Google / gemini-3.5-flash | 31486487 | ✅ 14 tool turns, **0× thought_signature 400** (vs DB anchor 2f54f88e@turn2); sub-agent tokens 180528/2252; grounded N=309, 46 src |
+| 2 | research_summarize | OpenAI / gpt-5.4-mini | 5757114b | ✅ control; grounded N=309, 17 src |
+| 3 | plan_execute_verify | Moonshot / kimi-k2.6 | 801b89a9 | ✅ **0× reasoning_content 400** across code turns; execute_code fired; ⚠️ Dim-5: fabricated n=247 (no search) |
+| 4 | plan_execute_verify | Anthropic / claude-haiku-4-5 | 2b61198c | ✅ grounded N=309 + **search+code = Dim-2 multi-tool ✓**; ⚠️ over-iterated (16 calls/10 code-exec) |
+| 5 | literature_review | GLM / glm-5.1→glm-4.6 | f09b3864 | ✅ **0 "max_steps" placeholder**; 3 subs real output 3470/1808/2587 (not /210 looper) |
+| 6 | literature_review | DeepSeek / v4-pro→v4-flash | 53ab5f76 | ✅ control; N=3 fan-out, 0 placeholder |
+| 7 | doc_qa_human | MiniMax / M2.7→M2.5-highspeed | 5b27540b | ✅ **ask_user round-trip works** (card→ANSWERED·AGENT RESUMED→finalize); ⚠️ Dim-5: finalize "reviewed" vs applied correction |
+| 8 | doc_qa_human | Google / gemini-3.5-flash | c97cc01d | ✅ ask_user round-trip + **finalize incorporated correction** (4 RQs + RQ↔O map); thought_signature reconfirmed |
+
+**4 gap-closure fixes all proven LIVE:** Google thought_signature (093-07), Moonshot reasoning_content (093-07), GLM max_steps (093-09), sub-agent model+tokens / no gpt-4o (093-08/S4). Across all 8 cells: status=completed, correct per-provider model, 0 gpt-4o leaks, sub-agent tokens non-NULL, 0 unexpected 400s.
+
+### Dimension 2 — 4-axis bandwidth — **PASS**
+- Cross-provider ✅ (8 cells). Multi-tool ✅ (cell 4 search+code). Parallel-thread ✅ (Thread A deepseek lit_review + Thread B OpenAI research_summarize concurrent; **no global isStreaming lockout** — 075.3 regression absent; no event bleed; clean A↔B reconcile). Long-message ✅ (5188-char kickoff persisted un-truncated in workflow_runs.inputs, run acted on it, no context-length error).
+
+### Dimension 4 — Deep-parity regression — **PASS (no regression)**
+- `eval_cross_provider.py --prompt factual-doc-search` = **8/8 providers PASS** (all invoke search_documents). Deep `task()` cell = PASS.
+- `capture_sse_baseline.py --mode after` raw verdict = BLOCK, **but per the documented noise-isolation method it is non-regression**: Anthropic twin **byte-identical across 2 runs**; all diverging providers' edits *moved* run-to-run (minimax & moonshot flipped PASS↔BLOCK; deepseek skeleton 26→57 tok) = LLM tool-path non-determinism, not structural regression. `agent_loop.py` git-zero-diff in 093 corroborates.
+
+### Dimension 10/11 — model-resolver data check + STRUCTURED-recovery — **PASS**
+- Guard fired correctly on ALL 7 providers (gpt-5.4-mini → correct per-provider default; never gpt-4o). NATIVE tool-fire confirmed on all compat-natives. STRUCTURED safety-net (registry-missing model) = code-verified only (UI can't exercise an unregistered id) — operator/edge follow-up.
+
+### Dimension 3 — durability — **PARTIAL (override)**
+- Abrupt-crash resume path **NOT exercised**: on Windows, Ctrl+C triggers a *graceful* shutdown that cancels+fails the in-flight run (producer `cancelled` → workflow_run `failed`); force-quit didn't override until the client SSE dropped. So the resume sweep had nothing stranded to recover. Resume infra is pre-existing (091/092), unchanged by 093 → retest deferred.
+- New findings from the attempt (→ ops/094): (a) graceful shutdown **hangs** on an open harness SSE connection; (b) it **fails an in-flight human-input run** rather than preserving it resumable; (c) a failed harness run **renders empty in the UI** (no reason) — RC-4 → 094.
+
+### Dimension 5 — result-quality — **operator-judged; 2 deferred gaps → SEED-050/096**
+- Excellent + grounded: Google, OpenAI, Anthropic, DeepSeek (N=309, real stats, cited). Two provider-specific gaps: **kimi-k2.6** execute fabricated n=247 (didn't search); **MiniMax-M2.7** finalize reviewed-the-draft instead of applying the correction. Plumbing uniform; quality varies by model → Phase 096 eval + prompt-tune candidates.
+
+### Operator UI/legibility observations (all → 094, none block 093)
+1. Draft-before-ask_user is **invisible** — review-an-invisible-draft (draft plumbed wire-only 093-05; render = 094 SC#6 / Deferred #1). 2. Nothing in chat during a run (spinner→full answer at once) → 094 SC#6. 3. **Operator-specified 094 acceptance bar:** show the *real steps* (sub-agents spawned, N searches, M tool calls, phase transitions, "merge generating", done) — the log-level transparency surfaced in the panel. 4. Generated files (charts/reports/xlsx from execute_code) not shown in panel FILES → SEED-037/038 + 094/095. 5. Failed run renders empty (RC-4) → 094. 6. Intermittent **general-chat silent send-drop** (not harness) → new bug report. 7. Mode toggle reads "Deep" during a Harness run → D-092-UX/094.
+
+### Overrides accepted by operator (2026-06-03)
+1. Dim-3 abrupt-resume retest deferred (Windows kill-friction; pre-existing infra). 2. Dim-5 result-quality (kimi/MiniMax) → SEED-050/096. 3. WR-01 (Deep task() honors sub_agent_model) accepted (eval task cell passed).
+
+**VERDICT: PARITY-02 Validated. Phase 093 CLOSED (passed_with_overrides). Next = /gsd:sketch 094 (G-2).**
