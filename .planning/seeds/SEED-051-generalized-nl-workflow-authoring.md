@@ -89,8 +89,9 @@ right place) — the reliability-from-grounding lever; search is whole-KB today.
 > workflow-start moving to the panel). Pull these into `/gsd:sketch 094` + `/gsd:discuss-phase
 > 094`. NOTE the v2.8/v2.9 sequencing question they raise: the full Workflows *page* is v2.9
 > authoring — so what does 094 do for launch in the interim (panel "Run workflow" per D-092-UX,
-> or defer the launcher to v2.9)? Decide at 094 discuss. (Not recorded in STATE/ROADMAP here to
-> avoid a lost-update race with the concurrent 093 session.)
+> or defer the launcher to v2.9)? Decide at 094 discuss. (Recorded in ROADMAP.md Phase 094
+> "SKETCH/DISCUSS INPUTS" callout on 2026-06-03 once 093 closed — the earlier lost-update race
+> with the concurrent 093 session is gone.)
 
 - **Workflows = a first-class PAGE in the nav (like Skills), not a chat dropdown.** Nav →
   "Automation / Workflows" → library (your drafts + published + shared/seed) + "Build new" +
