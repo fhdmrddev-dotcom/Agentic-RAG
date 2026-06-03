@@ -89,3 +89,53 @@ _None — all four panel sketches included in full._
 ## Downstream
 
 These findings are the design substrate for **Phase 087 (Panel UI)** — the G-2 sketch acceptance bar is met. Next on the 087 path: `/gsd:ui-phase 087` (turns these into the UI-SPEC design contract), then `/gsd:discuss-phase 087`, then `/gsd:plan-phase 087`. The skill now auto-loads during build for panel and chat-surface work.
+
+---
+
+# Session 3 — Workflow Legibility & Mode Clarity (Phase 094)
+
+**Date:** 2026-06-04
+**Sketches processed:** 6 (008–013 — all included)
+**Design areas:** Harness Phase Timeline · Unified Execution Surface & Run Seam · Run Honesty · Composer & Mode Clarity · Workflows Page · Workflow Builder (v2.9 design-ahead)
+**Skill output:** appended to `./.claude/skills/sketch-findings-agentic-rag/` (now 12 reference files across three sessions)
+
+## Included Sketches
+
+| # | Name | Winner | Design Area / Reference |
+|---|------|--------|-------------------------|
+| 008 | phase-timeline | D — RunCards on a spine | Harness Phase Timeline → `references/harness-phase-timeline.md` |
+| 009 | unified-surface | C — Live-status → resolves | Unified Execution Surface & Run Seam → `references/unified-execution-surface.md` |
+| 010 | honesty-and-drafts | C — Pin-while-active → fold (+ long-draft wide overlay) | Run Honesty → `references/run-honesty.md` |
+| 011 | mode-and-composer | A — Status chip + Cancel | Composer & Mode Clarity → `references/composer-and-mode.md` |
+| 012 | workflows-page | A — Card grid | Workflows Page → `references/workflows-page.md` |
+| 013 | workflow-builder | A — Talk-led | Workflow Builder (v2.9 design-ahead) → `references/workflow-builder.md` |
+
+## Excluded Sketches
+
+_None — all six workflow-legibility sketches included in full._
+
+## Grounding
+
+Unlike the first two sessions, this batch was authored against a real-evidence brief: `094-grounding/BRIEF.md` (the harness SSE event stream, the "wire-only / dropped by `api.ts`" analysis, competitive viz patterns, WCAG 2.1 AA) and `094-grounding/DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Both are preserved in the skill at `sources/094-grounding/` so the build phase wires real event names and real fields, not guesses. The synthesis was adversarially verified against the source mockups — three claims that drifted from ground truth (a fabricated mockup handler, a missing CSS rule, and one "zero backend change" over-promise that contradicted the DATA-CONTRACT) were caught and corrected.
+
+## Design Direction
+
+**Calm instrument, now driving a locked pipeline — made legible.** The v2.8 harness runs ordered multi-phase workflows, but today the chat shows a spinner then a wall of answer because every harness lifecycle event is dropped by `api.ts`. This session makes the run honest and the mode unambiguous, on the same restraint: one panel hosts BOTH Deep and Harness (the panel becomes the single live-execution surface — deliberately reversing sketch-001), the chat quiets to prompt + answer + a pointer, failures/drafts/batch-results all surface truthfully, and the Deep/Harness toggle leaves the composer for a first-class Workflows page so the mode can never mislabel. Same Deep Midnight tokens; color language extended (amber = active/needs-you/paused, green = done, red = failed, purple = retrying, primary = live pointer).
+
+## Key Decisions
+
+1. **Harness run = RunCards on a status-filled spine.** Each phase is a reusable RunCard threaded onto a vertical spine that fills green→done, amber=active, dashed-dim=locked-ahead, red=failed, purple=retrying — so the locked, escape-proof pipeline is *felt*. 5 real states, each glyph+pill+color (never color alone, WCAG). Failed-as-failed off `run_failed`/`gate_failed` (RC-4), never the terminal sentinel (wrongly `done` on failure). Sub-agent fan-out renders as real child rows (kills today's ghost avatars). *(Sketch 008 winner D)*
+
+2. **One execution surface, two drivers (D-094-UNIFY).** The workspace panel is the single live surface for BOTH Deep AND Harness — Deep's loop moves out of the chat into the panel (reversing 001). Chat keeps prompt + final answer + one quiet seam element: a live pointer while running, resolving to a compact receipt card below the answer. `phasesByThread` stays panel-only (PANEL-06) so panel events never re-render chat. *(Sketch 009 winner C)*
+
+3. **Honest by construction.** Attention-moments are loud while they need you (pinned amber=draft / red=failure), then fold into the timeline as a record. Failures carry a reason + closed taxonomy (max_steps / gate_failed / wall_clock_timeout / `reason_unknown` fallback). The draft you're asked to review is visible and labeled "not yet saved". Batch sub-results are readable before merge; the answer gets a provenance card. Large content = panel preview + opt-in `⤢` wide overlay, never crammed, never a fake percent. *(Sketch 010 winner C)*
+
+4. **Composer simplifies; mode = server truth.** Resting composer collapses to 2 pills (`[Model ▾]` with Provider folded in, `[General/Explorer ▾]`). The Deep/Harness toggle + workflow picker leave the composer entirely — finding #5 (toggle stuck on "Deep" mid-run) is killed by construction (no pill to mislabel). A running workflow shows as a slim amber status chip + Cancel above a disabled composer; Cancel stays where the cursor is. *(Sketch 011 winner A)*
+
+5. **Workflows get a first-class page; execution stays a thread mode.** A nav page (browse + launch only) renders existing `workflow_definitions` via `GET /workflows/published`; the card grid shows each workflow's locked phase chain inline. Run → new thread + `active_workflow_run_id` + redirect-into-thread, where the run streams using 008-D/009-C/011-A. Workflows are never page-resident — execution always lives in a thread (reusing run/stream/lock/resume). *(Sketch 012 winner A)*
+
+6. **NL authoring is talk-led, read-mostly, locked-on-publish.** You describe a recurring task (and upload a template); the AI drafts a read-mostly, live-streaming phase-card diagram from the 5 real phase types — no drag-canvas. Refine by talking; lint gates publish; publish freezes an immutable, versioned definition (migration 056), edits fork a draft. Per-phase optional KB scope via a searchable folder-tree picker. **Design-ahead — build v2.9 (SEED-051).** *(Sketch 013 winner A)*
+
+## Downstream
+
+These findings are the design substrate for **Phase 094 (Workflow Legibility + Mode Clarity)**. Build-now: 008-D · 009-C · 010-C · 011-A · 012-A — these mostly render harness lifecycle events already on the wire plus a published-workflows list endpoint (low/no new backend; the few net-new bindings, e.g. `folder_ids` on a phase config, are flagged honestly in the references). Design-ahead: 013 (NL builder, v2.9, SEED-051 spike-first). The G-2 sketch acceptance bar is met; next on the 094 path is the UI design contract / discuss-phase. The skill auto-loads during build for harness/workflow-run, composer, and chat-surface work.

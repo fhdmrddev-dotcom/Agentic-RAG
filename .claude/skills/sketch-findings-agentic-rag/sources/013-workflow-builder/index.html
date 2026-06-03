@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 013 — Workflow Builder (NL authoring vision)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ───────────────────────────────────────────────────────────────
+   Sketch 013 — Workflow Builder (NL authoring) · DESIGN NOW, BUILD v2.9
+   Q: How do you build a workflow by DESCRIBING it — AI drafts a
+      read-mostly LIVE diagram, you refine by TALKING, then publish
+      (locked + versioned)? NOT a drag-canvas (operator rejects it).
+   Building blocks = the 5 real phase types + ValidatorSpec only.
+   ─────────────────────────────────────────────────────────────── */
+body { padding-top: 52px; }
+.shell { height: calc(100vh - 52px); overflow: hidden; }
+
+.builder-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+.builder-head .bh-title { font-family: var(--font-headline); font-weight: 600; font-size: var(--text-md); }
+.builder-head .v29 { font-family: var(--font-mono); font-size: 9px; padding: 2px 7px; border-radius: var(--radius-full); background: var(--color-accent-violet); color: #fff; }
+.builder-head .spacer { flex: 1; }
+.lint-badge { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); padding: 4px var(--space-3); border-radius: var(--radius-full); background: var(--color-success-dim); color: var(--color-success); border: 1px solid hsl(142 71% 45% / .35); }
+.lint-badge.pending { background: var(--color-muted); color: var(--color-text-dim); border-color: var(--color-border); }
+.publish-btn { font-size: var(--text-sm); font-weight: 600; padding: 7px var(--space-4); border-radius: var(--radius-md); background: var(--color-primary); color: hsl(240 60% 8%); border: none; cursor: pointer; }
+.publish-btn.disabled { background: var(--color-muted); color: var(--color-text-dim); cursor: not-allowed; }
+.published-tag { display:inline-flex; align-items:center; gap:6px; font-size: var(--text-sm); color: var(--color-success); font-weight:600; }
+
+/* layout containers per variant */
+.body-area { display: grid; height: calc(100vh - 52px - 53px); overflow: hidden; }
+.body-area.vA { grid-template-columns: 380px 1fr; }
+.body-area.vB { grid-template-rows: 1fr auto; grid-template-columns: 1fr 300px; }
+.body-area.vC { grid-template-columns: 320px 1fr 300px; }
+
+/* talk rail */
+.talk { display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-bg-elev1); overflow: hidden; }
+.talk.bottom { border-right: none; border-top: 1px solid var(--color-border); grid-column: 1 / -1; }
+.talk-scroll { flex: 1; overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.talk-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); font-family: var(--font-mono); }
+.msg { font-size: 13px; line-height: 1.55; }
+.msg.user { align-self: flex-end; max-width: 88%; background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md) var(--radius-md) var(--radius-sm) var(--radius-md); }
+.msg.ai { display: flex; gap: var(--space-2); color: var(--color-text); }
+.msg.ai .bot { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent-violet)); flex-shrink: 0; }
+.msg.ai.thinking .bot { animation: brandPulse 1.5s infinite; }
+.msg.ai .mt { background: var(--color-surface); border: 1px solid var(--color-border-soft); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
+.talk-composer { padding: var(--space-3); border-top: 1px solid var(--color-border); }
+.talk-input { width: 100%; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-3); color: var(--color-text); font-family: inherit; font-size: var(--text-sm); resize: none; }
+.talk-hint { font-size: 10px; color: var(--color-text-dim); margin-top: 6px; text-align: center; }
+
+/* diagram (read-mostly, live) */
+.diagram { overflow-y: auto; padding: var(--space-5) var(--space-6) 72px; background: var(--color-bg); }
+.diagram-empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); color: var(--color-text-dim); text-align: center; }
+.diagram-empty .big { font-size: 30px; }
+
+/* inferred inputs strip */
+.inputs-strip { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); padding: var(--space-4); margin-bottom: var(--space-5); }
+.inputs-strip .is-h { display: flex; align-items: center; gap: var(--space-2); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: var(--space-3); }
+.input-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.input-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px var(--space-3); border-radius: var(--radius-md); background: var(--color-muted); border: 1px solid var(--color-border-soft); font-size: 12px; }
+.input-chip .ic-type { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); }
+.input-chip .edit { color: var(--color-text-dim); cursor: pointer; font-size: 10px; }
+.input-chip.template { border-color: hsl(258 90% 66% / .4); }
+.upload-btn { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:6px var(--space-3); border-radius:var(--radius-md); border:1px dashed var(--color-accent-violet); background:hsl(258 90% 66% / .08); color:var(--color-accent-violet); cursor:pointer; }
+.upload-btn:hover { background:hsl(258 90% 66% / .16); }
+.assets-h { display:flex; align-items:center; gap:var(--space-2); font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-accent-violet); font-family:var(--font-mono); margin:var(--space-4) 0 var(--space-2); }
+.grounding-row { font-size: 11px; color: var(--color-text-dim); margin-top: var(--space-3); display: flex; align-items: center; gap: 6px; }
+.grounding-row .folder { font-family: var(--font-mono); color: var(--color-success); }
+
+/* phase cards (vertical, spine-connected, read-mostly) */
+.flow { list-style: none; margin: 0; padding: 0; }
+.flow > li { position: relative; padding-left: 30px; padding-bottom: var(--space-3); }
+.flow > li:last-child { padding-bottom: 0; }
+.flow > li::before { content:''; position:absolute; left:10px; top:34px; bottom:-4px; width:2px; background: var(--color-border-soft); }
+.flow > li:last-child::before { display:none; }
+.flow-node { position:absolute; left:0; top:12px; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; font-size:10px; background: hsl(220 30% 7%); border:1.5px solid var(--color-border); color: var(--color-text-dim); z-index:1; }
+.pcard { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); padding: var(--space-3); transition: all var(--dur-base) var(--ease-out); }
+.pcard.new { animation: fadeSlideUp var(--dur-slow) var(--ease-out); border-color: var(--color-primary-glow); }
+.pcard.locked { background: var(--color-bg-elev1); }
+.pcard-top { display: flex; align-items: center; gap: var(--space-2); }
+.pcard .p-name { font-weight: 600; font-size: var(--text-sm); flex: 1; }
+.ptype { font-family: var(--font-mono); font-size: 9px; padding: 1px 6px; border-radius: var(--radius-sm); text-transform: uppercase; }
+.pt-agent { background: var(--color-success-dim); color: var(--color-success); }
+.pt-single { background: var(--color-primary-dim); color: var(--color-primary); }
+.pt-human { background: var(--color-warning-dim); color: var(--color-warning); }
+.pt-prog { background: var(--color-muted); color: var(--color-text-muted); }
+.pt-batch { background: hsl(258 90% 66% / .15); color: var(--color-accent-violet); }
+.pcard .p-note { font-size: 11.5px; color: var(--color-text-muted); margin-top: 5px; }
+.pcard-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: var(--space-2); align-items: center; }
+.tchip { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-muted); border: 1px solid var(--color-border-soft); padding: 1px 5px; border-radius: var(--radius-sm); }
+.tchip.scope { color: var(--color-success); border-color: hsl(142 71% 45% / .35); }
+/* per-phase KB scope control — selectable + optional */
+.scope-ctl { display:inline-flex; align-items:center; gap:5px; font-size:10px; padding:2px 7px; border-radius:var(--radius-sm); border:1px solid hsl(142 71% 45% / .35); background:var(--color-success-dim); color:var(--color-success); cursor:pointer; font-family:var(--font-mono); }
+.scope-ctl:hover { filter:brightness(1.15); }
+.scope-ctl.none { border-color:var(--color-border); background:var(--color-muted); color:var(--color-text-dim); }
+.scope-na { font-size:10px; color:var(--color-text-dim); font-family:var(--font-mono); }
+/* ── production scope picker (combobox + tree popup) — for 100+ nested folders ── */
+#scopeBackdrop { position:fixed; inset:0; z-index:8000; }
+#scopePop { position:fixed; z-index:8001; width:360px; max-height:432px; display:flex; flex-direction:column; background:var(--color-surface-hi); border:1px solid var(--color-border); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); overflow:hidden; }
+.sp-search { display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3); border-bottom:1px solid var(--color-border); }
+.sp-search input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-family:inherit; font-size:var(--text-sm); }
+.sp-search input::placeholder { color:var(--color-text-dim); }
+.sp-body { flex:1; overflow-y:auto; padding:var(--space-2) 0; }
+.sp-group { font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--color-text-dim); font-family:var(--font-mono); padding:var(--space-2) var(--space-3) 4px; }
+.sp-count { font-size:10px; color:var(--color-text-dim); font-family:var(--font-mono); padding:var(--space-2) var(--space-3); }
+.sp-row { display:flex; align-items:center; gap:8px; padding:6px var(--space-3); cursor:pointer; font-size:12.5px; }
+.sp-row:hover { background:var(--color-accent); }
+.sp-tri { width:12px; color:var(--color-text-dim); font-size:9px; transition:transform var(--dur-fast); flex-shrink:0; text-align:center; }
+.sp-tri.open { transform:rotate(90deg); }
+.sp-tri-sp { width:12px; flex-shrink:0; }
+.sp-check { width:16px; height:16px; border-radius:4px; border:1.5px solid var(--color-border); display:grid; place-items:center; font-size:10px; flex-shrink:0; color:#0b0b16; font-weight:700; }
+.sp-check.on { background:var(--color-primary); border-color:var(--color-primary); }
+.sp-check.part { background:var(--color-primary-dim); border-color:var(--color-primary); color:var(--color-primary); }
+.sp-name { flex:1; color:var(--color-text); }
+.sp-path { color:var(--color-text-dim); }
+.sp-glob { font-size:10px; }
+.sp-hint { font-size:9px; color:var(--color-text-dim); font-family:var(--font-mono); margin-left:6px; }
+.sp-default { border-bottom:1px solid var(--color-border-soft); }
+.sp-empty { padding:var(--space-4); text-align:center; color:var(--color-text-dim); font-size:12px; }
+.sp-foot { border-top:1px solid var(--color-border); padding:var(--space-2) var(--space-3); background:var(--color-bg-elev1); }
+.sp-sel { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:var(--space-2); min-height:22px; align-items:center; }
+.sp-sel-empty { font-size:11px; color:var(--color-text-dim); }
+.sp-chip { display:inline-flex; align-items:center; gap:5px; font-size:11px; padding:2px 7px; border-radius:var(--radius-full); background:var(--color-primary-dim); color:var(--color-primary); border:1px solid var(--color-primary-glow); }
+.sp-chip .x { cursor:pointer; opacity:.7; }
+.sp-chip .x:hover { opacity:1; }
+.sp-actions { display:flex; gap:var(--space-2); justify-content:flex-end; }
+.sp-clear { font-size:11px; padding:5px var(--space-3); border-radius:var(--radius-sm); background:transparent; border:1px solid var(--color-border); color:var(--color-text-muted); cursor:pointer; }
+.sp-done { font-size:11px; font-weight:600; padding:5px var(--space-4); border-radius:var(--radius-sm); background:var(--color-primary); color:#0b0b16; border:none; cursor:pointer; }
+.pcard-actions { display: flex; gap: 6px; margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--color-border-soft); }
+.pact { font-size: 11px; padding: 3px 9px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); }
+.pact.approve { border-color: hsl(142 71% 45% / .4); color: var(--color-success); }
+.pact.approve.on { background: var(--color-success-dim); }
+.pact:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+.add-phase { display: flex; align-items: center; gap: 6px; justify-content: center; padding: var(--space-2); border: 1px dashed var(--color-border); border-radius: var(--radius-md); color: var(--color-text-dim); font-size: 12px; cursor: pointer; margin-left: 30px; }
+.add-phase:hover { border-color: var(--color-primary-glow); color: var(--color-primary); }
+.drafting-row { display:flex; align-items:center; gap:var(--space-2); margin-left:30px; padding:var(--space-2); color: var(--color-text-dim); font-size:12px; }
+.drafting-row .dots { display:inline-flex; gap:3px; }
+.drafting-row .dots i { width:5px; height:5px; border-radius:50%; background:var(--color-primary); animation:dotBounce 1.2s infinite; }
+.drafting-row .dots i:nth-child(2){animation-delay:.15s} .drafting-row .dots i:nth-child(3){animation-delay:.3s}
+
+/* inspector (C) / right drawer */
+.inspector { border-left: 1px solid var(--color-border); background: var(--color-bg-elev1); padding: var(--space-4); overflow-y: auto; }
+.inspector .insp-h { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: var(--space-3); }
+.insp-field { margin-bottom: var(--space-3); }
+.insp-field label { font-size: 11px; color: var(--color-text-dim); display:block; margin-bottom: 4px; }
+.insp-field .val { font-size: 12.5px; color: var(--color-text); background: var(--color-surface); border:1px solid var(--color-border); border-radius: var(--radius-sm); padding: 6px 8px; }
+
+.published-note { padding: var(--space-3) var(--space-6); border-top: 1px dashed var(--color-border-soft); font-size: 11px; color: var(--color-text-dim); line-height: 1.5; }
+.published-note b { color: var(--color-primary); }
+
+.toolbar-toggle { display: flex; gap: 3px; }
+.toolbar-toggle button.on { background: var(--color-primary) !important; color: #0b0b16 !important; font-weight: 600; }
+.sketch-toolbar { bottom: auto; top: 60px; }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 013 · Workflow Builder</span>
+  <button class="variant-tab active" data-v="A" onclick="setVariant('A')">A · Talk-led ★</button>
+  <button class="variant-tab" data-v="B" onclick="setVariant('B')">B · Diagram-hero</button>
+  <button class="variant-tab" data-v="C" onclick="setVariant('C')">C · Three-pane</button>
+</nav>
+
+<div class="shell" id="shell"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">stage</span>
+  <div class="toolbar-toggle" id="stToggle">
+    <button data-s="describe" class="on" onclick="setStage('describe')">1 Describe</button>
+    <button data-s="drafting" onclick="setStage('drafting')">2 Drafting</button>
+    <button data-s="refine" onclick="setStage('refine')">3 Refine</button>
+    <button data-s="publish" onclick="setStage('publish')">4 Published</button>
+  </div>
+  <span style="opacity:.4">|</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const PHASES = [
+  {n:'Gather sources', t:'llm_agent', tt:'pt-agent', tools:['search_documents'], scope:'DBA folder', note:'Finds the relevant passages from your KB.'},
+  {n:'Draft section', t:'llm_single', tt:'pt-single', tools:[], note:'Writes the section from the gathered sources + your template structure.'},
+  {n:'Your review', t:'llm_human_input', tt:'pt-human', tools:[], note:'Pauses so you can confirm or correct the draft before it commits.'},
+  {n:'Fill template & export', t:'llm_agent', tt:'pt-agent', tools:['execute_code'], note:'Writes the final .docx from your uploaded template.'},
+];
+const INPUTS = [
+  {n:'topic', type:'text', cls:''},
+  {n:'template', type:'file · .docx', cls:'template'},
+];
+let CUR_V='A', STAGE='describe';
+// ── per-phase KB scope — PRODUCTION picker: searchable combobox over a folder TREE ──
+// Folders are a real nested tree; search_documents accepts folder_ids[] and auto-expands subtrees,
+// so multi-select emitting folder IDs needs zero schema/API change. Default (empty) = whole KB.
+let _fid=0; const _nid=()=>'f'+(++_fid);
+function F(name, children, global){ return {id:_nid(), name, global:!!global, children:children||[]}; }
+function leaves(prefix, n){ return Array.from({length:n},(_,i)=>F(prefix+' '+(i+1))); }
+const FOLDERS = [
+  F('Legal',[F('Contracts',[F('NDAs'),F('MSAs'),F('SOWs')]),F('Templates',[F('NDA-2024'),F('Offer Letters')]),F('Compliance',[F('GDPR'),F('SOC2'),F('HIPAA')])]),
+  F('Engineering',[F('Specs',[F('v2.7'),F('v2.8'),F('Archive')]),F('Runbooks',[F('Incident'),F('Deploy'),F('On-call')]),F('Research',[F('Spikes'),F('Benchmarks')])]),
+  F('Finance',[F('Invoices',[F('2024',leaves('Q',4)),F('2025',leaves('Q',4))]),F('Payroll'),F('Forecasts',leaves('FY',3))]),
+  F('Sales',[F('Pipeline'),F('Closed',[F('NDAs')]),F('Decks'),F('Regions',[F('AMER',leaves('Territory',4)),F('EMEA',leaves('Territory',4)),F('APAC',leaves('Territory',4))])]),
+  F('People',[F('Handbook'),F('Reviews'),F('Hiring',[F('Roles',leaves('Role',10))])]),
+  F('Operations',[F('Vendors',leaves('Vendor',8)),F('Facilities')]),
+  F('Marketing',[F('Campaigns',leaves('Campaign',6)),F('Brand')]),
+  F('Archive',[F('NDAs'),F('Legacy',leaves('Year',6))]),
+];
+const GLOBALS = [F('Company Handbook',[],true),F('Brand Assets',[],true),F('Security Policies',[],true)];
+const ROOTS = [...FOLDERS, ...GLOBALS];
+function _flatten(nodes,path,out){ for(const n of nodes){ const p=[...path,n.name]; out.push({n,path:p}); if(n.children.length) _flatten(n.children,p,out);} return out; }
+const FLAT = _flatten(ROOTS,['KB'],[]);
+const TOTAL = FLAT.length;
+const byId = id => FLAT.find(f=>f.n.id===id);
+let SELECTED=new Set(), EXPANDED=new Set(), SCOPE_Q='', ANCHOR=null;
+const RECENTS = []; (function(){ for(const f of FLAT){ if(f.n.name==='Contracts'||f.n.name==='Specs') RECENTS.push(f.n.id); } })();
+
+function chipLabel(){ if(SELECTED.size===0) return 'Whole knowledge base'; const names=[...SELECTED].map(id=>byId(id)&&byId(id).n.name).filter(Boolean); return names[0]+(names.length>1?' +'+(names.length-1):''); }
+function hasSelDesc(n){ for(const c of n.children){ if(SELECTED.has(c.id)||hasSelDesc(c)) return true; } return false; }
+function openScopePicker(e){ if(e){e.stopPropagation(); ANCHOR=e.currentTarget;} SCOPE_Q=''; renderScopePopover(); }
+function closeScopePicker(){ const el=document.getElementById('scopePop'); if(el) el.remove(); const bd=document.getElementById('scopeBackdrop'); if(bd) bd.remove(); render(); }
+function toggleExpand(id){ EXPANDED.has(id)?EXPANDED.delete(id):EXPANDED.add(id); renderScopePopoverBody(); }
+function toggleSelect(id){ if(id==='__all__'){ SELECTED.clear(); } else { SELECTED.has(id)?SELECTED.delete(id):SELECTED.add(id); } renderScopePopoverBody(); }
+function clearScope(){ SELECTED.clear(); renderScopePopoverBody(); }
+function onScopeSearch(v){ SCOPE_Q=v; renderScopePopoverBody(); }
+function treeRows(nodes, depth){
+  let html='';
+  for(const n of nodes){
+    const sel=SELECTED.has(n.id), part=!sel&&hasSelDesc(n), exp=EXPANDED.has(n.id), kids=n.children.length>0;
+    html+=`<div class="sp-row" style="padding-left:${8+depth*16}px">
+      ${kids?`<span class="sp-tri ${exp?'open':''}" onclick="event.stopPropagation();toggleExpand('${n.id}')">▸</span>`:'<span class="sp-tri-sp"></span>'}
+      <span class="sp-check ${sel?'on':part?'part':''}" onclick="event.stopPropagation();toggleSelect('${n.id}')">${sel?'✓':part?'–':''}</span>
+      <span class="sp-name" onclick="event.stopPropagation();toggleSelect('${n.id}')">${n.name}${n.global?' <span class="sp-glob">🌐</span>':''}</span>
+    </div>`;
+    if(exp&&kids) html+=treeRows(n.children, depth+1);
+  }
+  return html;
+}
+function scopeBodyHTML(){
+  if(SCOPE_Q.trim()){
+    const q=SCOPE_Q.trim().toLowerCase(), hits=FLAT.filter(f=>f.n.name.toLowerCase().includes(q));
+    if(!hits.length) return `<div class="sp-empty">No folders match “${SCOPE_Q}”.</div>`;
+    return `<div class="sp-count" aria-live="polite">${hits.length} folder${hits.length===1?'':'s'} found</div>`+
+      hits.map(f=>{const sel=SELECTED.has(f.n.id); return `<div class="sp-row" onclick="toggleSelect('${f.n.id}')"><span class="sp-check ${sel?'on':''}">${sel?'✓':''}</span><span class="sp-name"><span class="sp-path">${f.path.slice(0,-1).join(' › ')} › </span>${f.n.name}</span></div>`;}).join('');
+  }
+  const allSel=SELECTED.size===0;
+  let html=`<div class="sp-row sp-default" onclick="toggleSelect('__all__')"><span class="sp-check ${allSel?'on':''}">${allSel?'✓':''}</span><span class="sp-name">Whole knowledge base <span class="sp-hint">default · ${TOTAL} folders</span></span></div>`;
+  if(RECENTS.length){ html+=`<div class="sp-group">Recent</div>`+RECENTS.map(id=>{const f=byId(id),sel=SELECTED.has(id); return `<div class="sp-row" onclick="toggleSelect('${id}')"><span class="sp-check ${sel?'on':''}">${sel?'✓':''}</span><span class="sp-name"><span class="sp-path">${f.path.slice(0,-1).join(' › ')} › </span>${f.n.name}</span></div>`;}).join(''); }
+  html+=`<div class="sp-group">Your folders</div>`+treeRows(FOLDERS,0)+`<div class="sp-group">Shared / Global</div>`+treeRows(GLOBALS,0);
+  return html;
+}
+function selectedChips(){ if(SELECTED.size===0) return '<span class="sp-sel-empty">Scoped to the whole KB</span>'; return [...SELECTED].map(id=>{const f=byId(id); return `<span class="sp-chip">${f?f.n.name:id} <span class="x" onclick="toggleSelect('${id}')">✕</span></span>`;}).join(''); }
+function renderScopePopoverBody(){ const b=document.getElementById('scopePopBody'); if(b) b.innerHTML=scopeBodyHTML(); const s=document.getElementById('scopeSel'); if(s) s.innerHTML=selectedChips(); }
+function renderScopePopover(){
+  if(!document.getElementById('scopeBackdrop')){ const bd=document.createElement('div'); bd.id='scopeBackdrop'; bd.onclick=closeScopePicker; document.body.appendChild(bd); }
+  let el=document.getElementById('scopePop'); if(!el){ el=document.createElement('div'); el.id='scopePop'; el.onclick=e=>e.stopPropagation(); document.body.appendChild(el); }
+  el.innerHTML=`
+    <div class="sp-search"><span>🔍</span><input id="scopeSearch" role="combobox" aria-expanded="true" aria-label="Knowledge base scope" placeholder="Search ${TOTAL} folders…" oninput="onScopeSearch(this.value)" value="${SCOPE_Q.replace(/"/g,'&quot;')}" autocomplete="off"></div>
+    <div class="sp-body" id="scopePopBody" role="listbox">${scopeBodyHTML()}</div>
+    <div class="sp-foot"><div class="sp-sel" id="scopeSel">${selectedChips()}</div><div class="sp-actions"><button class="sp-clear" onclick="clearScope()">Clear</button><button class="sp-done" onclick="closeScopePicker()">Done</button></div></div>`;
+  if(ANCHOR){ const r=ANCHOR.getBoundingClientRect(); el.style.top=Math.max(60, Math.min(r.bottom+6, window.innerHeight-440))+'px'; el.style.left=Math.max(8, Math.min(r.left, window.innerWidth-372))+'px'; }
+  const inp=document.getElementById('scopeSearch'); if(inp) inp.focus();
+}
+
+function inputsStrip(locked){
+  return `<div class="inputs-strip">
+    <div class="is-h">⊙ Inputs the AI inferred — collected each run ${locked?'· locked on publish':'· review &amp; edit'}</div>
+    <div class="input-chips">
+      <span class="input-chip">topic <span class="ic-type">text</span> ${locked?'🔒':'<span class="edit">✎</span>'}</span>
+      ${locked?'':'<span class="input-chip" style="border-style:dashed;color:var(--color-text-dim)">＋ add input</span>'}
+    </div>
+    <div class="assets-h">📎 Assets — uploaded here, owned by the workflow</div>
+    <div class="input-chips">
+      <span class="input-chip template">section-template.docx <span class="ic-type">attached ✓</span> ${locked?'🔒':'<span class="edit">replace</span>'}</span>
+      ${locked?'':'<label class="upload-btn">⬆ Upload template / form<input type="file" hidden onchange="event.target.value=\'\'"></label>'}
+    </div>
+    <div class="grounding-row">📁 KB scope is set <b style="color:var(--color-text-muted)">per phase</b> below — <b style="color:var(--color-text-muted)">optional</b> (a phase can use a folder, the whole KB, or no KB).</div>
+  </div>`;
+}
+
+function phaseCard(p, idx, opts){
+  const tools = p.tools.map(t=>`<span class="tchip">${t}</span>`).join('');
+  const searches = p.tools.includes('search_documents');
+  const scopeNone = SELECTED.size===0;
+  const scope = searches
+    ? (opts.locked
+        ? `<span class="scope-ctl ${scopeNone?'none':''}" style="cursor:default">📁 ${chipLabel()}</span>`
+        : `<span class="scope-ctl ${scopeNone?'none':''}" onclick="openScopePicker(event)" title="Choose KB folder scope (searchable)">📁 scope: ${chipLabel()} ▾</span>`)
+    : '';
+  const actions = opts.locked ? ''
+    : `<div class="pcard-actions"><span class="pact approve on">✓ approved</span><span class="pact">✎ tweak</span><span class="pact">↻ replace</span></div>`;
+  const nodeIco = opts.locked?'🔒':(idx+1);
+  return `<li><span class="flow-node">${nodeIco}</span>
+    <div class="pcard ${opts.new?'new':''} ${opts.locked?'locked':''}">
+      <div class="pcard-top"><span class="p-name">${p.n}</span><span class="ptype ${p.tt}">${p.t}</span></div>
+      <div class="p-note">${p.note}</div>
+      <div class="pcard-meta">${tools}${scope}</div>
+      ${actions}
+    </div></li>`;
+}
+
+function diagramHTML(){
+  if (STAGE==='describe') {
+    return `<div class="diagram"><div class="diagram-empty">
+      <div class="big">✎</div>
+      <div style="font-size:var(--text-md);color:var(--color-text);font-weight:600">Describe the workflow you want</div>
+      <div style="max-width:340px">Tell the assistant what recurring task to automate and upload any template it should fill. It proposes the phases, tools, inputs &amp; KB scope — you refine by talking.</div>
+    </div></div>`;
+  }
+  const locked = STAGE==='publish';
+  let cards;
+  if (STAGE==='drafting') {
+    cards = PHASES.slice(0,2).map((p,i)=>phaseCard(p,i,{new:i===1})).join('')
+      + `<li><span class="flow-node">●</span><div class="drafting-row"><span class="dots"><i></i><i></i><i></i></span> proposing the next phase…</div></li>`;
+  } else {
+    cards = PHASES.map((p,i)=>phaseCard(p,i,{locked})).join('');
+  }
+  const addRow = (STAGE==='refine') ? `<div class="add-phase">＋ add a phase (or just ask in chat)</div>` : '';
+  const publishedNote = locked ? `<div class="published-note">✓ <b>Published as v1</b> — immutable &amp; locked (mirrors migration 056 <span style="font-family:var(--font-mono)">UNIQUE(slug,version)</span> + on-publish trigger). Future edits fork a <b>new draft (v2)</b>; the locked v1 never mutates. Run it from the <b>Workflows page</b> (sketch 012).</div>` : '';
+  return `<div class="diagram">${inputsStrip(locked)}<ol class="flow">${cards}</ol>${addRow}${publishedNote}</div>`;
+}
+
+function talkHTML(bottom){
+  const msgs = [];
+  msgs.push(`<div class="talk-label">Build by talking — the AI heavy-lifts, you approve</div>`);
+  if (STAGE!=='describe') {
+    msgs.push(`<div class="msg user">Draft a workflow that writes a literature-review section from my KB and a Word template, then lets me review it before it fills the template.</div>`);
+  }
+  if (STAGE==='drafting') {
+    msgs.push(`<div class="msg ai thinking"><div class="bot"></div><div class="mt">Proposing phases… I inferred 2 inputs (<b>topic</b>, <b>template</b>) and scoped search to your <b>DBA</b> folder.</div></div>`);
+  } else if (STAGE==='refine') {
+    msgs.push(`<div class="msg ai"><div class="bot"></div><div class="mt">Here's a 4-phase draft. Each phase uses only allowed tools and is lint-clean. Approve each, or tell me what to change — e.g. “add a web-search step” or “make the review optional”.</div></div>`);
+    msgs.push(`<div class="msg user">Looks right — keep it.</div>`);
+  } else if (STAGE==='publish') {
+    msgs.push(`<div class="msg ai"><div class="bot"></div><div class="mt">Published as <b>v1</b> 🔒. It's now in your Workflows page, ready to run. Want to start a v2 draft to change anything?</div></div>`);
+  }
+  const composer = bottom===true
+    ? `<div class="talk-composer" style="border-top:none"><textarea class="talk-input" rows="1" placeholder="${STAGE==='publish'?'Start a v2 draft to change anything…':'Describe or refine — e.g. “add a web search step”…'}">${STAGE==='describe'?'Draft a workflow that writes a lit-review section from my KB + a Word template, then lets me review before it fills the template.':''}</textarea></div>`
+    : `<div class="talk-composer"><textarea class="talk-input" rows="2" placeholder="${STAGE==='publish'?'Start a v2 draft to change anything…':'Describe or refine — e.g. “add a web search step”…'}">${STAGE==='describe'?'Draft a workflow that writes a lit-review section from my KB + a Word template, then lets me review before it fills the template.':''}</textarea><div class="talk-hint">talk to edit — no wiring, no drag-canvas</div></div>`;
+  return `<div class="talk ${bottom?'bottom':''}"><div class="talk-scroll">${msgs.join('')}</div>${composer}</div>`;
+}
+
+function inspectorHTML(){
+  return `<div class="inspector">
+    <div class="insp-h">Phase inspector · “Gather sources”</div>
+    <div class="insp-field"><label>Type</label><div class="val">llm_agent — one agent, looping over allowed tools</div></div>
+    <div class="insp-field"><label>Tools (whitelist)</label><div class="val">search_documents</div></div>
+    <div class="insp-field"><label>KB folder scope · optional</label><div class="val" style="display:flex;align-items:center;gap:6px">📁 ${chipLabel()}<span style="margin-left:auto;color:var(--color-text-dim)">▾</span></div><div style="font-size:10px;color:var(--color-text-dim);margin-top:4px">Searchable folder picker · multi-select · default = whole KB.</div></div>
+    <div class="insp-field"><label>Gate</label><div class="val" style="color:var(--color-text-dim)">none</div></div>
+    <div class="insp-field"><label>Consumes input</label><div class="val">topic</div></div>
+    <div style="font-size:10px;color:var(--color-text-dim);line-height:1.5;margin-top:var(--space-4)">Editing = pick from the 5 real phase types + tool whitelist + gate. No invented node types.</div>
+  </div>`;
+}
+
+function headHTML(){
+  const lint = STAGE==='describe' ? `<span class="lint-badge pending">lint · waiting for a draft</span>`
+    : `<span class="lint-badge">✓ lint clean — reachable · terminal · inputs satisfied</span>`;
+  const publish = STAGE==='publish'
+    ? `<span class="published-tag">🔒 Published · v1</span>`
+    : `<button class="publish-btn ${STAGE==='describe'?'disabled':''}" ${STAGE==='refine'?'onclick="setStage(\'publish\')"':''}>Publish &amp; lock ▸</button>`;
+  return `<div class="builder-head">
+    <span class="bh-title">＋ Build a workflow</span><span class="v29">v2.9 vision</span>
+    <span class="spacer"></span>${lint}${publish}
+  </div>`;
+}
+
+function render(){
+  let body;
+  if (CUR_V==='A') body = `<div class="body-area vA">${talkHTML(false)}${diagramHTML()}</div>`;
+  else if (CUR_V==='B') body = `<div class="body-area vB">${diagramHTML()}${inspectorHTML()}${talkHTML(true)}</div>`;
+  else body = `<div class="body-area vC">${talkHTML(false)}${diagramHTML()}${inspectorHTML()}</div>`;
+  document.getElementById('shell').innerHTML = headHTML() + body;
+}
+function setVariant(v){ CUR_V=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active',t.dataset.v===v)); render(); }
+function setStage(s){ STAGE=s; document.querySelectorAll('#stToggle button').forEach(b=>b.classList.toggle('on',b.dataset.s===s)); render(); }
+render();
+</script>
+</body>
+</html>
