@@ -28,7 +28,7 @@
  */
 import { useEffect, useId, useState } from "react"
 import { cn } from "@/lib/utils"
-import type { Phase, TaskRunIndexItem } from "@/types"
+import type { Phase } from "@/types"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -145,37 +145,6 @@ function classifyFailure(phase: Phase): ClassifiedFailure {
         ? `phase: ${slug} → gate · attempt ${attempt}`
         : `phase: ${slug} → gate`,
   }
-}
-
-// ── A sub-agent child row (llm_agent / llm_batch_agents). description + live
-//    status + summary on done. NO per-row tool/search count (sub-stream). ──
-function SubAgentRow({ agent }: { agent: TaskRunIndexItem }) {
-  const done = agent.status === "completed" || agent.status === "done"
-  const failed = agent.status === "failed"
-  return (
-    <li className="flex flex-col gap-0.5 border-l border-border/50 pl-3 text-[13px]">
-      <div className="flex items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className={cn(
-            "h-[6px] w-[6px] flex-none rounded-full",
-            failed
-              ? "bg-[hsl(var(--destructive))]"
-              : done
-                ? "bg-[hsl(var(--panel-status-done))]"
-                : "bg-[hsl(var(--panel-status-active))]",
-          )}
-        />
-        <span className="min-w-0 truncate text-foreground">{agent.description ?? "Sub-agent"}</span>
-        <span className={cn("ml-auto flex-none text-[11px]", done ? "text-[hsl(var(--panel-status-done))]" : failed ? "text-[hsl(0_80%_80%)]" : "text-panel-muted-foreground")}>
-          {failed ? "Failed" : done ? "Done" : "Running"}
-        </span>
-      </div>
-      {done && agent.summary && (
-        <p className="pl-3 text-[12px] leading-relaxed text-panel-muted-foreground">{agent.summary}</p>
-      )}
-    </li>
-  )
 }
 
 export interface PhaseCardProps {
@@ -304,21 +273,11 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
           </div>
         )}
 
-        {/* Sub-agent child rows (llm_agent / llm_batch_agents). The ONLY count is
-            the client tally of sub_agent_start (phase.subAgents.length) — NO
-            per-phase tool/search/source chip (D-03 / Pitfall 5 suppression). */}
-        {phase.subAgents.length > 0 && (
-          <>
-            <span className="text-[11px] font-medium text-panel-muted-foreground">
-              {phase.subAgents.length} {phase.subAgents.length === 1 ? "agent" : "agents"}
-            </span>
-            <ol className="flex flex-col gap-1.5">
-              {phase.subAgents.map((agent) => (
-                <SubAgentRow key={agent.sub_run_id} agent={agent} />
-              ))}
-            </ol>
-          </>
-        )}
+        {/* WR-03b: the per-phase `phase.subAgents` render block was removed — no
+            demux handler ever populates `phase.subAgents` (it is always []), so the
+            block was structurally dead. Per-phase association is the deferred
+            SEED-053 path. The honest sub-agent children surface instead via the
+            thread-scoped <BatchResultList/> mounted in WorkspacePanel (WR-01). */}
       </div>
     </div>
   )

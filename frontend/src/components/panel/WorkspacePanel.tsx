@@ -37,6 +37,7 @@ import {
   useAskUserPrompt,
   useViewingThread,
   usePhases,
+  useTasks,
   useWorkflowLockForThread,
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
@@ -49,6 +50,7 @@ import { FilesSection } from "./FilesSection"
 import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
 import { PhaseTimeline } from "./PhaseTimeline"
+import { BatchResultList } from "./BatchResultList"
 
 export type PanelState = "open" | "rail"
 
@@ -92,9 +94,15 @@ export function WorkspacePanel({
   // workflow lock (presence ⇒ harness mode). The Workflow section mounts when
   // mode==="harness" OR phases exist (DATA-CONTRACT §6), else PanelEmpty.
   const { data: phases } = usePhases(threadId)
+  // Phase 094 WR-01 (D-06 / SC#6): the run-level sub-agent rows (the honest
+  // per-subtopic `sub_agent_done.summary` source). Mounted thread-scoped beneath
+  // the live timeline so batch sub-results become VISIBLE before the merge — under
+  // the same harness/phases-exist gate as the timeline, AND only when tasks exist.
+  const { data: tasks } = useTasks(threadId)
   const workflowLock = useWorkflowLockForThread(threadId)
   const isHarness = workflowLock != null
   const showTimeline = isHarness || phases.length > 0
+  const showBatchResults = showTimeline && tasks.length > 0
 
   const isMobile = useIsMobile()
 
@@ -149,6 +157,20 @@ export function WorkspacePanel({
           {showTimeline && (
             <PanelSection title="Workflow" count={phases.length || undefined}>
               <PhaseTimeline threadId={threadId} />
+            </PanelSection>
+          )}
+
+          {/* Phase 094 WR-01 (D-06 / SC#6): the batch sub-results section — the
+              per-subtopic sub_agent_done.summary rows, readable BEFORE the merge.
+              Sibling block beneath the live timeline; mounted only for a harness
+              run/phases-exist context AND when tasks exist (never in Deep mode,
+              never an empty box). Thread-scoped via useTasks (PANEL-09 isolation —
+              the chat never re-renders). */}
+          {showBatchResults && (
+            <PanelSection title="Sub-results" count={tasks.length || undefined}>
+              <div className="px-2 pb-2">
+                <BatchResultList threadId={threadId} />
+              </div>
             </PanelSection>
           )}
         </>
