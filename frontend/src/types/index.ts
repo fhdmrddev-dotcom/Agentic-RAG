@@ -330,6 +330,39 @@ export interface TaskRunIndexItem {
   summary?: string
 }
 
+/**
+ * Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the normalized harness-phase shape
+ * (DATA-CONTRACT §3b). One element per phase in the panel-only `phasesByThread`
+ * slice. The discriminated render keys on `phaseType` (the wire `phase_started.
+ * phase_type` field, one of the 5 LOCKED literals; UNKNOWN → generic row).
+ *
+ * Source mapping (DATA-CONTRACT §3b):
+ *   slug       ← phase_started.phase
+ *   phaseIndex ← phase_started.phase_index
+ *   phaseType  ← phase_started.phase_type (the §2 discriminator)
+ *   status     ← phase_started→running / phase_completed→done /
+ *                run_failed|terminal gate_failed→failed /
+ *                non-terminal gate_failed→retrying /
+ *                phase_transition.via==="skip_to_phase"→skipped /
+ *                derived pending for not-yet-started phases
+ *   attempt    ← gate_failed.attempt
+ *   error      ← gate_failed.error / run_failed.reason
+ *   subAgents  ← sub_agent_start/done bookends (the existing TaskRunIndexItem
+ *                shape, keyed by sub_run_id), associated with this phase
+ *   pendingAsk ← a tool_call_id POINTER into pendingAsksByThread (the ask card
+ *                already has a store — do NOT duplicate the ask here)
+ */
+export interface Phase {
+  slug: string
+  phaseIndex: number
+  phaseType: string
+  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped"
+  attempt?: number
+  error?: string
+  subAgents: TaskRunIndexItem[]
+  pendingAsk: string | null
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 087 Plan 01 — workspace file content / versions / diff wire-mirror
 // interfaces + the ask_user answer POST body.

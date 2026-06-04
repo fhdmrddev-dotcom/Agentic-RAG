@@ -35,7 +35,7 @@
  */
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
-import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem } from "@/types"
+import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, Phase } from "@/types"
 import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
@@ -133,6 +133,22 @@ export interface StreamsState {
   // ────────────────────────────────────────────────────────────────────────────
   /** Per-thread workflow lock. Absent key = Deep (unlocked). */
   workflowLockByThread: Map<string, WorkflowLock>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the panel-only harness phase
+  // timeline slice. The 6 new harness lifecycle events (phase_started /
+  // phase_completed / phase_transition / gate_failed / run_failed /
+  // run_completed) — wire-emitted but DROPPED by api.ts today — demux into this
+  // ONE Map so a phase event NEVER mutates bucketsBySurface (the chat selector
+  // `useThreadMessages` reads bucketsBySurface EXCLUSIVELY → zero chat
+  // re-renders, PANEL-09). Mirrors the tasksByThread/workflowLockByThread shape:
+  // Map<threadId, Phase[]>, keyed by the OWNING thread id so a background harness
+  // run cannot corrupt the viewed thread's timeline (the SC#10 parallel-thread
+  // axis). EPHEMERAL — never persisted; reconciled from getThreadWorkflow on
+  // every mount (mirrors pendingAsksByThread/workspaceFilesByThread, NOT
+  // tasksByThread which persists). The chat side MUST NEVER read this Map.
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Per-thread harness phase timeline (panel-only). Absent key = no phases. */
+  phasesByThread: Map<string, Phase[]>
   actions: {
     setMessagesForBucket: (
       surface: SurfaceId,
@@ -205,6 +221,26 @@ export interface StreamsState {
     setWorkflowLockForThread: (threadId: string, lock: WorkflowLock) => void
     /** Clear a thread's workflow lock — GC delete-the-key (unlock / terminal). */
     clearWorkflowLockForThread: (threadId: string) => void
+    // ──────────────────────────────────────────────────────────────────────────
+    // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — panel-only phase-timeline
+    // mutators. Each copy-then-mutates the phasesByThread Map (new Map → set),
+    // keyed by the OWNING thread id (cross-thread isolation). NEVER touch
+    // bucketsBySurface. No-op stubs here; the provider registers real bodies in a
+    // mount-time useEffect (panel SSE can fire BEFORE that registers — Pitfall 5,
+    // so synchronous `() => {}` stubs, NOT notMounted).
+    // ──────────────────────────────────────────────────────────────────────────
+    /** Append a phase (phase_started) — no-op if its slug already present. */
+    appendPhaseForThread: (threadId: string, phase: Phase) => void
+    /** Patch a phase's status (+ optional fields) by slug (phase_completed /
+     *  gate_failed / run_failed / phase_transition). */
+    setPhaseStatusForThread: (
+      threadId: string,
+      slug: string,
+      status: Phase["status"],
+      patch?: Partial<Phase>,
+    ) => void
+    /** Full-state-replace of a thread's phase timeline (getThreadWorkflow reconcile). */
+    replacePhasesForThread: (threadId: string, phases: Phase[]) => void
   }
 }
 
@@ -256,6 +292,12 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   // (never persisted); reconciled from getThreadWorkflow on every mount.
   // Type: workflowLockByThread: Map<string, WorkflowLock>
   workflowLockByThread: new Map<string, WorkflowLock>(),
+  // Phase 094 Plan 02 (PANEL-08/09): per-thread harness phase timeline — fresh
+  // empty Map. EPHEMERAL (no streamsCache/localStorage read — phases reconcile
+  // from getThreadWorkflow on every mount, mirroring pendingAsksByThread, NOT
+  // tasksByThread which persists). Panel-only — chat selectors never read it.
+  // Type: phasesByThread: Map<string, Phase[]>
+  phasesByThread: new Map<string, Phase[]>(),
   actions: {
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
@@ -284,5 +326,11 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     // can fire before the provider's mount-time useEffect registers real bodies.
     setWorkflowLockForThread: () => {},
     clearWorkflowLockForThread: () => {},
+    // Phase 094 Plan 02 (PANEL-08/09): synchronous no-op stubs — a harness
+    // phase_* / gate_failed / run_failed SSE can fire BEFORE the provider's
+    // mount-time useEffect registers real bodies (Pitfall 5 — NOT notMounted).
+    appendPhaseForThread: () => {},
+    setPhaseStatusForThread: () => {},
+    replacePhasesForThread: () => {},
   },
 })))
