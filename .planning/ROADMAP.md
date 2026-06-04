@@ -186,7 +186,7 @@ Plans:
 **Plans**: 5 plans (4 waves)
 - [x] 094-01-PLAN.md — D-05 --accent-violet token (FIRST) + Wave-0 test scaffolds + DATA-CONTRACT §7 fixtures [Wave 1] ✅ 2026-06-04
 - [x] 094-02-PLAN.md — Additive phase_* SSE branches (Deep byte-identical) + panel-only phasesByThread slice + usePhases (PANEL-09) [Wave 2] ✅ 2026-06-04
-- [ ] 094-04-PLAN.md — D-04 RC-4 backend persist at BOTH failure-return sites (Deep byte-identical) [Wave 2, parallel with 02]
+- [x] 094-04-PLAN.md — D-04 RC-4 backend persist at BOTH failure-return sites (Deep byte-identical) [Wave 2, parallel with 02] ✅ 2026-06-04 (`_surface_failure_message` at fail_run + skip_to_phase guard; reason_unknown sentinel; `_shielded_finalize` untouched/77 insertions 0 deletions; test_094_rc4_failure GREEN 4/4; harness suite 94 passed/1 pre-existing)
 - [ ] 094-03-PLAN.md — PhaseTimeline + PhaseCard (WCAG 2.1 AA, reconcile-then-live, failure-with-reason, suppress counts) + WorkspacePanel mount + PANEL-08 auto-open [Wave 3]
 - [ ] 094-05-PLAN.md — D-02 mode label from server truth + D-06 draft preview + batch summaries [Wave 4]
 **UI hint**: yes

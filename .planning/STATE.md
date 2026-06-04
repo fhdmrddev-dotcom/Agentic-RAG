@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Completed 094-02-PLAN.md
-last_updated: "2026-06-04T18:49:05.559Z"
+stopped_at: Completed 094-04-PLAN.md
+last_updated: "2026-06-04T19:04:49.749Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 42
-  completed_plans: 39
-  percent: 93
+  completed_plans: 40
+  percent: 95
 ---
 
 # Project State
@@ -25,7 +25,9 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 ## Current Position
 
-**Phase 094 — EXECUTING (2/5 plans shipped). Plan 094-02 ✅ COMPLETE 2026-06-04** (sequential on `v2.5-dev`, normal commits WITH hooks). The PANEL-08/09 substrate — the SINGLE place a dropped harness lifecycle event becomes panel state. **(1) The highest-risk task (shared SSE dispatch): 6 ADDITIVE phase branches in `api.ts`** (`phase_started`/`phase_completed`/`phase_transition`/`gate_failed`/`run_failed`/`run_completed`) as the LAST else-ifs AFTER `cap_paused`, reading the FLAT producer payload verbatim, carrying NO `return` (cursor-advance still fires). **Deep dispatch PROVABLY BYTE-IDENTICAL** (the BINDING invariant): cumulative `git diff` on api.ts = **64 insertions / 0 deletions**, 0 removed Deep dispatch lines (`delta`/`sources`/`tool_end`/`ask_user_prompt`/`done` untouched), 0 `return` in the new block (only comment mentions). **(2) Panel-only `phasesByThread: Map<threadId, Phase[]>` slice** in streamsStore.ts beside `workflowLockByThread`, defaulted EMPTY (no cache read — ephemeral, reconciled on mount; mirrors pendingAsksByThread NOT tasksByThread) + 3 action interface decls + no-op `() => {}` stubs (Pitfall 5). **(3) `onPhase*` demux defaults** in StreamsProvider's makeStreamCallbacks, each closing over the OWNING `threadId` (Pitfall 6 — a background run can't corrupt the viewed thread); 3 action bodies (`new Map(prev)` copy-then-mutate, slug-keyed; an empty-slug sentinel for `run_failed` targets the latest non-terminal phase); the `usePhases(threadId)` selector + a `reconcilePhases` adapter wrapping `getThreadWorkflow` into the Phase[] reconcile-floor skeleton (total_phases pending, current running — D-v2.5-03 floor). **PANEL-09 PROVEN**: `useThreadMessages` (the chat selector) byte-identical (zero diff on its export line, reads bucketsBySurface only); `phaseHooks.test.tsx` GREEN — **INV-1 reference-identity** (`bucketsBySurface` ref unchanged across a phase replay while `phasesByThread` populates) + **INV-5 per-thread isolation** (THREAD_A phase_started leaves THREAD_B untouched). Full provider+panel suite **107 passed / 12 todo / 0 failed** (the 12 todo = Plan-03/04-owned scaffolds). `tsc -b` = **54 baseline (0 net-new** — a transient Task-1→Task-3 wiring cascade closed); `vite build` clean. **PANEL-08 + PANEL-09 → marked complete** in REQUIREMENTS.md. The `Phase` type (DATA-CONTRACT §3b) added to types/index.ts. Commits `6f32921e` (Task 1 — Phase type + slice) + `55b3bc82` (Task 2 — additive api.ts branches + RED→test) + `01d2f909` (Task 3 — demux + bodies + usePhases). Deviations: NONE. See 094-02-SUMMARY.md (self-check PASSED). **NEXT: Wave 3 — execute 094-03 (PhaseTimeline + PhaseCard render over `usePhases`, flips INV-2/3b/4 GREEN)** ‖ Wave 2 sibling 094-04 (D-04 RC-4 backend persist) can run in parallel.
+**Phase 094 — EXECUTING (3/5 plans shipped). Plan 094-04 ✅ COMPLETE 2026-06-04** (sequential on `v2.5-dev`, normal commits WITH hooks; TDD RED→GREEN). The ONE backend touch of the phase — the **RC-4 failure-honesty fix (D-04)**: a harness run that fails now PERSISTS a real assistant failure message before returning, so a later reconcile renders **failed-with-reason** instead of a silent empty `done` card (the finding-#3 trust bug). **`_surface_failure_message(ctx, run_id, reason, pool)`** added to `harness_engine.py` next to `_surface_final_answer` — a STRICT SUBSET of the success persist (lazy-imports `insert_assistant_message` + `_strip_nul`; owner-scoped via `ctx.current_user["id"]` + `ctx.thread_id`; grounding params OMITTED=None; missing owner ids → graceful skip + warning, never crashes a failing run). Called at **BOTH** `run_workflow` failure-return sites AFTER the `run_failed` emit, BEFORE `return`: **site #1** the `fail_run` branch AND **site #2** the `skip_to_phase` missing-target runtime guard (the SECOND site the CONTEXT anchor missed — Pitfall 7; a dangling-skip failure would otherwise still render empty). Empty/missing reason persists the verbatim UI-SPEC **`_REASON_UNKNOWN_SENTINEL`** ("Failure reason not captured by the backend — surfaced explicitly so the run is never shown as an empty success.") — NEVER empty content. **Deep byte-identical:** the helper lives in `harness_engine.py`, called ONLY from the two harness-only failure branches — `_shielded_finalize` (the shared Deep+harness terminal path) is UNTOUCHED (`grep -c "_shielded_finalize"` = 5 baseline-unchanged; `_surface_final_answer` body + Deep path untouched; `git diff` = **77 insertions / 0 deletions**, purely additive). **`test_094_rc4_failure.py` flipped GREEN** (INV-3a 4/4): fail_run persists the reason · missing-skip-target persists its reason · empty reason → sentinel · AST-guard proves the helper's CODE never references `_shielded_finalize`. Full harness suite **94 passed / 1 pre-existing failure** (`test_bounded_retry` — proven pre-existing via git-stash; the documented registry-pollution bug → `deferred-items.md`; 094-04 adds ZERO net-new failures). 2 Rule-1 auto-fixes (both for the plan's OWN new test: pollution-safe `_registry` triggering `register_all()` before snapshot — fixes a cross-file clobber of `test_phase_dispatch`; AST-based `_shielded_finalize` guard replacing a docstring-false-positiving substring check). Commits `19c6aa75` (RED) + `966e11eb` (GREEN — helper + both sites) + `c4ea4c90` (chore — deferred-items). See 094-04-SUMMARY.md (self-check PASSED). **NEXT: Wave 3 — execute 094-03 (PhaseTimeline + PhaseCard render over `usePhases`, flips INV-2/3b/4 GREEN) — the last 094 implementation plan; then 094-05 (surfacing).**
+
+**Phase 094 — Plan 094-02 ✅ COMPLETE 2026-06-04** (sequential on `v2.5-dev`, normal commits WITH hooks). The PANEL-08/09 substrate — the SINGLE place a dropped harness lifecycle event becomes panel state. **(1) The highest-risk task (shared SSE dispatch): 6 ADDITIVE phase branches in `api.ts`** (`phase_started`/`phase_completed`/`phase_transition`/`gate_failed`/`run_failed`/`run_completed`) as the LAST else-ifs AFTER `cap_paused`, reading the FLAT producer payload verbatim, carrying NO `return` (cursor-advance still fires). **Deep dispatch PROVABLY BYTE-IDENTICAL** (the BINDING invariant): cumulative `git diff` on api.ts = **64 insertions / 0 deletions**, 0 removed Deep dispatch lines (`delta`/`sources`/`tool_end`/`ask_user_prompt`/`done` untouched), 0 `return` in the new block (only comment mentions). **(2) Panel-only `phasesByThread: Map<threadId, Phase[]>` slice** in streamsStore.ts beside `workflowLockByThread`, defaulted EMPTY (no cache read — ephemeral, reconciled on mount; mirrors pendingAsksByThread NOT tasksByThread) + 3 action interface decls + no-op `() => {}` stubs (Pitfall 5). **(3) `onPhase*` demux defaults** in StreamsProvider's makeStreamCallbacks, each closing over the OWNING `threadId` (Pitfall 6 — a background run can't corrupt the viewed thread); 3 action bodies (`new Map(prev)` copy-then-mutate, slug-keyed; an empty-slug sentinel for `run_failed` targets the latest non-terminal phase); the `usePhases(threadId)` selector + a `reconcilePhases` adapter wrapping `getThreadWorkflow` into the Phase[] reconcile-floor skeleton (total_phases pending, current running — D-v2.5-03 floor). **PANEL-09 PROVEN**: `useThreadMessages` (the chat selector) byte-identical (zero diff on its export line, reads bucketsBySurface only); `phaseHooks.test.tsx` GREEN — **INV-1 reference-identity** (`bucketsBySurface` ref unchanged across a phase replay while `phasesByThread` populates) + **INV-5 per-thread isolation** (THREAD_A phase_started leaves THREAD_B untouched). Full provider+panel suite **107 passed / 12 todo / 0 failed** (the 12 todo = Plan-03/04-owned scaffolds). `tsc -b` = **54 baseline (0 net-new** — a transient Task-1→Task-3 wiring cascade closed); `vite build` clean. **PANEL-08 + PANEL-09 → marked complete** in REQUIREMENTS.md. The `Phase` type (DATA-CONTRACT §3b) added to types/index.ts. Commits `6f32921e` (Task 1 — Phase type + slice) + `55b3bc82` (Task 2 — additive api.ts branches + RED→test) + `01d2f909` (Task 3 — demux + bodies + usePhases). Deviations: NONE. See 094-02-SUMMARY.md (self-check PASSED). **NEXT: Wave 3 — execute 094-03 (PhaseTimeline + PhaseCard render over `usePhases`, flips INV-2/3b/4 GREEN)** ‖ Wave 2 sibling 094-04 (D-04 RC-4 backend persist) can run in parallel.
 
 **Phase 093 ✅ CLOSED 2026-06-03 (passed_with_overrides).** The operator-run **D-21 native-7 LIVE re-UAT PASSED** (Claude Chrome-MCP + log-sink + Supabase + LangSmith): **8/8 Dimension-1 cells**; all **4 gap-closure fixes proven live** (Google `thought_signature` / Moonshot `reasoning_content` round-trips, GLM `max_steps` convergence, sub-agent model+tokens — no gpt-4o); 4-axis ✓ (incl. **no global isStreaming lockout**, 5188-char long-message); Deep-regression ✓ (eval 8/8, Anthropic twin byte-identical ×2, task() pass). **PARITY-02 → Validated.** **Overrides:** (1) Dim-3 abrupt-resume retest deferred — Windows Ctrl+C is graceful (cancels→fails the run; resume sweep had nothing stranded); resume infra pre-existing/unchanged by 093. (2) Dim-5 result-quality (kimi fabricated n=247; MiniMax finalize reviewed-not-applied) → SEED-050/096. (3) WR-01 accepted (eval task cell passed). **UI legibility findings → Phase 094** (sketch-first, G-2): draft-before-ask_user invisible (094 SC#6/Deferred#1); no live in-chat/panel steps during runs — operator-specified 094 bar = show real steps (sub-agents/searches/tool-calls/phase-transitions/merge); RC-4 failed-run-renders-empty; generated-files-not-shown-in-panel → SEED-037/038. New bug filed: `general-chat-intermittent-silent-send-drop`. Graceful-shutdown ops findings (hang-on-open-SSE; fails-in-flight-human-input-run) noted. See **093-HUMAN-UAT.md**. **NEXT = `/gsd:sketch 094`.**
 
@@ -122,7 +124,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-04
 
-Progress: [█████████░] 93%
+Progress: [██████████] 95%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -186,6 +188,7 @@ Progress: [█████████░] 93%
 | Phase 093 P093-09 | ~30min | 1 task (Task 2; Task 1 operator-resolved) | 6 files |
 | Phase 094 P01 | 5min | 3 tasks | 8 files |
 | Phase 094 P02 | 9min | 3 tasks | 5 files |
+| Phase 094 P04 | 10min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -282,6 +285,7 @@ Recent decisions affecting current work:
 - 094-02: harness lifecycle events demux into a panel-only phasesByThread slice via 6 additive byte-identical-Deep SSE branches in api.ts (64/0 diff, 0 return)
 - 094-02: PANEL-09 proven — useThreadMessages byte-identical, INV-1 reference-identity GREEN; per-thread keying proven — INV-5 isolation GREEN
 - 094-02: usePhases reconcile uses a reconcilePhases adapter wrapping getThreadWorkflow into the Phase[] reconcile-floor skeleton (total_phases pending, current running)
+- 094-04: RC-4 failure-honesty persist at BOTH run_workflow failure-return sites (fail_run + skip_to_phase runtime guard) via _surface_failure_message; empty reason → UI-SPEC reason_unknown sentinel; Deep byte-identical (_shielded_finalize untouched, 77 insertions/0 deletions)
 
 ### Pending Todos
 
@@ -367,8 +371,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-04T18:49:05.551Z
-Stopped at: Completed 094-02-PLAN.md
+Last session: 2026-06-04T19:04:49.737Z
+Stopped at: Completed 094-04-PLAN.md
 Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
