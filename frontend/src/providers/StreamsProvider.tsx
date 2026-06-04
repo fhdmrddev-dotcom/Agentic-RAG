@@ -1910,9 +1910,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => {
             const next = new Map(s.phasesByThread)
             const prev = next.get(threadId) ?? EMPTY_PHASES
-            // Idempotent append: a duplicate phase_started for a slug already
+            // Idempotent: a genuine re-emit of a phase whose REAL slug is already
             // present is a no-op (replay/reconnect safety).
             if (prev.some((p) => p.slug === phase.slug)) return {}
+            // IN-02: the reconcile floor seeds positional placeholder rows
+            // (slug === `phase-${i}`, phaseType "unknown") because the real slugs
+            // aren't known ahead of phase_started. When a live phase_started
+            // carries the REAL slug for an index that still holds its placeholder,
+            // REPLACE the skeleton row in place (by phaseIndex) instead of
+            // appending — otherwise the timeline shows both `phase-1` (pending) and
+            // `research` (running) for the same index. Forward-only counting is
+            // preserved (the placeholder was running/pending; the live row carries
+            // the true status). Any other case appends as before.
+            const placeholderIdx = prev.findIndex(
+              (p) => p.phaseIndex === phase.phaseIndex && p.slug === `phase-${p.phaseIndex}`,
+            )
+            if (placeholderIdx !== -1) {
+              next.set(
+                threadId,
+                prev.map((p, i) =>
+                  i === placeholderIdx ? { ...p, ...phase } : p,
+                ),
+              )
+              return { phasesByThread: next }
+            }
             next.set(threadId, [...prev, phase])
             return { phasesByThread: next }
           }),
