@@ -68,9 +68,11 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   done: { glyph: "✓", text: "Complete", textClass: "text-[hsl(var(--panel-status-done))]" },
   // Lightened red text on the dim fill clears 4.5:1 (UI-SPEC §A11Y contrast note).
   failed: { glyph: "✕", text: "Failed", textClass: "text-[hsl(0_80%_80%)]" },
-  // The --accent-violet token (Plan 01) — resolves now; the lightened violet for
-  // the pill LABEL clears 4.5:1 on the panel surface (UI-SPEC §Color contrast).
-  retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet" },
+  // WR-04: the pill LABEL TEXT uses the LIGHTENED --accent-violet-text (9.83:1
+  // dark / 8.52:1 light) to clear the ≥4.5:1 normal-text floor. The base
+  // --accent-violet (text-accent-violet/border-accent-violet) is graphic-level
+  // (≥3:1) and stays on the glyph + the card border below (UI-SPEC §Color).
+  retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet-text" },
   skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
 }
 

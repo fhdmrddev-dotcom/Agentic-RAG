@@ -57,6 +57,11 @@ export default {
         // mapping shape as panel-status-*; defined in index.css :root/.dark.
         // Used via text-accent-violet / border-accent-violet (Plan 03 surfaces).
         "accent-violet": "hsl(var(--accent-violet))",
+        // Phase 094 WR-04 (UI-SPEC §Color contrast) — LIGHTENED violet for the
+        // `retrying` pill LABEL TEXT (normal text ≥4.5:1). The base accent-violet
+        // is graphic-level (≥3:1) and stays for the glyph/border; this token is the
+        // text-safe shade. Used via text-accent-violet-text (PhaseCard retrying).
+        "accent-violet-text": "hsl(var(--accent-violet-text))",
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",

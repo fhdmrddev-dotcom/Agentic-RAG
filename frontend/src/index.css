@@ -67,6 +67,13 @@
        component reads it yet; Plan 03 owns the retrying/batch surfaces.
          --accent-violet : 258 80% 40% (#4514b8) → 8.52:1 on light --panel-surface (text+graphic) */
     --accent-violet: 258 80% 40%;
+    /* Phase 094 WR-04 (UI-SPEC §Color contrast) — panel-scoped lightened violet
+       for the `retrying` pill LABEL TEXT (normal text needs ≥4.5:1; the graphic
+       --accent-violet stays for the glyph/border at ≥3:1). On the LIGHT panel the
+       dark violet 258 80% 40% (#4514b8) already clears 8.52:1 as text, so light
+       reuses that value.
+         --accent-violet-text : 258 80% 40% (#4514b8) → 8.52:1 on light --panel-surface (text) */
+    --accent-violet-text: 258 80% 40%;
 
     font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
   }
@@ -137,6 +144,12 @@
        --panel-surface (meets ≥3:1); pill LABEL text uses lightened 258 95% 84%
        (#c5b0fd) → 9.83:1. No component reads it yet (Plan 03 owns the surfaces). */
     --accent-violet: 258 90% 66%;
+    /* Phase 094 WR-04 (UI-SPEC §Color contrast) — the LIGHTENED violet for the
+       `retrying` pill LABEL TEXT on dark. The base --accent-violet (66% L) is only
+       4.35:1 (graphic floor) so it FAILS the ≥4.5:1 normal-text floor; this token
+       is the lightened value the UI-SPEC prescribes for the "Attempt N" label.
+         --accent-violet-text : 258 95% 84% (#c5b0fd) → 9.83:1 on dark --panel-surface (text) */
+    --accent-violet-text: 258 95% 84%;
   }
 }
 
