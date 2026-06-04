@@ -116,6 +116,13 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   //    A stale/regressing live event can momentarily lower activeIdx; we clamp the
   //    rendered counter to its running maximum (reconcile is the floor). ──
   const counterFloorRef = useRef<number>(0)
+  // WR-02 (PANEL-09): the component instance (and this render-local ref) persists
+  // across thread switches — it has no key={threadId}. Reset the floor when the
+  // thread changes so a previous Harness thread's "Phase 5 / 5" high-water mark
+  // can't bleed into the next thread (mirrors the `frame` reset effect above).
+  useEffect(() => {
+    counterFloorRef.current = 0
+  }, [threadId])
   const displayedCurrent = Math.max(counterFloorRef.current, counterCurrent)
   if (displayedCurrent > counterFloorRef.current) counterFloorRef.current = displayedCurrent
 
