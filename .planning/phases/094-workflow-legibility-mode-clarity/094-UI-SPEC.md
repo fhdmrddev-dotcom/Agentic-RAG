@@ -1,7 +1,7 @@
 ---
 phase: 094
 slug: workflow-legibility-mode-clarity
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "style=default · baseColor=slate · cssVariables=true · iconLibrary=lucide (existing app — frontend/components.json)"
 created: 2026-06-04
@@ -316,11 +316,11 @@ Documented as deferred — NO contract rows are written for these in 094:
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS (FLAG — label 0.82rem vs body 0.9rem only 0.08rem apart; non-blocking)
+- [x] Dimension 5 Spacing: PASS (FLAG — 12/20/40px valid 4-grid multiples outside canonical set; non-blocking)
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-06-04 (gsd-ui-checker — re-verify after revision 1; prior Dim-3 BLOCK resolved, 2 non-blocking FLAGs accepted)
