@@ -43,9 +43,18 @@ interface Props {
   // Phase 092 (MODE-01/02 — D-01/D-02/D-03/D-05) — dual-mode toggle + picker.
   // ───────────────────────────────────────────────────────────────────────────
   /** "deep" = the existing General/Explorer agent loop; "harness" reveals the
-   *  workflow picker. Undefined = the toggle is hidden (back-compat). */
+   *  workflow picker. Undefined = the toggle is hidden (back-compat). This is the
+   *  LAUNCH-toggle state (the user's intent for the NEXT kickoff) — it drives the
+   *  dropdown selection + the kickoff staging, NOT the displayed badge label. */
   workflowMode?: "deep" | "harness"
   onWorkflowModeChange?: (mode: "deep" | "harness") => void
+  /** Phase 094 (D-02 — server truth): the DISPLAYED mode-pill label. Derived by
+   *  the parent from `workflowLocked` (reconciled from `active_workflow_run_id`),
+   *  NOT from the stale `workflowMode` launch toggle — this kills finding #5 (a
+   *  running Harness workflow mislabeled "Deep"). Defaults to `workflowMode` when
+   *  absent (back-compat). The dropdown items + kickoff staging keep reading
+   *  `workflowMode`; only the badge TEXT reads this. */
+  displayedMode?: "deep" | "harness"
   /** Published workflows the Harness picker lists (D-01). */
   publishedWorkflows?: WorkflowOption[]
   /** The staged workflow id — sent as workflow_definition_id on the next send (D-02). */
@@ -82,11 +91,15 @@ export function MessageInput({
   onClearPrefill,
   workflowMode = "deep",
   onWorkflowModeChange,
+  displayedMode,
   publishedWorkflows = [],
   selectedWorkflowId,
   onWorkflowSelect,
   workflowLocked = false,
 }: Props) {
+  // Phase 094 (D-02): the DISPLAYED badge reads server truth. Back-compat: when
+  // the parent passes no `displayedMode`, fall back to the launch toggle.
+  const labelMode = displayedMode ?? workflowMode
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -345,7 +358,10 @@ export function MessageInput({
                       data-testid="workflow-mode-selector"
                     >
                       <Workflow className="h-3 w-3 shrink-0" />
-                      <span>{workflowMode === "harness" ? "Harness" : "Deep"}</span>
+                      {/* Phase 094 (D-02): displayed label = server truth
+                          (labelMode), NOT the stale workflowMode launch toggle.
+                          The dropdown items below keep reading workflowMode. */}
+                      <span>{labelMode === "harness" ? "Harness" : "Deep"}</span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                     </button>
                   </DropdownMenuTrigger>

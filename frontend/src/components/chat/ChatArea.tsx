@@ -371,6 +371,13 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onClearPrefill={onClearPrefill}
       workflowMode={workflowMode}
       onWorkflowModeChange={setWorkflowMode}
+      // Phase 094 (D-02 — server truth): the DISPLAYED mode badge derives from
+      // workflowLocked (reconciled from active_workflow_run_id at :161-167),
+      // never the stale launch-toggle useState. A running Harness workflow shows
+      // "Harness" regardless of what the local toggle was set to — kills
+      // finding #5. The launch toggle (workflowMode) still drives the dropdown
+      // selection + the :307 kickoff staging, unchanged.
+      displayedMode={workflowLocked ? "harness" : "deep"}
       publishedWorkflows={publishedWorkflows}
       selectedWorkflowId={selectedWorkflowId}
       onWorkflowSelect={setSelectedWorkflowId}
