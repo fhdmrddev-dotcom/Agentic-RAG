@@ -40,8 +40,10 @@ import type { TaskRunIndexItem } from "@/types"
 function cleanDescription(description: string | undefined): string {
   if (!description) return "Sub-task"
   // Drop a leading "Overall topic: …\n" / "Sub-question: " style prefix when one
-  // is present; otherwise return the description as-is.
-  const subQuestionMatch = description.match(/sub[-\s]?question\s*[:\-]\s*(.+)/is)
+  // is present; otherwise return the description as-is. IN-06: capture only the
+  // FIRST line (no `s`/dotAll flag) so a multi-line description like
+  // "Sub-question: A\nOverall topic: B" captures just "A", not the whole tail.
+  const subQuestionMatch = description.match(/sub[-\s]?question\s*[:\-]\s*(.+)/i)
   if (subQuestionMatch) return subQuestionMatch[1].trim()
   return description.trim()
 }
