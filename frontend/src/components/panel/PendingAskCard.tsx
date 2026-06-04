@@ -235,7 +235,10 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
         <p className="text-sm leading-relaxed text-foreground" id={labelId}>
           {prompt}
         </p>
-        <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]" aria-live="polite">
+        {/* IN-05: the card root is already role="status" (a polite live region),
+            so this inner line must NOT also carry aria-live — a nested polite
+            region inside role="status" can double-announce. The root announces. */}
+        <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]">
           No response within {formatClock(timeout_seconds)} — agent stopped
         </p>
       </div>
