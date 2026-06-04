@@ -350,6 +350,76 @@ async def _surface_final_answer(ctx, run_id: UUID, stream_run_id, redis, pool) -
         return None
 
 
+# ── D-04 / RC-4: persist a real failure message before a harness failure return ──
+# The reason_unknown sentinel — verbatim from the 094 UI-SPEC Copywriting Contract.
+# When the engine has no reason string, we persist THIS (never empty content) so a
+# failed run is never rendered as an empty "done" card (the RC-4 trust bug).
+_REASON_UNKNOWN_SENTINEL = (
+    "Failure reason not captured by the backend — surfaced explicitly so the "
+    "run is never shown as an empty success."
+)
+
+
+async def _surface_failure_message(ctx, run_id: UUID, reason, pool) -> str | None:
+    """Persist a real assistant FAILURE message before a harness failure return (RC-4).
+
+    A strict SUBSET of ``_surface_final_answer``'s durable persist block: the
+    success path persists the answer (with grounding); this persists the failure
+    REASON as plain prose (no grounding — a failure has none). Called from BOTH of
+    ``run_workflow``'s harness-only failure-return sites (the ``fail_run`` branch
+    AND the ``skip_to_phase`` runtime guard) AFTER the ``run_failed`` emit and
+    BEFORE the ``return`` — so a later reconcile reads a terminal run WITH a real
+    ``messages`` row and renders failed-with-reason instead of a silent empty
+    ``done`` (finding #3 / D-04).
+
+    ⚠️ Deep byte-identical guard (Pitfall 2): this helper lives INSIDE
+    ``harness_engine.py`` and is called ONLY from the two harness-only failure
+    branches. It MUST NOT live in (or route through) the shared Deep+harness
+    terminal path (the agent-runner's shielded finalize closure) — Deep never
+    reaches this code.
+
+    Owner-scoped (T-094-04-02): writes for the run's OWN owner via
+    ``ctx.current_user["id"]`` + ``ctx.thread_id``, identical to the proven
+    ``_surface_final_answer`` success path — no cross-user write, no new IDOR.
+
+    ``reason_unknown`` fallback (T-094-04-04): an empty / missing reason persists
+    the explicit ``_REASON_UNKNOWN_SENTINEL`` — NEVER empty content.
+
+    Returns the inserted ``messages`` id (str) or ``None`` (missing owner ids /
+    persist failure — a failing run must never crash inside this best-effort
+    persist).
+    """
+    _thread_id = getattr(ctx, "thread_id", None)
+    _user_id = ((getattr(ctx, "current_user", None) or {}).get("id"))
+    if not _thread_id or not _user_id:
+        # Never crash a failing run; the run_failed emit already fired.
+        logger.warning(
+            "harness failure surfacing: missing thread_id/user_id on ctx for run %s "
+            "(run_failed emitted but failure message not persisted)", run_id,
+        )
+        return None
+
+    # Lazy-import (keeps the harness-package import cycle broken — mirrors the
+    # success path) and _strip_nul the content; the reason_unknown sentinel is the
+    # load-bearing fallback that proves a failure is never shown as an empty success.
+    from app.db.runs import insert_assistant_message
+    from app.services.agent_loop import _strip_nul
+
+    content = _strip_nul(reason or _REASON_UNKNOWN_SENTINEL)
+    try:
+        # Grounding params OMITTED (None) — a strict subset of the success persist.
+        _inserted_id = await insert_assistant_message(
+            pool,
+            thread_id=UUID(_thread_id) if isinstance(_thread_id, str) else _thread_id,
+            user_id=UUID(_user_id) if isinstance(_user_id, str) else _user_id,
+            content=content,
+        )
+        return str(_inserted_id) if _inserted_id else None
+    except Exception as e:
+        logger.error("Failed to persist harness failure message: %s", e)
+        return None
+
+
 async def _execute_phase(phase, accumulated_outputs: dict, ctx) -> dict:
     """Dispatch a phase to its executor via the registry SEAM (Plan 03 fills it)."""
     phase_type = phase.config.phase_type
@@ -706,6 +776,9 @@ async def run_workflow(
                 event_type="run_failed", metadata={"reason": outcome.reason},
             )
             await _emit(redis, stream_run_id, "run_failed", reason=outcome.reason)
+            # RC-4 (D-04): persist a real failure message BEFORE returning, so a
+            # reconcile renders failed-with-reason — not a silent empty `done`.
+            await _surface_failure_message(ctx, run_id, outcome.reason, pool)
             return  # stop — no further phases
 
         # ── skip_to_phase: mark this phase skipped, jump the cursor (D-09) ──────
@@ -732,6 +805,10 @@ async def run_workflow(
                     event_type="run_failed", metadata={"reason": reason},
                 )
                 await _emit(redis, stream_run_id, "run_failed", reason=reason)
+                # RC-4 (D-04): the SECOND failure-return site — the missing-skip-
+                # target guard must persist its failure reason too, else a dangling
+                # skip still renders as an empty `done` (Pitfall 7 / both sites).
+                await _surface_failure_message(ctx, run_id, reason, pool)
                 return
             i = target_i
             continue

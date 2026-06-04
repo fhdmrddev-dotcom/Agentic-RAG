@@ -50,7 +50,15 @@ SENTINEL = (
 
 @contextmanager
 def _registry(**executors):
-    """Temporarily install stub executors into the engine PHASE_TYPE_REGISTRY."""
+    """Temporarily install stub executors into the engine PHASE_TYPE_REGISTRY.
+
+    Pollution-safe: ``import app.services.harness`` (idempotent — module-cached)
+    triggers ``register_all()`` so the 5 REAL executors are present BEFORE we
+    snapshot. Restoring the snapshot on exit therefore puts the real executors
+    back — a later ``test_phase_dispatch_routes_each_of_5_types`` (which asserts
+    the registry holds exactly the 5 real types) is not clobbered by this test.
+    """
+    import app.services.harness  # noqa: F401 — ensure register_all() ran first
     import app.services.harness_engine as eng
 
     saved = dict(eng.PHASE_TYPE_REGISTRY)
@@ -274,6 +282,36 @@ async def test_rc4_helper_does_not_touch_shielded_finalize(
     # (a) run_workflow persisted the failure itself (one row) — no shared finalize.
     assert len(_message_contents(mock_asyncpg_pool)) == 1
 
-    # (b) The helper's own source never reaches the shared terminal path.
-    src = inspect.getsource(eng._surface_failure_message)
-    assert "_shielded_finalize" not in src
+    # (b) The helper's CODE never references the shared terminal path. We AST-parse
+    #     the helper, drop the docstring node (which legitimately NAMES
+    #     _shielded_finalize in its guard note), and assert NO executable
+    #     Name/Attribute node references it (a call/route would show up as one).
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(eng._surface_failure_message)))
+    fn = tree.body[0]
+    # Strip the leading docstring statement so its prose doesn't count as code.
+    if (
+        fn.body
+        and isinstance(fn.body[0], ast.Expr)
+        and isinstance(getattr(fn.body[0], "value", None), ast.Constant)
+        and isinstance(fn.body[0].value.value, str)
+    ):
+        code_nodes = fn.body[1:]
+    else:
+        code_nodes = fn.body
+    referenced = {
+        n.id
+        for stmt in code_nodes
+        for n in ast.walk(stmt)
+        if isinstance(n, ast.Name)
+    } | {
+        n.attr
+        for stmt in code_nodes
+        for n in ast.walk(stmt)
+        if isinstance(n, ast.Attribute)
+    }
+    assert "_shielded_finalize" not in referenced, (
+        "the helper's code must not call/route through the shared _shielded_finalize"
+    )
