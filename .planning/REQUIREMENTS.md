@@ -36,8 +36,10 @@
 
 ### Panel — Phase Timeline
 
-- [ ] **PANEL-08**: The workspace panel shows a **live phase timeline** (current / locked / completed glyphs, gate pass/fail badges, transition log) that auto-opens on entering Harness Mode and reconciles via fetch on mount.
-- [ ] **PANEL-09**: Workflow phase events ride the existing `run:{run_id}` stream and demux into a dedicated `phasesByThread` store — panel phase updates trigger **zero chat message-list re-renders** (PANEL-06 isolation preserved).
+- [x] **PANEL-08
+**: The workspace panel shows a **live phase timeline** (current / locked / completed glyphs, gate pass/fail badges, transition log) that auto-opens on entering Harness Mode and reconciles via fetch on mount.
+- [x] **PANEL-09
+**: Workflow phase events ride the existing `run:{run_id}` stream and demux into a dedicated `phasesByThread` store — panel phase updates trigger **zero chat message-list re-renders** (PANEL-06 isolation preserved).
 
 ### Accessibility
 
