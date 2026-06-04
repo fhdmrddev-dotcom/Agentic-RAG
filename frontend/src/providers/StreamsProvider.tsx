@@ -1943,19 +1943,31 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             const prev = next.get(threadId) ?? EMPTY_PHASES
             if (prev.length === 0) return {}
             // An empty slug is the "active phase" sentinel (onRunFailed): target
-            // the LAST non-terminal (running/retrying/pending) row — the phase
-            // that was live when the run died. Otherwise match by slug.
+            // the phase that was live when the run died. Otherwise match by slug.
             let targetIdx = -1
             if (slug === "") {
+              // IN-01: prefer a GENUINELY-ACTIVE row (running/retrying) — the phase
+              // actually executing when the run died. A trailing `pending` skeleton
+              // row (seeded positionally by the reconcile floor) must NOT be
+              // preferentially marked failed when an earlier phase actually failed.
               for (let i = prev.length - 1; i >= 0; i--) {
                 const st = prev[i].status
-                if (st === "running" || st === "retrying" || st === "pending") {
+                if (st === "running" || st === "retrying") {
                   targetIdx = i
                   break
                 }
               }
-              // No live row (all terminal) → mark the last row, so a failure is
-              // never silently dropped.
+              // No active row → fall back to the last `pending` (a run that died
+              // before its first phase went live), then to the last row, so a
+              // failure is never silently dropped.
+              if (targetIdx === -1) {
+                for (let i = prev.length - 1; i >= 0; i--) {
+                  if (prev[i].status === "pending") {
+                    targetIdx = i
+                    break
+                  }
+                }
+              }
               if (targetIdx === -1) targetIdx = prev.length - 1
             } else {
               targetIdx = prev.findIndex((p) => p.slug === slug)
