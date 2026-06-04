@@ -64,6 +64,7 @@ import type {
   WorkspaceFile,
   PendingAsk,
   TaskRunIndexItem,
+  Phase,
 } from "@/types"
 import {
   getMessages,
@@ -109,6 +110,10 @@ const EMPTY_TODOS: Todo[] = []
 const EMPTY_FILES: WorkspaceFile[] = []
 const EMPTY_ASKS: PendingAsk[] = []
 const EMPTY_TASKS: TaskRunIndexItem[] = []
+// Phase 094 Plan 02 (PANEL-08/09) — stable EMPTY ref for the panel-only phase
+// timeline hook. A per-thread Map miss (or null threadId) returns this SAME
+// reference so useSyncExternalStore skips re-render (PANEL-09 structural).
+const EMPTY_PHASES: Phase[] = []
 
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
@@ -718,6 +723,55 @@ export function makeStreamCallbacks(opts: {
         capPaused: true,
         continuesRemaining: info.continuesRemaining,
       }),
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle demux.
+    // Each closes over the factory's `threadId` (the OWNING thread, Pitfall 6),
+    // so a background harness run's phase events can NEVER corrupt the viewed
+    // thread's timeline. They write phasesByThread ONLY — never bucketsBySurface
+    // (PANEL-09: the chat selector useThreadMessages reads bucketsBySurface
+    // exclusively → zero chat re-renders). Provider-agnostic (honest producer
+    // events, no provider branching).
+    // ────────────────────────────────────────────────────────────────────────
+    onPhaseStarted: (p) =>
+      useStreamsStore.getState().actions.appendPhaseForThread(threadId, {
+        slug: p.phase,
+        phaseIndex: p.phaseIndex,
+        phaseType: p.phaseType,
+        status: "running",
+        subAgents: [],
+        pendingAsk: null,
+      }),
+    onPhaseCompleted: (phase) =>
+      useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, phase, "done"),
+    onPhaseTransition: (from, _to, via) => {
+      // A skip_to_phase routing marks the FROM phase skipped (it was bypassed by
+      // a gate's on_failure='skip_to_phase'). A normal advance is a no-op on
+      // status (the from-phase already flipped to done via phase_completed).
+      if (via === "skip_to_phase")
+        useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, from, "skipped")
+    },
+    onGateFailed: (g) =>
+      // Non-terminal gate failure → the phase is retrying (the engine will
+      // re-attempt). A TERMINAL gate failure is followed by run_failed, which
+      // flips the active phase to failed below — so retrying here is correct for
+      // every attempt; run_failed overrides on exhaustion.
+      useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, g.phase, "retrying", {
+        attempt: g.attempt,
+        error: g.error,
+      }),
+    onRunFailed: (reason) =>
+      // Mark the latest RUNNING/RETRYING phase failed (the one that was active
+      // when the run died), carrying the reason. The store body resolves "the
+      // active phase" by scanning for the last non-terminal row.
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, "", "failed", { error: reason }),
+    onRunCompleted: () => {
+      // No-op on phase status: the final phase already flipped to done via
+      // phase_completed. The run-level completion is surfaced elsewhere (the
+      // grounding union / receipt). Kept as an explicit handler so the wire
+      // event is consumed, not dropped.
+    },
   }
 }
 
@@ -1847,6 +1901,57 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => ({
             workflowLockByThread: _clearWorkflowLock(s.workflowLockByThread, threadId),
           })),
+        // --- Phase 094 (PANEL-08/09): panel-only phase-timeline mutators ---
+        // Copy-then-mutate the phasesByThread Map (new Map → set), keyed strictly
+        // by the passed (OWNING) threadId. NEVER touch bucketsBySurface — the
+        // chat selector useThreadMessages reads bucketsBySurface only, so a phase
+        // mutation re-renders the panel timeline but NOT the chat (PANEL-09).
+        appendPhaseForThread: (threadId, phase) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            // Idempotent append: a duplicate phase_started for a slug already
+            // present is a no-op (replay/reconnect safety).
+            if (prev.some((p) => p.slug === phase.slug)) return {}
+            next.set(threadId, [...prev, phase])
+            return { phasesByThread: next }
+          }),
+        setPhaseStatusForThread: (threadId, slug, status, patch) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            if (prev.length === 0) return {}
+            // An empty slug is the "active phase" sentinel (onRunFailed): target
+            // the LAST non-terminal (running/retrying/pending) row — the phase
+            // that was live when the run died. Otherwise match by slug.
+            let targetIdx = -1
+            if (slug === "") {
+              for (let i = prev.length - 1; i >= 0; i--) {
+                const st = prev[i].status
+                if (st === "running" || st === "retrying" || st === "pending") {
+                  targetIdx = i
+                  break
+                }
+              }
+              // No live row (all terminal) → mark the last row, so a failure is
+              // never silently dropped.
+              if (targetIdx === -1) targetIdx = prev.length - 1
+            } else {
+              targetIdx = prev.findIndex((p) => p.slug === slug)
+            }
+            if (targetIdx === -1) return {}
+            next.set(
+              threadId,
+              prev.map((p, i) => (i === targetIdx ? { ...p, ...patch, status } : p)),
+            )
+            return { phasesByThread: next }
+          }),
+        replacePhasesForThread: (threadId, phases) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            next.set(threadId, phases)
+            return { phasesByThread: next }
+          }),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
@@ -2063,6 +2168,60 @@ export function useTasks(threadId: string | null): {
     threadId,
     hookId: "tasks",
     fetcher: getThreadTasks,
+    replace,
+  })
+  return { data, isLoading, error, reconcile }
+}
+
+/**
+ * Phase 094 Plan 02 (PANEL-08 / PANEL-09) — the panel-only harness phase
+ * timeline hook. Mirrors useTasks: a thin null-safe phasesByThread selector +
+ * usePanelReconcile for the mount reconcile floor.
+ *
+ * RECONCILE FLOOR (DATA-CONTRACT §3c / D-v2.5-03): the reconcile fetcher wraps
+ * `getThreadWorkflow` (the authoritative ThreadWorkflowState — total_phases +
+ * current_phase_index, the honest "Phase i / N" counter) and derives a Phase[]
+ * SKELETON: total_phases rows, all pending, the current one running. On mount,
+ * a reconnect mid-run shows "Phase 3 / 5, running" from durable DB state BEFORE
+ * any live event arrives. LIVE events then advance phasesByThread forward; live
+ * NEVER moves the counter backward (the reconcile is the floor). The fetcher is
+ * a no-op (returns []) when the thread is Deep / has no run, so the skeleton
+ * only appears for an actual harness run.
+ */
+async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
+  const wf = await getThreadWorkflow(threadId, signal)
+  if (wf.mode !== "harness" || wf.lock_is_stale) return []
+  const total = wf.total_phases ?? 0
+  if (total <= 0) return []
+  const current = wf.current_phase_index ?? 0
+  // Derive a skeleton: total pending rows, the current one running. Slugs are
+  // unknown ahead of live phase_started (only current_phase_slug is known), so
+  // non-current rows carry positional placeholder slugs the live events replace.
+  return Array.from({ length: total }, (_, i): Phase => ({
+    slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
+    phaseIndex: i,
+    phaseType: "unknown",
+    status: i < current ? "done" : i === current ? "running" : "pending",
+    subAgents: [],
+    pendingAsk: null,
+  }))
+}
+
+export function usePhases(threadId: string | null): {
+  data: Phase[]
+  isLoading: boolean
+  error: Error | null
+  reconcile: () => Promise<void>
+} {
+  const data = useStreamsStore((s) =>
+    threadId ? (s.phasesByThread.get(threadId) ?? EMPTY_PHASES) : EMPTY_PHASES,
+  )
+  const replace = useStreamsStore((s) => s.actions.replacePhasesForThread)
+  const { isLoading, error, reconcile } = usePanelReconcile<Phase>({
+    threadId,
+    hookId: "phases",
+    // fetcher: getThreadWorkflow wrapped to derive the Phase[] reconcile floor.
+    fetcher: reconcilePhases,
     replace,
   })
   return { data, isLoading, error, reconcile }
