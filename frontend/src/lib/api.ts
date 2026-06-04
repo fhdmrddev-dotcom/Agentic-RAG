@@ -342,6 +342,33 @@ export interface StreamCallbacks {
   /** sub_agent_done TASK variant (has sub_run_id) — distinct from the legacy
    *  analyze_document onSubAgentDone no-arg path. */
   onTaskDone?: (subRunId: string, status: string, summary: string) => void
+  // ──────────────────────────────────────────────────────────────────────────
+  // Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle SSE
+  // callbacks. The 6 new event types (phase_started / phase_completed /
+  // phase_transition / gate_failed / run_failed / run_completed) are
+  // wire-emitted by harness_engine.py (FLAT fields, verified) but DROPPED today
+  // (api.ts had ZERO phase branches). They demux to these panel-only callbacks
+  // → a new phasesByThread store slice. ADDITIVE ONLY: the dispatch branches sit
+  // AFTER the Deep switch (cap_paused) and carry NO `return` (cursor-advance
+  // still fires), so every Deep branch stays byte-identical. Provider-agnostic
+  // (honest producer events; no provider branching). Mirror the onCapPaused
+  // typed-object shape.
+  // ──────────────────────────────────────────────────────────────────────────
+  /** phase_started SSE — a phase begins (FLAT phase/phase_index/phase_type). */
+  onPhaseStarted?: (p: { phase: string; phaseIndex: number; phaseType: string }) => void
+  /** phase_completed SSE — a phase finished (FLAT phase/phase_index). */
+  onPhaseCompleted?: (phase: string, phaseIndex: number) => void
+  /** phase_transition SSE — moved between phases (FLAT from_phase/to_phase/via;
+   *  via==="skip_to_phase" marks the from-phase skipped). */
+  onPhaseTransition?: (from: string, to: string, via: string) => void
+  /** gate_failed SSE — a validation gate failed (FLAT phase/attempt/error). A
+   *  non-terminal attempt → retrying; a terminal one precedes run_failed. */
+  onGateFailed?: (g: { phase: string; attempt: number; error: string }) => void
+  /** run_failed SSE — the run failed (FLAT reason; may be empty → reason_unknown). */
+  onRunFailed?: (reason?: string) => void
+  /** run_completed SSE — the run finished (FLAT status; the done phase already
+   *  flipped via phase_completed — no-op on phase status). */
+  onRunCompleted?: (status?: string) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -665,6 +692,43 @@ export async function subscribeToRun(
             continuesRemaining: (parsed.continues_remaining ?? 0) as number,
           })
         }
+        // ──────────────────────────────────────────────────────────────────
+        // Phase 094 Plan 02 (PANEL-08/09) — additive harness phase-lifecycle
+        // branches. These are the LAST else-if branches of the switch, AFTER
+        // cap_paused and BEFORE the cursor-advance block (676-679). They read
+        // the FLAT producer payload verbatim (harness_engine.py: phase /
+        // phase_index / phase_type / attempt / error / reason / from_phase /
+        // to_phase / via / status) and carry NO `return` — so the cursor-advance
+        // still fires, exactly like todo_updated / cap_paused. The Deep dispatch
+        // above (delta / reasoning_delta / tool_* / sub_agent_* / code_* /
+        // sources / citations / confidence / ask_user_* / the terminal sentinels
+        // / planning / iteration_start / fallback_model / cap_paused) is
+        // BYTE-IDENTICAL — none of these new branches touches it. Panel-only,
+        // provider-agnostic.
+        else if (t === "phase_started" && callbacks.onPhaseStarted)
+          callbacks.onPhaseStarted({
+            phase: parsed.phase as string,
+            phaseIndex: parsed.phase_index as number,
+            phaseType: parsed.phase_type as string,
+          })
+        else if (t === "phase_completed" && callbacks.onPhaseCompleted)
+          callbacks.onPhaseCompleted(parsed.phase as string, parsed.phase_index as number)
+        else if (t === "phase_transition" && callbacks.onPhaseTransition)
+          callbacks.onPhaseTransition(
+            parsed.from_phase as string,
+            parsed.to_phase as string,
+            parsed.via as string,
+          )
+        else if (t === "gate_failed" && callbacks.onGateFailed)
+          callbacks.onGateFailed({
+            phase: parsed.phase as string,
+            attempt: parsed.attempt as number,
+            error: parsed.error as string,
+          })
+        else if (t === "run_failed" && callbacks.onRunFailed)
+          callbacks.onRunFailed(parsed.reason as string | undefined)
+        else if (t === "run_completed" && callbacks.onRunCompleted)
+          callbacks.onRunCompleted(parsed.status as string | undefined)
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
         // type-specific callback so the consumer's lastSeenOffsetRef only
