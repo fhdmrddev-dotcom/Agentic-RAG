@@ -36,6 +36,8 @@ import {
   useWorkspaceFiles,
   useAskUserPrompt,
   useViewingThread,
+  usePhases,
+  useWorkflowLockForThread,
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -46,6 +48,7 @@ import { TodosSection } from "./TodosSection"
 import { FilesSection } from "./FilesSection"
 import { VersionDiff } from "./VersionDiff"
 import { PendingAskStack } from "./PendingAskCard"
+import { PhaseTimeline } from "./PhaseTimeline"
 
 export type PanelState = "open" | "rail"
 
@@ -85,6 +88,13 @@ export function WorkspacePanel({
   const { data: todos } = useTodos(threadId)
   const { data: files } = useWorkspaceFiles(threadId)
   const { data: pendingAsks } = useAskUserPrompt(threadId)
+  // Phase 094 (PANEL-08): the harness phase-timeline slice + the server-truth
+  // workflow lock (presence ⇒ harness mode). The Workflow section mounts when
+  // mode==="harness" OR phases exist (DATA-CONTRACT §6), else PanelEmpty.
+  const { data: phases } = usePhases(threadId)
+  const workflowLock = useWorkflowLockForThread(threadId)
+  const isHarness = workflowLock != null
+  const showTimeline = isHarness || phases.length > 0
 
   const isMobile = useIsMobile()
 
@@ -93,7 +103,7 @@ export function WorkspacePanel({
   const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null)
 
   const hasActivity =
-    todos.length > 0 || files.length > 0 || pendingAsks.length > 0
+    todos.length > 0 || files.length > 0 || pendingAsks.length > 0 || phases.length > 0
 
   const todosDone = useMemo(
     () => todos.filter((t) => t.status === "completed").length,
@@ -132,6 +142,15 @@ export function WorkspacePanel({
               </p>
             )}
           </PanelSection>
+
+          {/* Phase 094 (PANEL-08): the harness phase-timeline — the 5th section,
+              mounted only for a harness run (server-truth lock) OR when phases
+              exist. Deep / no-run threads never see it (reuses PanelEmpty above). */}
+          {showTimeline && (
+            <PanelSection title="Workflow" count={phases.length || undefined}>
+              <PhaseTimeline threadId={threadId} />
+            </PanelSection>
+          )}
         </>
       )}
     </div>

@@ -21,6 +21,7 @@ import {
 import type { Folder, Message, Thread } from "@/types"
 import { Folder as FolderIcon, Loader2, Menu, Sparkles } from "lucide-react"
 import { toolLabel } from "@/lib/toolMeta"
+import { requestOpenPanel } from "@/components/panel/panelOpenSignal"
 
 interface Provider {
   id: string
@@ -305,6 +306,14 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // a workflow only starts once per pick.
     const kickoffWorkflowId =
       workflowMode === "harness" && selectedWorkflowId ? selectedWorkflowId : undefined
+    if (kickoffWorkflowId) {
+      // Phase 094 (PANEL-08): entering Harness Mode auto-opens the workspace
+      // panel to the phase timeline (the ChatLayout expand seam is already
+      // subscribed via subscribeOpenPanel). Fire ONLY on the harness branch —
+      // a Deep send must NOT force the panel open. Scoped to the panel-open
+      // seam so Plan 05's mode-label edit on this file layers cleanly.
+      requestOpenPanel()
+    }
     await sendMessage(
       activeThread.id,
       content,

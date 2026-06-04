@@ -24,18 +24,33 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
-import type { Todo, WorkspaceFile, PendingAsk } from "@/types"
+import type { Todo, WorkspaceFile, PendingAsk, Phase } from "@/types"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
 const useTodos = vi.fn()
 const useWorkspaceFiles = vi.fn()
 const useAskUserPrompt = vi.fn()
 const useViewingThread = vi.fn()
+// Phase 094 (PANEL-08): WorkspacePanel now also reads usePhases + the workflow
+// lock to gate the Workflow timeline section. Default to no harness activity
+// (empty phases, null lock) so the existing Todos/Files/Versions assertions are
+// unaffected; a dedicated test sets them to exercise the timeline mount.
+const usePhases = vi.fn()
+const useWorkflowLockForThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
+  usePhases: (...a: unknown[]) => usePhases(...a),
+  useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
+}))
+
+// Stub the heavy timeline child (it reads the real provider hooks); the panel
+// only mounts it when a harness run is active. A test that exercises the mount
+// asserts on this stub's presence.
+vi.mock("@/components/panel/PhaseTimeline", () => ({
+  PhaseTimeline: () => <div data-testid="phase-timeline">timeline</div>,
 }))
 
 vi.mock("@/components/panel/TodosSection", () => ({
@@ -67,11 +82,22 @@ function setHooks({
   files = mockWorkspaceFiles,
   asks = [] as PendingAsk[],
   viewing = "thread-1" as string | null,
-}: { todos?: Todo[]; files?: WorkspaceFile[]; asks?: PendingAsk[]; viewing?: string | null }) {
+  phases = [] as Phase[],
+  lock = null as { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null,
+}: {
+  todos?: Todo[]
+  files?: WorkspaceFile[]
+  asks?: PendingAsk[]
+  viewing?: string | null
+  phases?: Phase[]
+  lock?: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
+}) {
   useTodos.mockReturnValue({ data: todos, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkspaceFiles.mockReturnValue({ data: files, isLoading: false, error: null, reconcile: vi.fn() })
   useAskUserPrompt.mockReturnValue({ data: asks, isLoading: false, error: null, reconcile: vi.fn() })
   useViewingThread.mockReturnValue(viewing)
+  usePhases.mockReturnValue({ data: phases, isLoading: false, error: null, reconcile: vi.fn() })
+  useWorkflowLockForThread.mockReturnValue(lock)
 }
 
 function setViewport(width: number) {
@@ -216,6 +242,33 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(useTodos).toHaveBeenCalledWith("thread-1")
     expect(useWorkspaceFiles).toHaveBeenCalledWith("thread-1")
     expect(useAskUserPrompt).toHaveBeenCalledWith("thread-1")
+  })
+
+  // Phase 094 (PANEL-08) — the Workflow timeline section mounts only for a harness
+  // run (server-truth lock) OR when phases exist; a Deep / no-run thread never
+  // sees it (the empty short-circuit / PanelEmpty stays the calm default).
+  it("mounts the Workflow timeline section when a harness run holds the lock", () => {
+    setHooks({
+      lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("mounts the Workflow timeline section when phases exist even without a lock", () => {
+    setHooks({
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "running", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("does NOT mount the Workflow timeline for a Deep / no-run thread", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
   })
 
   // Phase 088-01 (D-13a) — structural a11y regression gate on the panel
