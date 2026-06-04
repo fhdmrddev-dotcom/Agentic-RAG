@@ -369,14 +369,14 @@ if _thread_id and _user_id:
 
 **Note:** A1–A3 are LOW-risk verification items for the planner, not unverified decisions. All load-bearing claims (the missing SSE branches, the two failure-return sites, the token absence, the selector boundary, the reconcile shape, `PendingAsk.draft`) were VERIFIED against live code this session.
 
-## Open Questions
+## Open Questions (RESOLVED — pinned at plan time against live code)
 
-1. **PANEL-08 auto-open trigger location.**
+1. **PANEL-08 auto-open trigger location.** → **RESOLVED:** `ChatLayout.tsx:106` exposes the `subscribeOpenPanel(expand)` seam; Plan 094-03 fires `requestOpenPanel()` at harness kickoff (force-open the panel to the timeline).
    - What we know: the panel open/rail machine is lifted to `ChatLayout`; a `subscribeOpenPanel(onExpand)` seam exists (per `WorkspacePanel.tsx` header). Harness kickoff sets `workflowLock`.
    - What's unclear: whether harness kickoff already force-opens the panel, or needs an `onExpand` nudge.
    - Recommendation: planner greps `ChatLayout` for `subscribeOpenPanel`/`onExpand` and the harness-kickoff path; add a one-line force-open if absent. Small, low-risk.
 
-2. **Exact D-02 mode-badge JSX site.**
+2. **Exact D-02 mode-badge JSX site.** → **RESOLVED:** the badge renders in `MessageInput.tsx:348` (passed `workflowMode`); Plan 094-05 re-points it to a `displayedMode` derived from `workflowLock`/`active_workflow_run_id` (server truth).
    - What we know: the signal is `workflowLock` (`ChatArea.tsx:83`); the badge is a panel mode tag + running-workflow status chip (UI-SPEC).
    - What's unclear: the precise component file/line that renders the current (possibly stale-`workflowMode`-derived) badge.
    - Recommendation: planner greps for the mode-label render (likely in the composer/status-chip area passed `workflowMode={workflowMode}` at `ChatArea.tsx:363`) and re-points it to `workflowLocked`.
