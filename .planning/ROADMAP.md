@@ -183,7 +183,12 @@ Plans:
   5. SC#10 UI-state UAT passes: the timeline renders correctly across collapse states, both themes, multiple threads, and mobile; a parallel thread streaming does not corrupt this thread's timeline.
   6. Intermediate phase output is visible (the draft before ask_user, batch sub-results — progressive disclosure, not just the final delta), and a failed/gate-failed run renders as **failed with a reason**, never as a `done` sentinel with empty content (the RC-4 trust bug). A harness answer gets a RunCard with the multi-phase provenance (parity with Deep tool turns).
   7. Mode clarity (D-092-UX): the two orthogonal axes (General/Explorer × Deep/Harness) + the workflow picker are disambiguated; Harness-with-no-workflow does not silently send a Deep turn; a `cap_paused` run shows a correct composer state + Continue affordance rather than a misleading lock placeholder.
-**Plans**: TBD
+**Plans**: 5 plans (4 waves)
+- [ ] 094-01-PLAN.md — D-05 --accent-violet token (FIRST) + Wave-0 test scaffolds + DATA-CONTRACT §7 fixtures [Wave 1]
+- [ ] 094-02-PLAN.md — Additive phase_* SSE branches (Deep byte-identical) + panel-only phasesByThread slice + usePhases (PANEL-09) [Wave 2]
+- [ ] 094-04-PLAN.md — D-04 RC-4 backend persist at BOTH failure-return sites (Deep byte-identical) [Wave 2, parallel with 02]
+- [ ] 094-03-PLAN.md — PhaseTimeline + PhaseCard (WCAG 2.1 AA, reconcile-then-live, failure-with-reason, suppress counts) + WorkspacePanel mount + PANEL-08 auto-open [Wave 3]
+- [ ] 094-05-PLAN.md — D-02 mode label from server truth + D-06 draft preview + batch summaries [Wave 4]
 **UI hint**: yes
 **Notes**: **G-2 FIRES** — `/gsd:sketch` precedes `/gsd:spec-phase`/`/gsd:plan-phase`. Operator-approved mockup is the acceptance bar. Purely additive to the v2.7 panel architecture (new `phase_*` SSE handlers are additive else-if branches — do not alter the existing `delta`/`sources`/`confidence` dispatch Deep depends on). G-4 lived-experience UAT (Chrome MCP, both themes, mobile, ask_user render+answer, failing-workflow-shows-failed, long-running phase progress, composer states). Baseline = `sketch-findings-agentic-rag` (panel-shell + chat↔panel-seam).
 
