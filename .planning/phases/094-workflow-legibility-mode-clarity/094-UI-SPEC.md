@@ -18,6 +18,8 @@ created: 2026-06-04
 > **Purely additive.** Every new `phase_*`/`gate_failed`/`run_failed` SSE handler is an additive `else-if` branch in `frontend/src/lib/api.ts` (the switch at ~485–667 has none today). It must NOT alter the existing `delta`/`sources`/`citations`/`confidence`/tool dispatch that Deep depends on. New state lives in a panel-only `phasesByThread` store slice (PANEL-06).
 >
 > **Real-vs-invented boundary is binding.** Every status/badge/label below maps to an event/field that actually exists on the wire OR is explicitly flagged client-derived. Source: `094-grounding/DATA-CONTRACT.md`. Invented fields (per-phase tool/source counts, fake %, hardcoded "48 sources") are SUPPRESSED, never faked.
+>
+> **One token is NEW this phase — `--accent-violet`.** It is the ONLY color this contract introduces that is not already live in `frontend/src/index.css`. It carries a real **Build Prerequisite** (§Build Prerequisites) — purple stays (locked sketch 008-D), but the token must be added to BOTH theme blocks + registered in `tailwind.config.js` BEFORE the `retrying` state or the `llm_batch_agents` marker can ship. Every OTHER token below is verified-live.
 
 ---
 
@@ -53,7 +55,7 @@ Declared values (4px grid — mirrors `--space-*` in `sources/themes/default.css
 | space-16 | 64px | Page-level spacing |
 
 **Exceptions (justified, all on the 4px grid or sub-pixel structural):**
-- **Spine geometry:** connector at `left:11px` width `2px`; node station `20px`, status-atom circle `18px`, sub-agent atom inline. These are structural alignment values (the opaque `.nodeD` station MUST mask the 2px connector) — not content spacing. Documented in `harness-phase-timeline.md` D2.
+- **Spine geometry:** connector at `left:11px` width `2px`; node station `20px`, status-atom circle `18px`, sub-agent atom inline. These are structural alignment values — the opaque `.nodeD` station (20px, panel-bg fill) is centered over and MUST mask the 2px connector; `left:11px` places the 2px connector at the visual center of the 20px station/spine column, not a content gap. Accepted by the checker as a structural exception. Documented in `harness-phase-timeline.md` D2.
 - **Touch targets:** rail icons and the panel toggle keep the existing 087 panel `52px` rail width / `≥44px` interactive height — do not shrink for the timeline.
 - **Mono micro-type padding:** status pills / count chips use `1px 6px`–`2px 7px` (sub-grid) — these are badge-intrinsic, consistent with the shipped panel count badges.
 
@@ -79,7 +81,7 @@ Sizes mirror `--text-*` tokens (rem-based; `--text-base: 0.9rem ≈ 14.4px`). Ex
 
 ## Color
 
-The dark theme ("Aether Deep Midnight") is the primary surface; light theme must also pass (both-themes a11y). All values mirror `frontend/src/index.css` (verified live, not invented). 60/30/10 split:
+The dark theme ("Aether Deep Midnight") is the primary surface; light theme must also pass (both-themes a11y). All values mirror `frontend/src/index.css` (verified live, not invented) **EXCEPT `--accent-violet`, which this phase introduces — see §Build Prerequisites.** 60/30/10 split:
 
 | Role | Value (dark) | Usage |
 |------|-------|-------|
@@ -87,6 +89,7 @@ The dark theme ("Aether Deep Midnight") is the primary surface; light theme must
 | Secondary (30%) | `--card` `220 30% 7%` · `--muted` `220 30% 11%` · `--accent` `220 25% 14%` | RunCards, phase cards, receipt, workflow cards, chips, hover states, modal bodies |
 | Accent (10%) | `--primary` `239 100% 82%` (soft indigo) | See reserved-for list below |
 | Destructive | `--destructive` `0 72% 51%` | Failed phase border/atom/pill, fail-reason block, Cancel/Stop control, red diff-base |
+| Phase-introduced | `--accent-violet` (NEW — `.dark` `258 90% 66%` / `:root` `258 80% 40%`) | `retrying` status spine/glyph + the `llm_batch_agents` phase-type left-border ONLY. Not yet live — §Build Prerequisites. |
 
 ### Status color language (LOCKED — the heart of this phase)
 
@@ -98,9 +101,13 @@ Each status = **glyph + pill label + color** (never color alone — §A11Y). Use
 | **running** (active) | `●` (pulse) | Running | `--panel-status-active` (dark `38 92% 62%` #f7b645 / light `32 90% 30%` #915108) | amber gradient → border | 10.48:1 dark · 5.15:1 light |
 | **locked-ahead** | `○` | Locked | `--muted-foreground` `220 16% 65%` (dashed, dimmed `opacity:.72`) | dashed-dim, inert | ≥4.5:1 (use `--muted-foreground`, NOT `-dim`) |
 | **failed** | `✕` | Failed | `--destructive` `0 72% 51%` (text lightened to `hsl(0 80% 80%)` on the dim fill) | red | text token lightened for ≥4.5:1 on dim fill |
-| **retrying** | `↻` | Attempt N | `--accent-violet` `258 90% 66%` (purple — distinct from amber/green/red) | purple | distinct hue, ≥3:1 graphic |
+| **retrying** | `↻` | Attempt N | `--accent-violet` (NEW token — graphic `258 90% 66%` dark / `258 80% 40%` light; pill **text** lightened — see contrast note) | purple | graphic 4.35:1 dark · 8.52:1 light (≥3:1); pill text ≥4.5:1 both |
 | **skipped** | `⤳` | Skipped | `--muted-foreground` (dimmed grey) | dimmed | — |
 | **paused / needs-you** (ask_user) | person/`●` | Needs you | `--warning` `38 92% 60%` (amber) | amber pin | warning text on warning-dim ≥4.5:1 |
+
+**`--accent-violet` contrast (NEW token — both thresholds verified, mirrors the `--destructive` "lightened text on dim fill" pattern already used by `failed`):**
+- **Dark (`.dark` = `258 90% 66%` #895af6):** as the spine/glyph/left-border **graphic** on the dark panel surface #0c121d → **4.35:1**, clears the ≥3:1 graphic/icon floor (1.4.11). The `Attempt N` **pill label text** is set in a lightened violet `258 95% 84%` (#cbb3fb) → **9.83:1** on the panel and **9.08:1** on a `258 40% 14%` violet-dim pill fill → clears ≥4.5:1 (1.4.3). (Same technique the `failed` row already uses: lighten the text, keep the vivid hue as the graphic.)
+- **Light (`:root` = `258 80% 40%` #4514b8 — a dark violet at the SAME hue, NOT the dark value reused):** as text **and** as graphic on the light panel surface #e8eaee → **8.52:1**, clears both ≥4.5:1 (text) and ≥3:1 (graphic). Tuned darker for the light surface exactly as the existing `--panel-status-done`/`-active` tokens carry separate light values (light needs dark shades). The pill label can use the same `258 80% 40%` value directly on the light panel.
 
 **Accent reserved for (explicit — never "all interactive elements"):**
 - The **live pointer / primary count** — indigo `--primary`: the Deep-run receipt left-border, the Deep live-status seam background/spark, the "Open ▸" / "Open in workspace ▸" link, the primary `Phase i/N` count chip, active Deep tool-row glow, Workflows-page card hover ring, the launch-modal primary, the General/Explorer pill focus.
@@ -109,9 +116,44 @@ Each status = **glyph + pill label + color** (never color alone — §A11Y). Use
 
 **Do NOT break the language:** amber is never "a generic highlight," indigo is never "danger," green is never "in progress." A Harness run is amber; a Deep run is indigo; this is how the user tells the two drivers apart on one surface (D-094-UNIFY).
 
-**Phase-type left-border color (Workflows page card chains + builder, 5 types):** `programmatic` → `--muted-foreground` (grey) · `llm_single` → `--primary` (indigo) · `llm_agent` → `--success` (green) · `llm_batch_agents` → `--accent-violet` (purple) · `llm_human_input` → `--warning` (amber). Keyed off `phase_type` (the wire discriminator), never inferred from slug.
+**Phase-type left-border color (Workflows page card chains + builder, 5 types):** `programmatic` → `--muted-foreground` (grey) · `llm_single` → `--primary` (indigo) · `llm_agent` → `--success` (green) · `llm_batch_agents` → `--accent-violet` (purple — NEW token, §Build Prerequisites) · `llm_human_input` → `--warning` (amber). Keyed off `phase_type` (the wire discriminator), never inferred from slug.
 
 **Light-theme reminder:** `--muted-foreground-dim` FAILS 4.5:1 on BOTH panel surfaces for meaningful text — the timeline's status/title text must use `--color-text` or the panel-status tokens; reserve the dim token for decorative-only meta reinforced by an adjacent legible element.
+
+---
+
+## Build Prerequisites (binding — the purple states cannot ship without these)
+
+This phase introduces ONE new design token and depends on TWO new thin backend reads. None is optional; the executor must land the token migration before the `retrying`/`llm_batch_agents` surfaces, and must gate the count chips on the data reads.
+
+### A. `--accent-violet` token migration (REQUIRED before any purple surface)
+
+Purple is LOCKED (sketch 008-D: purple = `retrying` AND purple = the `llm_batch_agents` phase-type marker). The fix the checker required is **make the token real**, not drop purple. `--accent-violet` exists today ONLY in the sketch theme (`sources/themes/default.css → --color-accent-violet`); it is NOT in the live `frontend/src/index.css` (`:root` or `.dark`) and NOT registered in `frontend/tailwind.config.js` (verified — zero matches for `accent-violet` anywhere under `frontend/`). An executor writing `var(--accent-violet)` today resolves to nothing → broken/transparent CSS.
+
+**Before the `retrying` state and the `llm_batch_agents` marker render, the executor MUST:**
+
+1. Add `--accent-violet` to **both** theme blocks in `frontend/src/index.css` (HSL channels only, no `hsl()` wrapper — matching the existing token convention), with a verification comment in the same style as the existing `--panel-status-*` blocks:
+   - `:root` (light theme): `--accent-violet: 258 80% 40%;`  /* #4514b8 → 8.52:1 on light --panel-surface #e8eaee (text + graphic) */
+   - `.dark` (dark theme): `--accent-violet: 258 90% 66%;`  /* #895af6 → 4.35:1 graphic on dark --panel-surface #0c121d (≥3:1). Pill LABEL text uses lightened 258 95% 84% (#cbb3fb) → 9.83:1 on panel / 9.08:1 on a 258 40% 14% violet-dim fill (≥4.5:1) */
+2. Register the color in `frontend/tailwind.config.js` under `theme.extend.colors`, mirroring the `panel-status-*` mapping exactly:
+   ```js
+   "accent-violet": "hsl(var(--accent-violet))",
+   ```
+3. (Recommended, to keep the lightened pill text + dim fill as utilities rather than inline) optionally add `--accent-violet-text: 258 95% 84%` (dark) / `258 80% 40%` (light) and `--accent-violet-dim: 258 40% 14%` (dark) / a light dim, registered the same way. If the executor instead lightens inline, the contrast targets above are the contract regardless.
+
+Do this in a **numbered SQL-style is N/A — this is a frontend CSS/Tailwind change, not a schema migration**; ship it as the first task on the purple surfaces.
+
+### B. Sub-agent live tool drill-down / per-phase counts (data read — keeps counts honest)
+
+Threading sub-stream `tool_start`/`tool_end` up to the harness producer. Until built, per-phase tool/source counts stay **SUPPRESSED** (not faked). (Deferred — see §Out-of-Scope.)
+
+### C. `GET /workflows/{id}` parsed-definition endpoint (data read — Workflows-page chains)
+
+`/published` returns only `{id, slug, name}`. Phase-type/tool chips on the Workflows page need this thin read. Until it exists, render **name + Run only** — do not invent a phase chain.
+
+### D. RC-4 terminal-sentinel source fix (durable failure honesty)
+
+The UI keys failure off `run_failed`/`gate_failed` regardless, but the durable fix is RC-4 at source so a captured failure never decays into an empty success.
 
 ---
 
@@ -121,9 +163,9 @@ All copy is concrete and final. Failure strings map to the **closed taxonomy** (
 
 | Element | Copy |
 |---------|------|
-| **Primary CTA (Workflows page)** | `▶ Run` (card) → opens launch modal → `▶ Run workflow` (modal confirm). Run is amber (Harness color). |
+| **Primary CTA (Workflows page)** | `▶ Run workflow` (card) → opens launch modal → `▶ Run workflow` (modal confirm). Card and modal confirm read identically (verb + noun, consistent). Run is amber (Harness color). |
 | **Workflow status chip (running)** | `⚙ Harness · {workflow_name} · phase {i}/{N} · {current_phase_slug}` — e.g. `⚙ Harness · Literature review · phase 2/3 · Review`. `{i}/{N}` from reconcile `current_phase_index+1`/`total_phases` (advanced forward by live `phase_completed`, never backward). On reconnect the slug reads `current_phase_slug` from reconcile (M4), not "indeterminate". |
-| **Cancel / Stop** | Chip control: `⏹ Cancel`. Composer Send becomes a red Stop: `■` (title="Cancel run"). Cancel stays reachable at the composer (not panel-only) so it survives a railed panel. |
+| **Cancel / Stop** | Chip control: `⏹ Cancel`. Composer Send becomes a red Stop: `■` (icon-only — `aria-label="Cancel run"`, optional `title="Cancel run"` for sighted hover). Cancel stays reachable at the composer (not panel-only) so it survives a railed panel. |
 | **Failure reason — `max_steps`** | `Sub-agent "{name}" reached its {max}-step cap without a final answer.` · where-line: `phase: {slug} · sub-agent {n} · {model} · {used}/{max} steps`. (Only `phase.slug` + `gate_failed.phase` are real in the where-line; model/sub-agent-index/step-ratio are sub-stream — render only real components, omit the rest. L3.) |
 | **Failure reason — `gate_failed`** | `Validation gate failed after {attempt} attempt(s); run halted.` · where-line: `phase: {slug} → gate · attempt {attempt}/{max}`. (`attempt`/`max` real from `gate_failed`; the human gate NAME is NOT on the wire — omit it, never invent.) |
 | **Failure reason — `wall_clock_timeout`** | `Phase exceeded its wall-clock budget before completing.` · where-line: `phase: {slug} · wall_clock_timeout`. (Verbatim string `"wall_clock_timeout after Ns"` is the only typed signal — surface the N if present.) |
@@ -153,7 +195,7 @@ All copy is concrete and final. Failure strings map to the **closed taxonomy** (
 | **Panel empty (no run)** | Reuse shipped 087 `PanelEmpty`: `No workspace activity yet` (the timeline section only mounts when `mode==="harness"` OR phases exist). |
 
 **Destructive actions in this phase:**
-1. **Cancel a running workflow** — reachable at the composer status chip (`⏹ Cancel`) AND the Send→Stop button. No extra confirm dialog (a run is cancelable + resumable state is expected; immediate stop is the lower-friction correct default per winner 011-A). Confirmation is the visible state change (chip clears, composer re-enables).
+1. **Cancel a running workflow** — reachable at the composer status chip (`⏹ Cancel`) AND the Send→Stop button. No extra confirm dialog (a run is cancelable + resumable state is expected; immediate stop is the lower-friction correct default per winner 011-A). Confirmation is the visible state change (chip clears, composer re-enables). The icon-only Stop button MUST carry `aria-label="Cancel run"` (see §A11Y — icon-only controls).
 2. **"Needs changes" on a draft** — non-destructive (sends `choice_index`/edited `response_text`; the run continues). No confirm.
 
 ---
@@ -179,7 +221,7 @@ The 5 real phase states + 2 run-pause states the timeline renders, each keyed of
 | `running` | `phase_started{phase, phase_index, phase_type}` | no | amber-glow card, `●` pulse, `Running` pill, auto-expanded, indeterminate progressbar (NO % value) |
 | `done` | `phase_completed{phase, phase_index}` | no | green solid spine, `✓`, `Complete`, collapses to summary row |
 | `failed` | `run_failed{reason}` OR terminal `gate_failed{error}` — **NOT the terminal `done` sentinel (RC-4)** | no | red card, `✕`, `Failed`, auto-expands, `.fail-reason` block with taxonomy |
-| `retrying` | non-terminal `gate_failed{phase, attempt, error}` (fires every attempt) | no | purple `.gate-row`, `↻`, `Attempt N`, stacked per-attempt (don't overwrite) |
+| `retrying` | non-terminal `gate_failed{phase, attempt, error}` (fires every attempt) | no | purple `.gate-row` (`--accent-violet` — §Build Prerequisites), `↻`, `Attempt N`, stacked per-attempt (don't overwrite) |
 | `skipped` | `phase_transition{via:"skip_to_phase"}` | no | dimmed, `⤳`, `Skipped` |
 | `paused` (ask_user) | `ask_user_prompt{tool_call_id, prompt, options, draft}` with no matching `ask_user_response` | no | amber pinned card + `PendingAskCard` (reuses 087); draft above question |
 | `cap_paused` | `cap_paused` SSE + reconcile | no | timeline shows current phase paused-but-resumable; Continue card in MessageItem (NOT timeline/composer) |
@@ -188,7 +230,7 @@ The 5 real phase states + 2 run-pause states the timeline renders, each keyed of
 - `programmatic` → "Server step" (gear). Single compact row. NO count chip (return dict is not on the producer wire — "N sub-topics" would be INVENTED).
 - `llm_single` → "AI write step" (pen). Single row, no count. NO per-phase body prose (INVENTED — only the final phase's text reaches chat).
 - `llm_agent` → "AI agent step" (robot). Parent row + ONE nested sub-agent child row (`sub_agent_start`→`sub_agent_done.summary`). Tool chips from STATIC `available_tools`. NO per-phase tool/source counts (sub-stream — suppress).
-- `llm_batch_agents` → "Parallel agents" (fan-out). Parent + N nested child rows sharing one time band. N = client tally of `sub_agent_start` (no aggregate field — NEVER hardcode). Per-subtopic `summary` readable before merge.
+- `llm_batch_agents` → "Parallel agents" (fan-out). Parent + N nested child rows sharing one time band. Purple `--accent-violet` left-border (NEW token — §Build Prerequisites). N = client tally of `sub_agent_start` (no aggregate field — NEVER hardcode). Per-subtopic `summary` readable before merge.
 - `llm_human_input` → "Needs you" (person). Paused amber; draft + question + chips in the panel `PendingAskCard`.
 
 ---
@@ -216,12 +258,15 @@ The 5 real phase states + 2 run-pause states the timeline renders, each keyed of
 
 The checker will verify color contrast and non-color-only signaling. This makes both checkable.
 
+**Icon-only controls (SC 4.1.2 — name, role, value):** every control whose visible content is ONLY a glyph/icon MUST carry an `aria-label` (not `title` alone — `title` is not reliably announced by screen readers). A `title` MAY be added in addition for sighted hover, but `aria-label` is the contract. This applies to: the composer **Send→Stop** button (`aria-label="Cancel run"`), the rail/panel toggle, any icon-only chip control, and any status atom that is not paired with adjacent real text.
+
 **Non-color-only status (SC 1.4.1) — every state = glyph + text + color, never color alone:**
 - `pending`→`○`+"Locked" · `running`→`●`+"Running"+progressbar · `done`→`✓`+"Complete" · `failed`→`✕`/`△!`+"Failed" · `retrying`→`↻`+"Attempt N" · `skipped`→`⤳`+"Skipped" · `paused`→person+"Needs you".
 - Status text is REAL text (or `aria-label`/visually-hidden on icon-only badges). Color is decorative reinforcement only. Receipt phase-dots are color-only by design → they carry an `aria-label` enumerating per-phase status ("3 phases: 2 complete, 1 failed").
 
 **Contrast (1.4.3 / 1.4.11) — both themes, verified against live tokens:**
 - Status text / phase titles / timestamps ≥4.5:1 → use `--color-text` or the panel-status tokens (`--panel-status-done` 10.63:1 dark / 4.72:1 light; `--panel-status-active` 10.48:1 dark / 5.15:1 light). Do NOT use `--muted-foreground-dim` for meaningful text (3.59:1 — fails).
+- The NEW `--accent-violet` (`retrying` / `llm_batch_agents`): graphic 4.35:1 dark (#895af6 on #0c121d) / 8.52:1 light (#4514b8 on #e8eaee) ≥3:1; `Attempt N` pill LABEL text uses the lightened violet (258 95% 84% dark → 9.83:1 on panel / 9.08:1 on a 258 40% 14% dim fill; 258 80% 40% light → 8.52:1) ≥4.5:1. Both thresholds verified — see §Color contrast note + §Build Prerequisites A.
 - Status/state icons, card borders, focus rings, progressbar track-vs-fill ≥3:1 (non-text).
 - Failure red/success green TEXT is lightened on dim fills (`hsl(0 80% 80%)` on `--danger-dim`) to clear 4.5:1.
 
@@ -235,13 +280,13 @@ The checker will verify color contrast and non-color-only signaling. This makes 
 
 **Focus management:** live updates NEVER steal focus; auto-expanding the active phase announces only (no `.focus()`). The `ask_user` interrupt is the EXCEPTION — move focus to the prompt + fire `role="alert"`. On RunCard collapse/unmount, return focus to the trigger.
 
-**Test gate:** vitest-axe on RunCard in each state (pending/running/done/failed) + timeline with 1 and N phases → zero violations. Unit-assert: announcer fires exactly once per transition (no per-token spam), `aria-expanded` toggles, `aria-busy` flips on stream end, keyboard nav works.
+**Test gate:** vitest-axe on RunCard in each state (pending/running/done/failed/retrying) + timeline with 1 and N phases → zero violations. Unit-assert: announcer fires exactly once per transition (no per-token spam), `aria-expanded` toggles, `aria-busy` flips on stream end, icon-only controls expose an accessible name (`aria-label`), keyboard nav works.
 
 ---
 
 ## Real-vs-Invented Field Guard (extra section — binding)
 
-Every datum traces to STATIC (definition), LIVE (SSE tally), or RECONCILE — or it is SUPPRESSED. Flagged INVENTED items (DATA-CONTRACT §8) that must NEVER be faked in 094:
+Every datum traces to STATIC (definition), LIVE (SSE tally), or RECONCILE — or it is SUPPRESSED. Tokens trace to live `index.css` — **except `--accent-violet`, which is PHASE-INTRODUCED (NEW) and carries a Build Prerequisite (§Build Prerequisites A); it is NOT a live token today and must be added before use.** Flagged INVENTED items (DATA-CONTRACT §8) that must NEVER be faked in 094:
 
 - ❌ Per-phase / mid-run `{k} sources`, `{n} searches`, `{m} tool calls` — tool/source events fire on the SUB stream (`run:{sub_run_id}`), not the producer. Suppress. Only the run-level end-of-run `sources.length` is real.
 - ❌ Fake percentage progress — no percent field exists. Use honest `Phase i/N` + indeterminate shimmer only.
@@ -249,8 +294,11 @@ Every datum traces to STATIC (definition), LIVE (SSE tally), or RECONCILE — or
 - ❌ `gate_passed` glyph from an event — audit-only, never on the wire. Infer "passed" from the phase advancing.
 - ❌ Per-phase body prose for `llm_single`/`programmatic` — persisted-only; only the final phase's text reaches chat.
 - ❌ Receipt phase-dots all-green — must read real per-phase `status` (incl. failed/running/locked).
-- ❌ Per-card phase chains on the Workflows page from `/published` — that endpoint returns only `{id, slug, name}`. Phase-type/tool chips need a new thin `GET /workflows/{id}` (build prereq §9-C); until then render name + Run only, do not invent a chain.
-- ✅ REAL: `phase_started{phase, phase_index, phase_type}`, `phase_completed`, `phase_transition{via}`, `gate_failed{phase, attempt, error}`, `run_failed{reason}`, `run_completed`, `sub_agent_start/done{summary}`, `ask_user_prompt{draft, options}`, reconcile `current_phase_index`/`total_phases`/`mode`/`definition_name`.
+- ❌ Per-card phase chains on the Workflows page from `/published` — that endpoint returns only `{id, slug, name}`. Phase-type/tool chips need a new thin `GET /workflows/{id}` (Build Prerequisite C); until then render name + Run only, do not invent a chain.
+- ❌ `var(--accent-violet)` BEFORE the token migration (Build Prerequisite A) — resolves to nothing → broken/transparent CSS. The purple `retrying` row and `llm_batch_agents` marker are gated on the token landing first.
+- ✅ REAL (wire): `phase_started{phase, phase_index, phase_type}`, `phase_completed`, `phase_transition{via}`, `gate_failed{phase, attempt, error}`, `run_failed{reason}`, `run_completed`, `sub_agent_start/done{summary}`, `ask_user_prompt{draft, options}`, reconcile `current_phase_index`/`total_phases`/`mode`/`definition_name`.
+- ✅ REAL (live tokens, verified in `frontend/src/index.css`): `--background`, `--panel-surface`, `--card`, `--muted`, `--accent`, `--primary`, `--destructive`, `--success`, `--warning`, `--muted-foreground`, `--muted-foreground-dim`, `--panel-status-done`, `--panel-status-active`, `--panel-muted-foreground[-dim]`, `--panel-border`.
+- ⚠️ PHASE-INTRODUCED (NOT yet live; Build Prerequisite A): `--accent-violet` (+ optional `--accent-violet-text`/`-dim`). Must be added to `:root` + `.dark` in `index.css` AND registered in `tailwind.config.js` before any purple surface renders.
 
 ---
 
@@ -261,8 +309,8 @@ Documented as deferred — NO contract rows are written for these in 094:
 - **v2.9 NL Workflow Builder / authoring canvas (sketch 013)** — talk-led diagram, authoring SSE, approve/tweak/replace, assets/template upload, per-phase `folder_ids[]` binding, live lint-on-draft endpoint, publish/version write path. DESIGN-AHEAD only (SEED-051). 094 ships ONLY the dashed "Build a workflow" entry-point card on the Workflows page (a `v2.9` pill, opens nothing). The 5-phase-type + ValidatorSpec vocabulary is real; the authoring surface has zero runtime binding today.
 - **Generated-files-in-panel artifact unification (SEED-037 / SEED-038)** — `execute_code` artifacts fire on the sub-agent stream and aren't threaded to the harness producer; workflow-produced files don't appear in the panel. The FILES tab reads the 087 workspace store; absence of files is normal. Confirm coverage at 094/095 planning, do not promise it here.
 - **Ops graceful-shutdown drain (093 finding #7)** — drain-streams-on-shutdown + preserve-paused-runs-as-resumable. Backend/ops, not a 094 render concern.
-- **Sub-agent live tool drill-down + per-phase counts (build prereq §9-B)** — threading sub-stream `tool_start`/`tool_end` up to the producer. Until built, per-phase tool/source counts stay SUPPRESSED (not faked).
-- **`GET /workflows/{id}` parsed-definition endpoint (§9-C)** and **RC-4 terminal-sentinel source fix (§9-D)** — flagged as build prerequisites; the UI keys failure off `run_failed`/`gate_failed` regardless, but the durable fix is RC-4 at source.
+- **Sub-agent live tool drill-down + per-phase counts (Build Prerequisite B)** — threading sub-stream `tool_start`/`tool_end` up to the producer. Until built, per-phase tool/source counts stay SUPPRESSED (not faked).
+- **`GET /workflows/{id}` parsed-definition endpoint (Build Prerequisite C)** and **RC-4 terminal-sentinel source fix (Build Prerequisite D)** — flagged as build prerequisites; the UI keys failure off `run_failed`/`gate_failed` regardless, but the durable fix is RC-4 at source.
 
 ---
 
