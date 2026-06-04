@@ -89,7 +89,9 @@ function DraftBlock({ draft }: { draft: string }) {
             />
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className="font-mono text-[10px] text-[hsl(var(--muted-foreground-dim))]">
+            {/* IN-04: panel-scoped dim token (8.42:1 dark / 4.66:1 light) — the
+                global --muted-foreground-dim is 3.59:1 on the dark panel (fails). */}
+            <span className="font-mono text-[10px] text-panel-muted-foreground-dim">
               ≈ {wordCount} words · long draft
             </span>
             <button
