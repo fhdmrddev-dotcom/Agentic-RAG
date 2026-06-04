@@ -41,7 +41,8 @@
 
 ### Accessibility
 
-- [ ] **A11Y-03**: The phase timeline meets **WCAG 2.1 AA** — keyboard-navigable, ARIA landmarks/labels, non-color-only status indicators, ≥4.5:1 contrast in both themes (vitest-axe gated).
+- [ ] **A11Y-03
+**: The phase timeline meets **WCAG 2.1 AA** — keyboard-navigable, ARIA landmarks/labels, non-color-only status indicators, ≥4.5:1 contrast in both themes (vitest-axe gated).
 
 ### Cross-Provider Reliability & Eval
 

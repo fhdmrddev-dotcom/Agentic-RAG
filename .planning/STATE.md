@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: "Phase 094 context gathered (discuss-094: 5 areas decided + SEED-052/053 + BUG-260604-01)"
-last_updated: "2026-06-04T17:12:58.315Z"
-last_activity: 2026-06-02
+stopped_at: Completed 094-01-PLAN.md
+last_updated: "2026-06-04T18:35:23.835Z"
+last_activity: 2026-06-04
 progress:
   total_phases: 9
   completed_phases: 6
-  total_plans: 37
-  completed_plans: 37
-  percent: 100
+  total_plans: 42
+  completed_plans: 38
+  percent: 90
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 093
+**Current focus:** Phase --phase — 094
 
 ## Current Position
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 --- (prior `human_needed` trace retained for audit) ---
 
-Phase: 093 — ALL 9 PLANS EXECUTED + GAP-CLOSURE CODE-REVIEWED + RE-VERIFIED `human_needed` (2026-06-03). **Post-execution gates (orchestrator, 2026-06-03):** (1) deep gap-closure code review of the 06-09 production surface (task_service.py/phase_types.py/harness.py/logging_sink.py/main.py) = **0 critical / 3 warning / 4 info**, RED LINE confirmed (no Deep regression; "verbatim agent_loop.py" claims checked against the real source); **WR-02** (log-sink crashes startup on an unwritable LOG_FILE_PATH) + **WR-03** (redaction missed connection-string/secret-env values) **FIXED commit 94fcd141** (startup-safe installer + URL-credential + dynamic secret-name redaction; 11/11 log-sink tests incl. 3 new + the import-time-handler hermeticity fix that closes the lone +1 net-new the 093-09 executor flagged → net-new now truly 0); **WR-01** (093-08 makes Deep `task()` honor `sub_agent_model` — deliberate, more-correct, matches analyze_document) = operator sign-off at re-UAT Test 8; original 01-05 review archived → 093-REVIEW-01-05-batch.md. (2) regression gate = 99/99 on the 093 + shared task_service + sub-agent + harness surface, app imports clean. (3) schema-drift gate clean (no migration in 06-09). (4) **re-verification `human_needed` — 41/41 codebase must-haves, RED LINE held (agent_loop.py + sub_agent_service.py zero-diff), 99/99 deterministic** (093-VERIFICATION.md). BINDING gate = the operator **D-21 native-7 × 5-type × 4-workflow LIVE re-UAT** (11-item matrix in 093-VERIFICATION.md `human_verification` + 093-HUMAN-UAT.md "Re-UAT" section + 093-VALIDATION.md runbook). **Live evidence already in hand** (the GLM diagnosis run, thread 71502600): 093-08 (glm-4.6 not gpt-4o) + 093-07/S4 (non-NULL tokens) + 093-01 (3-way split) all re-confirmed; still owed = Google/Moonshot 400-elimination (093-07), GLM convergence post-09-fix (093-09), + the operator-only dims. **PARITY-02 stays Pending → flips Validated + phase status passed on a clean LIVE re-UAT.** NEXT = operator runs the D-21 re-UAT (backend running + log-sink active) → report results → phase close (or gap-closure if a cell fails).
+Phase: --phase (094) — EXECUTING
 
 --- (gap-closure execution trace below — retained for audit) ---
 
@@ -118,9 +118,9 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-06-02
+Last activity: 2026-06-04
 
-Progress: [██████████] 97%
+Progress: [█████████░] 90%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -182,6 +182,7 @@ Progress: [██████████] 97%
 | Phase 093 P093-06 | 3min | 2 tasks | 4 files |
 | Phase 093 P093-07 | 18min | 3 tasks | 3 files |
 | Phase 093 P093-09 | ~30min | 1 task (Task 2; Task 1 operator-resolved) | 6 files |
+| Phase 094 P01 | 5min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -274,6 +275,7 @@ Recent decisions affecting current work:
 - (092-02): requirements MODE-01/MODE-02 left OPEN (NOT marked complete) — MODE-02 also needs Plan 03 lock-clear half + Plan 04 frontend; closure deferred to phase verification per execution requirements_note
 - (093-06, 2026-06-02): D-20 opt-in backend file log-sink shipped — install_file_log_sink() adds a redacting RotatingFileHandler to the root logger ONLY when LOG_FILE_PATH/BACKEND_LOG_FILE is set (else None + no handler = byte-identical console-only); _RedactingFilter strips sk-/Bearer/Authorization/JWT + live provider key env VALUES before write; idempotent via _gsd_093_sink sentinel; wired at main.py startup after load_dotenv; default logs/backend.log gitignore-covered by existing logs/+*.log (no new rule); 8/8 tests GREEN. The D-21 re-UAT enabler + Phase 096 automated-UAT substrate; operator sets the env var + restarts uvicorn to activate.
 - 093-09 (D-19): GLM sub-agent max_steps closed via force-synthesis fallback (any provider returns a real answer on exhaustion) + effective harness step cap 8->12; the step-cap clamp is sentinel-equality so 3 knobs raised in lockstep; 093 closes 7/7, no provider deferred
+- (094-01, 2026-06-04): the --accent-violet token landed FIRST (D-05 Build-Prerequisite A) in both index.css theme blocks (light 258 80% 40% / dark 258 90% 66%, HSL channels no hsl() wrapper, matching --panel-status-*) + the Tailwind accent-violet utility, so var(--accent-violet) resolves before any purple surface renders (Pitfall 3); no component reads it yet (Plan 03 owns the retrying glyph + llm_batch_agents left-border). frontend/src/test-fixtures/harness094.ts = the shared DATA-CONTRACT section 7 wire fixtures (16 export const fx: 5 per-phase-type + 6 per-run-state incl. wall-clock + reason-unknown variants, FLAT _emit shape + reconcile seeds) Plans 02/03/05 import. 5 Wave 0 RED scaffolds collect (4 frontend it.todo / 1 backend pytest.mark.skip), seeding INV-1..5 + INV-3a, each naming its owner (02/03/03/03/04). NO deviations; npm run build carries the documented 54-error tsc baseline (0 net-new, proven by stash; vite build clean). A11Y-03 validated by the INV-2 axe scaffold.
 
 ### Pending Todos
 
@@ -359,9 +361,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 094 context gathered (discuss-094: 5 areas decided + SEED-052/053 + BUG-260604-01)
-Resume file: --resume-file
+Last session: 2026-06-04T18:35:23.448Z
+Stopped at: Completed 094-01-PLAN.md
+Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
 
@@ -430,7 +432,7 @@ Resume file: --resume-file
 - **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
 - SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
-**Planned Phase:** 093 (harness-cross-provider-parity) — 9 plans — 2026-06-02T20:02:30.286Z
+**Planned Phase:** 094 (workflow-legibility-mode-clarity) — 5 plans — 2026-06-04T18:15:43.111Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
