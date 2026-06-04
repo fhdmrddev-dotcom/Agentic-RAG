@@ -7,7 +7,7 @@
  * ABSENT — A2 / Pitfall 1: submit must be gated + reconcile triggered).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup } from "@testing-library/react"
+import { render, screen, waitFor, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 import { mockPendingAskWithRunId, mockPendingAskNoRunId } from "./fixtures"
@@ -186,3 +186,75 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
 function mockPendingAskNoRunIdButReady(): PendingAsk {
   return { ...mockPendingAskNoRunId, run_id: "run-ready" }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 094 Plan 05 Task 2 (D-06) — ask.draft renders ABOVE the question.
+//
+// The draft is the prior phase's text the user is being asked to confirm; it is
+// labelled "not yet saved" so it is NEVER read as the final answer. Long drafts
+// preview behind a faded mask + open a WIDE overlay over the chat. When draft is
+// undefined (older streams) NO draft block renders (DRAFT-MISSING guard).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Short draft (renders inline, no open-wide control). */
+const SHORT_DRAFT = "Use the prod_sales_2026 dataset for the Q3 rollup."
+/** Long draft (>~120 words) → faded preview + "Review & edit full draft". */
+const LONG_DRAFT = Array.from({ length: 200 }, (_, i) => `word${i}`).join(" ")
+
+function mockPendingAskWithDraft(draft: string): PendingAsk {
+  return { ...mockPendingAskWithRunId, draft }
+}
+
+describe("PendingAskCard (D-06) — draft preview above the question", () => {
+  it("renders the draft body + the verbatim 'not yet saved' DRAFT tag ABOVE the prompt", () => {
+    render(<PendingAskCard ask={mockPendingAskWithDraft(SHORT_DRAFT)} reconcile={noopReconcile} />)
+    // The non-negotiable label — proves the draft is not the final answer.
+    expect(
+      screen.getByText(/DRAFT · awaiting your review — not yet saved/i),
+    ).toBeInTheDocument()
+    // The draft body renders.
+    expect(screen.getByText(SHORT_DRAFT)).toBeInTheDocument()
+    // The draft block precedes the question in DOM order (ABOVE the prompt).
+    const draftTag = screen.getByText(/DRAFT · awaiting your review — not yet saved/i)
+    const prompt = screen.getByText(mockPendingAskWithRunId.prompt)
+    expect(draftTag.compareDocumentPosition(prompt)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
+  it("does NOT render a DRAFT block when ask.draft is undefined (DRAFT-MISSING guard)", () => {
+    render(<PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />)
+    expect(
+      screen.queryByText(/DRAFT · awaiting your review — not yet saved/i),
+    ).not.toBeInTheDocument()
+    // The question still renders — the card is not blank.
+    expect(screen.getByText(mockPendingAskWithRunId.prompt)).toBeInTheDocument()
+  })
+
+  it("shows a word count + 'Review & edit full draft' control for a long draft", () => {
+    render(<PendingAskCard ask={mockPendingAskWithDraft(LONG_DRAFT)} reconcile={noopReconcile} />)
+    // Word count is computed from the draft length at render (never a fixture).
+    expect(screen.getByText(/200 words · long draft/i)).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /review & edit full draft/i }),
+    ).toBeInTheDocument()
+  })
+
+  it("opens a WIDE overlay containing the full draft when 'Review & edit full draft' is clicked", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={mockPendingAskWithDraft(LONG_DRAFT)} reconcile={noopReconcile} />)
+    await user.click(screen.getByRole("button", { name: /review & edit full draft/i }))
+    // The overlay is a dialog with the full draft body.
+    const dialog = await screen.findByRole("dialog")
+    expect(within(dialog).getByText(/word199/)).toBeInTheDocument()
+    // The "not yet saved" contract carries into the overlay title.
+    expect(within(dialog).getByText(/not yet saved/i)).toBeInTheDocument()
+  })
+
+  it("has no axe violations with a draft present", async () => {
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithDraft(SHORT_DRAFT)} reconcile={noopReconcile} />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
