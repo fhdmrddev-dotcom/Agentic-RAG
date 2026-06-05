@@ -4,9 +4,9 @@ title: Step count on timer does not match step count on tool panel header
 reported: 2026-05-28
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/streaming]
-folded_into: null
+folded_into: "095"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

@@ -4,9 +4,9 @@ title: Chat tool-call cards — no auto-scroll to bottom, expanded-by-default, a
 reported: 2026-05-29
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat-surface, frontend/components/chat/ToolCallPanel, frontend/components/chat/MessageItem, frontend/components/chat/tool-bodies, frontend/streaming]
-folded_into: null
+folded_into: "095"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Reviewed at Phase 087 discuss-phase (2026-05-29) — kept SEPARATE (own future phase). Phase 087 adds only additive seam renderers (SeamPointer/SeamCard/PausedRunCue) and MUST NOT worsen these cards. Re-open as a dedicated chat-tool-card unification phase. Re-reviewed at Phase 088 discuss (2026-05-29): confirmed OUT of 088 scope (chat-surface, not the workspace panel); 088 verifies it does not block the workspace E2E flow but does not fix it — candidate for a v2.8 chat-tool-card unification phase."

@@ -9,7 +9,7 @@ affected_areas: [frontend/panel-pending-askuser, backend/harness-failure-cleanup
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-052]
-re_open_trigger: null
+re_open_trigger: "Reviewed at Phase 095 discuss-phase (2026-06-05): a prior note tagged this 'route 095', but its surface is the side-panel pending-ask_user + backend harness-failure-cleanup + HITL round-trip, NOT the chat tool-card surface 095 owns. Routed OUT of 095 (operator did not object). Better fit: the ask_user/failure-honesty line — Phase 096 owns ask_user-restart UAT — or a dedicated HITL-cleanup fix. Stays open; re-route when that phase is scoped."
 reproduces_on:
   branch: v2.5-dev
   commit: post-094 (HEAD after phase 094 completion, 2026-06-05)
