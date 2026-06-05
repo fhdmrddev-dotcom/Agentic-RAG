@@ -64,7 +64,8 @@
 
 ### Polish Riders
 
-- [ ] **CHAT-04**: Chat tool-cards render in **one consistent frame** with auto-scroll, details-on-demand collapse, and no duplicates — closing BUG-260529-02 + `timer-disappears-long-runs` + `step-count-mismatch-timer-vs-panel` + the dead download link. *(sketch-first — G-2 fires)*
+- [x] **CHAT-04
+**: Chat tool-cards render in **one consistent frame** with auto-scroll, details-on-demand collapse, and no duplicates — closing BUG-260529-02 + `timer-disappears-long-runs` + `step-count-mismatch-timer-vs-panel` + the dead download link. *(sketch-first — G-2 fires)*
 - [~] **PARITY-01** *(RE-DEFERRED 2026-06-01 — discuss-093)*: ~~Anthropic Deep-mode parity — synthesized **summary tail** (BUG-260514-02), reduced **iteration bloat** (BUG-260523-04), non-Anthropic real task descriptions (BUG-260528-03).~~ Re-deferred: Deep is provider-robust on all 7; the 3 bugs aren't reproducing for the operator and aren't worth a shared-path risk. Re-open trigger: a focused Deep-mode UX phase OR the bugs re-reproduce. (The "cross-provider parity" the milestone actually needs is PARITY-02 — the *harness* path.)
 
 ### Carry-Forward Verification

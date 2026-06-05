@@ -4,14 +4,14 @@ milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
 stopped_at: "Phase 095 context gathered — ready for /gsd:sketch 095 (G-2)"
-last_updated: "2026-06-05T14:19:06.910Z"
+last_updated: "2026-06-05T19:06:35.288Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 9
   completed_phases: 7
-  total_plans: 42
-  completed_plans: 42
-  percent: 100
+  total_plans: 47
+  completed_plans: 43
+  percent: 91
 ---
 
 # Project State
@@ -21,9 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 094 — all 5 plans shipped; ready for /gsd:verify-work 094
+**Current focus:** Phase 095 — chat-tool-card-unification (EXECUTING, 5 plans / 3 waves)
 
 ## Current Position
+
+**Phase 095 — Plan 095-01 ✅ COMPLETE 2026-06-05** (sequential on `v2.5-dev`, normal commits WITH hooks; `type: execute` with `tdd=true` Tasks — RED confirmed before GREEN, test+impl in one task commit per the 093/094 gap-closure convention). The Wave-1 **foundational primitives** — the three genuinely-new single-sources-of-truth the rest of Phase 095 consumes, built FIRST so later plans cannot fork them (SKETCH-CONSISTENCY §1+§4). Touches **NO existing consumer** — zero behavior change to any rendered surface. **(D-04) `frontend/src/lib/stepCount.ts`** exports `unifiedStepCount(message)` (the ONE integer behind the RunCard step label, the collapsed-row "N steps", the RunCard header, the status strip, and the rail node count) + `dedupToolCalls(toolCalls)` (the ToolCallPanel.tsx:321-334 dedup extracted VERBATIM — same `tc.clientKey ?? tc.id ?? `${name}-${startedAt}-${idx}`` key + first-occurrence ordering — the ONE shared dedup home Plan 03 will import instead of the inline `useMemo`). `unifiedStepCount` = the **deduped** tool count; it **ignores `iterationCount` entirely** (cross-provider-safe — removes the `iteration_start` divergence) AND reads the **persisted** `tool_calls`, which fixes the "Step N vanishes on next-day reopen" bug for free (RESEARCH correction #5). Pure logic, no React hooks. **(D-07) `frontend/src/lib/fileIcon.tsx`** exports `fileIcon(filename, sizePx?)` → one per-extension Lucide glyph (FileText/Table/Image/Code/Presentation) + a colored `.{EXT}` ribbon label, the canonical ext→(color, glyph) map from the 095 sketch (pptx orange / pdf red / docx blue / md slate / csv green / png violet / json teal; default gray `.FILE`) — no second icon system (resolves SKETCH-CONSISTENCY G1). **XSS-safe** (T-095-01-01): the model/user-derived filename is rendered ONLY as a parsed extension label via React text children — never raw-HTML innerHTML, never markup interpolation; `import type { JSX } from react` sidesteps the global-JSX-namespace TS2503 that MessageSkeleton.tsx hits. **Tests:** `stepCount.test.ts` 11/11 (empty/null, clientKey dedup→4, id+composite fallback, **N-tools-across-M-iterations→N not M**, ordering) + `fileIcon.test.tsx` 11/11 (pptx/pdf/png/csv/docx/json labels, no-ext→`.FILE`, mixed-case normalize, svg present, **hostile-filename injection guard**, custom size); both green = 22/22. `tsc -b` = **37 (zero net-new** — zero errors reference stepCount.ts or fileIcon.tsx); `vite build` exit 0. Commits `3fb90249` (Task 1 — D-04) + `a146698e` (Task 2 — D-07). Deviations: NONE (2 doc-only comment rewordings to keep the acceptance greps `useMemo==0` / `dangerouslySetInnerHTML==0` literally clean). **Known stub:** both modules are intentionally **not yet consumed** — that IS the plan objective; wiring happens in Plans 02 (status strip), 03 (RunCard + ToolCallPanel import the dedup + StepRail), 05 (OutputFileCard imports fileIcon). CHAT-04 marked complete in REQUIREMENTS.md. See 095-01-SUMMARY.md (self-check PASSED). **NEXT: Wave 2 — execute 095-02 (RunCard: D-06 persistent timer + D-04 unify all 3 count sites + the one RunStatusStrip) ‖ 095-03 (D-05 sub-agent zero-duplicate root fix + shared dedup import + StepRail); both depend on 01.**
 
 **Phase 094 — ALL 5 PLANS SHIPPED ✅ — implementation COMPLETE 2026-06-04. Plan 094-05 ✅ COMPLETE (the FINAL plan)** (sequential on `v2.5-dev`, normal commits WITH hooks; TDD RED→GREEN). Three pure-frontend renders over data already on the wire, closing the last legibility gaps — **zero backend touch**. **(D-02) The displayed mode label reads SERVER TRUTH (finding #5 killed by construction):** `MessageInput` gained a `displayedMode?: "deep"|"harness"` prop that drives ONLY the Deep/Harness pill TEXT (defaults to `workflowMode` for back-compat); `ChatArea` passes `displayedMode={workflowLocked ? "harness" : "deep"}` derived from the server-truth lock (`workflowLocked` :85, reconciled from `active_workflow_run_id` :161-167). The dropdown items, the active/amber markers, AND the `:307` kickoff staging all keep reading `workflowMode` (the launch-toggle intent for the NEXT kickoff) — a read-derivation change, NOT a state-shape change. A running Harness workflow now shows "Harness" regardless of the stale local toggle. The Phase-092 composer (toggle + picker) is untouched (v2.9 2-pill deferred per D-02). Plan 03's `requestOpenPanel()` preserved. **(D-06 draft) `PendingAskCard` finally RENDERS `ask.draft`** (on the wire + the type since 093-05) via a new `DraftBlock` ABOVE the question — the VERBATIM amber tag `DRAFT · awaiting your review — not yet saved` (the "not yet saved" half non-negotiable — never read as the final answer); long drafts (≥60 words) show a faded-mask preview + `≈ {wordcount} words · long draft` (word count from `draft.length` at render, never a fixture) + a `⤢ Review & edit full draft` control opening a WIDE Dialog overlay OVER the chat (`w-[88vw] max-w-[760px]` = the UI-SPEC min(760px,88%); reuses the 087 DiffExpandOverlay pattern — focus-trap/Escape/restore, never auto-widens the panel). **DRAFT-MISSING guard:** `draft` undefined → no DRAFT block, question only. **(D-06 batch) New `BatchResultList`** reads `useTasks(threadId)` — the panel-only `tasksByThread` slice (PANEL-09) — EXCLUSIVELY, never a chat selector → ZERO chat re-render when a batch summary lands (T-094-05-04); per-subtopic rows = clean `description` (prefix-trimmed sub-question) → real `sub_agent_done.summary` on done, progressive disclosure (collapsed by default), suppressed per-item counts (D-03/§8), plain-text children. All three threat mitigations grep-proven (server-truth mode, no `dangerouslySetInnerHTML`, "not yet saved" label, panel-only read). **Tests:** `ChatAreaMode.test.tsx` 3/3 (locked→Harness over a stale "deep" toggle / unlocked→Deep / absent displayedMode→workflowMode) + `PendingAskCard.test.tsx` 18/18 (5 new draft cases incl. axe-with-draft 0 violations + DRAFT-MISSING guard); full panel suite 111/111 (no regression). `tsc -b` = **37 (zero net-new** — zero errors reference any of this plan's 6 files); `npx vite build` clean. Commits `7cb443f2` (D-02 mode label) + `492695c2` (D-06 draft) + `941c4f17` (BatchResultList). Deviations: NONE. **Known stub:** `BatchResultList` is exported-not-yet-mounted (the plan's Task 3 action = "Export it for reuse"; no mount-point in `files_modified`) — the component + its panel-only data read are complete/correct; wiring it into a batch PhaseCard / panel section is a follow-on render-composition step (documented, non-blocking). See 094-05-SUMMARY.md (self-check PASSED). **NEXT: `/gsd:verify-work 094`** — owns the live Chrome-MCP lived-experience UAT (G-4: mode reads Harness during a real run, draft visible+labelled before answering ask_user, batch summaries readable, both-themes a11y, SC#10 4-axis scoreboard) + the one BatchResultList mount-point to confirm/route.
 
@@ -37,7 +39,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 --- (prior `human_needed` trace retained for audit) ---
 
-Phase: 095
+Phase: --phase (095) — EXECUTING
 
 --- (gap-closure execution trace below — retained for audit) ---
 
@@ -70,7 +72,7 @@ Phase: 093 — GAP-CLOSURE COMPLETE (post-LIVE-UAT, D-15..D-21). Initial 5 plans
 --- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
-Plan: Not started
+Plan: 1 of --name
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -128,7 +130,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-05
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -196,6 +198,7 @@ Progress: [██████████] 100%
 | Phase 094 P04 | 10min | 1 tasks | 2 files |
 | Phase 094 P03 | 14min | 3 tasks | 10 files |
 | Phase 094 P05 | 7min | 3 tasks | 6 files |
+| Phase 095 P01 | 18min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -298,6 +301,8 @@ Recent decisions affecting current work:
 - 094-03: the honest Phase i/N counter derives from the phasesByThread slice (skeleton length=total_phases, active-row index) with a running-floor clamp — forward-only is structural; getThreadWorkflow fetched once for header name + terminal run_status only
 - 094-05: displayed mode label reads server truth (workflowLocked ← active_workflow_run_id) via a new displayedMode prop — kills finding #5 by construction; the Phase-092 launch toggle stays AS-IS (v2.9 2-pill deferred)
 - 094-05: ask.draft renders above the question labelled 'not yet saved' (D-06) with a faded-mask preview + ⤢ wide Dialog overlay; BatchResultList surfaces per-subtopic summaries from the panel-only useTasks store (PANEL-09 — zero chat re-render)
+- 095-01: unifiedStepCount derives from the DEDUPED + PERSISTED tool_calls (ignores iterationCount) — cross-provider-safe count that also survives next-day reopen (D-04 / RESEARCH correction #5)
+- 095-01: ONE shared fileIcon() (Lucide glyph + colored .EXT ribbon, canonical sketch ext-map) reused by every output-file card — no second icon system (D-07 / G1); XSS-safe parsed-ext-label-only (T-095-01-01)
 
 ### Pending Todos
 
@@ -454,7 +459,7 @@ Resume file: --resume-file
 - **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
 - SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
-**Planned Phase:** 094 (workflow-legibility-mode-clarity) — 5 plans — 2026-06-04T18:15:43.111Z
+**Planned Phase:** 095 (chat-tool-card-unification) — 5 plans — 2026-06-05T18:45:59.953Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
