@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 015 · Honest Status Strip + Jump-to-live — Phase 095</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  /* ───────────────────────────────────────────────────────────
+     Sketch 015 — The persistent run-status strip (D-06) + smart
+     follow-scroll & Jump-to-live (D-03). Where does the honest
+     ⏱·Step·activity readout LIVE so it never vanishes on a long run,
+     and how do we follow the live edge but get out of the way?
+     Built inside the 014 winning frame (numbered rail + nodes + bloom).
+     ─────────────────────────────────────────────────────────── */
+
+  body { padding-top: 0; }
+  .stage { max-width: 880px; margin: 0 auto; padding: 20px 20px 120px; }
+
+  /* controls */
+  .ctlbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 14px; padding:10px 12px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); font-size:var(--text-sm); }
+  .ctlbar .sep { width:1px; height:20px; background:var(--color-border); }
+  .ctl-btn { background:var(--color-primary-dim); color:var(--color-primary); border:1px solid var(--color-primary-glow); border-radius:var(--radius-sm); padding:5px 11px; font-size:var(--text-sm); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+  .ctl-btn:hover { background:var(--color-primary-glow); }
+  .ctl-btn.ghost { background:transparent; color:var(--color-text-muted); border-color:var(--color-border); }
+  .ctl-btn.ghost:hover { background:var(--color-accent); color:var(--color-text); }
+  .ctl-btn.warn { background:var(--color-danger-dim); color:var(--color-danger); border-color:hsl(0 72% 51% / .4); }
+  .hint { color:var(--color-text-dim); font-size:var(--text-xs); }
+
+  /* The "never vanishes" contrast readout (Cluster B / BUG-260528-01) */
+  .contrast { display:flex; gap:10px; flex-wrap:wrap; margin:0 0 14px; }
+  .cmp { flex:1 1 320px; border:1px solid var(--color-border); border-radius:var(--radius-md); padding:10px 12px; background:hsl(220 30% 8% / .5); }
+  .cmp .lbl { font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); margin-bottom:7px; }
+  .cmp.today .lbl { color:var(--color-danger); }
+  .cmp.new .lbl { color:var(--color-success); }
+  .readout { font-family:var(--font-mono); font-size:var(--text-sm); display:inline-flex; align-items:center; gap:8px; padding:5px 11px; border-radius:var(--radius-full); background:hsl(220 30% 11% / .8); border:1px solid var(--color-border); }
+  .readout.gone { color:var(--color-danger); border-color:hsl(0 72% 51% / .35); }
+  .readout.live { color:var(--color-text); }
+  .readout.live .a { color:var(--color-primary); }
+  .readout.done { color:var(--color-success); }
+  .cmp .note { font-size:var(--text-xs); color:var(--color-text-muted); margin-top:7px; }
+
+  /* status strip (shared atom) */
+  .status-strip { display:inline-flex; align-items:center; font-family:var(--font-mono); font-size:var(--text-xs); background:hsl(220 30% 11% / .85); border:1px solid var(--color-border); border-radius:var(--radius-full); padding:4px 4px 4px 4px; color:var(--color-text-muted); white-space:nowrap; }
+  .status-strip .seg { padding:0 8px; display:inline-flex; align-items:center; gap:5px; }
+  .status-strip .seg.time { color:var(--color-text); }
+  .status-strip .seg.time::before { content:'⏱'; }
+  .status-strip .divider { width:1px; height:12px; background:var(--color-border); }
+  .status-strip .seg.act { color:var(--color-primary); }
+  .status-strip .seg.act .dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:dotBounce 1.4s ease-in-out infinite; }
+  .status-strip.done { color:var(--color-success); }
+  .status-strip.done .seg.act { color:var(--color-success); } .status-strip.done .seg.act .dot { animation:none; }
+
+  /* chat viewport (scrollable) — seamless, NOT a framed box; thin subtle slider
+     so the run-card never looks caged. The only frame is the run-card's own. */
+  .chat-viewport { position:relative; height:440px; overflow-y:auto; }
+  .chat-viewport::-webkit-scrollbar { width:6px; }
+  .chat-viewport::-webkit-scrollbar-track { background:transparent; }
+  .chat-viewport::-webkit-scrollbar-thumb { background:hsl(220 16% 45% / 0.22); border-radius:3px; }
+  .chat-viewport::-webkit-scrollbar-thumb:hover { background:hsl(220 16% 45% / 0.4); }
+  .chat-inner { padding:4px 2px; }
+  .user-msg { margin:0 0 16px auto; max-width:70%; background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); color:var(--color-text); border-radius:var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); padding:9px 13px; font-size:var(--text-sm); }
+
+  /* run frame */
+  .run-frame { background:linear-gradient(180deg, hsl(220 30% 7% / .6), hsl(220 30% 7% / .3)); border:1px solid var(--color-primary-glow); box-shadow:var(--shadow-glow-primary); border-radius:var(--radius-lg); overflow:visible; }
+  .run-header { display:flex; align-items:center; gap:11px; padding:11px 14px; border-bottom:1px solid var(--color-border); background:hsl(220 30% 8% / .96); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); position:sticky; top:0; z-index:20; border-radius:var(--radius-lg) var(--radius-lg) 0 0; }
+  .avatar { width:26px; height:26px; border-radius:var(--radius-sm); flex:none; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color:#fff; font-size:13px; font-family:var(--font-headline); }
+  .avatar.streaming { animation:brandPulse 1.5s ease-in-out infinite; }
+  .run-title { font-size:var(--text-sm); font-weight:600; line-height:1.2; }
+  .run-sub { font-size:var(--text-xs); color:var(--color-text-dim); }
+  .hdr-strip { margin-left:auto; }
+  .run-progress { height:2px; background:var(--color-primary-dim); position:relative; overflow:hidden; }
+  .run-progress::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / .5), transparent); animation:progressShimmer 1.8s ease-in-out infinite; }
+  .run-body { padding:8px 10px; }
+
+  /* rail + nodes + essence (from 014 winner) */
+  .step { display:grid; grid-template-columns:34px 1fr; border-radius:var(--radius-sm); animation:toolSlideIn var(--dur-base) var(--ease-out); }
+  .rail { position:relative; display:flex; justify-content:center; }
+  .node { position:absolute; top:12px; width:11px; height:11px; border-radius:50%; border:2px solid var(--color-success); background:var(--color-success); z-index:2; }
+  .step.active .node { background:var(--color-bg); border-color:var(--color-primary); box-shadow:0 0 0 4px var(--color-primary-dim); animation:pulseGlow 1.6s ease-in-out infinite; }
+  .rail-line { position:absolute; top:21px; bottom:-2px; width:2px; left:50%; transform:translateX(-50%); background:var(--color-success); }
+  .step.active .rail-line { background:linear-gradient(180deg, var(--color-success), var(--color-primary)); }
+  .snum { font-family:var(--font-mono); font-size:10px; color:var(--color-success); min-width:11px; }
+  .step.active .snum { color:var(--color-primary); font-weight:700; }
+  .step-head { display:flex; align-items:center; gap:8px; padding:8px; border-radius:var(--radius-sm); }
+  .step.active { background:var(--color-primary-dim); box-shadow:inset 2px 0 0 var(--color-primary); }
+  .ess-ic { width:18px; text-align:center; flex:none; }
+  .ess-name { font-family:var(--font-mono); font-size:var(--text-xs); color:var(--color-text-muted); }
+  .ess-arrow { color:var(--color-text-dim); }
+  .ess-text { color:var(--color-text-muted); }
+  .step.active .ess-text { color:var(--color-primary); }
+  .pill { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:var(--radius-full); display:inline-flex; align-items:center; gap:6px; flex:none; margin-left:auto; }
+  .pill .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .pill.done { background:var(--color-success-dim); color:var(--color-success); }
+  .pill.running { background:var(--color-primary-dim); color:var(--color-primary); } .pill.running .dot { animation:dotBounce 1.4s ease-in-out infinite; }
+  .step-body { padding:2px 8px 10px; }
+  .tc-output { padding:8px 12px; background:#0d1117; border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:11px; color:#c9d1d9; line-height:1.7; max-height:160px; overflow-y:auto; }
+  .tc-output .caret { display:inline-block; width:7px; height:12px; background:var(--color-primary); vertical-align:-2px; margin-left:2px; animation:caretBlink 1s steps(1) infinite; }
+  .tc-divider { display:flex; align-items:center; padding:5px 12px; background:hsl(220 30% 9%); border-radius:var(--radius-sm) var(--radius-sm) 0 0; font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); letter-spacing:.06em; text-transform:uppercase; }
+  .tc-divider .live { margin-left:auto; color:var(--color-primary); display:flex; align-items:center; gap:6px; }
+  .tc-divider .live .dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:dotBounce 1.4s ease-in-out infinite; }
+
+  /* clickable folded step + chevron (D-01 details-on-demand) */
+  .step-head.clickable { cursor:pointer; transition:background var(--dur-fast); }
+  .step-head.clickable:hover { background:hsl(220 30% 9% / .5); }
+  .chev { margin-left:4px; color:var(--color-text-dim); transition:transform var(--dur-fast) var(--ease-out); flex:none; }
+  .step.is-open .chev { transform:rotate(90deg); }
+  /* expanded detail body */
+  .det { font-size:var(--text-xs); padding:2px 2px 2px 0; animation:fadeSlideUp var(--dur-base) var(--ease-out); }
+  .det-meta { font-family:var(--font-mono); color:var(--color-text-muted); padding:5px 9px; background:hsl(220 30% 8% / .5); border-radius:var(--radius-sm); margin-bottom:5px; }
+  .det-meta .k { color:var(--color-primary); }
+  .det-r { display:flex; gap:8px; padding:3px 9px; font-size:var(--text-xs); }
+  .det-r .sc { font-family:var(--font-mono); color:var(--color-success); }
+  .det-r .ck { color:var(--color-text-dim); }
+  .det-conf { display:inline-block; margin-top:5px; padding:2px 8px; border-radius:var(--radius-full); background:var(--color-warning-dim); color:var(--color-warning); font-family:var(--font-mono); font-size:10px; }
+  .det-pre { margin:0; padding:8px 11px; background:#0d1117; border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:11px; color:#c9d1d9; white-space:pre-wrap; line-height:1.6; }
+  .subrun-lite { display:flex; align-items:center; gap:7px; font-family:var(--font-mono); font-size:var(--text-xs); color:var(--color-text-muted); }
+  .subrun-lite .av { width:16px; height:16px; border-radius:4px; background:var(--color-accent-violet); color:#fff; display:flex; align-items:center; justify-content:center; font-size:9px; }
+  .dup-ok { margin-left:auto; font-size:10px; padding:1px 7px; border-radius:var(--radius-full); background:var(--color-success-dim); color:var(--color-success); }
+  .det-sum { margin-top:5px; color:var(--color-text); font-size:var(--text-sm); }
+  .todo { padding:3px 9px; font-size:var(--text-sm); color:var(--color-text-muted); }
+  .todo .tst { color:var(--color-primary); font-family:var(--font-mono); font-size:10px; margin-left:6px; }
+  .det-note { margin-top:6px; padding:0 9px; font-size:10px; color:var(--color-text-dim); font-style:italic; }
+  .tc-output.mini { max-height:none; padding:8px 11px; margin-bottom:5px; }
+  .tc-output .cmt { color:#8b949e; font-style:italic; }
+  .det-file { display:flex; align-items:center; gap:8px; padding:7px 10px; background:linear-gradient(135deg, hsl(220 30% 9%), hsl(220 30% 11%)); border:1px solid var(--color-border); border-radius:var(--radius-sm); margin-top:5px; font-size:var(--text-sm); }
+  .det-file .fic { width:26px; height:26px; border-radius:5px; background:linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); display:flex; align-items:center; justify-content:center; font-size:13px; }
+
+  /* ── the two strip homes ── */
+  /* bottom floating live-chip (B + C) — pinned to the viewport's visible bottom */
+  .live-chip { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); width:max-content; max-width:92%; z-index:30; display:flex; align-items:center; gap:0; background:hsl(220 30% 9% / .96); border:1px solid var(--color-primary-glow); box-shadow:var(--shadow-lg), var(--shadow-glow-primary); border-radius:var(--radius-full); padding:5px 5px 5px 6px; font-family:var(--font-mono); font-size:var(--text-xs); cursor:pointer; transition:border-color var(--dur-base) var(--ease-out); }
+  .live-chip:hover { border-color:var(--color-primary); }
+  .live-chip .seg { padding:0 8px; display:inline-flex; align-items:center; gap:5px; color:var(--color-text-muted); }
+  .live-chip .seg.time { color:var(--color-text); } .live-chip .seg.time::before { content:'⏱'; }
+  .live-chip .seg.act { color:var(--color-primary); } .live-chip .seg.act .dot { width:6px;height:6px;border-radius:50%;background:currentColor;animation:dotBounce 1.4s ease-in-out infinite; }
+  .live-chip .divider { width:1px; height:12px; background:var(--color-border); }
+  .live-chip .jump { margin-left:4px; background:var(--color-primary); color:hsl(216 45% 8%); border-radius:var(--radius-full); padding:3px 10px; font-weight:600; display:none; align-items:center; gap:5px; }
+  .live-chip.scrolled .jump { display:inline-flex; }
+  .live-chip.done { border-color:var(--color-success); box-shadow:var(--shadow-lg); }
+  .live-chip.done .seg.act { color:var(--color-success); } .live-chip.done .seg.act .dot { animation:none; }
+
+  /* bare jump pill (variant A only) */
+  .jump-pill { position:absolute; bottom:12px; left:50%; transform:translateX(-50%); width:max-content; z-index:30; display:none; align-items:center; gap:6px; background:var(--color-primary); color:hsl(216 45% 8%); border-radius:var(--radius-full); padding:6px 14px; font-size:var(--text-xs); font-weight:600; cursor:pointer; box-shadow:var(--shadow-lg); }
+  .jump-pill.show { display:inline-flex; }
+
+  /* variant gating */
+  .stage[data-v="a"] .hdr-strip { display:inline-flex; }
+  .stage[data-v="a"] .live-chip { display:none; }
+  .stage[data-v="b"] .hdr-strip { display:none; }
+  .stage[data-v="b"] .jump-pill { display:none !important; }
+  .stage[data-v="c"] .hdr-strip { display:inline-flex; }
+  .stage[data-v="c"] .jump-pill { display:none !important; }
+  /* C: bottom chip only when scrolled away */
+  .stage[data-v="c"] .live-chip { display:none; }
+  .stage[data-v="c"].scrolled .live-chip { display:flex; }
+  /* B: bottom chip always */
+  .stage[data-v="b"] .live-chip { display:flex; }
+
+  .v-caption { margin-top:14px; padding:11px 14px; background:hsl(220 30% 8% / .5); border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary); border-radius:var(--radius-sm); font-size:var(--text-sm); color:var(--color-text-muted); }
+  .v-caption b { color:var(--color-text); }
+  .v-caption .tag { display:inline-block; font-family:var(--font-mono); font-size:10px; padding:1px 6px; border-radius:var(--radius-full); background:var(--color-primary-dim); color:var(--color-primary); margin-right:4px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 015 · Status Strip + Jump-to-live</span>
+  <button class="variant-tab" onclick="setV('a',event)">A · Header strip</button>
+  <button class="variant-tab" onclick="setV('b',event)">B · Bottom live-chip</button>
+  <button class="variant-tab active" onclick="setV('c',event)">C · Hybrid <span class="star">★ winner</span></button>
+</div>
+
+<div class="stage" id="stage" data-v="a">
+
+  <div class="ctlbar">
+    <button class="ctl-btn" id="playBtn" onclick="togglePlay()">▶ Stream</button>
+    <button class="ctl-btn ghost" onclick="resetRun()">↻ Reset</button>
+    <div class="sep"></div>
+    <button class="ctl-btn warn" onclick="fireTransient()">⚠ Fire a transient stream-end (Kimi/Moonshot)</button>
+    <button class="ctl-btn ghost" onclick="trueTerminal()">✓ True terminal</button>
+    <span class="hint" style="margin-left:auto;">Scroll the chat up ↑ to release follow — the Jump-to-live affordance appears.</span>
+  </div>
+
+  <!-- The never-vanishes contrast (BUG-260528-01) -->
+  <div class="contrast">
+    <div class="cmp today">
+      <div class="lbl">Today — gated by <span class="mono">isStreamingNow || elapsedMs&gt;0</span></div>
+      <div id="todayReadout" class="readout live"><span>⏱ 3m12s</span></div>
+      <div class="note">A transient stream-end (common on Kimi/Moonshot long runs) flips <span class="mono">isStreamingNow</span> false mid-run → the whole timer disappears.</div>
+    </div>
+    <div class="cmp new">
+      <div class="lbl">095 — elapsed derived from a stable start-ts, rendered continuously</div>
+      <div id="newReadout" class="readout live"><span class="mono">⏱ 3m12s</span> · <span>Step 7</span> · <span class="a">Running code…</span></div>
+      <div class="note">Immune to dropped SSE, background-tab throttling, temp-id→DB-id remounts. Freezes only on a TRUE terminal.</div>
+    </div>
+  </div>
+
+  <div class="chat-viewport" id="viewport">
+    <div class="chat-inner">
+      <div class="user-msg">Build me a dissertation-defense deck from thesis.pdf and results.pdf — ~10 slides.</div>
+
+      <div class="run-frame">
+        <div class="run-header">
+          <div class="avatar streaming">A</div>
+          <div><div class="run-title">Dissertation deck</div><div class="run-sub">kimi-k2.6 · turn 1</div></div>
+          <div class="hdr-strip" id="hdrStrip"></div>
+        </div>
+        <div class="run-progress" id="runProg"></div>
+        <div class="run-body" id="runBody"></div>
+      </div>
+    </div>
+
+    <!-- bottom-anchored affordances (sticky to viewport bottom) -->
+    <div class="live-chip" id="liveChip" onclick="jumpToLive()"></div>
+    <div class="jump-pill" id="jumpPill" onclick="jumpToLive()">↓ Jump to live</div>
+  </div>
+
+  <div class="v-caption" id="caption"></div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>015</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+</div>
+
+<script>
+const STEPS = [
+  ['🔍','search_documents','Found 14 chunks in "thesis.pdf" (avg 0.61)','1.3s'],
+  ['🔍','search_documents','Found 9 chunks in "results.pdf" (avg 0.58)','1.1s'],
+  ['📄','read_document','Loaded lines 1–120 from "thesis.pdf" (412 total)','0.9s'],
+  ['📄','read_document','Loaded lines 1–88 from "results.pdf" (203 total)','0.8s'],
+  ['✨','analyze_document','Analyzed "results.pdf" (31 pages) → summarized','14.2s'],
+  ['✅','write_todos','Recorded 4 todos: outline → draft → chart → assemble','0.2s'],
+  ['🐍','execute_code','Executed 22 lines → chart_revenue.png (exit 0, 2.1s)','2.1s'],
+  ['🐍','execute_code','Executed 18 lines → chart_growth.png (exit 0, 1.8s)','1.8s'],
+  ['✨','analyze_document','Reviewed both charts → consistent, proceed','2.4s'],
+  ['🐍','execute_code','Building dissertation_defense.pptx…','live'], // active
+];
+const LIVE_LINES = ['building title slide…','slide 3/9: revenue chart embedded','slide 5/9: methodology','slide 7/9: region growth embedded','slide 9/9: conclusions','saved dissertation_defense.pptx'];
+
+let variant='a';
+let activeIndex=9;          // the live pptx build (10-step run)
+let phase='running';        // running | done
+let elapsedBase=220;        // 3m40s banked
+const peeked=new Set();     // finished steps the user clicked open (D-01 details-on-demand)
+let liveElapsed=0;          // current live step seconds (the STABLE-derived value)
+let liveLines=1;
+let following=true;
+let todayGone=false;        // the BUG-260528-01 simulated vanish
+let timer=null, streamTimer=null;
+
+function fmt(s){ s=Math.round(s); const m=Math.floor(s/60); const r=s-m*60; return m>0?`${m}m${String(r).padStart(2,'0')}s`:`${s}s`; }
+function total(){ return elapsedBase + (phase==='running'? liveElapsed : liveElapsed); }
+
+/* per-tool expanded detail (D-01: details re-ranked, never hidden) */
+function searchDet(q,folder,rows){ return `<div class="det"><div class="det-meta"><span class="k">query</span> › "${q}" &nbsp; <span class="k">folder</span> › ${folder}</div>${rows.map(r=>`<div class="det-r"><span class="sc">${r[0]}</span> ${r[1]} <span class="ck">${r[2]}</span></div>`).join('')}<div class="det-conf">● confidence medium · ${rows[0][0]}</div></div>`; }
+function readDet(pre){ return `<div class="det"><pre class="det-pre">${pre}</pre></div>`; }
+function subDet(name,sum){ return `<div class="det"><div class="subrun-lite"><span class="av">A</span> sub-agent · ${name} <span class="dup-ok">✓ 1 card · D-05</span></div><div class="det-sum">${sum}</div></div>`; }
+function todoDet(){ return `<div class="det"><div class="todo">◐ outline <span class="tst">in_progress</span></div><div class="todo">○ draft</div><div class="todo">○ chart</div><div class="todo">○ assemble</div><div class="det-note">panel-owned — shown here as the chat essence; full list lives in the workspace panel.</div></div>`; }
+function codeDet(code,out,fic,fnm,fmt){ return `<div class="det"><div class="tc-output mini"><span class="cmt"># 1 of N lines</span><br>${code}</div><div class="det-meta">stdout › ${out} · exit 0</div><div class="det-file"><span class="fic">${fic}</span> <b>${fnm}</b> <span class="ck">${fmt} · click to view</span></div></div>`; }
+function detailHTML(i){
+  switch(i){
+    case 0: return searchDet('dissertation methodology + results','thesis/',[['0.61','thesis.pdf','chunk 4/38'],['0.59','thesis.pdf','chunk 7/38'],['0.55','results.pdf','chunk 2/19']]);
+    case 1: return searchDet('key quantitative results','results/',[['0.58','results.pdf','chunk 2/19'],['0.54','results.pdf','chunk 9/19']]);
+    case 2: return readDet('# Methodology\nWe evaluate the proposed estimator on three\nbenchmark corpora (A/B/C), reporting YoY deltas\nand 95% confidence intervals.');
+    case 3: return readDet('## Results\nQ3 revenue rose 30.9% YoY, driven by APAC (+44%).\nMargin held at 61%. See Table 3 for the breakdown.');
+    case 4: return subDet('analyze_document','Q3 revenue +30.9% YoY (vs +21.7% Q2); APAC +44% the driver. Two figures worth charting: revenue-by-quarter, region growth.');
+    case 5: return todoDet();
+    case 6: return codeDet('rev.plot.bar(x="q", y="yoy")','yoy_q3 = 30.87%','🖼','chart_revenue.png','88 KB · matplotlib');
+    case 7: return codeDet('growth.plot.bar(x="region")','apac = 44.0%','🖼','chart_growth.png','71 KB · matplotlib');
+    case 8: return subDet('analyze_document','Both charts consistent with the source tables; axes labelled, units present. Safe to proceed to deck assembly.');
+    default: return '';
+  }
+}
+function expandStep(i){ if(i===activeIndex && phase==='running') return; if(peeked.has(i)) peeked.delete(i); else peeked.add(i); render(); }
+
+function essence(i){
+  const s=STEPS[i]; const st = i<activeIndex?'done':(i===activeIndex?'active':'queued');
+  const line = (i<activeIndex)? '<div class="rail-line"></div>':'';
+  const liveOpen = (i===activeIndex && phase==='running');
+  const open = liveOpen || peeked.has(i);
+  let head, body='';
+  if(liveOpen){
+    head = `<span class="ess-ic">${s[0]}</span><span class="ess-name">${s[1]}</span><span class="ess-text">${s[2]}</span><span class="pill running"><span class="dot"></span>running</span>`;
+    const shown = LIVE_LINES.slice(0,liveLines).map((l,j)=>`<div>${l}${j===liveLines-1?'<span class="caret"></span>':''}</div>`).join('');
+    body = `<div class="step-body"><div class="tc-divider"><span>STDOUT</span><span class="live"><span class="dot"></span>streaming · ${liveElapsed.toFixed(1)}s</span></div><div class="tc-output">${shown}</div></div>`;
+  } else {
+    const pill = `<span class="pill done"><span class="dot"></span>${s[3]==='live'?'done':s[3]}</span>`;
+    head = `<span class="ess-ic">${s[0]}</span><span class="ess-name">${s[1]}</span><span class="ess-arrow">→</span><span class="ess-text">${s[2]}</span>${pill}<span class="chev">›</span>`;
+    if(peeked.has(i)) body = `<div class="step-body">${detailHTML(i)}</div>`;
+  }
+  const click = liveOpen ? '' : ` onclick="expandStep(${i})"`;
+  return `<div class="step ${st}${open?' is-open':''}"><div class="rail"><div class="node"></div>${line}</div><div class="step-main"><div class="step-head${liveOpen?'':' clickable'}"${click}><span class="snum">${i+1}</span>${head}</div>${body}</div></div>`;
+}
+
+function stripInner(forChip){
+  if(phase==='done'){
+    return `<span class="seg act"><span class="dot"></span>done</span><span class="divider"></span><span class="seg time">${fmt(total())}</span><span class="divider"></span><span class="seg">${STEPS.length} steps</span>`;
+  }
+  return `<span class="seg time">${fmt(total())}</span><span class="divider"></span><span class="seg">Step ${activeIndex+1}</span><span class="divider"></span><span class="seg act"><span class="dot"></span>Running code…</span>`;
+}
+
+function render(){
+  // steps
+  let html='';
+  const upto = phase==='done'? STEPS.length-1 : activeIndex;
+  for(let i=0;i<=upto;i++) html+=essence(i);
+  document.getElementById('runBody').innerHTML = html;
+  // header strip
+  document.getElementById('hdrStrip').innerHTML = `<div class="status-strip ${phase==='done'?'done':''}">${stripInner()}</div>`;
+  // bottom chip
+  const chip=document.getElementById('liveChip');
+  chip.className = 'live-chip'+(following?'':' scrolled')+(phase==='done'?' done':'');
+  chip.innerHTML = stripInner(true) + `<span class="jump">↓ Jump to live</span>`;
+  // bare jump pill (variant A)
+  const jp=document.getElementById('jumpPill');
+  jp.className='jump-pill'+(!following && phase==='running'?' show':'');
+  // progress + avatar
+  document.getElementById('runProg').style.display = phase==='done'?'none':'block';
+  // contrast readouts
+  const nr=document.getElementById('newReadout');
+  nr.className='readout '+(phase==='done'?'done':'live');
+  nr.innerHTML = phase==='done'
+    ? `<span class="mono">✓ done · ⏱ ${fmt(total())}</span> · <span>${STEPS.length} steps</span>`
+    : `<span class="mono">⏱ ${fmt(total())}</span> · <span>Step ${activeIndex+1}</span> · <span class="a">Running code…</span>`;
+  const tr=document.getElementById('todayReadout');
+  if(todayGone){ tr.className='readout gone'; tr.innerHTML='<span>⏱ —</span> <span style="font-size:10px">timer vanished mid-run</span>'; }
+  else { tr.className='readout '+(phase==='done'?'done':'live'); tr.innerHTML = phase==='done'?`<span class="mono">⏱ ${fmt(total())}</span>`:`<span class="mono">⏱ ${fmt(total())}</span>`; }
+  updateCaption();
+}
+
+function updateCaption(){
+  const caps={
+    a:'<span class="tag">D-06</span> <b>Header strip.</b> Status rides the run-card header (sticky to the top of the chat viewport while the run is on screen). Rich identity, one home. Trade-off: on a tall run the strip sits at the top while the live action is at the bottom — the eye splits. Jump-to-live is a bare pill.',
+    b:'<span class="tag">D-06</span><span class="tag">D-03</span> <b>Bottom live-chip.</b> The status readout floats at the live edge, always visible, and IS the scroll anchor — it morphs to include "↓ Jump to live" when you scroll up. Status sits exactly where the action is. Trade-off: less run-identity at the top.',
+    c:'<span class="tag">D-06</span><span class="tag">D-03</span> <b>Hybrid (recommended candidate).</b> Header strip carries identity while the run is in view; the moment you scroll away (or the header leaves the viewport) a bottom chip appears at the live edge carrying the full status + Jump-to-live. Honest from both ends — you can never lose the timer or the live edge.'
+  };
+  document.getElementById('caption').innerHTML = caps[variant];
+}
+
+/* ── smart follow-scroll (D-03) ── */
+const vp=document.getElementById('viewport');
+function nearBottom(){ return vp.scrollHeight - vp.scrollTop - vp.clientHeight < 56; }
+vp.addEventListener('scroll', ()=>{
+  following = nearBottom();
+  document.getElementById('stage').classList.toggle('scrolled', !following);
+  render();
+});
+function jumpToLive(){ following=true; vp.scrollTop=vp.scrollHeight; document.getElementById('stage').classList.remove('scrolled'); render(); }
+function autoFollow(){ if(following) vp.scrollTop=vp.scrollHeight; }
+
+/* ── play / stream ── */
+function togglePlay(){
+  if(timer){ stop(); return; }
+  document.getElementById('playBtn').textContent='⏸ Pause';
+  if(phase==='done') resetRun();
+  timer=setInterval(()=>{ if(phase!=='running')return; liveElapsed+=0.25; render(); autoFollow(); }, 250);
+  streamTimer=setInterval(()=>{
+    if(phase!=='running')return;
+    if(liveLines<LIVE_LINES.length){ liveLines++; render(); autoFollow(); }
+    else { trueTerminal(); stop(); }
+  }, 1400);
+}
+function stop(){ clearInterval(timer); clearInterval(streamTimer); timer=streamTimer=null; document.getElementById('playBtn').textContent='▶ Stream'; }
+function resetRun(){ stop(); phase='running'; activeIndex=9; elapsedBase=220; liveElapsed=0; liveLines=1; todayGone=false; following=true; peeked.clear(); document.getElementById('stage').classList.remove('scrolled'); render(); setTimeout(()=>vp.scrollTop=vp.scrollHeight,30); }
+
+/* ── the bug demos ── */
+function fireTransient(){ // a transient stream-end: today's timer vanishes, 095 keeps ticking
+  todayGone=true; render();
+  // 095 keeps streaming — prove it by ensuring play continues / elapsed still moves
+  if(!timer) togglePlay();
+}
+function trueTerminal(){ stop(); phase='done'; // freeze both; 095 shows final, today stays gone (it already lost the value)
+  render(); }
+
+function setV(v,ev){
+  variant=v; document.getElementById('stage').dataset.v=v;
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  if(ev) ev.target.classList.add('active'); else document.querySelectorAll('.variant-tab')[{a:0,b:1,c:2}[v]].classList.add('active');
+  render(); setTimeout(()=>{ if(following) vp.scrollTop=vp.scrollHeight; },20);
+}
+setV('c');
+render();
+setTimeout(()=>vp.scrollTop=vp.scrollHeight, 60);
+</script>
+</body>
+</html>
