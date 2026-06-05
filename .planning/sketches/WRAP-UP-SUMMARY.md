@@ -139,3 +139,44 @@ Unlike the first two sessions, this batch was authored against a real-evidence b
 ## Downstream
 
 These findings are the design substrate for **Phase 094 (Workflow Legibility + Mode Clarity)**. Build-now: 008-D · 009-C · 010-C · 011-A · 012-A — these mostly render harness lifecycle events already on the wire plus a published-workflows list endpoint (low/no new backend; the few net-new bindings, e.g. `folder_ids` on a phase config, are flagged honestly in the references). Design-ahead: 013 (NL builder, v2.9, SEED-051 spike-first). The G-2 sketch acceptance bar is met; next on the 094 path is the UI design contract / discuss-phase. The skill auto-loads during build for harness/workflow-run, composer, and chat-surface work.
+
+---
+
+# Session 4 — Chat Tool-Card Unification (Phase 095)
+
+**Date:** 2026-06-05
+**Sketches processed:** 3 (014–016 — all included)
+**Design areas:** Chat Tool-Card Unification (one combined area: unified frame · status strip + scroll · output files)
+**Skill output:** appended to `./.claude/skills/sketch-findings-agentic-rag/` (now 13 reference files across four sessions; new: `references/chat-tool-card-unification.md`)
+
+## Included Sketches
+
+| # | Name | Winner | Design Area / Reference |
+|---|------|--------|-------------------------|
+| 014 | unified-card-frame | Synthesis — rail + status nodes + active bloom | Chat Tool-Card Unification → `references/chat-tool-card-unification.md` |
+| 015 | status-strip-and-scroll | C — Hybrid (header strip + bottom Jump-to-live chip) | (same reference) |
+| 016 | output-files-hero | A — Hero block + working group; per-extension SVG icons | (same reference) |
+
+## Excluded Sketches
+
+_None — all three included; packaged as ONE design area (they are one component set, not three)._
+
+## Grounding
+
+Authored against `095-SKETCH-GROUNDING.md` (real Deep SSE event vocabulary, the 24-tool set with literal resting-essence strings, the current-render "before", the three bug clusters + root mechanisms) — preserved in the skill at `sources/095-grounding/GROUNDING.md`. After all three were built, an independent cross-sketch audit (`095-SKETCH-CONSISTENCY.md`, also preserved) caught that the standalone HTML files had drifted into 13 near-duplicate copies of the same primitives; that audit became the **build-once component inventory** that the reference file leads with.
+
+## Design Direction
+
+**Calm instrument, the Deep tool-cards fixed-and-unified in place.** 094 D-01 kept Deep's cards in the chat (not the panel); 095 makes them one consistent calm frame: a borderless step-numbered status-node rail (the locked sequence *felt* without per-card borders), finished steps fold to a muted one-line essence, the active step blooms, every card click-expands to its detail. A run-status strip that NEVER vanishes (stable-start-ts, freezes only on a true terminal) lives in a hybrid header/floating placement with follow-but-release scroll. Output files hero the deliverable, keep intermediates present-but-quiet, and always download — with proper per-extension SVG file icons. Same Aether Deep Midnight tokens; same motion vocabulary.
+
+## Key Decisions
+
+1. **Unified frame = borderless status-node rail + active bloom (014 Synthesis).** Rail nodes fill green→done / pulsing-primary→active / dim→queued; one-line essence at rest (muted), active blooms (primary wash + left bar), click-to-expand details (D-01). Row-numbering makes the honest step count (D-04) and zero-duplicate (D-05) **structural**.
+2. **Honest run-status strip + follow-but-release scroll (015 Hybrid).** `⏱·Step·activity` derived from a stable start-ts, rendered continuously, frozen only on a true terminal (closes the Kimi/Moonshot vanish bug — a *timer-derivation* fix, not a placement choice). Header strip while in view + bottom Jump-to-live chip on scroll-away; follow the live edge, release on scroll-up, re-arm at bottom (D-03/D-06).
+3. **Output files hero/working + always-downloadable (016 Hero block).** "★ Your file" hero (agent-flagged) + visible-but-quiet working group; every link downloads even on a chat reopened tomorrow (re-sign on demand; investigate the dead-link root first — D-07/D-08).
+4. **Per-extension SVG file icons.** Document + folded corner + type glyph + colored extension ribbon (Untitled-UI / "40 file type" style). One shared `fileIcon()` across all three.
+5. **The governing build rule.** These three are ONE component set. Build the inventory once (`RunFrame` · `StepRail/StepRow` · `ToolEssenceLine` · one `ToolBody` · one `RunStatusStrip` · one `fileIcon` · one `OutputFileCard` · `SubAgentEssence` · `unifiedStepCount()` · `useFollowScroll`). `unifiedStepCount()` (feeds rail # + strip "Step N" + collapsed "N steps") IS the embodied D-04/D-05 fix. Forbid re-forking `.file-out` / `detailHTML` / a 2nd status-strip.
+
+## Downstream
+
+The design substrate for **Phase 095 (Chat Tool-Card Unification)**. Each sketch README carries a reuse-vs-net-new Build Handover; `references/chat-tool-card-unification.md` consolidates the decisions + the build-once inventory. G-2 acceptance bar met; next on the 095 path is `/gsd:plan-phase 095` (or `/gsd:ui-phase 095` for a UI-SPEC). The skill auto-loads during build for the chat tool-card frame, the run-status strip, scroll, and the output-files area.

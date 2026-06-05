@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-agentic-rag
-description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, AND the Phase 094 workflow-mode surfaces (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, StreamsProvider, MessageItem, useMessages, the workspace panel, the harness/workflow run UI, the composer, or any chat-surface component that touches the agent's mid-execution moment.
+description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, AND the Phase 095 chat tool-card unification (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the composer, or any chat-surface component that touches the agent's mid-execution moment.
 ---
 
 <context>
@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095)
 </context>
 
 <design_direction>
@@ -55,6 +55,15 @@ The v2.8 harness engine made the agent run *locked, ordered, multi-phase* workfl
 - **Authoring is talk-led (v2.9 design-ahead).** You build a workflow by *describing* it; the AI drafts a read-mostly, live-streaming phase-card diagram from the 5 real phase types — no drag-canvas. Publish locks an immutable, versioned definition (SEED-051).
 
 Color language extends the existing vocabulary: amber = active / needs-you / paused, green = done, red = failed, purple = retrying, primary = live pointer.
+
+## Chat Tool-Card Unification (Phase 095)
+
+094 D-01 kept Deep's tool-cards **in the chat** (not moved to the panel); 095 fixes-and-unifies them *in place*, refining the 001-C/002-C/003-B language. Three concerns, **one component set** (see `references/chat-tool-card-unification.md` + `sources/095-grounding/CONSISTENCY.md`):
+
+- **Unified frame = a borderless, step-numbered status-node rail.** Nodes fill green→done / pulsing-primary-ring→active / dim→queued so the sequence is *felt* without per-card borders; finished steps fold to a one-line essence (`# icon · tool → result`, muted), the active step blooms (primary wash + left bar). Every finished card is **click-to-expand** to its full per-tool body (details re-ranked, never hidden — D-01). Row numbering makes the honest step count (D-04) and the zero-duplicate invariant (D-05) **structural**, not cosmetic.
+- **Honest run-status strip + follow-but-release scroll.** `⏱ elapsed · Step N · activity` that **never vanishes** — elapsed derives from a **stable start-ts**, renders continuously (immune to dropped SSE / tab throttling / temp-id remounts), and freezes only on a TRUE terminal (closes the Kimi/Moonshot vanish bug; the never-vanishes fix is a *timer-derivation code change*, not a placement choice). Placement is **hybrid**: header strip while in view + a bottom chip with "↓ Jump to live" on scroll-away. Scroll follows the live edge, releases on scroll-up, re-arms at bottom.
+- **Output files = hero the deliverable, keep working files quiet, always-downloadable.** A big "★ Your file" hero (the agent-flagged final output) + a visible-but-quiet "Working files (N)" group. Every link downloads in one click, even on a chat reopened tomorrow (re-sign on demand; investigate the dead-link root first). The agent flags the hero via a small backend tag on `final_output_files` (D-08). **Per-extension SVG file icons** (document + folded corner + type glyph + colored extension ribbon, Untitled-UI style).
+- **The governing rule:** build the shared inventory ONCE — `RunFrame` · `StepRail/StepRow` · `ToolEssenceLine` · one `ToolBody` · one `RunStatusStrip` (two placement wrappers) · one `fileIcon` · one `OutputFileCard` · `SubAgentEssence` · `unifiedStepCount()` · `useFollowScroll`. `unifiedStepCount()` (one derivation feeding rail # + strip "Step N" + collapsed "N steps") IS the embodied D-04/D-05 honesty fix. Forbid re-forking `.file-out` / `detailHTML` / a second status-strip.
 </design_direction>
 
 <findings_index>
@@ -87,6 +96,12 @@ Color language extends the existing vocabulary: amber = active / needs-you / pau
 | Workflows Page | [references/workflows-page.md](references/workflows-page.md) | First-class nav page (browse + launch only) from `GET /workflows/published`; card grid shows each workflow's locked phase chain inline; Run → new thread + `active_workflow_run_id` + redirect-into-thread (execution is always a thread mode, never page-resident); build NOW, no new backend |
 | Workflow Builder (v2.9) | [references/workflow-builder.md](references/workflow-builder.md) | NL authoring: describe → AI drafts a read-mostly live-streaming phase-card diagram (5 real phase types + tool whitelist + gate + KB scope); refine by talking (no drag-canvas); lint gates publish; publish freezes immutable v1 / edits fork v2; per-phase KB folder picker. **Design-ahead — build v2.9 (SEED-051)** |
 
+**Chat tool-card unification (sketches 014–016, Phase 095):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Chat Tool-Card Unification | [references/chat-tool-card-unification.md](references/chat-tool-card-unification.md) | **One component set, three concerns.** (1) Unified frame = a borderless step-numbered status-node rail (green→done / pulsing-primary→active / dim→queued); finished steps fold to a muted one-line essence, active blooms, click-to-expand details; row-numbering makes D-04 count + D-05 zero-dup structural. (2) Honest run-status strip that never vanishes (stable-start-ts, freezes only on true terminal) + hybrid placement (header + bottom Jump-to-live chip) + follow-but-release scroll. (3) Output files hero/working split + always-downloadable + per-extension SVG file icons. **Build `unifiedStepCount()` once = the embodied honesty fix; forbid re-forking `.file-out`/`detailHTML`/a 2nd strip.** See `sources/095-grounding/CONSISTENCY.md`. |
+
 ## Theme
 
 The winning theme file is at [sources/themes/default.css](sources/themes/default.css). Tokens are direct mirrors of `frontend/src/index.css :.dark` — so transitioning sketches to React code should be a straight port, not a rebuild.
@@ -109,7 +124,13 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/012-workflows-page/](sources/012-workflows-page/) — winner: A (Card grid)
 - [sources/013-workflow-builder/](sources/013-workflow-builder/) — winner: A (Talk-led; v2.9 design-ahead)
 
+- [sources/014-unified-card-frame/](sources/014-unified-card-frame/) — winner: Synthesis (rail + status nodes + active bloom)
+- [sources/015-status-strip-and-scroll/](sources/015-status-strip-and-scroll/) — winner: C (Hybrid — header strip + bottom Jump-to-live chip)
+- [sources/016-output-files-hero/](sources/016-output-files-hero/) — winner: A (Hero block + working group; per-extension SVG icons)
+
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
+
+**Phase 095 grounding** — [sources/095-grounding/](sources/095-grounding/) holds `GROUNDING.md` (the real Deep SSE event vocabulary, the 24-tool set with literal resting-essence strings, the current-render "before", and the three bug clusters with their root mechanisms) and `CONSISTENCY.md` (the build-once component inventory + the 13-drift cross-sketch audit). Read both before wiring real event names or building any of the 014–016 surfaces.
 </findings_index>
 
 <when_to_load>
@@ -142,6 +163,14 @@ Load and apply this skill when:
 - Building the v2.9 NL workflow builder / authoring surface or the per-phase KB folder picker (`references/workflow-builder.md`)
 - Working on any phase tagged `harness`, `workflow`, `timeline`, `unify`, `composer`, `mode`, `honesty`, `launcher`, or `nl-authoring`, or on Phase 094 (Workflow Legibility + Mode Clarity)
 
+**Chat tool-card unification (sketches 014–016, Phase 095) — load when:**
+
+- Building or refactoring the Deep tool-card frame in `RunCard.tsx` / `ToolCallPanel.tsx` — the status-node rail, the one-line essence + click-to-expand, Focus-Mode fold/bloom, or the zero-duplicate sub-agent card (`references/chat-tool-card-unification.md`)
+- Building the persistent run-status strip (the never-vanishes timer derivation), its hybrid header/floating placement, the "Jump to live" chip, or the follow-but-release scroll in `MessageList.tsx`
+- Building the output-files area in `MessageItem.tsx` / `OutputFileCard.tsx` — the hero/working split, the agent-flagged final output, the always-downloadable guarantee, or the per-extension `fileIcon`
+- Implementing `unifiedStepCount()` or the `clientKey`/`makeToolKey` sub-agent-path dedup (the embodied D-04/D-05 honesty fixes) — **read `sources/095-grounding/CONSISTENCY.md` first to build the shared inventory once, not three forks**
+- Working on any phase tagged `tool-card`, `unify`, `status-strip`, `timer`, `auto-scroll`, `output-files`, `download`, or on Phase 095 (Chat Tool-Card Unification)
+
 Skip when:
 
 - Working on non-chat, non-panel surfaces (settings, document library, skill studio, auth)
@@ -167,4 +196,10 @@ Skip when:
 - 011-mode-and-composer (winner: A — Status chip + Cancel)
 - 012-workflows-page (winner: A — Card grid)
 - 013-workflow-builder (winner: A — Talk-led; v2.9 design-ahead)
+
+**Phase 095 — Chat Tool-Card Unification (2026-06-05):**
+
+- 014-unified-card-frame (winner: Synthesis — rail + status nodes + active bloom)
+- 015-status-strip-and-scroll (winner: C — Hybrid: header strip + bottom Jump-to-live chip)
+- 016-output-files-hero (winner: A — Hero block + working group; per-extension SVG icons)
 </metadata>
