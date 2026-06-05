@@ -24,7 +24,7 @@ use it, and the single source of truth it must read. **This is the contract for 
 | **`ToolBody` (per-tool)** | expand-on-click body: search meta/rows+confidence · read preview · code editor+STDOUT+caret · sub-agent summary · todo list | 014 `bodyHTML` ⊕ 015 `detailHTML` | **ONE** renderer keyed by tool kind — collapses the **G4 fork**; reuse existing `ToolCallPanel` bodies |
 | **`StatusPill`** | running/done/err mono pill + dot | 014 · 015 · 016 | one component; state = card status |
 | **`RunStatusStrip`** | `⏱ elapsed · Step N · activity` chip | 014 (header) · 015 (header **and** floating `live-chip`) | ONE strip, **two placement wrappers** (header / floating). Reads stable-start-ts elapsed + unified step count + activity verb. Resolves **G8/G9/G12** |
-| **`fileIcon` / `iconFor`** | ext→gradient tile + uppercase label (`.ficx`) | 014 · 015 · 016 | **ONE** module; 016's superset map (incl. `rtf`/`ts`/`html`) is canonical. Resolves **G1** |
+| **`fileIcon`** | SVG file icon: document + folded corner + type glyph + colored extension ribbon (Untitled-UI style) | 014 · 015 · 016 | **ONE** module (now byte-identical across all three); ext→(color, glyph-category) map. In code, a Lucide-based equivalent is fine. Resolves **G1** |
 | **`OutputFileCard` (+Hero/Working)** | generated-file row: icon tile + name + size/sub + download btn; hero emphasis + working-group | 014 (`.file-out` inline) ⟶ must NOT fork · 016 (hero/working) | **ONE** card — production already reuses `OutputFileCard` (grounding §3). Hero/working = a layout flag + `dl-btn` states (idle/ok/dead). Resolves **G5/G11** |
 | **`SubAgentEssence`** | single sub-agent card, one-per-task, dedup badge | 014 `.subrun` · 015 `.subrun-lite` | one component; the real fix = extend the `clientKey`/`makeToolKey` stamp to the sub-agent path (D-05). Resolves **G10** |
 | **`unifiedStepCount()`** | the single integer behind rail `snum`, strip `Step N`, **and** collapsed "N steps" | 014 · 015 · 016 (all independent today) | ONE derivation feeding rail + strip + collapsed header — the **embodied D-04 fix**. Resolves **G6** |
@@ -53,7 +53,7 @@ The audit found 13 drifts. Resolution (canonical source in **bold**); ✅ = fixe
 
 | # | Gap | Resolution |
 |---|---|---|
-| **G1** | `iconFor()` ext map: 016 is a superset (`rtf`/`ts`/`html`); 014/015 fall back to gray `?` for those | ✅ **014/015 aligned to 016's superset map.** Canonical = **016 `iconFor`**. Build = one module. |
+| **G1** | file icon was a solid color+text tile, then ext-map drift | ✅ **Replaced with a proper SVG file icon** (document + folded corner + type glyph + colored extension ribbon, Untitled-UI / "40 file type" style — operator ref). `fileIcon()` is now **byte-identical across 014/015/016**; the legacy `iconFor()` tile is superseded. Build = one module (Lucide-based equivalent fine). |
 | **G4** | Expand body forked: 014 `bodyHTML` (`.tc-search-*`/`.tc-editor`) vs 015 `detailHTML` (`.det-*`) | 📋 **ONE `ToolBody` keyed by tool kind** (reuse `ToolCallPanel` bodies). **Highest-risk drift** — forbid a second body system at build. |
 | **G3** | Resting `.ess-text` base color: 014 bright (`--color-text`) vs 015 muted; (014 mutes finished via `.step.done`) | ✅ **014 base set to muted** to match 015 — finished essence lines recede uniformly; active → primary in both. |
 | **G6** | Run-length fixture differs: 014=6 steps, 015=10, 016="10 steps", grounding §6=**11** | 📋 **Build to the §6 11-step fixture.** D-04 "count == cards" is proven per-sketch; cross-sketch counts intentionally not unified in throwaway mockups. |

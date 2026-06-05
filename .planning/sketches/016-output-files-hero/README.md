@@ -9,8 +9,10 @@ tags: [chat, output-files, hero, download, phase-095, D-07, D-08]
 > **Winner: A — Hero block.** A big, unmissable "★ Your file" card for the deliverable + a quieter
 > "Working files (N)" group. Per operator direction the working group **defaults open** (visible but
 > secondary) to honor "show all files," with the collapse affordance retained. File-type icons are
-> **per-extension color badges** (PPTX/PNG/MD/PDF/DOCX…) — one shared `fileIcon()` system reused by
-> sketches 014 + 015 too.
+> **proper SVG file icons** — a document with a folded corner, a type glyph (text-lines / table grid /
+> image / `</>` / slide bars), and a colored extension ribbon (`.PPTX` orange, `.PNG` violet, `.MD`
+> grey, `.PDF` red, `.DOCX` blue, `.CSV` green…), Untitled-UI / "40 file type" style. One shared
+> `fileIcon()` reused by sketches 014 + 015 too (operator ref 2026-06-05).
 
 # Sketch 016: Output Files — Hero / Working Split
 
@@ -67,7 +69,7 @@ Line anchors from `095-SKETCH-GROUNDING.md §3` — re-confirm at plan-phase.
 |---|---|---|---|
 | **Hero vs working split** | D-07 | flat index-ordered list, no hierarchy (`MessageItem.tsx:506–527`) | render the agent-flagged final output as a hero block; the rest as a visible-but-quiet "Working files" group |
 | **Agent flags the final deliverable** | D-08 | no `final`/role field on the `final_output_files` payload today | a small backend tag per file (the agent knows intent) — render as "agent-flagged final output"; **exact field name = planning/backend decision (verify)** |
-| **Per-extension file-type icon** (`fileIcon`/`iconFor`) | D-07 | one generic gradient icon for every file | extension→badge map (PPTX/PNG/MD/PDF/DOCX/CSV/JSON…); **shared with the 014/015 chat file cards** — build once |
+| **Per-extension file-type icon** (`fileIcon`) | D-07 | one generic gradient icon for every file | SVG document-with-folded-corner + type glyph + colored extension ribbon (Untitled-UI style); extension→(color, glyph) map; **shared with the 014/015 chat file cards** — build once. In code, a Lucide-based equivalent (FileText/Image/Table/Code/Presentation + colored ext label) is fine |
 | **Always-downloadable on reopen** | D-08 | dead links on reopen: signed-URL 1h TTL / sandbox cleanup / `url`-missing files render with no affordance (`OutputFileCard.tsx:72–86`) | **investigate-first** the exact dead-link root, then re-sign on demand (the contained backend touch); guarantee every final output carries a working `url` |
 
 ### ↪ Out of scope
