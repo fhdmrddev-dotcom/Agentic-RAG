@@ -711,7 +711,10 @@ export function makeStreamCallbacks(opts: {
     // assistant message; MessageItem renders the panel below the per-cell
     // delta outputs in each execute_code tool card. The reducer never
     // mutates `m.content` (Plan 03 invariant — only onDelta appends).
-    onFinalOutputFiles: (files: { filename: string; url?: string }[]) => {
+    onFinalOutputFiles: (files: { filename: string; url?: string; size?: number; is_hero?: boolean }[]) => {
+      // Phase 095 Plan 05 (D-08): the additive `is_hero` flag rides through the
+      // existing full-replace stamp untouched — MessageItem groups heroes above
+      // a collapsible Working files group.
       setMessages((prev) =>
         prev.map((m) => (m.id === assistantId ? { ...m, finalOutputFiles: files } : m)),
       )

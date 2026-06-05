@@ -112,7 +112,10 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
   // so reloaded messages display output file download links in the Final Outputs panel.
   // The persisted execute_code result contains output_files with {filename, url}.
   if (mapped.tool_calls?.length) {
-    const outputFiles: { filename: string; url?: string }[] = []
+    // Phase 095 Plan 05 (D-08): carry the persisted `is_hero` flag through reload
+    // reconstruction so a chat reopened the next day re-heroes the same file
+    // (the backend persists it onto each execute_code output_files entry).
+    const outputFiles: { filename: string; url?: string; size?: number; is_hero?: boolean }[] = []
     for (const tc of mapped.tool_calls) {
       if (tc.name === "execute_code" && tc.result) {
         try {
@@ -120,7 +123,7 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
           if (Array.isArray(r.output_files)) {
             for (const f of r.output_files) {
               if (f.filename) {
-                outputFiles.push({ filename: f.filename, url: f.url })
+                outputFiles.push({ filename: f.filename, url: f.url, size: f.size, is_hero: f.is_hero })
               }
             }
           }
@@ -290,7 +293,7 @@ export interface StreamCallbacks {
    * `finalOutputFiles`; MessageItem renders the pinned "Final outputs"
    * panel below the per-cell delta panels. Backend wire event type is
    * `final_output_files`. Payload shape: { filename: string; url?: string }[]. */
-  onFinalOutputFiles?: (files: { filename: string; url?: string }[]) => void
+  onFinalOutputFiles?: (files: { filename: string; url?: string; size?: number; is_hero?: boolean }[]) => void
   onSources?: (sources: SourceReference[]) => void
   onCitations?: (citations: Citation[]) => void
   onConfidence?: (
@@ -587,8 +590,10 @@ export async function subscribeToRun(
         // The reducer in StreamsProvider stamps it on the assistant message
         // as `finalOutputFiles`; MessageItem renders the pinned panel.
         else if (t === "final_output_files" && callbacks.onFinalOutputFiles)
+          // Phase 095 Plan 05 (D-08): the additive `is_hero` field flows through
+          // untouched as an extra key on each file dict — no dispatch change.
           callbacks.onFinalOutputFiles(
-            (parsed.files ?? []) as { filename: string; url?: string }[],
+            (parsed.files ?? []) as { filename: string; url?: string; size?: number; is_hero?: boolean }[],
           )
         else if (t === "sources" && callbacks.onSources)
           callbacks.onSources((parsed.sources ?? []) as SourceReference[])

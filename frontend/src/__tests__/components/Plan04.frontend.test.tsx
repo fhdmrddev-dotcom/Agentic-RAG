@@ -179,7 +179,7 @@ describe("Atom D — tool-card renders Sub-agent line when sub_agent_model prese
 // ── Atom E pt 2: pinned Final outputs panel on MessageItem (B-260519-11) ──
 
 
-describe("Atom E — final pinned 'Final outputs' panel renders when set", () => {
+describe("Atom E — final pinned output-files panel renders when set", () => {
   it("renders the panel listing each filename when message.finalOutputFiles is non-empty", () => {
     const m: Message = makeMessage({
       content: "Done.",
@@ -194,8 +194,10 @@ describe("Atom E — final pinned 'Final outputs' panel renders when set", () =>
 
     renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
 
-    // The pinned header must appear, plus each filename.
-    expect(screen.getByText("Final outputs")).toBeTruthy()
+    // Phase 095 Plan 05 (D-07): the panel header was relabeled "Final outputs"
+    // → "Generated files" (sketch §"Output files area"); each filename must
+    // still appear (re-rank, never hide).
+    expect(screen.getByText("Generated files")).toBeTruthy()
     expect(screen.getByText("chart1.png")).toBeTruthy()
     expect(screen.getByText("chart2.png")).toBeTruthy()
     expect(screen.getByText("report.pptx")).toBeTruthy()
@@ -209,7 +211,7 @@ describe("Atom E — final pinned 'Final outputs' panel renders when set", () =>
 
     renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
 
-    expect(screen.queryByText("Final outputs")).toBeNull()
+    expect(screen.queryByTestId("final-outputs-panel")).toBeNull()
   })
 })
 

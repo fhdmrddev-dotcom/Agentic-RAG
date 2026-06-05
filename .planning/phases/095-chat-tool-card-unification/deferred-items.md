@@ -33,3 +33,23 @@ only auto-fix issues DIRECTLY caused by the current task's changes).
 - **Proven PRE-EXISTING:** present on the clean baseline (part of the documented
   37-error tsc baseline from Plans 01/02). Not introduced by this plan.
 - **Disposition:** DEFERRED — part of the standing 37-error tsc baseline; out of scope.
+
+## Plan 095-05 (D-08 backend hero tag + D-07 OutputFileCard hero/working split)
+
+### DI-095-05-01 — Pre-existing Plan04 "Atom C" terminal-styling test failure
+
+- **File:** `frontend/src/__tests__/components/Plan04.frontend.test.tsx`
+- **Failing case (1):** `Atom C — stdout/stderr terminal-output styling routes by
+  channel > stdout lines use the emerald-400 class; stderr lines use red-400` —
+  asserts a rendered terminal line's `className` contains `emerald-400`; the
+  ExecuteCodeBody line styling has since drifted (the class lookup at L131-133 no
+  longer finds the expected node).
+- **Proven PRE-EXISTING:** `git stash` of this plan's 7 files → the SAME single case
+  fails identically on the clean baseline (1 failed / 7 skipped when run in
+  isolation). This plan's two OWN Plan04 final-outputs cases (relabeled "Final
+  outputs" → "Generated files" + testid empty-state) PASS; this plan regresses NONE
+  of the Plan04 passing cases.
+- **Root cause:** stale terminal-line-styling assertion vs the current ExecuteCodeBody
+  render — unrelated to OutputFileCard / the hero-working split. NOT a regression.
+- **Disposition:** DEFERRED — out of this plan's scope (terminal stdout/stderr styling,
+  not output-files). Part of the documented pre-existing ~17-failure full-suite cluster.

@@ -23,6 +23,12 @@ export interface OutputFile {
   filename: string
   url: string
   size: number
+  /** Phase 095 Plan 05 (D-08) — additive hero flag from the backend
+   * final_output_files emit + persisted execute_code result. True for the
+   * agent-flagged (else heuristic-picked) final deliverable; the chat
+   * output area heroes these above a collapsible "Working files" group.
+   * Optional — older streams without it degrade gracefully (all working). */
+  is_hero?: boolean
 }
 
 export interface ToolCall {
@@ -157,7 +163,7 @@ export interface Message {
    * ToolCallPanel — closes the cumulative-repeat symptom where a 12-file
    * run rendered 12 download links per cell. Absent for runs that produced
    * no output files. */
-  finalOutputFiles?: { filename: string; url?: string }[]
+  finalOutputFiles?: { filename: string; url?: string; size?: number; is_hero?: boolean }[]
   /** Phase 076.2 D-01: DeepSeek reasoning/thinking content. Present on
    * assistant messages from thinking-enabled providers (DeepSeek V4).
    * Accumulated during streaming via reasoning_delta SSE events.

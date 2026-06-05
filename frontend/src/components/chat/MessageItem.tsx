@@ -1,5 +1,5 @@
 import { memo, useRef, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play, ChevronRight } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 // Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
@@ -20,6 +20,7 @@ import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
+import { cn } from "@/lib/utils"
 import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 // Phase 087-05 (D-05 / chat-panel-seam.md): ADDITIVE seam renderers. Live runs
 // show quiet pointers / a paused cue; reloaded history resolves to self-contained
@@ -52,6 +53,68 @@ function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
     toolCalls?.some(
       (tc) => tc.name === "ask_user" && (tc.status === "running" || tc.status === "interrupted"),
     ) ?? false
+  )
+}
+
+/**
+ * Phase 095 Plan 05 (D-07) — the hero / working output-files split.
+ *
+ * Replaces the old flat `space-y-1.5` map of OutputFileCard. The agent-flagged
+ * (else heuristic-picked, Plan 05 Task 1 backend) `is_hero` files render as
+ * emphasized "★ Your file" hero cards ABOVE a collapsible "Working files (N)"
+ * group. Re-rank, NEVER hide (D-07, supersedes the BUG-260514-01 hiding stance):
+ * ALL files are present and downloadable; the working group is VISIBLE BY
+ * DEFAULT with a collapse affordance.
+ *
+ * Graceful additive contract: when NO file carries `is_hero` (an older stream,
+ * or a run with no hero), ALL files are treated as working — no hero block, no
+ * crash. Lives in a dedicated sub-component so the working-group collapse state
+ * (one local useState) never perturbs MessageItem's own hook order.
+ */
+type FinalOutputFile = NonNullable<Message["finalOutputFiles"]>[number]
+
+function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
+  const [workingOpen, setWorkingOpen] = useState(true)
+  const heroes = files.filter((f) => f.is_hero)
+  // Graceful: if nothing is flagged hero, everything is a working file.
+  const working = heroes.length > 0 ? files.filter((f) => !f.is_hero) : files
+
+  return (
+    <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
+      <div className="text-xs font-semibold mb-2 text-foreground/80">Generated files</div>
+      {heroes.length > 0 && (
+        <div className="space-y-2" data-testid="final-outputs-hero">
+          {heroes.map((f, i) => (
+            <OutputFileCard key={`hero-${i}`} file={f} variant="hero" />
+          ))}
+        </div>
+      )}
+      {working.length > 0 && (
+        <div className={heroes.length > 0 ? "mt-3" : ""} data-testid="final-outputs-working">
+          <button
+            type="button"
+            onClick={() => setWorkingOpen((o) => !o)}
+            aria-expanded={workingOpen}
+            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground/80 transition-colors mb-1.5"
+          >
+            <ChevronRight
+              className={cn(
+                "w-3 h-3 transition-transform",
+                workingOpen ? "rotate-90" : "",
+              )}
+            />
+            Working files ({working.length})
+          </button>
+          {workingOpen && (
+            <div className="space-y-1.5">
+              {working.map((f, i) => (
+                <OutputFileCard key={`working-${i}`} file={f} variant="working" />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -503,27 +566,16 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             inside ToolCallPanel / tool-bodies/ExecuteCodeBody (Phase 075.7
             rename). Closes the 12-download-
             links-for-1-desired-file cumulative-repeat symptom. */}
+        {/* Phase 095 Plan 05 (D-07) — hero / working output-files split. The
+            old flat `space-y-1.5` map is replaced by FinalOutputsPanel, which
+            heroes the agent-flagged deliverable above a collapsible "Working
+            files (N)" group. ALL files are present + downloadable (re-rank,
+            never hide — supersedes BUG-260514-01 hiding). Older streams without
+            `is_hero` degrade gracefully (all-working). The empty-state guard
+            (`finalOutputFiles.length > 0`) and `data-testid="final-outputs-panel"`
+            are preserved (D-075.2-07 + the existing test). */}
         {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
-          <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
-            <div className="text-xs font-semibold mb-2 text-foreground/80">Final outputs</div>
-            {/* Phase 075.2 Plan 02 (BUG-260521-02 / D-075.2-05): swap the
-                plain <li>{filename}</li> rows for the shared OutputFileCard so
-                the pinned panel matches the per-cell ExecuteCodeBody card
-                (Phase 075.7 rename of the legacy execute-code wrapper)
-                (icon + filename + size badge + ghost-border + hover state +
-                Bearer-fetch download). OutputFileCard renders a plain-filename
-                row (no anchor, no download) for legacy entries that lack
-                `url` (D-075.2-05 back-compat / RESEARCH §Q4). The empty-state
-                guard above (`finalOutputFiles.length > 0`) is preserved per
-                D-075.2-07 — panel does not render when the array is absent
-                or empty. data-testid="final-outputs-panel" is preserved for
-                the existing Plan04 frontend test. */}
-            <div className="space-y-1.5">
-              {message.finalOutputFiles.map((f, i) => (
-                <OutputFileCard key={i} file={f} />
-              ))}
-            </div>
-          </div>
+          <FinalOutputsPanel files={message.finalOutputFiles} />
         )}
         {/* Phase 087-05 (D-05 / chat-panel-seam.md D3) — ADDITIVE reload seam.
             On a rehydrated/terminal message the panel won't replay history, so
