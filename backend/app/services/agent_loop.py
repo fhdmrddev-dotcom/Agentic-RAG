@@ -785,6 +785,74 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
     return messages
 
 
+# Phase 095 Plan 05 Task 1 (D-08) — the final-output hero-tag selector.
+# Operator-resolved this session: "agent marks + backend fallback". The agent's
+# declaration (a meta dict already carrying an ``is_hero``/``hero`` truthy flag)
+# is honored first; ELSE a backend heuristic picks the hero so the chat output
+# area is NEVER heroless when ≥1 file exists across all 6 native providers.
+#
+# NOTE on the agent-declaration source: the agent loop does NOT today record an
+# explicit per-file "this is my final deliverable" intent — sandbox harvest
+# (sandbox_service.harvest_output_files) projects only {filename, url, size,
+# iteration} into the per-run meta dict. So in the CURRENT code the heuristic is
+# the sole live source. The agent-declaration branch below is kept additive and
+# forward-compatible: the moment a future change stamps ``is_hero``/``hero`` onto
+# a harvested meta dict (e.g. via a tool arg or a system-prompt convention), this
+# helper honors it WITHOUT any further wiring change. The unit test exercises that
+# branch so the contract is locked.
+#
+# Heuristic: if the user message names a requested extension (a small allowlist)
+# and a generated file matches → that/those file(s) are the hero; ELSE the single
+# largest-size file (tie-break: highest ``iteration`` = last-written). Returns a
+# set of hero filenames; empty ONLY when ``files`` is empty.
+_HERO_REQUESTABLE_EXTS = ("docx", "pptx", "pdf", "xlsx", "csv", "png", "md")
+
+
+def _select_hero_filenames(files: list[dict], user_message: str | None) -> set[str]:
+    """Pick the hero filename(s) for the final-outputs render (D-08).
+
+    Pure function — no Redis, no I/O. ``files`` are per-run meta dicts shaped
+    ``{filename, url, size, iteration, ...}`` (the projection from
+    ``sandbox_service.harvest_output_files``). Read-only; never mutates input.
+    """
+    if not files:
+        return set()
+
+    # (1) Agent declaration wins, if present on any meta dict (forward-compatible;
+    # see the module note above — no live producer of this flag yet).
+    declared = {
+        f["filename"]
+        for f in files
+        if (f.get("is_hero") or f.get("hero")) and f.get("filename")
+    }
+    if declared:
+        return declared
+
+    msg = (user_message or "").lower()
+
+    # (2) Requested-extension match. Detect a requested ext among the allowlist
+    # (tolerate a leading dot, e.g. ".pptx"); hero = every file with that ext.
+    requested = {ext for ext in _HERO_REQUESTABLE_EXTS if ext in msg}
+    if requested:
+        matched = {
+            f["filename"]
+            for f in files
+            if "." in f["filename"]
+            and f["filename"].rsplit(".", 1)[-1].lower() in requested
+        }
+        if matched:
+            return matched
+        # requested ext named but nothing matched → fall through to largest.
+
+    # (3) Fallback: the single largest deliverable; tie-break on highest iteration
+    # (the last-written file). Stable and deterministic.
+    hero = max(
+        files,
+        key=lambda f: (int(f.get("size") or 0), int(f.get("iteration") or 0)),
+    )
+    return {hero["filename"]}
+
+
 # ---------------------------------------------------------------------------
 # Agent loop
 # ---------------------------------------------------------------------------
@@ -1992,11 +2060,29 @@ async def run_agent_loop(
                 if tool_name == "execute_code":
                     try:
                         _r = json.loads(tool_result)
+                        # Phase 095 Plan 05 Task 1 (D-08) — persist the hero flag
+                        # so api.ts reload reconstruction (_mapMessageResponse)
+                        # re-heroes the same file on a next-day reopen. Compute
+                        # the hero set over the cumulative per-run meta dicts
+                        # available at this point (sandbox harvest ran inside
+                        # dispatch_tool before this persist, so the just-produced
+                        # files are already in _previous_files_in_run). The last
+                        # execute_code cell to persist therefore reflects the most
+                        # complete hero set. Purely additive: each output_files
+                        # entry gains an ``is_hero`` bool; the existing keys
+                        # (filename/url/size/...) are untouched.
+                        _persist_hero_set = _select_hero_filenames(
+                            list(_previous_files_in_run.values()), body.content
+                        )
+                        _persist_output_files = [
+                            {**_of, "is_hero": _of.get("filename") in _persist_hero_set}
+                            for _of in _r.get("output_files", [])
+                        ]
                         persisted_result = json.dumps({
                             "status": _r.get("status", "done"),
                             "exit_code": _r.get("exit_code", 0),
                             "duration_ms": _r.get("duration_ms", 0),
-                            "output_files": _r.get("output_files", []),
+                            "output_files": _persist_output_files,
                             "stdout": (_r.get("stdout", ""))[:800],
                             "stderr": (_r.get("stderr", ""))[:200],
                         })
@@ -2031,13 +2117,30 @@ async def run_agent_loop(
         # Historical context (B-260519-11 + BUG-260514-01): closes the
         # cumulative-repeat symptom (12 download links for 1 desired file).
         if _previous_files_in_run:
+            # Phase 095 Plan 05 Task 1 (D-08) — additive hero tag + url guard.
+            # Compute the run's hero set ONCE over the cumulative meta dicts
+            # (agent-declared else heuristic; NEVER empty when files exist) and
+            # project an additive ``is_hero`` flag onto each emitted file. The
+            # event NAME and the existing fields (filename/url/size) are
+            # unchanged — older frontends ignore the extra key (graceful). The
+            # url is guarded (``or ""``) so the chat render never paints a
+            # silent dead anchor (RESEARCH dead-link root #1). The flag is
+            # presentation-only and never feeds the owner-fenced re-sign
+            # download path (T-095-05-01).
+            _emit_metas = list(_previous_files_in_run.values())
+            _hero_set = _select_hero_filenames(_emit_metas, body.content)
             await _emit(
                 redis,
                 run_id,
                 'final_output_files',
                 files=[
-                    {"filename": meta["filename"], "url": meta["url"], "size": meta["size"]}
-                    for meta in _previous_files_in_run.values()
+                    {
+                        "filename": meta["filename"],
+                        "url": meta.get("url") or "",
+                        "size": meta["size"],
+                        "is_hero": meta["filename"] in _hero_set,
+                    }
+                    for meta in _emit_metas
                 ],
             )
 
