@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_plan
-stopped_at: Completed 094-05-PLAN.md (FINAL plan of Phase 094)
-last_updated: "2026-06-04T19:40:14.609Z"
-last_activity: 2026-06-04
+status: unknown
+stopped_at: "Phase 095 context gathered — ready for /gsd:sketch 095 (G-2)"
+last_updated: "2026-06-05T14:19:06.910Z"
+last_activity: 2026-06-05
 progress:
   total_phases: 9
-  completed_phases: 8
+  completed_phases: 7
   total_plans: 42
   completed_plans: 42
-  percent: 89
+  percent: 100
 ---
 
 # Project State
@@ -383,9 +383,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-04T19:40:14.599Z
-Stopped at: Completed 094-05-PLAN.md (FINAL plan of Phase 094)
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 095 context gathered — ready for /gsd:sketch 095 (G-2)
+Resume file: --resume-file
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
 
