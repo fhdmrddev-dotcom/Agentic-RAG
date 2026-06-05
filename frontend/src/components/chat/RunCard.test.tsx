@@ -86,9 +86,27 @@ describe("RunCard", () => {
     expect(html).not.toMatch(/animate-brandPulse/)
   })
 
-  it("iteration counter: renders Step {iterationCount + 1} when iterationCount provided", () => {
-    render(<RunCard message={makeMessage({ iterationCount: 4 })} isStreaming={true} />)
-    expect(screen.getByText("Step 5")).toBeInTheDocument()
+  // Phase 095 Plan 02 (D-04): the step number is now driven by
+  // unifiedStepCount(message) — the DEDUPED tool count — NOT iterationCount.
+  // The fixture below has 3 deduped tools spread across iterationCount=4, so the
+  // strip shows "Step 3" (the honest count), never "Step 5".
+  it("D-04: Step number reads unifiedStepCount, NOT iterationCount", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          iterationCount: 4,
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "running", startedAt: Date.now() },
+            { id: "tc-2", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+            { id: "tc-3", name: "read_document", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip")
+    expect(strip.textContent).toMatch(/Step 3/)
+    expect(strip.textContent).not.toMatch(/Step 5/)
   })
 
   it("active-glow: outer frame has primary border + shadow during streaming", () => {
@@ -186,7 +204,10 @@ describe("RunCard", () => {
     expect(screen.queryByTestId("run-card-collapsed")).toBeNull()
   })
 
-  it("collapsed-row copy: shows tool-call count + status word", () => {
+  // Phase 095 Plan 02 (D-04): the collapsed-row copy was relabeled
+  // "N tool calls" → "N steps" and now reads the SAME unifiedStepCount as the
+  // header + strip (SKETCH-CONSISTENCY — the three sites can never disagree).
+  it("collapsed-row copy: shows N steps (unifiedStepCount) + status word", () => {
     render(
       <RunCard
         message={makeMessage({
@@ -201,7 +222,8 @@ describe("RunCard", () => {
       />,
     )
     const collapsed = screen.getByTestId("run-card-collapsed")
-    expect(collapsed.textContent).toMatch(/3 tool calls/)
+    expect(collapsed.textContent).toMatch(/3 steps/)
+    expect(collapsed.textContent).not.toMatch(/tool calls/)
     expect(collapsed.textContent).toMatch(/failed/)
   })
 
@@ -215,5 +237,158 @@ describe("RunCard", () => {
     expect(screen.queryByTestId("run-card-collapsed")).toBeNull()
     // Without tools, RunCard still mounts (MessageItem gates that) but body is expanded
     expect(screen.getByTestId("run-card").querySelector(".p-3")).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 095 Plan 02 — D-06 persistent timer + D-04 unified count
+// ---------------------------------------------------------------------------
+
+describe("RunCard — D-06 persistent timer (the never-vanishes fix)", () => {
+  // The ROOT bug (BUG-260528-01): under the old `isStreamingNow || elapsedMs > 0`
+  // gate, a run that flipped terminal before any 250ms tick had elapsedMs === 0
+  // and the WHOLE timer vanished. The D-06 fix renders the strip continuously
+  // whenever created_at parses, regardless of isStreamingNow / elapsedMs.
+  it("timer is STILL rendered when a run flips terminal with zero elapsed (no vanish)", () => {
+    const createdAt = new Date().toISOString() // ~now → elapsed ≈ 0
+    render(
+      <RunCard
+        message={makeMessage({
+          created_at: createdAt,
+          runStatus: "completed", // terminal immediately; elapsedMs would be ~0
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "[]" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // The strip (which carries the ⏱ elapsed segment) must still be present.
+    const strip = screen.getByTestId("run-status-strip")
+    expect(strip).toBeInTheDocument()
+    expect(strip.textContent).toMatch(/⏱/)
+    // And it shows a real seconds value (never NaN), even at ~0 elapsed.
+    expect(strip.textContent).toMatch(/\d+(\.\d+)?s/)
+  })
+
+  it("freezes elapsed at a terminal — the value does not keep growing after terminal", () => {
+    // created_at 5s in the past; terminal NOW → the frozen elapsed ≈ 5s and is
+    // recomputed as (frozenEnd - start), never (now - start) after freeze.
+    const createdAt = new Date(Date.now() - 5000).toISOString()
+    render(
+      <RunCard
+        message={makeMessage({
+          created_at: createdAt,
+          runStatus: "completed",
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip")
+    const match = strip.textContent?.match(/([\d.]+)s/)
+    expect(match).not.toBeNull()
+    const seconds = parseFloat(match![1])
+    // Frozen near 5s (allow scheduling slack), and crucially BOUNDED — not the
+    // unbounded wall-clock that an un-frozen now-baseline would keep growing.
+    expect(seconds).toBeGreaterThanOrEqual(4.5)
+    expect(seconds).toBeLessThan(10)
+  })
+
+  it("renders no elapsed segment when created_at is unparseable (never NaN)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          // a deliberately unparseable created_at to exercise the Number.isFinite guard
+          created_at: "not-a-date",
+          runStatus: "completed",
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // Number.isFinite(startMs) is false → the strip is not rendered at all,
+    // and nothing renders "NaNs".
+    expect(screen.queryByTestId("run-status-strip")).toBeNull()
+    expect(screen.getByTestId("run-card").textContent).not.toMatch(/NaN/)
+  })
+
+  it("the activity verb shows while streaming and is gone (terminal) once done", () => {
+    const streaming = render(
+      <RunCard message={makeMessage({ runStatus: "streaming" })} isStreaming={true} />,
+    )
+    // streaming → strip carries a primary activity verb segment.
+    expect(streaming.getByTestId("run-status-strip").textContent).toMatch(/Searching|Running|Thinking|Synthesizing|Setting up|Working/)
+    streaming.unmount()
+
+    const terminal = render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "completed",
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // terminal → activityVerb is null → no live verb in the (header) strip.
+    // The header strip lives inside the header element; the collapsed-row is a
+    // separate surface. Read the header strip specifically.
+    const header = terminal.getByTestId("run-card").querySelector("header")
+    const headerStrip = header?.querySelector("[data-testid='run-status-strip']")
+    expect(headerStrip).not.toBeNull()
+    expect(headerStrip!.textContent).not.toMatch(/Searching|Running code|Synthesizing/)
+  })
+})
+
+describe("RunCard — D-04 unified count agrees across all three sites", () => {
+  it("header, strip, and collapsed-row all read the SAME unifiedStepCount (N, not M)", () => {
+    // 2 deduped tools (by clientKey) but a duplicate 3rd entry → unifiedStepCount
+    // dedups to 2; iterationCount=7 (M ≠ N). All sites must show 2.
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "completed",
+          iterationCount: 7,
+          tool_calls: [
+            { id: "tc-1", clientKey: "k1", name: "search_documents", args: {}, status: "done", result: "" },
+            { id: "tc-2", clientKey: "k2", name: "execute_code", args: {}, status: "done", result: "" },
+            { id: "tc-3", clientKey: "k1", name: "search_documents", args: {}, status: "done", result: "" }, // dup of k1
+          ],
+        } as Partial<Message>)}
+        isStreaming={false}
+      />,
+    )
+    // Collapsed by default (terminal + tools) → header strip + collapsed-row visible.
+    const header = screen.getByTestId("run-card").querySelector("header")!
+    expect(header.textContent).toMatch(/Run · 2 steps/) // header title
+    const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
+    expect(headerStrip.textContent).toMatch(/Step 2/) // strip
+    expect(headerStrip.textContent).not.toMatch(/Step 7/) // never iterationCount
+    const collapsed = screen.getByTestId("run-card-collapsed")
+    expect(collapsed.textContent).toMatch(/2 steps/) // collapsed-row
+  })
+
+  it("DB-loaded message WITHOUT iterationCount still shows a Step number (next-day reopen fix)", () => {
+    // Simulate a reloaded historical message: no iterationCount field at all,
+    // but the persisted tool_calls survive → unifiedStepCount still works.
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      tool_calls: [
+        { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "" },
+        { id: "tc-2", name: "read_document", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    // strip iterationCount entirely (DB reload omits it)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const header = screen.getByTestId("run-card").querySelector("header")!
+    const headerStrip = header.querySelector("[data-testid='run-status-strip']")!
+    expect(headerStrip.textContent).toMatch(/Step 2/)
   })
 })
