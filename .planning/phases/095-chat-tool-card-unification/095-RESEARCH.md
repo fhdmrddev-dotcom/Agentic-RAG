@@ -357,17 +357,21 @@ Wire format + screenshot are INSUFFICIENT; drive a real browser. These are the S
 
 *(No `[ASSUMED]` claims in the body — all root-cause findings are `[VERIFIED: codebase]`. The 3 above are forward-looking design choices the planner/operator confirms, not facts presented as verified.)*
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Both resolved with the operator during `/gsd:plan-phase 095` (2026-06-05) and baked into the plans.
 
 1. **Does the agent reliably know which file is the "final intended output"?**
    - What we know: the agent loop has the user prompt + request intent; it could match the requested file extension (`.docx`/`.pptx`) or carry an explicit declaration.
    - What's unclear: whether to derive the hero heuristically (largest matching-extension file) at the emit site, or require the agent to declare it via a tool arg/system-prompt convention.
    - Recommendation: start with a backend heuristic (match the user-requested extension; fall back to the largest/last-written deliverable). Keep it additive so a future explicit-declaration upgrade is non-breaking. Confirm with the operator at discuss/plan time — this is the one genuine product decision in D-08.
+   - **RESOLVED (operator):** "Agent marks + backend fallback" — the LLM flags its final deliverable; if it doesn't, the backend falls back to the requested-extension / last-written heuristic so the hero is NEVER empty across all 6 providers. Implemented in **Plan 095-05 Task 1** (additive field on `final_output_files`, persisted into the execute_code result for reload). No re-sign change.
 
 2. **Should the in-panel iteration divider ("Step N", ToolCallPanel.tsx:559-570) be re-labeled once D-04 makes "Step" = card count?**
    - What we know: the divider uses `tc.iteration` (agent rounds); the headline count switches to deduped tool-card count. Two different meanings of "Step."
    - What's unclear: whether the operator reads the divider as contradictory to the headline.
    - Recommendation: re-label the divider to "Round N" (or drop it) so "Step N" means exactly one thing (one visible action). Claude's discretion within D-04; verify against the sketch fixture.
+   - **RESOLVED:** re-label the divider to "Round N" so "Step N" means exactly one visible action everywhere after D-04. Implemented in **Plan 095-03 Task 2**.
 
 ## Sources
 
