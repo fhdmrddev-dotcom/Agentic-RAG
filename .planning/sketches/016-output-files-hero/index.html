@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 016 · Output Files — Hero / Working split — Phase 095</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  /* ───────────────────────────────────────────────────────────
+     Sketch 016 — Output files at run end (D-07/D-08). Hero the
+     deliverable the user asked for; keep intermediates present but
+     quiet; EVERY link downloads, even on a chat reopened tomorrow.
+     ─────────────────────────────────────────────────────────── */
+  body { padding-top:0; }
+  .stage { max-width:780px; margin:0 auto; padding:20px 20px 120px; }
+
+  .ctlbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin:6px 0 18px; padding:10px 12px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); font-size:var(--text-sm); }
+  .seg-toggle { display:inline-flex; border:1px solid var(--color-border); border-radius:var(--radius-full); overflow:hidden; }
+  .seg-toggle button { background:transparent; color:var(--color-text-muted); border:none; padding:5px 13px; font-size:var(--text-sm); cursor:pointer; font-family:inherit; transition:all var(--dur-fast); }
+  .seg-toggle button.on { background:var(--color-primary-dim); color:var(--color-primary); }
+  .ctlbar label.chk { display:flex; align-items:center; gap:6px; color:var(--color-text-muted); cursor:pointer; }
+  .ctlbar .hint { color:var(--color-text-dim); font-size:var(--text-xs); margin-left:auto; }
+
+  .user-msg { margin:0 0 14px auto; max-width:74%; background:var(--color-primary-dim); border:1px solid var(--color-primary-glow); color:var(--color-text); border-radius:var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); padding:9px 13px; font-size:var(--text-sm); }
+
+  /* collapsed finished run */
+  .run-collapsed { display:flex; align-items:center; gap:10px; padding:10px 13px; background:linear-gradient(180deg, hsl(220 30% 7% / .6), hsl(220 30% 7% / .3)); border:1px solid var(--color-border); border-radius:var(--radius-lg); font-size:var(--text-sm); margin-bottom:14px; cursor:pointer; }
+  .run-collapsed .avatar { width:24px; height:24px; border-radius:var(--radius-sm); background:linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; }
+  .pill { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.05em; padding:3px 8px; border-radius:var(--radius-full); display:inline-flex; align-items:center; gap:5px; }
+  .pill.done { background:var(--color-success-dim); color:var(--color-success); }
+  .pill .dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  .answer { font-size:var(--text-base); color:var(--color-text); line-height:1.6; margin-bottom:16px; }
+
+  /* ── Final Outputs area ── */
+  .outputs { border-top:1px solid var(--color-border-soft); padding-top:14px; }
+  .outputs-label { font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.08em; color:var(--color-text-dim); margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+
+  /* file primitives */
+  .fic { border-radius:var(--radius-sm); background:linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); display:flex; align-items:center; justify-content:center; color:#fff; flex:none; }
+  /* per-extension file-type badge — the tile color + label represent the actual extension */
+  .ficx { border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-mono); font-weight:700; letter-spacing:.01em; flex:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
+  .dl-btn { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--color-primary-glow); background:var(--color-primary-dim); color:var(--color-primary); border-radius:var(--radius-sm); padding:6px 13px; font-size:var(--text-sm); font-family:inherit; cursor:pointer; transition:all var(--dur-fast); }
+  .dl-btn:hover { background:var(--color-primary-glow); }
+  .dl-btn.quiet { border-color:var(--color-border); background:transparent; color:var(--color-text-muted); padding:5px 10px; }
+  .dl-btn.quiet:hover { background:var(--color-accent); color:var(--color-text); }
+  .dl-btn.ok { border-color:var(--color-success); background:var(--color-success-dim); color:var(--color-success); }
+  .dl-btn.dead { border-color:hsl(0 72% 51% / .4); background:var(--color-danger-dim); color:var(--color-danger); cursor:not-allowed; }
+
+  /* HERO block (variant A / C) */
+  .hero { display:flex; align-items:center; gap:14px; padding:15px; border:1px solid var(--color-primary-glow); border-radius:var(--radius-lg); background:linear-gradient(135deg, hsl(239 100% 82% / .08), hsl(258 90% 66% / .05)); box-shadow:var(--shadow-glow-primary); }
+  .hero .fic { width:48px; height:48px; font-size:22px; }
+  .hero .meta { flex:1; min-width:0; }
+  .hero .your { font-size:10px; text-transform:uppercase; letter-spacing:.1em; color:var(--color-primary); font-family:var(--font-mono); margin-bottom:3px; }
+  .hero .nm { font-size:var(--text-md); font-weight:600; }
+  .hero .sub { font-size:var(--text-xs); color:var(--color-text-muted); margin-top:2px; }
+  .hero .dl-btn { padding:9px 18px; font-size:var(--text-sm); }
+
+  /* working files group */
+  .working { margin-top:12px; }
+  .working-head { display:flex; align-items:center; gap:8px; padding:7px 4px; cursor:pointer; color:var(--color-text-muted); font-size:var(--text-sm); user-select:none; }
+  .working-head .chev { transition:transform var(--dur-fast); color:var(--color-text-dim); }
+  .working.open .working-head .chev { transform:rotate(90deg); }
+  .working-list { display:none; flex-direction:column; gap:6px; padding-top:4px; }
+  .working.open .working-list { display:flex; }
+
+  .file-row { display:flex; align-items:center; gap:11px; padding:9px 11px; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+  .file-row .fic { width:30px; height:30px; font-size:15px; background:hsl(220 30% 14%); }
+  .file-row .nm { font-size:var(--text-sm); }
+  .file-row .sub { font-size:var(--text-xs); color:var(--color-text-dim); }
+  .file-row .right { margin-left:auto; }
+  .file-row.quiet { background:transparent; border-color:var(--color-border-soft); }
+
+  /* chip row (variant C) */
+  .chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .file-chip { display:inline-flex; align-items:center; gap:7px; padding:5px 10px; border:1px solid var(--color-border); border-radius:var(--radius-full); background:var(--color-surface); font-size:var(--text-xs); cursor:pointer; transition:all var(--dur-fast); }
+  .file-chip:hover { border-color:var(--color-primary-glow); }
+  .file-chip .ci { font-size:13px; }
+  .file-chip .dot { width:5px; height:5px; border-radius:50%; background:var(--color-text-dim); }
+  .file-chip.dead { border-color:hsl(0 72% 51% / .35); color:var(--color-danger); }
+
+  /* B: one list, starred hero + dimmed */
+  .uni-list { display:flex; flex-direction:column; gap:7px; }
+  .uni-row { display:flex; align-items:center; gap:12px; padding:11px 13px; border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+  .uni-row.hero-row { border-color:var(--color-primary-glow); box-shadow:var(--shadow-glow-primary); background:linear-gradient(135deg, hsl(239 100% 82% / .07), transparent); }
+  .uni-row.hero-row .fic { width:40px; height:40px; font-size:19px; }
+  .uni-row.dim { opacity:.72; }
+  .uni-row .fic { width:30px; height:30px; font-size:15px; background:hsl(220 30% 14%); }
+  .uni-row .star { color:var(--color-warning); }
+  .uni-row .nm { font-size:var(--text-sm); font-weight:500; }
+  .uni-row.hero-row .nm { font-size:var(--text-md); font-weight:600; }
+  .uni-row .sub { font-size:var(--text-xs); color:var(--color-text-dim); }
+  .uni-row .right { margin-left:auto; }
+
+  /* TODAY flat list (the before) */
+  .flat-list { display:flex; flex-direction:column; gap:6px; }
+  .flat-note { font-size:var(--text-xs); color:var(--color-danger); margin-bottom:8px; font-family:var(--font-mono); }
+
+  .v-caption { margin-top:16px; padding:11px 14px; background:hsl(220 30% 8% / .5); border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary); border-radius:var(--radius-sm); font-size:var(--text-sm); color:var(--color-text-muted); }
+  .v-caption b { color:var(--color-text); }
+  .v-caption .tag { display:inline-block; font-family:var(--font-mono); font-size:10px; padding:1px 6px; border-radius:var(--radius-full); background:var(--color-primary-dim); color:var(--color-primary); margin-right:4px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 016 · Output Files — Hero / Working</span>
+  <button class="variant-tab active" onclick="setV('a',event)">A · Hero block + working group <span class="star">★ winner</span></button>
+  <button class="variant-tab" onclick="setV('b',event)">B · One list, starred hero</button>
+  <button class="variant-tab" onclick="setV('c',event)">C · Hero card + chip row</button>
+</div>
+
+<div class="stage" id="stage">
+
+  <div class="ctlbar">
+    <span style="color:var(--color-text-muted)">View:</span>
+    <div class="seg-toggle">
+      <button id="m095" class="on" onclick="setMode('new')">095 · hero / working</button>
+      <button id="mtoday" onclick="setMode('today')">Today · flat list</button>
+    </div>
+    <label class="chk"><input type="checkbox" id="reopen" onchange="render()"> 🕐 Reopen this chat tomorrow</label>
+    <span class="hint">Hero = the file you asked for. Every link must download — even a day later.</span>
+  </div>
+
+  <div class="user-msg">Build me a dissertation-defense deck from thesis.pdf and results.pdf — and a one-page outline. Give me the <b>.pptx</b>.</div>
+
+  <div class="run-collapsed">
+    <div class="avatar">A</div>
+    <span>Dissertation deck · 10 steps</span>
+    <span class="pill done"><span class="dot"></span>done · 3m48s</span>
+    <span style="margin-left:auto;color:var(--color-text-dim)">▸</span>
+  </div>
+
+  <div class="answer">Done — I built a 9-slide defense deck from both papers, with the revenue and region-growth charts, plus the one-page outline. The deck you asked for is below.</div>
+
+  <div class="outputs">
+    <div class="outputs-label" id="outLabel">Generated files</div>
+    <div id="outMount"></div>
+  </div>
+
+  <div class="v-caption" id="caption"></div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>016</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+</div>
+
+<script>
+const HERO = { ic:'📊', nm:'dissertation_defense.pptx', size:'4.1 MB', sub:'PowerPoint deck · the file you asked for', final:true };
+const WORKING = [
+  { ic:'📄', nm:'outline.md', size:'2.3 KB', sub:'one-page outline' },
+  { ic:'🖼', nm:'chart_revenue.png', size:'88 KB', sub:'matplotlib · intermediate' },
+  { ic:'🖼', nm:'chart_growth.png', size:'71 KB', sub:'matplotlib · intermediate' },
+];
+// Today's backend array order (intermediates first, no hero flag):
+const FLAT = [WORKING[0], WORKING[1], WORKING[2], HERO];
+
+let variant='a', mode='new';
+const dl = {}; // download state per filename: 'idle'|'ok'
+
+/* ── per-extension file-type icon (representative of each extension) ── */
+function iconFor(nm){
+  const ext = (nm.split('.').pop()||'').toLowerCase();
+  const M = {
+    pptx:['#e8590c','#f76707'], ppt:['#e8590c','#f76707'],
+    docx:['#1971c2','#1c7ed6'], doc:['#1971c2','#1c7ed6'], rtf:['#1971c2','#1c7ed6'],
+    pdf:['#c92a2a','#e03131'],
+    xlsx:['#2b8a3e','#37b24d'], xls:['#2b8a3e','#37b24d'], csv:['#2b8a3e','#37b24d'],
+    png:['#6741d9','#7950f2'], jpg:['#6741d9','#7950f2'], jpeg:['#6741d9','#7950f2'], gif:['#6741d9','#7950f2'], webp:['#6741d9','#7950f2'], svg:['#6741d9','#7950f2'],
+    md:['#495057','#6c757d'], txt:['#495057','#6c757d'],
+    json:['#0b7285','#1098ad'], py:['#0b7285','#1098ad'], js:['#0b7285','#1098ad'], ts:['#0b7285','#1098ad'], html:['#0b7285','#1098ad'],
+  };
+  const c = M[ext] || ['#495057','#868e96'];
+  return { grad:`linear-gradient(135deg, ${c[0]}, ${c[1]})`, label:(ext||'?').toUpperCase() };
+}
+function fileIcon(nm, px){
+  const i = iconFor(nm); const fs = Math.max(7, Math.round(px*0.27));
+  return `<div class="ficx" style="background:${i.grad};width:${px}px;height:${px}px;font-size:${fs}px" title="${i.label}">${i.label}</div>`;
+}
+
+function isDead(f){ // simulate today's dead-link decay on reopen (signed-URL 1h expiry / sandbox cleanup)
+  return mode==='today' && document.getElementById('reopen').checked && (f.nm==='dissertation_defense.pptx' || f.nm==='chart_revenue.png');
+}
+function download(nm){ const f=[HERO,...WORKING].find(x=>x.nm===nm); if(isDead(f)) return; dl[nm]='ok'; render(); }
+
+function dlBtn(f, cls){
+  if(isDead(f)) return `<button class="dl-btn dead" title="signed URL expired">✗ 404 · link expired</button>`;
+  if(dl[f.nm]==='ok') return `<button class="dl-btn ok">✓ Downloaded</button>`;
+  return `<button class="dl-btn ${cls||''}" onclick="download('${f.nm}')">⤓ Download</button>`;
+}
+
+function heroBlock(){
+  return `<div class="hero">${fileIcon(HERO.nm,48)}
+    <div class="meta"><div class="your">★ Your file</div><div class="nm">${HERO.nm}</div><div class="sub">${HERO.size} · ${HERO.sub}</div></div>
+    ${dlBtn(HERO)}</div>`;
+}
+function workingGroup(open){
+  return `<div class="working ${open?'open':''}" id="wgroup">
+    <div class="working-head" onclick="document.getElementById('wgroup').classList.toggle('open')"><span class="chev">›</span> Working files (${WORKING.length}) — intermediates, all downloadable</div>
+    <div class="working-list">${WORKING.map(f=>`<div class="file-row quiet">${fileIcon(f.nm,30)}<div><div class="nm">${f.nm}</div><div class="sub">${f.size} · ${f.sub}</div></div><div class="right">${dlBtn(f,'quiet')}</div></div>`).join('')}</div>
+  </div>`;
+}
+
+function render(){
+  // mode toggle visuals
+  document.getElementById('m095').classList.toggle('on', mode==='new');
+  document.getElementById('mtoday').classList.toggle('on', mode==='today');
+  document.getElementById('outLabel').innerHTML = mode==='today'
+    ? 'Generated files <span style="color:var(--color-danger);font-family:var(--font-mono);font-size:10px;margin-left:6px">today — flat, no hero, dead-link risk</span>'
+    : 'Generated files';
+
+  const mount = document.getElementById('outMount');
+  if(mode==='today'){
+    const anyDead = document.getElementById('reopen').checked;
+    mount.innerHTML = `${anyDead?'<div class="flat-note">⚠ reopened next day — 2 links expired (signed-URL TTL / sandbox cleanup). No way to tell which file you actually wanted.</div>':''}<div class="flat-list">${FLAT.map(f=>`<div class="file-row">${fileIcon(f.nm,30)}<div><div class="nm">${f.nm}</div><div class="sub">${f.size}</div></div><div class="right">${dlBtn(f)}</div></div>`).join('')}</div>`;
+  } else if(variant==='a'){
+    mount.innerHTML = heroBlock() + workingGroup(true);
+  } else if(variant==='b'){
+    const dimRows = WORKING.map(f=>`<div class="uni-row dim">${fileIcon(f.nm,30)}<div><div class="nm">${f.nm}</div><div class="sub">${f.size} · ${f.sub}</div></div><div class="right">${dlBtn(f,'quiet')}</div></div>`).join('');
+    mount.innerHTML = `<div class="uni-list"><div class="uni-row hero-row">${fileIcon(HERO.nm,40)}<div><div class="nm"><span class="star">★</span> ${HERO.nm}</div><div class="sub">${HERO.size} · the file you asked for</div></div><div class="right">${dlBtn(HERO)}</div></div>${dimRows}</div>`;
+  } else { // c
+    const chips = WORKING.map(f=>`<div class="file-chip ${isDead(f)?'dead':''}" onclick="download('${f.nm}')">${fileIcon(f.nm,16)}${f.nm}<span class="dot"></span>${dl[f.nm]==='ok'?'✓':'⤓'}</div>`).join('');
+    mount.innerHTML = heroBlock() + `<div style="margin-top:12px"><div class="outputs-label" style="margin-bottom:7px">Working files</div><div class="chip-row">${chips}</div></div>`;
+  }
+  updateCaption();
+}
+
+function updateCaption(){
+  const caps = {
+    a:'<span class="tag">D-07</span> <b>Hero block + working group.</b> The deliverable is a big, unmissable card ("★ Your file") with a prominent Download; intermediates fold into a quiet, collapsible "Working files (3)" group. Strongest hero/secondary hierarchy. Trade-off: two visual tiers = a bit more height.',
+    b:'<span class="tag">D-07</span> <b>One list, starred hero.</b> A single list: the hero row is larger, starred, primary-accented at the top; working files are dimmed below. Lightest structure, everything visible at once. Trade-off: the hero is less dominant than a dedicated block.',
+    c:'<span class="tag">D-07</span> <b>Hero card + chip row.</b> The hero gets the full card; working files compress to a quiet horizontal chip row (one click each). Most compact — best when there are many intermediates. Trade-off: chips show less metadata.'
+  };
+  document.getElementById('caption').innerHTML = caps[variant] + ' &nbsp;<span class="tag" style="background:var(--color-success-dim);color:var(--color-success)">D-08</span> Every link downloads — even on a chat reopened tomorrow (the agent flags the final output; links are re-signed on demand). Flip <b>Today · flat list</b> + <b>Reopen tomorrow</b> to see the before: a pile of intermediates with no hero and dead links.';
+}
+
+function setV(v,ev){ variant=v; document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); if(ev) ev.target.classList.add('active'); render(); }
+function setMode(m){ mode=m; render(); }
+render();
+</script>
+</body>
+</html>

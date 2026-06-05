@@ -125,6 +125,7 @@
   .tc-output .cmt { color:#8b949e; font-style:italic; }
   .det-file { display:flex; align-items:center; gap:8px; padding:7px 10px; background:linear-gradient(135deg, hsl(220 30% 9%), hsl(220 30% 11%)); border:1px solid var(--color-border); border-radius:var(--radius-sm); margin-top:5px; font-size:var(--text-sm); }
   .det-file .fic { width:26px; height:26px; border-radius:5px; background:linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .ficx { border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-mono); font-weight:700; letter-spacing:.01em; flex:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
 
   /* ── the two strip homes ── */
   /* bottom floating live-chip (B + C) — pinned to the viewport's visible bottom */
@@ -252,12 +253,23 @@ let timer=null, streamTimer=null;
 function fmt(s){ s=Math.round(s); const m=Math.floor(s/60); const r=s-m*60; return m>0?`${m}m${String(r).padStart(2,'0')}s`:`${s}s`; }
 function total(){ return elapsedBase + (phase==='running'? liveElapsed : liveElapsed); }
 
+/* per-extension file-type icon (shared with sketches 014/016 — one badge system) */
+function iconFor(nm){
+  const ext=(nm.split('.').pop()||'').toLowerCase();
+  const M={ pptx:['#e8590c','#f76707'], ppt:['#e8590c','#f76707'], docx:['#1971c2','#1c7ed6'], doc:['#1971c2','#1c7ed6'], rtf:['#1971c2','#1c7ed6'],
+    pdf:['#c92a2a','#e03131'], xlsx:['#2b8a3e','#37b24d'], xls:['#2b8a3e','#37b24d'], csv:['#2b8a3e','#37b24d'],
+    png:['#6741d9','#7950f2'], jpg:['#6741d9','#7950f2'], jpeg:['#6741d9','#7950f2'], gif:['#6741d9','#7950f2'], svg:['#6741d9','#7950f2'], webp:['#6741d9','#7950f2'],
+    md:['#495057','#6c757d'], txt:['#495057','#6c757d'], json:['#0b7285','#1098ad'], py:['#0b7285','#1098ad'], js:['#0b7285','#1098ad'], ts:['#0b7285','#1098ad'], html:['#0b7285','#1098ad'] };
+  const c=M[ext]||['#495057','#868e96']; return { grad:`linear-gradient(135deg, ${c[0]}, ${c[1]})`, label:(ext||'?').toUpperCase() };
+}
+function fileIcon(nm,px){ const i=iconFor(nm); const fs=Math.max(7,Math.round(px*0.27)); return `<div class="ficx" style="background:${i.grad};width:${px}px;height:${px}px;font-size:${fs}px" title="${i.label}">${i.label}</div>`; }
+
 /* per-tool expanded detail (D-01: details re-ranked, never hidden) */
 function searchDet(q,folder,rows){ return `<div class="det"><div class="det-meta"><span class="k">query</span> › "${q}" &nbsp; <span class="k">folder</span> › ${folder}</div>${rows.map(r=>`<div class="det-r"><span class="sc">${r[0]}</span> ${r[1]} <span class="ck">${r[2]}</span></div>`).join('')}<div class="det-conf">● confidence medium · ${rows[0][0]}</div></div>`; }
 function readDet(pre){ return `<div class="det"><pre class="det-pre">${pre}</pre></div>`; }
 function subDet(name,sum){ return `<div class="det"><div class="subrun-lite"><span class="av">A</span> sub-agent · ${name} <span class="dup-ok">✓ 1 card · D-05</span></div><div class="det-sum">${sum}</div></div>`; }
 function todoDet(){ return `<div class="det"><div class="todo">◐ outline <span class="tst">in_progress</span></div><div class="todo">○ draft</div><div class="todo">○ chart</div><div class="todo">○ assemble</div><div class="det-note">panel-owned — shown here as the chat essence; full list lives in the workspace panel.</div></div>`; }
-function codeDet(code,out,fic,fnm,fmt){ return `<div class="det"><div class="tc-output mini"><span class="cmt"># 1 of N lines</span><br>${code}</div><div class="det-meta">stdout › ${out} · exit 0</div><div class="det-file"><span class="fic">${fic}</span> <b>${fnm}</b> <span class="ck">${fmt} · click to view</span></div></div>`; }
+function codeDet(code,out,fic,fnm,fmt){ return `<div class="det"><div class="tc-output mini"><span class="cmt"># 1 of N lines</span><br>${code}</div><div class="det-meta">stdout › ${out} · exit 0</div><div class="det-file">${fileIcon(fnm,26)} <b>${fnm}</b> <span class="ck">${fmt} · click to view</span></div></div>`; }
 function detailHTML(i){
   switch(i){
     case 0: return searchDet('dissertation methodology + results','thesis/',[['0.61','thesis.pdf','chunk 4/38'],['0.59','thesis.pdf','chunk 7/38'],['0.55','results.pdf','chunk 2/19']]);

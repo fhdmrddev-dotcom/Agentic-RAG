@@ -175,6 +175,7 @@
 
   .file-out { margin-top: 8px; padding: 9px 11px; background: linear-gradient(135deg, hsl(220 30% 9%), hsl(220 30% 11%)); border: 1px solid var(--color-border); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px; }
   .file-out .ic { width: 32px; height: 32px; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .ficx { border-radius: var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-mono); font-weight:700; letter-spacing:.01em; flex:none; box-shadow:inset 0 1px 0 rgba(255,255,255,.12); }
   .file-out .nm { font-size: var(--text-sm); }
   .file-out .mt { font-size: var(--text-xs); color: var(--color-text-dim); }
   .file-out .dl { margin-left: auto; }
@@ -192,7 +193,7 @@
   .ess-ic { flex: none; width: 18px; text-align: center; }
   .ess-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
   .ess-arrow { color: var(--color-text-dim); }
-  .ess-text { color: var(--color-text); }
+  .ess-text { color: var(--color-text-muted); }  /* finished essence recedes (matches 015) — active line overridden to primary */
   .chev { transition: transform var(--dur-fast) var(--ease-out); color: var(--color-text-dim); flex: none; }
   .open > * .chev, .is-open .chev { transform: rotate(90deg); }
 
@@ -394,6 +395,18 @@ const peeked = new Set();  // finished steps the user clicked open (D-01 details
 function fmtTime(s){ s = Math.round(s*10)/10; if (s>=60){ const m=Math.floor(s/60); const r=Math.round(s-m*60); return m+'m'+String(r).padStart(2,'0')+'s'; } return s.toFixed(1)+'s'; }
 function totalElapsed(){ return elapsedBase + (phase==='running' ? liveElapsed : 36); }
 
+/* ── per-extension file-type icon (shared with sketches 015/016 — one badge system) ── */
+function iconFor(nm){
+  const ext = (nm.split('.').pop()||'').toLowerCase();
+  const M = { pptx:['#e8590c','#f76707'], ppt:['#e8590c','#f76707'], docx:['#1971c2','#1c7ed6'], doc:['#1971c2','#1c7ed6'], rtf:['#1971c2','#1c7ed6'],
+    pdf:['#c92a2a','#e03131'], xlsx:['#2b8a3e','#37b24d'], xls:['#2b8a3e','#37b24d'], csv:['#2b8a3e','#37b24d'],
+    png:['#6741d9','#7950f2'], jpg:['#6741d9','#7950f2'], jpeg:['#6741d9','#7950f2'], gif:['#6741d9','#7950f2'], svg:['#6741d9','#7950f2'], webp:['#6741d9','#7950f2'],
+    md:['#495057','#6c757d'], txt:['#495057','#6c757d'], json:['#0b7285','#1098ad'], py:['#0b7285','#1098ad'], js:['#0b7285','#1098ad'], ts:['#0b7285','#1098ad'], html:['#0b7285','#1098ad'] };
+  const c = M[ext] || ['#495057','#868e96'];
+  return { grad:`linear-gradient(135deg, ${c[0]}, ${c[1]})`, label:(ext||'?').toUpperCase() };
+}
+function fileIcon(nm, px){ const i=iconFor(nm); const fs=Math.max(7,Math.round(px*0.27)); return `<div class="ficx" style="background:${i.grad};width:${px}px;height:${px}px;font-size:${fs}px" title="${i.label}">${i.label}</div>`; }
+
 /* ── shared inner body for a step ── */
 function bodyHTML(step){
   const d = step.data;
@@ -430,7 +443,7 @@ function bodyHTML(step){
     } else {
       out = (d.stdout||['done']).map(l=>`<div class="line">${l}</div>`).join('');
       divider = `<span>STDOUT</span><span>${(d.stdout||[]).length} lines · exit 0</span>`;
-      file = `<div class="file-out"><div class="ic">${d.file.ic}</div><div><div class="nm">${d.file.nm}</div><div class="mt">${d.file.mt} · click to view</div></div><button class="ctl-btn dl">Open</button></div>`;
+      file = `<div class="file-out">${fileIcon(d.file.nm,32)}<div><div class="nm">${d.file.nm}</div><div class="mt">${d.file.mt} · click to view</div></div><button class="ctl-btn dl">Open</button></div>`;
     }
     return `<div class="body-wrap">
       <div class="tc-editor"><div class="tc-gutter">${gutter}</div><div class="tc-code">${codeLines}</div></div>
