@@ -135,6 +135,79 @@ describe("ToolCallPanel — 075.6 Req #7 + 075.8 Task 4 step-list Focus Mode", (
   })
 })
 
+describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider", () => {
+  it("renders the divider as 'Round N', never 'Step N' (D-04 relabel)", () => {
+    // 3 done across iter-0 + 1 done in iter-1 + active iter-2 → 2 dividers
+    // (iter-0→1, iter-1→2). The divider label must read "Round N".
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkDoneTool({ id: "t2", iteration: 0 }),
+      mkDoneTool({ id: "t3", iteration: 1 }),
+      mkActiveTool({ id: "t4", iteration: 2 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // With 3 done before the active step, Focus Mode collapses past steps; the
+    // divider above the active step still fires (Pitfall 6 / L5). Expand to see
+    // both dividers.
+    const summary = container.querySelector("[data-testid='step-summary-row']") as HTMLButtonElement | null
+    if (summary) fireEvent.click(summary)
+
+    const dividers = container.querySelectorAll("[data-testid='iteration-divider']")
+    expect(dividers.length).toBeGreaterThanOrEqual(1)
+    dividers.forEach((d) => {
+      expect(d.textContent).toMatch(/Round \d+/)
+      expect(d.textContent).not.toMatch(/Step \d+/)
+    })
+  })
+
+  it("renders each deduped tool on a numbered status-node rail (snum + node)", () => {
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+      mkDoneTool({ id: "t2", iteration: 0 }),
+      mkActiveTool({ id: "t3", iteration: 0 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // One rail node + one snum per deduped tool (3 tools → 3 of each).
+    const nodes = container.querySelectorAll("[data-testid='step-node']")
+    const snums = container.querySelectorAll("[data-testid='step-snum']")
+    expect(nodes.length).toBe(3)
+    expect(snums.length).toBe(3)
+    // Numbering is 1-based and sequential.
+    const numbers = Array.from(snums).map((s) => s.textContent)
+    expect(numbers).toEqual(["1", "2", "3"])
+    // The running tool's node is the ACTIVE state; the done tools are done.
+    const states = Array.from(nodes).map((n) => n.getAttribute("data-node-state"))
+    expect(states).toEqual(["done", "done", "active"])
+  })
+
+  it("dedups the rail: two snapshots of the same logical tool render ONE numbered row (D-05 structural)", () => {
+    const stableClientKey = "anthropic|msg-1|search_documents|1700000000000|0"
+    const toolCalls: ToolCall[] = [
+      {
+        name: "search_documents",
+        id: "tu_a",
+        clientKey: stableClientKey,
+        args: { query: "x" },
+        status: "preparing",
+        iteration: 0,
+      } as ToolCall,
+      {
+        name: "search_documents",
+        id: "tu_b", // provider mutated the id
+        clientKey: stableClientKey,
+        args: { query: "x" },
+        status: "running",
+        startedAt: 1_700_000_000_500,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Shared dedup collapses them → exactly ONE rail node/snum (no dup row).
+    expect(container.querySelectorAll("[data-testid='step-node']").length).toBe(1)
+    expect(container.querySelectorAll("[data-testid='step-snum']")[0]?.textContent).toBe("1")
+  })
+})
+
 describe("ToolCallPanel — Phase 075.9 T3 clientKey dedup", () => {
   // The defect this guards against (the "felt-experience" sub-agent dup):
   //

@@ -13,6 +13,7 @@ import { ToolArgsLivePanel } from "./ToolArgsLivePanel"
 import { ExecuteCodeEditorInset } from "./tool-bodies/ExecuteCodeBody"
 import { toolLabel, toolSummary as getToolSummary } from "@/lib/toolMeta"
 import { StatusPill, type ToolStatus } from "./StatusPill"
+import { dedupToolCalls } from "@/lib/stepCount"
 
 interface Props {
   toolCalls: ToolCall[]
@@ -299,6 +300,76 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
   )
 }
 
+// ---- Step rail (Phase 095 Plan 03 Task 2, sketch 014 — unified-card-frame) ----
+//
+// The borderless step-numbered status-node rail. Each deduped tool renders on
+// a 2-column grid: a rail column (node + connecting line + `snum`) and the
+// step main column (the EXISTING per-tool head + body — REUSED verbatim, no
+// second body system; G4). Node state derives from (index, status):
+//   done   = a finished step (filled-success node, success snum)
+//   active = the step running now (pulsing-primary ring node, primary snum)
+//   queued = not-yet-started (dim outline node)
+// Numbering makes the D-04 count + D-05 zero-dup structural (a dup = two
+// same-numbered rows). Reuse-only CSS — no new keyframes.
+
+type NodeState = "done" | "active" | "queued"
+
+function StepRow({
+  snum,
+  node,
+  isLast,
+  children,
+}: {
+  snum: number
+  node: NodeState
+  isLast: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="grid grid-cols-[28px_1fr] min-w-0">
+      {/* Rail column: connecting line + status node + step number */}
+      <div className="relative flex flex-col items-center" aria-hidden="true">
+        {/* the spine — fills success up to the active node; hidden on the last row */}
+        {!isLast && (
+          <div
+            data-testid="step-rail-line"
+            className={cn(
+              "absolute top-5 bottom-0 w-px left-1/2 -translate-x-1/2",
+              node === "queued" ? "bg-border" : "bg-success/60",
+              node === "active" && "bg-gradient-to-b from-success/60 to-primary",
+            )}
+          />
+        )}
+        {/* the status node */}
+        <span
+          data-testid="step-node"
+          data-node-state={node}
+          className={cn(
+            "relative z-[1] mt-2.5 w-2.5 h-2.5 rounded-full border-2 flex-shrink-0",
+            node === "done" && "bg-success border-success",
+            node === "active" &&
+              "bg-card border-primary animate-pulseGlow shadow-[0_0_0_3px_hsl(var(--primary)/0.15)]",
+            node === "queued" && "bg-card border-border",
+          )}
+        />
+        {/* the step number */}
+        <span
+          data-testid="step-snum"
+          className={cn(
+            "mt-1 font-mono text-[10px] tabular-nums leading-none",
+            node === "active" ? "text-primary font-bold" : "text-success/80",
+            node === "queued" && "text-muted-foreground/50",
+          )}
+        >
+          {snum}
+        </span>
+      </div>
+      {/* Step main column: the reused per-tool head + body */}
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
 // ---- Main panel ----
 
 export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
@@ -312,32 +383,13 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   // ordering so the timeline / displayItems sort below behaves the same;
   // only the duplicate suffix entries get dropped.
   //
-  // Phase 075.9 T3: PREFER `tc.clientKey` over `tc.id`. The provider-emitted
-  // `tc.id` mutates across the preparing→running transition on some
-  // providers (Anthropic, OpenRouter), so two snapshots of the same logical
-  // tool can produce two distinct dedup keys → both render mid-stream. The
-  // stable `clientKey` stamped by StreamsProvider on creation closes this
-  // root cause. Fallback chain: clientKey > id > composite (for in-flight
-  // tests / DB-loaded messages without a clientKey stamp).
-  //
-  // The composite fallback (`${name}-${startedAt}-${idx}`) is kept ONLY for
-  // the migration window — once every consumer is on clientKey and historical
-  // DB messages get backfilled (or accept clientKey-less rendering), this
-  // can collapse to `tc.clientKey ?? tc.id`.
-  const deduplicatedToolCalls = useMemo(() => {
-    const seen = new Set<string>()
-    const result: ToolCall[] = []
-    ;(toolCalls ?? []).forEach((tc, idx) => {
-      // REMOVE after migration window: composite fallback for tools without
-      // a clientKey stamp (DB-loaded historical messages, in-flight test
-      // fixtures). New live-SSE tools always have clientKey.
-      const key = tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
-      if (seen.has(key)) return
-      seen.add(key)
-      result.push(tc)
-    })
-    return result
-  }, [toolCalls])
+  // Phase 095 Plan 03 Task 2 (D-04 single dedup home): import the ONE shared
+  // dedup from @/lib/stepCount (Plan 01) instead of an inline copy. The shared
+  // helper is byte-identical to the prior inline derivation (same
+  // clientKey > id > composite fallback chain, first-occurrence ordering) —
+  // the point is ONE source so the panel count and the RunCard headline count
+  // (which also reads unifiedStepCount → dedupToolCalls) can never drift.
+  const deduplicatedToolCalls = useMemo(() => dedupToolCalls(toolCalls), [toolCalls])
 
   if (!deduplicatedToolCalls || deduplicatedToolCalls.length === 0) return null
 
@@ -359,6 +411,26 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
     ...deduplicatedToolCalls.map((tc): DisplayItem => ({ kind: 'tool', tc, t: tc.status === "preparing" ? Infinity : (tc.startedAt ?? Date.now()) })),
     ...(activatedSkills ?? []).map((activation): DisplayItem => ({ kind: 'skill', activation, t: activation.occurredAt })),
   ].sort((a, b) => a.t - b.t)
+
+  // Phase 095 Plan 03 Task 2 (sketch 014 rail): per-tool 1-based step number,
+  // assigned in deduped-tool order. The snum is the rail's load-bearing
+  // numbering — it maps 1:1 to unifiedStepCount and makes D-05 zero-dup
+  // structural (a duplicate = two same-numbered rows). Keyed on the stable
+  // clientKey > id > composite identity (the SAME key dedupToolCalls uses).
+  const toolStepNumber = new Map<string, number>()
+  deduplicatedToolCalls.forEach((tc, idx) => {
+    const key = tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+    toolStepNumber.set(key, idx + 1)
+  })
+  const stepKeyOf = (tc: ToolCall, idx: number) =>
+    tc.clientKey ?? tc.id ?? `${tc.name}-${tc.startedAt ?? ''}-${idx}`
+  // Node state from (status): the running/preparing tool is the active node;
+  // a finished tool is done; anything else (rare) is queued.
+  const nodeStateOf = (tc: ToolCall): NodeState => {
+    if (tc.status === "running" || tc.status === "preparing") return "active"
+    if (tc.status === "done" || tc.status === "interrupted") return "done"
+    return "queued"
+  }
 
   // 075.6 Plan 02 / SPEC Req #4: default-expand-for-active-preparing rule.
   // The LAST tool in displayItems whose status === "preparing" is the
@@ -546,6 +618,14 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
             // .tool-progress-bar positioned absolute at the wrapper's bottom.
             const isToolActive = tc.status === "running" || tc.status === "preparing"
 
+            // Phase 095 Plan 03 Task 2 (sketch 014 rail): this tool's step
+            // number + node state for the StepRow wrapper. `isLastTool` hides
+            // the connecting spine on the final rail row.
+            const stepKey = stepKeyOf(tc, i)
+            const snum = toolStepNumber.get(stepKey) ?? 0
+            const node = nodeStateOf(tc)
+            const isLastTool = snum === deduplicatedToolCalls.length
+
             return (
               <div
                 key={i}
@@ -571,14 +651,23 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     data-iteration={tc.iteration}
                   >
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                    {/* Phase 095 Plan 03 Task 2 (D-04 relabel): "Round N", not
+                        "Step N". This within-run divider groups agent ROUNDS
+                        (tc.iteration); after D-04, "Step" means exactly one
+                        visible action (the rail snum / unifiedStepCount), so
+                        the round divider is relabeled to free that word. */}
                     <span className="text-[10px] font-semibold text-muted-foreground/70 tracking-wider uppercase">
-                      Step {tc.iteration + 1}
+                      Round {tc.iteration + 1}
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
                   </div>
                 ) : i > 0 && (
                   <div className="h-px bg-border/20 -mt-1 mb-2.5 mx-1" />
                 )}
+                {/* Phase 095 Plan 03 Task 2: the EXISTING tool head + body
+                    (reused verbatim — no second body system, G4) rendered onto
+                    the borderless numbered status-node rail (sketch 014). */}
+                <StepRow snum={snum} node={node} isLast={isLastTool}>
                 {tc.name === "execute_code" ? (
                   // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL
                   // execute_code statuses (preparing/running/done). Previously
@@ -762,6 +851,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     {agentState && <SubAgentBlock agent={agentState} />}
                   </>
                 )}
+                </StepRow>
                 {/* Phase 075.8 Task 3 (sketch 002 D6): bottom progress shimmer
                     on every active tool — both the execute_code branch and the
                     generic-tool branch. Absolute-positioned against the
