@@ -228,7 +228,7 @@ Plans:
 | 092. Dual-Mode Wiring + Continue Button | 6/7 | In progress (092-06 F3 code-complete + UAT gaps_found → NEW blocker F4 blocks end-to-end workflow; 092-07 F4 gap-closure remaining; MODE-01/02 + CONT-01 stay OPEN) | - |
 | 092.5. Provider Gateway Extraction (NEW — refactor) | 6/6 | Complete    | 2026-06-01 |
 | 093. Harness Cross-Provider Parity + Phase-Type Hardening | 8/9 | Gap-closure in progress 2026-06-03 — initial 5 plans (substrate + F9 gateway-consumption + model-resolver + ask_user F10 + shared surfacing) executed 2026-06-02; gap-closure 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 hydration + runs.usage) + 093-08 (D-18/S3 sub-agent model resolution — gpt-4o-avoidance) shipped. Remaining: 093-09 (D-19 GLM diagnose-first, autonomous:false). PARITY-02 stays OPEN until the native-7 × 5-type × 4-workflow LIVE UAT passes | - |
-| 094. Workflow Legibility + Mode Clarity | 2/5 | In progress (094-01 Wave 0 + 094-02 Wave 2 shipped 2026-06-04 — 094-02: 6 additive harness phase_* SSE branches [Deep byte-identical, 64/0 diff] + panel-only phasesByThread slice + onPhase* demux + usePhases reconcile-floor selector; phaseHooks.test.tsx GREEN [INV-1 PANEL-09 reference-identity + INV-5 per-thread isolation]; PANEL-08/09 → marked complete) | - |
+| 094. Workflow Legibility + Mode Clarity | 5/5 | Complete    | 2026-06-05 |
 | 095. Chat Tool-Card Unification | 0/0 | Not started | - |
 | 096. Eval Harness + Cross-Provider Verification + Concurrency | 0/0 | Not started | - |
 

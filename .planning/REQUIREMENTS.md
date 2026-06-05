@@ -119,9 +119,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | GATEWAY-01 | Phase 092.5 | Complete |
 | PARITY-02 | Phase 093 | **Validated (passed_with_overrides, 2026-06-03)** — D-21 native-7 LIVE re-UAT GREEN: 8/8 cells, all 4 gap-closure fixes proven LIVE (Google `thought_signature`, Moonshot `reasoning_content`, GLM `max_steps`, sub-agent model+tokens / no gpt-4o); 4-axis ✓ (cross-provider/multi-tool/parallel-thread/long-message); Deep-regression ✓ (eval 8/8, Anthropic twin byte-identical ×2, task() pass). Overrides: Dim-3 abrupt-resume retest deferred (Windows kill-friction, pre-existing infra unchanged by 093); Dim-5 result-quality (kimi fabrication / MiniMax finalize) → SEED-050/096; WR-01 accepted. UI legibility findings → 094. See 093-HUMAN-UAT.md. |
 | PARITY-01 | (re-deferred 2026-06-01) | Deferred |
-| PANEL-08 | Phase 094 | Pending |
-| PANEL-09 | Phase 094 | Pending |
-| A11Y-03 | Phase 094 | Pending |
+| PANEL-08 | Phase 094 | Complete |
+| PANEL-09 | Phase 094 | Complete |
+| A11Y-03 | Phase 094 | Complete |
 | CHAT-04 | Phase 095 | Pending |
 | EVAL-01 | Phase 096 | Pending |
 | EVAL-02 | Phase 096 | Pending |

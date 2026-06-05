@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_for_verification
+status: ready_to_plan
 stopped_at: Completed 094-05-PLAN.md (FINAL plan of Phase 094)
 last_updated: "2026-06-04T19:40:14.609Z"
 last_activity: 2026-06-04
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 42
   completed_plans: 42
-  percent: 100
+  percent: 89
 ---
 
 # Project State
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 --- (prior `human_needed` trace retained for audit) ---
 
-Phase: --phase (094) — EXECUTING
+Phase: 095
 
 --- (gap-closure execution trace below — retained for audit) ---
 
@@ -70,7 +70,7 @@ Phase: 093 — GAP-CLOSURE COMPLETE (post-LIVE-UAT, D-15..D-21). Initial 5 plans
 --- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
-Plan: 1 of --name
+Plan: Not started
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -126,7 +126,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-06-04
+Last activity: 2026-06-05
 
 Progress: [██████████] 100%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
@@ -141,7 +141,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 
-- Total plans completed: 43 (v2.7)
+- Total plans completed: 48 (v2.7)
 - Prior milestones: v2.6 shipped 91 plans in 16 days (~5.7 plans/day)
 - Average duration: ~12min
 
@@ -157,6 +157,7 @@ Progress: [██████████] 100%
 | 089 | 4 | - | - |
 | 091 | 8 | - | - |
 | 092.5 | 6 | - | - |
+| 094 | 5 | - | - |
 
 **Recent Trend:**
 
