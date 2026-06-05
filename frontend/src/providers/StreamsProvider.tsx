@@ -488,28 +488,122 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
+    // Phase 095 Plan 03 Task 1 (D-05 root fix): the legacy analyze_document
+    // sub-agent now stamps onto its OWNING tool_call entry instead of a
+    // separate single-slot message-scoped sub_agent field. That single slot
+    // was the dual-render ROOT: it rendered once as the tool body (via the
+    // owner's tc.sub_agent on reconcile) AND once via the message-scoped
+    // fallback in ToolCallPanel, so the read/summarize content visibly doubled
+    // and never self-healed (it was stable state, not the 075.2 transient-id
+    // race — a separate root, and that transient fix is left fully untouched).
+    //
+    // The fix mirrors onToolStart's makeToolKey discipline: find the running
+    // analyze_document owner and set tc.sub_agent on THAT entry, preserving
+    // its existing clientKey. If no owner exists yet (sub_agent_start arrived
+    // before tool_start for some provider ordering), create the owner entry
+    // here with ONE stable makeToolKey identity from frame 1. Provider-agnostic
+    // and additive — m.content and the four terminal kinds are untouched, and
+    // the closure is scoped to the OWNING threadId (no global flag, no
+    // cross-thread write).
+    //
+    // helper: locate the tool_call this sub-agent belongs to (the most recent
+    // running/preparing analyze_document — the legacy sub-agent owner).
     onSubAgentStart: (filename, task) => {
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, sub_agent: { filename, task, content: "", status: "running" } }
-            : m,
-        ),
+        prev.map((m) => {
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Find the most recent running/preparing analyze_document owner.
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            const tc = calls[i]
+            if (
+              tc.name === "analyze_document" &&
+              (tc.status === "running" || tc.status === "preparing")
+            ) {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx !== -1) {
+            // Stamp onto the existing owner, preserving its clientKey identity.
+            const updated = calls.map((tc, i) =>
+              i === ownerIdx
+                ? { ...tc, sub_agent: { filename, task, content: "", status: "running" as const } }
+                : tc,
+            )
+            return { ...m, tool_calls: updated }
+          }
+          // No owner yet (sub_agent_start before tool_start) — create the
+          // analyze_document owner entry with ONE stable identity from frame 1,
+          // mirroring onToolStart's makeToolKey stamp (443-448).
+          const observedAt = Date.now()
+          const clientKey = makeToolKey({
+            messageId: assistantId,
+            name: "analyze_document",
+            observedAt,
+            index: calls.length,
+          })
+          const ownerEntry: ToolCall = {
+            id: `running-${observedAt}`,
+            clientKey,
+            name: "analyze_document",
+            args: {},
+            status: "running",
+            startedAt: observedAt,
+            iteration: currentIteration,
+            sub_agent: { filename, task, content: "", status: "running" },
+          }
+          return { ...m, tool_calls: [...calls, ownerEntry] }
+        }),
       )
     },
     onSubAgentDelta: (text) => {
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.id !== assistantId || !m.sub_agent) return m
-          return { ...m, sub_agent: { ...m.sub_agent, content: m.sub_agent.content + text } }
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Append to the OWNING tool_call's sub_agent.content (the most recent
+          // entry that carries a running sub_agent). Immutable copy-then-mutate.
+          // This is a NEW-field append — m.content is never touched (preserves
+          // the onDelta content-append invariant).
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].sub_agent && calls[i].sub_agent!.status === "running") {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx === -1) return m
+          const updated = calls.map((tc, i) =>
+            i === ownerIdx
+              ? { ...tc, sub_agent: { ...tc.sub_agent!, content: tc.sub_agent!.content + text } }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
         }),
       )
     },
     onSubAgentDone: () => {
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.id !== assistantId || !m.sub_agent) return m
-          return { ...m, sub_agent: { ...m.sub_agent, status: "done" } }
+          if (m.id !== assistantId) return m
+          const calls = m.tool_calls ?? []
+          // Flip the owning tool_call's sub_agent status → done.
+          let ownerIdx = -1
+          for (let i = calls.length - 1; i >= 0; i--) {
+            if (calls[i].sub_agent && calls[i].sub_agent!.status === "running") {
+              ownerIdx = i
+              break
+            }
+          }
+          if (ownerIdx === -1) return m
+          const updated = calls.map((tc, i) =>
+            i === ownerIdx
+              ? { ...tc, sub_agent: { ...tc.sub_agent!, status: "done" as const } }
+              : tc,
+          )
+          return { ...m, tool_calls: updated }
         }),
       )
     },

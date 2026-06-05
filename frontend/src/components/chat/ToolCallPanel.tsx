@@ -16,7 +16,13 @@ import { StatusPill, type ToolStatus } from "./StatusPill"
 
 interface Props {
   toolCalls: ToolCall[]
-  subAgent?: SubAgentState  // live sub-agent state during streaming
+  /**
+   * Phase 095 Plan 03 (D-05): no longer read. The legacy analyze_document
+   * sub-agent now lives on its owning tool_call (`tc.sub_agent`), stamped by
+   * StreamsProvider — collapsing the dual render source. RunCard still passes
+   * `message.sub_agent` for back-compat; the field is accepted but unused.
+   */
+  subAgent?: SubAgentState
   isPlanning?: boolean      // agent finished tool round, deciding next action
   /** Phase 56 D-03: 0-based iteration index from iteration_start SSE event. Display as `Step ${N + 1}`. */
   iterationCount?: number
@@ -295,7 +301,7 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
 
 // ---- Main panel ----
 
-export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
+export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
   // Phase 075.7 Bug D fix: `isPlanning` and `iterationCount` props are still
   // declared in the Props interface (RunCard.tsx passes them) but are no
   // longer consumed here. RunCard owns run-level chrome (timer, counter,
@@ -523,13 +529,15 @@ export function ToolCallPanel({ toolCalls, subAgent, activatedSkills }: Props) {
             const tc = item.tc
             // ===== Existing tool-call render body, unchanged =====
             const summary = toolSummary(tc)
-            // 075.6 Plan 03 / Req #6: drop the narrow `tc.name === "analyze_document"`
-            // gate. Any sub-agent run's live `m.sub_agent.content` (already accumulated
-            // server-side via sub_agent_delta events for ALL sub-agent kinds) now
-            // surfaces inside the parent tool row that triggered it. Precedence rule
-            // unchanged: tool-scoped tc.sub_agent wins over message-scoped subAgent prop.
-            const agentState: SubAgentState | undefined =
-              tc.sub_agent ?? subAgent
+            // Phase 095 Plan 03 Task 1 (D-05 root fix): the sub-agent now lives
+            // ONLY on its owning tool_call (StreamsProvider onSubAgentStart stamps
+            // it onto the analyze_document owner; the single-slot message-scoped
+            // live-write is gone). The old dual source (tool-scoped OR the
+            // message-scoped prop fallback) was the double-render ROOT — collapsed
+            // to the tool-scoped value alone so a sub-agent body can never render
+            // twice (once as the tool body, once via the message-scoped fallback).
+            // The message-scoped `subAgent` prop is no longer read on this path.
+            const agentState: SubAgentState | undefined = tc.sub_agent
 
             // Phase 075.8 Task 3 (sketch 002 D6): active-tool glow + bottom shimmer.
             // Applied to the per-tool wrapper when the tool is running or
