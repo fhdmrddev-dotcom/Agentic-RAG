@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sketch 014 · Unified Card Frame — Phase 095</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  /* ───────────────────────────────────────────────────────────
+     Sketch 014 — Unified chat tool-card frame (Phase 095, D-01/D-02/D-05)
+     Three takes on: resting one-line essence · live Focus-Mode stack ·
+     zero-duplicate sub-agent. Same REAL run rendered in all three so the
+     comparison is the FRAME, not the content.
+     Builds on the locked 001-C run-frame / 002-C tool-card / 003-B Focus.
+     ─────────────────────────────────────────────────────────── */
+
+  body { padding-top: 0; }
+
+  .stage {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 24px 20px 140px;
+    transition: max-width var(--dur-base) var(--ease-out);
+  }
+  .stage.vp-phone   { max-width: 400px; }
+  .stage.vp-tablet  { max-width: 720px; }
+  .stage.vp-desktop { max-width: 860px; }
+
+  /* Run controls bar */
+  .run-controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: 8px 0 18px;
+    padding: 10px 12px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+  .run-controls .grp { display: flex; align-items: center; gap: 7px; }
+  .run-controls .sep { width: 1px; height: 20px; background: var(--color-border); }
+  .ctl-btn {
+    background: var(--color-primary-dim); color: var(--color-primary);
+    border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-sm); padding: 5px 11px;
+    font-family: var(--font-sans); font-size: var(--text-sm); cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .ctl-btn:hover { background: var(--color-primary-glow); }
+  .ctl-btn.ghost { background: transparent; color: var(--color-text-muted); border-color: var(--color-border); }
+  .ctl-btn.ghost:hover { background: var(--color-accent); color: var(--color-text); }
+  .run-controls label.chk { display: flex; align-items: center; gap: 6px; color: var(--color-text-muted); cursor: pointer; user-select: none; }
+  .run-controls .hint { color: var(--color-text-dim); font-size: var(--text-xs); }
+
+  /* User prompt bubble (context) */
+  .user-msg {
+    margin: 0 0 16px auto; max-width: 78%;
+    background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+    color: var(--color-text); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+    padding: 10px 14px; font-size: var(--text-base);
+  }
+
+  /* ── Shared run-frame (001-C) ── */
+  .run-frame {
+    background: linear-gradient(180deg, hsl(220 30% 7% / 0.6), hsl(220 30% 7% / 0.3));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden; position: relative;
+  }
+  .run-frame.active { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+
+  .run-header {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--color-border);
+    background: hsl(220 30% 8% / 0.92);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .avatar {
+    width: 28px; height: 28px; border-radius: var(--radius-sm); flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    color: #fff; font-size: 14px; font-family: var(--font-headline);
+  }
+  .avatar.streaming { animation: brandPulse 1.5s ease-in-out infinite; }
+  .run-title { font-size: var(--text-sm); font-weight: 600; line-height: 1.2; }
+  .run-sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+
+  /* The persistent honest status strip (D-06 preview — placement explored in 015) */
+  .status-strip {
+    margin-left: auto; display: flex; align-items: center; gap: 0;
+    font-family: var(--font-mono); font-size: var(--text-xs);
+    background: hsl(220 30% 11% / 0.8); border: 1px solid var(--color-border);
+    border-radius: var(--radius-full); padding: 4px 4px 4px 10px;
+    color: var(--color-text-muted); white-space: nowrap;
+  }
+  .status-strip .seg { padding: 0 8px; display: inline-flex; align-items: center; gap: 5px; }
+  .status-strip .seg.time { color: var(--color-text); }
+  .status-strip .seg.time::before { content: '⏱'; }
+  .status-strip .divider { width: 1px; height: 12px; background: var(--color-border); }
+  .status-strip .seg.act { color: var(--color-primary); }
+  .status-strip .seg.act .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: dotBounce 1.4s ease-in-out infinite; }
+  .run-frame:not(.active) .status-strip { color: var(--color-success); }
+  .run-frame:not(.active) .status-strip .seg.act { color: var(--color-success); }
+  .run-frame:not(.active) .status-strip .seg.act .dot { animation: none; }
+
+  .run-progress { height: 2px; background: var(--color-primary-dim); position: relative; overflow: hidden; }
+  .run-progress::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / 0.5), transparent);
+    animation: progressShimmer 1.8s ease-in-out infinite;
+  }
+  .run-frame:not(.active) .run-progress { display: none; }
+
+  .run-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* Next-up footer (003-B) */
+  .next-up {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 11px; border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md); color: var(--color-text-dim);
+    font-family: var(--font-mono); font-size: var(--text-xs);
+  }
+  .next-up .label { text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted); }
+  .next-up .qmark { margin-left: auto; }
+  .next-up.thinking .dotline { display: inline-flex; gap: 3px; margin-left: auto; }
+  .next-up.thinking .dotline i { width: 4px; height: 4px; border-radius: 50%; background: var(--color-primary); display: inline-block; animation: dotBounce 1.4s ease-in-out infinite; }
+  .next-up.thinking .dotline i:nth-child(2){ animation-delay: .15s; } .next-up.thinking .dotline i:nth-child(3){ animation-delay: .3s; }
+
+  /* Collapsed terminal run summary (001-C / 003-B D5) */
+  .run-collapsed {
+    display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer;
+    font-size: var(--text-sm); transition: background var(--dur-fast);
+  }
+  .run-collapsed:hover { background: hsl(220 30% 9% / 0.6); }
+  .run-collapsed .chev { margin-left: auto; color: var(--color-text-dim); transition: transform var(--dur-fast); }
+
+  /* ── Universal status pill ── */
+  .pill {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 3px 8px; border-radius: var(--radius-full); display: inline-flex; align-items: center; gap: 6px; flex: none;
+  }
+  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill.running { background: var(--color-primary-dim); color: var(--color-primary); }
+  .pill.running .dot { animation: dotBounce 1.4s ease-in-out infinite; }
+  .pill.done { background: var(--color-success-dim); color: var(--color-success); }
+  .pill.err  { background: var(--color-danger-dim); color: var(--color-danger); }
+
+  /* ── Shared inner tool bodies (002-C) — same across all variants ── */
+  .body-wrap { font-size: var(--text-sm); }
+  .tc-search-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); padding: 6px 10px; background: hsl(220 30% 8% / .5); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .tc-search-meta .k { color: var(--color-primary); }
+  .tc-search-row { display: flex; align-items: center; gap: 10px; padding: 5px 10px; border-radius: var(--radius-sm); }
+  .tc-search-row:hover { background: hsl(220 30% 9% / .6); }
+  .tc-search-row .score { font-family: var(--font-mono); font-size: 11px; color: var(--color-success); width: 34px; }
+  .tc-search-row .doc { font-size: var(--text-sm); }
+  .tc-search-row .chunk { color: var(--color-text-dim); font-size: var(--text-xs); margin-left: 6px; }
+  .conf-badge { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 9px; border-radius: var(--radius-full); font-size: 11px; background: var(--color-warning-dim); color: var(--color-warning); font-family: var(--font-mono); }
+
+  .read-preview, .tc-editor { background: #0d1117; border-radius: var(--radius-sm); overflow: hidden; }
+  .read-preview pre { margin: 0; padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; line-height: 1.7; color: #c9d1d9; white-space: pre-wrap; }
+
+  .tc-editor { display: grid; grid-template-columns: 30px 1fr; max-height: 168px; overflow-y: auto; }
+  .tc-gutter { background: hsl(220 30% 7%); color: var(--color-text-dim); font-family: var(--font-mono); font-size: 11px; text-align: right; padding: 8px 6px 8px 0; line-height: 1.7; user-select: none; border-right: 1px solid var(--color-border); }
+  .tc-code { padding: 8px 12px; font-family: var(--font-mono); font-size: 11px; line-height: 1.7; color: #c9d1d9; white-space: pre; overflow-x: auto; }
+  .tc-code .kw{color:#ff7b72;} .tc-code .str{color:#a5d6ff;} .tc-code .num{color:#79c0ff;} .tc-code .fn{color:#d2a8ff;} .tc-code .cmt{color:#8b949e;font-style:italic;}
+  .tc-divider { display: flex; align-items: center; padding: 5px 12px; background: hsl(220 30% 9%); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); letter-spacing: .06em; text-transform: uppercase; }
+  .tc-divider .live { margin-left: auto; color: var(--color-primary); display: flex; align-items: center; gap: 6px; }
+  .tc-divider .live .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: dotBounce 1.4s ease-in-out infinite; }
+  .tc-output { padding: 8px 12px; background: #0d1117; font-family: var(--font-mono); font-size: 11px; color: #c9d1d9; max-height: 120px; overflow-y: auto; line-height: 1.65; }
+  .tc-output .line.stderr { color: #ffa198; }
+  .tc-output .caret { display:inline-block; width:7px; height:13px; background: var(--color-primary); vertical-align:-2px; margin-left:2px; animation: caretBlink 1s steps(1) infinite; }
+  .tool-progress { height: 2px; background: var(--color-primary-dim); position: relative; overflow: hidden; margin-top: 0; }
+  .tool-progress::after { content:''; position:absolute; inset:0; background: linear-gradient(90deg, transparent, var(--color-primary-glow), transparent); animation: progressShimmer 1.4s ease-in-out infinite; }
+
+  .file-out { margin-top: 8px; padding: 9px 11px; background: linear-gradient(135deg, hsl(220 30% 9%), hsl(220 30% 11%)); border: 1px solid var(--color-border); border-radius: var(--radius-sm); display: flex; align-items: center; gap: 10px; }
+  .file-out .ic { width: 32px; height: 32px; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .file-out .nm { font-size: var(--text-sm); }
+  .file-out .mt { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .file-out .dl { margin-left: auto; }
+
+  /* Sub-agent nested child run */
+  .subrun { border: 1px solid var(--color-border-soft); border-left: 2px solid var(--color-accent-violet); border-radius: var(--radius-sm); padding: 8px 10px; background: hsl(258 40% 10% / .3); }
+  .subrun .sr-head { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--color-text-muted); font-family: var(--font-mono); }
+  .subrun .sr-head .av { width: 18px; height: 18px; border-radius: 4px; background: var(--color-accent-violet); display:flex;align-items:center;justify-content:center; color:#fff; font-size:10px; }
+  .subrun .sr-sum { margin-top: 6px; font-size: var(--text-sm); color: var(--color-text); }
+  .dup-tag { font-size: 10px; font-family: var(--font-mono); padding: 2px 7px; border-radius: var(--radius-full); margin-left: auto; }
+  .dup-tag.bad { background: var(--color-danger-dim); color: var(--color-danger); }
+  .dup-tag.good { background: var(--color-success-dim); color: var(--color-success); }
+
+  /* essence line — shared atoms */
+  .ess-ic { flex: none; width: 18px; text-align: center; }
+  .ess-name { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .ess-arrow { color: var(--color-text-dim); }
+  .ess-text { color: var(--color-text); }
+  .chev { transition: transform var(--dur-fast) var(--ease-out); color: var(--color-text-dim); flex: none; }
+  .open > * .chev, .is-open .chev { transform: rotate(90deg); }
+
+  /* ════════════════ VARIANT A — Flat essence rows ════════════════ */
+  .v-a .run-body { gap: 0; padding: 6px; }
+  .v-a .step { border-radius: var(--radius-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .v-a .step + .step { border-top: 1px solid var(--color-border-soft); }
+  .v-a .step-head { display: flex; align-items: center; gap: 9px; padding: 9px 8px; cursor: pointer; transition: background var(--dur-fast); border-radius: var(--radius-sm); }
+  .v-a .step-head:hover { background: hsl(220 30% 9% / .5); }
+  .v-a .step.active > .step-head { cursor: default; }
+  .v-a .step-body { padding: 4px 8px 12px 30px; }
+  .v-a .step.active .step-body { border-left: 2px solid var(--color-primary); margin-left: 8px; padding-left: 14px; }
+  .v-a .step.done .ess-text { color: var(--color-text-muted); }
+
+  /* ════════════════ VARIANT B — Bordered cards on a status spine ════════════════ */
+  .v-b .run-body { position: relative; padding: 14px 12px 12px 10px; gap: 10px; }
+  .v-b .spine { position: absolute; left: 21px; top: 20px; bottom: 54px; width: 2px; background: linear-gradient(180deg, var(--color-success), var(--color-primary-glow) 70%, var(--color-border)); border-radius: 1px; }
+  .v-b .step { position: relative; padding-left: 26px; animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .v-b .node { position: absolute; left: 5px; top: 11px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-bg); border: 2px solid var(--color-success); z-index: 2; }
+  .v-b .step.active .node { border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-dim); animation: pulseGlow 1.6s ease-in-out infinite; }
+  .v-b .step.queued .node { border-color: var(--color-border); }
+  .v-b .card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+  .v-b .step.active .card { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+  .v-b .card-head { display: flex; align-items: center; gap: 9px; padding: 9px 11px; cursor: pointer; transition: background var(--dur-fast); }
+  .v-b .card-head:hover { background: hsl(220 30% 8% / .6); }
+  .v-b .step.active .card-head { cursor: default; }
+  .v-b .card-body { padding: 0 11px 11px; }
+  .v-b .step.done .ess-text { color: var(--color-text-muted); }
+
+  /* ════════════════ VARIANT C — Continuous rail + blooming active row ════════════════ */
+  .v-c .run-body { padding: 8px 10px; gap: 1px; }
+  .v-c .step { display: grid; grid-template-columns: 30px 1fr; border-radius: var(--radius-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .v-c .step-num { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); text-align: center; padding-top: 11px; position: relative; }
+  .v-c .step-num::before { content: ''; position: absolute; left: 50%; top: 26px; bottom: -1px; width: 1px; background: var(--color-border); transform: translateX(-50%); }
+  .v-c .step:last-child .step-num::before { display: none; }
+  .v-c .step.done .step-num { color: var(--color-success); }
+  .v-c .step.active .step-num { color: var(--color-primary); font-weight: 700; }
+  .v-c .step-main { min-width: 0; }
+  .v-c .step-head { display: flex; align-items: center; gap: 9px; padding: 9px 8px; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--dur-fast); }
+  .v-c .step-head:hover { background: hsl(220 30% 9% / .4); }
+  .v-c .step.active { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); }
+  .v-c .step.active .step-head { cursor: default; }
+  .v-c .step-body { padding: 2px 8px 12px; }
+  .v-c .step.done .ess-text { color: var(--color-text-muted); }
+
+  /* ════════ VARIANT S — Synthesis: C rail + bloom + B status nodes (recommended) ════════ */
+  .v-s .run-body { padding: 8px 10px; gap: 2px; }
+  .v-s .step { display: grid; grid-template-columns: 34px 1fr; border-radius: var(--radius-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .v-s .rail { position: relative; display: flex; justify-content: center; }
+  .v-s .node { position: absolute; top: 12px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--color-success); background: var(--color-success); z-index: 2; }
+  .v-s .step.active .node { background: var(--color-bg); border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-dim); animation: pulseGlow 1.6s ease-in-out infinite; }
+  .v-s .step.queued .node { background: var(--color-bg); border-color: var(--color-border); }
+  .v-s .rail-line { position: absolute; top: 22px; bottom: -4px; width: 2px; left: 50%; transform: translateX(-50%); background: var(--color-success); }
+  .v-s .step.active .rail-line { background: linear-gradient(180deg, var(--color-success), var(--color-primary)); }
+  .v-s .snum { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); min-width: 11px; }
+  .v-s .step.done .snum { color: var(--color-success); }
+  .v-s .step.active .snum { color: var(--color-primary); font-weight: 700; }
+  .v-s .step-head { display: flex; align-items: center; gap: 8px; padding: 9px 8px; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--dur-fast); }
+  .v-s .step-head:hover { background: hsl(220 30% 9% / .4); }
+  .v-s .step.active { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); }
+  .v-s .step.active .step-head { cursor: default; }
+  .v-s .step-body { padding: 2px 8px 12px; }
+  .v-s .step.done .ess-text { color: var(--color-text-muted); }
+
+  /* caption under each variant */
+  .v-caption { margin-top: 14px; padding: 11px 14px; background: hsl(220 30% 8% / .5); border: 1px solid var(--color-border-soft); border-left: 2px solid var(--color-primary); border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--color-text-muted); }
+  .v-caption b { color: var(--color-text); }
+  .v-caption .tag { display:inline-block; font-family: var(--font-mono); font-size: 10px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--color-primary-dim); color: var(--color-primary); margin-right: 4px; }
+
+  .annot-on [data-annot]:hover::after {
+    content: attr(data-annot); position: absolute; z-index: 9999;
+    background: #000; color: #fff; font-family: var(--font-mono); font-size: 10px;
+    padding: 2px 6px; border-radius: 4px; margin-top: -22px; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 014 · Unified Card Frame</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Flat essence rows</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Cards on a spine</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Continuous rail</button>
+  <button class="variant-tab" onclick="showVariant('s', event)">Synthesis · C rail + B nodes <span class="star">★ winner</span></button>
+</div>
+
+<div class="stage" id="stage">
+
+  <div class="run-controls">
+    <div class="grp">
+      <button class="ctl-btn" id="playBtn" onclick="togglePlay()">▶ Play run</button>
+      <button class="ctl-btn ghost" onclick="resetRun()">↻ Reset</button>
+    </div>
+    <div class="sep"></div>
+    <div class="grp">
+      <button class="ctl-btn ghost" onclick="setPhase('running')">● Mid-run</button>
+      <button class="ctl-btn ghost" onclick="setPhase('done')">✓ Finished (collapsed)</button>
+    </div>
+    <div class="sep"></div>
+    <label class="chk"><input type="checkbox" id="dupToggle" onchange="renderAll()" /> Show today's sub-agent <b style="color:var(--color-danger)">double-render</b> bug</label>
+    <span class="hint" style="margin-left:auto;">Same real run in all 3 tabs — compare the <b>frame</b>, not the content.</span>
+  </div>
+
+  <div class="user-msg">Build me a dissertation-defense deck from <b>thesis.pdf</b> and <b>results.pdf</b> — charts for the key results, ~10 slides.</div>
+
+  <div id="variant-a" class="variant"><div class="mount" id="mount-a"></div>
+    <div class="v-caption"><span class="tag">D-01</span><span class="tag">D-02</span> <b>Flat essence rows.</b> Lowest chrome — each step is a calm line; the active step opens in place with a thin accent. Closest to Claude.ai. Reads fast on a 11-step run; the trade-off is weaker visual sequencing (no explicit "where am I in the chain").</div>
+  </div>
+  <div id="variant-b" class="variant" style="display:none"><div class="mount" id="mount-b"></div>
+    <div class="v-caption"><span class="tag">D-01</span><span class="tag">D-02</span> <b>Bordered cards on a status spine.</b> Most "instrument" — a filling spine (green→done, pulsing primary→active) makes the locked sequence <i>felt</i>, echoing the 008 phase-timeline at the tool level. Trade-off: heaviest chrome; can feel busy when 8+ cards stack.</div>
+  </div>
+  <div id="variant-c" class="variant" style="display:none"><div class="mount" id="mount-c"></div>
+    <div class="v-caption"><span class="tag">D-01</span><span class="tag">D-02</span> <b>Continuous rail + blooming active row.</b> A numbered rail gives sequence like B, but cards aren't individually bordered — the active step "blooms" (primary wash + left bar) while finished steps stay tight. The calm middle: A's low chrome + B's orientation.</div>
+  </div>
+
+  <div id="variant-s" class="variant" style="display:none"><div class="mount" id="mount-s"></div>
+    <div class="v-caption" style="border-left-color:var(--color-success)"><span class="tag" style="background:var(--color-success-dim);color:var(--color-success)">★ recommended</span><span class="tag">D-01</span><span class="tag">D-02</span><span class="tag">D-04</span><span class="tag">D-05</span> <b>Synthesis — C's calm rail + bloom, with B's status nodes.</b> The rail fills with status dots (filled green = done, pulsing primary ring = active) so the locked sequence is <i>felt</i> like B, but cards stay borderless and the active step blooms like C — calmest at rest, one controlled spike at the live moment. Each row keeps its step number → the timer strip's "Step N" maps 1:1 to a numbered row (<b>D-04</b> honest count), and a duplicate would show as two rows numbered the same (<b>D-05</b> made structurally obvious).</div>
+  </div>
+
+</div>
+
+<div class="sketch-toolbar">
+  <span>014</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVp('phone')">P</button>
+  <button onclick="setVp('tablet')">T</button>
+  <button onclick="setVp('desktop')">D</button>
+  <button onclick="document.body.classList.toggle('annot-on')">⌗</button>
+</div>
+
+<script>
+/* ── viewport + tabs ── */
+function setVp(v){ const s=document.getElementById('stage'); s.classList.remove('vp-phone','vp-tablet','vp-desktop'); s.classList.add('vp-'+v); }
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(v => v.style.display='none');
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).style.display='block';
+  if(ev) ev.target.classList.add('active');
+}
+
+/* ── The real run (grounded in 095-SKETCH-GROUNDING §6 fixture) ──
+   Each step folds to its REAL essence line when finished; the active one is open. */
+const STEPS = [
+  { ic:'🔍', name:'search_documents', verb:'Searching…',
+    essence:'Found 14 chunks in "thesis.pdf" (avg similarity 0.61)', dur:'1.3s', kind:'search',
+    data:{ q:'dissertation methodology + key results', folder:'thesis/', conf:'medium · 0.61',
+      rows:[['0.61','thesis.pdf','chunk 4 of 38'],['0.59','thesis.pdf','chunk 7 of 38'],['0.55','results.pdf','chunk 2 of 19']] } },
+
+  { ic:'📄', name:'read_document', verb:'Reading…',
+    essence:'Loaded lines 1–120 from "thesis.pdf" (412 lines total)', dur:'0.9s', kind:'read',
+    data:{ pre:'# Methodology\n\nWe evaluate the proposed estimator on three\nbenchmark corpora (A/B/C), reporting YoY deltas\nand 95% CIs. Revenue impact is measured against…' } },
+
+  { ic:'✨', name:'analyze_document', verb:'Analyzing…',
+    essence:'Analyzed "results.pdf" (full doc, 31 pages) → summarized', dur:'14.2s', kind:'subagent',
+    data:{ task:'summarize key quantitative findings of results.pdf',
+      sum:'Q3 revenue +30.9% YoY (vs +21.7% Q2); APAC the growth driver (+44%). Two figures worth charting: revenue-by-quarter, region growth.' } },
+
+  { ic:'🐍', name:'execute_code', verb:'Running code…', lang:'python',
+    essence:'Executed 22 lines Python → generated chart_revenue.png (exit 0, 2.1s)', dur:'2.1s', kind:'code',
+    data:{ code:[
+        ['<span class="kw">import</span> matplotlib.pyplot <span class="kw">as</span> plt'],
+        ['<span class="kw">import</span> pandas <span class="kw">as</span> pd'],
+        ['rev = pd.<span class="fn">read_csv</span>(<span class="str">"q.csv"</span>)'],
+        ['ax = rev.<span class="fn">plot</span>.<span class="fn">bar</span>(x=<span class="str">"q"</span>, y=<span class="str">"yoy"</span>)'],
+        ['plt.<span class="fn">savefig</span>(<span class="str">"chart_revenue.png"</span>)'] ],
+      stdout:['loaded 4 quarters','yoy_q3 = 30.87%','saved chart_revenue.png'],
+      file:{ ic:'🖼', nm:'chart_revenue.png', mt:'88 KB · matplotlib' } } },
+
+  { ic:'🐍', name:'execute_code', verb:'Running code…', lang:'python',
+    essence:'Executed 47 lines Python → generated dissertation_defense.pptx (exit 0, 6.4s)', dur:'6.4s', kind:'code-live',
+    data:{ code:[
+        ['<span class="kw">from</span> pptx <span class="kw">import</span> Presentation'],
+        ['<span class="kw">from</span> pptx.util <span class="kw">import</span> Inches'],
+        ['prs = <span class="fn">Presentation</span>()'],
+        ['<span class="cmt"># title + 8 content slides</span>'],
+        ['<span class="kw">for</span> s <span class="kw">in</span> slides:'],
+        ['    add_slide(prs, s)'],
+        ['prs.<span class="fn">save</span>(<span class="str">"dissertation_defense.pptx"</span>)'] ],
+      stdoutLive:['building title slide…','slide 3/9: revenue chart embedded','slide 6/9: region growth embedded','slide 9/9: conclusions'],
+      file:{ ic:'📊', nm:'dissertation_defense.pptx', mt:'4.1 MB · python-pptx' } } },
+
+  { ic:'✨', name:'analyze_document', verb:'Reviewing…',
+    essence:'Reviewed draft deck → 2 fixes suggested', dur:'3.0s', kind:'subagent',
+    data:{ task:'review the draft deck for clarity + factual consistency',
+      sum:'2 fixes: (1) slide 4 y-axis label missing units; (2) conclusion overstates APAC — soften to "primary driver".' } },
+];
+
+/* run state */
+let activeIndex = 4;       // start mid-run on the live pptx build
+let phase = 'running';     // running | done
+let elapsedBase = 192;     // 3m12s of prior work already elapsed
+let liveElapsed = 4.1;     // seconds the active code step has been running
+let liveLineCount = 1;     // how many live stdout lines have streamed
+let playTimer = null, tickTimer = null;
+const peeked = new Set();  // finished steps the user clicked open (D-01 details-on-demand)
+
+function fmtTime(s){ s = Math.round(s*10)/10; if (s>=60){ const m=Math.floor(s/60); const r=Math.round(s-m*60); return m+'m'+String(r).padStart(2,'0')+'s'; } return s.toFixed(1)+'s'; }
+function totalElapsed(){ return elapsedBase + (phase==='running' ? liveElapsed : 36); }
+
+/* ── shared inner body for a step ── */
+function bodyHTML(step){
+  const d = step.data;
+  if (step.kind==='search'){
+    return `<div class="body-wrap">
+      <div class="tc-search-meta"><span class="k">query</span> › "${d.q}"&nbsp;&nbsp;<span class="k">folder</span> › ${d.folder}</div>
+      ${d.rows.map(r=>`<div class="tc-search-row"><span class="score">${r[0]}</span><div class="doc">${r[1]}<span class="chunk">${r[2]}</span></div></div>`).join('')}
+      <div class="conf-badge">● confidence ${d.conf}</div>
+    </div>`;
+  }
+  if (step.kind==='read'){
+    return `<div class="body-wrap"><div class="read-preview"><pre>${d.pre}</pre></div></div>`;
+  }
+  if (step.kind==='subagent'){
+    const showDup = document.getElementById('dupToggle')?.checked;
+    const card = `<div class="subrun">
+        <div class="sr-head"><span class="av">A</span> sub-agent · ${step.name}
+          <span class="dup-tag ${showDup?'bad':'good'}">${showDup?'⚠ 2 cards · today':'✓ 1 card · D-05'}</span></div>
+        <div class="sr-sum">${d.sum}</div>
+      </div>`;
+    return `<div class="body-wrap">${card}${showDup?card:''}</div>`;
+  }
+  if (step.kind==='code' || step.kind==='code-live'){
+    const live = step.kind==='code-live' && phase==='running';
+    const code = d.code.map((l,i)=>l[0]);
+    const gutter = code.map((_,i)=>`<div>${i+1}</div>`).join('');
+    const codeLines = code.join('\n');
+    let out, divider, prog='', file='';
+    if (live){
+      const shown = d.stdoutLive.slice(0, liveLineCount);
+      out = shown.map((l,i)=>`<div class="line">${l}${i===shown.length-1?'<span class="caret"></span>':''}</div>`).join('');
+      divider = `<span>STDOUT</span><span class="live"><span class="dot"></span>streaming · ${liveElapsed.toFixed(1)}s</span>`;
+      prog = `<div class="tool-progress"></div>`;
+    } else {
+      out = (d.stdout||['done']).map(l=>`<div class="line">${l}</div>`).join('');
+      divider = `<span>STDOUT</span><span>${(d.stdout||[]).length} lines · exit 0</span>`;
+      file = `<div class="file-out"><div class="ic">${d.file.ic}</div><div><div class="nm">${d.file.nm}</div><div class="mt">${d.file.mt} · click to view</div></div><button class="ctl-btn dl">Open</button></div>`;
+    }
+    return `<div class="body-wrap">
+      <div class="tc-editor"><div class="tc-gutter">${gutter}</div><div class="tc-code">${codeLines}</div></div>
+      <div class="tc-divider">${divider}</div>
+      <div class="tc-output">${out}</div>
+      ${prog}${file}
+    </div>`;
+  }
+  return '';
+}
+
+/* essence line atoms */
+function essenceInner(step, idx){
+  const st = idx<activeIndex ? 'done' : (idx===activeIndex ? 'active' : 'queued');
+  const pill = st==='active'
+    ? `<span class="pill running"><span class="dot"></span>${step.verb||'running'}</span>`
+    : `<span class="pill done"><span class="dot"></span>${step.dur}</span>`;
+  if (st==='active'){
+    return `<span class="ess-ic">${step.ic}</span><span class="ess-name">${step.name}</span>
+      <span class="ess-text" style="color:var(--color-primary)">${step.verb||''}</span>${pill}`;
+  }
+  return `<span class="ess-ic">${step.ic}</span><span class="ess-name">${step.name}</span>
+    <span class="ess-arrow">→</span><span class="ess-text">${step.essence}</span>${pill}
+    <span class="chev">›</span>`;
+}
+
+/* per-variant step renderers */
+function renderSteps(variant){
+  const upto = activeIndex; // steps 0..activeIndex visible (cards appear as they start)
+  let html = '';
+  for (let i=0;i<=upto && i<STEPS.length;i++){
+    const step = STEPS[i];
+    const st = i<activeIndex ? 'done' : (i===activeIndex ? 'active' : 'queued');
+    const liveOpen = (i===activeIndex && phase==='running');
+    const open = liveOpen || peeked.has(i);
+    const body = open ? `<div class="step-body">${bodyHTML(step)}</div>` : '';
+    const bodyB = open ? `<div class="card-body">${bodyHTML(step)}</div>` : '';
+    if (variant==='a'){
+      html += `<div class="step ${st} ${open?'is-open':''}">
+        <div class="step-head" onclick="expandStep(${i})">${essenceInner(step,i)}</div>${body}</div>`;
+    } else if (variant==='b'){
+      html += `<div class="step ${st}"><div class="node"></div>
+        <div class="card ${open?'is-open':''}"><div class="card-head" onclick="expandStep(${i})">${essenceInner(step,i)}</div>${bodyB}</div></div>`;
+    } else if (variant==='c'){
+      html += `<div class="step ${st} ${open?'is-open':''}"><div class="step-num">${i+1}</div>
+        <div class="step-main"><div class="step-head" onclick="expandStep(${i})">${essenceInner(step,i)}</div>${body}</div></div>`;
+    } else { // 's' — synthesis: C rail + bloom + B status nodes
+      const line = (i < activeIndex) ? '<div class="rail-line"></div>' : '';
+      html += `<div class="step ${st} ${open?'is-open':''}">
+        <div class="rail"><div class="node"></div>${line}</div>
+        <div class="step-main"><div class="step-head" onclick="expandStep(${i})"><span class="snum">${i+1}</span>${essenceInner(step,i)}</div>${body}</div></div>`;
+    }
+  }
+  return html;
+}
+
+function statusStripHTML(){
+  if (phase==='done'){
+    return `<div class="status-strip"><span class="seg act"><span class="dot"></span>done</span><span class="divider"></span><span class="seg time">${fmtTime(totalElapsed())}</span><span class="divider"></span><span class="seg">${STEPS.length} steps</span></div>`;
+  }
+  const step = STEPS[Math.min(activeIndex, STEPS.length-1)];
+  return `<div class="status-strip">
+    <span class="seg time">${fmtTime(totalElapsed())}</span><span class="divider"></span>
+    <span class="seg">Step ${activeIndex+1}</span><span class="divider"></span>
+    <span class="seg act"><span class="dot"></span>${step.verb||'Working…'}</span></div>`;
+}
+
+function frameHTML(variant){
+  if (phase==='done'){
+    return `<div class="run-frame">
+      <div class="run-collapsed" onclick="setPhase('running')">
+        <div class="avatar">A</div>
+        <div><div class="run-title">Dissertation deck — built</div>
+          <div class="run-sub">Run · ${STEPS.length} steps · all cards fold to essence</div></div>
+        ${statusStripHTML()}
+        <span class="chev">›</span>
+      </div></div>
+      <div style="margin-top:14px;padding:12px 14px;background:hsl(220 30% 8% / .4);border:1px solid var(--color-border-soft);border-radius:var(--radius-md);font-size:var(--text-base);color:var(--color-text)">
+        Done. I built a 9-slide deck from both papers, with revenue and region-growth charts. Your file and the working files appear below the answer — that split is <b>Sketch 016</b>. <span class="hint" style="color:var(--color-text-dim)">(Step count = ${STEPS.length} cards on screen — the timer strip agrees: D-04.)</span></div>`;
+  }
+  const next = activeIndex < STEPS.length-1
+    ? `<div class="next-up thinking"><span class="label">Next</span><span>${STEPS[activeIndex+1].name.replace(/_/g,' ')}</span><span class="dotline"><i></i><i></i><i></i></span></div>`
+    : `<div class="next-up"><span class="label">Finishing</span><span>composing answer</span><span class="qmark">queued</span></div>`;
+  return `<div class="run-frame active">
+    <div class="run-header">
+      <div class="avatar streaming">A</div>
+      <div><div class="run-title">Dissertation deck</div><div class="run-sub">kimi-k2.6 · turn 1</div></div>
+      ${statusStripHTML()}
+    </div>
+    <div class="run-progress"></div>
+    <div class="run-body ${variant==='b'?'':''}">${variant==='b'?'<div class="spine"></div>':''}${renderSteps(variant)}${next}</div>
+  </div>`;
+}
+
+function renderAll(){
+  ['a','b','c','s'].forEach(v=>{ document.getElementById('mount-'+v).innerHTML = `<div class="v-${v}">${frameHTML(v)}</div>`; });
+}
+
+/* interactions — click any finished essence row to expand its full body inline
+   (D-01: details are re-ranked, never hidden). Click again to fold. */
+function expandStep(i){
+  if (i===activeIndex && phase==='running') return; // active step is already open + live
+  if (peeked.has(i)) peeked.delete(i); else peeked.add(i);
+  renderAll();
+}
+
+function togglePlay(){
+  if (playTimer){ stopPlay(); return; }
+  document.getElementById('playBtn').textContent = '⏸ Pause';
+  if (phase==='done'){ resetRun(); }
+  // live stdout ticking on the active code step
+  tickTimer = setInterval(()=>{
+    if (phase!=='running'){ return; }
+    liveElapsed += 0.7;
+    const step = STEPS[activeIndex];
+    if (step && step.kind==='code-live' && liveLineCount < step.data.stdoutLive.length) liveLineCount++;
+    renderAll();
+  }, 700);
+  // advance steps
+  playTimer = setInterval(()=>{
+    if (activeIndex < STEPS.length-1){
+      // bank the finished active step's time
+      elapsedBase += liveElapsed; liveElapsed = 0; liveLineCount = 1;
+      activeIndex++;
+      renderAll();
+    } else {
+      setPhase('done'); stopPlay();
+    }
+  }, 2100);
+  renderAll();
+}
+function stopPlay(){ clearInterval(playTimer); clearInterval(tickTimer); playTimer=tickTimer=null; document.getElementById('playBtn').textContent='▶ Play run'; }
+function resetRun(){ stopPlay(); peeked.clear(); activeIndex=0; phase='running'; elapsedBase=2.2; liveElapsed=0.4; liveLineCount=1; renderAll(); }
+function setPhase(p){ stopPlay(); peeked.clear(); phase=p; if(p==='running'&&activeIndex>=STEPS.length-1){ activeIndex=4; } if(p==='running'){ /* restore mid-run snapshot */ if(activeIndex===0){activeIndex=4; elapsedBase=192; liveElapsed=4.1; liveLineCount=2;} } renderAll(); }
+
+renderAll();
+</script>
+</body>
+</html>

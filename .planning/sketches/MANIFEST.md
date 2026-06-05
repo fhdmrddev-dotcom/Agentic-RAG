@@ -30,6 +30,7 @@ The acceptance bar for every variant is the **long execution in progress** momen
 | 5 | **File browse = full-replace drill-in; diff = in-column unified.** Tapping a file replaces the panel body with a full-height preview (md → MarkdownRenderer, code → syntax highlight, csv → table, image → framed) + a `‹ Files` back button. Versions compare as a **unified inline diff** (+/− coloring) that stays in-column by default; an opt-in `⤢ expand` button pops only the diff into a wide overlay over the chat for rare gnarly diffs — never auto-widen (would reflow chat). Every file type needs a graceful preview/too-large fallback (no raw byte dumps). | Sketch 005 winner A (C folded in) |
 | 6 | **Pending `ask_user` = dual-surface, calm-loud.** Calm pinned card at the top of the panel (choice chips + always-present free-text) **plus** a pointer cue inside the chat run-card. The agent's block is made unmissable structurally — paused amber run-card, **locked composer** ("agent is paused"), pulsing toggle dot — not by hijacking the screen. Submit resumes in place (card → green, run-card un-pauses, composer unlocks). Configurable timeout expires gracefully with a clear message, never a silent hang. | Sketch 006 winner C |
 | 7 | **Chat↔panel seam = live-pointer / reload-resolved.** Mental model: **panel = what's true now** (reconciles to current state on reload, never replays history); **chat = what happened.** Live: the 3 panel-owned tools (`write_todos`/`workspace_write`/`ask_user`) render as quiet one-line pointers in chat (no noisy duplication). Reload: the transcript resolves to compact self-contained cards — answered Q&A renders (closes the documented `ask_user` reload gap), files → clickable chips, todos → final-state note. Keeps the chat scannable rather than piling onto an already-dense surface. | Sketch 007 winner C |
+| 8 | **Unified chat tool-card = borderless numbered rail + status nodes + active bloom.** Every Deep tool card lives on one frame: a step-numbered rail whose nodes fill (green=done, pulsing-primary ring=active, dim=queued) so the sequence is *felt* without per-card borders; finished steps fold to a one-line essence (`icon · tool → result`), only the active step is open + live and "blooms" (primary wash). Row numbering makes the honest step count (strip == cards, D-04) and the zero-duplicate invariant (a dup = two same-numbered rows, D-05) structurally legible. Refines decisions 1–3 for Phase 095's fix-and-unify-in-place scope — not a new frame. | Sketch 014 winner Synthesis (C rail + B nodes) |
 
 ## Sketches
 
@@ -55,3 +56,11 @@ Grounded by `094-grounding/BRIEF.md` (real harness SSE events, real seed-workflo
 | 011 | mode-and-composer | General/Explorer × Deep/Harness clarity; simplified composer; no "Deep" label mid-Harness-run | **A — Status chip + Cancel** ★ | composer, mode, d-092-ux |
 | 012 | workflows-page | Library + launcher (build now); renders existing workflow_definitions; Run → opens a thread | **A — Card grid** ★ (landed thread reuses 008-D/009-C/011-A) | page, launcher, nav |
 | 013 | workflow-builder | NL authoring vision (design now, build v2.9); read-mostly live diagram, describe→refine→publish | **A — Talk-led** ★ | builder, nl, v2.9, design-ahead |
+
+### Phase 095 session — Chat Tool-Card Unification (2026-06-05)
+
+Grounded by `.planning/phases/095-chat-tool-card-unification/095-SKETCH-GROUNDING.md` (real SSE events, real essence strings, real bug mechanics, reuse-vs-net-new). Refines the locked 001-C/002-C/003-B chat frame for 095's fix-and-unify-in-place scope. Each sketch README carries a **Build Handover** (reuse vs net-new) section.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 014 | unified-card-frame | At rest (one-line essence) and expanded — what's the unified tool-card frame + the live Focus-Mode stack? | **Synthesis — C rail + B nodes** ★ | chat, tool-card, focus-mode, dedup, G-5 |
