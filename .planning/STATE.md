@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: "Phase 095 — Plan 095-02 COMPLETE (RunCard D-06 timer + D-04 count + RunStatusStrip); next = execute 095-03"
-last_updated: "2026-06-05T19:19:25.708Z"
+stopped_at: "Phase 095 — Plan 095-03 COMPLETE (D-05 sub-agent zero-dup root fix + ToolCallPanel shared dedup + StepRail rail + Round-N divider); Wave 2 done; next = execute 095-04 ‖ 095-05 (Wave 3)"
+last_updated: "2026-06-05T19:43:34.494Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 9
   completed_phases: 7
   total_plans: 47
-  completed_plans: 45
-  percent: 96
+  completed_plans: 46
+  percent: 98
 ---
 
 # Project State
@@ -21,9 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 095 — chat-tool-card-unification (EXECUTING, 5 plans / 3 waves; Plans 01+02 ✅, next = 095-03)
+**Current focus:** Phase 095 — chat-tool-card-unification (EXECUTING, 5 plans / 3 waves; Plans 01+02+03 ✅ — Wave 2 done; next = Wave 3 = 095-04 ‖ 095-05)
 
 ## Current Position
+
+**Phase 095 — Plan 095-03 ✅ COMPLETE 2026-06-05** (sequential on `v2.5-dev`, normal commits WITH hooks). The Wave-2 sibling — the **D-05 sub-agent zero-duplicate ROOT fix** + the ToolCallPanel-side unification. **(D-05 root fix — closes BUG-260529-02 #3):** the legacy `analyze_document` sub-agent now **stamps onto its OWNING tool_call** (`tc.sub_agent`) instead of a separate single-slot `message.sub_agent`. `StreamsProvider.makeStreamCallbacks` `onSubAgentStart` finds the most-recent running/preparing `analyze_document` owner and sets `tc.sub_agent` on THAT entry **preserving its `clientKey`** — OR, when `sub_agent_start` arrives before `tool_start` (provider ordering), CREATES the owner with ONE stable `makeToolKey` identity from frame 1 (mirrors `onToolStart` 443-448); `onSubAgentDelta` appends to the owner's `sub_agent.content` (immutable copy-then-mutate — **never `m.content`**, onDelta invariant preserved); `onSubAgentDone` flips the owner's `sub_agent.status`. The single-slot `message.sub_agent` live-write is GONE (`grep m.sub_agent` = 0). ToolCallPanel's dual render source `tc.sub_agent ?? subAgent` — the double-render ROOT (rendered once as the tool body, once via the message-scoped fallback, stable state → no self-heal) — is **collapsed to `tc.sub_agent` alone** (`grep` = 0); the `subAgent` prop stays on Props (RunCard back-compat) but is no longer read. This is a **SEPARATE root from the 075.2 transient-id flicker** — `_isTransientStreamEnd`/`_reattachAfterTransient` left **fully frozen** (`grep` = 14, baseline-unchanged). **(D-04 shared dedup):** ToolCallPanel imports the ONE `dedupToolCalls` from `@/lib/stepCount` (Plan 01), replacing its inline `useMemo`/`const seen = new Set` copy (`grep` = 0) — the panel count and the RunCard headline count (which also reads `unifiedStepCount` → `dedupToolCalls`) **cannot drift**. **(StepRail numbered rail — sketch 014):** each deduped tool's EXISTING head + body (reused verbatim — **no second body system, G4**) wrapped in a borderless 2-col rail (status `node` + connecting spine + `snum`); node state from `(status)`: running/preparing=active (`animate-pulseGlow`, primary), done/interrupted=done (filled-success), else queued; reuse-only CSS, no new keyframes. Numbering makes D-04 count + D-05 zero-dup **structural** (a dup = two same-numbered rows). **(Round-N relabel):** the in-panel iteration divider `Step {tc.iteration + 1}` → `Round {tc.iteration + 1}` (`grep "Step {tc.iteration"` = 0, `"Round {tc.iteration"` = 1) so "Step" means exactly one visible action everywhere after D-04. **Cross-provider/PANEL-06 held:** all changes additive/derivation-only in the shared `makeStreamCallbacks` closure scoped to the OWNING `threadId` (proven by a THREAD_A→THREAD_B isolation test — A's sub-agent never bleeds into B); zero panel-store reads added by either file's diff. **Tests:** 4 new dedup D-05 cases (one-block stamp / start-before-tool_start / content-append invariant / per-thread isolation) + 3 new ToolCallPanel cases (Round-N label / numbered rail snum+node states / rail dedup one-row); transient suite **14/14** (075.2 fix non-regressed), RunCard **23/23**, ToolCallPanel **8/8**. `tsc -b` = **37 (zero net-new** — the lone touched-file error, `getActiveRuns` unused-import at StreamsProvider.tsx:73, is pre-existing); `vite build` exit 0. **Full-suite 17 failed / 474 passed (491)** — the 17 match the documented pre-existing baseline (all 7 failing files PROVEN pre-existing by clean-baseline rerun; **ZERO net-new failures**, +7 new passing tests). Commits `32290cad` (Task 1 — D-05 sub-agent stamp) + `c12cad43` (Task 2 — shared dedup + StepRail + Round-N). Deviations: **1 (Rule 3 — the planned test paths `frontend/__tests__/...` do not exist; used the real `frontend/src/__tests__/...` layout)**. Issue resolved: a `git stash`/`checkout HEAD~1` during the baseline-failure check transiently reverted Task 1's ToolCallPanel collapse — caught by the acceptance greps, re-applied, re-verified before committing Task 2. **2 pre-existing failures deferred** (DI-095-03-01 stale 075.2 dedup id-assertions + DI-095-03-02 `getActiveRuns` unused-import) → `deferred-items.md`. **Known stub:** none (the `subAgent` prop is accepted-but-unused back-compat, documented). See 095-03-SUMMARY.md (self-check PASSED). **NEXT: Wave 3 — execute 095-04 (D-03 `useFollowScroll` follow-but-release + the floating JumpToLive chip mounting Plan 02's RunStatusStrip `placement="floating"`) ‖ 095-05 (D-07/D-08 output-files hero/working split + fileIcon + the backend hero tag).**
 
 **Phase 095 — Plan 095-02 ✅ COMPLETE 2026-06-05** (sequential on `v2.5-dev`, normal commits WITH hooks). The two RunCard-internal honesty fixes + the ONE `RunStatusStrip` (Wave 2). **(D-06 persistent timer — the never-vanishes ROOT fix, closes BUG-260528-01):** removed the `performance.now()` baseline + the streaming-gated effect AND the exact `{(isStreamingNow || elapsedMs > 0)}` render gate (the vanish trap). Elapsed now derives from `startMs = Date.parse(message.created_at)` — a **stable wall-clock baseline that survives the 083 temp-id→DB-id remount** (REINFORCES BUG-260526-04, never regresses it; RESEARCH A2: the reconcile placeholder sets `created_at = run.started_at`). `elapsedMs = (frozenEndRef.current ?? now) - startMs` is **recomputed each 250ms tick (not an accumulator)** → background-tab `setInterval` throttling only coarsens the tick, never freezes/skews it. The timer **renders CONTINUOUSLY** whenever `Number.isFinite(startMs)` (regardless of `isStreamingNow`/`elapsedMs`) and **freezes ONCE** at the streaming→terminal edge via `frozenEndRef`; a `Number.isFinite` guard falls back to NOT rendering elapsed (never NaN) when `created_at` is unparseable. Compact `Xm Ys` form once a run crosses a minute (sketch `3m12s`). **(D-04 unified count):** all THREE RunCard count sites — the header title (`Run · N steps`), the `RunStatusStrip` `Step N`, and the collapsed-row (`N steps`) — now read `unifiedStepCount(message)` (Plan 01's deduped+persisted count); relabeled "N tools"/"N tool calls" → "N steps". `iterationCount` destructured to a panel-only alias (`panelIterationCount`) so the ToolCallPanel Round-N divider still works but NO visible step number reads it (acceptance grep `message.iterationCount`==0). Because the count derives from persisted `tool_calls` (not the reload-omitted `iterationCount`), the step label **survives next-day reopen** (RESEARCH correction #5) AND is cross-provider-safe. **(RunStatusStrip — NEW `frontend/src/components/chat/RunStatusStrip.tsx`):** the SINGLE `⏱ elapsed · Step N · activity` strip with a `placement: "header" | "floating"` prop (identical segment markup, two wrappers — SKETCH-CONSISTENCY §B "one component, two homes"); header placement wired into RunCard this plan, **floating placement provided for Plan 04's** scroll-away "↓ Jump to live" chip. Reuse-only CSS (`font-mono`, `tabular-nums`, `animate-dotBounce` dot, `.done` modifier — no new keyframes); XSS-safe (`activityVerb` = `outerBannerLabel`, a controlled enum string, rendered as React text children — no `dangerouslySetInnerHTML`). **Tests:** RunCard suite **23/23** (7 new D-06/D-04 cases — zero-elapsed-no-vanish / freeze-at-terminal / unparseable-created_at NaN-guard / verb-streaming-only-then-gone / three-sites-agree-N≠M / DB-loaded-no-iterationCount-still-shows-Step-N; + 2 stale assertions retargeted to the new "steps" copy, Rule 1). `tsc -b` = **37 (zero net-new** — zero errors reference RunCard/RunStatusStrip); `vite build` exit 0. **Full-suite 17 failures all PROVEN pre-existing** by stash-and-rerun on the clean baseline (15/15 + 2/2 = same files fail identically; the documented flaky StreamsProvider/timing cluster — none reference RunCard/RunStatusStrip/stepCount; this plan adds ZERO net-new failures). **083 non-regression held** (MessageList `key={run-${msg.runId}}` untouched; RunCard reads `created_at` not perf.now). All acceptance greps pass; **PANEL-06 isolation held** (zero panel-store reads in either file). Commits `b9548e55` (RunStatusStrip) + `8e1ac415` (RunCard D-06 timer + D-04 count + tests). Deviations: NONE (2 stale-test retargets + 2 comment rewordings — both Rule-1 maintenance from the plan-mandated relabel/relocation, not behavioral). **Known stub:** RunStatusStrip `placement="floating"` is provided-but-not-yet-mounted — that IS the plan's forward contract (Plan 04 mounts the floating chip). See 095-02-SUMMARY.md (self-check PASSED). **NEXT: Wave 2 sibling — execute 095-03 (D-05 sub-agent zero-duplicate root fix + ToolCallPanel imports the shared dedup + StepRail), depends on 01.**
 
@@ -132,7 +134,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-05
 
-Progress: [█████████░] 91%
+Progress: [██████████] 96%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -201,6 +203,7 @@ Progress: [█████████░] 91%
 | Phase 094 P03 | 14min | 3 tasks | 10 files |
 | Phase 094 P05 | 7min | 3 tasks | 6 files |
 | Phase 095 P01 | 18min | 2 tasks | 4 files |
+| Phase 095 P03 | 16min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -305,6 +308,7 @@ Recent decisions affecting current work:
 - 094-05: ask.draft renders above the question labelled 'not yet saved' (D-06) with a faded-mask preview + ⤢ wide Dialog overlay; BatchResultList surfaces per-subtopic summaries from the panel-only useTasks store (PANEL-09 — zero chat re-render)
 - 095-01: unifiedStepCount derives from the DEDUPED + PERSISTED tool_calls (ignores iterationCount) — cross-provider-safe count that also survives next-day reopen (D-04 / RESEARCH correction #5)
 - 095-01: ONE shared fileIcon() (Lucide glyph + colored .EXT ribbon, canonical sketch ext-map) reused by every output-file card — no second icon system (D-07 / G1); XSS-safe parsed-ext-label-only (T-095-01-01)
+- D-05 sub-agent zero-dup root fix (095-03): the legacy analyze_document sub-agent stamps onto its OWNING tool_call (tc.sub_agent, clientKey/makeToolKey identity) instead of a single-slot message.sub_agent; the dual render source tc.sub_agent ?? subAgent is collapsed — one SubAgentBlock, never the self-heals-in-10-15s doubling. Separate root from 075.2 (frozen).
 
 ### Pending Todos
 
@@ -390,9 +394,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 095 context gathered — ready for /gsd:sketch 095 (G-2)
-Resume file: --resume-file
+Last session: 2026-06-05T19:43:34.484Z
+Stopped at: Completed 095-03-PLAN.md
+Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
 
