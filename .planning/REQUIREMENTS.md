@@ -137,7 +137,7 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | A11Y-03 | Phase 094 | Complete |
 | CHAT-04 | Phase 095 | Pending |
 | WORKSPACE-PARITY | Phase 095.1 | Code-complete, pending live verify (D-01/02 panel-fill selector 095.1-01 + TodosSection precedence 095.1-02; D-06 flat Generated-files list 095.1-05; GAP-1 095.1-06 — hasActivity now reaches useDerivedPanel so the derived panel actually renders on no-write_todos runs, honest count badge, real-panel guard test). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
-| RUN-HONESTY | Phase 095.1 | Pending |
+| RUN-HONESTY | Phase 095.1 | Code-complete, pending live verify (D-04 attribution run-sub + D-05 true reload timer 095.1-03; D-07 deliverable-aware Resume 095.1-05; GAP-2 095.1-07 — live attribution stamped onto the dispatch placeholder + run-sub turn decoupled from iterationCount so live==reload). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
 | PROVIDER-ERR | Phase 095.1 | In progress (Wave 0 classifier shipped 095.1-01; agent_loop wiring in 095.1-04) |
 | EVAL-01 | Phase 096 | Pending |
 | EVAL-02 | Phase 096 | Pending |
