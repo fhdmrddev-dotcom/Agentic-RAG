@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_verify
-stopped_at: "Phase 095 GAP-CLOSURE — 095-09 SHIPPED (single-hero backend fix, GAP-095-02/WR-02). ALL 4 gap plans (06/07/08/09) shipped → phase gap-closure structurally complete; NEXT = /gsd:verify-work 095"
-last_updated: "2026-06-06T07:44:59.185Z"
+status: human_uat_pending
+stopped_at: "Phase 095 GAP-CLOSURE — all 4 gap plans (06/07/08/09) shipped + code-review (0 crit / 1 warn → WR-01 double-frame FIXED commit 4065580b) + automated re-verification = human_needed (4/4 must-haves; all 3 operator gaps + WR-01 code-closed; zero net-new test failures, tsc 37 baseline, backend 19/19, frontend 497 passed). AWAITING operator live Chrome-MCP re-UAT (095-HUMAN-UAT.md — 5 scenarios × 6 providers). NEXT = /gsd:verify-work 095 (operator-driven)"
+last_updated: "2026-06-06T12:00:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 9
