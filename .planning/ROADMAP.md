@@ -232,7 +232,7 @@ Plans:
   7. SC#10 4-axis + all-8-provider live verification: every fix confirmed on openai, anthropic, google, deepseek, moonshot, glm/zhipu, minimax, openrouter (OpenRouter/Ollama panel = best-effort, structured mode).
 **Plans**: 5 plans (2 waves)
 - [x] 095.1-01-PLAN.md — Wave 0 scaffolds: workspacePanel.ts selector (spike-006/007 port) + provider_gateway/errors.py classifier, each unit-tested first ✅ 2026-06-06 (31 FE + 27 BE tests green; tsc baseline-clean; zero consumer touched)
-- [ ] 095.1-02-PLAN.md — WORKSPACE-PARITY panel (D-01/02): activity-derived read-only todos via a PANEL-06-safe selector + TodosSection precedence render
+- [x] 095.1-02-PLAN.md — WORKSPACE-PARITY panel (D-01/02): activity-derived read-only todos via a PANEL-06-safe selector + TodosSection precedence render ✅ 2026-06-06 (useDerivedPanel option-b read selector + real-todos-first precedence + "derived from activity" marker; TodosSection 12/12 + panelHooks 19/19; tsc baseline 37; vite build 0; FC#1 isolation preserved)
 - [ ] 095.1-03-PLAN.md — RUN-HONESTY attribution+timer (D-04/05): one additive runs↔messages SELECT → RunCard {provider}·{model}·turn N + true completedAt−startedAt timer
 - [ ] 095.1-04-PLAN.md — PROVIDER-ERR (D-03): wire classify_provider_error into the agent_loop catch (Google 429 → rate-limit, never billing)
 - [ ] 095.1-05-PLAN.md — MessageItem honesty (D-06 flat Generated-files list + D-07 deliverable-aware Resume)
@@ -263,7 +263,7 @@ Plans:
 | 093. Harness Cross-Provider Parity + Phase-Type Hardening | 8/9 | Gap-closure in progress 2026-06-03 — initial 5 plans (substrate + F9 gateway-consumption + model-resolver + ask_user F10 + shared surfacing) executed 2026-06-02; gap-closure 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 hydration + runs.usage) + 093-08 (D-18/S3 sub-agent model resolution — gpt-4o-avoidance) shipped. Remaining: 093-09 (D-19 GLM diagnose-first, autonomous:false). PARITY-02 stays OPEN until the native-7 × 5-type × 4-workflow LIVE UAT passes | - |
 | 094. Workflow Legibility + Mode Clarity | 5/5 | Complete    | 2026-06-05 |
 | 095. Chat Tool-Card Unification | 5/5 + gap 4/4 | Gap-closure complete (06/07/08/09 ✅); ready for /gsd:verify-work | 2026-06-06 |
-| 095.1 Cross-Provider Run Honesty & Workspace Parity | 1/5 | Wave 0 ✅ 2026-06-06 (095.1-01: workspacePanel selector + provider_gateway/errors.py, both unit-test-green, zero consumer touched); W1 ×4 disjoint next; WORKSPACE-PARITY/RUN-HONESTY/PROVIDER-ERR | - |
+| 095.1 Cross-Provider Run Honesty & Workspace Parity | 2/5 | W1 in progress ✅ 2026-06-06 (095.1-02: WORKSPACE-PARITY panel-fill — useDerivedPanel option-b selector + TodosSection precedence; 62/62 touched+consumed tests green; tsc baseline 37; FC#1 held); 095.1-03/04/05 disjoint next | - |
 | 096. Eval Harness + Cross-Provider Verification + Concurrency | 0/0 | Not started | - |
 
 ---
