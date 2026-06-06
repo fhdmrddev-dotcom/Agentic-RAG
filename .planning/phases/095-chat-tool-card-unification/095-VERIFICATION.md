@@ -1,23 +1,40 @@
 ---
 phase: 095-chat-tool-card-unification
-verified: 2026-06-06T00:45:00Z
-status: gaps_found
-score: 4/4 automated truths verified; operator live-UAT (2026-06-06) found 3 gaps
+verified: 2026-06-06T12:00:00Z
+status: human_needed
+score: 4/4 must-haves verified (gap-closure re-verification)
 overrides_applied: 0
-gaps_source: operator-live-UAT-2026-06-06 (diagnosed + adversarially verified, workflow wf_a263d71a-919)
-gap_scope_decision: "full-fidelity (both bugs + all high/med visual matches; header = model·turn subline; defer LOW/data-field items to seed)"
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/4 automated; operator live-UAT found 3 gaps
+  gaps_closed:
+    - "GAP-095-01: fold-all shared boolean — replaced with per-step expandedSteps Set; one click expands only that card"
+    - "GAP-095-02: hero highlight leaks working files — _select_hero_filenames returns exactly ONE hero on every branch; canonical _hero_set shared by emit + persist (live == reload)"
+    - "GAP-095-03 HIGH essence + un-gate: finished cards rest as a single result-bearing essence line from step 1 (no >=3 gate)"
+    - "GAP-095-03 MED bloom: active-step bloom (primary-dim wash + inset 2px primary left bar) replaces the outer glow"
+    - "GAP-095-03 MED chip chrome: header status strip is a rounded-full pill (bg + border + divider bars)"
+    - "GAP-095-03 MED single verb: activity verb renders exactly once (in the strip only, not in the title)"
+    - "GAP-095-03 MED run-sub: 'turn N' subline restored from iterationCount (no backend field)"
+    - "GAP-095-03 MED icon sizes: hero 48px / working 30px"
+    - "GAP-095-03 MED hero glow: soft 24px primary halo replaces flat 1px ring"
+    - "GAP-095-03 MED top-rule/eyebrow: borderless top-rule + uppercase dim mono eyebrow replaces bordered card"
+    - "GAP-095-03 LOW chip-order: status-first, jump trailing"
+    - "GAP-095-03 LOW intermediates copy: 'Working files (N) — intermediates, all downloadable'"
+    - "WR-01 (code review): double-frame regression fixed via header-bare placement variant on RunStatusStrip"
+  gaps_remaining: []
+  regressions: []
 human_verification:
   - test: "Long run stays honest — timer continuous, step count == cards, no sub-agent dup, freeze at true terminal"
-    expected: "Kimi/Moonshot ~11-step run: timer never blinks out, step N in header == step N in strip == N deduped cards in panel, read/summarize sub-agent appears exactly once, timer freezes at run end"
+    expected: "Kimi/Moonshot ~11-step run: timer never blinks out, step N in header == step N in strip == N deduped cards in panel, read/summarize sub-agent appears exactly once, timer freezes at run end; also verify WR-03 (sub_agent_start before tool_start ordering) does not drop args"
     why_human: "Needs a real long multi-step run across a slow provider; browser-only behavior; cannot simulate live SSE + real-time DOM updates programmatically"
   - test: "Multi-tool calm — search_documents + execute_code; finished folds, active open, auto-scroll follows edge"
-    expected: "One prompt fires both tools; finished tools collapse to summary row; active tool is expanded; chat follows the live edge while at bottom"
+    expected: "One prompt fires both tools; finished tools collapse to summary essence row; active tool is expanded with bloom; chat follows the live edge while at bottom; scrolling up shows jump chip with status-first / jump-trailing order"
     why_human: "Live streaming + scroll behavior requires a real browser with DevTools MCP; cannot test scroll physics in jsdom"
-  - test: "Hero file downloads — ask for a .docx; hero is the doc; one-click download; reopen chat next day — download still works"
-    expected: "The .docx is the hero card (above Working files); Download button works immediately; on a next-day reload the hero card still shows and the download still succeeds via the re-sign endpoint"
+  - test: "Hero file downloads — ask for a .docx; hero is the single doc (not all docs); one-click download; reopen chat next day — download still works; if multi-cell run, still exactly one hero on reload"
+    expected: "The .docx is the sole hero card (above 'Working files (N) — intermediates, all downloadable'); Download button works immediately; on a next-day reload the hero card still shows exactly one hero and the download still succeeds via the re-sign endpoint"
     why_human: "Needs real file generation + re-sign path + next-day reopen; cannot simulate Supabase Storage signed URLs or multi-session elapsed time in tests"
   - test: "Two threads + 6-provider parity — Thread A streaming while Thread B accepts a prompt; unified frame identical across all 6 native providers"
-    expected: "No cross-thread bleed; the RunCard frame, step count, timer, sub-agent zero-dup, and file hero/working layout are indistinguishable across OpenAI / Anthropic / Google / OpenRouter / DeepSeek / MiniMax (native-7 minus GLM for the chat surface)"
+    expected: "No cross-thread bleed; the RunCard frame, step count, timer, sub-agent zero-dup, single-essence finished cards, and file hero/working layout are indistinguishable across OpenAI / Anthropic / Google / OpenRouter / DeepSeek / MiniMax; per-card collapse works on all providers"
     why_human: "Requires parallel streaming sessions + cross-provider live runs; browser-only multi-tab behavior"
 ---
 
@@ -25,9 +42,9 @@ human_verification:
 
 **Phase Goal:** Chat tool-cards render in one consistent frame with auto-scroll, details-on-demand collapse, no duplicates, consistent timer/step-count, and a working download — closing the felt-experience defects in the chat execution surface.
 
-**Verified:** 2026-06-06T00:45:00Z
+**Verified:** 2026-06-06T12:00:00Z
 **Status:** human_needed
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — gap-closure re-verification after plans 095-06..09 + WR-01 code-review fix
 
 ---
 
@@ -37,96 +54,106 @@ human_verification:
 
 | #   | Truth                                                                                                                   | Status     | Evidence                                                                                                                                                                                                             |
 | --- | ----------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Tool-cards render in one consistent frame with auto-scroll and details-on-demand collapse; no duplicate cards on any provider (closing BUG-260529-02). | ✓ VERIFIED | D-05 root fix: `StreamsProvider` `onSubAgentStart/Delta/Done` now stamps onto the OWNING tool_call's `tc.sub_agent`; `tc.sub_agent ?? subAgent` dual source collapsed to `tc.sub_agent` alone (grep=0). 4 D-05 dedup tests green including THREAD_A→THREAD_B isolation and start-before-tool_start ordering. StepRail wraps the existing TOOL_BODIES (no second renderer). `dedupToolCalls` is the ONE shared dedup (ToolCallPanel imports it from `@/lib/stepCount`; inline `const seen = new Set` = 0). |
-| 2   | The run timer stays visible for the full duration of long runs (closing `timer-disappears-long-runs`) and the step count matches between the timer and the panel (closing `step-count-mismatch-timer-vs-panel`). | ✓ VERIFIED | D-06: RunCard derives elapsed from `Date.parse(message.created_at)` (grep ≥ 1); `performance.now` = 0; `elapsedMs > 0` gate = 0; renders continuously via `{hasStart && <RunStatusStrip …/>}`. D-04: all three RunCard count sites read `unifiedStepCount(message)` (grep = 5); `message.iterationCount` = 0; ToolCallPanel's `dedupToolCalls` is from the shared module. RunCard tests: 23/23 including zero-elapsed-no-vanish, freeze-at-terminal, NaN-guard, three-sites-agree-N≠M, DB-loaded-no-iterationCount-still-shows-Step-N all green. Note: WR-01 (inflated elapsed on reloaded terminal runs, see Warnings below). |
-| 3   | The output-file download link works end-to-end (no dead link); SC#10 cross-provider UAT confirms the unified frame behaves identically across all 6 native providers and survives a parallel-thread + long-message scenario. | ? PARTIAL  | Automated (D-07/D-08): `_select_hero_filenames` helper present; `is_hero` on emit + persist (grep ≥ 2); `sandbox_outputs.py` diff empty (owner fence untouched); url guard present; `is_hero` flows through `api.ts` + `_mapMessageResponse` for reload reconstruction; 13/13 backend pytest green. `OutputFileCard` hero/working variant + `fileIcon` wired; url-less dead state present (no silent dead anchor). Frontend finalOutputs tests 7/7 green. Cross-provider + parallel-thread + long-message = operator-owned LIVE Chrome-DevTools-MCP UAT (4 scenarios in `095-VALIDATION.md Manual-Only`). |
-| 4   | The change is contained to the frontend chat surface (plus D-08 additive backend field) and does not regress the PANEL-06 isolation or the StreamsProvider demux.                                                | ✓ VERIFIED | PANEL-06: `git diff` of all 13 changed files shows zero new reads of `todosByThread`, `tasksByThread`, `phasesByThread`, `workspaceFilesByThread`, `pendingAsksByThread`. StreamsProvider demux: all sub-agent writes stay inside the `makeStreamCallbacks` closure over `assistantId`; `_isTransientStreamEnd`/`_reattachAfterTransient` grep = 14 (frozen, unchanged from baseline). `dangerouslySetInnerHTML` = 0 across all 8 changed frontend component files. `sandbox_outputs.py` diff = 0 lines. `'final_output_files'` event name unchanged (grep = 1 emit site, baseline). tsc -b = 37 (documented baseline, zero net-new errors reference any phase-095 source file). |
+| 1   | Tool-cards render in one consistent frame with auto-scroll and details-on-demand collapse; no duplicate cards on any provider (closing BUG-260529-02). | ✓ VERIFIED | GAP-095-01 fixed: `stepsCollapsed`/`setStepsCollapsed`/`shouldCollapse` all = 0 in ToolCallPanel.tsx; `expandedSteps` >= 13 occurrences; `expandedSteps.has` = 5; 12/12 ToolCallPanel tests green including 5 new per-step cases. GAP-095-03 essence + un-gate: single essence line resting state, no >=3 gate; sub-agent transparency line remains visible at rest. D-05 sub-agent dedup unchanged (tc.sub_agent stamp, m.sub_agent = 0). |
+| 2   | The run timer stays visible for the full duration of long runs; step count matches between the timer and the panel. | ✓ VERIFIED | D-06 timer from Date.parse(message.created_at) unchanged (frozenEndRef/startMs/elapsedLabel confirmed untouched in Plan 07). D-04 unifiedStepCount wiring on all 3 sites unchanged. Run-sub `turn N` added from iterationCount (no backend field). GAP-095-03 MED strip pill chrome: `rounded-full` = 5 in RunStatusStrip.tsx; `w-px bg-border` = 2 (divider bars); middots replaced; outerBannerLabel = 1 call site (strip only); verb removed from headerTitle. 28/28 RunCard tests green (23 existing + 5 new Plan 07). |
+| 3   | The output-file download link works end-to-end (no dead link); SC#10 cross-provider UAT confirms the unified frame behaves identically across all 6 native providers and survives a parallel-thread + long-message scenario. | ? PARTIAL  | GAP-095-02 fixed: `_select_hero_filenames` now returns exactly 1 hero on every branch via `_hero_pick` tie-break; old multi-hero test assertion gone; 19/19 backend tests green; `_select_hero_filenames(list(_previous_files_in_run` = 0 (partial per-cell computation removed); `_hero_set` = 5 (computed once, shared by emit + re-stamp); `final_output_files` emit sites = 1 (unchanged). GAP-095-03 file-axis: hero icon 48px, working 30px, soft 24px halo, borderless top-rule + dim eyebrow, intermediates copy, status-first chip. WR-01 fix: `header-bare` placement added to RunStatusStrip (no double-frame). Frontend file suites 7/7 + 9/9 green. SC#10 cross-provider 4-axis = operator-owned live UAT (4 scenarios in 095-VALIDATION.md). |
+| 4   | The change is contained to the frontend chat surface (plus D-08 additive backend field) and does not regress PANEL-06 isolation or the StreamsProvider demux. | ✓ VERIFIED | dangerouslySetInnerHTML = 0 in all gap-closure files (ToolCallPanel, RunCard, RunStatusStrip, OutputFileCard, MessageItem, MessageList — 4 occurrences found are in pre-existing MarkdownRenderer/ChatArea/ShikiCode). PANEL-06 panel-store reads unchanged. final_output_files event name = 1 (unchanged). sandbox_outputs.py untouched (is_hero never feeds the re-sign path). Full vitest: 17 failed / 497 passed — identical pre-existing baseline, ZERO net-new failures. tsc -b = 37 (documented baseline). vite build exit 0. |
 
-**Score:** 4/4 truths verified (SC#3's cross-provider × parallel-thread × long-message portion routes to human_verification as it requires live browser UAT)
+**Score:** 4/4 truths verified (SC#3's cross-provider 4-axis lived-experience UAT routes to human_verification)
+
+---
+
+### Deferred Items
+
+No items deferred to later phases. All originally-deferred items remain in SEED-054 (per-file subtitle + folded-page SVG icon) as previously documented.
 
 ---
 
 ### Required Artifacts
 
-| Artifact                                               | Expected                                                                                 | Status     | Details                                                                                     |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `frontend/src/lib/stepCount.ts`                        | `unifiedStepCount` + `dedupToolCalls` (D-04 single source of truth)                     | ✓ VERIFIED | Exists; exports both functions; pure logic, no React; verbatim ToolCallPanel dedup key; 82 lines substantive |
-| `frontend/src/lib/fileIcon.tsx`                        | `fileIcon(filename, sizePx?)` per-extension Lucide icon + ext label (D-07)               | ✓ VERIFIED | Exists; canonical ext→(color, Glyph) map; Lucide glyphs (FileText/Table/Image/Code/Presentation); XSS-safe (ext-label only); 105 lines substantive |
-| `frontend/src/components/chat/RunStatusStrip.tsx`      | ONE `⏱ elapsed · Step N · activity` strip with `placement: "header" | "floating"` (D-06) | ✓ VERIFIED | Exists; exports `RunStatusStrip`; `placement` prop present; two CSS wrappers over identical segment markup; no `dangerouslySetInnerHTML`; 83 lines substantive |
-| `frontend/src/components/chat/RunCard.tsx`             | D-06 timer from `created_at`; D-04 `unifiedStepCount` on all 3 sites; hosts `RunStatusStrip` | ✓ VERIFIED | `performance.now`=0; `elapsedMs > 0`=0; `message.created_at` ≥ 1; `unifiedStepCount`=5; `message.iterationCount`=0 |
-| `frontend/src/components/chat/ToolCallPanel.tsx`       | shared `dedupToolCalls`; `StepRail`; "Round N" divider; dual source collapsed             | ✓ VERIFIED | `dedupToolCalls` import present; `const seen = new Set`=0; `tc.sub_agent ?? subAgent`=0; `Round {tc.iteration`=1; `Step {tc.iteration`=0; snum/node rail present |
-| `frontend/src/providers/StreamsProvider.tsx`           | D-05 sub-agent stamps onto owning tool_call; no single-slot `message.sub_agent` writes  | ✓ VERIFIED | `m.sub_agent` (message-level write) = 0; `tc.sub_agent` writes on owning tool_call entries confirmed; `_isTransientStreamEnd` frozen at 14 |
-| `frontend/src/hooks/useFollowScroll.ts`                | D-03 follow/release/re-arm/jump state machine                                            | ✓ VERIFIED | Exists; exports `useFollowScroll`; `isPinned`, `showJumpToLive`, `jumpToLive`, `beginProgrammaticScroll` all present; THRESHOLD = 120px |
-| `frontend/src/components/chat/MessageList.tsx`         | `useFollowScroll` wired; floating JumpToLive chip using `RunStatusStrip`; BL-05 preserved | ✓ VERIFIED | `useFollowScroll` import + call present; `isPinned` ≥ 1; `beginProgrammaticScroll` ≥ 1; `RunStatusStrip`/`jumpToLive` ≥ 1; `scrollListenerAttachedRef` preserved |
-| `frontend/src/components/chat/OutputFileCard.tsx`      | `variant` hero/working + `fileIcon`; url-less dead state; no silent dead anchor          | ✓ VERIFIED | `fileIcon` import present; `variant="hero" | "working"` prop; hero glow/gradient layout; url-less dead-state affordance; `dangerouslySetInnerHTML`=0 |
-| `frontend/src/components/chat/MessageItem.tsx`         | `FinalOutputsPanel` hero block above collapsible Working files; all files present        | ✓ VERIFIED | `FinalOutputsPanel` sub-component; `Working files` text ≥ 1; `is_hero`/`heroes` ≥ 1; `data-testid="final-outputs-panel"` preserved; re-rank never hide |
-| `backend/app/services/agent_loop.py`                   | `_select_hero_filenames`; `is_hero` on emit + persist; url guard                        | ✓ VERIFIED | Helper at module level; `is_hero` ≥ 2; `_select_hero_filenames` ≥ 1; `'final_output_files'` = 1 (baseline); `sandbox_outputs.py` diff = 0 |
-| `backend/tests/test_095_final_output_tag.py`           | 13 cases: hero selection, emit projection, persist reconstruction                        | ✓ VERIFIED | 13/13 pytest green (confirmed by orchestrator evidence + direct run) |
+| Artifact | Expected | Status | Details |
+| -------- | --------- | ------ | ------- |
+| `frontend/src/components/chat/ToolCallPanel.tsx` | Per-step expandedSteps Set; single essence-line resting state; un-gated fold; active bloom; no stepsCollapsed | ✓ VERIFIED | expandedSteps = 13 refs; stepsCollapsed/setStepsCollapsed/shouldCollapse = 0; `inset 2px 0 0` in index.css = 2; ToolEssenceLine present |
+| `frontend/src/__tests__/components/ToolCallPanel.test.tsx` | 12 tests including 5 per-step + 2 Task 2 cases | ✓ VERIFIED | 12/12 green; expand-one-only assertion present; former expand-all assertion replaced |
+| `frontend/src/index.css` | .tc-active-wrap = primary-dim wash + inset 2px left bar | ✓ VERIFIED | Lines 399-404: `background: hsl(var(--primary) / 0.06)` + `box-shadow: inset 2px 0 0 hsl(var(--primary))`; old `0 0 24px` outer glow absent from this block |
+| `frontend/src/components/chat/RunStatusStrip.tsx` | Three placements: header (pill), header-bare (plain), floating (pill); divider bars; no middots | ✓ VERIFIED | All 3 placement branches confirmed; `rounded-full` = 5; `w-px bg-border` = 2; dangerouslySetInnerHTML = 0 |
+| `frontend/src/components/chat/RunCard.tsx` | Calm title (no verb); `turn N` run-sub; outerBannerLabel call count = 1 (import + 1 call site) | ✓ VERIFIED | headerTitle derives `Run · N steps` / `Agent run` (no outerBannerLabel); `turn ` present = 1 in run-sub; outerBannerLabel call = 1 (strip activityVerb only) |
+| `frontend/src/components/chat/OutputFileCard.tsx` | icon 48/30; soft 24px halo; no flat 1px ring | ✓ VERIFIED | `isHeroVariant ? 48 : 30` = 1; `shadow-[0_0_24px_hsl(239_100%_82%/0.18)]` = 1; old `0_0_0_1px_rgba(99,102,241,0.08)` = 0 |
+| `frontend/src/components/chat/MessageItem.tsx` | borderless top-rule + dim eyebrow; intermediates copy; no bordered box | ✓ VERIFIED | `border-t border-border/60 pt-3.5` = 1; `uppercase tracking-[0.1em]` = 1; `intermediates, all downloadable` = 1; `rounded-md ghost-border bg-card/40 p-3` = 0 |
+| `frontend/src/components/chat/MessageList.tsx` | RunStatusStrip LEADS with placement=header-bare; jump span TRAILS | ✓ VERIFIED | RunStatusStrip at line 204, jump span at line 213 (strip before span); `placement="header-bare"` confirmed; `aria-label="Jump to live"` = 1; `data-testid="jump-to-live-chip"` = 1 |
+| `backend/app/services/agent_loop.py` | `_hero_pick`; single-hero on every branch; `_hero_set` shared by emit + re-stamp; no partial per-cell call | ✓ VERIFIED | `_hero_pick` helper defined; `max(matched_metas` via `_hero_pick(matched_metas)` = 1; `_hero_set` = 5 refs; `_select_hero_filenames(list(_previous_files_in_run` = 0 (removed); `final_output_files` = 1 emit; `re.findall` = 3 (token detection) |
+| `backend/tests/test_095_final_output_tag.py` | 19 cases; multi-cell live==reload test; `len(...) == 1` assertions; old multi-hero assertion gone | ✓ VERIFIED | 19/19 pytest green; `len(heroes) == 1` = 9 occurrences; old `{"a.docx", "b.docx"}` assertion = 0; `test_multi_cell_live_equals_reload_single_hero` present |
 
 ---
 
 ### Key Link Verification
 
-| From                                              | To                                              | Via                                     | Status     | Details                                                               |
-| ------------------------------------------------- | ----------------------------------------------- | --------------------------------------- | ---------- | --------------------------------------------------------------------- |
-| `RunCard.tsx`                                     | `frontend/src/lib/stepCount.ts`                 | `import { unifiedStepCount }`           | ✓ WIRED    | Import confirmed; 5 usage sites in RunCard                             |
-| `ToolCallPanel.tsx`                               | `frontend/src/lib/stepCount.ts dedupToolCalls`  | `import { dedupToolCalls }`             | ✓ WIRED    | Import confirmed; inline useMemo dedup replaced; `const seen = new Set`=0 |
-| `MessageList.tsx`                                 | `frontend/src/hooks/useFollowScroll.ts`         | `useFollowScroll(getViewport, isStreaming)` | ✓ WIRED | Import + call confirmed; auto-follow gated on `isPinned`               |
-| `MessageList.tsx` JumpToLive chip                 | `RunStatusStrip.tsx placement=header`           | `<RunStatusStrip placement="header" …>` inside pill button | ✓ WIRED | Confirmed (discretion: header placement inside floating pill, not placement=floating — documented rationale in 095-04-SUMMARY) |
-| `OutputFileCard.tsx`                              | `frontend/src/lib/fileIcon.tsx`                 | `import { fileIcon }`                   | ✓ WIRED    | Import confirmed; used for both hero and working variants              |
-| `MessageItem.tsx FinalOutputsPanel`               | `OutputFileCard.tsx`                            | `<OutputFileCard variant="hero"/"working" …>` | ✓ WIRED | Confirmed; hero block + collapsible working group both use OutputFileCard |
-| `agent_loop.py final_output_files emit`           | `api.ts onFinalOutputFiles dispatch`            | additive `is_hero` field on file dicts  | ✓ WIRED    | `is_hero` flows through `api.ts:593-596` and `StreamsProvider:714-715` |
-| `api.ts _mapMessageResponse` reload               | `is_hero` reconstruct                           | `api.ts:126` carries `is_hero` from tool_calls result | ✓ WIRED | Confirmed; reload reconstruction carries the flag for next-day re-hero |
-| `StreamsProvider onSubAgentStart`                 | owning `analyze_document` tool_call `tc.sub_agent` | stamp onto matching running tool_call or create synthetic owner | ✓ WIRED | Confirmed; `m.sub_agent` single-slot writes = 0; `tc.sub_agent` writes on owner entries only |
+| From | To | Via | Status | Details |
+| ---- | -- | --- | ------ | ------- |
+| `ToolCallPanel.tsx` collapsed branch | `expandedSteps` Set membership | `!expandedSteps.has(stepKeyOf(tc, i))` | ✓ WIRED | Gate confirmed at line 605; un-gated (no >=3 threshold) |
+| Collapsed essence row onClick | `expandedSteps` mutation | `setExpandedSteps(prev => new Set(prev).add(key))` | ✓ WIRED | expandStep/collapseStep helpers confirmed |
+| `RunCard.tsx` headerTitle | calm run identity (no verb) | title = `Run · N steps` / `Agent run` | ✓ WIRED | headerTitle derivation confirmed; outerBannerLabel not in title path |
+| `RunCard.tsx` strip activityVerb | `outerBannerLabel` (single call site) | `isStreamingNow ? outerBannerLabel(...) : null` | ✓ WIRED | Confirmed sole call site in the strip's activityVerb prop |
+| `MessageList.tsx` floating chip | `RunStatusStrip` with `placement="header-bare"` | no double-frame (WR-01 fix) | ✓ WIRED | `placement="header-bare"` at line 208; RunStatusStrip leads, jump span trails |
+| `OutputFileCard.tsx` hero variant | `fileIcon(file.filename, 48)` | `isHeroVariant ? 48 : 30` | ✓ WIRED | Line 82 confirmed |
+| `_select_hero_filenames` all branches | `_hero_pick(metas)["filename"]` | single tie-break applied on declared/requested-ext/fallback | ✓ WIRED | All 3 branches confirmed; returns `{winner["filename"]}` |
+| Loop-end `_hero_set` | Persisted execute_code rows | Post-loop re-stamp iterates `persisted_tool_calls` | ✓ WIRED | `_hero_set` = 5 refs; re-stamp guard present; `_persist_assistant_message` called after re-stamp |
 
 ---
 
 ### Data-Flow Trace (Level 4)
 
-| Artifact                 | Data Variable             | Source                                     | Produces Real Data | Status       |
-| ------------------------ | ------------------------- | ------------------------------------------ | ------------------ | ------------ |
-| `RunStatusStrip.tsx`     | `stepCount`, `elapsedLabel` | `unifiedStepCount(message)` + `Date.parse(message.created_at)` in RunCard | Yes — reads persisted `tool_calls` + `created_at` from DB/SSE message | ✓ FLOWING    |
-| `ToolCallPanel.tsx`      | `deduplicatedToolCalls`   | `dedupToolCalls(toolCalls)` from `@/lib/stepCount` | Yes — processes real `message.tool_calls` from SSE/DB | ✓ FLOWING    |
-| `MessageList.tsx`        | `isPinned`, `showJumpToLive` | `useFollowScroll` reading real DOM scroll geometry | Yes — driven by actual viewport scroll events | ✓ FLOWING    |
-| `OutputFileCard.tsx`     | `file.url`, `file.is_hero` | `StreamsProvider onFinalOutputFiles` → `messages` state | Yes — from live SSE `final_output_files` event or DB-loaded `tool_calls` result | ✓ FLOWING    |
-| `MessageItem.tsx FinalOutputsPanel` | `heroes`, `working` | `message.finalOutputFiles` filtered by `is_hero` | Yes — real file list from `final_output_files` event | ✓ FLOWING    |
+| Artifact | Data Variable | Source | Produces Real Data | Status |
+| -------- | ------------- | ------ | ------------------ | ------ |
+| `ToolCallPanel.tsx` ToolEssenceLine | `summarizeToolCall(tc)` result text | Real `tc.result` from SSE/DB `tool_calls` | Yes | ✓ FLOWING |
+| `ToolCallPanel.tsx` expandedSteps | component-local Set keyed on stepKeyOf | Real `toolCalls` prop each render | Yes — re-derived from live SSE/DB | ✓ FLOWING |
+| `RunStatusStrip.tsx` header placement | elapsedLabel, stepCount, activityVerb | RunCard passes from Date.parse(created_at) + unifiedStepCount(message) + outerBannerLabel | Yes | ✓ FLOWING |
+| `RunCard.tsx` runSub | `turn N` | `message.iterationCount` (0-based, from SSE/DB) | Yes | ✓ FLOWING |
+| `OutputFileCard.tsx` hero/working | file.url, file.is_hero, file.filename | `final_output_files` SSE event or DB-loaded tool_calls result | Yes | ✓ FLOWING |
+| `MessageItem.tsx` FinalOutputsPanel | heroes[], working[] | `message.finalOutputFiles` filtered by `is_hero` | Yes — canonical `_hero_set` from agent_loop.py | ✓ FLOWING |
+| `agent_loop.py` `_hero_set` | hero filenames | `_hero_pick` over complete `_previous_files_in_run` | Yes — real sandbox harvest | ✓ FLOWING |
 
 ---
 
 ### Behavioral Spot-Checks
 
-| Behavior                                  | Command                                                                     | Result           | Status  |
-| ----------------------------------------- | --------------------------------------------------------------------------- | ---------------- | ------- |
-| D-04 stepCount pure logic: N deduped tools across M iterations → N | `npx vitest run src/lib/__tests__/stepCount.test.ts` | 11/11 passed | ✓ PASS  |
-| D-07 fileIcon: ext→Lucide glyph + colored label | `npx vitest run src/lib/__tests__/fileIcon.test.tsx` | 11/11 passed | ✓ PASS  |
-| D-06 timer: no vanish on zero elapsed, freeze at terminal | `npx vitest run src/components/chat/RunCard.test.tsx` | 23/23 passed | ✓ PASS  |
-| D-03 follow-scroll state machine: release/re-arm/jump/programmatic-immunity | `npx vitest run src/__tests__/hooks/useFollowScroll.test.ts` | 7/7 passed | ✓ PASS  |
-| D-03 MessageList: chip shows on scroll-away, hides on re-arm | `npx vitest run src/__tests__/components/chat/MessageList.test.tsx` | 9/9 passed | ✓ PASS  |
-| D-07 hero/working grouping + url-less dead state | `npx vitest run src/__tests__/components/MessageItem.finalOutputs.test.tsx` | 7/7 passed | ✓ PASS  |
-| D-08 hero tag: selection + emit + persist | `cd backend && venv/Scripts/python -m pytest tests/test_095_final_output_tag.py` | 13/13 passed | ✓ PASS  |
-| D-05 zero-dup sub-agent                   | `npx vitest run src/__tests__/providers/StreamsProvider.dedup.test.ts`      | 4 new D-05 cases green; 2 PRE-EXISTING DI-095-03-01 failures (stale 075.2 id assertions) | ✓ PASS (new cases) |
-| ToolCallPanel shared dedup + Round-N rail | `npx vitest run src/__tests__/components/ToolCallPanel.test.tsx`            | 8/8 passed       | ✓ PASS  |
+| Behavior | Command | Result | Status |
+| -------- | ------- | ------ | ------ |
+| GAP-095-01 per-card collapse: expand one, others stay folded | `npx vitest run src/__tests__/components/ToolCallPanel.test.tsx` | 12/12 passed | ✓ PASS |
+| GAP-095-03 single-step un-gate: 1 finished step folds to essence from step 1 | Included in ToolCallPanel suite above | 12/12 passed | ✓ PASS |
+| GAP-095-03 bloom: .tc-active-wrap = primary-dim wash + inset 2px left bar | `grep -c "inset 2px 0 0" frontend/src/index.css` | 2 | ✓ PASS |
+| GAP-095-03 chip chrome: RunStatusStrip header = rounded-full pill | `grep -c "rounded-full" frontend/src/components/chat/RunStatusStrip.tsx` | 5 | ✓ PASS |
+| WR-01 fix: floating chip uses header-bare (no double-frame) | `grep -c "header-bare" frontend/src/components/chat/MessageList.tsx` | 1 | ✓ PASS |
+| GAP-095-03 single verb: outerBannerLabel call sites = 1 | RunCard.tsx outerBannerLabel grep (import + 1 call) | 1 call site in strip | ✓ PASS |
+| GAP-095-03 icon sizes: hero 48, working 30 | `grep -c "isHeroVariant ? 48 : 30" OutputFileCard.tsx` | 1 | ✓ PASS |
+| GAP-095-03 top-rule/eyebrow: no bordered box | `grep -c "rounded-md ghost-border bg-card/40 p-3" MessageItem.tsx` | 0 | ✓ PASS |
+| GAP-095-03 intermediates copy | `grep -c "intermediates, all downloadable" MessageItem.tsx` | 1 | ✓ PASS |
+| GAP-095-02 single-hero backend: 19 cases all branches single | `cd backend && venv/Scripts/python -m pytest tests/test_095_final_output_tag.py` | 19/19 passed | ✓ PASS |
+| GAP-095-02 no partial per-cell hero computation | `grep -c "_select_hero_filenames(list(_previous_files_in_run" agent_loop.py` | 0 | ✓ PASS |
+| GAP-095-02 canonical _hero_set shared by emit + persist | `grep -c "_hero_set" agent_loop.py` | 5 | ✓ PASS |
+| Full frontend suite: zero net-new failures | `npx vitest run` | 17 failed / 497 passed (documented pre-existing baseline, ZERO net-new) | ✓ PASS |
+| RunCard suite: 28/28 green | `npx vitest run src/components/chat/RunCard.test.tsx` | 28/28 passed | ✓ PASS |
+| tsc -b baseline maintained | `npx tsc -b` | 37 errors (documented baseline) | ✓ PASS |
+| vite build clean | `npx vite build` | exit 0 | ✓ PASS |
 
 ---
 
 ### Requirements Coverage
 
-| Requirement | Source Plan       | Description                                                                                                             | Status       | Evidence                                                                                                          |
-| ----------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| CHAT-04     | 095-01 through 095-05 (all 5 plans) | Chat tool-cards render in one consistent frame with auto-scroll, details-on-demand collapse, no duplicates, consistent timer/step-count, and a working download | ✓ SATISFIED (automated) + ? HUMAN (live UAT) | D-04..D-08 all implemented and tested; 4 lived-experience UAT scenarios remain in Manual-Only queue |
+| Requirement | Source Plan | Description | Status | Evidence |
+| ----------- | ----------- | ----------- | ------ | -------- |
+| CHAT-04 | 095-01..09 (all plans incl. gap closure) | Chat tool-cards render in one consistent frame with auto-scroll, details-on-demand collapse, no duplicates, consistent timer/step-count, and a working download | ✓ SATISFIED (automated) + ? HUMAN (live UAT) | All structural gap fixes verified in code; 4 lived-experience UAT scenarios remain in Manual-Only queue |
 
 ---
 
 ### Anti-Patterns Found
 
-| File                                                  | Line    | Pattern                                  | Severity  | Impact                                                                                                         |
-| ----------------------------------------------------- | ------- | ---------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
-| `frontend/src/components/chat/RunCard.tsx`            | 108-124 | WR-01: timer inflated on reloaded terminal runs — `frozenEndRef.current` captures `Date.now()` (page-load instant) as the freeze; `elapsedMs = pageLoad - created_at` → e.g. `1440m 0s` for a day-old run | ⚠️ Warning | The live-run vanish is fixed (SC#2 target). The reloaded-terminal path regresses: old code showed nothing; new code shows a wildly wrong duration. Not a critical blocker (live runs are correct; the REVIEW code-review found 0 criticals) but introduces an honesty gap on cold-loaded terminal runs. |
-| `backend/app/services/agent_loop.py`                  | 2060-2092 | WR-02: hero flag computed per execute_code cell (cumulative `_previous_files_in_run` at each cell's persist point) → on reload, `_mapMessageResponse` aggregates across all cells and may surface multiple `is_hero=True` files where the live run showed one | ⚠️ Warning | Reload-only edge case. Live `final_output_files` emit picks exactly one hero over the full cumulative set. Reload may hero 2-3 files instead of 1 in a multi-cell run. Re-rank/never-hide contract holds; all files downloadable. Breaks D-08 "single hero on reload" in the multi-cell scenario. |
-| `frontend/src/providers/StreamsProvider.tsx`          | 520-560 | WR-03: when `sub_agent_start` arrives before `tool_start`, the fallback creates a synthetic owner entry with `id: "running-{observedAt}"`. If the real `tool_start` then arrives, `onToolStart`'s idempotency guard no-ops (name + iteration match) and the real tool's `args` are dropped from the row. Sub-agent body content is preserved; only args are lost. | ⚠️ Warning | Low probability (out-of-order provider path + specific timing). No duplicate render (SC#1 holds). The provider-specific ordering must be proven live to know if any native-7 provider actually triggers this path. Should be verified during UAT. |
-| `frontend/src/components/chat/ToolCallPanel.tsx`      | 429-433 | IN-03: `nodeStateOf` queued branch is unreachable for the real `ToolCall.status` union (`"running" | "done" | "interrupted" | "preparing"`). A failed tool silently becomes a dim "queued" node if the union ever gains `"failed"`. | ℹ️ Info    | Defensive dead code, harmless today. No user-visible impact. |
-| `backend/app/services/agent_loop.py`                  | 826-852 | IN-02: `_select_hero_filenames` mixes `f.get("filename")` (agent-declaration branch) with `f["filename"]` direct access (ext/fallback branches). The `KeyError` path is unreachable today (harvest always populates `filename`) but the inconsistency is a future-regression risk. | ℹ️ Info    | No current impact. |
-| `frontend/src/components/chat/MessageList.tsx`        | 30-47, 232-250 | IN-01: floating chip elapsed (`formatFloatingElapsed`) re-renders only on `messages` change, not on a 250ms interval, so it can freeze during token-quiet stretches. | ℹ️ Info    | Cosmetic; header strip remains authoritative timer. |
+| File | Line | Pattern | Severity | Impact |
+| ---- | ---- | ------- | -------- | ------ |
+| `frontend/src/components/chat/RunCard.tsx` | 108-124 | WR-01 (timer inflation) is fixed for live runs. The cold-reload timer (reloaded terminal runs) still uses `frozenEndRef.current` captured at page-load instant → e.g. `1440m 0s` for a day-old run. This is a honesty gap but not a new regression from the gap plans — it existed before plan 06-09. SC#2 target (live-run vanish) is fixed. | ⚠️ Warning | Cold-loaded terminal runs show a wrong (inflated) duration. Follow-on `/gsd:quick` recommended. |
+| `frontend/src/components/chat/ToolCallPanel.tsx` | 429-433 | IN-03: `nodeStateOf` queued branch is unreachable for the real `ToolCall.status` union. | ℹ️ Info | Defensive dead code, harmless today. |
+| `backend/app/services/agent_loop.py` | 820-886 | IN-02 note: `f.get("filename")` vs `f["filename"]` mixed access is resolved (Plan 09 added `_hero_pick` with consistent access). | ℹ️ Info | Resolved by Plan 09. |
+| `frontend/src/components/chat/ToolCallPanel.tsx` | 514-524 | IN-02 (code review): stale "075.6 collapse-at-3+" comments still describe the removed mechanism. | ℹ️ Info | Comment staleness only; no behavioral impact. |
 
 ---
 
@@ -134,105 +161,73 @@ human_verification:
 
 Per `095-VALIDATION.md` Manual-Only section and SC#3 cross-provider requirement. All four scenarios require Chrome DevTools MCP + live providers:
 
-#### 1. Long Run Stays Honest
+#### 1. Long Run Stays Honest (+ WR-03 check)
 
 **Test:** Run a Kimi/Moonshot prompt that triggers ~11 tool calls (e.g. "Research and write a 10-slide PPTX on enterprise RAG architecture"). Watch the RunCard header from first token to completion.
 
 **Expected:**
 - Timer shows and ticks continuously from kick-off (never blinks out mid-run)
 - "Step N" in the header strip and in the panel always shows the same N
-- The read/summarize (analyze_document) sub-agent card appears exactly ONCE (no duplicate that self-heals after 10-15s)
-- Timer freezes to a final duration at run-end (does not keep ticking after the run completes)
+- The read/summarize (analyze_document) sub-agent card appears exactly ONCE (no duplicate)
+- Timer freezes to a final duration at run-end
+- Per-card collapse: each finished essence row expands only itself when clicked
+- WR-03 check: does Kimi/Moonshot trigger `sub_agent_start` before `tool_start`? If so, verify the sub-agent row still has its args visible (the rare ordering edge case)
 
-**Why human:** Requires a real long multi-step run on a slow provider; the browser must be live to observe the continuous DOM timer ticks; jsdom cannot simulate the 250ms setInterval + real SSE stream.
-
-**Also check WR-03:** Does Kimi/Moonshot trigger the `sub_agent_start` before `tool_start` ordering? If so, verify the sub-agent row still has its args visible (the WR-03 edge case).
+**Why human:** Requires a real long multi-step run on a slow provider; continuous DOM timer ticks; live SSE + real-time DOM.
 
 #### 2. Multi-Tool Calm
 
 **Test:** One prompt to any native provider: "Search my knowledge base for RAG papers and then run Python to plot a bar chart of the top 5 papers by citation count."
 
 **Expected:**
-- `search_documents` and `execute_code` both appear as numbered rail rows (StepRail)
-- When `search_documents` completes, it folds to a summary row (Focus Mode)
-- The active `execute_code` row stays expanded
-- Auto-scroll follows the live edge while the user is at the bottom; scrolling up releases the pin; the "↓ Jump to live" chip appears; clicking it re-pins
+- `search_documents` and `execute_code` both appear as numbered rail rows
+- When `search_documents` completes, it folds to a single essence line (Focus Mode, un-gated from step 1)
+- The active `execute_code` row stays expanded with the active bloom (primary-dim wash + inset 2px left bar)
+- Clicking one finished essence row expands only that row (per-card collapse — the #1 fix)
+- Auto-scroll follows the live edge; scrolling up releases the pin; the "↓ Jump to live" chip shows with status segments leading and "↓ Jump to live" trailing
 
-**Why human:** Live streaming + actual DOM scroll physics; jsdom does not simulate real viewport geometry or smooth scroll.
+**Why human:** Live streaming + actual DOM scroll physics; jsdom cannot simulate viewport geometry.
 
-#### 3. Hero File Downloads (Including Next-Day)
+#### 3. Hero File Downloads (Including Single-Hero + Next-Day)
 
-**Test:** Ask any provider: "Create a summary report as a Word document (.docx)." After the run completes:
-- Verify the .docx appears as a "★ Your file" hero card above the "Working files (N)" group
-- Click the Download button — verify the file downloads correctly (not a 404)
-- Close the browser tab; wait (or simulate by clearing session state); reopen the chat thread
-- Verify the hero card still shows the .docx as the hero and the Download button still works
+**Test:** Ask any provider: "Create a summary report as a Word document (.docx) and include a CSV data table." After the run completes:
+- Verify the .docx appears as the SINGLE "★ Your file" hero card above "Working files (N) — intermediates, all downloadable"
+- The CSV appears in the Working files group (not as a hero)
+- Click the Download button on the hero — verify it downloads (not a 404)
+- Close and reopen the chat thread
+- Verify the hero card still shows exactly ONE hero (the .docx) and the Download button still works
+- (Multi-cell check) If the run used multiple execute_code cells, confirm only one hero on reload (WR-02 fix)
 
-**Expected:** Hero is the .docx; all other generated files are in the Working files group; download works immediately; next-day/reload also works via the re-sign endpoint.
-
-**Why human:** Needs real Supabase Storage signed URL generation + the re-sign endpoint (`sandbox_outputs.py`) + multi-session elapsed time. Also surfaces WR-02 risk: if the run used multiple `execute_code` cells, check that only ONE .docx is heroed on reload (not two).
+**Why human:** Needs real Supabase Storage signed URLs + re-sign endpoint + multi-session elapsed time.
 
 #### 4. Two Threads + 6-Provider Parity
 
 **Test:** Open Thread A with one provider (e.g. OpenAI) on a multi-tool prompt. While Thread A is streaming, open Thread B with a different provider (e.g. Anthropic) and send a prompt. Then sweep 4 more providers (Google, OpenRouter, DeepSeek, MiniMax) each with a 2+ tool prompt.
 
 **Expected:**
-- No cross-thread bleed (Thread B's tool cards do not appear in Thread A's run)
-- The RunCard frame, step count, timer, sub-agent zero-dup, and file hero/working layout look identical across all 6 providers — one consistent UX frame
+- No cross-thread bleed
+- The RunCard frame, per-card collapse, active bloom, step count, timer, sub-agent zero-dup, single essence line, and file hero/working layout are indistinguishable across all 6 providers
+- The `turn N` run-sub and pill-chrome strip look consistent
 
-**Why human:** Parallel streaming sessions require a real browser; cross-provider visual parity requires live runs on each provider.
-
----
-
-### Warnings Summary (not gaps, not human items)
-
-These three items from the code review are noted for the record but do not block the phase goal or the human UAT:
-
-**WR-01 — Timer inflated on reloaded terminal runs.** Live runs: fixed (SC#2 target achieved). Cold-loaded terminal runs (next-day reopen): the freeze captures `Date.now()` on mount, producing e.g. `1440m 0s` for a day-old run. The SC#2 target (`timer-disappears-long-runs`) was live-run vanishing, which is fixed. The reload-inflation is a new inaccuracy vs the old behavior (old: no timer shown; new: wrong timer shown). Recommend fixing in a follow-on `/gsd:quick` by tracking whether the freeze was captured during a live stream this session.
-
-**WR-02 — Multiple heroes on reload for multi-cell runs.** The hero set is recomputed per-cell at persist time; `_mapMessageResponse` aggregates across cells on reload and may surface 2-3 hero cards instead of 1. The live `final_output_files` emit correctly picks one. Fix: compute the hero set once over the full cumulative `_previous_files_in_run` at the emit site and carry that as the canonical set for all cells' persist records.
-
-**WR-03 — Synthetic owner row drops real tool args.** Low-probability (requires `sub_agent_start` before `tool_start` ordering). Sub-agent content is preserved; only `args` are lost from the placeholder row. Verify during UAT #1 (Kimi/Moonshot) whether this ordering actually occurs.
+**Why human:** Parallel streaming sessions require a real browser; cross-provider visual parity requires live runs.
 
 ---
 
-### Gaps Summary
+### Gap-Closure Summary
 
-The 4 automated truths verified, but the operator ran the LIVE Chrome-DevTools-MCP UAT (2026-06-06) and found **3 gaps**. Each was root-caused + adversarially verified (workflow wf_a263d71a-919, 11 agents). Operator scope decision: **full fidelity** (fix both bugs + all high/medium visual divergences; header identity = `model · turn` subline, no backend; defer LOW + data-field items to a seed). Full diagnosis in `095-HUMAN-UAT.md`.
+All 3 operator-UAT gaps from 2026-06-06 have been structurally closed by plans 095-06..09 plus a code-review WR-01 fix (commit 4065580b):
 
-#### GAP-095-01 — Tool-card fold-all (HIGH, confidence high)
-- **What the operator saw:** expanding ONE completed tool-card expands ALL of them.
-- **Root cause:** `ToolCallPanel.tsx:488` single shared `stepsCollapsed` boolean; every collapsed summary row's onClick (`:552`, `:570`) flips it. No per-row identity. Mid-run only (Focus Mode, ≥3 done steps).
-- **Fix:** per-step `Set<string>` keyed on `stepKeyOf` clientKey; gate `:544` with `!expandedSteps.has(key)`; onClicks add ONE key; add per-row re-collapse affordance. Update `ToolCallPanel.test.tsx:99-108` (currently codifies expand-all) + add a partial-expand test.
-- **Files:** `frontend/src/components/chat/ToolCallPanel.tsx` (+ test). Violates D-01, SC#1.
+| Gap | Root Cause | Fix | Code Evidence | Tests |
+| --- | ---------- | --- | ------------- | ----- |
+| GAP-095-01 fold-all | Single shared `stepsCollapsed` boolean | Per-step `expandedSteps` Set keyed on stepKeyOf | stepsCollapsed/setStepsCollapsed/shouldCollapse = 0; expandedSteps = 13 refs | 12/12 ToolCallPanel ✓ |
+| GAP-095-02 hero leak | `_select_hero_filenames` returned multi-element set; partial per-cell hero vs complete emit | `_hero_pick` tie-break, single hero every branch; loop-end re-stamp | `_hero_set` = 5; partial call = 0; single-hero len asserts = 9 | 19/19 backend ✓ |
+| GAP-095-03 sketch divergences | 9 visual/UX gaps (HIGH/MED/LOW) across ToolCallPanel, header, file-axis | Plans 06 (essence+bloom), 07 (chip chrome+verb+subline), 08 (file-axis+chip-order) | All grep acceptance criteria pass | All suites ✓ |
+| WR-01 double-frame | Plan 07 gave header chrome to placement="header"; Plan 08 embedded it inside the floating pill | `header-bare` placement variant (plain segments, no nested pill) | `header-bare` in RunStatusStrip.tsx type + MessageList.tsx usage | — |
 
-#### GAP-095-02 — Hero highlight leaks working files (HIGH, confidence high; confirms WR-02)
-- **What the operator saw:** the highlighted (hero) section sometimes includes working files, not just the deliverable.
-- **Root cause:** `agent_loop.py:835-844` `_select_hero_filenames` returns a multi-element SET (every file of a requested extension → `is_hero`). Frontend partition is correct; leak is 100% backend over-selection. `test_095_final_output_tag.py:62-69` encodes the multi-hero behavior as intended.
-- **Fix:** requested-ext branch returns exactly ONE filename via `max(size, iteration)`; update the test to one hero. Secondary (separate): kill the live-vs-reload divergence in the fallback branch by computing the hero set ONCE at loop end for both emit + persist (or re-derive on reload in `api.ts`). Ext-detection tokenize = defense-in-depth, not the cause.
-- **Files:** `backend/app/services/agent_loop.py` (+ test); optionally `frontend/src/lib/api.ts`. Touches SC#1.
-
-#### GAP-095-03 — Design fidelity vs sketch contract 014/015/016 (MIXED; full-fidelity scope)
-In scope (operator chose full fidelity):
-- HIGH — finished card → the single **essence line** (`snum · icon · name → result · pill · chev`); the args+separate-result two-row shape is replaced. `ToolCallPanel.tsx:690-747`, `206-228`.
-- HIGH — **un-gate** the Focus-Mode fold so every finished step folds to essence from step 1 (remove the `>=3` gate `:486-488`). Lands with GAP-095-01's per-step state.
-- MED — active step **bloom** (primary-dim wash + inset 2px left bar, active essence text primary) replacing the old `tc-active-wrap` outer glow. `index.css:399-404`.
-- MED — header status strip gets the **pill chrome** (bg + 1px border + rounded-full + divider bars). `RunStatusStrip.tsx:44-51`.
-- MED — header: activity verb in the **strip only** + restore the `model · turn` **run-sub** subline + a simple derived title (no backend). `RunCard.tsx:170-174`, `230-235`.
-- MED — hero file icon **48px** / working **30px**. `OutputFileCard.tsx:82`.
-- MED — hero **soft 24px glow halo** replacing the flat 1px ring. `OutputFileCard.tsx:165`.
-- MED — files area: **borderless top-rule + uppercase dim eyebrow** ("Generated files") replacing the boxed card. `MessageItem.tsx:83-84`.
-- LOW (cheap, include) — floating chip **status-first, jump trailing**; working toggle "— intermediates, all downloadable" copy. `MessageList.tsx:191-212`, `MessageItem.tsx:106`.
-
-Deferred to a SEED (operator decision — LOW / needs data contract):
-- per-file descriptive subtitle (needs a backend `description`/`role` field on `final_output_files`).
-- folded-page SVG file icon (the Lucide form is **explicitly permitted** by the contract — not a real gap).
-
-WR-03 (StreamsProvider out-of-order `sub_agent_start` arg-drop) stays a watch-item — not operator-reproduced.
-
-**Routing:** ONE gap-closure phase via `/gsd:plan-phase 095 --gaps`, organized as 4 units (ToolCallPanel essence+collapse+bloom / header chrome+verb+subline / file-axis visual / backend one-hero+test). Quick fixes rejected — units re-edit the same ToolCallPanel + MessageItem hot files; one plan = one cross-provider validation pass.
+Remaining items: 4 lived-experience UAT scenarios (Manual-Only, require Chrome DevTools MCP + live providers). WR-01 (cold-reload timer inflation) is a pre-existing honesty gap, recommended as a follow-on `/gsd:quick`.
 
 ---
 
-_Verified: 2026-06-06T00:45:00Z_
+_Verified: 2026-06-06T12:00:00Z_
 _Verifier: Claude (gsd-verifier)_
+_Re-verification: gap-closure after plans 095-06..09 + WR-01 fix_

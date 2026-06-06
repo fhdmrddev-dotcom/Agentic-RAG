@@ -3,12 +3,17 @@ status: partial
 phase: 095-chat-tool-card-unification
 source: [095-VERIFICATION.md, 095-VALIDATION.md, 095-REVIEW.md]
 started: 2026-06-06T00:00:00Z
-updated: 2026-06-06T00:00:00Z
+updated: 2026-06-06T12:00:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing — live Chrome-DevTools-MCP UAT across the 6 native providers]
+[awaiting human RE-test — all 3 operator gaps + the WR-01 code-review regression
+are now CODE-CLOSED by gap plans 095-06..09 (+ commit 4065580b). Re-run the live
+Chrome-DevTools-MCP UAT across the 6 native providers to confirm the felt
+experience matches before closing the phase. Code evidence is verified (4/4
+must-haves, zero net-new test failures) but the lived-experience axes can only be
+confirmed in a real browser with real providers.]
 
 ## Tests
 
@@ -21,32 +26,36 @@ sub-agent (`analyze_document`) appears EXACTLY ONCE — no double-render (closin
 BUG-260529-02 #3). Also watch WR-03: confirm whether an out-of-order
 `sub_agent_start` (before `tool_start`) ever drops the real tool's args onto a
 synthetic owner row.
-result: [pending]
+result: [pending — original 095-01..05 work; not re-touched by gap plans]
 
 ### 2. Multi-tool run is calm (collapse + auto-scroll + jump-to-live)
 expected: A single prompt exercising `search_documents` + `execute_code` renders
-both tool-cards in ONE consistent frame; finished cards fold (details-on-demand,
-click-to-expand); the active card stays open; the chat follows the live edge but
-RELEASES when you scroll up (D-03 follow-but-release), and the floating
-"↓ Jump to live" chip appears on scroll-away and returns you to the bottom.
-result: ISSUE — operator 2026-06-06: the fold/unfold of completed tasks is NOT
-per-card. Expanding ONE completed tool-card expands EVERY completed tool-card at
-once (violates D-01 click-to-expand + SC#1 details-on-demand collapse).
-→ gap: BUG-FOLD-ALL (shared collapse-state in ToolCallPanel)
+both tool-cards in ONE consistent frame; finished cards fold to a single essence
+line (details-on-demand, click-to-expand) from step 1; the active card stays open
+and blooms; the chat follows the live edge but RELEASES when you scroll up (D-03);
+the floating "↓ Jump to live" chip (status-first, jump trailing) appears on
+scroll-away and returns you to the bottom WITHOUT a double-framed pill.
+result: [pending re-test — FIX SHIPPED] Plan 095-06 replaced the shared
+`stepsCollapsed` boolean with a per-step `expandedSteps` Set (one click expands
+ONLY that card), un-gated the fold (essence from step 1), and added the active
+bloom. WR-01 (floating-chip double-frame) fixed via the `header-bare` strip
+variant. Verify the per-card fold/unfold is now independent and the chip is a
+single pill.
 
 ### 3. Hero file downloads — immediately AND next-day (reload honesty)
 expected: Ask the agent to generate a `.docx` (or `.pptx`/`.pdf`). The output
-renders a hero "★ Your file" card (with the per-extension file icon) above any
-collapsible "Working files (N)" group; the Download link works END-TO-END (no
-dead link) right away. Reopen the chat (simulate next-day reload) → the hero card
-still renders and the download STILL works. Watch WR-02: on a MULTI-CELL
-`execute_code` run, confirm the reloaded panel shows ONE hero card, not several.
-Watch WR-01: confirm the reloaded run's elapsed timer is not absurdly inflated
-(e.g. `1440m 0s` for a day-old run).
-result: ISSUE — operator 2026-06-06: the highlighted (hero) section sometimes
-includes WORKING files alongside the genuine final file — the hero/working split
-leaks. Confirms code-review WR-02 live.
-→ gap: BUG-HERO-LEAK (more than one is_hero / partition mis-bucket)
+renders a hero "★ Your file" card (per-extension icon, 48px) above a collapsible
+"Working files (N) — intermediates, all downloadable" group; the Download link
+works END-TO-END right away. Reopen the chat (next-day reload) → the hero card
+still renders and the download STILL works. WR-02: on a MULTI-CELL `execute_code`
+run, confirm the panel shows EXACTLY ONE hero card both live AND on reload (they
+must agree). WR-01-timer: confirm the reloaded run's elapsed timer is not absurdly
+inflated.
+result: [pending re-test — FIX SHIPPED] Plan 095-09 made `_select_hero_filenames`
+return exactly ONE hero on every branch and shares one canonical `_hero_set`
+between the live emit and the persist re-stamp (live == reload). Plan 095-08
+applied the 48px hero icon, 24px soft halo, and the "intermediates" copy. Verify
+exactly one hero (not the CSV/scratch file) live and after reload.
 
 ### 4. Two threads + 6-provider parity (SC#10 4-axis)
 expected: Thread A streaming while Thread B accepts a new prompt — no cross-thread
@@ -61,90 +70,59 @@ result: [pending]
 expected: The rendered chat tool-card / run-card / status-strip / scroll surfaces
 AND the output-files hero/working surface match the operator-approved sketch
 design contract (sketch-findings-agentic-rag — sources 014/015/016).
-result: ISSUE — operator 2026-06-06: "overall good but NOT THE SAME as the
-sketches design." Non-specific; concrete divergences under diagnosis (workflow
-wf_a263d71a-919). To confirm scope with operator before building.
-→ gap: DESIGN-DIVERGENCE (specifics TBD from diagnosis)
+result: [pending re-test — FIXES SHIPPED] Plans 095-06/07/08 landed all
+diagnosed divergences (essence line, un-gate, bloom, pill chrome, single verb,
+`turn N` run-sub, hero 48/working 30, soft halo, borderless top-rule + dim
+eyebrow, intermediates copy, status-first chip). SEED-054 deferred the per-file
+subtitle + SVG-icon items. Verify the surfaces now read as the sketches.
 
 ## Summary
 
 total: 5
 passed: 0
-issues: 3
-pending: 2
+issues: 0
+pending: 5
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-Operator live-UAT (2026-06-06) surfaced 3 issues. Diagnosed + adversarially
-verified by workflow wf_a263d71a-919 (11 agents). Root causes below; fix scope
-for the design items pending operator confirmation.
+**All 3 operator gaps + WR-01 are CODE-CLOSED — pending operator live re-UAT.**
 
-### BUG-FOLD-ALL (severity: high, confidence: high — CONFIRMED both adversarial lenses)
-- **Root cause:** `ToolCallPanel.tsx:488` — a SINGLE shared `stepsCollapsed`
-  boolean governs the in-flight "Focus Mode" done-step window. Every collapsed
-  summary row's onClick (`:552`, `:570`) calls `setStepsCollapsed(false)`, so
-  one click un-collapses ALL rows. No per-row identity exists. Only observable
-  MID-RUN (≥3 done steps before the active tool); after a run ends the per-card
-  `ToolResultBlock` state (`:148`) is correct, which is why it self-heals on
-  reload.
-- **Fix:** replace the boolean with a per-step `Set<string>` keyed on the same
-  `stepKeyOf` clientKey identity; gate `:544` with `!expandedSteps.has(key)`;
-  `:552`/`:570` add ONE key; add a per-row re-collapse affordance (the existing
-  "Hide earlier steps" button only renders while `!stepsCollapsed`).
-- **Caveat:** `ToolCallPanel.test.tsx:99-108` currently CODIFIES the expand-all
-  behavior — must be updated + a partial-expand test added.
-- **Files:** `frontend/src/components/chat/ToolCallPanel.tsx` (+ its test). Violates D-01 + SC#1.
+Gap closure: plans 095-06..09 (gap_closure, Wave 1, disjoint files) shipped
+2026-06-06 + code-review fix (commit `4065580b`). Verified in the codebase
+(095-VERIFICATION.md, status human_needed, 4/4 must-haves, zero net-new test
+failures, `tsc -b` = 37 baseline, backend 19/19, frontend 497 passed). The
+diagnostic history (workflow wf_a263d71a-919) is retained below for audit; each
+maps to a shipped fix.
 
-### BUG-HERO-LEAK (severity: high, confidence: high — primary cause CONFIRMED)
-- **Root cause:** `agent_loop.py:835-844` `_select_hero_filenames` returns a
-  MULTI-element SET in the requested-extension branch — every file whose ext
-  matches a requested ext is stamped `is_hero=True`. A run that writes the
-  deliverable + same-type scratch files heroes them all. The frontend partition
-  is CORRECT (faithfully renders `is_hero`, working = strict complement) — the
-  leak is 100% backend over-selection. `test_095_final_output_tag.py:62-69`
-  encodes the multi-hero behavior as intended.
-- **Fix:** requested-ext branch returns exactly ONE filename via the same
-  `max(size, iteration)` tie-break as the fallback; update the test to assert one
-  hero.
-- **Secondary (separate, narrower):** a live-vs-reload divergence exists only in
-  the fallback "largest-file" branch on multi-cell runs (persist stamps per-cell
-  over a partial list; live computes once over the full set). Fix = compute the
-  hero set ONCE at loop end and apply to both emit + persisted rows (or re-derive
-  on reload in `api.ts`). NOTE: the earlier "md matches made/summary" substring
-  claim was a fabricated example caught by the skeptic — substring ext-detection
-  hardening is legit defense-in-depth but NOT the symptom cause.
-- **Files:** `backend/app/services/agent_loop.py` (+ test); optionally `frontend/src/lib/api.ts`. Touches SC#1 (no dup) + file-axis honesty. Confirms WR-02.
+### BUG-FOLD-ALL → CLOSED by 095-06 (re-test #2)
+Per-step `expandedSteps` Set keyed on `stepKeyOf` replaces the shared
+`stepsCollapsed` boolean; one click expands only that card; per-row re-collapse
+("Hide") added. 12/12 ToolCallPanel tests green (incl. 5 new per-step cases).
 
-### DESIGN-DIVERGENCE (vs sketch contract 014/015/016) — confirmed, scope pending
-Lots MATCHES (run-frame, sticky header, never-vanishes timer, rail node/snum,
-unifiedStepCount single-source, dedup, hero/working structure, color map). The
-confirmed divergences, ranked:
-- HIGH — finished card shows args + a SEPARATE result row, not the sketch's
-  single "essence line" (`snum · icon · name → result · pill · chev`). `ToolCallPanel.tsx:690-747` + `206-228`.
-- HIGH — Focus-Mode fold gated at ≥3 steps; sketch un-gates so every finished
-  step folds to its essence from step 1. `ToolCallPanel.tsx:486-488`.
-- MED — active step doesn't "bloom" (sketch: primary-dim wash + inset 2px left
-  bar; code: old 075.8 outer glow). `index.css:399-404`.
-- MED — header status strip is bare middot text, missing the rounded-full pill
-  chrome (bg/border/divider bars). `RunStatusStrip.tsx:44-51`.
-- MED — activity verb rendered twice (title + strip); model·turn run-sub dropped. `RunCard.tsx:170-174`.
-- MED — hero file icon 30px (sketch 48px); working 16px (sketch 30px). `OutputFileCard.tsx:82`.
-- MED — hero glow is a flat 1px ring @8% (sketch: soft 24px primary halo). `OutputFileCard.tsx:165`.
-- MED — output container is a bordered box (sketch: borderless top-rule + dim
-  uppercase eyebrow; predates 095). `MessageItem.tsx:83-84`.
-- LOW — floating chip leads with Jump-to-live then status (sketch: status first,
-  jump trailing); working toggle missing "— intermediates, all downloadable";
-  no descriptive subtitle (partly a data-contract gap — no description field on
-  the wire); fileIcon is Lucide-glyph form (EXPLICITLY PERMITTED by the contract — not a required change).
+### BUG-HERO-LEAK → CLOSED by 095-09 (re-test #3)
+`_select_hero_filenames` returns exactly ONE hero on every branch (shared
+`_hero_pick` max-size/iteration tie-break); one canonical `_hero_set` computed
+over the COMPLETE set drives both the live emit and the post-loop persist
+re-stamp, so live == reload. Token-match ext detection hardening added. 19/19
+backend tests green (incl. `test_multi_cell_live_equals_reload_single_hero`).
 
-WR-03 (StreamsProvider out-of-order sub_agent_start arg-drop) remains a
-watch-item, not operator-reproduced.
+### DESIGN-DIVERGENCE → CLOSED by 095-06/07/08 (re-test #2, #5)
+All HIGH/MED/LOW diagnosed items shipped (essence line, un-gate, bloom, pill
+chrome, single verb, `turn N` run-sub, icon sizes, soft halo, top-rule/eyebrow,
+intermediates copy, chip order). SEED-054 defers per-file subtitle + SVG icon
+(data-contract gap + explicitly-permitted icon form).
 
-**Recommended routing:** ONE gap-closure phase (`/gsd:plan-phase 095 --gaps`),
-4 units: (1) ToolCallPanel essence-line + per-step collapse + un-gate + bloom;
-(2) header chip chrome + single verb + run-sub; (3) file-axis visual fidelity
-(icon sizes, glow, top-rule/eyebrow); (4) backend one-hero + test. Quick fixes
-rejected — units 1-3 re-edit the same ToolCallPanel/MessageItem hot files, so one
-plan + one cross-provider validation pass is cleaner.
+### WR-01 (code review) → CLOSED by commit 4065580b (re-test #2)
+Plan 07's header-pill chrome double-framed Plan 08's embedded floating chip. Fixed
+with a `header-bare` placement variant (plain segments, no nested pill); the
+floating chip now renders a single pill. RunCard/MessageList suites 37/37 green.
+
+WR-03 (StreamsProvider out-of-order `sub_agent_start` arg-drop) remains a
+watch-item (re-test #1), not operator-reproduced.
+
+**Next:** operator runs the live Chrome-DevTools-MCP re-UAT (the 5 scenarios
+above) across the 6 native providers. If all pass → `/gsd:verify-work 095` records
+PASS and the phase closes. If any felt-experience defect remains → a further
+gap-closure cycle.
