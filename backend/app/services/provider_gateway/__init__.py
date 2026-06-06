@@ -14,6 +14,7 @@ to avoid that cycle; ``_emit`` / ``spawn`` stay passed-in callables consumer-sid
 from __future__ import annotations
 
 from .dispatcher import CallingMode, GatewayRequest, open_stream
+from .errors import ErrorKind, classify_provider_error, message_for_kind
 from .events import (
     DeltaEvent,
     FinishEvent,
@@ -41,4 +42,8 @@ __all__ = [
     "FinishEvent",
     "UsageEvent",
     "UsageDeltaEvent",
+    # Per-provider error classification (D-095.1-03 / PROVIDER-ERR)
+    "ErrorKind",
+    "classify_provider_error",
+    "message_for_kind",
 ]
