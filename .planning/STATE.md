@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Phase 095.1 EXECUTED (5/5 plans, sequential) + verified (human_needed) + code-reviewed (0 critical, 2 warning) — ready for /gsd:verify-work 095.1
-last_updated: "2026-06-06T13:30:00.000Z"
+stopped_at: Phase 095.1 live 8-provider UAT done — 5 pass / 2 gaps / 2 blocked. Gap plans 06 (derived-panel gate) + 07 (live attribution/turn) written + plan-checker PASSED. NEXT /gsd:execute-phase 095.1 --gaps-only
+last_updated: "2026-06-06T14:45:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 10
