@@ -166,6 +166,49 @@ describe("ToolCallPanel — 095 Plan 06 per-step expand (GAP-095-01 + un-gate)",
   })
 })
 
+describe("ToolCallPanel — 095 Plan 06 Task 2: single essence line for finished cards", () => {
+  it("rests a finished (all-done) card as ONE essence row — result, not args + separate result", () => {
+    // No active tool → activeIndex === -1 → the all-done / reload case.
+    const toolCalls: ToolCall[] = [
+      mkDoneTool({ id: "t1", iteration: 0 }),
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // The resting state is ONE essence/result line (the tool-result-summary
+    // element), not a separate head-row-with-args plus a separate result row.
+    const essences = container.querySelectorAll("[data-testid='tool-result-summary']")
+    expect(essences.length).toBe(1)
+    // The essence carries the result arrow, not the args-in-quotes summary as a
+    // separate visible row.
+    expect(essences[0]?.textContent).toMatch(/→/)
+  })
+
+  it("clicking the essence line expands the finished card's full body", () => {
+    const toolCalls: ToolCall[] = [
+      {
+        name: "execute_code",
+        id: "x1",
+        args: { code: "print(2)" },
+        status: "done",
+        result: JSON.stringify({ stdout: "2", exit_code: 0 }),
+        startedAt: 1_700_000_000_000,
+        endedAt: 1_700_000_000_100,
+        iteration: 0,
+      } as ToolCall,
+    ]
+    const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+
+    // At rest: essence line, no editor body.
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(0)
+    const essence = container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement | null
+    expect(essence).toBeTruthy()
+
+    // Click → the full execute_code body (editor) renders.
+    fireEvent.click(essence!)
+    expect(container.querySelectorAll("[data-testid='tc-editor']").length).toBe(1)
+  })
+})
+
 describe("ToolCallPanel — Phase 095 Plan 03 Task 2: StepRail + Round-N divider", () => {
   it("renders the divider as 'Round N', never 'Step N' (D-04 relabel)", () => {
     // 3 done across iter-0 + 1 done in iter-1 + active iter-2 → 2 dividers
@@ -331,6 +374,12 @@ describe("ToolCallPanel — Phase 075.9 T3 clientKey dedup", () => {
       } as ToolCall,
     ]
     const { container } = renderWithTooltip(<ToolCallPanel toolCalls={toolCalls} />)
+    // Phase 095 Plan 06 (GAP-095-03 essence): a DONE execute_code now rests as
+    // a single essence line, not the full editor body. Expand it to reveal the
+    // editor — dedup must still leave exactly ONE card/editor (not two).
+    const essence = container.querySelector("[data-testid='tool-result-summary']") as HTMLButtonElement | null
+    expect(essence).toBeTruthy()
+    fireEvent.click(essence!)
     // Exactly one execute_code body rendered (the execute_code body has a
     // tc-editor inset only when args.code is present — both entries have
     // it, but dedup should leave only one).

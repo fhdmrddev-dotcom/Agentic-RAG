@@ -389,17 +389,17 @@
   animation: progressShimmer 1.8s ease-in-out infinite;
 }
 
-/* Phase 075.8 Task 3 (sketch 002 D6): active-tool glow wrapper.
-   Per tool-call-panel.md D6 — when a tool is mid-execution
-   (preparing/running), wrap it with a soft primary-glow box-shadow + a
-   thin top-edge primary tint, and place a bottom progress shimmer (the
-   existing .tool-progress-bar) at the wrapper's bottom edge. Per sketch
-   D6 the bar lives at the BOTTOM (top is reserved for the run-card's
-   own progress band so we don't double-shimmer). */
+/* Phase 095 Plan 06 (sketch 014 — active bloom, GAP-095-03 bloom).
+   Replaces the 075.8 outer-glow (box-shadow: 0 0 24px …) with the sketch-014
+   active-step bloom: a primary-dim wash + an inset 2px primary LEFT bar, so
+   the running step "blooms" in place rather than emitting an outer halo. The
+   bottom progress shimmer (.tool-progress-bar) stays as the separate motion
+   cue. Per sketch 014: `.step.active { background: --color-primary-dim;
+   box-shadow: inset 2px 0 0 --color-primary }`. */
 .tc-active-wrap {
   position: relative;
-  background: linear-gradient(180deg, hsl(var(--primary) / 0.05), transparent 60%);
-  box-shadow: 0 0 24px hsl(var(--primary) / 0.18);
+  background: hsl(var(--primary) / 0.06); /* --color-primary-dim wash */
+  box-shadow: inset 2px 0 0 hsl(var(--primary)); /* inset 2px primary left bar */
   padding-bottom: 4px; /* leaves vertical room for the absolute bottom shimmer */
 }
 

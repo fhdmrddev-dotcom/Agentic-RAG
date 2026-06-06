@@ -144,8 +144,12 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
 // this file. `ToolResultBlock` stays inline per CONTEXT deferred list;
 // only its inner dispatch was swapped to use the registry.
 
-function ToolResultBlock({ tc }: { tc: ToolCall }) {
-  const [open, setOpen] = useState(false)
+function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; defaultOpen?: boolean }) {
+  // Phase 095 Plan 06: when the parent card is already expanded (its key is in
+  // expandedSteps), the resting essence line is the ToolEssenceLine above; this
+  // block should open straight to the body, not show a redundant nested
+  // `→ summary` essence row. defaultOpen=true is passed in that case.
+  const [open, setOpen] = useState(defaultOpen)
 
   let parsed: any = null
   try {
@@ -313,6 +317,58 @@ function SkillRow({ activation }: { activation: SkillActivation }) {
 // same-numbered rows). Reuse-only CSS — no new keyframes.
 
 type NodeState = "done" | "active" | "queued"
+
+// ---- Essence line (Phase 095 Plan 06, sketch 014 — GAP-095-03 essence) ----
+//
+// A FINISHED (done/interrupted) tool's resting state is ONE line:
+//   {icon} {tool} → {result} {pill} {chev}
+// The resting text is the RESULT (summarizeToolCall), NOT the args summary —
+// "finished essence recedes" so the result uses text-muted-foreground. The
+// whole row is the click target that expands this card's full body. Replaces
+// the prior two-row resting state (head row with args-in-quotes + a SEPARATE
+// ToolResultBlock result row) with a single essence line. Used for every
+// non-execute_code finished tool; execute_code reuses it for its done resting
+// line so a done code card shows ONE result-bearing line, not args + a
+// separate result row.
+function ToolEssenceLine({
+  tc,
+  onExpand,
+}: {
+  tc: ToolCall
+  onExpand: () => void
+}) {
+  const result = summarizeToolCall(tc) || "View results"
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      data-testid="tool-result-summary"
+      aria-label="Expand this step"
+      className="w-full flex items-center gap-2.5 text-left group"
+    >
+      <span
+        className={cn(
+          "flex-shrink-0 p-1 rounded-md bg-muted/50 transition-colors duration-300",
+          toolIconColor(tc.name, tc.status),
+        )}
+      >
+        {toolIcon(tc.name)}
+      </span>
+      <span className="flex-1 min-w-0 text-xs truncate">
+        <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
+        <span className="mx-1 text-muted-foreground/50">→</span>
+        <span className="text-muted-foreground">{result}</span>
+      </span>
+      <StatusPill
+        status={pillStatus(tc.status)}
+        duration={
+          tc.startedAt != null && tc.endedAt != null ? tc.endedAt - tc.startedAt : undefined
+        }
+      />
+      <ChevronRight className="w-3 h-3 text-muted-foreground/40 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+    </button>
+  )
+}
 
 function StepRow({
   snum,
@@ -645,6 +701,17 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
             const isExpandedEarlierStep =
               activeIndex !== -1 && i < activeIndex && expandedSteps.has(stepKey)
 
+            // Phase 095 Plan 06 (GAP-095-03 essence): a finished tool that is
+            // NOT individually expanded rests as a single essence line
+            // (sketch 014 D-01). This covers the all-done / reload case
+            // (activeIndex === -1) and any finished tool after the active one —
+            // the in-flight earlier-step fold is handled by the collapsed
+            // branch above. Active/preparing tools never collapse (the live
+            // head + streaming body always render). Mutually exclusive with
+            // isExpandedEarlierStep (that requires the key IN expandedSteps).
+            const isFinished = tc.status === "done" || tc.status === "interrupted"
+            const isFinishedCollapsed = isFinished && !expandedSteps.has(stepKey)
+
             return (
               <div
                 key={i}
@@ -702,7 +769,26 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     <span>Hide</span>
                   </button>
                 )}
-                {tc.name === "execute_code" ? (
+                {isFinishedCollapsed ? (
+                  /* Phase 095 Plan 06 (GAP-095-03 essence): the single
+                     essence line for a finished, not-expanded tool. Clicking
+                     it expands this card's full body (adds its key to
+                     expandedSteps). Replaces the old head-row + separate
+                     ToolResultBlock resting pair with ONE result-bearing line.
+                     Covers execute_code too (a done code card rests as one
+                     result line, not args + a separate result row). */
+                  <>
+                    <ToolEssenceLine tc={tc} onExpand={() => expandStep(stepKey)} />
+                    {/* Phase 075.1 Atom D transparency line stays visible at
+                        rest — a silent sub-agent model downgrade is a trust
+                        signal, not a detail to hide behind a click. */}
+                    {tc.sub_agent_model && (
+                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground/70 italic font-mono">
+                        Sub-agent: {tc.sub_agent_model}
+                      </div>
+                    )}
+                  </>
+                ) : tc.name === "execute_code" ? (
                   // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL
                   // execute_code statuses (preparing/running/done). Previously
                   // the `tc.status !== "preparing"` guard caused a full
@@ -747,7 +833,14 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                           </span>
                         ) : (
                           <>
-                            <span className="font-semibold text-foreground/80">
+                            {/* Phase 095 Plan 06 (sketch 014 bloom): the ACTIVE
+                                (running) step's verb text leans PRIMARY (the
+                                sketch `.step.active .ess-text { color: primary }`);
+                                a finished/expanded verb stays the calm foreground. */}
+                            <span className={cn(
+                              "font-semibold",
+                              tc.status === "running" ? "text-primary" : "text-foreground/80",
+                            )}>
                               {tc.status === "running" ? `Running ${toolLabel(tc.name)}` : toolLabel(tc.name)}
                             </span>
                             {summary && (
@@ -876,9 +969,13 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     {/* Expandable parameters */}
                     {(tc.status === "done" || tc.status === "interrupted") && <ToolArgsBlock tc={tc} />}
 
-                    {/* Result block (all tools) */}
+                    {/* Result block (all tools). Phase 095 Plan 06: a finished
+                        tool reaches this branch only when it is EXPANDED (its
+                        key is in expandedSteps; the resting essence line is
+                        ToolEssenceLine above). Open the result body directly so
+                        there is no redundant nested `→ summary` essence row. */}
                     {(tc.status === "done" || tc.status === "interrupted") && tc.result && !agentState && (
-                      <ToolResultBlock tc={tc} />
+                      <ToolResultBlock tc={tc} defaultOpen={expandedSteps.has(stepKey)} />
                     )}
 
                     {/* Sub-agent block (live or restored) */}
