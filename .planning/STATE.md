@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: unknown
-stopped_at: "Phase 095 — ALL 5 PLANS COMPLETE (095-05 D-08 hero tag + D-07 output-files hero/working split shipped); Phase 095 implementation DONE; next = /gsd:verify-work 095"
-last_updated: "2026-06-05T20:15:00.000Z"
-last_activity: 2026-06-05
+status: ready_to_execute
+stopped_at: "Phase 095 GAP-CLOSURE PLANNED — operator live-UAT found 3 gaps (fold-all, hero-leak, sketch-divergence); 4 gap plans 095-06..09 checker-PASSED; next = /gsd:execute-phase 095 --gaps-only"
+last_updated: "2026-06-06T01:30:00.000Z"
+last_activity: 2026-06-06
 progress:
   total_phases: 9
   completed_phases: 9
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 095 — chat-tool-card-unification (ALL 5 PLANS ✅ — implementation COMPLETE; next = `/gsd:verify-work 095`)
+**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = `/gsd:execute-phase 095 --gaps-only`.
 
 ## Current Position
 
