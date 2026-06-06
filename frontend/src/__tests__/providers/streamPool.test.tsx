@@ -33,7 +33,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, renderHook, waitFor, act } from "@testing-library/react"
 import type { ReactNode } from "react"
-import type { Message } from "@/types"
 
 // ── Mock API module ───────────────────────────────────────────────────────────
 // vi.mock is hoisted; use vi.hoisted() for any closure-captured vars.
