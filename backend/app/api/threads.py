@@ -1594,6 +1594,14 @@ async def send_message(
         content={
             "message_id": str(_user_msg_id),
             "run_id": str(run_id),
+            # Phase 095.1-07 (GAP-2): surface the ALREADY-resolved model/provider
+            # (computed at L921-954 before insert_run, and written to the runs row)
+            # so the live assistant placeholder shows `{provider} · {model}` in the
+            # LIVE moment — not only after a reload re-reads them via the Plan-03
+            # enrich SELECT. Additive keys ONLY; no re-resolution, no SSE/chunk-path
+            # change. These are the SAME values the reload enrich reads back.
+            "model": _resolved_model,
+            "provider": _resolved_provider,
         },
     )
 
