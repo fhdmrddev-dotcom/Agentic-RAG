@@ -452,3 +452,402 @@ async def test_096_ci_workflow_regression_happy_path(
     assert _audit_indices(pool.calls, "gate_passed"), (
         "the verify phase's regex gate must record gate_passed"
     )
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Test 2 — gate retry is BOUNDED and audited (HARNESS-04 structural lock)
+# ───────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_096_gate_retry_bounded(
+    mock_asyncpg_pool, fake_redis, build_workflow_definition, monkeypatch
+):
+    """The llm_agent gate phase fails its regex first, passes on the retry.
+
+    Asserts exactly 2 LLM calls for the phase (bounded retry honored —
+    max_retries=2 never exceeded), a gate_failed audit write lands BETWEEN the
+    two calls on the pool timeline, and the phase ultimately completes."""
+    from app.services import harness_engine, task_service
+
+    pool = mock_asyncpg_pool
+    wf = build_workflow_definition(
+        [
+            {"slug": "gated", "phase_index": 0,
+             "config": {"phase_type": "llm_agent",
+                        "prompt": "CI-GATED: produce the verified answer.",
+                        "available_tools": ["search_documents"]},
+             "validators": [
+                 {"kind": "regex_match",
+                  "config": {"pattern": "VERIFIED"},
+                  "on_failure": "retry",
+                  "max_retries": 2}
+             ]},
+        ],
+        slug="ci_gate_retry",
+        name="CI gate retry",
+    )
+    run_id = uuid.uuid4()
+    phase_id = uuid.uuid4()
+    pool.set_fetch_result(
+        [{"id": phase_id, "slug": "gated", "phase_index": 0,
+          "status": "pending", "output": {}}]
+    )
+
+    def route(request):
+        sys_prompt = request.system_prompt
+        if "CI-GATED" not in sys_prompt:
+            raise AssertionError(f"unexpected LLM call: {sys_prompt[:80]!r}")
+        if "failed validation" in sys_prompt:
+            # The retry attempt — ctx.retry_feedback was appended to the prompt
+            # (the producer/consumer round-trip), so the model can now comply.
+            return _final_events("Corrected answer. VERIFIED.")
+        # First attempt: deliberately misses the regex (no marker token).
+        return _final_events("Draft answer: checks still pending.")
+
+    gw = ScriptedGateway(route, pool=pool)
+    spawned: list[asyncio.Task] = []
+    ctx = _make_workflow_ctx(
+        run_id=run_id, pool=pool, redis=fake_redis,
+        inputs={"kickoff_prompt": "CI gate retry kickoff."},
+        spawned=spawned,
+    )
+    monkeypatch.setitem(_TOOL_REGISTRY, "search_documents", _fake_search_documents)
+
+    with patch.object(task_service, "open_stream", gw.open_stream), \
+         patch.object(task_service, "get_pg_pool", _make_get_pool(pool)), \
+         patch("app.config.get_model_capability_async", _fake_capability):
+        await asyncio.wait_for(
+            harness_engine.run_workflow(
+                run_id, wf, ctx, pool=pool, redis=fake_redis
+            ),
+            timeout=30,
+        )
+    if spawned:
+        await asyncio.wait_for(asyncio.gather(*spawned), timeout=30)
+
+    # ── Bounded retry: exactly 2 LLM calls (attempt 0 fails, attempt 1 passes;
+    #    max_retries=2 would allow a 3rd — it must never be needed or exceeded) ──
+    assert len(gw.calls) == 2, (
+        f"expected exactly 2 LLM calls for the gated phase, got {len(gw.calls)}"
+    )
+    retry_calls = [c for c in gw.calls if "failed validation" in c["system_prompt"]]
+    assert len(retry_calls) == 1, (
+        "exactly ONE retry attempt carries the gate-failure feedback"
+    )
+
+    # ── The gate-failure audit write lands BETWEEN the two LLM calls ──────────
+    gate_failed = _audit_indices(pool.calls, "gate_failed")
+    assert len(gate_failed) == 1, "exactly one gate_failed audit for the one miss"
+    assert gw.calls[0]["pool_calls_len"] <= gate_failed[0] < gw.calls[1]["pool_calls_len"], (
+        "the gate_failed audit must land after attempt 1 and before attempt 2"
+    )
+    # The pass after the retry is audited too.
+    gate_passed = _audit_indices(pool.calls, "gate_passed")
+    assert gate_passed and gate_failed[0] < gate_passed[0]
+
+    # ── The phase ultimately completes; the run terminalizes completed ────────
+    active, completed = _phase_write_indices(pool.calls, phase_id)
+    assert active and completed and active[0] < completed[0]
+    assert _run_terminal_status(pool.calls, run_id) == "completed"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Test 3 — the REAL dispatch_tool whitelist guard refuses a non-whitelisted tool
+# ───────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_096_whitelist_refusal(
+    mock_asyncpg_pool, fake_redis, build_workflow_definition, monkeypatch
+):
+    """A batch sub-agent calls ``execute_code`` while the phase whitelist is
+    ``["search_documents"]``. The REAL dispatch_tool guard refuses it (the
+    refusal-shaped tool_result is fed back to the model), the phase does NOT
+    crash, and no execute_code side-effect write reaches the pool."""
+    from app.services import harness_engine, task_service
+
+    pool = mock_asyncpg_pool
+    wf = build_workflow_definition(
+        [
+            {"slug": "fanout", "phase_index": 0,
+             "config": {"phase_type": "llm_batch_agents",
+                        "prompt": "CI-WHITELIST: research with the allowed "
+                                  "tools only.",
+                        "available_tools": ["search_documents"],
+                        "max_parallel_agents": 5,
+                        "merge_strategy": "concat"}},
+        ],
+        slug="ci_whitelist",
+        name="CI whitelist refusal",
+    )
+    run_id = uuid.uuid4()
+    phase_id = uuid.uuid4()
+    pool.set_fetch_result(
+        [{"id": phase_id, "slug": "fanout", "phase_index": 0,
+          "status": "pending", "output": {}}]
+    )
+
+    def route(request):
+        sys_prompt = request.system_prompt
+        if "CI-WHITELIST" not in sys_prompt:
+            raise AssertionError(f"unexpected LLM call: {sys_prompt[:80]!r}")
+        if _has_tool_result(request):
+            return _final_events("Understood — staying inside the whitelist.")
+        # The model hallucinates a NON-whitelisted tool.
+        return _tool_call_events(
+            "execute_code", {"code": "print('nope')"}, "call_exec_1"
+        )
+
+    gw = ScriptedGateway(route, pool=pool)
+
+    # Sentinel: if the guard ever lets the call through to the registry handler,
+    # the test fails loudly (the refusal must happen BEFORE handler lookup).
+    handler_reached = {"n": 0}
+
+    async def _sentinel_execute_code(args, ctx) -> ToolResult:
+        handler_reached["n"] += 1
+        raise AssertionError(
+            "dispatch_tool let a non-whitelisted execute_code through the guard"
+        )
+
+    monkeypatch.setitem(_TOOL_REGISTRY, "execute_code", _sentinel_execute_code)
+    monkeypatch.setitem(_TOOL_REGISTRY, "search_documents", _fake_search_documents)
+
+    spawned: list[asyncio.Task] = []
+    ctx = _make_workflow_ctx(
+        run_id=run_id, pool=pool, redis=fake_redis,
+        inputs={"kickoff_prompt": "CI whitelist kickoff."},
+        spawned=spawned,
+    )
+
+    with patch.object(task_service, "open_stream", gw.open_stream), \
+         patch.object(task_service, "get_pg_pool", _make_get_pool(pool)), \
+         patch("app.config.get_model_capability_async", _fake_capability):
+        await asyncio.wait_for(
+            harness_engine.run_workflow(
+                run_id, wf, ctx, pool=pool, redis=fake_redis
+            ),
+            timeout=30,
+        )
+    if spawned:
+        await asyncio.wait_for(asyncio.gather(*spawned), timeout=30)
+
+    # ── The refusal-shaped tool_result was fed back to the model ──────────────
+    followups = [c for c in gw.calls if _call_has_tool_result(c)]
+    assert followups, "the refusal must be fed back on a follow-up call"
+    refusal_msgs = [
+        m
+        for c in followups
+        for m in c["messages"]
+        if m.get("role") == "tool"
+    ]
+    assert any(
+        "tool_not_available_in_phase" in (m.get("content") or "")
+        for m in refusal_msgs
+    ), "the refusal tool_result must carry the dispatch_tool marker"
+    assert any(
+        "execute_code" in (m.get("content") or "") for m in refusal_msgs
+    ), "the refusal must name the refused tool"
+
+    # ── The guard fired BEFORE the registry handler (sentinel untouched) ──────
+    assert handler_reached["n"] == 0, "the real handler must NEVER be reached"
+    # ...and the refusal is audited (D-06 tool_refused, fire-and-forget flushed).
+    refused = _audit_indices(pool.calls, "tool_refused")
+    assert refused, "a tool_refused harness_audit row must be written"
+
+    # ── No execute_code side-effect write: the ONLY pool rows mentioning the
+    #    tool are the tool_refused audit INSERTs themselves ─────────────────────
+    for sql, args in pool.calls:
+        if not isinstance(sql, str):
+            continue
+        if any("execute_code" in str(a) for a in args):
+            assert "INSERT INTO harness_audit" in sql, (
+                f"unexpected execute_code side-effect write: {sql[:80]!r}"
+            )
+
+    # ── The phase did NOT crash — it completed and the run terminalized ───────
+    active, completed = _phase_write_indices(pool.calls, phase_id)
+    assert active and completed and active[0] < completed[0]
+    assert _run_terminal_status(pool.calls, run_id) == "completed"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# Test 4 — resume 2-phase writes: crash-leaves-active, sweep re-runs from the top
+# ───────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_096_resume_two_phase_writes(
+    mock_asyncpg_pool, fake_redis, build_workflow_definition, monkeypatch
+):
+    """Interrupt a run BETWEEN a phase's mark_phase_active and complete_phase
+    (the fake's stream dies mid-phase after the active write), then sweep with
+    the REAL ``resume_stranded_workflows``. Asserts: a SECOND mark_phase_active
+    for the same phase (re-run from the top), no phase skipped, and the CAS
+    claim write precedes the re-run (the test_harness_resume :417-476 claim
+    contract)."""
+    from app.services import harness_engine, task_service
+
+    pool = mock_asyncpg_pool
+    wf = build_workflow_definition(
+        [
+            {"slug": "one", "phase_index": 0,
+             "config": {"phase_type": "llm_single",
+                        "prompt": "CI-RESUME-ONE: do step one."}},
+            {"slug": "two", "phase_index": 1,
+             "config": {"phase_type": "llm_single",
+                        "prompt": "CI-RESUME-TWO: do step two."}},
+        ],
+        slug="ci_resume",
+        name="CI resume",
+    )
+    run_id = uuid.uuid4()
+    p_one, p_two = uuid.uuid4(), uuid.uuid4()
+    thread_id = uuid.uuid4()
+    user_id = uuid.uuid4()
+
+    state = {"crash_step_two": True}
+
+    def route(request):
+        sys_prompt = request.system_prompt
+        if "CI-RESUME-ONE" in sys_prompt:
+            return _final_events("step one done.")
+        if "CI-RESUME-TWO" in sys_prompt:
+            if state["crash_step_two"]:
+                # Dies AFTER the engine's mark_phase_active write and BEFORE any
+                # durable output — the exact crash-leaves-active window
+                # (test_crash_leaves_phase_active_not_completed's contract).
+                return (
+                    [{"type": "delta", "content": "partial step two"}],
+                    RuntimeError("simulated mid-phase crash"),
+                )
+            return _final_events("step two done after resume.")
+        raise AssertionError(f"unexpected LLM call: {sys_prompt[:80]!r}")
+
+    gw = ScriptedGateway(route, pool=pool)
+
+    # SQL-aware fetch/fetchrow routing on the recording mock connection: the
+    # sweep's reads (find_resumable_runs / claim_run / get_active_phase /
+    # _load_run_definition) and the engine's load_run_phases share one pool, so
+    # the sticky single-result fixture surface is not enough here.
+    phase_rows = [
+        {"id": p_one, "slug": "one", "phase_index": 0,
+         "status": "pending", "output": {}},
+        {"id": p_two, "slug": "two", "phase_index": 1,
+         "status": "pending", "output": {}},
+    ]
+    run_rows: list[dict] = []
+
+    async def _routed_fetch(sql, *args):
+        pool.calls.append((sql, args))
+        if "FROM workflow_runs wr" in sql:
+            return [dict(r) for r in run_rows]
+        if "FROM workflow_phases" in sql:
+            return [dict(r) for r in phase_rows]
+        return []
+
+    async def _routed_fetchrow(sql, *args):
+        pool.calls.append((sql, args))
+        if "SET claimed_at = now()" in sql:
+            return {"id": run_id}  # the lease CAS wins
+        if "FROM workflow_phases" in sql and "status = 'active'" in sql:
+            return dict(phase_rows[1])
+        if "SELECT wd.definition" in sql:
+            return {"definition": wf.model_dump(mode="json")}
+        return None
+
+    pool._conn.fetch = _routed_fetch
+    pool._conn.fetchrow = _routed_fetchrow
+
+    spawned: list[asyncio.Task] = []
+    ctx = _make_workflow_ctx(
+        run_id=run_id, pool=pool, redis=fake_redis,
+        inputs={"kickoff_prompt": "CI resume kickoff."},
+        spawned=spawned,
+        thread_id=str(thread_id),
+    )
+
+    with patch.object(task_service, "open_stream", gw.open_stream), \
+         patch.object(task_service, "get_pg_pool", _make_get_pool(pool)), \
+         patch("app.config.get_model_capability_async", _fake_capability):
+        # ── Part A: the crash — interrupted between p_two's active write and
+        #    its complete write ────────────────────────────────────────────────
+        with pytest.raises(RuntimeError, match="simulated mid-phase crash"):
+            await asyncio.wait_for(
+                harness_engine.run_workflow(
+                    run_id, wf, ctx, pool=pool, redis=fake_redis
+                ),
+                timeout=30,
+            )
+
+        one_active, one_completed = _phase_write_indices(pool.calls, p_one)
+        two_active, two_completed = _phase_write_indices(pool.calls, p_two)
+        assert one_active and one_completed and one_active[0] < one_completed[0]
+        assert len(two_active) == 1, "phase two was marked active before the work"
+        assert not two_completed, (
+            "a crashed phase must NEVER be marked completed (2-phase write)"
+        )
+
+        # ── Part B: seed the stranded state the sweep expects, heal the script,
+        #    then run the REAL startup sweep against the same pool timeline ─────
+        state["crash_step_two"] = False
+        phase_rows[0] = {"id": p_one, "slug": "one", "phase_index": 0,
+                         "status": "completed", "output": {"text": "step one done."}}
+        phase_rows[1] = {"id": p_two, "slug": "two", "phase_index": 1,
+                         "status": "active", "output": {}}
+        run_rows.append(
+            {"run_id": run_id, "thread_id": thread_id,
+             "current_phase_id": p_two,
+             "inputs": {"kickoff_prompt": "CI resume kickoff."},
+             "user_id": user_id}
+        )
+
+        resumed = await asyncio.wait_for(
+            harness_engine.resume_stranded_workflows(pool=pool, redis=fake_redis),
+            timeout=30,
+        )
+
+    if spawned:
+        await asyncio.wait_for(asyncio.gather(*spawned), timeout=30)
+
+    assert resumed == 1, "the sweep must claim + re-run exactly this one run"
+
+    # ── A SECOND mark_phase_active for the SAME phase: re-run from the top ────
+    two_active, two_completed = _phase_write_indices(pool.calls, p_two)
+    assert len(two_active) == 2, (
+        "the swept run must re-mark the stranded phase active (re-run from top)"
+    )
+    assert two_completed and two_active[1] < two_completed[0], (
+        "the re-run completes AFTER its second active write (2-phase order)"
+    )
+
+    # ── No phase skipped; the completed phase is NOT re-executed ──────────────
+    assert not any(
+        isinstance(sql, str) and "status='skipped'" in sql
+        for sql, _args in pool.calls
+    ), "resume must never skip a phase"
+    step_one_calls = [
+        c for c in gw.calls if "CI-RESUME-ONE" in c["system_prompt"]
+    ]
+    assert len(step_one_calls) == 1, (
+        "the already-completed phase must NOT re-run (idempotent resume)"
+    )
+
+    # ── The CAS claim write precedes the re-run (lease CAS, not a status
+    #    self-transition — the :417-476 claim contract) ────────────────────────
+    claim_idx = [
+        i for i, (sql, _args) in enumerate(pool.calls)
+        if isinstance(sql, str) and "SET claimed_at = now()" in sql
+    ]
+    assert claim_idx, "no CAS claim write recorded"
+    claim_sql = pool.calls[claim_idx[0]][0]
+    assert "claimed_at IS NULL OR claimed_at <" in claim_sql, (
+        "the claim must be the lease-expiry CAS predicate"
+    )
+    assert "SET status = 'active'" not in claim_sql, (
+        "the claim must stamp the lease, not a no-op status self-transition"
+    )
+    assert claim_idx[0] < two_active[1], (
+        "the CAS claim must precede the re-run's mark_phase_active"
+    )
+
+    # ── The resumed run terminalizes completed ────────────────────────────────
+    assert _run_terminal_status(pool.calls, run_id) == "completed"
