@@ -13,11 +13,32 @@ import { axe } from "vitest-axe"
 import { mockPendingAskWithRunId, mockPendingAskNoRunId } from "./fixtures"
 import type { PendingAsk } from "@/types"
 
-// ── Mock the api client so submit is observable + deterministic ──
-vi.mock("@/lib/api", () => ({
-  answerAskUser: vi.fn().mockResolvedValue(undefined),
+// ── Mock Supabase auth so the real api.ts module-load (importActual below)
+//    never constructs a client against a real URL (panelHooks idiom) ──
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
 }))
-import { answerAskUser } from "@/lib/api"
+
+// ── Partial-mock the api client: answerAskUser is observable + deterministic;
+//    ApiError stays the REAL class (importActual) so the component's
+//    `err instanceof ApiError` 404-honesty branch is exercised against the
+//    true class identity (096-04 / BUG-260605-01). ──
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
+  return {
+    ...actual,
+    answerAskUser: vi.fn().mockResolvedValue(undefined),
+  }
+})
+import { answerAskUser, ApiError } from "@/lib/api"
 
 // ── Mock the Phase 086 hooks so PendingAskStack consumes a controlled array ──
 const hookState: { asks: PendingAsk[]; reconcile: ReturnType<typeof vi.fn> } = {
@@ -137,9 +158,13 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
   })
 
   it("stacks multiple pending asks — newest pinned on top, each its own amber card (D-03)", () => {
+    // 096-04: created_at now drives the countdown seed — keep these FRESH
+    // (relative to now) so both cards mount pending, preserving the ordering
+    // assertion this test owns.
+    const now = Date.now()
     hookState.asks = [
-      { ...mockPendingAskWithRunId, tool_call_id: "tc-old", created_at: "2026-05-29T10:00:00Z", prompt: "Older question?" },
-      { ...mockPendingAskWithRunId, tool_call_id: "tc-new", created_at: "2026-05-29T10:05:00Z", prompt: "Newer question?" },
+      { ...mockPendingAskWithRunId, tool_call_id: "tc-old", created_at: new Date(now - 60_000).toISOString(), prompt: "Older question?" },
+      { ...mockPendingAskWithRunId, tool_call_id: "tc-new", created_at: new Date(now).toISOString(), prompt: "Newer question?" },
     ]
     render(<PendingAskStack />)
     const prompts = screen.getAllByText(/question\?/i)
@@ -256,5 +281,84 @@ describe("PendingAskCard (D-06) — draft preview above the question", () => {
       <PendingAskCard ask={mockPendingAskWithDraft(SHORT_DRAFT)} reconcile={noopReconcile} />,
     )
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 096 Plan 04 (BUG-260605-01 / D-06 honesty) — 404 honesty + created_at
+// countdown. A dead prompt must never read as live: a 404 on submit surfaces a
+// visible expired state (never silence), and the countdown derives from
+// created_at so a reconciled stale prompt never shows a misleading fresh 5:00.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A pending ask whose created_at is `secondsAgo` seconds in the past. */
+function mockPendingAskCreatedAgo(
+  secondsAgo: number,
+  overrides: Partial<PendingAsk> = {},
+): PendingAsk {
+  return {
+    ...mockPendingAskWithRunId,
+    created_at: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+    ...overrides,
+  }
+}
+
+describe("PendingAskCard (096-04) — 404 honesty + created_at-derived countdown", () => {
+  it("surfaces a visible expired state when answerAskUser rejects with ApiError(404) — never silence", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(
+      new ApiError("Failed to submit ask_user answer", 404),
+    )
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(5)} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    // The 404 is the backend's IDOR-safe "run not active" answer — the card
+    // flips to the calm expired state with the CONSTANT honesty message.
+    expect(
+      await screen.findByText("This prompt has expired — the run is no longer active"),
+    ).toBeInTheDocument()
+    // The amber pending chrome is gone — submitting rolled back, calm grey status.
+    expect(screen.queryByText("Needs you")).not.toBeInTheDocument()
+    expect(screen.getByRole("status")).toBeInTheDocument()
+  })
+
+  it("stays pending + shows a visible retryable error line on ApiError(500) — submit re-enabled", async () => {
+    const user = userEvent.setup()
+    vi.mocked(answerAskUser).mockRejectedValueOnce(
+      new ApiError("Failed to submit ask_user answer", 500),
+    )
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(5)} reconcile={noopReconcile} />)
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+    // Visible, constant-string error — never silent, never raw server text.
+    expect(
+      await screen.findByText("Couldn't submit your answer — try again."),
+    ).toBeInTheDocument()
+    // Still the pending card; the submit button is re-enabled for retry.
+    expect(screen.getByText("Needs you")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send answer/i })).toBeEnabled()
+  })
+
+  it("renders expired ON MOUNT for a reconciled stale prompt (created_at 10min ago, timeout 300s) — never a fresh 5:00", () => {
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(600)} reconcile={noopReconcile} />)
+    expect(screen.queryByText("Needs you")).not.toBeInTheDocument()
+    expect(screen.getByRole("status")).toBeInTheDocument()
+    expect(screen.getByText(/no response within 5:00 — agent stopped/i)).toBeInTheDocument()
+  })
+
+  it("seeds the countdown from created_at (30s ago, timeout 300s → ≈270 remaining)", () => {
+    render(<PendingAskCard ask={mockPendingAskCreatedAgo(30)} reconcile={noopReconcile} />)
+    const clock = screen.getByText(/^\d+:\d{2}$/)
+    const [m, s] = clock.textContent!.split(":").map(Number)
+    const remaining = m * 60 + s
+    expect(remaining).toBeLessThanOrEqual(271)
+    expect(remaining).toBeGreaterThanOrEqual(268)
+  })
+
+  it("seeds at timeout_seconds when created_at is absent (SSE-fresh — current behavior preserved)", () => {
+    // mockPendingAskNoRunIdButReady carries run_id but NO created_at — the
+    // genuinely-fresh SSE path (emission ≈ mount) honestly shows the full clock.
+    render(<PendingAskCard ask={mockPendingAskNoRunIdButReady()} reconcile={noopReconcile} />)
+    expect(screen.getByText("5:00")).toBeInTheDocument()
   })
 })
