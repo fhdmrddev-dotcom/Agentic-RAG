@@ -126,6 +126,34 @@ def test_no_requested_ext_size_tie_breaks_on_iteration():
     assert heroes == {"last.png"}
 
 
+def test_substring_ext_inside_word_does_not_trigger_requested_match():
+    # Plan 09 Task 3 (hardening) — token match, not raw substring. A word that
+    # merely CONTAINS an allowlisted ext as a substring (e.g. "pngs" embeds "png"
+    # only as a token here; use a true embed: "description" embeds nothing, so
+    # craft "scvsummary" embedding "csv"? no — pick "discsv" embeds "csv") must
+    # NOT flag the ext. With no real requested token, the heuristic falls back to
+    # the largest file, NOT a spurious .csv hero.
+    files = [
+        _f("notes.csv", 1_000, iteration=0),
+        _f("big.png", 50_000, iteration=1),
+    ]
+    # "discsv" contains the substring "csv" but is not the token "csv".
+    heroes = _select_hero_filenames(files, "please produce a discsv overview")
+    assert heroes == {"big.png"}
+    assert len(heroes) == 1
+
+
+def test_token_ext_with_trailing_punctuation_still_matches():
+    # "csv." / "csv," / ".csv" all tokenize to the token "csv" → still matches.
+    files = [
+        _f("data.csv", 1_000, iteration=0),
+        _f("chart.png", 50_000, iteration=1),
+    ]
+    heroes = _select_hero_filenames(files, "export the table as csv, thanks!")
+    assert heroes == {"data.csv"}
+    assert len(heroes) == 1
+
+
 def test_requested_ext_named_but_no_file_matches_falls_back_to_largest():
     # user asked for pdf, but only png/csv were produced → heuristic falls back.
     files = [

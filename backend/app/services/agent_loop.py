@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
@@ -858,10 +859,17 @@ def _select_hero_filenames(files: list[dict], user_message: str | None) -> set[s
 
     msg = (user_message or "").lower()
 
-    # (2) Requested-extension match. Detect a requested ext among the allowlist
-    # (tolerate a leading dot, e.g. ".pptx"); the hero is the SINGLE largest file
-    # with that ext (tie-break highest iteration), NOT every matching file.
-    requested = {ext for ext in _HERO_REQUESTABLE_EXTS if ext in msg}
+    # (2) Requested-extension match. Detect a requested ext among the allowlist.
+    # Phase 095 Plan 09 Task 3 (hardening) — tokenize the message and match whole
+    # tokens, NOT a raw substring. ``re.findall(r"[a-z0-9]+", msg)`` splits on any
+    # non-alphanumeric (so ".pptx" → "pptx" still matches), bounding what counts
+    # as a requested ext and removing the spurious-substring failure mode (e.g. a
+    # stray "csv"/"png" embedded inside a longer word). Forward hardening — not a
+    # reproduced bug; the symptom cause was the multi-hero return fixed in Task 1.
+    # The hero is the SINGLE largest file with that ext (tie-break highest
+    # iteration), NOT every matching file.
+    tokens = set(re.findall(r"[a-z0-9]+", msg))
+    requested = {ext for ext in _HERO_REQUESTABLE_EXTS if ext in tokens}
     if requested:
         matched_metas = [
             f for f in files
