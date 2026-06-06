@@ -392,3 +392,112 @@ describe("RunCard — D-04 unified count agrees across all three sites", () => {
     expect(headerStrip.textContent).toMatch(/Step 2/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Phase 095 Plan 07 — GAP-095-03 MED: single verb + calm title + run-sub
+// ---------------------------------------------------------------------------
+
+describe("RunCard — Plan 07 single verb (the activity verb lives in the strip, not the title)", () => {
+  it("the activity verb renders EXACTLY ONCE in the header (in the strip, never the title line)", () => {
+    // While streaming, a search_documents tool → the verb "Searching knowledge
+    // base…". It must appear once total in the header (the strip), NOT twice
+    // (the old double-verb bug rendered it in both the title and the strip).
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    const verb = "Searching knowledge base"
+    const occurrences = (header.textContent ?? "").split(verb).length - 1
+    expect(occurrences).toBe(1)
+
+    // And the single occurrence is INSIDE the strip, not the title.
+    const strip = header.querySelector("[data-testid='run-status-strip']") as HTMLElement
+    expect(strip.textContent).toMatch(/Searching knowledge base/)
+
+    // The title line (first child div of the flex-1 column) must NOT carry the verb.
+    const titleColumn = strip.parentElement as HTMLElement // the flex-1 min-w-0 column
+    const titleLine = titleColumn.querySelector("div") as HTMLElement // first div = title
+    expect(titleLine.textContent).not.toMatch(/Searching knowledge base/)
+    // The title is a calm run identity (no activity verb).
+    expect(titleLine.textContent).toMatch(/Run · 1 step|Agent run/)
+  })
+
+  it("the title is a calm run identity, NOT the verb, even between tools (synthesizing)", () => {
+    // Between tools (no active tool, isPlanning false) the OLD title would read
+    // "Synthesizing answer…" — the verb in the title. Now the title is calm.
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          isPlanning: false,
+          tool_calls: [
+            { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "[]" },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip") as HTMLElement
+    const titleColumn = strip.parentElement as HTMLElement
+    const titleLine = titleColumn.querySelector("div") as HTMLElement
+    expect(titleLine.textContent).not.toMatch(/Synthesizing/)
+    expect(titleLine.textContent).toMatch(/Run · 1 step|Agent run/)
+  })
+})
+
+describe("RunCard — Plan 07 model·turn run-sub subline (restored from existing data)", () => {
+  it("renders a `turn N` run-sub from iterationCount (turn = iterationCount + 1)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          iterationCount: 0, // 0-based → turn 1
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/turn 1/)
+  })
+
+  it("the run-sub turn number tracks a later iteration (iterationCount 2 → turn 3)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          iterationCount: 2, // 0-based → turn 3
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/turn 3/)
+  })
+
+  it("defaults to `turn 1` when iterationCount is absent (DB-loaded reopen)", () => {
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      tool_calls: [
+        { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/turn 1/)
+  })
+})

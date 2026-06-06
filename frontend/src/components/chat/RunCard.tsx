@@ -136,15 +136,6 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     return sum
   }, 0)
 
-  // Header copy is runStatus-aware (075.7-DEBUG fix — Bug A):
-  //   - streaming → outerBannerLabel (per-tool active-state taxonomy from
-  //     Phase 067.1; fallback "Synthesizing answer…" between tools).
-  //   - terminal + tools → static `Run · N tool calls · ✓ done` mirroring the
-  //     collapsed-row copy (sketch live-run-container D5 + UI-SPEC §8.2).
-  //   - terminal + no tools → just the status word.
-  // outerBannerLabel was authored as a streaming-only helper (toolMeta.ts:68);
-  // calling it on terminal turns returned the streaming-phase fallback string
-  // and is the root cause of the "Synthesizing answer…" persistence bug.
   const lastTool = message.tool_calls?.[message.tool_calls.length - 1] ?? null
   const activeTool =
     lastTool && (lastTool.status === "running" || lastTool.status === "preparing")
@@ -167,11 +158,27 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // count site reads the raw iteration field to derive a displayed number.
   const { iterationCount: panelIterationCount } = message
 
-  const headerTitle = isStreamingNow
-    ? outerBannerLabel(activeTool, hasTools, message.isPlanning ?? false)
-    : hasTools
-      ? `Run · ${stepCount} step${stepCount === 1 ? "" : "s"} · ${statusGlyph(message.runStatus)} ${statusWord(message.runStatus, message.runError)}`
-      : statusWord(message.runStatus, message.runError)
+  // ---- Plan 07 (GAP-095-03 MED): single verb + calm run-identity title ----
+  // The activity verb USED to occupy the title line (the streaming branch derived
+  // the verb here) while the strip's `activityVerb` ALSO derived it — the verb
+  // rendered TWICE. The operator-locked fix: the verb lives in the STRIP ONLY; the
+  // title becomes a calm, deterministic run identity for BOTH streaming and
+  // terminal. The status word is NOT carried here — it already lives honestly on
+  // the collapsed-row (`Run · N steps · ✓ done · elapsed`); the expanded terminal
+  // header reads the title + the now-`.done` (success-toned, verb=null) strip,
+  // which is sufficient. The verb helper is now invoked from exactly ONE site
+  // (the strip's `activityVerb` below).
+  const headerTitle = hasTools
+    ? `Run · ${stepCount} step${stepCount === 1 ? "" : "s"}`
+    : "Agent run"
+
+  // ---- Plan 07 (GAP-095-03 MED): the restored `model · turn` run-sub ----
+  // Derived from data ALREADY on the message — NO new backend field, NO migration.
+  // The Message type exposes no model/provider field, so the model segment is
+  // OMITTED (the plan's documented fallback) and the run-sub shows just `turn N`.
+  // turn = (iterationCount ?? 0) + 1 (iterationCount is 0-based — Phase 56 D-03).
+  const turnNumber = (message.iterationCount ?? 0) + 1
+  const runSub = `turn ${turnNumber}`
 
   return (
     <div
@@ -222,6 +229,13 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-foreground truncate">
             {headerTitle}
+          </div>
+          {/* Plan 07 (GAP-095-03 MED): the `model · turn` run-sub subline,
+              restored UNDER the calm title (sketch HTML: title + run-sub +
+              hdr-strip). Model omitted (no Message.model field); shows `turn N`
+              from existing iterationCount data — no backend field. */}
+          <div className="font-mono text-xs text-muted-foreground/70 truncate">
+            {runSub}
           </div>
           {hasStart && (
             <RunStatusStrip
