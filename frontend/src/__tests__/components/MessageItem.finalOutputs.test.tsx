@@ -7,19 +7,21 @@
  * continues to honor the empty-state guard (panel does not render when
  * finalOutputFiles is absent or empty).
  *
- * Phase 095 Plan 05 (D-07) EXTENSION — the hero / working split:
- *   - a fixture with 1 is_hero + N working → hero rendered emphasized/separate
- *     ("★ Your file"), working in a collapsible group, ALL downloadable when url
- *     present;
+ * Phase 095.1 Plan 05 (D-095.1-06) REVERSAL — the FLAT "Generated files" list:
+ *   - the hero/working split (the old 095-05/08 visual) is REMOVED per the
+ *     operator-approved CONTEXT.md decision. Output files now render as ONE
+ *     equal flat list — no "★ Your file" hero crown, no hero/working split, no
+ *     "Working files (N)" collapse group;
+ *   - a multi-file fixture (some with is_hero: true) renders exactly N flat
+ *     rows; the frontend IGNORES is_hero (no read, no crash);
+ *   - every file is present and downloadable;
  *   - a url-less file → affordance CLEARLY DISABLED (dead state), never a silent
- *     dead anchor;
- *   - an older fixture with NO is_hero on any file → all render as working
- *     (graceful, no crash).
+ *     dead anchor (the orthogonal honesty fix is KEPT).
  *
  * Helpers mirror Plan04.frontend.test.tsx so the two files stay independent.
  */
 import { describe, it, expect } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { MessageItem } from "@/components/chat/MessageItem"
@@ -73,12 +75,14 @@ describe("MessageItem — output-files panel (BUG-260521-02)", () => {
 })
 
 // ---------------------------------------------------------------------------
-// Phase 095 Plan 05 (D-07) — hero / working split
+// Phase 095.1 Plan 05 (D-095.1-06) — flat "Generated files" list (reverses the
+// 095-05/08 hero/working split per the operator-approved CONTEXT.md decision)
 // ---------------------------------------------------------------------------
-describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
-  it("heroes the is_hero file in a separate emphasized block above a collapsible Working files group; ALL files downloadable", () => {
+describe("MessageItem — flat Generated-files list (Phase 095.1 D-06)", () => {
+  it("renders ALL files as one flat list of equal rows; NO hero crown, NO Working-files group, is_hero ignored", () => {
     const m = makeMessage({
       finalOutputFiles: [
+        // is_hero is present on the first entry — the frontend must IGNORE it.
         { filename: "report.docx", url: "/sandbox-outputs/report.docx", is_hero: true },
         { filename: "scratch.csv", url: "/sandbox-outputs/scratch.csv" },
         { filename: "chart.png", url: "/sandbox-outputs/chart.png" },
@@ -86,49 +90,28 @@ describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
     } as Partial<Message>)
     const { container } = renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
 
-    // hero block present + separate; carries the "★ Your file" caption
-    const heroGroup = screen.getByTestId("final-outputs-hero")
-    expect(heroGroup).toBeTruthy()
-    expect(heroGroup.querySelector("a[download='report.docx']")).not.toBeNull()
-    expect(screen.getAllByText("★ Your file").length).toBe(1)
+    // the eyebrow + the panel data-testid are preserved
+    const panel = screen.getByTestId("final-outputs-panel")
+    expect(panel).toBeTruthy()
+    expect(screen.getByText("Generated files")).toBeTruthy()
 
-    // working group present, labelled with the count (2 = the non-hero files)
-    // + the sketch-016 intermediates copy (095-08 GAP-095-03 LOW)
-    expect(screen.getByText(/Working files \(2\) — intermediates, all downloadable/)).toBeTruthy()
-    const workingGroup = screen.getByTestId("final-outputs-working")
-    // ALL files downloadable (re-rank, never hide) — both working files are anchors
-    expect(workingGroup.querySelector("a[download='scratch.csv']")).not.toBeNull()
-    expect(workingGroup.querySelector("a[download='chart.png']")).not.toBeNull()
-    // the hero is NOT duplicated inside the working group
-    expect(workingGroup.querySelector("a[download='report.docx']")).toBeNull()
-
-    // every emitted file has a download affordance somewhere in the panel
+    // exactly N flat download rows, all downloadable
     expect(container.querySelectorAll("a[download]").length).toBe(3)
+    expect(container.querySelector("a[download='report.docx']")).not.toBeNull()
+    expect(container.querySelector("a[download='scratch.csv']")).not.toBeNull()
+    expect(container.querySelector("a[download='chart.png']")).not.toBeNull()
+
+    // NO hero crown / caption, NO hero block, NO working-files split group
+    expect(screen.queryByText("★ Your file")).toBeNull()
+    expect(screen.queryByTestId("final-outputs-hero")).toBeNull()
+    expect(screen.queryByTestId("final-outputs-working")).toBeNull()
+    expect(screen.queryByText(/Working files/)).toBeNull()
   })
 
-  it("the Working files group is collapsible (visible by default, toggles closed)", () => {
+  it("D-06 dead-link KEPT: a url-less file renders a clearly-disabled affordance, NOT a silent dead anchor", () => {
     const m = makeMessage({
       finalOutputFiles: [
-        { filename: "deck.pptx", url: "/sandbox-outputs/deck.pptx", is_hero: true },
-        { filename: "notes.md", url: "/sandbox-outputs/notes.md" },
-      ],
-    } as Partial<Message>)
-    renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
-
-    const toggle = screen.getByRole("button", { name: /Working files \(1\)/ })
-    // visible by default
-    expect(toggle.getAttribute("aria-expanded")).toBe("true")
-    expect(screen.getByText("notes.md")).toBeTruthy()
-    // collapse
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute("aria-expanded")).toBe("false")
-    expect(screen.queryByText("notes.md")).toBeNull()
-  })
-
-  it("D-07 dead-link: a url-less file renders a clearly-disabled affordance, NOT a silent dead anchor", () => {
-    const m = makeMessage({
-      finalOutputFiles: [
-        { filename: "legacy.png" }, // no url, no is_hero → working, dead state
+        { filename: "legacy.png" }, // no url → dead state affordance (orthogonal honesty fix, kept)
       ],
     } as Partial<Message>)
     const { container } = renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
@@ -141,7 +124,7 @@ describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
     expect(screen.getByText("Download unavailable")).toBeTruthy()
   })
 
-  it("graceful: an older fixture with NO is_hero on any file → all render as working (no hero block, no crash)", () => {
+  it("graceful: a fixture with NO is_hero on any file → identical flat list (no hero block, no crash)", () => {
     const m = makeMessage({
       finalOutputFiles: [
         { filename: "a.png", url: "/sandbox-outputs/a.png" },
@@ -149,11 +132,11 @@ describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
       ],
     } as Partial<Message>)
     const { container } = renderWithTooltip(<MessageItem message={m} isStreaming={false} />)
-    // no hero block
+    // no hero block, no crown
     expect(screen.queryByTestId("final-outputs-hero")).toBeNull()
     expect(screen.queryByText("★ Your file")).toBeNull()
-    // all files in the working group, all downloadable
-    expect(screen.getByText(/Working files \(2\) — intermediates, all downloadable/)).toBeTruthy()
+    // both files flat + downloadable
+    expect(container.querySelectorAll("a[download]").length).toBe(2)
     expect(container.querySelector("a[download='a.png']")).not.toBeNull()
     expect(container.querySelector("a[download='b.png']")).not.toBeNull()
   })
