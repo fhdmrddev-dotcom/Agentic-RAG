@@ -77,19 +77,74 @@ blocked: 0
 
 ## Gaps
 
-Operator live-UAT (2026-06-06) surfaced 3 issues — diagnosis in progress
-(workflow wf_a263d71a-919, adversarially verified). Root causes + fix directions
-land here before gap-plan:
+Operator live-UAT (2026-06-06) surfaced 3 issues. Diagnosed + adversarially
+verified by workflow wf_a263d71a-919 (11 agents). Root causes below; fix scope
+for the design items pending operator confirmation.
 
-- **BUG-FOLD-ALL** (status: diagnosing) — expanding one completed tool-card
-  expands all; shared collapse-state in `ToolCallPanel.tsx`. Violates D-01 +
-  SC#1 (details-on-demand collapse).
-- **BUG-HERO-LEAK** (status: diagnosing) — working files leak into the hero
-  highlight; >1 is_hero (WR-02) or frontend partition mis-bucket. Spans
-  `agent_loop.py` + `MessageItem.tsx` FinalOutputsPanel. Touches SC#1 (no dup) /
-  the file-axis honesty.
-- **DESIGN-DIVERGENCE** (status: diagnosing) — implementation diverges from the
-  sketch contract; concrete list + operator scope confirmation pending.
+### BUG-FOLD-ALL (severity: high, confidence: high — CONFIRMED both adversarial lenses)
+- **Root cause:** `ToolCallPanel.tsx:488` — a SINGLE shared `stepsCollapsed`
+  boolean governs the in-flight "Focus Mode" done-step window. Every collapsed
+  summary row's onClick (`:552`, `:570`) calls `setStepsCollapsed(false)`, so
+  one click un-collapses ALL rows. No per-row identity exists. Only observable
+  MID-RUN (≥3 done steps before the active tool); after a run ends the per-card
+  `ToolResultBlock` state (`:148`) is correct, which is why it self-heals on
+  reload.
+- **Fix:** replace the boolean with a per-step `Set<string>` keyed on the same
+  `stepKeyOf` clientKey identity; gate `:544` with `!expandedSteps.has(key)`;
+  `:552`/`:570` add ONE key; add a per-row re-collapse affordance (the existing
+  "Hide earlier steps" button only renders while `!stepsCollapsed`).
+- **Caveat:** `ToolCallPanel.test.tsx:99-108` currently CODIFIES the expand-all
+  behavior — must be updated + a partial-expand test added.
+- **Files:** `frontend/src/components/chat/ToolCallPanel.tsx` (+ its test). Violates D-01 + SC#1.
+
+### BUG-HERO-LEAK (severity: high, confidence: high — primary cause CONFIRMED)
+- **Root cause:** `agent_loop.py:835-844` `_select_hero_filenames` returns a
+  MULTI-element SET in the requested-extension branch — every file whose ext
+  matches a requested ext is stamped `is_hero=True`. A run that writes the
+  deliverable + same-type scratch files heroes them all. The frontend partition
+  is CORRECT (faithfully renders `is_hero`, working = strict complement) — the
+  leak is 100% backend over-selection. `test_095_final_output_tag.py:62-69`
+  encodes the multi-hero behavior as intended.
+- **Fix:** requested-ext branch returns exactly ONE filename via the same
+  `max(size, iteration)` tie-break as the fallback; update the test to assert one
+  hero.
+- **Secondary (separate, narrower):** a live-vs-reload divergence exists only in
+  the fallback "largest-file" branch on multi-cell runs (persist stamps per-cell
+  over a partial list; live computes once over the full set). Fix = compute the
+  hero set ONCE at loop end and apply to both emit + persisted rows (or re-derive
+  on reload in `api.ts`). NOTE: the earlier "md matches made/summary" substring
+  claim was a fabricated example caught by the skeptic — substring ext-detection
+  hardening is legit defense-in-depth but NOT the symptom cause.
+- **Files:** `backend/app/services/agent_loop.py` (+ test); optionally `frontend/src/lib/api.ts`. Touches SC#1 (no dup) + file-axis honesty. Confirms WR-02.
+
+### DESIGN-DIVERGENCE (vs sketch contract 014/015/016) — confirmed, scope pending
+Lots MATCHES (run-frame, sticky header, never-vanishes timer, rail node/snum,
+unifiedStepCount single-source, dedup, hero/working structure, color map). The
+confirmed divergences, ranked:
+- HIGH — finished card shows args + a SEPARATE result row, not the sketch's
+  single "essence line" (`snum · icon · name → result · pill · chev`). `ToolCallPanel.tsx:690-747` + `206-228`.
+- HIGH — Focus-Mode fold gated at ≥3 steps; sketch un-gates so every finished
+  step folds to its essence from step 1. `ToolCallPanel.tsx:486-488`.
+- MED — active step doesn't "bloom" (sketch: primary-dim wash + inset 2px left
+  bar; code: old 075.8 outer glow). `index.css:399-404`.
+- MED — header status strip is bare middot text, missing the rounded-full pill
+  chrome (bg/border/divider bars). `RunStatusStrip.tsx:44-51`.
+- MED — activity verb rendered twice (title + strip); model·turn run-sub dropped. `RunCard.tsx:170-174`.
+- MED — hero file icon 30px (sketch 48px); working 16px (sketch 30px). `OutputFileCard.tsx:82`.
+- MED — hero glow is a flat 1px ring @8% (sketch: soft 24px primary halo). `OutputFileCard.tsx:165`.
+- MED — output container is a bordered box (sketch: borderless top-rule + dim
+  uppercase eyebrow; predates 095). `MessageItem.tsx:83-84`.
+- LOW — floating chip leads with Jump-to-live then status (sketch: status first,
+  jump trailing); working toggle missing "— intermediates, all downloadable";
+  no descriptive subtitle (partly a data-contract gap — no description field on
+  the wire); fileIcon is Lucide-glyph form (EXPLICITLY PERMITTED by the contract — not a required change).
 
 WR-03 (StreamsProvider out-of-order sub_agent_start arg-drop) remains a
-watch-item, not operator-confirmed.
+watch-item, not operator-reproduced.
+
+**Recommended routing:** ONE gap-closure phase (`/gsd:plan-phase 095 --gaps`),
+4 units: (1) ToolCallPanel essence-line + per-step collapse + un-gate + bloom;
+(2) header chip chrome + single verb + run-sub; (3) file-axis visual fidelity
+(icon sizes, glow, top-rule/eyebrow); (4) backend one-hero + test. Quick fixes
+rejected — units 1-3 re-edit the same ToolCallPanel/MessageItem hot files, so one
+plan + one cross-provider validation pass is cleaner.
