@@ -246,9 +246,18 @@ async def _enrich_messages_with_runs(
     runs_select_own (migration 035 lines 47-49). Mirrors list_active_runs
     at threads.py:543-551 (D-062-12).
     """
+    # Phase 095.1-03 (D-04/D-05): ADDITIVE-SELECT-ONLY on this G-5 hot file.
+    # The SELECT gains 4 COLUMNS (model, provider, started_at, completed_at) so
+    # the run-sub can show `{provider} · {model} · turn N` (D-04 model
+    # attribution) and the RunCard timer can derive the TRUE duration
+    # completed_at − started_at (D-05). The WHERE clause is UNCHANGED
+    # (.eq thread_id + .eq user_id + RLS runs_select_own) → no widened row set,
+    # no IDOR (T-095.1-03-02). No migration, no new write — runs.model/provider
+    # are NOT NULL and started_at DEFAULTs now(); completed_at is written on
+    # finalize. Flows to BOTH /messages and /snapshot (shared helper).
     runs_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, message_id, status")
+        .select("run_id, message_id, status, model, provider, started_at, completed_at")
         .eq("thread_id", thread_id)
         .eq("user_id", user_id)
         .order("started_at", desc=True)
@@ -268,6 +277,13 @@ async def _enrich_messages_with_runs(
         run = runs_by_message.get(m["id"])
         m["run_id"] = run["run_id"] if run else None
         m["run_status"] = run["status"] if run else None
+        # Phase 095.1-03 (D-04/D-05): additive stamps. A message with no matched
+        # run (legacy / pre-run-backed) gets None for all 4 — graceful, never a
+        # fabricated value (the honesty rule).
+        m["model"] = run["model"] if run else None
+        m["provider"] = run["provider"] if run else None
+        m["started_at"] = run["started_at"] if run else None
+        m["completed_at"] = run["completed_at"] if run else None
 
     return messages
 

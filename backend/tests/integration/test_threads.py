@@ -179,6 +179,7 @@ class TestGetMessages:
                 _message_row("user", "Hello"),
                 _message_row("assistant", "Hi there"),
             ]),  # messages
+            _make_result([]),                      # runs enrich SELECT (always runs)
         ]
         response = client.get(f"/threads/{THREAD_ID}/messages", headers=auth_headers)
         assert response.status_code == 200
