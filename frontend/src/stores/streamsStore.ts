@@ -165,7 +165,7 @@ export interface StreamsState {
         provider?: string
         agentMode?: string
         surfaceId?: SurfaceId
-        onTitleUpdate?: (t: string) => void
+        onTitleUpdate?: (threadId: string, title: string) => void
         /** Phase 092 (MODE-01 / D-02) — Harness kickoff: when set, the backend
          *  creates a workflow run + the producer drives run_workflow. Omitted on
          *  a Deep send (byte-identical). */

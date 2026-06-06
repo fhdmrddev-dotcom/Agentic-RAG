@@ -298,7 +298,11 @@ type ThreadBoundSetMessages = (
 export function makeStreamCallbacks(opts: {
   assistantId: string
   threadId: string
-  onTitleUpdate?: (title: string) => void
+  // Title cross-wiring fix (parallel chats): the consumer receives the run's
+  // OWNING threadId so the title lands on the right chat even under concurrent
+  // runs / fast nav. makeStreamCallbacks injects it (the wire StreamCallbacks
+  // below still receives title-only).
+  onTitleUpdate?: (threadId: string, title: string) => void
   setMessages: ThreadBoundSetMessages
 }): StreamCallbacks {
   const { assistantId, threadId, onTitleUpdate, setMessages } = opts
@@ -333,7 +337,10 @@ export function makeStreamCallbacks(opts: {
     onTerminal: () => {
       // Default no-op — caller wraps to flip runStatus and handle buffer_expired.
     },
-    onTitleUpdate,
+    // Inject the run's OWNING threadId (closure) so a generated title is applied
+    // to THIS run's chat — not whatever thread the user is viewing when the title
+    // SSE arrives (the cross-wiring under parallel chats / fast nav).
+    onTitleUpdate: onTitleUpdate ? (title: string) => onTitleUpdate(threadId, title) : undefined,
     onToolPreparing: (name: string, index: number) => {
       setMessages((prev) =>
         prev.map((m) => {

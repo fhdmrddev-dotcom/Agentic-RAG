@@ -33,7 +33,7 @@ interface Provider {
 interface Props {
   thread: Thread | null
   onCreateThread: (folderId?: string | null) => Promise<Thread>
-  onTitleUpdate?: (title: string) => void
+  onTitleUpdate?: (threadId: string, title: string) => void
   folders: Folder[]
   prefillMessage?: string | null
   onClearPrefill?: () => void

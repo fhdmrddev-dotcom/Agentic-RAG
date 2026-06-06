@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatArea } from "@/components/chat/ChatArea"
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
@@ -47,15 +47,13 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, prefillMessage, 
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
 
-  const selectedThreadRef = useRef(selectedThread)
-  useEffect(() => {
-    selectedThreadRef.current = selectedThread
-  }, [selectedThread])
-
+  // Title cross-wiring fix (parallel chats): apply a generated title to the run's
+  // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
+  // — NOT the currently VIEWED thread, which under fast nav / concurrent runs was
+  // the wrong chat (the long run getting a short chat's title).
   const handleTitleUpdate = useCallback(
-    (title: string) => {
-      const thread = selectedThreadRef.current
-      if (thread) updateThreadTitle(thread.id, title)
+    (threadId: string, title: string) => {
+      updateThreadTitle(threadId, title)
     },
     [updateThreadTitle],
   )

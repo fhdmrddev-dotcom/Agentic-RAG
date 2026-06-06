@@ -64,7 +64,7 @@ interface UseMessages {
     threadId: string,
     content: string,
     model?: string,
-    onTitleUpdate?: (title: string) => void,
+    onTitleUpdate?: (threadId: string, title: string) => void,
     agentMode?: string,
     provider?: string,
     /** Phase 092 (MODE-01 / D-02) — Harness kickoff: the picked published-
