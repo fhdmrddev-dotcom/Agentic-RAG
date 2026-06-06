@@ -121,3 +121,18 @@ below are for operator decision; neither is a gap-closure failure.
 - Live floating "↓ Jump to live" chip (verified in code + unit tests + structural DOM).
 - Sub-agent exactly-once (no analyze_document run triggered; covered by 095-03 tests).
 - Cross-provider breadth beyond OpenAI; parallel-thread isolation; long-message axis.
+
+### Resolution routing (2026-06-06 — folded into Phase 095.1)
+
+Both operator-decision items above were formalized into **Phase 095.1**
+(cross-provider-run-honesty-workspace-parity) and IMPLEMENTED:
+- **NEW-095-A** (inflated reload timer) → **095.1-03 D-05** persists run start/end and
+  derives `elapsed = completedAt − startedAt` (identical live and on reload; a finished
+  run with no `completedAt` shows NO duration). Closes BUG-260606-02.
+- **NEW-095-B** (hero = largest file, not the titled deliverable) → **095.1-05 D-06**
+  removed the hero concept entirely (flat equal "Generated files" list, all downloadable),
+  so "which file is crowned" is moot. The backend `is_hero` flag stays written-but-unread.
+
+Status: code shipped (Phase 095.1 all 5 plans, 2026-06-06); **awaiting live confirmation
+via `/gsd:verify-work 095.1`** (8-provider lived-experience UAT). Not flipped to a final
+PASS here — that closure is owned by the 095.1 verify-work loop.
