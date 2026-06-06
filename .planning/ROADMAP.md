@@ -210,7 +210,7 @@ Plans:
 
 **Gap-closure plans (operator live-UAT 2026-06-06 — 3 gaps; 4 plans 06-09, Wave 1, disjoint files):**
 - [x] 095-06-PLAN.md — GAP-095-01 per-card collapse (per-step `expandedSteps` Set kills fold-all) + GAP-095-03 un-gate / single essence line / active bloom [gap, Wave 1] ✅ 2026-06-06
-- [ ] 095-07-PLAN.md — header chrome [gap, Wave 1]
+- [x] 095-07-PLAN.md — header chrome (GAP-095-03 MED: pill-chrome strip + single verb + restored `model · turn` run-sub) [gap, Wave 1] ✅ 2026-06-06
 - [ ] 095-08-PLAN.md — file-axis fidelity [gap, Wave 1]
 - [ ] 095-09-PLAN.md — single hero (multi-select leak) [gap, Wave 1]
 **UI hint**: yes

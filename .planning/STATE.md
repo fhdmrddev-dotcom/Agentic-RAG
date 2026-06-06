@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: ready_to_execute
-stopped_at: "Phase 095 GAP-CLOSURE — 095-06 SHIPPED (per-card collapse + single essence + active bloom; GAP-095-01 + GAP-095-03 closed). Gap plans 095-07/08/09 remain; next = continue /gsd:execute-phase 095 --gaps-only"
-last_updated: "2026-06-06T07:12:30.000Z"
+stopped_at: "Phase 095 GAP-CLOSURE — 095-07 SHIPPED (header chrome: pill-chrome strip + single verb + restored model·turn run-sub; GAP-095-03 MED closed). Gap plans 095-08/09 remain; next = continue /gsd:execute-phase 095 --gaps-only"
+last_updated: "2026-06-06T07:25:00.000Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 9
-  completed_phases: 9
+  completed_phases: 7
   total_plans: 51
-  completed_plans: 49
-  percent: 96
+  completed_plans: 50
+  percent: 98
 ---
 
 # Project State
@@ -21,9 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). **095-06 ✅ SHIPPED 2026-06-06** (GAP-095-01 fold-all + GAP-095-03 un-gate/essence/bloom). Gap plans 095-07/08/09 remain. Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = continue `/gsd:execute-phase 095 --gaps-only`.
+**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). **095-06 ✅ SHIPPED 2026-06-06** (GAP-095-01 fold-all + GAP-095-03 un-gate/essence/bloom). **095-07 ✅ SHIPPED 2026-06-06** (GAP-095-03 MED header chrome: pill-chrome strip + single verb + restored model·turn run-sub). Gap plans 095-08/09 remain. Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = continue `/gsd:execute-phase 095 --gaps-only`.
 
 ## Current Position
+
+**Phase 095 — Plan 095-07 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks). The three **MED header divergences from sketch 014** — the `RunStatusStrip` header pill chrome, the double-verb removal, and the restored `model · turn` run-sub subline. **(GAP-095-03 MED chip chrome):** the `RunStatusStrip` `placement="header"` branch went from bare `text-muted-foreground` middot text to the sketch-014 `.status-strip` chip — `rounded-full border border-border bg-[hsl(220_30%_11%/0.8)] px-2.5 py-1`; the three `·` middot separators are now 1px vertical divider bars (`h-3 w-px bg-border/60`, the sketch `.divider`). The floating placement (Plan 04 mounts it) is byte-untouched — both header and floating contracts preserved. **(GAP-095-03 MED single verb):** the activity verb USED to render TWICE — once as `headerTitle = outerBannerLabel(...)` (streaming branch) AND once in the strip's `activityVerb` (same call). The operator-locked fix lands: the verb lives in the STRIP ONLY (`outerBannerLabel` now invoked from exactly ONE site — the strip's `activityVerb`); the `headerTitle` becomes a calm run identity (`Run · N steps` with tools, `Agent run` without) — no verb, no status word. The honest status word still lives on the collapsed-row (`Run · N steps · ✓ done · elapsed`) and the now-`.done` (success-toned, verb=null) terminal strip. **(GAP-095-03 MED run-sub):** a muted `font-mono text-xs text-muted-foreground/70` subline restored UNDER the title shows `turn N` (`turn = (iterationCount ?? 0) + 1`, 0-based per Phase 56 D-03). The `Message` type exposes NO `model`/`provider` field (confirmed by reading `types/index.ts` — those live on `TaskRunIndexItem`, not `Message`), so the model segment is OMITTED per the plan's documented fallback — NO new backend field, NO migration. **D-06 timer untouched** (`startMs`/`frozenEndRef`/`elapsedLabel` intact — only the title derivation + run-sub changed); **D-04 untouched** (`unifiedStepCount` across all 3 sites intact). **Provider-agnostic + additive:** frontend-only, derivation-only; `dangerouslySetInnerHTML` == 0 in both files (T-095-07-01). **Tests:** RunCard **28/28** (23 existing unchanged — no stale title-equals-verb retargeting needed since 095-02 already uses strip-based assertions; + 5 new Plan-07: verb-once-in-strip-not-title / calm-title-between-tools / turn-N from iterationCount / turn tracks a later iteration / turn-1 default when iterationCount absent). `tsc -b` = **37 (the documented baseline — zero net-new**, zero errors reference RunCard.tsx / RunStatusStrip.tsx / their tests); `vite build` exit 0. **Full-suite 17 failed / 497 passed (514)** — the 17 match the documented pre-existing baseline cluster (same 7 files: MessageItem / Plan04 / useMessages / StreamsProvider.dedup / streamsProvider / streamsProvider_075_9_clientkey / model-info); **ZERO net-new failures** (was 17/492/509 before this plan → **+5 net-new passing**, same 17 failures); none reference the touched files. Commits `011b7309` (Task 1 — header pill chrome) + `51287533` (Task 2 — single verb + calm title + run-sub). Deviations: **NONE** (the title-form choice `Run · N steps` / `Agent run` is an in-scope discretion the plan explicitly permits — a calm run identity is the requirement, `"Agent run"` the safe default — not a deviation). **Known stub:** none. See 095-07-SUMMARY.md (self-check PASSED). **NEXT: continue Wave-1 gap plans — 095-08 (file-axis fidelity) / 095-09 (single hero / multi-select leak); disjoint files, no overlap; then `/gsd:verify-work 095`.**
 
 **Phase 095 — Plan 095-06 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; Task 1 TDD RED→GREEN). The **#1 felt bug + the two HIGH + one MED sketch-fidelity divergences** in `ToolCallPanel.tsx`. **(GAP-095-01 fold-all — the per-step expand Set):** the single shared collapse boolean (every collapsed summary row's onClick toggled ONE flag → expanded ALL finished cards) is replaced by a per-step `expandedSteps: Set<string>` keyed on the SAME `stepKeyOf` identity the rail snum + dedup use (`clientKey ?? id ?? composite` — survives the 075.9 preparing→running→done id mutation + reload; state reconstructed from `toolCalls` each render). The collapsed-branch gate is now `i < activeIndex && (item.kind !== 'tool' || !expandedSteps.has(key))`; clicking ONE essence row calls `expandStep(key)` (adds ONLY that key) → it alone expands, the others stay folded. A per-row `collapseStep(key)` re-collapse control (ChevronUp "Hide", `data-testid="step-recollapse"`) on each expanded earlier step folds it back independently — the old aggregate "Hide earlier steps" (re-folded ALL) is gone. Skill rows get a stable composite key so a tool-row click never expands a skill row. `data-iteration-min` now rides the FIRST still-collapsed earlier step (recomputed), not a hard-coded `i===0` (the contiguous block can break under partial-expand). **(GAP-095-03 un-gate):** the `>= 3` `shouldCollapse` threshold is DELETED — every finished step folds to an essence row from step 1. **(GAP-095-03 essence — `ToolEssenceLine`):** a new component renders a finished tool's resting state as ONE result-bearing line `{icon} {tool} → {result} {pill} {chev}` (result text muted, `summarizeToolCall(tc)`, NOT the args-in-quotes summary); click expands the full per-tool body. Covers the all-done/reload case (`activeIndex === -1`) AND `execute_code` (one result line at rest, the Shiki editor on expand — the active/preparing streaming path untouched/byte-stable). `ToolResultBlock` gained `defaultOpen` so an expanded card opens straight to its body (no redundant nested essence). **(GAP-095-03 bloom):** `index.css .tc-active-wrap` swapped the 075.8 outer glow (`0 0 24px hsl(var(--primary)/0.18)`) for the sketch-014 bloom — primary-dim wash (`hsl(var(--primary)/0.06)`) + `inset 2px 0 0 hsl(var(--primary))` left bar; the running verb text leans `text-primary`; the bottom progress shimmer stays as the separate motion cue. **Provider-agnostic + additive:** all state component-local; the 075.6 default-expand-active-preparing rule (`panelExpanded`/`togglePanel`/`lastPreparingIndex`), 075.2 transient-id machinery, and 095-03 StepRail/Round-N divider all preserved; `dangerouslySetInnerHTML` == 0 (T-095-06-01). **Tests:** ToolCallPanel **12/12** (5 new per-step: fold-default / expand-one-only / second-expands-too / single-step un-gate / re-collapse; 2 new Task 2: one essence row at rest / click expands body; updated the 095-03 rail-node + 075.9 execute_code dedup tests to expand the now-folded rows first). `tsc -b` = **37 (the documented baseline — zero net-new**, zero errors reference ToolCallPanel.tsx / its test / index.css); `vite build` exit 0. **Full-suite 17 failed / 492 passed (509)** — the 17 match the documented pre-existing baseline cluster (7 files); **ZERO net-new failures** (PROVEN by stash: Task-1-only run = 17), **+2 net-new passing** (490→492). Commits `b61bd63b` (Task 1 — per-step Set + un-gate, TDD RED→GREEN) + `a7da14dd` (Task 2 — essence line + active bloom). Deviations: **1 (Rule 1 — the essence collapse hid the `Sub-agent: <model>` 075.1-Atom-D transparency line → +1 net-new Plan04 Atom D failure; fixed by surfacing the transparency note ON the resting essence since a silent model downgrade is a trust signal, not a click-to-reveal detail; back to 17 baseline)**. **Known stub:** none. See 095-06-SUMMARY.md (self-check PASSED). **NEXT: continue Wave-1 gap plans — 095-07 (header chrome) / 095-08 (file-axis fidelity) / 095-09 (single hero); disjoint files, no overlap; then `/gsd:verify-work 095`.**
 
@@ -140,7 +142,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-05
 
-Progress: [█████████░] 94%
+Progress: [██████████] 96%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -212,6 +214,7 @@ Progress: [█████████░] 94%
 | Phase 095 P03 | 16min | 2 tasks | 4 files |
 | Phase 095 P05 | 11min | 2 tasks | 9 files |
 | Phase 095 P06 | 15min | 2 tasks | 3 files |
+| Phase 095 P07 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -319,6 +322,8 @@ Recent decisions affecting current work:
 - D-05 sub-agent zero-dup root fix (095-03): the legacy analyze_document sub-agent stamps onto its OWNING tool_call (tc.sub_agent, clientKey/makeToolKey identity) instead of a single-slot message.sub_agent; the dual render source tc.sub_agent ?? subAgent is collapsed — one SubAgentBlock, never the self-heals-in-10-15s doubling. Separate root from 075.2 (frozen).
 - 095-06: per-step expandedSteps Set (keyed on stepKeyOf) replaces the shared collapse boolean — one click expands ONLY that finished card (closes GAP-095-01 fold-all)
 - 095-06: un-gated Focus fold + single ToolEssenceLine resting state + sketch-014 active bloom (primary-dim wash + inset 2px left bar) closes GAP-095-03
+- 095-07: run-card title is a calm run identity ('Run · N steps' / 'Agent run') — no activity verb, no status word; the verb lives in the RunStatusStrip ONLY (single-verb invariant)
+- 095-07: the model·turn run-sub omits the model segment (no Message.model field) and shows just 'turn N' from existing iterationCount — no new backend field, no migration
 
 ### Pending Todos
 
@@ -404,8 +409,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-06T07:11:40.801Z
-Stopped at: Completed 095-06-PLAN.md (gap-closure)
+Last session: 2026-06-06T07:24:55.209Z
+Stopped at: Completed 095-07-PLAN.md (gap-closure — header chrome)
 Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
