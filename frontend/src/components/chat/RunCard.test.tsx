@@ -462,13 +462,52 @@ describe("RunCard — Plan 07 single verb (the activity verb lives in the strip,
   })
 })
 
-describe("RunCard — Plan 07 model·turn run-sub subline (restored from existing data)", () => {
-  it("renders a `turn N` run-sub from iterationCount (turn = iterationCount + 1)", () => {
+describe("RunCard — Plan 095.1-07 GAP-2 run-sub turn reconciliation (live == reload)", () => {
+  // Helper: extract the run-sub subline text (the font-mono row UNDER the title,
+  // BEFORE the RunStatusStrip) so the live-vs-reload guard compares the exact
+  // string both states render.
+  function runSubText(host: HTMLElement): string {
+    // The run-sub is the LEAF div whose text is exactly `... turn N` (the
+    // font-mono subline). Prefer the div with NO child element (the leaf) so we
+    // don't grab the title-column wrapper that concatenates title + sub + strip.
+    const candidates = Array.from(host.querySelectorAll("div")).filter(
+      (d) => /turn \d+/.test(d.textContent ?? "") && d.querySelector("div") === null,
+    )
+    return candidates[0]?.textContent ?? ""
+  }
+
+  // RETARGETED (095.1-07): the run-sub turn is reconciled to a stable `1` — it no
+  // longer reads iterationCount (a within-run agent-loop iteration). A LIVE-shaped
+  // message (model+provider+iterationCount present, streaming) now reads `turn 1`,
+  // NOT `turn {iterationCount+1}`.
+  it("a LIVE message (model+provider+iterationCount, streaming) shows a stable `turn 1`", () => {
     render(
       <RunCard
         message={makeMessage({
           runStatus: "streaming",
-          iterationCount: 0, // 0-based → turn 1
+          provider: "openai",
+          model: "gpt-5.4-mini",
+          iterationCount: 5, // would have been `turn 6` under the old divergence
+          tool_calls: [
+            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
+          ],
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
+    expect(header.textContent).toMatch(/openai · gpt-5\.4-mini · turn 1/)
+    expect(header.textContent).not.toMatch(/turn 6/)
+  })
+
+  // RETARGETED (095.1-07): changing iterationCount no longer changes the run-sub
+  // turn — it is decoupled from the agent-loop iteration entirely.
+  it("the run-sub turn does NOT track iterationCount (iterationCount 2 → still `turn 1`)", () => {
+    render(
+      <RunCard
+        message={makeMessage({
+          runStatus: "streaming",
+          iterationCount: 2, // old behavior would render `turn 3`
           tool_calls: [
             { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
           ],
@@ -478,23 +517,7 @@ describe("RunCard — Plan 07 model·turn run-sub subline (restored from existin
     )
     const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
     expect(header.textContent).toMatch(/turn 1/)
-  })
-
-  it("the run-sub turn number tracks a later iteration (iterationCount 2 → turn 3)", () => {
-    render(
-      <RunCard
-        message={makeMessage({
-          runStatus: "streaming",
-          iterationCount: 2, // 0-based → turn 3
-          tool_calls: [
-            { id: "tc-1", name: "execute_code", args: {}, status: "running", startedAt: Date.now() },
-          ],
-        } as Partial<Message>)}
-        isStreaming={true}
-      />,
-    )
-    const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
-    expect(header.textContent).toMatch(/turn 3/)
+    expect(header.textContent).not.toMatch(/turn 3/)
   })
 
   it("defaults to `turn 1` when iterationCount is absent (DB-loaded reopen)", () => {
@@ -508,5 +531,44 @@ describe("RunCard — Plan 07 model·turn run-sub subline (restored from existin
     render(<RunCard message={reloaded} isStreaming={false} />)
     const header = screen.getByTestId("run-card").querySelector("header") as HTMLElement
     expect(header.textContent).toMatch(/turn 1/)
+  })
+
+  // THE DECISIVE GUARD (GAP-2): a LIVE-shaped message (model+provider present,
+  // iterationCount present, terminal-this-session) and a RELOAD-shaped message
+  // (same model+provider, iterationCount ABSENT) for the SAME run must render the
+  // IDENTICAL run-sub string — `{provider} · {model} · turn 1`. This is the
+  // live==reload consistency contract: it FAILS before the reconciliation (live
+  // would read `turn {iterationCount+1}`) and PASSES after.
+  it("live and reload render the IDENTICAL run-sub for the same run", () => {
+    const attribution = { provider: "openai", model: "gpt-5.4-mini" } as const
+
+    const live = makeMessage({
+      runStatus: "completed",
+      ...attribution,
+      iterationCount: 5, // a multi-iteration run that JUST finished live
+      tool_calls: [
+        { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+
+    const reloaded = makeMessage({
+      runStatus: "completed",
+      ...attribution,
+      tool_calls: [
+        { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
+      ],
+    } as Partial<Message>)
+    delete (reloaded as { iterationCount?: number }).iterationCount
+
+    const { unmount } = render(<RunCard message={live} isStreaming={false} />)
+    const liveSub = runSubText(screen.getByTestId("run-card"))
+    unmount()
+
+    render(<RunCard message={reloaded} isStreaming={false} />)
+    const reloadSub = runSubText(screen.getByTestId("run-card"))
+
+    expect(liveSub).toBe("openai · gpt-5.4-mini · turn 1")
+    expect(reloadSub).toBe("openai · gpt-5.4-mini · turn 1")
+    expect(liveSub).toBe(reloadSub) // live == reload — the GAP-2 contract
   })
 })
