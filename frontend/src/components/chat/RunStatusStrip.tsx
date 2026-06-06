@@ -13,14 +13,21 @@ import { cn } from "@/lib/utils"
  *                       the strip and the cards can never disagree).
  *   - `activityVerb`  — `outerBannerLabel(...)` while streaming, `null` when terminal.
  *
- * Two placement wrappers over identical segment markup (the build-once rule):
- *   - `placement="header"`   — the inline header chip RunCard hosts. Per sketch
- *                              014 (.status-strip) this is a rounded-full PILL —
- *                              subtle bg + 1px border + vertical divider bars
- *                              between segments (GAP-095-03 MED chip chrome,
- *                              Plan 07). It used to render bare middot text.
- *   - `placement="floating"` — the bottom live-chip styling (Plan 04's
- *                              scroll-away "↓ Jump to live" home).
+ * Three placement wrappers over identical segment markup (the build-once rule):
+ *   - `placement="header"`      — the inline header chip RunCard hosts. Per sketch
+ *                                 014 (.status-strip) this is a rounded-full PILL —
+ *                                 subtle bg + 1px border + vertical divider bars
+ *                                 between segments (GAP-095-03 MED chip chrome,
+ *                                 Plan 07). It used to render bare middot text.
+ *   - `placement="header-bare"` — the SAME segment markup with NO pill chrome (plain
+ *                                 muted text). Used when the strip is embedded INSIDE
+ *                                 another pill (the floating "↓ Jump to live" chip in
+ *                                 MessageList) — the host already supplies the pill, so
+ *                                 a second `header` pill here would double-frame
+ *                                 (WR-01, code-review 095). Pre-Plan-07 `header`
+ *                                 behavior, preserved as its own name.
+ *   - `placement="floating"`    — the bottom live-chip styling (Plan 04's
+ *                                 scroll-away "↓ Jump to live" home).
  *
  * Both homes share ONE segment markup; only the wrapper className differs. The
  * segment separators are 1px vertical divider bars (the sketch `.divider`), NOT
@@ -41,7 +48,7 @@ export function RunStatusStrip({
   elapsedLabel: string
   stepCount: number
   activityVerb: string | null
-  placement: "header" | "floating"
+  placement: "header" | "header-bare" | "floating"
 }) {
   // `.done` modifier (not a parent selector) per the sketch: a terminal strip
   // (no activity verb) recedes to the success tone; a live strip stays primary.
@@ -54,10 +61,14 @@ export function RunStatusStrip({
         "inline-flex items-center gap-2 font-mono text-xs whitespace-nowrap tabular-nums",
         // Plan 07 (GAP-095-03 MED chip chrome): the header placement is now a
         // rounded-full PILL — subtle bg + 1px border (the sketch `.status-strip`),
-        // not bare middot text. The floating branch keeps its own pill chrome.
-        placement === "header"
-          ? "rounded-full border border-border bg-[hsl(220_30%_11%/0.8)] px-2.5 py-1 text-muted-foreground"
-          : "rounded-full border border-primary/40 bg-popover/92 px-3 py-1.5 shadow-lg backdrop-blur-md",
+        // not bare middot text. `header-bare` is the plain-segment variant for
+        // embedding inside another pill (the floating chip — WR-01). The floating
+        // branch keeps its own pill chrome.
+        placement === "header-bare"
+          ? "text-muted-foreground"
+          : placement === "header"
+            ? "rounded-full border border-border bg-[hsl(220_30%_11%/0.8)] px-2.5 py-1 text-muted-foreground"
+            : "rounded-full border border-primary/40 bg-popover/92 px-3 py-1.5 shadow-lg backdrop-blur-md",
         isDone && "text-success",
       )}
     >

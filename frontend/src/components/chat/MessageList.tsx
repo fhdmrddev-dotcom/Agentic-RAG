@@ -183,9 +183,10 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             the ONE RunStatusStrip — no second strip.
 
             The button IS the single floating pill (border + bg + glow); the strip
-            is mounted with placement="header" INSIDE it so the live-status segments
-            render as plain text WITHOUT a second nested pill border (a
-            placement="floating" strip would double-frame inside this pill).
+            is mounted with placement="header-bare" INSIDE it so the live-status
+            segments render as plain text WITHOUT a second nested pill border (both
+            placement="floating" AND the Plan-07 placement="header" pill would
+            double-frame inside this pill — WR-01, code-review 095).
 
             Phase 095 Plan 08 (GAP-095-03 LOW): per sketch 015 `.live-chip`, the
             status segments LEAD and the `.jump` affordance TRAILS (the jump morphs
@@ -204,7 +205,7 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
               elapsedLabel={chipElapsed}
               stepCount={chipStepCount}
               activityVerb="Streaming…"
-              placement="header"
+              placement="header-bare"
             />
             <span aria-hidden="true" className="opacity-40">
               ·
