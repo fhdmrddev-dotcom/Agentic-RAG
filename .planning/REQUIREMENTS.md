@@ -133,9 +133,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | PANEL-09 | Phase 094 | Complete |
 | A11Y-03 | Phase 094 | Complete |
 | CHAT-04 | Phase 095 | Pending |
-| WORKSPACE-PARITY | Phase 095.1 | Pending |
+| WORKSPACE-PARITY | Phase 095.1 | In progress (Wave 0 selector shipped 095.1-01; consumer wiring in 095.1-02) |
 | RUN-HONESTY | Phase 095.1 | Pending |
-| PROVIDER-ERR | Phase 095.1 | Pending |
+| PROVIDER-ERR | Phase 095.1 | In progress (Wave 0 classifier shipped 095.1-01; agent_loop wiring in 095.1-04) |
 | EVAL-01 | Phase 096 | Pending |
 | EVAL-02 | Phase 096 | Pending |
 | CONC-01 | Phase 096 | Pending |

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Phase 095.1 context gathered (6 decisions locked + bug routing)
-last_updated: "2026-06-06T11:31:10.927Z"
-last_activity: 2026-06-05
+stopped_at: Completed 095.1-01-PLAN.md (Wave-0 foundation modules)
+last_updated: "2026-06-06T11:48:40.035Z"
+last_activity: 2026-06-06
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 56
-  completed_plans: 51
-  percent: 91
+  completed_plans: 52
+  percent: 93
 ---
 
 # Project State
@@ -21,9 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). **095-06 ✅ SHIPPED 2026-06-06** (GAP-095-01 fold-all + GAP-095-03 un-gate/essence/bloom). **095-07 ✅ SHIPPED 2026-06-06** (GAP-095-03 MED header chrome: pill-chrome strip + single verb + restored model·turn run-sub). **095-08 ✅ SHIPPED 2026-06-06** (GAP-095-03 file-axis fidelity: hero icon 48/working 30 + soft 24px hero glow halo + borderless top-rule/dim eyebrow + intermediates copy + status-first/jump-trailing chip; partition logic untouched per scope). **095-09 ✅ SHIPPED 2026-06-06** (GAP-095-02 / WR-02 backend single-hero fix: `_select_hero_filenames` returns exactly ONE hero on every branch + one canonical `_hero_set` shared by the live emit + the re-stamped persisted execute_code rows → live == reload; token-match ext detection). **ALL 4 gap plans (06/07/08/09) shipped** — phase gap-closure structurally complete. Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = `/gsd:verify-work 095`.
+**Current focus:** Phase --phase — 095.1
 
 ## Current Position
+
+**Phase 095.1 — Plan 095.1-01 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; both tasks TDD RED→GREEN). The **Wave-0 foundation modules** — the two NET-NEW pure units the later waves consume, each unit-test-green BEFORE any consumer wires them. Touches **NO existing consumer → zero behavior change**. **(Task 1 — `frontend/src/lib/workspacePanel.ts`, WORKSPACE-PARITY D-095.1-01/02):** the deterministic activity-derived workspace-panel selector, a TS port of the VALIDATED spike-006 (gate + derive) + spike-007 (code-label inference). `shouldPopulate` (write_todos OR ≥2 deduped MEANINGFUL tools — `dedupToolCalls` reused from stepCount.ts, never re-rolled); `deriveWorkspacePanel` (precedence: real write_todos plan > one read-only item per meaningful tool); `inferLabel` (leading-`#`-comment > keyword RULES `.to_csv`→CSV / `savefig`→chart / docx / pptx / reportlab / xlsx / `print`→Print output > "Run code"); label precedence per item `write_todos.content > execute_code.description > inferLabel(code) > "Run code"`; status map `done`→completed / `running`+`preparing`→in_progress / else pending. Uses CONTEXT's AUTHORITATIVE `MEANINGFUL_TOOLS` set (`task`, NOT the spike's `sub_agent`; broader producers + substantive-retrieval). Pure `.ts`, NO JSX/React; **plain-string labels only** — the XSS render-as-text-children contract (T-095.1-01-01) is enforced at the Plan 02 consumer (`dangerouslySetInnerHTML` == 0 here, only a prose mention in the doc-comment). **31 vitest tests GREEN**; `tsc -b` = **37 (the documented baseline — zero net-new)**. **(Task 2 — `backend/app/services/provider_gateway/errors.py`, PROVIDER-ERR D-095.1-03):** the per-provider error classifier that maps each provider's NATIVE SDK error to a normalized `ErrorKind` from STRUCTURED status codes — killing the keyword-soup billing-misclassification. `classify_provider_error(provider, exc)` branches by family: google reads `.code`+`.status` (NOT `.status_code` — Pitfall 6), openai-compat/anthropic isinstance the SDK subclasses then fall back to `.status_code`; **429 → rate_limit ALWAYS precedes any billing classification** so Google's `RESOURCE_EXHAUSTED` can NEVER read as billing (closes BUG-260606-01). Billing claimed ONLY when an `insufficient_quota` STRUCTURAL code/body is present — never the word "quota" in message text. `message_for_kind(kind, raw)`: specific kinds get fixed honest copy with NO raw-detail interpolation; `unknown` gets a neutral message + BOUNDED 300-char raw detail (Information-Disclosure control T-095.1-01-02). SDK imports guarded in try/except ImportError (degrades to numeric `.status_code`); **NO import cycle** (imports only `__future__`/`typing`/`openai`/`anthropic` — the agent_loop/threads grep matches are docstring prose only). Re-exported from the package `__init__`. **27 pytest tests GREEN** (+ the 13 analog `test_api_error_guards` still pass = 40/40); package import smoke exits 0. Commits `d1a70b40` (T1 RED) + `702eb3f5` (T1 GREEN) + `3ad40934` (T2 RED) + `2b876c18` (T2 GREEN). Deviations: **1 (Rule 3 — the plan's prescribed test `tc()` factory typed `args` via an intersection that re-applied `Record<string,string>` to the call-site nested-args literals → 3 net-new TS2322; fixed by `Omit<…,"args">`-ing the Partial part so the loose fixture bag is accepted — test-harness typing only, no production/fixture data change; tsc back to baseline 37)**. **Known stub:** none — both modules are intentionally NOT yet consumed (that IS the Wave-0 objective; Plans 02/04 wire them). See 095.1-01-SUMMARY.md (self-check PASSED; TDD gate compliance recorded). **NEXT: Wave 1 — execute the 4 disjoint consumer plans: 095.1-02 (panel render, imports `deriveWorkspacePanel`) ‖ 095.1-03 (attribution+timer SELECT) ‖ 095.1-04 (wire `classify_provider_error` into the agent_loop catch) ‖ 095.1-05 (flat Generated-files + deliverable-aware Resume).**
 
 **Phase 095 — Plan 095-09 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; Task 1 TDD RED→GREEN). The **BACKEND single-hero fix (GAP-095-02 / WR-02)** — the last gap plan; the hero/working PARTITION over-selection that the frontend (correctly) just renders. **(Task 1 — single hero on every branch, `agent_loop.py`):** `_select_hero_filenames` used to return a MULTI-element set on the requested-extension branch (every file of a requested ext → hero). Now a new shared `_hero_pick` tie-break (max size, then iteration) is applied identically across the declared, requested-ext, and fallback branches → the helper returns a set of length EXACTLY 1 whenever ≥1 file exists. The requested-ext branch collects the matching metas then picks the single largest; the declared branch collapses any multi-declaration to one. Old multi-hero test retargeted to a single hero; +size-tie + multi-declared-collapse + `len==1` on all 3 paths. **(Task 2 — one canonical hero set for emit + persist, live == reload):** the per-cell `execute_code` persist used to compute the hero over a PARTIAL `_previous_files_in_run` at each cell while the loop-end emit computed over the COMPLETE set — so a multi-cell run heroed a different file on reload. Now the per-cell persist stamps `is_hero=False` (placeholder), and the loop-end RE-STAMPS every persisted execute_code row against the ONE canonical `_hero_set` computed over the complete set (mutated in place in `persisted_tool_calls`, read at call-time by `_persist_assistant_message` ~L1174, re-stamp at ~L2165 runs before persist ~L2332/2440; guarded against truncated/non-JSON fallback results). `_select_hero_filenames` now called EXACTLY ONCE in the loop (the per-cell partial call is gone); `_hero_set` referenced 5× (compute + re-stamp + emit). +multi-cell live==reload consistency test + graceful-skip-non-json. **(Task 3 — token-match ext detection, hardening):** requested-ext detection switched from raw substring `ext in msg` to whole-token `re.findall(r"[a-z0-9]+", msg)` (`.pptx` still tokenizes to `pptx`; a substring embed like `discsv` no longer flags `csv`). Forward hardening only — the symptom cause was the multi-hero return fixed in Task 1. +substring-no-trigger + trailing-punctuation cases. **Presentation-only + cross-provider safe:** `'final_output_files'` event name unchanged (`grep -c == 1`); `sandbox_outputs.py` (owner-fenced re-sign download path) BYTE-IDENTICAL (git diff empty) — the `is_hero` flag never feeds the download path; pure provider-free helper at two shared sites; NO schema, NO migration. **Tests:** `test_095_final_output_tag.py` **19/19 GREEN**; all 5 agent_loop-importing test files (095-final-output / 089-seam / 075.5-google-native / 075.4-registry-sweep / continue) **61/61 GREEN** — ZERO net-new failures; module imports clean (`import re` added). Commits `70271dab` (Task 1 — single-hero branch, TDD) + `a2979082` (Task 2 — canonical emit+persist re-stamp) + `91167254` (Task 3 — tokenize ext). Deviations: **NONE** (TDD RED confirmed before GREEN; the only "issue" was a `&&`-chained grep stopping on `grep -c`'s zero-count non-zero exit — re-ran separately, all greps pass). **Known stub:** none (the `is_hero=False` per-cell value is a documented intentional placeholder overwritten by the loop-end re-stamp before persistence). See 095-09-SUMMARY.md (self-check PASSED). **ALL 4 gap plans (06/07/08/09) shipped — Phase 095 gap-closure is structurally complete. NEXT: `/gsd:verify-work 095`** (owns the live Chrome-MCP single-hero / live==reload UAT: ask for a .docx → exactly ONE hero, one-click download, reopen next-day → still the same single hero + the SC#10 4-axis cross-provider scoreboard).
 
@@ -55,7 +57,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 --- (prior `human_needed` trace retained for audit) ---
 
-Phase: --phase (095) — EXECUTING
+Phase: --phase (095.1) — EXECUTING
 
 --- (gap-closure execution trace below — retained for audit) ---
 
@@ -144,9 +146,9 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 - SECURITY PASS — run `/gsd:secure-phase` over the workflow-runtime phases 090 → 091 → 092 at milestone closure (anchor on 092, where the server-enforced Harness→Deep authz lock lands). Risk-based: these 3 phases hold the milestone's real security surface (RLS / tool-whitelist execution gate / server-side mode lock); 093/094/095 are low-surface UI/provider polish. Not urgent because 090 RLS is already live-verified and 091's code review already cleared eval/SQL-injection/secrets + the whitelist no-op invariant. PULL FORWARD to right after 092 ONLY if v2.8 ships to real/production users before closure. (Project has produced SECURITY.md only twice ever — secure-phase has never been per-phase here.)
 
-Last activity: 2026-06-05
+Last activity: 2026-06-06
 
-Progress: [██████████] 100%
+Progress: [█████████░] 93%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -221,6 +223,7 @@ Progress: [██████████] 100%
 | Phase 095 P07 | 6min | 2 tasks | 3 files |
 | Phase 095 P08 | 5min | 3 tasks | 4 files |
 | Phase 095-chat-tool-card-unification P09 | 6min | 3 tasks | 2 files |
+| Phase 095.1 P01 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -330,6 +333,7 @@ Recent decisions affecting current work:
 - 095-06: un-gated Focus fold + single ToolEssenceLine resting state + sketch-014 active bloom (primary-dim wash + inset 2px left bar) closes GAP-095-03
 - 095-07: run-card title is a calm run identity ('Run · N steps' / 'Agent run') — no activity verb, no status word; the verb lives in the RunStatusStrip ONLY (single-verb invariant)
 - 095-07: the model·turn run-sub omits the model segment (no Message.model field) and shows just 'turn N' from existing iterationCount — no new backend field, no migration
+- 095.1-01: billing claimed ONLY when insufficient_quota structurally proven; 429 always classifies rate_limit before billing (closes BUG-260606-01)
 
 ### Pending Todos
 
@@ -415,9 +419,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 095.1 context gathered (6 decisions locked + bug routing)
-Resume file: --resume-file
+Last session: 2026-06-06T11:48:31.125Z
+Stopped at: Completed 095.1-01-PLAN.md (Wave-0 foundation modules)
+Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
 
