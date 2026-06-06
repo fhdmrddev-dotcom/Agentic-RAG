@@ -252,7 +252,17 @@ Plans:
   3. `llm_batch_agents` fan-out is bounded by `max_parallel_agents` (default 5) composing with the global Redis-Lua cap (20); N=10 fans out at ≤5 concurrent and a batch phase does not starve app-wide request latency (cross-tab GET stays <50ms); the live AnyIO threadpool budget is verified before sizing defaults (SEED-036a).
   4. HARNESS-03 resumability is independently verified: kill-and-resume at mid-`programmatic`, mid-`llm_agent`, and mid-`ask_user` produces no skipped phases and no double-applied side effects.
   5. The thread-switch connection-saturation hang (BUG-260530-01) is fixed: with ≥6 concurrent active runs streaming, switching threads reconciles in <1s (no 15-30s stall). Fix is **frontend stream-cap** — only the viewed thread (plus a small bounded pool) holds a live `fetch` stream; background runs reconcile via `GET /threads/{id}/snapshot` on return (D-v2.5-03). Preserves PANEL-06 isolation + per-thread demux; carries the SC#10 4-axis parallel-thread UAT (StreamsProvider is a G-5 hot file).
-**Plans**: TBD
+**Plans**: 8 plans (3 waves)
+
+Plans:
+- [ ] 096-01-PLAN.md — Eval seed substrate: eval_slow_step fn + migration 066 eval_coverage 5-type workflow + [BLOCKING] SQL-editor apply (W1)
+- [ ] 096-02-PLAN.md — D-01 CI structural gate: test_096_ci_workflow_regression (fake gateway adapter at open_stream seam; sequencing/gate-retry/whitelist/resume legs) (W1)
+- [ ] 096-03-PLAN.md — D-06 backend: terminal-site ask_user expiry cleanup + /pending dual-namespace liveness filter (BUG-260605-01) (W1)
+- [ ] 096-04-PLAN.md — D-06 frontend: answerAskUser ApiError + PendingAskCard 404-honesty + created_at countdown (W1)
+- [ ] 096-05-PLAN.md — CONC-01 stream-cap: StreamsProvider thread-keyed LRU-3 pool + eviction bookkeeping + D-10 honest indicators (BUG-260530-01) (W1)
+- [ ] 096-06-PLAN.md — EVAL-01 eval extension: --workflow rows + D-02a ask_user auto-answer + D-04 capability table + D-01 operator-gate docs (W2)
+- [ ] 096-07-PLAN.md — D-08 restart_smoke.py (3 kill points) + conc_probe.py (N=10 fan-out, latency p95, AnyIO budget) (W2)
+- [ ] 096-08-PLAN.md — D-05 model curation: curate_models.py live /models pass + registry/defaults/PROVIDERS/Settings updates + operator approval (W3)
 **Notes**: CONC-01 covers BOTH backend fan-out fairness (`llm_batch_agents`) AND the frontend stream-connection saturation (BUG-260530-01) — same parallel-thread responsiveness guarantee. The frontend cap-live-streams fix lands here because Phase 094's panel timeline rides the same `run:{run_id}` stream and must not be throttled by held-open background streams. Operator-chosen approach 2026-05-30 (rejected: single multiplexed transport, HTTP/2 serving).
 
 ### Progress
