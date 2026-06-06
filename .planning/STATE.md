@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
-stopped_at: Completed 095.1-02-PLAN.md (WORKSPACE-PARITY panel-fill render)
-last_updated: "2026-06-06T12:01:13.801Z"
+stopped_at: Completed 095.1-03-PLAN.md (RUN-HONESTY model attribution + true reload timer)
+last_updated: "2026-06-06T12:19:44.003Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 56
-  completed_plans: 53
-  percent: 95
+  completed_plans: 54
+  percent: 96
 ---
 
 # Project State
@@ -24,6 +24,8 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 **Current focus:** Phase --phase — 095.1
 
 ## Current Position
+
+**Phase 095.1 — Plan 095.1-03 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; both tasks TDD RED→GREEN). The **RUN-HONESTY model attribution + true reload timer (D-095.1-04/05)** — a Wave-1 sibling, making every run honest about WHO answered and HOW LONG it took via ONE additive runs↔messages SELECT threaded through the full type chain into RunCard. **(Task 1 — additive enrich SELECT + MessageResponse fields, backend):** `_enrich_messages_with_runs` (the G-5 hot file `threads.py`) gains 4 COLUMNS (`model, provider, started_at, completed_at`) — the WHERE clause (`thread_id` + `user_id` + RLS `runs_select_own`) is BYTE-IDENTICAL → no widened row set, no IDOR (T-095.1-03-02); the zip loop stamps the 4 fields, None when no run (graceful). `MessageResponse` += 4 nullable fields (`datetime` already imported). NO migration (runs.model/provider NOT NULL, started_at DEFAULT now() NOT NULL, completed_at written on finalize — confirmed full-schema.sql 555-558); NO new write; flows to BOTH /messages and /snapshot (shared helper). The shared SSE/chunk path is UNTOUCHED — diff confined to the enrich helper (2 hunks), NO provider-branch / `_emit` / event-name change (grep-proven, provider-agnostic across all 8 providers). **(Task 2 — api.ts + types + RunCard render, frontend):** `Message` += `model?`/`provider?`/`startedAt?`/`completedAt?`; `_mapMessageResponse` explicit snake→camel null→undefined (started_at/completed_at must not leak through `...rest` as snake). **D-04 run-sub:** the 095-07 "model OMITTED" stub becomes `{provider} · {model} · turn N` from the REAL resolved runs.model/provider (e.g. `google · gemini-3.5-flash · turn 1`), graceful `turn N` for legacy/no-run; React text children only (`dangerouslySetInnerHTML` == 0, T-095.1-03-01). **D-05 timer:** a terminal run's duration = persisted `completedAt − startedAt` (true wall-clock, identical live and on reload) — never `Date.now() − created_at` (the BUG-260606-02 "1440m" lie, CLOSED). The KEY fix is a new `wasStreamingRef` gate: only a run watched stream THIS session captures a same-session `frozenEnd`; a RELOADED already-terminal run (never streaming this session) with no `completedAt` shows NO duration (the honesty rule — show nothing before a lie). `RunStatusStrip` += `showElapsed` prop (default true) to omit the ⏱ segment honestly when no true end-time. **Tests:** backend `test_threads.py` enrich GREEN — 5/5 (`-x -k "GetMessages or enrich or runs"`); frontend RunCard.timer.test.tsx (NEW, 6 cases: true-duration / no-duration / live-tick-preserved / day-old BUG-260606-02 guard + 2 D-04 run-sub) + RunCard.test.tsx (28, incl. 2 D-06 timer tests RETARGETED from the old now−created_at freeze the bug D-05 reverses) = **34/34 GREEN**. `tsc -b` = **37 (the documented baseline — zero net-new**, zero errors reference any touched file); `vite build` exit 0; `src/__tests__` = **16 failed/290 passed — PROVEN identical to baseline via git stash (the 6-file cluster = the documented pre-existing baseline; ZERO net-new; none reference RunCard/api.ts/types/RunStatusStrip)**. Commits `196eef60` (T1 RED) + `14b2c862` (T1 GREEN) + `2bc49e47` (T2 RED) + `31afa420` (T2 GREEN) + `3106cd87` (docs cleanup). Deviations: **3 (all Rule 1 — DI-1: fixed a PRE-EXISTING `test_returns_message_list` side_effect gap, the enrich SELECT has always been the helper's 3rd execute call, proven pre-existing by stash; DI-2: retargeted 2 stale D-06 timer tests that encoded the now-REVERSED now−created_at freeze, plan-anticipated; DI-3: updated a stale "Model omitted" run-sub JSX comment)**. **Known stub:** none (the `turn N` legacy fallback + the no-duration render are intentional honesty behavior, not placeholders). See 095.1-03-SUMMARY.md (self-check PASSED; TDD gate compliance recorded). **RUN-HONESTY req NOT yet checked** — it also spans D-095.1-07 (deliverable-aware Resume) which ships in sibling 095.1-05; this plan completes D-04 + D-05 only. **NEXT: remaining Wave-1 siblings — 095.1-04 (PROVIDER-ERR — wire `classify_provider_error` into the agent_loop catch) ‖ 095.1-05 (MessageItem honesty — flat Generated-files list + deliverable-aware Resume); then `/gsd:verify-work 095.1`.**
 
 **Phase 095.1 — Plan 095.1-02 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; both tasks TDD RED→GREEN). The **WORKSPACE-PARITY panel-fill render (D-095.1-01/02)** — the FIRST Wave-1 consumer, wiring Plan-01's `deriveWorkspacePanel` selector into the workspace todos panel so it fills CONSISTENTLY for every provider on genuine multi-step work (incl. the OpenAI-gpt-5.4-mini parity bar — providers that never call `write_todos`) and stays CLEAN for trivial chats. Closes the panel-fill symptom of BUG-260604-01 + gives non-Anthropic runs meaningful labels (`non-anthropic-generic-code-task-descriptions`). **(Task 1 — `useDerivedPanel(threadId)` in `StreamsProvider.tsx`):** a PURE read selector over the viewing thread's persisted chat `tool_calls` (flattened across all assistant messages in `bucketsBySurface.get("chat")`). Consumes Plan-01 `shouldPopulate` (gate: write_todos OR ≥2 deduped MEANINGFUL tools) + `deriveWorkspacePanel`. Returns the stable module-level `EMPTY_DERIVED` ref on null threadId OR gate-miss so it never forces a chat re-render. **Implemented OPTION (b)** (RESEARCH Open-Q1/A2): a panel-side read selector that NEVER writes `todosByThread` and NEVER mutates the chat bucket reference — PANEL-06/FC#1 isolation held BY CONSTRUCTION (no fallback to option-a needed). Churn-guarded: the store selector returns the STABLE chat `Message[]` ref; the derivation is `useMemo`'d over `[threadId, messages]` so the hook output identity is stable until tool activity changes. Reload-safe for free (`tool_calls` are DB truth reconstructed by `_mapMessageResponse`). **(Task 2 — TodosSection precedence render):** real `write_todos` plan wins (precedence 1, today's behavior verbatim); else `useDerivedPanel` non-empty → **read-only** derived rows (new `DerivedRow` reuses `StatusIndicator` + `STATUS_LABEL` + `STATUS_TEXT_COLOR`, NO interactive control — derived items mirror tool status, can't be ticked) + a subtle "derived from activity" marker once at the section top (D-095.1-01 discretion); else `return null` (precedence 3, clean). A real plan is NEVER overwritten (Pitfall 2). Labels render as React text children ONLY (T-095.1-02-01 / Pattern E; `dangerouslySetInnerHTML` == 0, `onClick` == 0 — the 2 prior prose mentions reworded to "raw/innerHTML markup" to keep the acceptance grep literally clean). **WorkspacePanel.tsx UNTOUCHED** (per plan — derived count in the header is out-of-scope polish). **Tests:** TodosSection **12/12** (7 existing + 5 new: precedence 1/2/3 + read-only-no-tick + derived-state axe-clean) + panelHooks **19/19** (14 existing + 5 new: null/clean stable-EMPTY, ≥2-meaningful derive, cross-message flatten, FC#1 isolation — no todosByThread write + chat bucket ref unchanged) + the consumed workspacePanel selector **31/31** = **62/62 GREEN**. `tsc -b --force` = **37 (the documented baseline — zero net-new**; the lone touched-file error `getActiveRuns` unused-import at StreamsProvider.tsx:73 is PRE-EXISTING/documented DI-095-03-02, present in HEAD~1); `vite build` exit 0. Commits `b3cfc1ee` (Task 1 — useDerivedPanel selector, TDD RED→GREEN) + `ba10b2f6` (Task 2 — TodosSection precedence, TDD RED→GREEN). Deviations: **NONE** (option-b succeeded without falling back to option-a; the 2 comment rewordings are doc-only to keep the XSS grep clean, not behavioral). **Known stub:** none (the empty-panel fallback is intentional clean-panel behavior, not a placeholder; both surfaces read real persisted data). See 095.1-02-SUMMARY.md (self-check PASSED; TDD gate compliance recorded). **Cross-provider/SC#10:** additive/derivation-only + thread-scoped — a pure read over the OWNING thread's persisted tool_calls, never edits a working provider's shared SSE/chunk path; the 8-provider live panel-fill/clean UAT is authored in VALIDATION.md, exercised at `/gsd:verify-work`. **NEXT: Wave 1 siblings (disjoint files, no overlap) — 095.1-03 (RUN-HONESTY attribution+timer SELECT → RunCard) ‖ 095.1-04 (PROVIDER-ERR — wire `classify_provider_error` into the agent_loop catch) ‖ 095.1-05 (MessageItem honesty — flat Generated-files list + deliverable-aware Resume); then `/gsd:verify-work 095.1`.**
 
@@ -150,7 +152,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-06
 
-Progress: [██████████] 95%
+Progress: [██████████] 96%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -226,6 +228,7 @@ Progress: [██████████] 95%
 | Phase 095 P08 | 5min | 3 tasks | 4 files |
 | Phase 095-chat-tool-card-unification P09 | 6min | 3 tasks | 2 files |
 | Phase 095.1 P01 | 7min | 2 tasks | 5 files |
+| Phase 095.1 P03 | 42min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -336,6 +339,7 @@ Recent decisions affecting current work:
 - 095-07: run-card title is a calm run identity ('Run · N steps' / 'Agent run') — no activity verb, no status word; the verb lives in the RunStatusStrip ONLY (single-verb invariant)
 - 095-07: the model·turn run-sub omits the model segment (no Message.model field) and shows just 'turn N' from existing iterationCount — no new backend field, no migration
 - 095.1-01: billing claimed ONLY when insufficient_quota structurally proven; 429 always classifies rate_limit before billing (closes BUG-260606-01)
+- D-095.1-04/05 shipped: run-sub {provider}·{model}·turn N from real runs.model/provider + true reload timer completedAt−startedAt (no migration; closes BUG-260606-02); additive enrich SELECT, byte-identical WHERE, shared SSE path untouched
 
 ### Pending Todos
 
@@ -421,8 +425,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-06T11:48:31.125Z
-Stopped at: Completed 095.1-01-PLAN.md (Wave-0 foundation modules)
+Last session: 2026-06-06T12:19:00.698Z
+Stopped at: Completed 095.1-03-PLAN.md (RUN-HONESTY model attribution + true reload timer)
 Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
