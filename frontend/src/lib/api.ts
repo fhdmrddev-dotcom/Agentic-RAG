@@ -986,7 +986,7 @@ export async function answerAskUser(
     body: JSON.stringify(body),
     signal,
   })
-  if (!res.ok) throw new Error(`Failed to submit ask_user answer (status ${res.status})`)
+  if (!res.ok) throw new ApiError("Failed to submit ask_user answer", res.status)
 }
 
 /** Phase 063 (D-063-03): server-side Stop. DELETE /runs/{runId} cancels the
