@@ -332,3 +332,147 @@ async def test_expiry_write_lands_after_terminal_status_write(
     assert terminal_idx < inserts[0], (
         "expiry insert must come AFTER the terminal-status write, never before"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 2 — /pending liveness filter, dual ID namespace (panel.py)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_pending_excludes_terminal_harness_prompt(mock_asyncpg_pool):
+    """Test 5: a harness prompt whose workflow_runs.status is terminal (failed)
+    is EXCLUDED from /pending."""
+    from app.api import panel
+
+    rid = str(uuid.uuid4())
+    mock_asyncpg_pool.set_fetchrow_results([
+        {"status": "failed", "active_workflow_run_id": uuid.UUID(rid)},
+    ])
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, rid) is False
+    # The uuid column is compared via a ::text cast (no cast errors on
+    # malformed prompt run_ids).
+    sql = mock_asyncpg_pool.calls[0][0]
+    assert "::text = $1" in sql
+
+
+@pytest.mark.asyncio
+async def test_pending_excludes_stale_anchor_harness_prompt(mock_asyncpg_pool):
+    """Test 6: a harness prompt whose run is non-terminal but is NOT the
+    thread's active_workflow_run_id anchor (stale anchor) is EXCLUDED —
+    submit would 404 at the runs.py anchor-confirm, so showing it is dishonest."""
+    from app.api import panel
+
+    rid = str(uuid.uuid4())
+    mock_asyncpg_pool.set_fetchrow_results([
+        {"status": "active", "active_workflow_run_id": uuid.uuid4()},  # ≠ rid
+    ])
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, rid) is False
+
+    # Counter-case: live AND anchored → INCLUDED (the happy harness path).
+    mock_asyncpg_pool.set_fetchrow_results([
+        {"status": "active", "active_workflow_run_id": uuid.UUID(rid)},
+    ])
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, rid) is True
+
+
+@pytest.mark.asyncio
+async def test_pending_keeps_live_deep_prompt(mock_asyncpg_pool):
+    """Test 7 (Pitfall 6 guard): a Deep prompt (runs-keyed) whose runs.status
+    is 'streaming' is INCLUDED — the filter must not eat the runs namespace."""
+    from app.api import panel
+
+    rid = str(uuid.uuid4())
+    mock_asyncpg_pool.set_fetchrow_results([
+        None,                       # workflow_runs miss (Deep namespace)
+        {"status": "streaming"},    # runs hit — live
+    ])
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, rid) is True
+
+
+@pytest.mark.asyncio
+async def test_pending_excludes_terminal_deep_prompt(mock_asyncpg_pool):
+    """Test 8: a Deep prompt whose runs.status is terminal is EXCLUDED."""
+    from app.api import panel
+
+    rid = str(uuid.uuid4())
+    for terminal in ("completed", "failed"):
+        mock_asyncpg_pool.set_fetchrow_results([None, {"status": terminal}])
+        assert await panel._prompt_run_is_live(mock_asyncpg_pool, rid) is False, (
+            f"runs.status={terminal!r} must be excluded"
+        )
+
+
+@pytest.mark.asyncio
+async def test_pending_keeps_unknown_and_legacy_prompts(mock_asyncpg_pool):
+    """Test 9: a prompt with NO resolvable run_id (legacy/unknown namespace)
+    is INCLUDED — fail-open; never break legacy prompts."""
+    from app.api import panel
+
+    # Unknown id: misses BOTH namespaces → keep.
+    mock_asyncpg_pool.set_fetchrow_results([None, None])
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, "rid-unknown") is True
+
+    # Legacy prompt with no run_id at all: keep, with ZERO liveness queries.
+    fresh_calls_before = len(mock_asyncpg_pool.calls)
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, None) is True
+    assert await panel._prompt_run_is_live(mock_asyncpg_pool, "") is True
+    assert len(mock_asyncpg_pool.calls) == fresh_calls_before, (
+        "missing run_id must short-circuit without querying"
+    )
+
+
+def test_pending_route_filters_dead_prompt_keeps_legacy(
+    client, mock_execute_result,
+):
+    """Route wiring: GET /ask_user/pending drops a dead-harness prompt and keeps
+    a legacy (no-run_id) prompt; payload shape unchanged; ownership gate first."""
+    from datetime import datetime, timezone
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    thread_id = "55555555-5555-5555-5555-555555555555"
+    mock_execute_result.data = {"id": thread_id}  # ownership SELECT hit
+
+    dead_rid = str(uuid.uuid4())
+    created = datetime(2026, 6, 7, 12, 0, 0, tzinfo=timezone.utc)
+    pool_rows = [
+        {
+            "id": uuid.uuid4(),
+            "tool_calls": [{
+                "kind": "ask_user_prompt", "tool_call_id": "tc-dead",
+                "prompt": "dead?", "options": ["a"], "timeout_seconds": 300,
+                "run_id": dead_rid,
+            }],
+            "created_at": created,
+        },
+        {
+            "id": uuid.uuid4(),
+            "tool_calls": [{
+                "kind": "ask_user_prompt", "tool_call_id": "tc-legacy",
+                "prompt": "legacy?", "options": None, "timeout_seconds": 60,
+            }],
+            "created_at": created,
+        },
+    ]
+    mock_pool = MagicMock()
+    mock_pool.fetch = AsyncMock(return_value=pool_rows)
+    # Only the dead prompt resolves in workflow_runs (terminal) — one fetchrow.
+    mock_pool.fetchrow = AsyncMock(
+        side_effect=[{"status": "failed", "active_workflow_run_id": None}]
+    )
+
+    async def _async_pool():
+        return mock_pool
+
+    with patch("app.api.panel.get_pg_pool", side_effect=_async_pool):
+        resp = client.get(f"/threads/{thread_id}/ask_user/pending")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert len(body) == 1, "the dead-run prompt must be filtered out"
+    assert body[0]["tool_call_id"] == "tc-legacy"
+    # Payload shape unchanged (panel.py:144-155 consumers).
+    assert set(body[0].keys()) == {
+        "message_id", "tool_call_id", "prompt", "options",
+        "timeout_seconds", "run_id", "draft", "created_at",
+    }
