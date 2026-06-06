@@ -60,6 +60,11 @@ from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
+# Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
+# error classifier — replaces the billing-first keyword if-ladder in the outer
+# APIError catch so a 429 (incl. Google RESOURCE_EXHAUSTED) reads as rate_limit,
+# NEVER billing (closes BUG-260606-01). Pure helper; adapters untouched.
+from app.services.provider_gateway import classify_provider_error, message_for_kind
 from app.utils.db import aexec
 from app.dependencies import get_pg_pool
 from app.db.runs import insert_assistant_message
@@ -2242,42 +2247,29 @@ async def run_agent_loop(
       except (APIError, anthropic.APIError, google_errors.APIError) as e:
           # Phase 075.5 T-260523-05 — broadened from openai-only to
           # also include native Anthropic + Google SDK error classes,
-          # so the actionable keyword-mapped messages below fire for
+          # so the structured per-provider classification below fires for
           # ALL providers, not just OpenAI/OpenRouter.
           logger.error("LLM API error in event stream (thread %s): %s", thread_id, e)
           err_str = str(e)
+          # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR) — replaces the billing-first
+          # keyword if-ladder. Classification is now STRUCTURED per-provider via the
+          # gateway-boundary classifier, keyed on the in-scope `_resolved_provider`
+          # (set at run_agent_loop top, ctx.resolved_provider). 429 → rate_limit
+          # ALWAYS precedes billing, so a Google RESOURCE_EXHAUSTED (whose text
+          # contains "quota") can NEVER read as billing again (closes BUG-260606-01);
+          # billing is claimed ONLY when an `insufficient_quota` structural signal
+          # proves it; an uncertain error → neutral truthful copy + bounded raw detail.
+          # CONTEXT-OVERFLOW: it has no reliable structured status code — it usually
+          # arrives as a 400 bad_request — so it is retained as a SINGLE narrow text
+          # pre-check here. This is a targeted retention of the one keyword case with
+          # no reliable structured code, NOT the billing-first soup; all other
+          # classification is structured (D-095.1-03).
           err_lower = err_str.lower()
-          # Map common API errors to actionable user messages
-          if any(kw in err_lower for kw in ("credit balance", "billing", "quota", "insufficient_quota", "rate limit", "rate_limit")):
-              user_msg = (
-                  "*API billing or rate-limit error: your account has insufficient credits "
-                  "or has hit a usage limit. Please check your provider's billing dashboard.*"
-              )
-          elif any(kw in err_lower for kw in ("invalid api key", "invalid_api_key", "authentication", "unauthorized", "401")):
-              user_msg = (
-                  "*Authentication error: the API key for this provider is invalid or expired. "
-                  "Please check your API key in Settings.*"
-              )
-          elif any(kw in err_lower for kw in ("unsupported parameter", "unsupported_parameter")):
-              user_msg = (
-                  f"*Model parameter error: {err_str}. "
-                  "This model may not support the current configuration.*"
-              )
-          elif any(kw in err_lower for kw in ("context", "maximum", "too long", "too large", "token limit", "overloaded")):
-              user_msg = (
-                  "*The conversation has grown too long for this model's context window. "
-                  "Please start a new chat or reduce the amount of history.*"
-              )
-          elif isinstance(e, APIError) and _is_transient_provider_error(e):
-              # isinstance guard: _is_transient_provider_error reads
-              # openai-specific attrs (e.body.get, .status_code shape).
-              # For Anthropic/Google we skip the transient classification
-              # rather than risk an AttributeError inside the catch.
-              user_msg = (
-                  "*The AI provider is temporarily unavailable. Please try again in a moment.*"
-              )
+          if any(kw in err_lower for kw in ("context", "maximum context", "too long", "token limit")):
+              kind = "context_overflow"
           else:
-              user_msg = f"*LLM API error: {err_str}*"
+              kind = classify_provider_error(_resolved_provider, e)
+          user_msg = message_for_kind(kind, err_str)
           # Phase 075.5 T-260523-05 — always emit the actionable message
           # as a delta. The prior `if not full_content` guard meant that
           # provider errors mid-run (after several successful tool calls)

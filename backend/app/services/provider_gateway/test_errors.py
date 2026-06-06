@@ -203,3 +203,77 @@ def test_specific_kinds_never_interpolate_raw_detail():
     secret = "sk-SUPERSECRETKEY-do-not-leak"
     for kind in ("rate_limit", "auth", "billing", "server", "context_overflow"):
         assert secret not in message_for_kind(kind, secret)
+
+
+# ─────────── agent_loop wiring guard (Plan 095.1-04 — the consumer) ──────────
+# These assert the EXACT composition the agent_loop catch block now performs —
+# ``message_for_kind(classify_provider_error(_resolved_provider, e), str(e))`` —
+# so the BUG-260606-01 fix is guarded at the wiring boundary, not just at the
+# classifier unit. The wiring test lives here (NOT a heavy streaming-harness
+# agent_loop test) per the plan: it exercises the identical 2-call composition
+# the consumer uses, with the in-scope provider as the key.
+
+class _FakeGoogleError(Exception):
+    """A Google-SDK-shaped error: ``.code`` (int) + ``.status`` (str), no
+    ``.status_code`` — with a controllable ``str()`` (the message the wiring
+    feeds to ``message_for_kind`` as ``err_str``)."""
+
+    def __init__(self, code, status, message):
+        super().__init__(message)
+        self.code = code
+        self.status = status
+
+
+class _FakeOpenAIError(Exception):
+    """An OpenAI-compat-shaped error: ``.status_code`` (int) + optional
+    structural ``.code``/``.body`` — with a controllable ``str()``."""
+
+    def __init__(self, status_code, message, code=None, body=None):
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.body = body
+
+
+def test_wiring_google_429_renders_rate_limit_message_not_billing():
+    # BUG-260606-01 at the WIRING boundary: a Google 429/RESOURCE_EXHAUSTED whose
+    # str() text contains "quota"+"billing" must render the rate-limit copy.
+    exc = _FakeGoogleError(
+        429,
+        "RESOURCE_EXHAUSTED",
+        "429 RESOURCE_EXHAUSTED: You exceeded your current quota, please "
+        "check your plan and billing details.",
+    )
+    err_str = str(exc)
+    # the exact composition the agent_loop catch block performs:
+    kind = classify_provider_error("google", exc)
+    user_msg = message_for_kind(kind, err_str)
+    assert kind == "rate_limit"
+    assert "billing" not in user_msg.lower()
+    assert "retry" in user_msg.lower()
+
+
+def test_wiring_openai_429_text_quota_renders_rate_limit_not_billing():
+    # Same wiring guard for the OpenAI-compat family: a plain 429 whose message
+    # contains "quota" (no structural insufficient_quota) renders rate-limit.
+    exc = _FakeOpenAIError(
+        429, "Rate limit reached: you have exceeded your quota.", code=None, body=None
+    )
+    err_str = str(exc)
+    kind = classify_provider_error("openai", exc)
+    user_msg = message_for_kind(kind, err_str)
+    assert kind == "rate_limit"
+    assert "billing" not in user_msg.lower()
+
+
+def test_wiring_unknown_error_renders_neutral_message_with_bounded_detail():
+    # An uncertain error (no structured signal) renders the neutral truthful copy
+    # plus bounded raw detail — never a guessed billing cause.
+    exc = Exception("connection reset by peer")
+    err_str = str(exc)
+    kind = classify_provider_error("anthropic", exc)
+    user_msg = message_for_kind(kind, err_str)
+    assert kind == "unknown"
+    assert "billing" not in user_msg.lower()
+    assert "provider returned an error" in user_msg.lower()
+    assert "connection reset by peer" in user_msg
