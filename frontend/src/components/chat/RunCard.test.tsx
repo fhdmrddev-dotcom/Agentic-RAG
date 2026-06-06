@@ -249,13 +249,19 @@ describe("RunCard — D-06 persistent timer (the never-vanishes fix)", () => {
   // gate, a run that flipped terminal before any 250ms tick had elapsedMs === 0
   // and the WHOLE timer vanished. The D-06 fix renders the strip continuously
   // whenever created_at parses, regardless of isStreamingNow / elapsedMs.
-  it("timer is STILL rendered when a run flips terminal with zero elapsed (no vanish)", () => {
-    const createdAt = new Date().toISOString() // ~now → elapsed ≈ 0
+  it("timer is STILL rendered when a run flips terminal with a real persisted duration (no vanish)", () => {
+    // Phase 095.1-03 (D-05): a terminal run carries the persisted started_at /
+    // completed_at (the TRUE wall-clock). The strip + the ⏱ duration both render
+    // — the never-vanishes guarantee, now honest (completedAt − startedAt), not
+    // a now−created_at fabrication.
+    const now = Date.now()
     render(
       <RunCard
         message={makeMessage({
-          created_at: createdAt,
-          runStatus: "completed", // terminal immediately; elapsedMs would be ~0
+          created_at: new Date(now).toISOString(),
+          runStatus: "completed",
+          startedAt: new Date(now - 100).toISOString(),
+          completedAt: new Date(now).toISOString(), // ≈0.1s true duration
           tool_calls: [
             { id: "tc-1", name: "search_documents", args: {}, status: "done", result: "[]" },
           ],
@@ -271,15 +277,19 @@ describe("RunCard — D-06 persistent timer (the never-vanishes fix)", () => {
     expect(strip.textContent).toMatch(/\d+(\.\d+)?s/)
   })
 
-  it("freezes elapsed at a terminal — the value does not keep growing after terminal", () => {
-    // created_at 5s in the past; terminal NOW → the frozen elapsed ≈ 5s and is
-    // recomputed as (frozenEnd - start), never (now - start) after freeze.
-    const createdAt = new Date(Date.now() - 5000).toISOString()
+  it("freezes elapsed at a terminal — shows the TRUE persisted completedAt − startedAt", () => {
+    // Phase 095.1-03 (D-05): started_at 5s before completed_at → the frozen
+    // elapsed is the TRUE 5s persisted duration, identical live and on reload
+    // (never now − created_at). The created_at here is ~now to prove the source
+    // is started_at/completed_at, NOT created_at.
+    const now = Date.now()
     render(
       <RunCard
         message={makeMessage({
-          created_at: createdAt,
+          created_at: new Date(now).toISOString(),
           runStatus: "completed",
+          startedAt: new Date(now - 5000).toISOString(),
+          completedAt: new Date(now).toISOString(),
           tool_calls: [
             { id: "tc-1", name: "execute_code", args: {}, status: "done", result: "" },
           ],
@@ -291,8 +301,7 @@ describe("RunCard — D-06 persistent timer (the never-vanishes fix)", () => {
     const match = strip.textContent?.match(/([\d.]+)s/)
     expect(match).not.toBeNull()
     const seconds = parseFloat(match![1])
-    // Frozen near 5s (allow scheduling slack), and crucially BOUNDED — not the
-    // unbounded wall-clock that an un-frozen now-baseline would keep growing.
+    // The TRUE 5s persisted duration, bounded — not an unbounded wall-clock.
     expect(seconds).toBeGreaterThanOrEqual(4.5)
     expect(seconds).toBeLessThan(10)
   })

@@ -102,27 +102,78 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   //   3. Render CONTINUOUSLY whenever `start` parses (Number.isFinite) — no
   //      nonzero-elapsed gate. Freeze at a TRUE terminal by capturing frozenEnd
   //      to Date.now() exactly ONCE on the streaming→terminal edge.
-  const startMs = Date.parse(message.created_at)
-  const hasStart = Number.isFinite(startMs)
+  // ---- Plan 095.1-03 (D-05 true reload timer) — the BUG-260606-02 fix ----
+  // The OLD impl froze a terminal run at `Date.now()` captured at first render
+  // (`frozenEndRef`) and measured from `created_at`. On RELOAD of a day-old run
+  // that first render is already terminal, so the freeze captured the CURRENT
+  // clock against a day-old created_at → a fabricated "1440m" duration.
+  //
+  // D-05 honesty rule: a FINISHED run's duration is the persisted wall-clock
+  // `completedAt − startedAt` (identical live and on reload). A finished run
+  // with NO completedAt shows NO duration — never a current-clock fabrication.
+  // The live streaming tick is unchanged (the 095 never-vanishes behavior must
+  // not regress).
+  //
+  // Baselines:
+  //   - `runStartMs` = the run's true start (message.startedAt) if present,
+  //     else `created_at` (the live-tick baseline that survives the 083
+  //     temp-id→DB-id remount). Used for BOTH the live tick AND the true duration.
+  const runStartMs = message.startedAt ? Date.parse(message.startedAt) : Date.parse(message.created_at)
+  const hasStart = Number.isFinite(runStartMs)
+  const completedMs = message.completedAt ? Date.parse(message.completedAt) : NaN
+  const hasTrueEnd = Number.isFinite(completedMs)
   const [now, setNow] = useState(() => Date.now())
+  // frozenEndRef is kept ONLY as the live→terminal transition fallback: a run
+  // that terminates THIS session (was streaming, then flipped terminal) before a
+  // persisted completedAt arrives still needs a frozen end. A RELOADED terminal
+  // run mounts already-terminal — it was NEVER streaming this session — so it
+  // must NOT capture Date.now() (that is the BUG-260606-02 "1440m" lie). The
+  // `wasStreamingRef` gate is what distinguishes the two: only a run we actually
+  // watched stream gets a same-session frozen end; a reloaded terminal run with
+  // no completedAt simply shows NO duration (the honesty rule).
   const frozenEndRef = useRef<number | null>(null)
-  // Capture the freeze instant ONCE at the streaming→terminal edge so the final
-  // elapsed is correct (and stays put). isStreamingNow flips false → terminal.
-  if (!isStreamingNow && frozenEndRef.current == null && hasStart) {
+  const wasStreamingRef = useRef<boolean>(false)
+  if (isStreamingNow) {
+    wasStreamingRef.current = true
+    if (frozenEndRef.current != null) frozenEndRef.current = null  // re-arm (defensive)
+  } else if (
+    wasStreamingRef.current &&
+    frozenEndRef.current == null &&
+    hasStart &&
+    !hasTrueEnd
+  ) {
+    // Observed streaming→terminal this session with no persisted completedAt →
+    // a legitimate same-session end-time.
     frozenEndRef.current = Date.now()
-  }
-  // Re-arm if a remount or status flip ever re-enters streaming (defensive —
-  // the timer should resume ticking, never stay frozen on a live run).
-  if (isStreamingNow && frozenEndRef.current != null) {
-    frozenEndRef.current = null
   }
   useEffect(() => {
     if (!isStreamingNow) return
     const id = window.setInterval(() => setNow(Date.now()), 250)
     return () => window.clearInterval(id)
   }, [isStreamingNow])
-  const elapsedMs = hasStart ? (frozenEndRef.current ?? now) - startMs : 0
-  const elapsedLabel = formatElapsed(elapsedMs)
+
+  // Duration derivation, honesty-gated:
+  //   - streaming → live tick from runStartMs to now (never-vanishes).
+  //   - terminal + persisted completedAt → TRUE duration completedMs − runStartMs.
+  //   - terminal + no completedAt but a same-session frozenEnd → that frozen end
+  //     (a run that JUST finished live this session — a real end-time, not the
+  //     current clock against a stale created_at).
+  //   - terminal + no completedAt + no frozenEnd → NO duration (the honesty rule).
+  let elapsedMs: number | null = null
+  if (hasStart) {
+    if (isStreamingNow) {
+      elapsedMs = now - runStartMs
+    } else if (hasTrueEnd) {
+      elapsedMs = completedMs - runStartMs
+    } else if (frozenEndRef.current != null) {
+      elapsedMs = frozenEndRef.current - runStartMs
+    }
+  }
+  // `hasElapsed` gates the timer render — a terminal run with no honest end-time
+  // shows nothing rather than a fabricated value. `elapsedLabel` is "" when null
+  // so legacy render sites that interpolate it produce no duration text.
+  const hasElapsed = elapsedMs != null
+  const elapsedLabel = hasElapsed ? formatElapsed(elapsedMs as number) : ""
 
   // Phase 076.1-04: Cumulative file count from completed tool call results.
   // Parses tc.result JSON for output_files arrays across all tool calls.
@@ -172,13 +223,19 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
     ? `Run · ${stepCount} step${stepCount === 1 ? "" : "s"}`
     : "Agent run"
 
-  // ---- Plan 07 (GAP-095-03 MED): the restored `model · turn` run-sub ----
-  // Derived from data ALREADY on the message — NO new backend field, NO migration.
-  // The Message type exposes no model/provider field, so the model segment is
-  // OMITTED (the plan's documented fallback) and the run-sub shows just `turn N`.
+  // ---- Plan 095.1-03 (D-04 model attribution): the honest `{provider} · {model} · turn N` run-sub ----
+  // 095-07 left this as a "model OMITTED" stub because the Message type carried
+  // no model/provider field. D-04 now threads the REAL resolved runs.model /
+  // runs.provider through the additive enrich → message.model / message.provider,
+  // so the run-sub shows WHICH model actually answered (e.g. `google · gemini-3.5-flash`).
+  // GRACEFUL: a legacy / pre-run-backed message (no run row) has no model/provider
+  // → the run-sub falls back to just `turn N`. All values render as React text
+  // children only — never innerHTML (T-095.1-03-01 XSS mitigation).
   // turn = (iterationCount ?? 0) + 1 (iterationCount is 0-based — Phase 56 D-03).
   const turnNumber = (message.iterationCount ?? 0) + 1
-  const runSub = `turn ${turnNumber}`
+  const runSub = message.provider && message.model
+    ? `${message.provider} · ${message.model} · turn ${turnNumber}`
+    : `turn ${turnNumber}`
 
   return (
     <div
@@ -241,6 +298,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
             <RunStatusStrip
               placement="header"
               elapsedLabel={elapsedLabel}
+              showElapsed={hasElapsed}
               stepCount={stepCount}
               activityVerb={
                 isStreamingNow
@@ -291,7 +349,11 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           <span title={message.runError || undefined}>
             {statusGlyph(message.runStatus)} {statusWord(message.runStatus, message.runError)}
           </span>
-          {hasStart && (
+          {/* D-095.1-05 honesty rule: only show the elapsed segment when there
+              is a TRUE duration (persisted completedAt − startedAt, or a
+              same-session frozen end). A terminal run with no real end-time
+              shows the status word but NO fabricated duration. */}
+          {hasElapsed && (
             <>
               <span aria-hidden="true">·</span>
               <span className="font-mono">{elapsedLabel}</span>
@@ -347,7 +409,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               <span className="flex-1 truncate">
                 Thinking · planning next step
               </span>
-              {hasStart && (
+              {hasElapsed && (
                 <span className="font-mono opacity-60 tabular-nums">
                   {elapsedLabel}
                 </span>

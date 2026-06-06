@@ -44,11 +44,18 @@ export function RunStatusStrip({
   stepCount,
   activityVerb,
   placement,
+  showElapsed = true,
 }: {
   elapsedLabel: string
   stepCount: number
   activityVerb: string | null
   placement: "header" | "header-bare" | "floating"
+  // Phase 095.1-03 (D-05 honesty rule): when a terminal run has no TRUE end-time
+  // (no persisted completedAt and no same-session frozen end), RunCard passes
+  // `showElapsed={false}` so the ⏱ duration segment is OMITTED entirely rather
+  // than rendering a fabricated/empty value. Step N + the terminal tone remain.
+  // Defaults true → every existing caller (live tick, true terminal) is unchanged.
+  showElapsed?: boolean
 }) {
   // `.done` modifier (not a parent selector) per the sketch: a terminal strip
   // (no activity verb) recedes to the success tone; a live strip stays primary.
@@ -72,14 +79,21 @@ export function RunStatusStrip({
         isDone && "text-success",
       )}
     >
-      {/* ⏱ elapsed — always present whenever RunCard passes a label (start-ts parses) */}
-      <span className="flex items-center gap-1" aria-live="polite">
-        <span aria-hidden="true">⏱</span>
-        <span>{elapsedLabel}</span>
-      </span>
+      {/* ⏱ elapsed — present when RunCard passes a label (start-ts parses) AND
+          there's an HONEST duration to show. A terminal run with no true
+          end-time passes showElapsed={false} → the segment is omitted entirely
+          (D-095.1-05 honesty rule: show nothing before showing a fabricated value). */}
+      {showElapsed && (
+        <>
+          <span className="flex items-center gap-1" aria-live="polite">
+            <span aria-hidden="true">⏱</span>
+            <span>{elapsedLabel}</span>
+          </span>
 
-      {/* divider bar — replaces the old `·` middot (sketch `.divider`) */}
-      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+          {/* divider bar — replaces the old `·` middot (sketch `.divider`) */}
+          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+        </>
+      )}
 
       {/* Step N — the D-04 unifiedStepCount, identical to the header/collapsed-row */}
       <span>Step {stepCount}</span>
