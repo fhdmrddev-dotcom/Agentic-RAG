@@ -34,14 +34,18 @@ import {
 import type { ToolCall } from "@/types"
 
 // Minimal ToolCall factory — only the fields the gate/derive touch matter.
-// `args` is Record<string, string> per the type; nested shapes (todos) are
-// stamped via the factory override and read through `unknown` in the module.
-function tc(partial: Partial<ToolCall> & { args?: Record<string, unknown> }): ToolCall {
+// `args` is Record<string, string> on the real type; the panel reads nested
+// shapes (todos / description / code) through `unknown`, so the factory accepts
+// a loose `args` bag (Omit args from the Partial part to dodge the type clash).
+function tc(
+  partial: Omit<Partial<ToolCall>, "args"> & { args?: Record<string, unknown> },
+): ToolCall {
+  const { args, ...rest } = partial
   return {
-    name: partial.name ?? "search_documents",
-    args: (partial.args ?? {}) as Record<string, string>,
-    status: partial.status ?? "done",
-    ...partial,
+    name: "search_documents",
+    status: "done",
+    ...rest,
+    args: (args ?? {}) as unknown as Record<string, string>,
   } as ToolCall
 }
 
