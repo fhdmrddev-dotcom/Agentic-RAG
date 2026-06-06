@@ -1,9 +1,11 @@
 ---
 phase: 095-chat-tool-card-unification
 verified: 2026-06-06T00:45:00Z
-status: human_needed
-score: 4/4 automated truths verified
+status: gaps_found
+score: 4/4 automated truths verified; operator live-UAT (2026-06-06) found 3 gaps
 overrides_applied: 0
+gaps_source: operator-live-UAT-2026-06-06 (diagnosed + adversarially verified, workflow wf_a263d71a-919)
+gap_scope_decision: "full-fidelity (both bugs + all high/med visual matches; header = model·turn subline; defer LOW/data-field items to seed)"
 human_verification:
   - test: "Long run stays honest — timer continuous, step count == cards, no sub-agent dup, freeze at true terminal"
     expected: "Kimi/Moonshot ~11-step run: timer never blinks out, step N in header == step N in strip == N deduped cards in panel, read/summarize sub-agent appears exactly once, timer freezes at run end"
@@ -196,9 +198,39 @@ These three items from the code review are noted for the record but do not block
 
 ### Gaps Summary
 
-No automated gaps. The 4 human-verification items above are all operator-owned LIVE Chrome-DevTools-MCP UAT scenarios per `095-VALIDATION.md` (Manual-Only section). They cannot be automated (real browser, real providers, real file downloads, real elapsed time). The status is `human_needed` because these scenarios have not yet been exercised.
+The 4 automated truths verified, but the operator ran the LIVE Chrome-DevTools-MCP UAT (2026-06-06) and found **3 gaps**. Each was root-caused + adversarially verified (workflow wf_a263d71a-919, 11 agents). Operator scope decision: **full fidelity** (fix both bugs + all high/medium visual divergences; header identity = `model · turn` subline, no backend; defer LOW + data-field items to a seed). Full diagnosis in `095-HUMAN-UAT.md`.
 
-The 3 warnings (WR-01, WR-02, WR-03) are polish/edge-case concerns documented above; they do not block the phase goal and are recommended for follow-on quick fixes.
+#### GAP-095-01 — Tool-card fold-all (HIGH, confidence high)
+- **What the operator saw:** expanding ONE completed tool-card expands ALL of them.
+- **Root cause:** `ToolCallPanel.tsx:488` single shared `stepsCollapsed` boolean; every collapsed summary row's onClick (`:552`, `:570`) flips it. No per-row identity. Mid-run only (Focus Mode, ≥3 done steps).
+- **Fix:** per-step `Set<string>` keyed on `stepKeyOf` clientKey; gate `:544` with `!expandedSteps.has(key)`; onClicks add ONE key; add per-row re-collapse affordance. Update `ToolCallPanel.test.tsx:99-108` (currently codifies expand-all) + add a partial-expand test.
+- **Files:** `frontend/src/components/chat/ToolCallPanel.tsx` (+ test). Violates D-01, SC#1.
+
+#### GAP-095-02 — Hero highlight leaks working files (HIGH, confidence high; confirms WR-02)
+- **What the operator saw:** the highlighted (hero) section sometimes includes working files, not just the deliverable.
+- **Root cause:** `agent_loop.py:835-844` `_select_hero_filenames` returns a multi-element SET (every file of a requested extension → `is_hero`). Frontend partition is correct; leak is 100% backend over-selection. `test_095_final_output_tag.py:62-69` encodes the multi-hero behavior as intended.
+- **Fix:** requested-ext branch returns exactly ONE filename via `max(size, iteration)`; update the test to one hero. Secondary (separate): kill the live-vs-reload divergence in the fallback branch by computing the hero set ONCE at loop end for both emit + persist (or re-derive on reload in `api.ts`). Ext-detection tokenize = defense-in-depth, not the cause.
+- **Files:** `backend/app/services/agent_loop.py` (+ test); optionally `frontend/src/lib/api.ts`. Touches SC#1.
+
+#### GAP-095-03 — Design fidelity vs sketch contract 014/015/016 (MIXED; full-fidelity scope)
+In scope (operator chose full fidelity):
+- HIGH — finished card → the single **essence line** (`snum · icon · name → result · pill · chev`); the args+separate-result two-row shape is replaced. `ToolCallPanel.tsx:690-747`, `206-228`.
+- HIGH — **un-gate** the Focus-Mode fold so every finished step folds to essence from step 1 (remove the `>=3` gate `:486-488`). Lands with GAP-095-01's per-step state.
+- MED — active step **bloom** (primary-dim wash + inset 2px left bar, active essence text primary) replacing the old `tc-active-wrap` outer glow. `index.css:399-404`.
+- MED — header status strip gets the **pill chrome** (bg + 1px border + rounded-full + divider bars). `RunStatusStrip.tsx:44-51`.
+- MED — header: activity verb in the **strip only** + restore the `model · turn` **run-sub** subline + a simple derived title (no backend). `RunCard.tsx:170-174`, `230-235`.
+- MED — hero file icon **48px** / working **30px**. `OutputFileCard.tsx:82`.
+- MED — hero **soft 24px glow halo** replacing the flat 1px ring. `OutputFileCard.tsx:165`.
+- MED — files area: **borderless top-rule + uppercase dim eyebrow** ("Generated files") replacing the boxed card. `MessageItem.tsx:83-84`.
+- LOW (cheap, include) — floating chip **status-first, jump trailing**; working toggle "— intermediates, all downloadable" copy. `MessageList.tsx:191-212`, `MessageItem.tsx:106`.
+
+Deferred to a SEED (operator decision — LOW / needs data contract):
+- per-file descriptive subtitle (needs a backend `description`/`role` field on `final_output_files`).
+- folded-page SVG file icon (the Lucide form is **explicitly permitted** by the contract — not a real gap).
+
+WR-03 (StreamsProvider out-of-order `sub_agent_start` arg-drop) stays a watch-item — not operator-reproduced.
+
+**Routing:** ONE gap-closure phase via `/gsd:plan-phase 095 --gaps`, organized as 4 units (ToolCallPanel essence+collapse+bloom / header chrome+verb+subline / file-axis visual / backend one-hero+test). Quick fixes rejected — units re-edit the same ToolCallPanel + MessageItem hot files; one plan = one cross-provider validation pass.
 
 ---
 
