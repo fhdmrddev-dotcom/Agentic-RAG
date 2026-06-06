@@ -80,8 +80,8 @@ function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
   const working = heroes.length > 0 ? files.filter((f) => !f.is_hero) : files
 
   return (
-    <div className="mt-3 rounded-md ghost-border bg-card/40 p-3" data-testid="final-outputs-panel">
-      <div className="text-xs font-semibold mb-2 text-foreground/80">Generated files</div>
+    <div className="mt-3 border-t border-border/60 pt-3.5" data-testid="final-outputs-panel">
+      <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted-foreground mb-2.5">Generated files</div>
       {heroes.length > 0 && (
         <div className="space-y-2" data-testid="final-outputs-hero">
           {heroes.map((f, i) => (
@@ -103,7 +103,7 @@ function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
                 workingOpen ? "rotate-90" : "",
               )}
             />
-            Working files ({working.length})
+            Working files ({working.length}) — intermediates, all downloadable
           </button>
           {workingOpen && (
             <div className="space-y-1.5">

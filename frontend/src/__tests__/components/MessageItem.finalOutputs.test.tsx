@@ -93,7 +93,8 @@ describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
     expect(screen.getAllByText("★ Your file").length).toBe(1)
 
     // working group present, labelled with the count (2 = the non-hero files)
-    expect(screen.getByText("Working files (2)")).toBeTruthy()
+    // + the sketch-016 intermediates copy (095-08 GAP-095-03 LOW)
+    expect(screen.getByText(/Working files \(2\) — intermediates, all downloadable/)).toBeTruthy()
     const workingGroup = screen.getByTestId("final-outputs-working")
     // ALL files downloadable (re-rank, never hide) — both working files are anchors
     expect(workingGroup.querySelector("a[download='scratch.csv']")).not.toBeNull()
@@ -152,7 +153,7 @@ describe("MessageItem — hero / working split (Phase 095 D-07)", () => {
     expect(screen.queryByTestId("final-outputs-hero")).toBeNull()
     expect(screen.queryByText("★ Your file")).toBeNull()
     // all files in the working group, all downloadable
-    expect(screen.getByText("Working files (2)")).toBeTruthy()
+    expect(screen.getByText(/Working files \(2\) — intermediates, all downloadable/)).toBeTruthy()
     expect(container.querySelector("a[download='a.png']")).not.toBeNull()
     expect(container.querySelector("a[download='b.png']")).not.toBeNull()
   })
