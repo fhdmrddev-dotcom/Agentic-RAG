@@ -19,6 +19,8 @@ the hero flag is presentation-only and must never feed the download path
 """
 from __future__ import annotations
 
+import json
+
 from app.services.agent_loop import _select_hero_filenames
 
 
@@ -235,3 +237,102 @@ def test_persist_projection_carries_is_hero_for_reload():
     ]
     assert persisted[0]["is_hero"] is True
     assert "url" in persisted[0]
+
+
+# ---------------------------------------------------------------------------
+# Plan 09 Task 2 (GAP-095-02 / WR-02) — live == reload consistency.
+# The per-cell persist sees only a PARTIAL cumulative file list, so it stamps
+# is_hero=False as a placeholder; the loop-end re-stamp recomputes is_hero over
+# the COMPLETE set so the persisted rows and the live emit hero the SAME single
+# file. This mirrors the agent_loop.py re-stamp logic exactly.
+# ---------------------------------------------------------------------------
+def _restamp_persisted_rows(persisted_tool_calls: list[dict], hero_set: set[str]) -> None:
+    """Mirror of agent_loop.py's loop-end re-stamp of persisted execute_code rows."""
+    for _tc in persisted_tool_calls:
+        if _tc.get("name") != "execute_code":
+            continue
+        try:
+            _pr = json.loads(_tc["result"])
+            _of_rows = _pr.get("output_files")
+            if not isinstance(_of_rows, list):
+                continue
+            _pr["output_files"] = [
+                {**_of, "is_hero": _of.get("filename") in hero_set} for _of in _of_rows
+            ]
+            _tc["result"] = json.dumps(_pr)
+        except (json.JSONDecodeError, TypeError, KeyError):
+            continue
+
+
+def test_multi_cell_live_equals_reload_single_hero():
+    # Two-cell run: cell 1 wrote scratch.csv, cell 2 wrote deck.pptx; user asked
+    # for a pptx. The live emit (over the COMPLETE set) AND the re-stamped
+    # persisted rows must hero the SAME single file (deck.pptx).
+    user_message = "build me a pptx deck"
+
+    # --- per-cell persist: each cell only sees a PARTIAL cumulative list, so it
+    # stamps a False placeholder (matching agent_loop.py's per-cell persist). ---
+    persisted_tool_calls = [
+        {
+            "name": "execute_code",
+            "status": "done",
+            "result": json.dumps({
+                "status": "done", "exit_code": 0, "duration_ms": 1,
+                "output_files": [{"filename": "scratch.csv", "url": "/u/scratch.csv", "size": 1_000, "is_hero": False}],
+            }),
+        },
+        {
+            "name": "execute_code",
+            "status": "done",
+            "result": json.dumps({
+                "status": "done", "exit_code": 0, "duration_ms": 1,
+                "output_files": [{"filename": "deck.pptx", "url": "/u/deck.pptx", "size": 9_000, "is_hero": False}],
+            }),
+        },
+    ]
+
+    # --- loop end: compute the canonical hero set ONCE over the COMPLETE set ---
+    complete_metas = [
+        {"filename": "scratch.csv", "url": "/u/scratch.csv", "size": 1_000, "iteration": 1},
+        {"filename": "deck.pptx", "url": "/u/deck.pptx", "size": 9_000, "iteration": 2},
+    ]
+    hero_set = _select_hero_filenames(complete_metas, user_message)
+    assert hero_set == {"deck.pptx"}
+    assert len(hero_set) == 1
+
+    # live emit projection over the complete set
+    emit = _project_emit(complete_metas, user_message)
+    live_heroes = {f["filename"] for f in emit if f["is_hero"]}
+
+    # re-stamp the persisted rows against the SAME canonical hero set
+    _restamp_persisted_rows(persisted_tool_calls, hero_set)
+    reload_heroes = {
+        of["filename"]
+        for tc in persisted_tool_calls
+        for of in json.loads(tc["result"])["output_files"]
+        if of["is_hero"]
+    }
+
+    # live == reload: both hero exactly deck.pptx, nothing else
+    assert live_heroes == {"deck.pptx"}
+    assert reload_heroes == {"deck.pptx"}
+    assert live_heroes == reload_heroes
+    # and the intermediate scratch.csv is NOT a hero in either view
+    assert all(
+        of["is_hero"] is False
+        for tc in persisted_tool_calls
+        for of in json.loads(tc["result"])["output_files"]
+        if of["filename"] == "scratch.csv"
+    )
+
+
+def test_restamp_skips_truncated_non_json_result_gracefully():
+    # A truncated/non-JSON fallback result (the per-cell except path) must be
+    # skipped without raising during the loop-end re-stamp.
+    persisted_tool_calls = [
+        {"name": "execute_code", "status": "done", "result": "TRUNCATED-not-json…"},
+        {"name": "search_documents", "status": "done", "result": "irrelevant"},
+    ]
+    # must not raise
+    _restamp_persisted_rows(persisted_tool_calls, {"deck.pptx"})
+    assert persisted_tool_calls[0]["result"] == "TRUNCATED-not-json…"

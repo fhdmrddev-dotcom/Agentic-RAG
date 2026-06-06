@@ -2085,22 +2085,26 @@ async def run_agent_loop(
                 if tool_name == "execute_code":
                     try:
                         _r = json.loads(tool_result)
-                        # Phase 095 Plan 05 Task 1 (D-08) — persist the hero flag
-                        # so api.ts reload reconstruction (_mapMessageResponse)
-                        # re-heroes the same file on a next-day reopen. Compute
-                        # the hero set over the cumulative per-run meta dicts
-                        # available at this point (sandbox harvest ran inside
-                        # dispatch_tool before this persist, so the just-produced
-                        # files are already in _previous_files_in_run). The last
-                        # execute_code cell to persist therefore reflects the most
-                        # complete hero set. Purely additive: each output_files
-                        # entry gains an ``is_hero`` bool; the existing keys
-                        # (filename/url/size/...) are untouched.
-                        _persist_hero_set = _select_hero_filenames(
-                            list(_previous_files_in_run.values()), body.content
-                        )
+                        # Phase 095 Plan 05 Task 1 (D-08) + Plan 09 Task 2
+                        # (GAP-095-02 / WR-02) — persist the hero flag so api.ts
+                        # reload reconstruction (_mapMessageResponse) re-heroes the
+                        # SAME file on a next-day reopen.
+                        #
+                        # IMPORTANT: do NOT compute the hero set here. At this
+                        # per-cell persist point ``_previous_files_in_run`` is only
+                        # PARTIAL (later cells have not run yet), so a per-cell hero
+                        # would disagree with the loop-end emit (computed over the
+                        # COMPLETE set) → live and reload would hero different files
+                        # on a multi-cell run. Instead we stamp ``is_hero=False`` as
+                        # a placeholder and RE-STAMP every persisted execute_code row
+                        # once after the loop against the single canonical
+                        # ``_hero_set`` (see the loop-end emit site below). This makes
+                        # the persisted rows reflect the ONE canonical set → live ==
+                        # reload. Purely additive: each output_files entry gains an
+                        # ``is_hero`` bool; the existing keys (filename/url/size/...)
+                        # are untouched.
                         _persist_output_files = [
-                            {**_of, "is_hero": _of.get("filename") in _persist_hero_set}
+                            {**_of, "is_hero": False}
                             for _of in _r.get("output_files", [])
                         ]
                         persisted_result = json.dumps({
@@ -2153,7 +2157,35 @@ async def run_agent_loop(
             # presentation-only and never feeds the owner-fenced re-sign
             # download path (T-095-05-01).
             _emit_metas = list(_previous_files_in_run.values())
+            # Phase 095 Plan 09 Task 2 (GAP-095-02 / WR-02) — compute the hero set
+            # ONCE over the COMPLETE run file set. This is the single source of
+            # truth shared by BOTH the live emit (below) AND the post-loop re-stamp
+            # of the persisted execute_code rows, so live == reload (a multi-cell
+            # reload heroes the same single file as the live run).
             _hero_set = _select_hero_filenames(_emit_metas, body.content)
+
+            # Re-stamp the persisted execute_code rows against the canonical
+            # ``_hero_set`` (the per-cell persist above stamped a False placeholder
+            # over the PARTIAL cumulative list). Each row's output_files ``is_hero``
+            # is recomputed from the complete-set hero, re-serialized, written back.
+            # Guarded: a truncated/non-JSON fallback ``result`` (the per-cell
+            # ``except`` path) is skipped gracefully.
+            for _tc in persisted_tool_calls:
+                if _tc.get("name") != "execute_code":
+                    continue
+                try:
+                    _pr = json.loads(_tc["result"])
+                    _of_rows = _pr.get("output_files")
+                    if not isinstance(_of_rows, list):
+                        continue
+                    _pr["output_files"] = [
+                        {**_of, "is_hero": _of.get("filename") in _hero_set}
+                        for _of in _of_rows
+                    ]
+                    _tc["result"] = json.dumps(_pr)
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    continue
+
             await _emit(
                 redis,
                 run_id,
