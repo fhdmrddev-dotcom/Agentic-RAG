@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: ready_to_execute
-stopped_at: "Phase 095 GAP-CLOSURE — 095-08 SHIPPED (file-axis fidelity: hero icon 48/working 30 + soft 24px hero glow halo + borderless top-rule/dim eyebrow + intermediates copy + status-first/jump-trailing chip; GAP-095-03 MED×3 + LOW×2 closed; partition logic untouched). Gap plan 095-09 remains; next = continue /gsd:execute-phase 095 --gaps-only"
-last_updated: "2026-06-06T07:33:00.000Z"
+status: ready_to_verify
+stopped_at: "Phase 095 GAP-CLOSURE — 095-09 SHIPPED (single-hero backend fix, GAP-095-02/WR-02). ALL 4 gap plans (06/07/08/09) shipped → phase gap-closure structurally complete; NEXT = /gsd:verify-work 095"
+last_updated: "2026-06-06T07:44:59.185Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 9
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 51
-  completed_plans: 50
-  percent: 98
+  completed_plans: 51
+  percent: 100
 ---
 
 # Project State
@@ -21,9 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). **095-06 ✅ SHIPPED 2026-06-06** (GAP-095-01 fold-all + GAP-095-03 un-gate/essence/bloom). **095-07 ✅ SHIPPED 2026-06-06** (GAP-095-03 MED header chrome: pill-chrome strip + single verb + restored model·turn run-sub). **095-08 ✅ SHIPPED 2026-06-06** (GAP-095-03 file-axis fidelity: hero icon 48/working 30 + soft 24px hero glow halo + borderless top-rule/dim eyebrow + intermediates copy + status-first/jump-trailing chip; partition logic untouched per scope). Gap plan **095-09** remains (single hero / multi-select leak — backend). Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = continue `/gsd:execute-phase 095 --gaps-only`.
+**Current focus:** Phase 095 — chat-tool-card-unification GAP CLOSURE. Original 5 plans shipped + verified 4/4 automated; operator live-UAT (2026-06-06) found 3 gaps → diagnosed + adversarially verified (wf_a263d71a-919) → 4 gap plans 095-06..09 (gap_closure:true, Wave 1, disjoint files, checker-PASSED). **095-06 ✅ SHIPPED 2026-06-06** (GAP-095-01 fold-all + GAP-095-03 un-gate/essence/bloom). **095-07 ✅ SHIPPED 2026-06-06** (GAP-095-03 MED header chrome: pill-chrome strip + single verb + restored model·turn run-sub). **095-08 ✅ SHIPPED 2026-06-06** (GAP-095-03 file-axis fidelity: hero icon 48/working 30 + soft 24px hero glow halo + borderless top-rule/dim eyebrow + intermediates copy + status-first/jump-trailing chip; partition logic untouched per scope). **095-09 ✅ SHIPPED 2026-06-06** (GAP-095-02 / WR-02 backend single-hero fix: `_select_hero_filenames` returns exactly ONE hero on every branch + one canonical `_hero_set` shared by the live emit + the re-stamped persisted execute_code rows → live == reload; token-match ext detection). **ALL 4 gap plans (06/07/08/09) shipped** — phase gap-closure structurally complete. Full-fidelity scope; SEED-054 defers per-file subtitle + SVG icon. NEXT = `/gsd:verify-work 095`.
 
 ## Current Position
+
+**Phase 095 — Plan 095-09 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks; Task 1 TDD RED→GREEN). The **BACKEND single-hero fix (GAP-095-02 / WR-02)** — the last gap plan; the hero/working PARTITION over-selection that the frontend (correctly) just renders. **(Task 1 — single hero on every branch, `agent_loop.py`):** `_select_hero_filenames` used to return a MULTI-element set on the requested-extension branch (every file of a requested ext → hero). Now a new shared `_hero_pick` tie-break (max size, then iteration) is applied identically across the declared, requested-ext, and fallback branches → the helper returns a set of length EXACTLY 1 whenever ≥1 file exists. The requested-ext branch collects the matching metas then picks the single largest; the declared branch collapses any multi-declaration to one. Old multi-hero test retargeted to a single hero; +size-tie + multi-declared-collapse + `len==1` on all 3 paths. **(Task 2 — one canonical hero set for emit + persist, live == reload):** the per-cell `execute_code` persist used to compute the hero over a PARTIAL `_previous_files_in_run` at each cell while the loop-end emit computed over the COMPLETE set — so a multi-cell run heroed a different file on reload. Now the per-cell persist stamps `is_hero=False` (placeholder), and the loop-end RE-STAMPS every persisted execute_code row against the ONE canonical `_hero_set` computed over the complete set (mutated in place in `persisted_tool_calls`, read at call-time by `_persist_assistant_message` ~L1174, re-stamp at ~L2165 runs before persist ~L2332/2440; guarded against truncated/non-JSON fallback results). `_select_hero_filenames` now called EXACTLY ONCE in the loop (the per-cell partial call is gone); `_hero_set` referenced 5× (compute + re-stamp + emit). +multi-cell live==reload consistency test + graceful-skip-non-json. **(Task 3 — token-match ext detection, hardening):** requested-ext detection switched from raw substring `ext in msg` to whole-token `re.findall(r"[a-z0-9]+", msg)` (`.pptx` still tokenizes to `pptx`; a substring embed like `discsv` no longer flags `csv`). Forward hardening only — the symptom cause was the multi-hero return fixed in Task 1. +substring-no-trigger + trailing-punctuation cases. **Presentation-only + cross-provider safe:** `'final_output_files'` event name unchanged (`grep -c == 1`); `sandbox_outputs.py` (owner-fenced re-sign download path) BYTE-IDENTICAL (git diff empty) — the `is_hero` flag never feeds the download path; pure provider-free helper at two shared sites; NO schema, NO migration. **Tests:** `test_095_final_output_tag.py` **19/19 GREEN**; all 5 agent_loop-importing test files (095-final-output / 089-seam / 075.5-google-native / 075.4-registry-sweep / continue) **61/61 GREEN** — ZERO net-new failures; module imports clean (`import re` added). Commits `70271dab` (Task 1 — single-hero branch, TDD) + `a2979082` (Task 2 — canonical emit+persist re-stamp) + `91167254` (Task 3 — tokenize ext). Deviations: **NONE** (TDD RED confirmed before GREEN; the only "issue" was a `&&`-chained grep stopping on `grep -c`'s zero-count non-zero exit — re-ran separately, all greps pass). **Known stub:** none (the `is_hero=False` per-cell value is a documented intentional placeholder overwritten by the loop-end re-stamp before persistence). See 095-09-SUMMARY.md (self-check PASSED). **ALL 4 gap plans (06/07/08/09) shipped — Phase 095 gap-closure is structurally complete. NEXT: `/gsd:verify-work 095`** (owns the live Chrome-MCP single-hero / live==reload UAT: ask for a .docx → exactly ONE hero, one-click download, reopen next-day → still the same single hero + the SC#10 4-axis cross-provider scoreboard).
 
 **Phase 095 — Plan 095-08 ✅ COMPLETE 2026-06-06** (sequential on `v2.5-dev`, normal commits WITH hooks). The **file-axis visual divergences from sketch 016 (3 MED) + two cheap LOW items (sketch 015)**, with the hero/working PARTITION logic byte-untouched (the multi-hero leak is the SEPARATE backend fix owned by Plan 095-09). **(GAP-095-03 MED icon size + MED hero glow — `OutputFileCard.tsx`):** the fileIcon size raised `isHeroVariant ? 30 : 16` → `48 : 30` (sketch-016 sizes); the hero card's flat `shadow-[0_0_0_1px_rgba(99,102,241,0.08)]` 1px ring swapped for the soft 24px primary halo `shadow-[0_0_24px_hsl(239_100%_82%/0.18)]` (= `--shadow-glow-primary`, a Tailwind arbitrary value mirroring the sketch token — no new CSS class, no index.css touch). The dead-state hero branch inherits the larger 48px icon and stays glow-less. **(GAP-095-03 MED top-rule/eyebrow + LOW intermediates copy — `MessageItem.tsx` FinalOutputsPanel):** the container went from the bordered box `rounded-md ghost-border bg-card/40 p-3` to the borderless top-rule `border-t border-border/60 pt-3.5`; the bold `text-xs font-semibold text-foreground/80` label became the uppercase letter-spaced DIM mono eyebrow `text-[10px] font-mono uppercase tracking-[0.1em] text-muted-foreground` (text "Generated files" kept verbatim); the working toggle now reads `Working files (N) — intermediates, all downloadable`. `data-testid="final-outputs-panel"` + the `heroes`/`working` filter preserved. **(GAP-095-03 LOW chip-order — `MessageList.tsx`):** the floating jump-to-live chip's children reordered — the `RunStatusStrip` (status segments) now LEADS, the separator + "↓ Jump to live" span TRAIL (sketch-015 `.live-chip`: `.jump` morphs in after the status); button identity (testid, aria-label, onClick, sticky positioning, glow) + `RunStatusStrip.tsx` UNTOUCHED (file-disjoint from sibling 095-07). **Provider-agnostic + additive + presentation-only:** frontend-only, className+copy only, no SSE/shared-hot-path/provider branch touched; `dangerouslySetInnerHTML` == 0 in both OutputFileCard.tsx + MessageItem.tsx; the git-diff partition-logic grep confirms NO +/- line references `files.filter`/`heroes.length > 0 ?`. **Tests:** `MessageItem.finalOutputs` **7/7** · `MessageList` **9/9**. `tsc -b` = **37 (the documented baseline — zero net-new**, zero errors reference the touched files); `vite build` exit 0 (twice). **Full-suite 17 failed / 497 passed (514)** — identical to the documented pre-existing baseline cluster (same 7 files: model-info / MessageItem / Plan04 / useMessages / StreamsProvider.dedup / streamsProvider / streamsProvider_075_9_clientkey); **ZERO net-new failures**; the one touched test file (`MessageItem.finalOutputs`) is GREEN and not in the failure set. Commits `4e06d425` (Task 1 — hero icon 48 + soft glow halo) + `ab67f9e6` (Task 2 — top-rule/eyebrow + intermediates copy) + `2c59ba36` (Task 3 — chip status-first/jump-trailing). Deviations: **1 (Rule 1 — retargeted 2 exact-string `getByText("Working files (N)")` test assertions to substring/regex for the new toggle copy — explicitly anticipated by Task 2's acceptance criteria, plan-mandated, not scope creep)**. **Known stub:** none (the per-file subtitle + folded-page SVG icon stay DEFERRED to SEED-054, explicitly out of scope). See 095-08-SUMMARY.md (self-check PASSED). **NEXT: execute 095-09 (single hero / multi-select leak — the BACKEND partition fix on the same FinalOutputsPanel surface; files disjoint); then `/gsd:verify-work 095`.**
 
@@ -144,7 +146,7 @@ v2.8 CLOSURE CHECKLIST (do NOT do per-phase):
 
 Last activity: 2026-06-05
 
-Progress: [██████████] 98%
+Progress: [██████████] 100%
 <!-- v2.8 phase progress: 089/090/091/092/092.5 complete (5/9); 093 all 9 plans (initial 5 + gap-closure 093-06..09) EXECUTED + SHIPPED — 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 finish-event hydration) + 093-08 (D-18/S3 sub-agent model resolution) + 093-09 (D-19 GLM max_steps force-synthesis + cap 8→12) all DONE → NEXT = verifier-owned D-21 re-UAT (the native-7 × 5-type × 4-workflow LIVE UAT, BINDING) → phase close (PARITY-02 flips to Complete 7/7 when LIVE UAT passes); 094/095/096 remaining -->
 
 ### Phase 092 Plan 05 (gap-closure) — ✅ COMPLETE
@@ -218,6 +220,7 @@ Progress: [██████████] 98%
 | Phase 095 P06 | 15min | 2 tasks | 3 files |
 | Phase 095 P07 | 6min | 2 tasks | 3 files |
 | Phase 095 P08 | 5min | 3 tasks | 4 files |
+| Phase 095-chat-tool-card-unification P09 | 6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -412,8 +415,8 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-06T07:24:55.209Z
-Stopped at: Completed 095-07-PLAN.md (gap-closure — header chrome)
+Last session: 2026-06-06T07:44:59.176Z
+Stopped at: Completed 095-09-PLAN.md (gap-closure: single-hero backend fix, GAP-095-02/WR-02)
 Resume file: None
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).

@@ -212,7 +212,7 @@ Plans:
 - [x] 095-06-PLAN.md — GAP-095-01 per-card collapse (per-step `expandedSteps` Set kills fold-all) + GAP-095-03 un-gate / single essence line / active bloom [gap, Wave 1] ✅ 2026-06-06
 - [x] 095-07-PLAN.md — header chrome (GAP-095-03 MED: pill-chrome strip + single verb + restored `model · turn` run-sub) [gap, Wave 1] ✅ 2026-06-06
 - [x] 095-08-PLAN.md — file-axis fidelity (GAP-095-03 MED: hero icon 48/working 30 + soft 24px hero glow halo + borderless top-rule/dim eyebrow; LOW: intermediates copy + status-first/jump-trailing chip; partition logic untouched) [gap, Wave 1] ✅ 2026-06-06
-- [ ] 095-09-PLAN.md — single hero (multi-select leak) [gap, Wave 1]
+- [x] 095-09-PLAN.md — single hero / multi-select leak (backend): GAP-095-02 / WR-02 — `_select_hero_filenames` returns exactly ONE hero on every branch + one canonical `_hero_set` shared by emit + persist (live == reload); token-match ext detection [gap, Wave 1] ✅ 2026-06-06
 **UI hint**: yes
 **Notes**: **G-2 FIRES** — `/gsd:sketch` SHIPPED (sketches 014/015/016 → `Skill("sketch-findings-agentic-rag")`); the operator-approved mockup is the acceptance bar (no UI-SPEC.md — the sketch-findings skill IS the design contract). Touches hot-file-ledger files (ToolCallPanel, MessageItem, StreamsProvider, RunCard, MessageList) — G-5 satisfied as of 075.7, re-confirmed by 095-RESEARCH (095 is the first chat-render feature touch since the refactor; all touches are additive extensions, not rebuilds → G-5 does NOT fire). SC#4 "frontend-only" NARROWED by D-08 to permit ONE additive backend field on `final_output_files` (the hero tag). Build-once inventory (SKETCH-CONSISTENCY §1): 3 genuinely-new files (`stepCount.ts`, `fileIcon.tsx`, `useFollowScroll.ts` + `RunStatusStrip.tsx`) + 5 additive extensions + 1 backend field. The 4-axis lived-experience UAT (Chrome-DevTools MCP) is authored in 095-VALIDATION.md Manual-Only, NOT PLAN tasks.
 
@@ -240,7 +240,7 @@ Plans:
 | 092.5. Provider Gateway Extraction (NEW — refactor) | 6/6 | Complete    | 2026-06-01 |
 | 093. Harness Cross-Provider Parity + Phase-Type Hardening | 8/9 | Gap-closure in progress 2026-06-03 — initial 5 plans (substrate + F9 gateway-consumption + model-resolver + ask_user F10 + shared surfacing) executed 2026-06-02; gap-closure 093-06 (D-20 log-sink) + 093-07 (D-16/D-17 hydration + runs.usage) + 093-08 (D-18/S3 sub-agent model resolution — gpt-4o-avoidance) shipped. Remaining: 093-09 (D-19 GLM diagnose-first, autonomous:false). PARITY-02 stays OPEN until the native-7 × 5-type × 4-workflow LIVE UAT passes | - |
 | 094. Workflow Legibility + Mode Clarity | 5/5 | Complete    | 2026-06-05 |
-| 095. Chat Tool-Card Unification | 5/5 + gap 3/4 | Gap-closure (06/07/08 ✅; 09 pending) | 2026-06-06 |
+| 095. Chat Tool-Card Unification | 5/5 + gap 4/4 | Gap-closure complete (06/07/08/09 ✅); ready for /gsd:verify-work | 2026-06-06 |
 | 096. Eval Harness + Cross-Provider Verification + Concurrency | 0/0 | Not started | - |
 
 ---
