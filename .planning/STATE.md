@@ -4,14 +4,14 @@ milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
 stopped_at: Phase 095.1 context gathered (6 decisions locked + bug routing)
-last_updated: "2026-06-06T10:30:28.755Z"
+last_updated: "2026-06-06T11:31:10.927Z"
 last_activity: 2026-06-05
 progress:
   total_phases: 10
   completed_phases: 8
-  total_plans: 51
+  total_plans: 56
   completed_plans: 51
-  percent: 100
+  percent: 91
 ---
 
 # Project State
@@ -486,7 +486,7 @@ Resume file: --resume-file
 - **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
 - SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
-**Planned Phase:** 095 (chat-tool-card-unification) — 5 plans — 2026-06-05T18:45:59.953Z
+**Planned Phase:** 095.1 (cross-provider-run-honesty-workspace-parity) — 5 plans — 2026-06-06T11:31:10.913Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
