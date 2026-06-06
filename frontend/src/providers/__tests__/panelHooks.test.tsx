@@ -81,9 +81,11 @@ import {
   useWorkspaceFiles,
   useAskUserPrompt,
   useTasks,
+  useDerivedPanel,
 } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import { readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
+import type { Message, ToolCall } from "@/types"
 
 const THREAD_A = "thread-A"
 const THREAD_B = "thread-B"
@@ -481,4 +483,147 @@ describe("Phase 086 panel — WR-04 localStorage write-path persistence", () => 
       vi.useRealTimers()
     }
   })
+})
+
+// Phase 095.1 Plan 02 Task 1 (D-095.1-01/02) — useDerivedPanel: a PURE read
+// selector over the viewing thread's persisted chat tool_calls. Option (b): it
+// NEVER writes todosByThread and NEVER touches the chat bucket reference
+// (PANEL-06 / FC#1). The gate (shouldPopulate) + derivation (deriveWorkspacePanel)
+// come from @/lib/workspacePanel (Plan 01, already unit-tested).
+describe("Phase 095.1 panel — useDerivedPanel (activity-derived workspace panel)", () => {
+  // Build an assistant chat message carrying tool_calls (the persisted shape the
+  // selector flattens). clientKey makes each call distinct under dedupToolCalls.
+  function tc(partial: Partial<ToolCall> & { name: string }): ToolCall {
+    return {
+      args: {},
+      status: "done",
+      ...partial,
+    } as ToolCall
+  }
+  function assistantMsg(toolCalls: ToolCall[]): Message {
+    return {
+      id: "assistant-msg",
+      thread_id: THREAD_A,
+      role: "assistant",
+      content: "",
+      created_at: "2026-06-06T10:00:00Z",
+      updated_at: "2026-06-06T10:00:00Z",
+      tool_calls: toolCalls,
+    } as Message
+  }
+  function seedChat(threadId: string, msgs: Message[]) {
+    act(() => {
+      useStreamsStore.getState().actions.setMessagesForBucket("chat", threadId, msgs)
+    })
+  }
+
+  it("returns the stable EMPTY ref when threadId is null", () => {
+    mountProviderForDerived()
+    const { result, rerender } = renderHook(({ tid }) => useDerivedPanel(tid), {
+      initialProps: { tid: null as string | null },
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    const first = result.current
+    expect(first).toEqual([])
+    rerender({ tid: null })
+    // Same stable reference across renders → no chat re-render churn.
+    expect(result.current).toBe(first)
+  })
+
+  it("returns the stable EMPTY ref when the smart gate does NOT pass (one-shot lookup)", () => {
+    mountProviderForDerived()
+    // A single meaningful tool → gate (≥2) does not pass → clean panel.
+    seedChat(THREAD_A, [
+      assistantMsg([tc({ name: "search_documents", clientKey: "k1" })]),
+    ])
+    const { result, rerender } = renderHook(({ tid }) => useDerivedPanel(tid), {
+      initialProps: { tid: THREAD_A as string | null },
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    const first = result.current
+    expect(first).toEqual([])
+    rerender({ tid: THREAD_A })
+    expect(result.current).toBe(first)
+  })
+
+  it("derives read-only items from chat tool_calls when the gate passes (≥2 meaningful tools)", () => {
+    mountProviderForDerived()
+    seedChat(THREAD_A, [
+      assistantMsg([
+        tc({
+          name: "execute_code",
+          clientKey: "k1",
+          status: "done",
+          args: { description: "Compute the Q3 rollup", code: "print(1)" } as unknown as Record<
+            string,
+            string
+          >,
+        }),
+        tc({
+          name: "execute_code",
+          clientKey: "k2",
+          status: "running",
+          args: { code: "df.to_csv('out.csv')" } as unknown as Record<string, string>,
+        }),
+      ]),
+    ])
+    const { result } = renderHook(() => useDerivedPanel(THREAD_A), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    expect(result.current).toHaveLength(2)
+    expect(result.current[0]).toEqual({ label: "Compute the Q3 rollup", status: "completed" })
+    // second derives a label from the code (.to_csv → CSV) + maps running → in_progress
+    expect(result.current[1]).toEqual({ label: "Create CSV file", status: "in_progress" })
+  })
+
+  it("flattens tool_calls across ALL assistant messages in the thread, in order", () => {
+    mountProviderForDerived()
+    seedChat(THREAD_A, [
+      assistantMsg([tc({ name: "search_documents", clientKey: "k1" })]),
+      assistantMsg([tc({ name: "query_tables", clientKey: "k2" })]),
+    ])
+    const { result } = renderHook(() => useDerivedPanel(THREAD_A), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    expect(result.current.map((i) => i.label)).toEqual(["Search documents", "Query tables"])
+  })
+
+  it("does NOT mutate todosByThread and does NOT change the chat bucket reference (PANEL-06 / FC#1)", () => {
+    mountProviderForDerived()
+    seedChat(THREAD_A, [
+      assistantMsg([
+        tc({ name: "execute_code", clientKey: "k1", args: { code: "print(1)" } as unknown as Record<string, string> }),
+        tc({ name: "search_documents", clientKey: "k2" }),
+      ]),
+    ])
+    const bucketBefore = useStreamsStore.getState().bucketsBySurface
+    const { result } = renderHook(() => useDerivedPanel(THREAD_A), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+    expect(result.current.length).toBeGreaterThan(0)
+    // PANEL-06: reading the derived selector left the panel store untouched...
+    expect(useStreamsStore.getState().todosByThread.get(THREAD_A) ?? []).toHaveLength(0)
+    // ...and never replaced the chat bucket reference.
+    expect(useStreamsStore.getState().bucketsBySurface).toBe(bucketBefore)
+  })
+
+  // Helper: mount the provider so the real action bodies (setMessagesForBucket)
+  // are registered before we seed the chat bucket.
+  function mountProviderForDerived() {
+    return renderHook(() => useDerivedPanel(null), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+  }
 })

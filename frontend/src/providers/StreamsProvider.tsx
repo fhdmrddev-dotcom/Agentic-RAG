@@ -53,7 +53,7 @@
  *                      store; async actions throw notMounted. Safe.
  * RESEARCH §Pitfall 5: Throwing stubs surface pre-mount usage instantly.
  */
-import { useEffect, useRef, type PropsWithChildren, type MutableRefObject } from "react"
+import { useEffect, useMemo, useRef, type PropsWithChildren, type MutableRefObject } from "react"
 import type {
   Message,
   ToolCall,
@@ -92,6 +92,15 @@ import {
 import { makeThrottle } from "@/lib/throttle"
 import { writeSnapshotToLocalStorage } from "@/lib/streamsCache"
 import { makeToolKey } from "@/lib/toolKey"
+// Phase 095.1 Plan 02 (D-095.1-01/02): the deterministic activity-derived
+// workspace-panel selector (Plan 01). `useDerivedPanel` is a PURE read over the
+// viewing thread's persisted chat tool_calls — it consumes these, never re-rolls
+// the gate/derive logic.
+import {
+  shouldPopulate,
+  deriveWorkspacePanel,
+  type DerivedPanelItem,
+} from "@/lib/workspacePanel"
 // Phase 092-07 (Facet C): the Continue affordance (MessageItem) fires this signal
 // with the FRESH producer_run_id from the /continue 200 body; the provider
 // re-subscribes that thread's producer stream (additive, per-thread keyed).
@@ -114,6 +123,11 @@ const EMPTY_TASKS: TaskRunIndexItem[] = []
 // timeline hook. A per-thread Map miss (or null threadId) returns this SAME
 // reference so useSyncExternalStore skips re-render (PANEL-09 structural).
 const EMPTY_PHASES: Phase[] = []
+// Phase 095.1 Plan 02 (D-095.1-01/02) — stable EMPTY ref for the activity-derived
+// workspace panel selector. Returned (same rationale as EMPTY_TODOS) whenever the
+// thread is null OR the smart gate does not pass, so reading useDerivedPanel never
+// forces a chat re-render (PANEL-06 / FC#1 isolation).
+const EMPTY_DERIVED: DerivedPanelItem[] = []
 
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
@@ -2242,6 +2256,36 @@ export function useTodos(threadId: string | null): {
     replace,
   })
   return { data, isLoading, error, reconcile }
+}
+
+// Phase 095.1 Plan 02 (D-095.1-01/02): the activity-derived workspace panel. A
+// PURE read selector over the viewing thread's persisted chat tool_calls — it
+// NEVER writes todosByThread (so the real write_todos precedence in TodosSection
+// stays trivial) and NEVER mutates the chat bucket reference (PANEL-06 / FC#1).
+// Reload-safe for free because tool_calls are DB truth reconstructed by
+// _mapMessageResponse — the same derivation recomputes next-day.
+//
+// Implemented as OPTION (b) (RESEARCH Open-Q1 / A2): a panel-side read selector,
+// NOT a cross-store write through replaceTodosForThread (option a). Chosen because
+// writing derived items into the panel store from the chat path risks the PANEL-06
+// isolation contract and muddies real-vs-derived precedence; a pure read keeps ONE
+// clean precedence with zero cross-store write. Verified against FC#1.
+//
+// To avoid useSyncExternalStore churn (a selector returning a fresh array every
+// render would re-run subscribers), the store selector returns the STABLE chat
+// Message[] reference (changes only when the bucket changes), and the derivation
+// is memoized over that ref — so the hook output identity is stable until the
+// thread's tool activity actually changes.
+export function useDerivedPanel(threadId: string | null): DerivedPanelItem[] {
+  const messages = useStreamsStore((s) =>
+    threadId ? (s.bucketsBySurface.get("chat")?.get(threadId) ?? EMPTY_ARRAY) : EMPTY_ARRAY,
+  )
+  return useMemo(() => {
+    if (!threadId) return EMPTY_DERIVED
+    const allToolCalls = messages.flatMap((m) => m.tool_calls ?? [])
+    if (!shouldPopulate(allToolCalls)) return EMPTY_DERIVED
+    return deriveWorkspacePanel(allToolCalls)
+  }, [threadId, messages])
 }
 
 export function useWorkspaceFiles(threadId: string | null): {
