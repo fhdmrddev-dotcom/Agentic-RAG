@@ -25,15 +25,39 @@ def _thread_row(thread_id=None, title="New Chat"):
     }
 
 
-def _message_row(role="user", content="Hello"):
+def _message_row(role="user", content="Hello", message_id=None):
     return {
-        "id": str(uuid4()),
+        "id": message_id or str(uuid4()),
         "thread_id": THREAD_ID,
         "user_id": USER_ID,
         "role": role,
         "content": content,
         "created_at": NOW,
         "updated_at": NOW,
+    }
+
+
+def _run_row(
+    *,
+    message_id,
+    run_id=None,
+    status="completed",
+    model="gpt-5.4-mini",
+    provider="openai",
+    started_at=NOW,
+    completed_at=NOW,
+):
+    """Phase 095.1-03 (D-04/D-05): a runs↔messages enrich row carrying the
+    4 new additive columns (model, provider, started_at, completed_at) on top
+    of the existing run_id/message_id/status the enrich SELECT already reads."""
+    return {
+        "run_id": run_id or str(uuid4()),
+        "message_id": message_id,
+        "status": status,
+        "model": model,
+        "provider": provider,
+        "started_at": started_at,
+        "completed_at": completed_at,
     }
 
 
@@ -160,6 +184,68 @@ class TestGetMessages:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
+
+    # ── Phase 095.1-03 (D-04 model attribution + D-05 true reload timer) ──────
+    # The additive runs↔messages enrich now stamps model/provider/started_at/
+    # completed_at onto each matched assistant message. The execute side_effect
+    # order for GET /messages is: (1) thread ownership, (2) messages SELECT,
+    # (3) runs enrich SELECT (inside _enrich_messages_with_runs).
+
+    def test_enrich_stamps_model_provider_timer_on_matched_run(
+        self, client, auth_headers, mock_builder
+    ):
+        assistant_id = str(uuid4())
+        mock_builder.execute.side_effect = [
+            _make_result(_thread_row()),                       # thread ownership
+            _make_result([
+                _message_row("user", "Hello", message_id=str(uuid4())),
+                _message_row("assistant", "Hi there", message_id=assistant_id),
+            ]),                                                # messages
+            _make_result([                                     # runs enrich
+                _run_row(
+                    message_id=assistant_id,
+                    status="completed",
+                    model="gemini-3.5-flash",
+                    provider="google",
+                    started_at="2026-06-06T10:00:00+00:00",
+                    completed_at="2026-06-06T10:00:05+00:00",
+                ),
+            ]),
+        ]
+        response = client.get(f"/threads/{THREAD_ID}/messages", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assistant = next(m for m in data if m["role"] == "assistant")
+        assert assistant["model"] == "gemini-3.5-flash"
+        assert assistant["provider"] == "google"
+        # started_at / completed_at flow through as ISO datetimes (serialized
+        # by Pydantic) — the true-reload-timer (D-05) reads completed_at − started_at.
+        assert assistant["started_at"] is not None
+        assert assistant["completed_at"] is not None
+        assert "2026-06-06T10:00:00" in assistant["started_at"]
+        assert "2026-06-06T10:00:05" in assistant["completed_at"]
+
+    def test_enrich_yields_null_model_provider_for_no_run_message(
+        self, client, auth_headers, mock_builder
+    ):
+        # A legacy / pre-run-backed assistant message has NO matching run row →
+        # all 4 new fields must be null (graceful — never a fabricated value).
+        assistant_id = str(uuid4())
+        mock_builder.execute.side_effect = [
+            _make_result(_thread_row()),                       # thread ownership
+            _make_result([
+                _message_row("assistant", "Legacy reply", message_id=assistant_id),
+            ]),                                                # messages
+            _make_result([]),                                  # runs enrich: no match
+        ]
+        response = client.get(f"/threads/{THREAD_ID}/messages", headers=auth_headers)
+        assert response.status_code == 200
+        data = response.json()
+        assistant = data[0]
+        assert assistant["model"] is None
+        assert assistant["provider"] is None
+        assert assistant["started_at"] is None
+        assert assistant["completed_at"] is None
 
 
 class TestSendMessage:
