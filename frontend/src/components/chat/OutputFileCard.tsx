@@ -79,7 +79,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   const isHeroVariant = variant === "hero"
   // Phase 095 Plan 05 (D-07): the per-extension icon (Plan 01 fileIcon, the ONE
   // shared icon system — no second icon path). Larger glyph in the hero block.
-  const icon = fileIcon(file.filename, isHeroVariant ? 30 : 16)
+  const icon = fileIcon(file.filename, isHeroVariant ? 48 : 30)
 
   // Url-less dead state (D-07 / 095-VALIDATION.md D-07 dead-link row): a file
   // arriving without a `url` (older persisted entry, or a url-less emit) now
@@ -162,7 +162,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
         // prominent layout; working = the quieter ghost-border row. Reuse-only
         // utilities (bg-primary/5, border-primary/40 — no new keyframes).
         isHeroVariant
-          ? "gap-3.5 px-4 py-3 border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/5 shadow-[0_0_0_1px_rgba(99,102,241,0.08)]"
+          ? "gap-3.5 px-4 py-3 border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/5 shadow-[0_0_24px_hsl(239_100%_82%/0.18)]"
           : "gap-2.5 px-3 py-2 ghost-border",
         downloading
           ? "opacity-60 cursor-not-allowed"
