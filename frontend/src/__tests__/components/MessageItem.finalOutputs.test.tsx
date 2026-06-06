@@ -20,7 +20,7 @@
  *
  * Helpers mirror Plan04.frontend.test.tsx so the two files stay independent.
  */
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import type { ReactElement } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -139,5 +139,59 @@ describe("MessageItem — flat Generated-files list (Phase 095.1 D-06)", () => {
     expect(container.querySelectorAll("a[download]").length).toBe(2)
     expect(container.querySelector("a[download='a.png']")).not.toBeNull()
     expect(container.querySelector("a[download='b.png']")).not.toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phase 095.1 Plan 05 (D-095.1-07) — deliverable-aware Resume gate
+// A run that already produced its deliverables (execute_code output files) before
+// a later iteration failed/timed_out does NOT falsely offer Resume. Closes
+// BUG-260518-01 (resume-after-success genuine-terminal case 075 didn't cover).
+// ---------------------------------------------------------------------------
+describe("MessageItem — deliverable-aware Resume gate (Phase 095.1 D-07)", () => {
+  const onResume = vi.fn()
+
+  function queryResume() {
+    return screen.queryByRole("button", { name: /resume/i })
+  }
+
+  it("failed run WITH deliverables → NO Resume button (the BUG-260518-01 case)", () => {
+    // content present so the Resume gate (nested in the content block) is genuinely
+    // exercised — the run succeeded enough to answer + produce a file, then failed.
+    const m = makeMessage({
+      runStatus: "failed",
+      content: "Here is your report. (the run later failed)",
+      finalOutputFiles: [{ filename: "report.docx", url: "/sandbox-outputs/report.docx" }],
+    } as Partial<Message>)
+    renderWithTooltip(<MessageItem message={m} isStreaming={false} onResume={onResume} />)
+    expect(queryResume()).toBeNull()
+  })
+
+  it("failed run with NO deliverables → Resume button shown (unchanged)", () => {
+    const m = makeMessage({ runStatus: "failed", content: "Something broke." } as Partial<Message>)
+    renderWithTooltip(<MessageItem message={m} isStreaming={false} onResume={onResume} />)
+    expect(queryResume()).not.toBeNull()
+  })
+
+  it("timed_out run WITH deliverables → NO Resume button", () => {
+    const m = makeMessage({
+      runStatus: "timed_out",
+      content: "Generated the CSV before the run timed out.",
+      finalOutputFiles: [{ filename: "out.csv", url: "/sandbox-outputs/out.csv" }],
+    } as Partial<Message>)
+    renderWithTooltip(<MessageItem message={m} isStreaming={false} onResume={onResume} />)
+    expect(queryResume()).toBeNull()
+  })
+
+  it("timed_out run with NO deliverables → Resume button shown (unchanged)", () => {
+    const m = makeMessage({ runStatus: "timed_out", content: "Took too long." } as Partial<Message>)
+    renderWithTooltip(<MessageItem message={m} isStreaming={false} onResume={onResume} />)
+    expect(queryResume()).not.toBeNull()
+  })
+
+  it("completed run → NO Resume button (unchanged)", () => {
+    const m = makeMessage({ runStatus: "completed", content: "All done." } as Partial<Message>)
+    renderWithTooltip(<MessageItem message={m} isStreaming={false} onResume={onResume} />)
+    expect(queryResume()).toBeNull()
   })
 })
