@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import {
-  ChevronDown, ChevronRight, CheckCircle2, Loader2,
+  ChevronDown, ChevronRight, ChevronUp, CheckCircle2, Loader2,
   Search, Globe, Database, FileText, Wrench,
   FolderOpen, GitBranch, TextSearch, FileSearch,
   BookOpen, Zap, Clock, Code2, Terminal,
@@ -476,16 +476,30 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
           (it): it is Extract<DisplayItem, { kind: "tool" }> =>
             it.kind === "tool" && it.tc.status === "done",
         )
-  // 2026-05-24 fix: collapsed-summary count uses TOTAL items before active
-  // (any kind: tool + skill), not only completed tools. Prior to this fix
-  // the label said e.g. "Completed 3 steps" while the active row was
-  // labelled "Step 7" because skill rows / undefined-status tools were
-  // excluded from the count. The visible "Step N" header is derived from
-  // `tc.iteration + 1` (line ~805) so the count needs to reflect every
-  // row the user can see being hidden by collapse, not a subset.
-  const hiddenStepsCount = activeIndex === -1 ? 0 : activeIndex
-  const shouldCollapse = hiddenStepsCount >= 3
-  const [stepsCollapsed, setStepsCollapsed] = useState(true)
+  // Phase 095 Plan 06 (GAP-095-01 fold-all + GAP-095-03 un-gate): replace the
+  // single shared collapse boolean — where one click on ANY collapsed summary
+  // row toggled the whole flag and expanded EVERY finished card (the #1 felt
+  // bug, violates D-01 click-to-expand) — with a per-step expanded Set keyed
+  // on the SAME `stepKeyOf` identity the rail snum + dedup use. Membership in
+  // the Set means "this finished step is expanded to its full body"; absence
+  // means "folded to its one-line essence". The prior >=3 collapse gate is
+  // GONE — EVERY finished step folds from step 1 (Focus Mode from the very
+  // first finished tool). The identity scheme survives the
+  // preparing->running->done id mutation (075.9) and a reload (state is
+  // reconstructed from `toolCalls` each render). State stays component-local
+  // and provider-agnostic — no StreamsProvider/api.ts/backend change.
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(() => new Set())
+  const expandStep = (key: string) => setExpandedSteps((prev) => new Set(prev).add(key))
+  const collapseStep = (key: string) =>
+    setExpandedSteps((prev) => {
+      const n = new Set(prev)
+      n.delete(key)
+      return n
+    })
+  // Skill collapsed rows have no stepKey identity in toolStepNumber; give them
+  // a stable composite key so a skill row is individually expandable too and a
+  // tool-row click NEVER expands a skill row (or any other tool row).
+  const skillStepKey = (activation: SkillActivation) => `skill-${activation.occurredAt}`
 
   // Pitfall 6 mitigation: summary row carries iteration = min(iteration of
   // collapsed items) as data-iteration-min so future readers can see the
@@ -497,62 +511,55 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
     return iters.length > 0 ? Math.min(...iters) : undefined
   })()
 
+  // Phase 095 Plan 06: under interleaved partial-expand the contiguous
+  // collapsed block can break, so the data-iteration-min hint can no longer be
+  // hard-coded at i === 0. Compute the FIRST still-collapsed earlier step
+  // (i < activeIndex, kind === 'tool', not in expandedSteps) and put the hint
+  // on that row only.
+  const firstCollapsedToolIndex = (() => {
+    if (activeIndex === -1) return -1
+    for (let i = 0; i < activeIndex; i++) {
+      const it = displayItems[i]
+      if (it.kind === "tool" && !expandedSteps.has(stepKeyOf(it.tc, i))) return i
+    }
+    return -1
+  })()
+
   // Phase 075.7 UAT fix (Bug D): RunCard.tsx wraps this component and owns
   // the outer rounded frame, sticky header (run summary + timer + counter +
   // brand-pulse avatar), expand/collapse state, and shimmer. ToolCallPanel
   // renders the tool-list body only — no outer frame, no header.
   return (
     <div className="px-4 pb-3.5 space-y-1 min-w-0 overflow-hidden">
-          {/* Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
-              Per-step result-summary rows replace the prior aggregate
-              "Show N earlier steps" toggle. Collapsed past steps render
-              as one-line `→ {summary}` rows inline (the sketch D3
-              behavior — "while a run is in flight, completed tool calls
-              auto-collapse to a one-line summary showing their result,
-              not their args"). The aggregate Show-toggle is dropped per
-              PLAN.md Task 4 pick.
-              The "Hide earlier steps" toggle remains visible only when
-              the user has opted into the full-expanded view, so they
-              can re-fold without losing the affordance. */}
-          {shouldCollapse && !stepsCollapsed && (
-            <div
-              key="expanded-steps-collapse"
-              data-testid="expanded-steps-collapse"
-              className="pt-2.5"
-            >
-              <button
-                type="button"
-                onClick={() => setStepsCollapsed(true)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted/30 rounded-md transition-colors"
-              >
-                <ChevronDown className="w-3.5 h-3.5" />
-                <span>Hide earlier steps</span>
-              </button>
-            </div>
-          )}
+          {/* Phase 095 Plan 06 (GAP-095-01 + GAP-095-03 un-gate):
+              EVERY finished step before the active one folds to a one-line
+              `→ {result}` essence row (Focus Mode from step 1 — no >=3 gate).
+              Clicking ONE essence row adds ONLY that row's key to
+              `expandedSteps`, so it alone expands to its full body; the other
+              finished essence rows stay folded (closes the fold-all bug). The
+              prior aggregate "Hide earlier steps" toggle (re-folded ALL) is
+              gone — each expanded earlier step gets its own per-row re-collapse
+              control instead (rendered in the full-body branch below). The
+              iteration divider above the active step still derives
+              prevToolIteration from the LAST collapsed-but-rendered item
+              (Pitfall 6 / Landmine L5 mitigation preserved). */}
           {displayItems.map((item, i) => {
-            // Phase 075.8 Task 4 (sketch 001 D3 — Focus Mode):
-            // When shouldCollapse + stepsCollapsed, past steps
-            // (positions 0..activeIndex-1) render as one-line result-
-            // summary rows via summarizeToolCall(tc). Clicking the row
-            // expands the full view (sets stepsCollapsed=false).
-            // The iteration divider above the active step still derives
-            // prevToolIteration from displayItems[i-1] (the LAST
-            // collapsed-but-rendered item) — the iter-N → iter-(N+1)
-            // boundary above the active step continues to fire
-            // (Pitfall 6 / Landmine L5 mitigation preserved).
-            if (shouldCollapse && stepsCollapsed && i < activeIndex) {
+            if (
+              i < activeIndex &&
+              (item.kind !== "tool" || !expandedSteps.has(stepKeyOf(item.tc, i)))
+            ) {
               if (item.kind === 'tool') {
                 const collapsedTc = item.tc
+                const collapsedKey = stepKeyOf(collapsedTc, i)
                 const summaryText = summarizeToolCall(collapsedTc) || toolLabel(collapsedTc.name)
                 return (
                   <button
-                    key={`step-summary-${i}-${collapsedTc.clientKey ?? collapsedTc.id ?? collapsedTc.name}`}
+                    key={`step-summary-${i}-${collapsedKey}`}
                     type="button"
-                    onClick={() => setStepsCollapsed(false)}
+                    onClick={() => expandStep(collapsedKey)}
                     data-testid="step-summary-row"
-                    data-iteration-min={i === 0 ? collapsedIterationMin : undefined}
-                    aria-label={`Expand to view ${hiddenStepsCount} earlier steps`}
+                    data-iteration-min={i === firstCollapsedToolIndex ? collapsedIterationMin : undefined}
+                    aria-label="Expand this step"
                     className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
                   >
                     <span className="opacity-50 flex-shrink-0">→</span>
@@ -562,12 +569,13 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
               }
               // Skill rows in collapsed Focus Mode: keep them visible as a
               // single compact line so the user still sees the activation
-              // happened mid-run.
+              // happened mid-run. A skill row expands ONLY its own composite
+              // key — a tool-row click never reaches it.
               return (
                 <button
                   key={`step-summary-skill-${i}-${item.activation.occurredAt}`}
                   type="button"
-                  onClick={() => setStepsCollapsed(false)}
+                  onClick={() => expandStep(skillStepKey(item.activation))}
                   className="w-full text-left px-3 py-1.5 text-xs font-mono text-muted-foreground/70 hover:text-foreground hover:bg-muted/20 rounded-md transition-colors flex items-center gap-2"
                 >
                   <Zap className="w-3 h-3 opacity-50 flex-shrink-0" />
@@ -577,6 +585,9 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                 </button>
               )
             }
+            // Phase 095 Plan 06: a skill row whose key IS in expandedSteps (or
+            // any skill row at/after the active index) falls through to the
+            // full SkillRow render below.
             if (item.kind === 'skill') {
               return (
                 <div key={`skill-${i}-${item.activation.occurredAt}`}>
@@ -626,6 +637,14 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
             const node = nodeStateOf(tc)
             const isLastTool = snum === deduplicatedToolCalls.length
 
+            // Phase 095 Plan 06: an EARLIER finished step (i < activeIndex)
+            // that the user expanded out of its essence row. It renders its
+            // full body here and gets a per-row re-collapse control so it can
+            // fold back to its essence independently (the Set shrinks for this
+            // key only — no aggregate "Hide earlier steps" anymore).
+            const isExpandedEarlierStep =
+              activeIndex !== -1 && i < activeIndex && expandedSteps.has(stepKey)
+
             return (
               <div
                 key={i}
@@ -668,6 +687,21 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     (reused verbatim — no second body system, G4) rendered onto
                     the borderless numbered status-node rail (sketch 014). */}
                 <StepRow snum={snum} node={node} isLast={isLastTool}>
+                {/* Phase 095 Plan 06: per-row re-collapse for an earlier step
+                    the user expanded out of its essence. Folds THIS row back to
+                    its one-line essence (the Set shrinks for this key only). */}
+                {isExpandedEarlierStep && (
+                  <button
+                    type="button"
+                    onClick={() => collapseStep(stepKey)}
+                    data-testid="step-recollapse"
+                    aria-label="Hide this step"
+                    className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                  >
+                    <ChevronUp className="w-3 h-3" />
+                    <span>Hide</span>
+                  </button>
+                )}
                 {tc.name === "execute_code" ? (
                   // Phase 075.9 hot-fix: render ExecuteCodeBody for ALL
                   // execute_code statuses (preparing/running/done). Previously
