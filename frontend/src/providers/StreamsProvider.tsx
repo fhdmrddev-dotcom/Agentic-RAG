@@ -32,8 +32,9 @@
  *           threadId is non-null — without adding a second assignment to the
  *           ref. Sole-writer grep gate remains at exactly 1.
  * L-068-04: makeStreamCallbacks factory captures surfaceId via closure
- *           (RESEARCH §Finding #7). Deltas route to streamingThreadIdRef's
- *           bucket regardless of viewing thread.
+ *           (RESEARCH §Finding #7). Deltas route to the run's OWNING thread
+ *           bucket (captured via closure) regardless of viewing thread — which is
+ *           what lets concurrent background streams coexist (SEED-055).
  * L-068-05: reconcile's for-loop runId-match dedup (m.runId equals run.run_id)
  *           reuses the existing placeholder's id as the assistantId.
  * L-068-06: loadMessages MERGE 3-clause filter preserves live in-flight temp
@@ -967,10 +968,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const subscriptionsRef = useRef<Map<string, AbortController>>(new Map())
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
   const reconcileInFlightRef = useRef(false)
-  const streamingThreadIdRef = useRef<string | null>(null)
   const activeThreadIdRef = useRef<string | null>(null)
   // Phase 068 (Task 2a): additional refs lifted from useMessages.ts for sendMessage.
-  const isSendingRef = useRef(false)
+  // SEED-055 (true concurrent chats): the send guard is now PER-THREAD. The old
+  // single global `isSendingRef` boolean + single-slot `streamingThreadIdRef` were
+  // replaced by `sendingThreadsRef` — the Set of thread ids with a send currently in
+  // flight. A send into thread B is therefore no longer blocked by thread A streaming
+  // (the old global mutex silently DROPPED it — BUG-260603-01 mechanism #1). The Set
+  // is added at the guard (synchronously, before the optimistic placeholders) and
+  // deleted in the finally; the reconcile / loadMessages placeholder-preservation
+  // guards read `.has(threadId)`, preserving the BUG-260521-01 wipe protection
+  // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
+  // lockstep) still drives the composer's OWN-thread disable + Stop button.
+  const sendingThreadsRef = useRef<Set<string>>(new Set())
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
@@ -1092,7 +1102,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // is now structurally orthogonal to streaming-state membership.
         clearThreadBucket: (surface) => {
           const tid = activeThreadIdRef.current
-          if (tid && tid !== streamingThreadIdRef.current) {
+          // SEED-055: refuse to wipe the active bucket if a send is in flight on it
+          // (per-thread now — was `tid !== streamingThreadIdRef.current`).
+          if (tid && !sendingThreadsRef.current.has(tid)) {
             useStreamsStore.setState((state) => {
               const surfMap = state.bucketsBySurface.get(surface)
               if (!surfMap || !surfMap.has(tid)) return {}
@@ -1178,8 +1190,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // (preserve untyped temps instead of bailing completely).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
               const dbRunIds = new Set(snapshot.messages.filter((m) => m.runId).map((m) => m.runId))
-              const sendInFlightOnThisThread =
-                isSendingRef.current && streamingThreadIdRef.current === threadId
+              // SEED-055: per-thread send-in-flight check (was
+              // `isSendingRef.current && streamingThreadIdRef.current === threadId`).
+              // Each thread's optimistic temps are now preserved on its OWN send,
+              // so a reconcile on thread A no longer wipes A's temps while B streams.
+              const sendInFlightOnThisThread = sendingThreadsRef.current.has(threadId)
               const liveTempPlaceholders = prev.filter((m) => {
                 if (!m.id.startsWith("temp-")) return false
                 if (m.runId) {
@@ -1412,9 +1427,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // thread; cleanup on onTerminal. Source: useMessages.ts:673-939.
         sendMessage: async (threadId, content, opts) => {
           const surfaceId: SurfaceId = opts?.surfaceId ?? "chat"
-          if (isSendingRef.current) return
-          isSendingRef.current = true
-          streamingThreadIdRef.current = threadId
+          // SEED-055 (true concurrent chats): per-thread guard. Block only a re-send
+          // into a thread that is ALREADY sending (re-entrancy / double-submit) — a
+          // send into a DIFFERENT thread proceeds CONCURRENTLY (the old global
+          // `isSendingRef` boolean silently dropped it). Added synchronously here,
+          // before the optimistic placeholders, so a fresh-thread reconcile's
+          // preserve-guard sees it immediately.
+          if (sendingThreadsRef.current.has(threadId)) return
+          sendingThreadsRef.current.add(threadId)
 
           // Optimistic user message.
           const userMsg: Message = {
@@ -1657,8 +1677,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }
           } finally {
             abortControllerRef.current = null
-            isSendingRef.current = false
-            streamingThreadIdRef.current = null
+            // SEED-055: release THIS thread's send slot (per-thread; other threads'
+            // in-flight sends are unaffected).
+            sendingThreadsRef.current.delete(threadId)
             // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads delete.
             // This is the AUTHORITATIVE streaming-end write — clearThreadBucket
             // no longer writes here (D-075.4-A1 invariant; see L:617).
@@ -1724,9 +1745,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // Phase 068 (L-068-07 safety-net side): stopStream tears down
         // subscription; mirror remove. Source: useMessages.ts:477-495.
         stopStream: async () => {
-          // Pitfall 3: derive run_id from streaming bucket (or fall back to
-          // viewing bucket). RESEARCH §Pattern 5: read via getState().
-          const stid = streamingThreadIdRef.current ?? activeThreadIdRef.current
+          // SEED-055: Stop targets the VIEWED thread — the composer's Stop button
+          // only renders on the thread you're watching (useStreamingForThread), and
+          // under concurrency there is no single "streaming thread" to fall back to.
+          // Was `streamingThreadIdRef.current ?? activeThreadIdRef.current`.
+          const stid = activeThreadIdRef.current
           if (!stid) return
           const bucket =
             useStreamsStore.getState().bucketsBySurface.get("chat")?.get(stid) ?? []
@@ -1802,12 +1825,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // discards cross-thread responses.
               if (activeThreadIdRef.current !== threadId) return
               // Protect optimistic placeholders if a send is in flight on the same thread.
-              // Phase 068.5 Gap-02: scope to streamingThreadIdRef so cross-thread
-              // cold-load reconciles (A streaming, user clicks unvisited D) merge
-              // into the target bucket instead of bailing globally and leaving
-              // MessageSkeleton stuck. The un-stamped placeholder window is
-              // bounded to the sending thread, so this guard only matters there.
-              if (isSendingRef.current && streamingThreadIdRef.current === threadId) return
+              // Phase 068.5 Gap-02 / SEED-055: per-thread guard — bail only if a send
+              // is in flight on THIS thread (its optimistic temps aren't yet runId-
+              // stamped). Cross-thread cold-load reconciles still merge normally. Was
+              // `isSendingRef.current && streamingThreadIdRef.current === threadId`.
+              if (sendingThreadsRef.current.has(threadId)) return
               // L-068-06 / L-068.5-02: MERGE 3-clause filter preserves live in-flight
               // temp placeholders. Predicate (BYTE-IDENTICAL from useMessages.ts:644-649):
               //   m.id.startsWith('temp-') && m.runId && !dbRunIds.has(m.runId)
@@ -2188,16 +2210,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // threads load from DB + skeleton; their cache writes were wasted churn.
   useEffect(() => {
     const writeNow = (state: StreamsState) => {
-      const streamingTid = streamingThreadIdRef.current
+      // SEED-055: persist EVERY currently-streaming thread (was the single
+      // streamingThreadIdRef slot) plus the viewed thread, so concurrent background
+      // streams are all cached.
+      const streaming = state.streamingThreads
       const activeTid = activeThreadIdRef.current
-      // If neither ref points anywhere (early-render), skip persistence — nothing
-      // meaningful to cache yet. The hydrate path at mount still works because
-      // it reads the existing snapshot before any write fires.
-      if (!streamingTid && !activeTid) return
+      // If nothing is streaming and no thread is viewed (early-render), skip
+      // persistence — nothing meaningful to cache yet. The hydrate path at mount
+      // still works because it reads the existing snapshot before any write fires.
+      if (streaming.size === 0 && !activeTid) return
       writeSnapshotToLocalStorage(
         state.bucketsBySurface,
         Date.now(),
-        (_surface, tid) => tid === streamingTid || tid === activeTid,
+        (_surface, tid) => streaming.has(tid) || tid === activeTid,
         state.todosByThread,
         state.tasksByThread,
       )
