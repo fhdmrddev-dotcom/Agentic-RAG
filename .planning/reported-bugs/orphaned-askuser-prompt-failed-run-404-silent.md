@@ -4,12 +4,12 @@ title: Orphaned ask_user prompt from a failed/terminal run renders submittable b
 reported: 2026-06-05
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/panel-pending-askuser, backend/harness-failure-cleanup, backend/ask_user-roundtrip, HITL]
-folded_into: null
+folded_into: "096"
 verified_closed_by: null
 related_seeds: [SEED-052]
-re_open_trigger: "Reviewed AGAIN at Phase 095.1 discuss-phase (2026-06-06): considered for 095.1 (run-honesty theme) but routed OUT — 095.1 covers chat-run-honesty + provider-error + workspace-panel; this bug's surface is side-panel pending-ask_user + backend harness-failure-cleanup + HITL round-trip. Operator confirmed leave OPEN → best fit Phase 096 (ask_user-restart UAT) or a dedicated HITL-cleanup fix. PRIOR: Reviewed at Phase 095 discuss-phase (2026-06-05): a prior note tagged this 'route 095', but its surface is the side-panel pending-ask_user + backend harness-failure-cleanup + HITL round-trip, NOT the chat tool-card surface 095 owns. Routed OUT of 095 (operator did not object). Better fit: the ask_user/failure-honesty line — Phase 096 owns ask_user-restart UAT — or a dedicated HITL-cleanup fix. Stays open; re-route when that phase is scoped."
+re_open_trigger: "FOLDED into Phase 096 at discuss-phase (2026-06-06, D-096-06): fix lands as a 096 task (backend terminal-status ask_user cleanup + frontend expired/disabled card + surfaced 404 error); EVAL-02's restart-mid-ask_user UAT verifies the fix. Re-open if the 096 restart UAT still reproduces the orphaned-submittable card. PRIOR: Reviewed AGAIN at Phase 095.1 discuss-phase (2026-06-06): considered for 095.1 (run-honesty theme) but routed OUT — 095.1 covers chat-run-honesty + provider-error + workspace-panel; this bug's surface is side-panel pending-ask_user + backend harness-failure-cleanup + HITL round-trip. Operator confirmed leave OPEN → best fit Phase 096 (ask_user-restart UAT) or a dedicated HITL-cleanup fix. PRIOR: Reviewed at Phase 095 discuss-phase (2026-06-05): a prior note tagged this 'route 095', but its surface is the side-panel pending-ask_user + backend harness-failure-cleanup + HITL round-trip, NOT the chat tool-card surface 095 owns. Routed OUT of 095 (operator did not object). Better fit: the ask_user/failure-honesty line — Phase 096 owns ask_user-restart UAT — or a dedicated HITL-cleanup fix. Stays open; re-route when that phase is scoped."
 reproduces_on:
   branch: v2.5-dev
   commit: post-094 (HEAD after phase 094 completion, 2026-06-05)
