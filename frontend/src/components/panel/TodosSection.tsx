@@ -17,8 +17,9 @@
  */
 import { Circle, CircleDot, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useTodos, useViewingThread } from "@/providers/StreamsProvider"
+import { useTodos, useViewingThread, useDerivedPanel } from "@/providers/StreamsProvider"
 import type { Todo } from "@/types"
+import type { DerivedPanelItem } from "@/lib/workspacePanel"
 
 type TodoStatus = "pending" | "in_progress" | "completed"
 
@@ -99,19 +100,78 @@ function TodoRow({ todo }: { todo: Todo }) {
   )
 }
 
+// Phase 095.1 Plan 02 (D-095.1-01/02) — a single DERIVED, READ-ONLY row. Reuses
+// the EXACT real-todo row layout (StatusIndicator + text + status-text label) so
+// derived items look like first-class panel items, but renders NO interactive
+// control: a derived item mirrors a tool's status and the user cannot tick it.
+// The label is a model/sandbox-derived string → rendered as React text children
+// ONLY, never as raw/innerHTML markup (T-095.1-02-01 / Pattern E).
+function DerivedRow({ item }: { item: DerivedPanelItem }) {
+  // DerivedPanelItem.status is already the panel vocabulary
+  // ("pending" | "in_progress" | "completed") — normalize defensively anyway.
+  const status = normalizeStatus(item.status)
+  return (
+    <li className="flex items-start gap-2 px-3 py-1.5 text-[0.82rem] leading-relaxed">
+      <span className="mt-0.5">
+        <StatusIndicator status={status} />
+      </span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 text-foreground/90",
+          status === "completed" && "text-panel-muted-foreground line-through",
+        )}
+      >
+        {item.label}
+      </span>
+      <span
+        className={cn(
+          "ml-auto flex-none font-mono text-[0.62rem] uppercase tracking-wider",
+          STATUS_TEXT_COLOR[status],
+        )}
+      >
+        {STATUS_LABEL[status]}
+      </span>
+    </li>
+  )
+}
+
 export function TodosSection() {
   const threadId = useViewingThread()
   const { data: todos } = useTodos(threadId)
+  // Phase 095.1 (D-095.1-01/02): the activity-derived fallback panel. Precedence:
+  //   1. real write_todos (todos non-empty) → render those (today's behavior).
+  //   2. real todos empty + derived non-empty → derived read-only rows + marker.
+  //   3. both empty → null (clean). A real plan is NEVER overwritten (Pitfall 2).
+  const derived = useDerivedPanel(threadId)
 
-  if (todos.length === 0) return null
+  // PRECEDENCE 2 + 3: no real write_todos plan for this thread.
+  if (todos.length === 0) {
+    if (derived.length === 0) return null
+    return (
+      <>
+        {/* Subtle, non-interactive marker — the derived items are honest about
+            being synthesized from tool activity (D-095.1-01, Claude's discretion
+            on placement: once, at the section top). */}
+        <span className="block px-3 pb-1 text-[0.62rem] font-mono uppercase tracking-wider text-panel-muted-foreground-dim">
+          derived from activity
+        </span>
+        <ul className="flex flex-col gap-0.5">
+          {derived.map((item, i) => (
+            <DerivedRow key={i} item={item} />
+          ))}
+        </ul>
+      </>
+    )
+  }
 
+  // PRECEDENCE 1: a real write_todos plan exists — render it verbatim (unchanged).
   const ordered = [...todos].sort((a, b) => a.order_index - b.order_index)
 
   // Phase 088-01 (A11Y-01 / D-12, RESEARCH Pattern 7) — SR announce of todo
   // completion progress. `polite` (not assertive): status flips are informational,
   // and a multi-step run would interrupt the SR mid-read on every todo change if
   // assertive. The region is visually-hidden (sr-only) and renders text only
-  // (never dangerouslySetInnerHTML — Phase 087 no-raw-HTML invariant, T-088-01-01).
+  // (never raw/innerHTML markup — Phase 087 no-raw-HTML invariant, T-088-01-01).
   const total = ordered.length
   const doneCount = ordered.filter(
     (t) => normalizeStatus(t.status) === "completed",
