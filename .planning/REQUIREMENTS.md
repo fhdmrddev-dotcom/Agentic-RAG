@@ -68,6 +68,14 @@
 **: Chat tool-cards render in **one consistent frame** with auto-scroll, details-on-demand collapse, and no duplicates — closing BUG-260529-02 + `timer-disappears-long-runs` + `step-count-mismatch-timer-vs-panel` + the dead download link. *(sketch-first — G-2 fires)*
 - [~] **PARITY-01** *(RE-DEFERRED 2026-06-01 — discuss-093)*: ~~Anthropic Deep-mode parity — synthesized **summary tail** (BUG-260514-02), reduced **iteration bloat** (BUG-260523-04), non-Anthropic real task descriptions (BUG-260528-03).~~ Re-deferred: Deep is provider-robust on all 7; the 3 bugs aren't reproducing for the operator and aren't worth a shared-path risk. Re-open trigger: a focused Deep-mode UX phase OR the bugs re-reproduce. (The "cross-provider parity" the milestone actually needs is PARITY-02 — the *harness* path.)
 
+### Cross-Provider Run Honesty (Phase 095.1 — born from 095 live UAT)
+
+> Phase 095's all-8-provider live UAT (2026-06-06) surfaced 5 cross-provider/honesty findings + one operator design reversal. Six fixes, all shared / frontend / gateway → naturally cover all 8 providers. Maps the candidate IDs CONTEXT.md locked to their decisions; all fixes are projections/classification over data that already exists (NO migration, NO new SSE event, NO new write). Acceptance bar = OpenAI gpt-5.4-mini parity, verified LIVE across all 8 providers (SC#7 / SC#10 4-axis).
+
+- [ ] **WORKSPACE-PARITY**: The workspace todos/tasks panel populates from a **deterministic, provider-independent mechanism** (smart-gate + activity-derivation; spikes 006/007) — fills for ALL providers on multi-step work INCLUDING those that never call `write_todos`, stays CLEAN for simple Q&A / single-tool runs, never forced/prompt-instructed, and honors `write_todos` when the model calls it. Output files render as ONE flat "Generated files" list (no hero crown, no working/hero split); all present, all downloadable (url-less → "Download unavailable"). *(D-095.1-01 frontend-derived panel projection; D-095.1-02 smart gate + `MEANINGFUL_TOOLS` + label precedence; D-095.1-06 flat list. Folds the panel-fill symptom of BUG-260604-01 + addresses `non-anthropic-generic-code-task-descriptions` via the label-inference chain. The behavioral root of BUG-260604-01 — making models actually work step-by-step — stays deferred to v2.9 / SEED-052.)*
+- [ ] **RUN-HONESTY**: Every assistant response surfaces **which model/provider** generated it (`{provider} · {model} · turn N`, read from `runs.model`/`runs.provider`); a reloaded completed run shows its **true duration** (`completed_at − started_at`, never time-since-creation); and a run that produced its deliverables but ended failed/timed_out does **not** falsely offer **Resume** (deliverable-aware gate). *(D-095.1-04 model attribution run-sub; D-095.1-05 true reload timer; D-095.1-07 deliverable-aware Resume. One additive runs↔messages SELECT for 04/05 — no migration. Folds BUG-260606-02 reload-timer-inflated + BUG-260518-01 resume-after-success.)*
+- [ ] **PROVIDER-ERR**: A 429 rate-limit (any provider, incl. Google `RESOURCE_EXHAUSTED`) reads as a **rate-limit-with-retry**, NOT "billing / insufficient credits" — classified at the **per-provider gateway boundary** on structured status codes (429=rate-limit, 401=auth, insufficient_quota=billing, 400=bad-request, 5xx=server, else neutral), not shared keyword-soup; uncertain → neutral truthful message, never a guessed cause. *(D-095.1-03 gateway-boundary error classification — a pure `classify_provider_error` helper in `provider_gateway/errors.py` called from the agent_loop catch; adapters byte-identical. Folds BUG-260606-01 Google-429-mislabel.)*
+
 ### Carry-Forward Verification
 
 - [x] **CF-01**: The v2.7 carry-forwards are verified-and-closed or re-opened via a **cross-provider UAT sweep** at kickoff — title-gen on DeepSeek/Moonshot/Google (BUG-260527-01), Google secondary-model 404 routing, and the download-link payload; **SEED-037 download wire-up** ships as a standalone `/gsd:quick`.
@@ -97,10 +105,11 @@ Deferred per **D-v2.8-01** — the plugin contract is cross-milestone load-beari
 | In-panel office/PDF/PPTX viewing | SEED-037 viewing rides with the v2.9 `file_preview` plugin; only the **download** wire-up ships in v2.8 |
 | `threads.deep_mode_metadata jsonb` column | v2.7 PRD proposed it; dropped — no consumer in v2.8 scope (research delta #4) |
 | Harness as the default mode | Deep Mode is the unchanged default; Harness is strictly opt-in |
+| Model-behavior fix (step-by-step / todo-loop compliance) | Phase 095.1 makes the panel HONEST about what each model did; changing model behavior itself stays at v2.9 / SEED-052 (D-095.1 NOT-in-scope) |
 
 ## Traceability
 
-Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7 (last phase 088) → v2.8 starts at 089.
+Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7 (last phase 088) → v2.8 starts at 089. Phase 095.1 inserted 2026-06-06 (born from 095 live UAT findings).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -124,13 +133,16 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | PANEL-09 | Phase 094 | Complete |
 | A11Y-03 | Phase 094 | Complete |
 | CHAT-04 | Phase 095 | Pending |
+| WORKSPACE-PARITY | Phase 095.1 | Pending |
+| RUN-HONESTY | Phase 095.1 | Pending |
+| PROVIDER-ERR | Phase 095.1 | Pending |
 | EVAL-01 | Phase 096 | Pending |
 | EVAL-02 | Phase 096 | Pending |
 | CONC-01 | Phase 096 | Pending |
 
 **Coverage:**
-- v2.8 requirements: 22 active + 1 re-deferred (PARITY-01) — rescoped 2026-06-01 (discuss-093)
-- Mapped to phases: 22 ✓ (9 phases incl. the NEW 092.5; 089–096)
+- v2.8 requirements: 25 active + 1 re-deferred (PARITY-01) — rescoped 2026-06-01 (discuss-093); +3 (WORKSPACE-PARITY / RUN-HONESTY / PROVIDER-ERR) added 2026-06-06 at plan-phase 095.1
+- Mapped to phases: 25 ✓ (10 phases incl. 092.5 + 095.1; 089–096)
 - Unmapped: 0 ✓
 
 **Per-phase requirement count:**
@@ -142,8 +154,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 - Phase 093 (Harness Cross-Provider Parity + Phase-Type Hardening): PARITY-02 — 1 req (PARITY-01 re-deferred)
 - Phase 094 (Panel Phase Timeline): PANEL-08, PANEL-09, A11Y-03 — 3 reqs
 - Phase 095 (Chat Tool-Card Unification): CHAT-04 — 1 req
+- Phase 095.1 (Cross-Provider Run Honesty & Workspace Parity): WORKSPACE-PARITY, RUN-HONESTY, PROVIDER-ERR — 3 reqs
 - Phase 096 (Eval Harness + Cross-Provider Verification + Concurrency): EVAL-01, EVAL-02, CONC-01 — 3 reqs
 
 ---
 *Requirements defined: 2026-05-30*
-*Last updated: 2026-05-30 after roadmap creation — 21/21 mapped across 8 phases (089-096), 0 unmapped*
+*Last updated: 2026-06-06 at plan-phase 095.1 — added WORKSPACE-PARITY / RUN-HONESTY / PROVIDER-ERR (3 reqs); 25 active mapped across 10 phases (089-096), 0 unmapped*
