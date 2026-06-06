@@ -47,6 +47,7 @@ def test_requested_extension_match_is_hero():
     ]
     heroes = _select_hero_filenames(files, "Please write me a docx report of the findings")
     assert heroes == {"report.docx"}
+    assert len(heroes) == 1  # requested-ext path → exactly one hero
 
 
 def test_requested_extension_with_leading_dot_and_uppercase():
@@ -59,14 +60,45 @@ def test_requested_extension_with_leading_dot_and_uppercase():
     assert heroes == {"deck.pptx"}
 
 
-def test_multiple_files_share_requested_extension_all_hero():
+def test_multiple_files_share_requested_extension_single_hero():
+    # Phase 095 Plan 09 Task 1 (GAP-095-02 / WR-02) — the requested-ext branch
+    # must return EXACTLY ONE hero (the largest matching file), never a
+    # multi-element set. The larger .docx wins via max(size, iteration).
     files = [
         _f("a.docx", 1_000),
         _f("b.docx", 2_000),
         _f("notes.txt", 9_999),
     ]
     heroes = _select_hero_filenames(files, "give me the docx files")
-    assert heroes == {"a.docx", "b.docx"}
+    assert heroes == {"b.docx"}
+    assert len(heroes) == 1
+
+
+def test_requested_ext_size_tie_breaks_on_iteration():
+    # Two requested-ext files tie on size → the higher iteration (last-written)
+    # wins, mirroring the fallback tie-break.
+    files = [
+        _f("early.docx", 5_000, iteration=0),
+        _f("late.docx", 5_000, iteration=3),
+        _f("notes.txt", 9_999),
+    ]
+    heroes = _select_hero_filenames(files, "give me the docx")
+    assert heroes == {"late.docx"}
+    assert len(heroes) == 1
+
+
+def test_multiple_declared_heroes_collapse_to_single():
+    # A declared-hero set that somehow contains multiple filenames collapses to
+    # exactly one (max size, tie iteration) — the declaration branch can never
+    # leak multiple heroes either.
+    files = [
+        _f("small.docx", 1_000, iteration=0, is_hero=True),
+        _f("big.docx", 8_000, iteration=1, is_hero=True),
+        _f("filler.csv", 99_999, iteration=2),
+    ]
+    heroes = _select_hero_filenames(files, "do whatever")
+    assert heroes == {"big.docx"}
+    assert len(heroes) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +112,7 @@ def test_no_requested_ext_largest_is_hero():
     ]
     heroes = _select_hero_filenames(files, "make some charts please")
     assert heroes == {"big.png"}
+    assert len(heroes) == 1  # fallback path → exactly one hero
 
 
 def test_no_requested_ext_size_tie_breaks_on_iteration():
@@ -125,6 +158,7 @@ def test_agent_declared_hero_honored_over_heuristic():
     ]
     heroes = _select_hero_filenames(files, "do whatever")
     assert heroes == {"summary.docx"}
+    assert len(heroes) == 1  # declared path → exactly one hero
 
 
 def test_agent_declared_hero_honored_even_when_requested_ext_present():

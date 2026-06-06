@@ -802,55 +802,80 @@ def _reconstruct_history(history_rows: list[dict], active_provider: str = "") ->
 # branch so the contract is locked.
 #
 # Heuristic: if the user message names a requested extension (a small allowlist)
-# and a generated file matches → that/those file(s) are the hero; ELSE the single
-# largest-size file (tie-break: highest ``iteration`` = last-written). Returns a
-# set of hero filenames; empty ONLY when ``files`` is empty.
+# and a generated file matches → the SINGLE largest matching file is the hero;
+# ELSE the single largest-size file overall (tie-break: highest ``iteration`` =
+# last-written). Returns a set holding EXACTLY ONE hero filename; empty ONLY when
+# ``files`` is empty.
+#
+# Phase 095 Plan 09 (GAP-095-02 / WR-02): EVERY branch returns exactly one hero.
+# The requested-ext branch previously returned a MULTI-element set (every file of
+# a requested ext → hero), which leaked multiple heroes into the chat output area
+# and disagreed with the per-cell persist (which heroed over a partial cumulative
+# list). The single shared ``_hero_pick`` tie-break (max size, then iteration) is
+# now applied identically across the declared, requested-ext, and fallback paths.
 _HERO_REQUESTABLE_EXTS = ("docx", "pptx", "pdf", "xlsx", "csv", "png", "md")
 
 
+def _hero_pick(metas: list[dict]) -> dict:
+    """Pick the single best deliverable from ``metas`` (max size, tie iteration).
+
+    The ONE canonical tie-break shared by every branch of
+    ``_select_hero_filenames`` so the hero is identical wherever it is computed.
+    ``metas`` MUST be non-empty.
+    """
+    return max(
+        metas,
+        key=lambda f: (int(f.get("size") or 0), int(f.get("iteration") or 0)),
+    )
+
+
 def _select_hero_filenames(files: list[dict], user_message: str | None) -> set[str]:
-    """Pick the hero filename(s) for the final-outputs render (D-08).
+    """Pick THE single hero filename for the final-outputs render (D-08 / GAP-095-02).
 
     Pure function — no Redis, no I/O. ``files`` are per-run meta dicts shaped
     ``{filename, url, size, iteration, ...}`` (the projection from
     ``sandbox_service.harvest_output_files``). Read-only; never mutates input.
+
+    Returns a set of EXACTLY ONE filename whenever ``files`` is non-empty (and an
+    empty set otherwise). Every branch (agent-declared, requested-ext, fallback)
+    collapses to a single hero via the shared ``_hero_pick`` tie-break, so the
+    chat output area heroes exactly one deliverable and the live emit agrees with
+    the persisted reload (Task 2 re-stamps the persisted rows against this set).
     """
     if not files:
         return set()
 
     # (1) Agent declaration wins, if present on any meta dict (forward-compatible;
-    # see the module note above — no live producer of this flag yet).
-    declared = {
-        f["filename"]
-        for f in files
+    # see the module note above — no live producer of this flag yet). If the agent
+    # ever declares MULTIPLE heroes, collapse to one (the largest/last) so the
+    # declaration branch can never leak multiple heroes either.
+    declared_metas = [
+        f for f in files
         if (f.get("is_hero") or f.get("hero")) and f.get("filename")
-    }
-    if declared:
-        return declared
+    ]
+    if declared_metas:
+        return {_hero_pick(declared_metas)["filename"]}
 
     msg = (user_message or "").lower()
 
     # (2) Requested-extension match. Detect a requested ext among the allowlist
-    # (tolerate a leading dot, e.g. ".pptx"); hero = every file with that ext.
+    # (tolerate a leading dot, e.g. ".pptx"); the hero is the SINGLE largest file
+    # with that ext (tie-break highest iteration), NOT every matching file.
     requested = {ext for ext in _HERO_REQUESTABLE_EXTS if ext in msg}
     if requested:
-        matched = {
-            f["filename"]
-            for f in files
-            if "." in f["filename"]
+        matched_metas = [
+            f for f in files
+            if f.get("filename")
+            and "." in f["filename"]
             and f["filename"].rsplit(".", 1)[-1].lower() in requested
-        }
-        if matched:
-            return matched
+        ]
+        if matched_metas:
+            return {_hero_pick(matched_metas)["filename"]}
         # requested ext named but nothing matched → fall through to largest.
 
     # (3) Fallback: the single largest deliverable; tie-break on highest iteration
     # (the last-written file). Stable and deterministic.
-    hero = max(
-        files,
-        key=lambda f: (int(f.get("size") or 0), int(f.get("iteration") or 0)),
-    )
-    return {hero["filename"]}
+    return {_hero_pick(files)["filename"]}
 
 
 # ---------------------------------------------------------------------------
