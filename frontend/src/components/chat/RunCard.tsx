@@ -231,8 +231,18 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
   // GRACEFUL: a legacy / pre-run-backed message (no run row) has no model/provider
   // → the run-sub falls back to just `turn N`. All values render as React text
   // children only — never innerHTML (T-095.1-03-01 XSS mitigation).
-  // turn = (iterationCount ?? 0) + 1 (iterationCount is 0-based — Phase 56 D-03).
-  const turnNumber = (message.iterationCount ?? 0) + 1
+  //
+  // ---- Plan 095.1-07 (GAP-2) turn reconciliation: live == reload ----
+  // The run-sub describes ONE run = ONE turn. It used to read message.iterationCount
+  // (a WITHIN-run agent-loop iteration, NOT a conversation turn) → the live path
+  // showed `turn {iterationCount+1}` while a reload (iterationCount omitted by
+  // _mapMessageResponse) showed `turn 1` — the same run disagreed live vs reload
+  // (095.1-UAT 6b). The reload value (`turn 1` for a single exchange) is the
+  // operator-accepted intended value, so render a STABLE turn that is identical
+  // live and on reload. The raw iterationCount is still forwarded to
+  // ToolCallPanel's per-iteration "Round N" divider (panelIterationCount) — that
+  // consumer is unchanged; only the run-sub stops reading it.
+  const turnNumber = 1
   const runSub = message.provider && message.model
     ? `${message.provider} · ${message.model} · turn ${turnNumber}`
     : `turn ${turnNumber}`

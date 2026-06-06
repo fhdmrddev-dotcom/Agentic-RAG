@@ -1460,7 +1460,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
 
           try {
             // Step 1: POST returns synchronously with {message_id, run_id} (D-063-01)
-            const { message_id, run_id } = await postMessage(threadId, content, {
+            // Phase 095.1-07 (GAP-2): the dispatch response now ALSO carries the
+            // RESOLVED model/provider (aliased so they don't shadow the request
+            // `opts?.model`/`opts?.provider`); we stamp them onto the assistant
+            // placeholder below so attribution shows in the LIVE moment, not only
+            // after a reload re-reads them via the Plan-03 enrich SELECT.
+            const {
+              message_id,
+              run_id,
+              model: resolvedModel,
+              provider: resolvedProvider,
+            } = await postMessage(threadId, content, {
               model: opts?.model,
               provider: opts?.provider,
               agentMode: opts?.agentMode,
@@ -1493,10 +1503,19 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             }))
 
             // WR-04 fix: swap temp user id for real, stamp run_id on assistant placeholder.
+            // Phase 095.1-07 (GAP-2): also stamp the RESOLVED model/provider so the
+            // RunCard run-sub shows `{provider} · {model}` LIVE. Coerce null →
+            // undefined to match the Message type (string | undefined, not | null).
             useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
               prev.map((m) => {
                 if (m.id === userMsg.id) return { ...m, id: message_id }
-                if (m.id === assistantId) return { ...m, runId: run_id }
+                if (m.id === assistantId)
+                  return {
+                    ...m,
+                    runId: run_id,
+                    model: resolvedModel ?? undefined,
+                    provider: resolvedProvider ?? undefined,
+                  }
                 return m
               }),
             )

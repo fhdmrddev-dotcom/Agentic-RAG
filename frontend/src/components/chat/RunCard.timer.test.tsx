@@ -181,7 +181,11 @@ describe("RunCard — D-04 model attribution (run-sub)", () => {
       />,
     )
     const card = screen.getByTestId("run-card")
-    expect(card.textContent).toContain("turn 3")
+    // Plan 095.1-07 (GAP-2) retarget: the run-sub turn is reconciled to a stable
+    // `1` (live == reload) — it no longer reads iterationCount, so a message with
+    // iterationCount 2 now renders `turn 1`, not `turn 3`. The graceful-legacy
+    // contract (no provider/model → just `turn N`, no middot segment) is unchanged.
+    expect(card.textContent).toContain("turn 1")
     // No middot-joined provider·model segment when both are absent.
     expect(card.textContent).not.toMatch(/\S+ · \S+ · turn/)
   })

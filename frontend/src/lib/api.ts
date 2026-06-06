@@ -214,6 +214,13 @@ export async function renameThread(id: string, title: string): Promise<Thread> {
 export interface PostMessageResponse {
   message_id: string
   run_id: string
+  // Phase 095.1-07 (GAP-2): the already-resolved model/provider the backend
+  // wrote to the runs row, surfaced ADDITIVELY on the dispatch response so the
+  // live assistant placeholder shows `{provider} · {model}` in the LIVE moment
+  // (not only after a reload re-reads them via the Plan-03 enrich SELECT).
+  // Optional + nullable to match the wire shape; legacy callers are unaffected.
+  model?: string | null
+  provider?: string | null
 }
 
 /** Phase 062 ActiveRunResponse mirror. Always status='streaming' per D-062-02. */
