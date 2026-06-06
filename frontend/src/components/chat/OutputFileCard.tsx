@@ -49,16 +49,17 @@ interface OutputFileCardProps {
      *  — closes BUG-260523-03's user-visible affordance side (backend dedup
      *  was Plan 03's deliverable; UI surfacing is this Plan 04 wave). */
     supersedes?: string
-    /** Phase 095 Plan 05 (D-08) — additive hero flag (read by MessageItem to
-     *  pick the variant; this card renders it as a "★ Your file" caption in the
-     *  hero variant). Optional — older streams degrade to working. */
+    /** Phase 095 Plan 05 (D-08) — additive hero flag, kept on the shape for
+     *  back-compat with the persisted/emitted payload. Phase 095.1 D-095.1-06
+     *  REMOVED the hero presentation, so this card NO LONGER reads `is_hero`
+     *  (it stays written-but-unread, harmless and forward-compatible). */
     is_hero?: boolean
   }
-  /** Phase 095 Plan 05 (D-07) — layout flag. "hero" = the emphasized "★ Your
-   *  file" block (primary glow border, gradient bg, larger fileIcon, prominent
-   *  Download); "working" = the quieter intermediate row. Default "working" so
-   *  every existing call site is unchanged. BOTH variants use the SAME
-   *  fileIcon(filename) (Plan 01) and the SAME url-optional / download states. */
+  /** Phase 095.1 Plan 05 (D-095.1-06) — INERT layout flag. The hero/working
+   *  visual split was reversed (operator-approved CONTEXT.md decision), so this
+   *  prop no longer changes the rendered shape — every row renders the one quiet
+   *  uniform style. Kept optional + accepted (default "working") purely for
+   *  call-site back-compat so no other call site needs touching. */
   variant?: "hero" | "working"
 }
 
@@ -76,10 +77,10 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
 
-  const isHeroVariant = variant === "hero"
-  // Phase 095 Plan 05 (D-07): the per-extension icon (Plan 01 fileIcon, the ONE
-  // shared icon system — no second icon path). Larger glyph in the hero block.
-  const icon = fileIcon(file.filename, isHeroVariant ? 48 : 30)
+  // Phase 095.1 Plan 05 (D-095.1-06): the per-extension icon (Plan 01 fileIcon,
+  // the ONE shared icon system — no second icon path). Uniform 30px glyph on
+  // every row — the hero 48px branch was removed with the hero split.
+  const icon = fileIcon(file.filename, 30)
 
   // Url-less dead state (D-07 / 095-VALIDATION.md D-07 dead-link row): a file
   // arriving without a `url` (older persisted entry, or a url-less emit) now
@@ -90,20 +91,12 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   if (!file.url) {
     return (
       <div
-        className={cn(
-          "flex items-center gap-2.5 rounded-md ghost-border text-xs",
-          isHeroVariant ? "px-4 py-3 bg-muted/30" : "px-3 py-2 bg-muted/30",
-        )}
+        className="flex items-center gap-2.5 rounded-md ghost-border text-xs px-3 py-2 bg-muted/30"
         data-variant={variant}
         data-dead="true"
       >
         <span className="flex-shrink-0 opacity-70">{icon}</span>
         <span className="flex-1 min-w-0 flex flex-col">
-          {isHeroVariant && (
-            <span className="text-[10px] font-mono uppercase tracking-wider text-primary">
-              ★ Your file
-            </span>
-          )}
           <span className="font-mono text-foreground/60 truncate">{file.filename}</span>
           {file.supersedes && (
             <span className="text-[10px] text-muted-foreground/70 truncate">
@@ -157,34 +150,17 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
       aria-disabled={downloading}
       data-variant={variant}
       className={cn(
-        "flex items-center rounded-md text-xs transition-colors group",
-        // Phase 095 Plan 05 (D-07): hero = primary glow border + gradient wash +
-        // prominent layout; working = the quieter ghost-border row. Reuse-only
-        // utilities (bg-primary/5, border-primary/40 — no new keyframes).
-        isHeroVariant
-          ? "gap-3.5 px-4 py-3 border border-primary/40 bg-gradient-to-br from-primary/10 to-accent/5 shadow-[0_0_24px_hsl(239_100%_82%/0.18)]"
-          : "gap-2.5 px-3 py-2 ghost-border",
-        downloading
-          ? "opacity-60 cursor-not-allowed"
-          : isHeroVariant
-            ? "hover:from-primary/15 hover:to-accent/10"
-            : "bg-muted/30 hover:bg-accent/40",
+        // Phase 095.1 Plan 05 (D-095.1-06): the ONE quiet uniform row — the hero
+        // glow/gradient/large-icon/prominent-Download styling was removed with
+        // the hero split. Every file renders this same calm ghost-border row.
+        "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition-colors group ghost-border",
+        downloading ? "opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
         downloadError ? "border border-red-500/40" : "",
       )}
     >
       <span className="flex-shrink-0">{icon}</span>
       <span className="flex-1 min-w-0 flex flex-col">
-        {isHeroVariant && (
-          <span className="text-[10px] font-mono uppercase tracking-wider text-primary">
-            ★ Your file
-          </span>
-        )}
-        <span
-          className={cn(
-            "font-mono truncate",
-            isHeroVariant ? "text-sm text-foreground font-medium" : "text-foreground/80",
-          )}
-        >
+        <span className="font-mono truncate text-foreground/80">
           {file.filename}
         </span>
         {/* Plan 075.4-04 D-075.4-D2 — supersedes subline (closes BUG-260523-03 UI side).
@@ -201,16 +177,7 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
       {file.size != null && (
         <span className="text-muted-foreground/50 flex-shrink-0">{formatBytes(file.size)}</span>
       )}
-      {isHeroVariant ? (
-        <span className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground flex-shrink-0">
-          {downloading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Download className="w-3.5 h-3.5" />
-          )}
-          Download
-        </span>
-      ) : downloading ? (
+      {downloading ? (
         <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
       ) : (
         <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />

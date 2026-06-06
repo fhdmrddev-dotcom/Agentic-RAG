@@ -1,5 +1,5 @@
 import { memo, useRef, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play, ChevronRight } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Zap, Play } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 // Phase 092 (CONT-01 / D-07): the inline Continue card reads the per-thread
@@ -20,7 +20,6 @@ import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
-import { cn } from "@/lib/utils"
 import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
 // Phase 087-05 (D-05 / chat-panel-seam.md): ADDITIVE seam renderers. Live runs
 // show quiet pointers / a paused cue; reloaded history resolves to self-contained
@@ -57,63 +56,29 @@ function hasPendingAsk(toolCalls: ToolCall[] | undefined): boolean {
 }
 
 /**
- * Phase 095 Plan 05 (D-07) — the hero / working output-files split.
+ * Phase 095.1 Plan 05 (D-095.1-06) — the FLAT "Generated files" list.
  *
- * Replaces the old flat `space-y-1.5` map of OutputFileCard. The agent-flagged
- * (else heuristic-picked, Plan 05 Task 1 backend) `is_hero` files render as
- * emphasized "★ Your file" hero cards ABOVE a collapsible "Working files (N)"
- * group. Re-rank, NEVER hide (D-07, supersedes the BUG-260514-01 hiding stance):
- * ALL files are present and downloadable; the working group is VISIBLE BY
- * DEFAULT with a collapse affordance.
- *
- * Graceful additive contract: when NO file carries `is_hero` (an older stream,
- * or a run with no hero), ALL files are treated as working — no hero block, no
- * crash. Lives in a dedicated sub-component so the working-group collapse state
- * (one local useState) never perturbs MessageItem's own hook order.
+ * REVERSES the 095-05/08 hero/working split (operator-approved CONTEXT.md
+ * decision): no hero crown caption, no hero/working split, no collapse
+ * group. Output files render as ONE equal flat list — every file an equal
+ * `OutputFileCard` row, all visible, all downloadable. The frontend IGNORES the
+ * backend `is_hero` flag entirely (no read here) — it stays WRITTEN-BUT-UNREAD,
+ * harmless and forward-compatible (no backend change). The url-less "Download
+ * unavailable" dead-state affordance is an ORTHOGONAL honesty fix that lives in
+ * OutputFileCard and is KEPT. No local collapse state, so this sub-component no
+ * longer perturbs MessageItem's hook order in any new way.
  */
 type FinalOutputFile = NonNullable<Message["finalOutputFiles"]>[number]
 
 function FinalOutputsPanel({ files }: { files: FinalOutputFile[] }) {
-  const [workingOpen, setWorkingOpen] = useState(true)
-  const heroes = files.filter((f) => f.is_hero)
-  // Graceful: if nothing is flagged hero, everything is a working file.
-  const working = heroes.length > 0 ? files.filter((f) => !f.is_hero) : files
-
   return (
     <div className="mt-3 border-t border-border/60 pt-3.5" data-testid="final-outputs-panel">
       <div className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted-foreground mb-2.5">Generated files</div>
-      {heroes.length > 0 && (
-        <div className="space-y-2" data-testid="final-outputs-hero">
-          {heroes.map((f, i) => (
-            <OutputFileCard key={`hero-${i}`} file={f} variant="hero" />
-          ))}
-        </div>
-      )}
-      {working.length > 0 && (
-        <div className={heroes.length > 0 ? "mt-3" : ""} data-testid="final-outputs-working">
-          <button
-            type="button"
-            onClick={() => setWorkingOpen((o) => !o)}
-            aria-expanded={workingOpen}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground/80 transition-colors mb-1.5"
-          >
-            <ChevronRight
-              className={cn(
-                "w-3 h-3 transition-transform",
-                workingOpen ? "rotate-90" : "",
-              )}
-            />
-            Working files ({working.length}) — intermediates, all downloadable
-          </button>
-          {workingOpen && (
-            <div className="space-y-1.5">
-              {working.map((f, i) => (
-                <OutputFileCard key={`working-${i}`} file={f} variant="working" />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      <div className="space-y-1.5">
+        {files.map((f, i) => (
+          <OutputFileCard key={`gen-${i}`} file={f} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -566,13 +531,14 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             inside ToolCallPanel / tool-bodies/ExecuteCodeBody (Phase 075.7
             rename). Closes the 12-download-
             links-for-1-desired-file cumulative-repeat symptom. */}
-        {/* Phase 095 Plan 05 (D-07) — hero / working output-files split. The
-            old flat `space-y-1.5` map is replaced by FinalOutputsPanel, which
-            heroes the agent-flagged deliverable above a collapsible "Working
-            files (N)" group. ALL files are present + downloadable (re-rank,
-            never hide — supersedes BUG-260514-01 hiding). Older streams without
-            `is_hero` degrade gracefully (all-working). The empty-state guard
-            (`finalOutputFiles.length > 0`) and `data-testid="final-outputs-panel"`
+        {/* Phase 095.1 Plan 05 (D-095.1-06) — FLAT "Generated files" list.
+            FinalOutputsPanel renders every file as ONE equal OutputFileCard row
+            (no hero crown, no hero/working split, no collapse group) — reverses
+            the 095-05/08 visual per the operator-approved CONTEXT.md decision.
+            ALL files are present + downloadable; the backend `is_hero` flag is
+            IGNORED by the frontend (written-but-unread, no backend change). The
+            empty-state guard (`finalOutputFiles.length > 0`) and the
+            `data-testid="final-outputs-panel"`
             are preserved (D-075.2-07 + the existing test). */}
         {message.finalOutputFiles && message.finalOutputFiles.length > 0 && (
           <FinalOutputsPanel files={message.finalOutputFiles} />
