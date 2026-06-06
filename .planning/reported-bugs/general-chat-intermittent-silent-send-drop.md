@@ -9,7 +9,7 @@ affected_areas: [frontend/chat, frontend/composer]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "Reviewed at Phase 095.1 discuss-phase (2026-06-06): considered for the 095.1 cross-check but routed OUT — composer/send-path surface (frontend/chat, frontend/composer), unrelated to 095.1's run-honesty + provider-error + workspace-panel scope. Stays OPEN; re-route to a dedicated composer/send-reliability fix when scoped."
 reproduces_on:
   branch: v2.5-dev
   commit: bf8ec00b

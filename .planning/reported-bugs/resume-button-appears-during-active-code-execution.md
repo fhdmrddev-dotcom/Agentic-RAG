@@ -6,9 +6,9 @@ surface: Agentic-RAG
 severity: major
 status: folded
 affected_areas: [frontend/streaming, frontend/chat-ui, backend/sse, backend/redis-streams]
-folded_into: "075"
+folded_into: "095.1"
 related_seeds: [SEED-007, SEED-008, SEED-025]
-re_open_trigger: "Phase 075 ships and operator still observes Resume button appearing mid-stream during a long sandbox cell — closure validation: snapshot endpoint's reconcile-fetch path (D-075-13) didn't gate Resume on confirmed terminal runs.status."
+re_open_trigger: "RE-FOLDED into Phase 095.1 at discuss-phase (2026-06-06): the 075 re-open trigger FIRED — operator observed Resume offered after a SUCCESSFUL run that produced deliverables then a later iteration failed/timed_out (075 fixed only the mid-stream transient case, not the genuine-terminal case). Now owned by D-095.1-07 (deliverable-aware Resume gate). Re-open if, after 095.1 ships, a run that produced its deliverables still offers Resume on failed/timed_out."
 reproduces_on:
   branch: v2.5-dev
   commit: 2996d0a

@@ -9,7 +9,7 @@ affected_areas: [backend/agent-loop, backend/services/agent_loop.py, ask_user/HI
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-052]
-re_open_trigger: v2.9 milestone kickoff / SEED-052 planning, OR any phase that touches the Deep agent-loop interactivity prompt (agent_loop.py ~545-572), the Deep-mode ask_user round-trip, or todo-driven execution.
+re_open_trigger: "PARTIAL-FOLD note (095.1 discuss, 2026-06-06): the PANEL-FILL SYMPTOM (workspace panel stayed empty for providers that never loop todos) is handled by Phase 095.1 D-095.1-01/02 — the panel now fills deterministically from activity regardless of whether the model loops todos. The BEHAVIORAL root (model ignores 'ask me per step' / never advances+marks todos) stays DEFERRED here — 095.1 does NOT change model behavior. Re-open the behavioral fix at: v2.9 milestone kickoff / SEED-052 planning, OR any phase that touches the Deep agent-loop interactivity prompt (agent_loop.py ~545-572), the Deep-mode ask_user round-trip, or todo-driven execution."
 reproduces_on:
   branch: v2.5-dev
   commit: 3fdb88ec (HEAD at report time; behavior observed 2026-06-02)
