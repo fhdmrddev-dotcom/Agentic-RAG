@@ -39,6 +39,7 @@ import {
   usePhases,
   useTasks,
   useWorkflowLockForThread,
+  useDerivedPanel,
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -99,6 +100,13 @@ export function WorkspacePanel({
   // the live timeline so batch sub-results become VISIBLE before the merge — under
   // the same harness/phases-exist gate as the timeline, AND only when tasks exist.
   const { data: tasks } = useTasks(threadId)
+  // Phase 095.1 Plan 06 (GAP-1 / WORKSPACE-PARITY): the activity-derived workspace
+  // panel signal. REUSE the existing Plan-02 hook — it already applies the smart
+  // gate (write_todos OR ≥2 deduped MEANINGFUL tools) internally and returns the
+  // stable EMPTY ref when the thread doesn't qualify (so reading it never churns a
+  // chat re-render — PANEL-06 preserved). `derived.length > 0` is the correct
+  // "earns a derived panel" signal; do NOT re-derive the gate here.
+  const derived = useDerivedPanel(threadId)
   const workflowLock = useWorkflowLockForThread(threadId)
   const isHarness = workflowLock != null
   const showTimeline = isHarness || phases.length > 0
@@ -110,8 +118,17 @@ export function WorkspacePanel({
   // sets it and VersionDiff consumes it — never orphaned).
   const [selectedFile, setSelectedFile] = useState<WorkspaceFile | null>(null)
 
+  // Phase 095.1 Plan 06 (GAP-1, D-095.1-01/02): include the derived signal so a
+  // thread with ONLY tool-call activity that earns a derived panel (the
+  // no-write_todos cross-provider parity case) renders the panel body instead of
+  // short-circuiting to <PanelEmpty/> — letting TodosSection (precedence 2) show
+  // the derived rows. Without this the derivation was structurally unreachable.
   const hasActivity =
-    todos.length > 0 || files.length > 0 || pendingAsks.length > 0 || phases.length > 0
+    todos.length > 0 ||
+    files.length > 0 ||
+    pendingAsks.length > 0 ||
+    phases.length > 0 ||
+    derived.length > 0
 
   const todosDone = useMemo(
     () => todos.filter((t) => t.status === "completed").length,
@@ -133,7 +150,16 @@ export function WorkspacePanel({
         <PanelEmpty />
       ) : (
         <>
-          <PanelSection title="Todos" count={{ done: todosDone, total: todos.length }}>
+          {/* Phase 095.1 Plan 06 (GAP-1): keep the Todos count badge HONEST. With
+              derived-only activity there are no REAL todos, so a {done:0,total:0}
+              badge would render a misleading "0/0". Omit the count badge entirely
+              when there are no real todos (PanelSection renders no badge when count
+              is undefined — same omission idiom the Files section uses); the
+              "derived from activity" marker inside TodosSection signals the state. */}
+          <PanelSection
+            title="Todos"
+            count={todos.length > 0 ? { done: todosDone, total: todos.length } : undefined}
+          >
             <TodosSection />
           </PanelSection>
 

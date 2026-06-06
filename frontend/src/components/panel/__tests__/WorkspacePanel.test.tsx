@@ -25,6 +25,7 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
+import type { DerivedPanelItem } from "@/lib/workspacePanel"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
 const useTodos = vi.fn()
@@ -41,6 +42,12 @@ const usePhases = vi.fn()
 // unaffected; a dedicated test sets them to exercise the BatchResultList mount.
 const useTasks = vi.fn()
 const useWorkflowLockForThread = vi.fn()
+// Phase 095.1 Plan 06 (GAP-1): WorkspacePanel now also reads useDerivedPanel to
+// gate the derived-panel signal in hasActivity. Default to [] (no derived panel)
+// so the existing PanelEmpty short-circuit + populated assertions are unaffected;
+// the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
+// (which renders the REAL TodosSection — this file sentinel-mocks it).
+const useDerivedPanel = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -49,6 +56,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...a),
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
+  useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
 }))
 
 // Stub the heavy timeline child (it reads the real provider hooks); the panel
@@ -97,6 +105,7 @@ function setHooks({
   phases = [] as Phase[],
   tasks = [] as TaskRunIndexItem[],
   lock = null as { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null,
+  derived = [] as DerivedPanelItem[],
 }: {
   todos?: Todo[]
   files?: WorkspaceFile[]
@@ -105,6 +114,7 @@ function setHooks({
   phases?: Phase[]
   tasks?: TaskRunIndexItem[]
   lock?: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
+  derived?: DerivedPanelItem[]
 }) {
   useTodos.mockReturnValue({ data: todos, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkspaceFiles.mockReturnValue({ data: files, isLoading: false, error: null, reconcile: vi.fn() })
@@ -113,6 +123,7 @@ function setHooks({
   usePhases.mockReturnValue({ data: phases, isLoading: false, error: null, reconcile: vi.fn() })
   useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkflowLockForThread.mockReturnValue(lock)
+  useDerivedPanel.mockReturnValue(derived)
 }
 
 function setViewport(width: number) {
