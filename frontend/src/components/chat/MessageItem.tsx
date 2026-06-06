@@ -220,6 +220,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const hasRunningTools = message.tool_calls?.some((tc) => tc.status === "running") ?? false
   const hasAnyTools = (message.tool_calls?.length ?? 0) > 0
   const allToolsDone = hasAnyTools && !hasRunningTools
+  // Phase 095.1 Plan 05 (D-095.1-07): deliverable-aware Resume gate predicate.
+  // True when this run already produced execute_code output files (persisted +
+  // reload-reconstructed onto finalOutputFiles, api.ts) before a later iteration
+  // failed/timed_out — so Resume must NOT be offered (the user's work is already
+  // on disk). Closes BUG-260518-01.
+  const producedDeliverables = (message.finalOutputFiles?.length ?? 0) > 0
   // Phase 067.1 Plan 02: extend activeTool to include "preparing" so outerBannerLabel
   // can render the ~2s sandbox-warmup copy ("Preparing code…") before tool_start fires.
   // Mirror of ToolCallPanel.tsx:540 active-tool detection (PATTERNS.md).
@@ -386,8 +392,17 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 stopped), completed, streaming, or undefined (DB-loaded
                 historical messages without run metadata). Same onResume
                 callback re-POSTs the original prompt with full conversation
-                context (today's failed-state Resume code path). */}
-            {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && (
+                context (today's failed-state Resume code path).
+
+                Phase 095.1 Plan 05 (D-095.1-07): deliverable-aware. A run that
+                already produced its deliverables (execute_code output files,
+                persisted + reload-reconstructed onto finalOutputFiles) before a
+                later iteration failed/timed_out does NOT falsely offer Resume —
+                the work the user wanted is already on disk. Closes
+                BUG-260518-01 (the genuine-terminal case 075 didn't cover).
+                "Deliverables" = execute_code output files specifically; we do
+                NOT count workspace_write files here (out of scope). */}
+            {!isStreaming && message.role === "assistant" && (message.runStatus === "failed" || message.runStatus === "timed_out") && !producedDeliverables && (
               <Button
                 variant="ghost"
                 size="sm"
