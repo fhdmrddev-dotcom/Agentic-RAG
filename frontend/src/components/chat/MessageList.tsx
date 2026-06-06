@@ -185,9 +185,12 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             The button IS the single floating pill (border + bg + glow); the strip
             is mounted with placement="header" INSIDE it so the live-status segments
             render as plain text WITHOUT a second nested pill border (a
-            placement="floating" strip would double-frame inside this pill). The
-            "↓ Jump to live" affordance per the sketch `.live-chip .jump` leads the
-            segments. Discretion call documented in 095-04-SUMMARY.md. */}
+            placement="floating" strip would double-frame inside this pill).
+
+            Phase 095 Plan 08 (GAP-095-03 LOW): per sketch 015 `.live-chip`, the
+            status segments LEAD and the `.jump` affordance TRAILS (the jump morphs
+            in AFTER the status). So the RunStatusStrip renders FIRST and the
+            "↓ Jump to live" span trails. */}
         {showJumpToLive && (
           <button
             type="button"
@@ -197,18 +200,18 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             aria-label="Jump to live"
             className="animate-fadeSlideUp sticky bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-primary/50 bg-popover/92 px-3 py-1.5 shadow-lg backdrop-blur-md transition-colors hover:border-primary"
           >
-            <span className="font-mono text-xs font-semibold text-primary">
-              ↓ Jump to live
-            </span>
-            <span aria-hidden="true" className="opacity-40">
-              ·
-            </span>
             <RunStatusStrip
               elapsedLabel={chipElapsed}
               stepCount={chipStepCount}
               activityVerb="Streaming…"
               placement="header"
             />
+            <span aria-hidden="true" className="opacity-40">
+              ·
+            </span>
+            <span className="font-mono text-xs font-semibold text-primary">
+              ↓ Jump to live
+            </span>
           </button>
         )}
       </div>
