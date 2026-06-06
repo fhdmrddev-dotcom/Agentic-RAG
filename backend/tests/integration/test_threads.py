@@ -369,6 +369,7 @@ class TestSendMessageDispatchAttribution:
         send_message: thread ownership select -> user-message insert -> title-check
         select. Title generation is short-circuited (title != "New Chat") so the
         run_in_threadpool LLM call never fires."""
+        import asyncio
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
 
@@ -380,12 +381,20 @@ class TestSendMessageDispatchAttribution:
 
         _settings = SimpleNamespace(llm_model=settings_model, active_provider=settings_provider)
 
+        def _no_spawn(coro):
+            """Don't run the real producer (agent_runner) — close its coroutine
+            cleanly and return a REAL already-completed task so the shutdown
+            lifespan's RUN_TASKS gather (main.py L280-284) cleans up without a
+            MagicMock blowing up at teardown."""
+            coro.close()
+            return asyncio.get_event_loop().create_task(asyncio.sleep(0))
+
         with patch("app.api.threads.load_user_settings", return_value=_settings), \
              patch("app.api.threads.override_provider", side_effect=lambda s, p: SimpleNamespace(llm_model=s.llm_model, active_provider=p)), \
              patch("app.api.threads.get_model_capability_async", new=AsyncMock(return_value={})), \
              patch("app.api.threads.insert_run", new=AsyncMock(return_value=None)), \
              patch("app.api.threads.get_pg_pool", new=AsyncMock(return_value=MagicMock())), \
-             patch("app.api.threads.asyncio.create_task", side_effect=lambda coro: (coro.close(), MagicMock())[1]):
+             patch("app.api.threads.asyncio.create_task", side_effect=_no_spawn):
             response = client.post(
                 f"/threads/{THREAD_ID}/messages",
                 headers=auth_headers,
