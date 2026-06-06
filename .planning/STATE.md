@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: human_uat_pending
-stopped_at: "Phase 095 GAP-CLOSURE — all 4 gap plans (06/07/08/09) shipped + code-review (0 crit / 1 warn → WR-01 double-frame FIXED commit 4065580b) + automated re-verification = human_needed (4/4 must-haves; all 3 operator gaps + WR-01 code-closed; zero net-new test failures, tsc 37 baseline, backend 19/19, frontend 497 passed). AWAITING operator live Chrome-MCP re-UAT (095-HUMAN-UAT.md — 5 scenarios × 6 providers). NEXT = /gsd:verify-work 095 (operator-driven)"
-last_updated: "2026-06-06T12:00:00.000Z"
+status: ready_to_discuss
+stopped_at: "Phase 095 CLOSED 2026-06-06 — 3 operator gaps verified FIXED live (Chrome-MCP). Live cross-provider UAT surfaced 5 unplanned cross-provider/honesty findings (Google 429-mislabel, panel-empty=model-compliance, resume-after-success, reload-timer, model-attribution) → Phase 095.1 FORMALIZED before 096. Spike 006/007 VALIDATED the deterministic smart-gate + activity-derived workspace panel. NEXT = /gsd:discuss-phase 095.1"
+last_updated: "2026-06-06T14:00:00.000Z"
 last_activity: 2026-06-06
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 8
   total_plans: 51
   completed_plans: 51
-  percent: 100
+  percent: 80
 ---
 
 # Project State
