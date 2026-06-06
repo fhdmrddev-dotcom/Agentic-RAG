@@ -348,3 +348,85 @@ class TestSendMessage:
                 continue
             parsed = json.loads(raw)
             assert "type" in parsed
+
+
+class TestSendMessageDispatchAttribution:
+    """Phase 095.1-07 (GAP-2): the POST /messages dispatch JSONResponse carries
+    the already-resolved model/provider (additive) so the live assistant message
+    can show ``{provider} · {model}`` in the LIVE moment — not only after a reload.
+
+    These drive the modern 201 dispatch path (the SSE-on-POST path was removed in
+    Phase 062/063; ``postMessage`` reads {message_id, run_id} from this body). We
+    mock ONLY the dispatch primitives that the resolved values feed (insert_run,
+    the pg pool, the user-settings/registry resolution, and the producer spawn) so
+    the handler reaches its ``return JSONResponse(...)`` deterministically — the
+    asserted ``model``/``provider`` equal the values the mocks resolve.
+    """
+
+    def _drive(self, client, auth_headers, mock_builder, *, body, settings_model, settings_provider):
+        """Run send_message through to its dispatch JSONResponse and return the
+        parsed body. The Supabase side_effect rows mirror the aexec call order in
+        send_message: thread ownership select -> user-message insert -> title-check
+        select. Title generation is short-circuited (title != "New Chat") so the
+        run_in_threadpool LLM call never fires."""
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock
+
+        mock_builder.execute.side_effect = [
+            _make_result(_thread_row()),                      # thread ownership check (active_workflow_run_id absent)
+            _make_result([_message_row("user", "Hello", message_id=MESSAGE_ID)]),  # insert user message
+            _make_result(_thread_row(title="Existing title")),  # title-check select (!= "New Chat" -> no gen)
+        ]
+
+        _settings = SimpleNamespace(llm_model=settings_model, active_provider=settings_provider)
+
+        with patch("app.api.threads.load_user_settings", return_value=_settings), \
+             patch("app.api.threads.override_provider", side_effect=lambda s, p: SimpleNamespace(llm_model=s.llm_model, active_provider=p)), \
+             patch("app.api.threads.get_model_capability_async", new=AsyncMock(return_value={})), \
+             patch("app.api.threads.insert_run", new=AsyncMock(return_value=None)), \
+             patch("app.api.threads.get_pg_pool", new=AsyncMock(return_value=MagicMock())), \
+             patch("app.api.threads.asyncio.create_task", side_effect=lambda coro: (coro.close(), MagicMock())[1]):
+            response = client.post(
+                f"/threads/{THREAD_ID}/messages",
+                headers=auth_headers,
+                json=body,
+            )
+        return response
+
+    def test_dispatch_response_carries_resolved_model_and_provider(
+        self, client, auth_headers, mock_builder
+    ):
+        """The 201 dispatch body includes additive ``model``/``provider`` equal to
+        the resolved values (from user settings when the body omits a model), and
+        STILL carries ``message_id``/``run_id`` (the existing contract is intact)."""
+        response = self._drive(
+            client, auth_headers, mock_builder,
+            body={"content": "Hello"},                # no explicit model -> settings.llm_model
+            settings_model="gpt-5.4-mini",
+            settings_provider="openai",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        # Existing contract intact:
+        assert data["message_id"] == MESSAGE_ID
+        assert "run_id" in data and data["run_id"]
+        # Additive attribution (GAP-2): the resolved model/provider cross the boundary.
+        assert data["model"] == "gpt-5.4-mini"
+        assert data["provider"] == "openai"
+
+    def test_dispatch_response_model_provider_follow_explicit_body_override(
+        self, client, auth_headers, mock_builder
+    ):
+        """When the request body carries an explicit model + provider, the dispatch
+        response echoes THOSE resolved values (body.model wins over settings; the
+        explicit provider is applied via override_provider)."""
+        response = self._drive(
+            client, auth_headers, mock_builder,
+            body={"content": "Hi", "model": "claude-sonnet-4.5", "provider": "anthropic"},
+            settings_model="gpt-5.4-mini",
+            settings_provider="openai",
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["model"] == "claude-sonnet-4.5"
+        assert data["provider"] == "anthropic"
