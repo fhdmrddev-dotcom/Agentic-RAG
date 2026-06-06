@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
-status: verified
-stopped_at: Phase 095.1 VERIFIED via live re-UAT (operator-driven + DB-cross-checked) - all 3 prior issues PASS, tests 8+9 skipped-with-reason; next = Phase 096
-last_updated: "2026-06-06T20:45:00Z"
+status: unknown
+stopped_at: Phase 096 context gathered
+last_updated: "2026-06-06T19:43:20.758Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 10
@@ -439,9 +439,9 @@ Plus v2.7-specific deferrals carried with re-open triggers: **SEED-037** (in-pan
 
 ## Session Continuity
 
-Last session: 2026-06-06T15:04:34.999Z
-Stopped at: Completed 095.1-07-PLAN.md (GAP-2 — live attribution + turn live==reload)
-Resume file: None
+Last session: --stopped-at
+Stopped at: Phase 096 context gathered
+Resume file: --resume-file
 
 **Plan 093-02 — ✅ COMPLETE (2026-06-02):** the F9 core fix + the phase's highest-risk task (SHARED Deep+harness `task_service.py`, D-14 RED LINE). 2 tasks (Task 1 code+tests; Task 2 deterministic byte-identical-Deep guard, verification-only).
 
