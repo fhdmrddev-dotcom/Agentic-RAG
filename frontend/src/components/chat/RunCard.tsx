@@ -287,10 +287,11 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
           <div className="text-sm font-semibold text-foreground truncate">
             {headerTitle}
           </div>
-          {/* Plan 07 (GAP-095-03 MED): the `model · turn` run-sub subline,
-              restored UNDER the calm title (sketch HTML: title + run-sub +
-              hdr-strip). Model omitted (no Message.model field); shows `turn N`
-              from existing iterationCount data — no backend field. */}
+          {/* Plan 095.1-03 (D-04 model attribution): the run-sub subline UNDER
+              the calm title (sketch HTML: title + run-sub + hdr-strip). Shows the
+              REAL resolved `{provider} · {model} · turn N` (message.provider/model
+              from the additive enrich); falls back to `turn N` for legacy/no-run
+              messages. Rendered as React text children only (T-095.1-03-01). */}
           <div className="font-mono text-xs text-muted-foreground/70 truncate">
             {runSub}
           </div>
