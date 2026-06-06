@@ -70,6 +70,12 @@ type MessageResponseDTO = Message & {
   run_id?: string | null
   run_status?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out" | null  // Phase 066 D-066-04: mirrors backend MessageResponse.run_status 5-value Literal post-migration 038
   reasoning_content?: string | null  // Phase 076.2: DeepSeek thinking mode reasoning_content from backend
+  // Phase 095.1-03 (D-04 model attribution + D-05 true reload timer): the runs
+  // enrich adds these 4 snake fields; the mapper coerces them null → undefined.
+  model?: string | null
+  provider?: string | null
+  started_at?: string | null
+  completed_at?: string | null
 }
 
 function _mapMessageResponse(m: MessageResponseDTO): Message {
@@ -92,6 +98,13 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     run_id,
     run_status,
     reasoning_content,  // Phase 076.2: DeepSeek thinking mode
+    // Phase 095.1-03 (D-04/D-05): destructure the 4 enrich fields so the snake
+    // started_at/completed_at do NOT leak through ...rest, and coerce null →
+    // undefined (mirroring the runId/runStatus idiom).
+    model,
+    provider,
+    started_at,
+    completed_at,
     ...rest
   } = m
   const mapped: Message = {
@@ -100,6 +113,11 @@ function _mapMessageResponse(m: MessageResponseDTO): Message {
     runId: run_id ?? undefined,
     runStatus: run_status ?? undefined,
     reasoningContent: reasoning_content ?? undefined,  // Phase 076.2
+    // Phase 095.1-03 (D-04 model attribution + D-05 true reload timer)
+    model: model ?? undefined,
+    provider: provider ?? undefined,
+    startedAt: started_at ?? undefined,
+    completedAt: completed_at ?? undefined,
   }
   if (confidence_level) {
     mapped.confidence = {

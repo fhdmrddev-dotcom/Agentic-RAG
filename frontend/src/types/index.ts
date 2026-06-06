@@ -150,6 +150,22 @@ export interface Message {
   runId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
+  /** Phase 095.1-03 (D-04 model attribution): the REAL resolved model/provider
+   * of the run that produced this assistant message, read from runs.model /
+   * runs.provider via the additive runs↔messages enrich. Drives the RunCard
+   * run-sub `{provider} · {model} · turn N`. Optional (NOT `| null`) because the
+   * api.ts mapper coerces the wire null → undefined; absent for legacy /
+   * pre-run-backed messages (graceful → run-sub shows just `turn N`). */
+  model?: string
+  provider?: string
+  /** Phase 095.1-03 (D-05 true reload timer): the run's persisted wall-clock
+   * start/end (runs.started_at / runs.completed_at, ISO strings). A finished
+   * run's TRUE duration = completedAt − startedAt — identical live and on reload
+   * (never Date.now() − created_at, the BUG-260606-02 inflation lie). A finished
+   * run with no completedAt → NO duration (the honesty rule). Optional because
+   * the mapper coerces null → undefined. */
+  startedAt?: string
+  completedAt?: string
   /** Phase 076.1: error string from SSE terminal errorPayload. Populated by
    * StreamsProvider onTerminal when kind === "error" or "timed_out". Used by
    * RunCard to display categorized failure reason. Only available for live-
