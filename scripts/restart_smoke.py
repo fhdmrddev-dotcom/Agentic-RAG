@@ -123,8 +123,18 @@ _SQL_PHASES = (
 # Double-execution detector — harness_audit is INSERT-only (HARNESS-06), so a
 # re-applied side effect HAS to show up as a second phase_completed row.
 # Any row returned = a double-applied side effect.
+# NOTE on the CASE jsonb_typeof(...) wrapper (mirrors eval_cross_provider.py's
+# duplicate_phase_completed): the LIVE writer stores harness_audit.metadata as a
+# jsonb STRING containing JSON (double-encoded — verified live 2026-06-07:
+# 386/386 audit rows are jsonb_typeof = 'string'). `->>` on a jsonb string
+# returns NULL, so without normalization ALL of a run's phase_completed rows
+# collapse into one NULL bucket and count(*) > 1 false-FAILs every healthy run.
+# A string unwraps via `#>> '{}'` then re-parses with `::jsonb`; an object
+# passes through — the detector keeps working if the writer is ever fixed.
 _SQL_DOUBLE_COMPLETION = (
-    "SELECT metadata->>'phase' AS slug, count(*) AS n FROM harness_audit "
+    "SELECT (CASE WHEN jsonb_typeof(metadata) = 'string' "
+    "THEN (metadata #>> '{}')::jsonb ELSE metadata END)->>'phase' AS slug, "
+    "count(*) AS n FROM harness_audit "
     "WHERE run_id = %s AND event_type = 'phase_completed' "
     "GROUP BY 1 HAVING count(*) > 1"
 )
