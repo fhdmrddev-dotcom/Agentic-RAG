@@ -71,15 +71,19 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "gpt-4.1-mini":                         400_000,  # actual 1M — practical cap
     "gpt-4.1-nano":                         400_000,  # actual 1M — practical cap — deprecated
     "gpt-5":                                200_000,  # actual 200k — superseded by 5.4+
+    "gpt-5.2":                              200_000,  # conservative cap pending published spec (live /models 2026-06-07, 096 D-05 curation)
     "gpt-5.4":                              400_000,  # actual 1M — 400K practical cap
+    "gpt-5.4-pro":                          400_000,  # actual 1M — 400K practical cap (mirrors gpt-5.4; live /models 2026-06-07, 096 D-05 curation)
     "gpt-5.4-mini":                         200_000,  # actual 400K — 200K practical cap
     "gpt-5.4-nano":                         200_000,  # actual 400K — 200K practical cap
     "gpt-5.5":                              400_000,  # actual 1M — 400K practical cap
+    "gpt-5.5-pro":                          400_000,  # actual 1M — 400K practical cap (mirrors gpt-5.5; live /models 2026-06-07, 096 D-05 curation)
     # ── Anthropic ───────────────────────────────────────────────────────────
+    "claude-opus-4-8":                      200_000,  # actual 1M — 200K practical cap (mirrors opus-4-7; live /models 2026-06-07, 096 D-05 curation)
     "claude-opus-4-7":                      200_000,  # actual 1M — 200K practical cap
     "claude-opus-4-6":                      200_000,  # actual 1M — superseded by 4.7
     "claude-sonnet-4-6":                    200_000,  # actual 1M — 200K practical cap
-    "claude-sonnet-4-5":                    200_000,  # actual 1M — 200K practical cap
+    "claude-sonnet-4-5-20250929":           200_000,  # actual 1M — 200K practical cap (dated ID — undated alias not served live; 096 D-05 curation 2026-06-07)
     "claude-haiku-4-5-20251001":            200_000,  # actual 1M — 200K practical cap
     # ── Google ──────────────────────────────────────────────────────────────
     "gemini-2.5-pro":                       600_000,  # actual 1M — practical cap
@@ -95,17 +99,18 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "moonshotai/kimi-k2.5":                 200_000,  # actual 262k
     "minimax/minimax-m2.7":                 160_000,  # actual 204k
     "deepseek/deepseek-v4-pro":             200_000,  # actual 1M — stay conservative via OpenRouter
-    "minimax/minimax-m2.5:free":            150_000,  # actual 196k
+    # minimax/minimax-m2.5:free removed 2026-06-07 — no longer served by OpenRouter live /models (096 D-05 curation)
     "nvidia/nemotron-3-super-120b-a12b:free": 200_000,  # actual 262k
     "google/gemma-4-26b-a4b-it":             200_000,  # actual 262k
     "google/gemma-4-31b-it:free":            200_000,  # actual 262k — free tier
     # ── DeepSeek direct ────────────────────────────────────────────────────
+    # deepseek-chat / deepseek-reasoner removed 2026-06-07 — the announced 2026-07-24
+    # deprecation was effected early; live /models serves only the v4 tier (096 D-05 curation)
     "deepseek-v4-flash":                    200_000,  # actual 1M — conservative cap
     "deepseek-v4-pro":                      200_000,  # actual 1M — conservative cap
-    "deepseek-chat":                         60_000,  # deprecated 2026/07/24 → v4-flash non-thinking
-    "deepseek-reasoner":                     60_000,  # deprecated 2026/07/24 → v4-flash thinking
     # ── Moonshot/Kimi direct ──────────────────────────────────────────────
     "kimi-k2.6":                            200_000,  # actual 262k
+    "kimi-k2.5":                            200_000,  # actual 262k (live /models 2026-06-07, 096 D-05 curation)
     "moonshot-v1-8k":                         7_000,  # actual 8k
     # ── MiniMax direct (int'l api.minimax.io; codes from /models, specs per platform.minimax.io/docs/guides/models-intro; D-089 curation 2026-05-30) ──
     "MiniMax-M2":                           200_000,  # docs: 200K ctx / 128K out / function calling
@@ -113,8 +118,9 @@ MODEL_CONTEXT_DEFAULTS: dict[str, int] = {
     "MiniMax-M2.1-highspeed":               200_000,
     "MiniMax-M2.5":                         200_000,
     "MiniMax-M2.5-highspeed":               200_000,  # fast rep (native-7 baseline)
-    "MiniMax-M2.7":                         200_000,  # flagship
+    "MiniMax-M2.7":                         200_000,
     "MiniMax-M2.7-highspeed":               200_000,
+    "MiniMax-M3":                           200_000,  # flagship — conservative cap pending published spec (live /models 2026-06-07, 096 D-05 curation)
     # ── GLM/Zhipu direct (int'l api.z.ai; all 7 from /models, D-089 curation 2026-05-30) ──
     "glm-4.5":                              128_000,
     "glm-4.5-air":                          128_000,  # lightweight fast tier
@@ -186,26 +192,34 @@ class ModelCapability(TypedDict, total=False):
 MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # OpenAI — proven native tool support
     # max_output_tokens verified against per-model OpenAI docs 2026-05-18
+    # verified against live /models 2026-06-07 (096 D-05 curation) — o3/o4 removed (no longer
+    # served); gpt-5.5-pro / gpt-5.4-pro / gpt-5.2 added; gpt-5.5 timeout 300s -> 600s
+    # (flagship tier — Open Q4 resolved, operator-approved)
     "gpt-4o":       {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
     "gpt-4o-mini":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  16384, "capability_source": "registry"},
     "gpt-4.1":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
     "gpt-4.1-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens":  32768, "capability_source": "registry"},
     "gpt-4.1-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens":  16384, "capability_source": "registry"},
     "gpt-5":        {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "gpt-5.2":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # live /models 2026-06-07 (096 D-05 curation)
     "gpt-5.4":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class per memory feedback_model_names_representative.md
+    "gpt-5.4-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
     "gpt-5.4-mini": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
     "gpt-5.4-nano": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 180, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class
-    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},
+    "gpt-5.5":      {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # 300s -> 600s flagship tier (Open Q4 resolved, operator-approved 2026-06-07)
+    "gpt-5.5-pro":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True},  # pro/reasoning tier — live /models 2026-06-07 (096 D-05 curation)
     "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "o3":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},
-    "o4":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True},  # representative-class — o4 follows o3 family
+    # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use
     # max_output_tokens verified against platform.claude.com/docs/en/about-claude/models/overview 2026-05-18
     # Rule-1 deviation from SEED-009: Opus 4.7 / Opus 4.6 = 128000 (live docs), NOT 32000 (seed older number)
+    # verified against live /models 2026-06-07 (096 D-05 curation) — opus-4-8 added; undated
+    # claude-sonnet-4-5 replaced by the dated claude-sonnet-4-5-20250929 (only the dated ID is served)
+    "claude-opus-4-8":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation)
     "claude-opus-4-7":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},  # extended thinking — Issue #51568
     "claude-opus-4-6":           {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry"},
     "claude-sonnet-4-6":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},
-    "claude-sonnet-4-5":         {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},
+    "claude-sonnet-4-5-20250929": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 600, "max_output_tokens":  64000, "capability_source": "registry"},  # dated ID — undated alias not served live (096 D-05 curation 2026-06-07)
     "claude-haiku-4-5-20251001": {"native_tools": True, "provider": "anthropic", "llm_call_timeout_seconds": 300, "max_output_tokens":  64000, "capability_source": "registry"},
     # Google direct — native function calling
     # max_output_tokens verified via Vertex AI + ai.google.dev docs 2026-05-18
@@ -233,21 +247,26 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # successor to gemini-2.5-flash-lite. Caps mirror 2.5-flash-lite pending GA spec.
     "gemini-3.1-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16},
     # DeepSeek direct — OpenAI-compatible API at api.deepseek.com
+    # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek-chat /
+    # deepseek-reasoner removed: the announced 2026-07-24 deprecation was effected early;
+    # live /models serves only the v4 tier
     "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
     "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry"},
-    "deepseek-chat":      {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
-    "deepseek-reasoner":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 8192, "capability_source": "registry"},
-    # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.cn
+    # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.ai
+    # verified against live /models 2026-06-07 (096 D-05 curation) — kimi-k2.5 added
     "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},
+    "kimi-k2.5":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry"},  # live /models 2026-06-07 (096 D-05 curation)
     "moonshot-v1-8k":     {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry"},
-    # MiniMax direct — OpenAI-compatible API at api.minimax.io (INTERNATIONAL; all 7 from live /models 2026-05-30, D-089 docs curation)
+    # MiniMax direct — OpenAI-compatible API at api.minimax.io (INTERNATIONAL; all 8 verified
+    # against live /models 2026-06-07, 096 D-05 curation — MiniMax-M3 added, exact PascalCase)
     "MiniMax-M2":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
     "MiniMax-M2.1":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
     "MiniMax-M2.1-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast
     "MiniMax-M2.5":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},
     "MiniMax-M2.5-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast rep (eval/native-7 baseline)
-    "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # flagship (PascalCase — API is case-sensitive)
+    "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # (PascalCase — API is case-sensitive)
     "MiniMax-M2.7-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry"},  # fast flagship
+    "MiniMax-M3":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation; exact PascalCase)
     # GLM/Zhipu direct — OpenAI-compatible API at api.z.ai/api/paas/v4 (INTERNATIONAL; codes from live /models, specs per docs.z.ai/guides/llm/*; D-089 docs curation 2026-05-30)
     "glm-4.5":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry"},
     "glm-4.5-air":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry"},  # lightweight fast tier
@@ -258,8 +277,9 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
+    # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek/deepseek-reasoner
+    # + minimax/minimax-m2.5:free removed (no longer served by OpenRouter live /models)
     "deepseek/deepseek-chat":     {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":   8192, "capability_source": "registry"},
-    "deepseek/deepseek-reasoner": {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":   8192, "capability_source": "registry"},
     "deepseek/deepseek-r1":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  32768, "capability_source": "registry"},
     "z-ai/glm-5.1":               {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
     "moonshotai/kimi-k2.5":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
@@ -268,7 +288,6 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # per RESEARCH.md A5 recommendation (pass-through preferred over guessed 16384).
     "minimax/minimax-01":         {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "capability_source": "registry"},
     "minimax/minimax-m2.7":       {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry"},
-    "minimax/minimax-m2.5:free":  {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 600, "max_output_tokens":  16384, "capability_source": "registry"},
     "deepseek/deepseek-v4-pro":   {"native_tools": False, "provider": "openrouter", "llm_call_timeout_seconds": 900, "max_output_tokens":  65536, "capability_source": "registry"},
 }
 
@@ -591,6 +610,11 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
 # Sub-agent model defaults: cheapest stable model per provider.
 # Intentionally lives here (not in sub_agent_service) to avoid circular imports
 # when user_settings.py needs to resolve the model without importing sub_agent_service.
+# NOTE (096 Pitfall 1): this table decides the harness eval's effective model per
+# provider — workflow phases run via sub-agents, so the request's `model` field does
+# NOT steer them. Assert effective model from sub-agent runs.model rows, and curate
+# THIS table when bumping a provider's eval tier.
+# verified against live /models 2026-06-07 (096 D-05 curation)
 _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "anthropic":  "claude-haiku-4-5-20251001",
     "openai":     "gpt-5.4-mini",
@@ -599,8 +623,8 @@ _SUB_AGENT_MODEL_DEFAULTS: dict[str, str] = {
     "ollama":     "",   # Local, user manages their own models
     "deepseek":  "deepseek-v4-flash",
     "moonshot":  "kimi-k2.6",
-    "minimax":   "MiniMax-M2.5-highspeed",   # int'l api.minimax.io; fast tier, PascalCase (D-089 docs curation 2026-05-30)
-    "zhipu":     "glm-4.6",                  # int'l api.z.ai; official /models id (D-089 docs curation 2026-05-30; glm-4.5-flash worked but isn't in official /models)
+    "minimax":   "MiniMax-M2.7-highspeed",   # int'l api.minimax.io; fast flagship tier, PascalCase (096 D-05 curation 2026-06-07 — supersedes M2.5-highspeed)
+    "zhipu":     "glm-5-turbo",              # int'l api.z.ai; fast GLM-5 tier from live /models (096 D-05 curation 2026-06-07 — supersedes glm-4.6)
 }
 
 

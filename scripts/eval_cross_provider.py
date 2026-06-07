@@ -81,15 +81,15 @@ from pathlib import Path
 # Additive only — no assertion/gate/localhost/override/prompt/schema change.
 PROVIDERS: list[tuple[str, str]] = [
     ("openai", "gpt-5.4-mini"),
-    ("anthropic", "claude-haiku-4-5"),
+    ("anthropic", "claude-haiku-4-5-20251001"),  # dated ID — undated alias not served by live /models (096 D-05 curation 2026-06-07)
     ("google", "gemini-3.5-flash"),   # 3.x+ — NOT gemini-2.5 (D-03)
     ("openrouter", "z-ai/glm-5.1"),
     ("deepseek", "deepseek-v4-flash"),   # native weak-model — SEED-034 fold-gate target
     ("moonshot", "kimi-k2.6"),           # native weak-model — SEED-034 fold-gate target
     # --- ADD (Phase 089 D-089-09 — native-7 baseline; _PROVIDER_BASE_URLS source of truth;
     #     provider-class representatives, full pinning pass is Phase 096 EVAL-01) ---
-    ("zhipu", "glm-4.6"),                # GLM int'l z.ai official /models id (D-089 docs curation 2026-05-30; glm-4-flash was dead -> 400 model-not-found)
-    ("minimax", "MiniMax-M2.5-highspeed"),  # MiniMax int'l fast tier, PascalCase (D-089 docs curation 2026-05-30; lowercase + China host -> 401)
+    ("zhipu", "glm-5.1"),                # GLM int'l z.ai latest flagship from live /models (096 D-05 curation 2026-06-07 — supersedes glm-4.6)
+    ("minimax", "MiniMax-M2.7-highspeed"),  # MiniMax int'l fast flagship tier, PascalCase (096 D-05 curation 2026-06-07 — supersedes M2.5-highspeed)
 ]
 
 # Backend base URL — local uvicorn. Overridable via EVAL_BASE_URL for an operator
