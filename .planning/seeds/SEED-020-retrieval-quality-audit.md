@@ -4,7 +4,7 @@ title: Retrieval Quality Audit — embedding model + re-ranker + hybrid retrieva
 status: planted
 planted: 2026-05-16
 phase_origin: 071.3-docling-demotion-table-engine-full-rip
-related_seeds: [SEED-006, SEED-019, SEED-021]
+related_seeds: [SEED-006, SEED-019, SEED-021, SEED-027, SEED-059, SEED-060]
 re_open_trigger: |
   Either of these (whichever fires first) per D-071.3-14:
   1. User reports a retrieval-quality complaint — e.g., chat returns wrong or
@@ -14,8 +14,22 @@ re_open_trigger: |
      section of an ingested document.
   2. v2.7 milestone opens (proactive audit before next major milestone —
      regardless of complaints).
+trigger_status: |
+  TRIGGER #1 FIRED 2026-06-06 — first concrete failing-query evidence: live
+  hybrid-search UAT on thread "DOC0056 Ownership and Keywords" (f23b00af).
+  Queries "DOC0056 department owner author" / "DOC0065 n_tokens" returned 0
+  lexical rows (plainto_tsquery AND-semantics) and the fused top-N missed the
+  obviously-relevant chunk that the bare-ID query DOES find. Full forensics:
+  .planning/research/rag-architecture-assessment-2026-06-06.md. Mechanics
+  split out as SEED-059 (keyword-leg semantics + RRF tie-break + zero-hit
+  recovery) and SEED-060 (headerless tabular chunks). The audit itself stays
+  planted; when it opens, its bench MUST slice queries by type (exact-ID vs
+  natural-language vs tabular-attribute) and include the SEED-059 fix options
+  as bench arms.
 suggested_phase: post-v2.6 (likely early v2.7 — paired with Agent Workspace
-  or as a dedicated retrieval phase)
+  or as a dedicated retrieval phase). 2026-06-06 update: eval fixture rows land
+  first in Phase 096 (v2.8 eval harness); the full audit is a v2.9+ sweep
+  candidate, with SEED-059/SEED-060 as its first two work items.
 ---
 
 ## Why this seed exists
@@ -26,15 +40,23 @@ baseline of ~443). Once raw text + tables + images are in the database, the
 **next quality bottleneck is RETRIEVAL** — choosing which chunks to surface
 to the LLM for a given user query.
 
-The current retrieval stack (as of Phase 071.3 close):
+The current retrieval stack (as of Phase 071.3 close; **fact-checked 2026-06-06**):
 
 - **Embedding model:** `text-embedding-3-small` (OpenAI) by default — read at
-  runtime from `app_settings.embedding_model_name` / `user_settings`
-- **Re-ranker:** none. The hybrid search (vector + BM25) returns top-N by
-  RRF fusion, no cross-encoder or LLM re-rank pass
-- **Hybrid retrieval:** BM25 (Postgres `tsvector`) + dense vector (pgvector
-  cosine), fused via RRF (Reciprocal Rank Fusion) — wired in
-  `backend/app/services/retrieval/hybrid_search.py`
+  runtime from `app_settings.embedding_model` / `user_settings`
+- **Re-ranker:** ~~none~~ → a rerank stage now EXISTS
+  (`app/services/rerank_service.py`, Cohere `rerank-v3.5` provider config) but
+  `rerank_enabled` defaults to **False** — it has never been benched or turned
+  on in anger. The audit's re-ranker section becomes "bench + decide default,"
+  not "build."
+- **Hybrid retrieval:** keyword leg (Postgres `tsvector` via SQL fn
+  `keyword_search_chunks`, `plainto_tsquery` — **AND-semantics, see SEED-059**)
+  + dense vector (pgvector cosine via `match_document_chunks`), fused via RRF —
+  wired in `backend/app/services/retrieval_service.py` (the old
+  `retrieval/hybrid_search.py` path in this seed's first draft no longer exists)
+- **Live defaults (app_settings 2026-06-06):** hybrid ON, rerank OFF,
+  vector/keyword weights 1.0/1.0, rrf_k=60, top_k=5, candidates=20,
+  match_threshold=0.3
 
 This is fine for current scale but never empirically benchmarked against
 alternatives. With Phase 071.3 putting much more high-quality content into

@@ -121,6 +121,7 @@ The v2.8 closing phase — it builds almost no new features; it **proves the har
 - **BUG-260603-01** (silent send-drop) → stays open; dedicated composer/send-reliability fix when scoped (SEED-055 residual).
 - **Live-eval GitHub Actions job** (manual-trigger workflow_dispatch with provider secrets) → possible later hardening of D-01 if the operator ritual proves insufficient; rejected for now (cost, secrets, provider flakiness, localhost-gate philosophy).
 - **Playwright E2E revival** → SEED-049 (separate effort; explicitly NOT part of 096's CI gate).
+- **Retrieval-quality eval fixtures** (bare-ID lookup, ID+intent-words, tabular-attribute correctness — from the 2026-06-06 DOC0056 assessment, `.planning/research/rag-architecture-assessment-2026-06-06.md`) → deliberately OUT of 096: a different eval dimension (retrieval correctness is shared/pre-provider; 096's eval measures per-provider harness/tool behavior) and would add a KB-fixture dependency the eval script doesn't have. Parked in SEED-059/SEED-020; surfaces at the v2.9 `/gsd:new-milestone` sweep.
 
 </deferred>
 

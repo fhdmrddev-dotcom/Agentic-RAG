@@ -4,7 +4,7 @@ title: Tables-in-retrieval + multimodal chat injection — close the "table cont
 status: planted
 planted: 2026-05-18
 phase_origin: 074-seed-009-seed-011-polish-bundle (user-flagged 2026-05-18 between phases — "we have images tables and tables table that are stored during ingestion, how is it actually injected into the context? are they being included in the chunks retrieved or is it being already stored as chunks?")
-related_seeds: [SEED-006, SEED-020, SEED-021]
+related_seeds: [SEED-006, SEED-020, SEED-021, SEED-059, SEED-060]
 relates_to:
   - `backend/app/services/multimodal_service.py:181-242` — `extract_and_store_tables()` writes rows to `document_tables` ONLY; no `document_chunks` insert, no embedding column on `document_tables`
   - `backend/app/services/multimodal_service.py:368-521` — `extract_and_store_images()` writes rows to `document_images` AND embeds `[Image p.X]: {description}` as separate `document_chunks` rows. So images ARE in retrieval (via description text); tables are NOT
@@ -49,6 +49,17 @@ So the standard RAG path is **blind to tables entirely** unless the agent
 knows to invoke the `query_tables` tool. And images reach the model as
 their text description only — even on Claude Opus 4.7 / Sonnet 4.6 / GPT-5.x
 / Gemini 2.5+, which natively accept image content blocks.
+
+**2026-06-06 addendum (assessment session):** the inverse gap also exists —
+CSV/XLSX files (which ARE tables) never reach `document_tables` at all; they
+flow through `documents.py::extract_text` into flat headerless text chunks
+(D-069-02), so `query_tables` can't see them either. Live evidence: the
+DOC0056 thread forensics in
+`.planning/research/rag-architecture-assessment-2026-06-06.md`. That side is
+tracked as **SEED-060** (Track D proposes CSV/XLSX → `document_tables`, which
+should ship in the same phase folder as this seed's Track A — same pipeline,
+same backfill story). SEED-059 covers the retrieval-side keyword-leg mechanics
+the same session surfaced.
 
 ## Scope — two tracks
 
