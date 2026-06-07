@@ -44,12 +44,20 @@ uvicorn, script detects restart via /health and asserts DB truth — no_skipped_
 single_completion_audit PASS (WR-01 normalization now applied), no_duplicate_subagents PASS.
 The ask_user leg additionally asserts prompt_reemitted + answer-after-restart completion
 (BUG-260605-01 live verification).
-result: issue
+result: issue → FIXED ✅ (096-09, commit e5c2a1f2; live re-verified 2026-06-07)
 reported: "SMOKE_RESULT programmatic FAIL — SMOKE_ASSERT run_completed FAIL workflow_runs.status=failed; no_skipped_phases FAIL split=active, fanout/deep_dive/confirm/summarize=pending; single_completion_audit PASS; no_duplicate_subagents FAIL sub_questions=0 sub_run_ids=0. Operator kill+restart executed correctly (SMOKE_DOWN/SMOKE_UP both detected)."
 severity: blocker
-notes: |
-  Legs llm_agent + ask_user NOT run — same root cause would fail them identically
-  (shared kill mechanism). All 3 legs must re-run after the fix.
+resolution: |
+  Root cause: graceful-shutdown F2 backstop terminalized workflow_runs + cleared
+  anchor on the shutdown cancel → resume sweep never re-claimed. Fix (096-09):
+  shutdown-gated so non-shutdown paths are byte-identical; ask_user phase escapes
+  on the shutdown sentinel so the prompt survives for re-emit. LIVE RE-VERIFIED
+  2026-06-07 — ALL 3 legs PASS:
+    - programmatic SMOKE_RESULT PASS (run fa5ba738, claimed, 5/5)
+    - llm_agent    SMOKE_RESULT PASS (run 834b6a7e, claimed, 5/5)
+    - ask_user     SMOKE_RESULT PASS (run 14cdb490) — prompt_reemitted PASS +
+      answer_reached_engine PASS (BUG-260605-01 live-verified) + 5/5
+  All 3 workflow_runs: status=completed, claimed=yes, completed_phases=5/5 (DB).
 
 ### 3. 4-axis UAT scoreboard (SC#10)
 expected: Cross-provider × multi-tool × parallel-thread × long-message rows per
