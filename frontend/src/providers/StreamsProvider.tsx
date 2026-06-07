@@ -130,6 +130,16 @@ const EMPTY_PHASES: Phase[] = []
 // forces a chat re-render (PANEL-06 / FC#1 isolation).
 const EMPTY_DERIVED: DerivedPanelItem[] = []
 
+// Phase 096-05 (D-09 — BUG-260530-01): cap held-open streaming fetches at a
+// thread-keyed LRU pool. One held-open fetch per active run saturates the
+// browser's 6-per-host HTTP/1.1 connection cap (uvicorn serves HTTP/1.1), so
+// with ~6 concurrent runs every navigation's reconcile GETs queue 15-30s behind
+// the streams. Pool = 3 (the viewed thread + the 2 most-recently-viewed
+// background threads) leaves 3 connections free for normal traffic. Evicted
+// threads keep executing server-side; returning to one re-attaches via the
+// EXISTING reconcile path with replay from the retained cursor (D-11).
+const STREAM_POOL_SIZE = 3
+
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
 // all three watched refs are unchanged, so a reference change in bucketsBySurface
@@ -976,6 +986,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   const lastSeenOffsetRef = useRef<Map<string, string>>(new Map())
   const reconcileInFlightRef = useRef(false)
   const activeThreadIdRef = useRef<string | null>(null)
+  // Phase 096-05 (D-09): most-recently-viewed thread ids, most-recent first,
+  // deduped, capped at ~10 entries. Feeds the LRU-3 keep-set (viewed thread +
+  // first STREAM_POOL_SIZE-1 MRU entries). A ref — never display state.
+  const mruThreadsRef = useRef<string[]>([])
   // Phase 068 (Task 2a): additional refs lifted from useMessages.ts for sendMessage.
   // SEED-055 (true concurrent chats): the send guard is now PER-THREAD. The old
   // single global `isSendingRef` boolean + single-slot `streamingThreadIdRef` were
@@ -1015,6 +1029,57 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       (updater) =>
         useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, updater)
 
+    // ── Phase 096-05 (D-09 / BUG-260530-01): thread-keyed LRU-3 stream pool ──
+    // The keep-set = {viewed thread} ∪ first (STREAM_POOL_SIZE - 1) MRU threads
+    // (minus the viewed thread). EVERY stream-open site below is gated on
+    // membership so no code path can ever leak a 4th held-open connection.
+    const isThreadInStreamPool = (threadId: string | null): boolean => {
+      if (threadId === null) return true // pre-navigation sends never blocked
+      const viewed = activeThreadIdRef.current
+      const keep = new Set<string>(
+        [viewed, ...mruThreadsRef.current.filter((t) => t !== viewed)]
+          .filter(Boolean)
+          .slice(0, STREAM_POOL_SIZE) as string[],
+      )
+      return keep.has(threadId)
+    }
+
+    // Evict every subscription whose owning thread (reverse lookup via the
+    // store's subscriptionsByThread mirror) is OUTSIDE the keep-set.
+    //
+    // api.ts:516-517 — AbortError is a SILENT return: NO onTerminal fires on a
+    // caller-initiated abort, so the evictor must replicate the onTerminal
+    // remove pair (StreamsProvider :subscribeProducerStream onTerminal shape)
+    // itself: subscriptionsRef.delete + _removeRunFromThread, in lockstep.
+    //
+    // NEVER touch lastSeenOffsetRef — the cursor is the D-11 replay substrate:
+    // returning to an evicted thread re-attaches via the existing reconcile
+    // path, replaying from the retained cursor (client cursors win over the
+    // snapshot's since_cursors re-seed).
+    const enforceStreamPool = (viewedThreadId: string) => {
+      const keep = new Set<string>(
+        [viewedThreadId, ...mruThreadsRef.current.filter((t) => t !== viewedThreadId)]
+          .filter(Boolean)
+          .slice(0, STREAM_POOL_SIZE),
+      )
+      const byThread = useStreamsStore.getState().subscriptionsByThread
+      for (const [ownerThreadId, runIds] of byThread) {
+        if (keep.has(ownerThreadId)) continue
+        for (const runId of runIds) {
+          const controller = subscriptionsRef.current.get(runId)
+          controller?.abort()
+          subscriptionsRef.current.delete(runId)
+          useStreamsStore.setState((s) => ({
+            subscriptionsByThread: _removeRunFromThread(
+              s.subscriptionsByThread,
+              ownerThreadId,
+              runId,
+            ),
+          }))
+        }
+      }
+    }
+
     // Phase 092-07 (Facet C): re-subscribe a thread's FRESH producer stream so a
     // startup-sweep-resumed run (mount reconcile latest_producer_run_id) AND a
     // Harness Continue (the /continue 200 producer_run_id) re-attach their live
@@ -1025,6 +1090,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       if (!threadId || !producerRunId) return
       // Idempotent: already attached → no-op.
       if (subscriptionsRef.current.has(producerRunId)) return
+      // Phase 096-05 (D-09): pool-gate — skip opening (and the slot-reservation
+      // write) for a thread outside the LRU-3 keep-set. The run keeps executing
+      // server-side; reconcile re-attaches it when the thread is re-viewed.
+      if (!isThreadInStreamPool(threadId)) return
       const surfaceId: SurfaceId = "chat"
       const controller = new AbortController()
       subscriptionsRef.current.set(producerRunId, controller)
@@ -1157,6 +1226,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               .catch((err) => {
                 console.error("[StreamsProvider] reconcile from setViewingThread failed", err)
               })
+            // Phase 096-05 (D-09): AFTER the reconcile fires — promote this
+            // thread to the front of the MRU list (deduped, capped) and evict
+            // every stream outside the LRU-3 keep-set. Navigation is the ONLY
+            // eviction trigger; the viewed thread is always in the keep-set so
+            // the reconcile above can never have its own attach evicted.
+            mruThreadsRef.current = [
+              threadId,
+              ...mruThreadsRef.current.filter((t) => t !== threadId),
+            ].slice(0, 10)
+            enforceStreamPool(threadId)
           }
         },
 
@@ -1258,6 +1337,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Phase 063.1 (D-063.1-09 / Gap-003): NARROWED short-circuit.
               if (subscriptionsRef.current.has(run.run_id)) continue
 
+              // Phase 096-05 (D-09): pool-gate — never open (or reserve a slot
+              // for) a stream whose thread is outside the LRU-3 keep-set. In
+              // practice reconcile targets the viewed thread (always in-pool);
+              // the gate is defensive so no future path leaks a 4th connection.
+              if (!isThreadInStreamPool(threadId)) continue
+
               // WR-06 fix: RESERVE the subscription slot BEFORE firing subscribeToRun.
               const controller = new AbortController()
               subscriptionsRef.current.set(run.run_id, controller)
@@ -1303,6 +1388,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     run.run_id,
                     lastSeenOffsetRef,
                     (rid: string, since: string) => {
+                      // Phase 096-05 (D-09): pool-gate the transient re-attach
+                      // — skip opening (and the slot reservation) when the
+                      // owning thread left the LRU-3 keep-set mid-probe.
+                      if (!isThreadInStreamPool(threadId)) return
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -1524,10 +1613,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // D-067-01: reserve subscription slot BEFORE the runId-stamping setMessages.
             // L-068-07 (open side): track in subscriptionsByThread mirror.
             // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
-            subscriptionsRef.current.set(run_id, controller)
-            useStreamsStore.setState((s) => ({
-              subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run_id),
-            }))
+            // Phase 096-05 (D-09): pool-gate — in practice the send-time thread
+            // IS the viewed thread (always in-pool); the gate is defensive so a
+            // future code path can't leak a 4th held-open connection. Computed
+            // ONCE here (no awaits between reservation and the subscribe below)
+            // so the reservation and the open stay consistent.
+            const sendThreadInPool = isThreadInStreamPool(threadId)
+            if (sendThreadInPool) {
+              subscriptionsRef.current.set(run_id, controller)
+              useStreamsStore.setState((s) => ({
+                subscriptionsByThread: _addRunToThread(s.subscriptionsByThread, threadId, run_id),
+              }))
+            }
 
             // WR-04 fix: swap temp user id for real, stamp run_id on assistant placeholder.
             // Phase 095.1-07 (GAP-2): also stamp the RESOLVED model/provider so the
@@ -1586,6 +1683,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     registeredRunId,
                     lastSeenOffsetRef,
                     (rid, since) => {
+                      // Phase 096-05 (D-09): pool-gate the transient re-attach
+                      // — skip opening (and the slot reservation) when the
+                      // owning thread left the LRU-3 keep-set mid-probe.
+                      if (!isThreadInStreamPool(threadId)) return
                       const newController = new AbortController()
                       subscriptionsRef.current.set(rid, newController)
                       // Plan 075.4-01 D-075.4-A1: per-thread subscriptionsByThread.
@@ -1651,7 +1752,12 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               lastSeenOffsetRef.current.set(run_id, msId)
             }
 
-            await subscribeToRun(run_id, "0", callbacks, controller.signal)
+            // Phase 096-05 (D-09): same gate as the slot reservation above —
+            // skip the held-open fetch when the thread is outside the pool
+            // (the run keeps executing server-side; reconcile re-attaches it).
+            if (sendThreadInPool) {
+              await subscribeToRun(run_id, "0", callbacks, controller.signal)
+            }
           } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
               // Caller-initiated abort.
