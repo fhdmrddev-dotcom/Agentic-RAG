@@ -47,7 +47,9 @@ def test_uses_max_completion_tokens_registry_hit_gpt5() -> None:
     from app.config import MODEL_CAPABILITIES
     from app.services.openai_service import _uses_max_completion_tokens
 
-    for model_id in ("gpt-5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.5", "o3", "o4"):
+    # o3/o4 dropped — removed from registry 2026-06-07 (096 D-05 curation, not served live);
+    # gpt-5.2/5.4-pro/5.5-pro added by the same curation pass.
+    for model_id in ("gpt-5", "gpt-5.2", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-pro", "gpt-5.5", "gpt-5.5-pro"):
         assert MODEL_CAPABILITIES[model_id].get("uses_max_completion_tokens") is True
         assert _uses_max_completion_tokens(model_id) is True
 

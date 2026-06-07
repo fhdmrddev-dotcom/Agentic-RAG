@@ -313,14 +313,15 @@ class Test093IntentionalSubAgentResolution:
         assert resolved != "gpt-4o"
 
     def test_zhipu_no_real_model_falls_to_glm_not_gpt4o(self):
-        """Same no-real-model case, active_provider=zhipu → glm-4.6, not gpt-4o."""
+        """Same no-real-model case, active_provider=zhipu → glm-5-turbo, not gpt-4o.
+        (Default repinned glm-4.6 → glm-5-turbo by the 096 D-05 curation, 2026-06-07.)"""
         from app.config import settings
         from app.services.task_service import _resolve_sub_agent_effective_model
         us = _make_user_settings(provider="zhipu", llm_model="", sub_agent_model="")
         us.available_models = []
         with patch.object(settings, "llm_model", "gpt-4o"):
             resolved = _resolve_sub_agent_effective_model(us, ctx_model="")
-        assert resolved == _SUB_AGENT_MODEL_DEFAULTS["zhipu"] == "glm-4.6"
+        assert resolved == _SUB_AGENT_MODEL_DEFAULTS["zhipu"] == "glm-5-turbo"
         assert resolved != "gpt-4o"
 
     def test_openai_global_default_stays_gpt4o_guard_does_not_fire(self):
