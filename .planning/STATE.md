@@ -4,14 +4,14 @@ milestone: v2.8
 milestone_name: Harness Engine & Workflow Mode
 status: unknown
 stopped_at: Phase 096 context gathered
-last_updated: "2026-06-06T19:43:20.758Z"
+last_updated: "2026-06-06T21:04:47.467Z"
 last_activity: 2026-06-06
 progress:
   total_phases: 10
   completed_phases: 9
-  total_plans: 58
+  total_plans: 66
   completed_plans: 58
-  percent: 100
+  percent: 88
 ---
 
 # Project State
@@ -21,7 +21,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 **Core value:** The agent acts as an AI colleague -- it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared
-**Current focus:** Phase --phase — 095.1
+**Current focus:** Phase 096 — eval-harness-cross-provider-verification-concurrency
 
 ## Current Position
 
@@ -71,7 +71,7 @@ See: .planning/PROJECT.md (updated 2026-05-30 after v2.7 close)
 
 --- (prior `human_needed` trace retained for audit) ---
 
-Phase: --phase (095.1) — EXECUTING
+Phase: 096 (eval-harness-cross-provider-verification-concurrency) — EXECUTING
 
 --- (gap-closure execution trace below — retained for audit) ---
 
@@ -104,7 +104,7 @@ Phase: 093 — GAP-CLOSURE COMPLETE (post-LIVE-UAT, D-15..D-21). Initial 5 plans
 --- (historical 092 execution trace below — retained for audit) ---
 
 Phase: --phase (092) — EXECUTING
-Plan: 1 of --name
+Plan: 1 of 8
 Plans: 4 plans / 4 waves (sequential, 1 plan per wave). Wiring phase — connects the Phase 090/091 harness substrate to the live app: MODE-01 (Deep/Harness mode switch + workflow-run creation), MODE-02 (server-side Harness→Deep authz lock), CONT-01 (Continue button). OWNS the workflow-start trigger (INSERT INTO workflow_runs) that unblocks 091's persisted cross-provider UAT + closes SEED-047 (persist inputs+model into resume ctx).
 
   - Wave 1: 092-01 (schema migration 063 + test foundation — autonomous:false, operator SQL-editor apply checkpoint)
@@ -510,7 +510,7 @@ Resume file: --resume-file
 - **GATEWAY-01 stays OPEN** (Pending) — this plan is the SKELETON only; closure requires the adapter waves (02-06) + the operator-run 089 SSE-diff byte-identical gates. `requirements.mark-complete` intentionally skipped.
 - SUMMARY: 092.5-01-SUMMARY.md (self-check PASSED). NEXT: Plan 092.5-02 (Wave 1, autonomous:false — operator captures native-7 BEFORE baselines via `scripts/capture_sse_baseline.py --mode before` against the pre-extraction loop; the byte-identical reference for Waves 3/5).
 
-**Planned Phase:** 095.1 (cross-provider-run-honesty-workspace-parity) — 5 plans — 2026-06-06T11:31:10.913Z
+**Planned Phase:** 096 (Eval Harness + Cross-Provider Verification + Concurrency) — 8 plans — 2026-06-06T20:58:57.664Z
 
 **Plan 092-01 — ✅ COMPLETE (2026-05-31):** schema foundation landed.
 
