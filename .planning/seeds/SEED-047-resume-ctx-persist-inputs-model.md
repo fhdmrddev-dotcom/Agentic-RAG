@@ -1,7 +1,9 @@
 ---
 id: SEED-047
 title: Resume context must rehydrate run inputs + model — persist them at workflow_runs creation
-status: planted
+status: closed
+closed: 2026-06-07 (v2.8 milestone audit close-out)
+closed_evidence: "Fix landed across 092 (migration 063 persists workflow_runs.inputs/model at creation; kickoff_prompt threaded into wf_ctx + both resume ctxs) + 093 (resolve_workflow_ctx_model). Code-verified: harness_engine.py:1126-1178 rehydrates inputs from the durable wr.inputs row + resolves model via resolve_workflow_ctx_model(load_user_settings(owner)) — never model=''. Proof gate (096 EVAL-02 live kill-and-resume) PASSED 2026-06-07: all 3 kill points incl. the llm_agent leg (run 834b6a7e) completed post-restart with a real model."
 planted: 2026-05-31
 planted_by: orchestrator (091-08 gap-closure — 091-REVIEW WR-01/WR-02 deferral)
 trigger_when: Phase 092 wires workflow-run creation — persist run inputs + model on the workflow_runs row so the resume ctx can rehydrate them; Phase 096 EVAL-02 (live kill-and-resume) is the proof gate

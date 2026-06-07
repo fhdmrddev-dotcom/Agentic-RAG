@@ -1,5 +1,5 @@
 ---
-seed_id: SEED-063
+seed_id: SEED-068  # renumbered from SEED-063 at v2.8 audit close-out 2026-06-07 (ID collision with SEED-063-execute-code-wallclock-timeout)
 title: Public benchmark scoreboard — root-level BENCHMARKS.md aggregating app-wide scores per release (industry/competitive credibility artifact)
 status: planted
 planted: 2026-06-07
