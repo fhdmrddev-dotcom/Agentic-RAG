@@ -1,7 +1,7 @@
 ---
 seed_id: SEED-063
 title: execute_code needs a wall-clock timeout — runaway model code wedges a run forever (availability bug)
-status: planted
+status: IMPLEMENTED (commit pending) — backend done + unit-tested; AWAITS live verification (run code exceeding the limit → clean abort + container killed + run continues)
 planted: 2026-06-07
 phase_origin: Phase 096 live UAT (Test 3 stream-cap storm) — operator-run, DB-verified
 category: B — real defect, slated for a small dedicated fix phase (operator-approved routing 2026-06-07)

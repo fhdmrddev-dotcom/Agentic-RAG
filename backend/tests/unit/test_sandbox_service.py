@@ -118,6 +118,76 @@ class TestCloseAll:
         mock_b.close.assert_called_once()
 
 
+class TestKillSession:
+    """096 / SEED-063 — execute_code wall-clock-timeout abort path."""
+
+    def teardown_method(self):
+        from app.services.sandbox_service import SandboxSessionManager
+        _clear_state()
+        SandboxSessionManager._docker_client = None  # don't leak the class-attr mock
+
+    def test_kill_session_removes_container_and_drops_session(self):
+        """Happy path: kill+remove the container (force=True), drop the session, return True."""
+        from app.services.sandbox_service import (
+            sandbox_manager, SandboxSessionManager, _sessions, _last_used,
+        )
+        _sessions["thread-kill"] = _make_mock_session()
+        _last_used["thread-kill"] = 123.0
+        mock_container = MagicMock()
+        mock_client = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+        SandboxSessionManager._docker_client = mock_client
+
+        result = sandbox_manager.kill_session("thread-kill")
+
+        assert result is True
+        mock_client.containers.get.assert_called_once_with("sandbox-thread-kill")
+        mock_container.remove.assert_called_once_with(force=True)
+        assert "thread-kill" not in _sessions
+        assert "thread-kill" not in _last_used
+
+    def test_kill_session_container_not_found(self):
+        """Missing container → returns False but still drops the cached session."""
+        import docker
+        from app.services.sandbox_service import (
+            sandbox_manager, SandboxSessionManager, _sessions,
+        )
+        _sessions["thread-nf"] = _make_mock_session()
+        mock_client = MagicMock()
+        mock_client.containers.get.side_effect = docker.errors.NotFound("no such container")
+        SandboxSessionManager._docker_client = mock_client
+
+        result = sandbox_manager.kill_session("thread-nf")
+
+        assert result is False
+        assert "thread-nf" not in _sessions
+
+    def test_kill_session_docker_error_swallowed(self):
+        """A Docker error never raises out of the abort path; session still dropped."""
+        from app.services.sandbox_service import (
+            sandbox_manager, SandboxSessionManager, _sessions,
+        )
+        _sessions["thread-derr"] = _make_mock_session()
+        mock_client = MagicMock()
+        mock_client.containers.get.side_effect = RuntimeError("docker daemon down")
+        SandboxSessionManager._docker_client = mock_client
+
+        # Must NOT raise.
+        result = sandbox_manager.kill_session("thread-derr")
+
+        assert result is False
+        assert "thread-derr" not in _sessions
+
+    def test_kill_session_nonexistent_thread(self):
+        """Killing an unknown thread is a harmless no-op (no container, returns False)."""
+        import docker
+        from app.services.sandbox_service import sandbox_manager, SandboxSessionManager
+        mock_client = MagicMock()
+        mock_client.containers.get.side_effect = docker.errors.NotFound("nope")
+        SandboxSessionManager._docker_client = mock_client
+        assert sandbox_manager.kill_session("never-existed") is False
+
+
 class TestLazyImportGuard:
     def test_lazy_import_guard(self):
         """sandbox_service module can be imported without llm_sandbox at module level."""
