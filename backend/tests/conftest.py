@@ -397,6 +397,12 @@ class _RecordingConnection:
 
     async def fetch(self, sql, *args):
         self._pool.calls.append((sql, args))
+        # Phase 096: a queued sequence takes precedence so a test can return
+        # DIFFERENT row sets for successive fetch calls (e.g. load_run_phases
+        # then the terminal-site ask_user pending-prompt SELECT). Falls back to
+        # the single sticky value when the queue is empty/unset.
+        if self._pool._fetch_results:
+            return self._pool._fetch_results.pop(0)
         return self._pool._fetch_result
 
     async def fetchval(self, sql, *args):
@@ -455,6 +461,7 @@ class _MockAsyncpgPool:
         self._fetchrow_result = None
         self._fetchrow_results: list = []  # Phase 092 — per-call fetchrow queue
         self._fetch_result = []
+        self._fetch_results: list = []  # Phase 096 — per-call fetch queue
         self._fetchval_result = None
         self._conn = _RecordingConnection(self)
 
@@ -487,6 +494,10 @@ class _MockAsyncpgPool:
 
     def set_fetch_result(self, v):
         self._fetch_result = v
+
+    def set_fetch_results(self, seq):
+        """Queue per-call fetch return values (Phase 096 — successive SELECTs)."""
+        self._fetch_results = list(seq)
 
     def set_fetchval_result(self, v):
         self._fetchval_result = v

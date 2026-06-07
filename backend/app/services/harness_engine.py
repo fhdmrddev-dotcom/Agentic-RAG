@@ -151,6 +151,72 @@ def _persist_output(output: dict) -> dict:
     return output
 
 
+async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
+    """D-06 (BUG-260605-01): resolve any outstanding ask_user prompt when a run
+    reaches terminal status. INSERT-only (HARNESS-06 audit posture): writes a
+    system message shaped as the matching ask_user_response with expired=true,
+    so the EXISTING /pending NOT EXISTS correlation excludes it — no query
+    change needed for new runs.
+
+    The SELECT mirrors the panel.py /pending shape (jsonb ``@>`` containment +
+    the NOT EXISTS exclusion of already-answered prompts), scoped to THIS run
+    via the prompt payload's ``run_id`` (phase_types.py stores ``ctx.run_id`` —
+    the workflow_run id). The INSERT byte-matches the correlation the /pending
+    query excludes on: ``kind='ask_user_response'`` + the prompt's
+    ``tool_call_id`` (correlated via ``tool_calls->0->>'tool_call_id'``).
+    Never UPDATEs any existing row. No-op when nothing is pending. Callers wrap
+    each call in try/except — cleanup must never convert a successful
+    terminalization into a crash.
+    """
+    if thread_id is None:
+        return
+    _tid = thread_id if isinstance(thread_id, UUID) else UUID(str(thread_id))
+    rows = await pool.fetch(
+        """
+        SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
+        FROM messages m
+        WHERE m.thread_id = $1
+          AND m.role = 'system'
+          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+          AND m.tool_calls->0->>'run_id' = $2
+          AND NOT EXISTS (
+            SELECT 1 FROM messages r
+            WHERE r.thread_id = m.thread_id
+              AND r.role = 'system'
+              AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+              AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+          )
+        """,
+        _tid,
+        str(run_id),
+    )
+    for r in rows:
+        tcid = r["tool_call_id"]
+        if not tcid:
+            continue
+        # Plain Python list for the jsonb param — the pool's JSONB codec
+        # (dependencies._init_pg_connection, D-073-06) serializes it, mirroring
+        # insert_assistant_message (db/runs.py). $N placeholders only (T-096-03-03).
+        await pool.execute(
+            """
+            INSERT INTO messages (thread_id, user_id, role, content, tool_calls)
+            VALUES ($1, $2, 'system', '', $3)
+            """,
+            _tid,
+            r["user_id"],
+            [{
+                "kind": "ask_user_response",
+                "tool_call_id": tcid,
+                "expired": True,
+                "response_text": None,
+            }],
+        )
+        logger.info(
+            "expired pending ask_user prompt tcid=%s for terminal run %s",
+            tcid, run_id,
+        )
+
+
 # ── F7 (092-07): run-level grounding union ────────────────────────────────────
 def _accumulate_phase_grounding(
     output: dict | None,
@@ -753,17 +819,41 @@ async def run_workflow(
         # 2. Execute under the bounded-retry gate loop (wall-clock cap + gates +
         #    on_failure routing live inside). The step cap is enforced INSIDE the
         #    executor (run_task_sub_agent max_steps, Plan 03) — both caps present.
-        outcome = await _run_phase_with_gates(
-            phase,
-            accumulated_outputs,
-            ctx,
-            run_id=run_id,
-            pool=pool,
-            redis=redis,
-            wall_clock=wall_clock,
-            _audit_user_id=_audit_user_id,
-            stream_run_id=stream_run_id,
-        )
+        try:
+            outcome = await _run_phase_with_gates(
+                phase,
+                accumulated_outputs,
+                ctx,
+                run_id=run_id,
+                pool=pool,
+                redis=redis,
+                wall_clock=wall_clock,
+                _audit_user_id=_audit_user_id,
+                stream_run_id=stream_run_id,
+            )
+        except BaseException:
+            # ── cancel/escape path (D-06 / BUG-260605-01) ─────────────────────
+            # A user Stop cancels the producer task while the phase await blocks
+            # (a paused ask_user lives exactly here); a crash escapes the same
+            # way. Either escape reaches a terminal status OUTSIDE this engine —
+            # the threads.py F2 backstop terminalizes workflow_runs after this
+            # propagates — so resolve any outstanding prompt NOW or it strands
+            # as a submittable-but-dead card. Shielded (cancellation is already
+            # in flight) + best-effort: cleanup failure never masks the original
+            # escape. The process-death case runs no code here by definition —
+            # the startup sweep's re-emit contract (Plan 04) is untouched.
+            try:
+                await asyncio.shield(
+                    _expire_pending_ask_user(
+                        pool, getattr(ctx, "thread_id", None), run_id
+                    )
+                )
+            except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
+                logger.exception(
+                    "ask_user expiry cleanup failed on cancel/escape for run %s",
+                    run_id,
+                )
+            raise
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
         if outcome.kind == "fail_run":
@@ -779,6 +869,17 @@ async def run_workflow(
             # RC-4 (D-04): persist a real failure message BEFORE returning, so a
             # reconcile renders failed-with-reason — not a silent empty `done`.
             await _surface_failure_message(ctx, run_id, outcome.reason, pool)
+            # D-06 (BUG-260605-01): the run is now durably terminal — resolve any
+            # outstanding ask_user prompt so /pending never serves a dead one.
+            try:
+                await _expire_pending_ask_user(
+                    pool, getattr(ctx, "thread_id", None), run_id
+                )
+            except Exception:  # noqa: BLE001 — cleanup never crashes a terminal
+                logger.exception(
+                    "ask_user expiry cleanup failed at fail_run site for run %s",
+                    run_id,
+                )
             return  # stop — no further phases
 
         # ── skip_to_phase: mark this phase skipped, jump the cursor (D-09) ──────
@@ -809,6 +910,16 @@ async def run_workflow(
                 # target guard must persist its failure reason too, else a dangling
                 # skip still renders as an empty `done` (Pitfall 7 / both sites).
                 await _surface_failure_message(ctx, run_id, reason, pool)
+                # D-06 (BUG-260605-01): second terminal site — same prompt expiry.
+                try:
+                    await _expire_pending_ask_user(
+                        pool, getattr(ctx, "thread_id", None), run_id
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "ask_user expiry cleanup failed at missing-skip-target "
+                        "site for run %s", run_id,
+                    )
                 return
             i = target_i
             continue
@@ -1171,6 +1282,22 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                     logger.exception(
                         "resume producer-shell finalize failed for %s", _pid
                     )
+            # D-06 (BUG-260605-01): EVERY resume exit path resolves outstanding
+            # prompts AFTER the shell finalize. Success: the engine's own
+            # terminal sites usually already expired (NOT EXISTS makes this a
+            # no-op) — except the timed-out-prompt-then-completed edge, closed
+            # here. Failed redrive: the old prompt's subscription is dead; the
+            # next sweep's re-run re-asks with a fresh prompt row, so expiring
+            # the stale one keeps /pending honest in the interim.
+            try:
+                await _expire_pending_ask_user(
+                    pool, run.get("thread_id"), run_id
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "ask_user expiry cleanup failed in resume finalizer for "
+                    "run %s", run_id,
+                )
         resumed += 1
 
     return resumed
