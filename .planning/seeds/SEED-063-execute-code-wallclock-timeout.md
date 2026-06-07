@@ -64,3 +64,23 @@ writes code that never finishes (a slow algorithm on huge data), the chat hangs
 forever, eats your CPU, and can't even be stopped — which is exactly what
 happened in testing. The fix: give code-execution a deadline; if it runs too
 long, stop it cleanly and tell the user, instead of hanging.
+
+## Follow-up (2026-06-07, post-fix): models are not PROACTIVELY aware of the limit
+
+Verified: the 180s cap is communicated only REACTIVELY (the timeout ToolResult error
+coaches "split the work into smaller steps"). Neither the shared `EXECUTE_CODE_TOOL`
+description (`backend/app/services/openai_service.py:435`) nor the shared
+`SYSTEM_PROMPT` code-execution conventions (`backend/app/services/agent_loop.py`)
+mentions a time limit — so models burn the full 180s before learning the wall exists,
+instead of planning chunked work upfront.
+
+Proposed polish (operator-approved direction, routed to a dedicated prompt-polish
+phase — NOT a drive-by edit, per provider-docs-first):
+- Add ~1 sentence to the execute_code tool description: each execution has a
+  wall-clock limit (surface the configured value, not a hardcoded "180"); for long
+  computations split work into steps — variables/files persist across calls in the
+  same thread.
+- Provider-uniform by construction (single tool definition + single SYSTEM_PROMPT,
+  all 8 providers) but any shared-prompt change requires cross-provider UAT
+  (4-axis scoreboard).
+- Belongs with SEED-034 (per-provider prompt strategy) when that phase is scoped.
