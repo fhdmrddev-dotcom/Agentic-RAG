@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xQwDPcnweQpgKRByg6TpiSxJRE5P3KHJeM0hxGUEPFOYgrhdcv4XKtnQeu02IOO
+\restrict JBuGUgEGGrKOvYQUmC2CfUIsDtLRTYMRfwQrMbkz67VTmYqbbFtFCea1HEnbetz
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -2463,5 +2463,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xQwDPcnweQpgKRByg6TpiSxJRE5P3KHJeM0hxGUEPFOYgrhdcv4XKtnQeu02IOO
+\unrestrict JBuGUgEGGrKOvYQUmC2CfUIsDtLRTYMRfwQrMbkz67VTmYqbbFtFCea1HEnbetz
 
