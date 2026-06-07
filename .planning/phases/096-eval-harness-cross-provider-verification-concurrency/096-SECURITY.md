@@ -95,6 +95,18 @@ SUMMARY.md `## Threat Flags` sections: plans 02, 03, 05, and 08 explicitly decla
 
 ---
 
+## Addendum — UAT-Discovered Threat (closed post-audit routing)
+
+One availability threat was discovered during Phase 096 live UAT (Test 3 stream-cap storm) — outside the 8 plan threat models — and fixed via seed-routed commits:
+
+| Threat ID | Category | Component | Disposition | Status | Evidence |
+|-----------|----------|-----------|-------------|--------|----------|
+| T-096-UAT-01 | Denial of service | `_handle_execute_code` unbounded await | mitigate | CLOSED | `backend/app/services/tool_dispatcher.py:614-670` — wall-clock ceiling (`settings.sandbox_exec_timeout_seconds`, default 180s at `config.py:758`, env `SANDBOX_EXEC_TIMEOUT_SECONDS`, 0 disables); on expiry kills+removes container via `sandbox_service.py:138` `kill_session` (frees blocked executor thread), emits `code_execution_complete` exit_code=124, returns clean ToolResult error. Commits `07e3b9ff` (fix) + `30cd4147` (4 unit tests). LIVE-VERIFIED 2026-06-07: operator set timeout=10s, ran `sleep(30)` — aborted at 10s, no hang (SEED-063) |
+
+Incident context: 2 runs wedged 40+ min inside `execute_code` (runaway model code under CPU contention); producers held thread-executor slots; uvicorn graceful shutdown hung. Full incident record in `.planning/seeds/SEED-063-execute-code-wallclock-timeout.md`; siblings SEED-064 (Stop affordance — implemented, awaits live verify) and SEED-065 (load degradation — partially fixed, remainder deferred).
+
+---
+
 ## Security Audit Trail
 
 | Audit Date | Threats Total | Closed | Open | Run By |
