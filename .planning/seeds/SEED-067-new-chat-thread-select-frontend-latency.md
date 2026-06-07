@@ -47,6 +47,15 @@ JSON.stringify over cached threads, or NavPanel re-rendering 158 rows
 synchronously. 158 threads should NOT cost 5–7s in a well-built list → there's a
 real inefficiency, merely amplified by the debris volume.
 
+## Cleanup performed (2026-06-07)
+
+Pruned 66 unambiguous infra-test threads via DELETE /threads/{id} (eval workflow,
+restart-smoke, conc-probe, sse-diff, Python Sorting Benchmark / Sleep Delay,
+"Use the code tool in three separate steps", Initial Greeting, 14 empty New-Chat
+shells). **158 → 92 threads.** Operator re-test of New Chat latency pending — the
+result tells us whether the hang is thread-count scaling (faster now) or a
+count-independent frontend cost (still slow → prioritize the trace).
+
 ## Two-step plan
 
 1. **Immediate relief + cause test**: prune the unambiguous test-debris threads
