@@ -609,6 +609,15 @@ async def run_task_sub_agent(
         per_run_task_semaphore=parent_ctx.per_run_task_semaphore,
         # D-085-09 — constrained toolset; dispatch_tool will route on this.
         available_tools=list(allowed_tools),
+        # Phase 091 HARNESS-05 / D-05 layer 2 — 096-02 wiring fix: propagate the
+        # phase whitelist onto the SUB-agent ctx, where dispatch_tool actually
+        # runs. The harness phase-ctx builder (phase_types.py:196) sets it on the
+        # PARENT ctx only, but every harness tool call dispatches with sub_ctx —
+        # so the dispatch-time backstop was structurally unreachable on the live
+        # harness path (caught by test_096_whitelist_refusal, the T-096-02-02
+        # regression lock). None (every Deep-Mode / tasks caller — the dataclass
+        # default) keeps the guard a literal no-op → byte-identical Deep dispatch.
+        phase_whitelist=parent_ctx.phase_whitelist,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).
