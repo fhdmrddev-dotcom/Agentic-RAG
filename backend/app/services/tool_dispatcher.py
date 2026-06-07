@@ -1523,7 +1523,9 @@ def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[st
     ``parent_run_id``/``run_id`` are producer ``runs`` ids on the harness path, and
     a row keyed there is invisible to per-workflow-run audit readers.
     """
-    run_id = ctx.workflow_run_id or ctx.parent_run_id or ctx.run_id
+    # getattr: ctx may be a duck-typed stub predating the 096 workflow_run_id field —
+    # per this function's contract, a missing attribute must never break a clean refusal.
+    run_id = getattr(ctx, "workflow_run_id", None) or ctx.parent_run_id or ctx.run_id
     if ctx.pool is None or run_id is None:
         return  # no harness substrate on this ctx — nothing to audit against
     # Phase 092-05 F1: harness_audit.user_id is NOT NULL — bind the run-owner
