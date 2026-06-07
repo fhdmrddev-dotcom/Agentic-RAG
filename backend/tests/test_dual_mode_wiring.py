@@ -23,6 +23,22 @@ import pytest
 from app.models.harness import WorkflowDefinition
 
 
+@pytest.fixture(autouse=True)
+def _reset_app_shutdown_flag():
+    """Test-isolation guard (pre-existing 096-09 pollution, found at v2.8 audit
+    close-out): any test that runs the app lifespan (e.g. the sync ``client``
+    fixture in test_published_workflows_list_endpoint) triggers main.py's
+    shutdown hook, which sets harness_engine._APP_SHUTTING_DOWN=True — a
+    process-global that then SKIPS the F2 terminalize backstop for every later
+    test in the session (the F2 assertions fail with 'app shutting down').
+    Reset it around every test in this module so each test sees a running app.
+    """
+    from app.services.harness_engine import set_app_shutting_down
+    set_app_shutting_down(False)
+    yield
+    set_app_shutting_down(False)
+
+
 # ── LIVE structural anchor ───────────────────────────────────────────────────
 
 def test_wiring_module_uses_real_definition_shape(build_workflow_definition):
@@ -490,6 +506,104 @@ async def test_harness_failure_terminalizes_and_clears_anchor(
             assert finish_spy.await_count == 1
             assert finish_spy.await_args.args[1] == new_run_id
             assert finish_spy.await_args.args[2] == "failed"
+    finally:
+        app.dependency_overrides.pop(get_supabase, None)
+        app.dependency_overrides.pop(get_redis, None)
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(15)
+async def test_user_cancel_terminalizes_workflow_as_cancelled(
+    fake_redis, mock_asyncpg_pool
+):
+    """v2.8-audit cancel-honesty regression: when the harness producer is
+    CANCELLED (user Stop / DELETE /runs/{id} -> task.cancel() ->
+    asyncio.CancelledError -> _terminal_status='cancelled' at threads.py),
+    the F2 backstop records workflow_runs.status='cancelled' — the user's true
+    intent — not the blanket 'failed'. Crash/exception escapes keep writing
+    'failed' verbatim (test_harness_failure_terminalizes_and_clears_anchor).
+    'cancelled' is already a first-class terminal value everywhere: the
+    workflow_runs CHECK (full-schema.sql), _TERMINAL_WORKFLOW_STATUSES in
+    threads.py + panel.py (lock self-heal / ask-expiry), and the frontend
+    PhaseTimeline/RunCard terminal sets.
+    """
+    import asyncio as _asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID
+
+    import httpx
+    from httpx import ASGITransport
+
+    from app.main import app
+    from app.dependencies import get_supabase, get_redis
+
+    thread_id = uuid.uuid4()
+    def_id = uuid.uuid4()
+    new_run_id = uuid.uuid4()
+
+    def_row = {
+        "id": str(def_id),
+        "status": "published",
+        "is_global": True,
+        "created_by": str(uuid.uuid4()),
+        "definition": {
+            "slug": "wf", "version": 1, "name": "WF", "status": "published",
+            "phases": [{"slug": "p0", "phase_index": 0,
+                        "config": {"phase_type": "llm_single", "prompt": "x"}}],
+        },
+    }
+    sb = _branch_test_supabase(thread_id, workflow_def_row=def_row)
+
+    # run_workflow hangs until the producer task is cancelled (the user-Stop
+    # shape: DELETE /runs/{id} reaches RUN_TASKS and calls task.cancel()).
+    started = _asyncio.Event()
+
+    async def _hang(*_a, **_k):
+        started.set()
+        await _asyncio.sleep(30)
+
+    finish_spy = AsyncMock()
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: fake_redis
+    try:
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.api.threads.insert_run", AsyncMock()), \
+             patch("app.api.threads.create_workflow_run",
+                   AsyncMock(return_value=new_run_id)), \
+             patch("app.api.threads.generate_thread_title", return_value=("T", None)), \
+             patch("app.api.threads.finalize_run", AsyncMock()), \
+             patch("app.db.workflows.finish_run", finish_spy), \
+             patch("app.services.harness_engine.run_workflow", _hang), \
+             patch("app.services.harness_engine._load_run_definition",
+                   AsyncMock(return_value=None)):
+            async with httpx.AsyncClient(
+                transport=ASGITransport(app=app), base_url="http://test"
+            ) as c:
+                resp = await c.post(
+                    f"/threads/{thread_id}/messages",
+                    headers={"Authorization": "Bearer test-token"},
+                    json={"content": "research X",
+                          "workflow_definition_id": str(def_id)},
+                )
+            assert resp.status_code == 201, resp.text
+
+            from app.api.threads import RUN_TASKS
+            run_id = UUID(resp.json()["run_id"])
+            task = RUN_TASKS.get(run_id)
+            assert task is not None
+            # Let the producer reach run_workflow before cancelling.
+            await _asyncio.wait_for(started.wait(), timeout=5.0)
+            task.cancel()
+            try:
+                await _asyncio.wait_for(task, timeout=5.0)
+            except (Exception, _asyncio.CancelledError):
+                pass
+
+            # Cancel-honesty: finish_run records 'cancelled', not 'failed'.
+            assert finish_spy.await_count == 1
+            assert finish_spy.await_args.args[1] == new_run_id
+            assert finish_spy.await_args.args[2] == "cancelled"
     finally:
         app.dependency_overrides.pop(get_supabase, None)
         app.dependency_overrides.pop(get_redis, None)

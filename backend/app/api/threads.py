@@ -1550,7 +1550,18 @@ async def send_message(
                             await _finish_wf(
                                 await get_pg_pool(),
                                 _active_workflow_run_id,
-                                "failed",
+                                # v2.8-audit cancel-honesty fix: a user Stop sets
+                                # _terminal_status='cancelled' (:1379) and the
+                                # workflow_runs CHECK + every terminal-status
+                                # consumer (_TERMINAL_WORKFLOW_STATUSES here and
+                                # in panel.py, PhaseTimeline, RunCard) already
+                                # handle 'cancelled' — record the true intent.
+                                # Every OTHER non-completed escape (timed_out is
+                                # NOT in the workflow_runs CHECK, failed, crash)
+                                # keeps writing 'failed' verbatim.
+                                "cancelled"
+                                if _terminal_status == "cancelled"
+                                else "failed",
                             )
                         except BaseException:
                             logger.exception(
