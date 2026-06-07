@@ -312,7 +312,10 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis, mock_asyncpg_p
     monkeypatch.setattr(harness_engine, "_resume_run", _run)
 
     async def _load_def(pool, run_id):
-        return None  # the stubbed _resume_run ignores the definition
+        # Truthy sentinel — the stubbed _resume_run ignores the definition, but
+        # it must be non-None or the sweep's WR-02 missing-definition guard
+        # skips the run before the redrive.
+        return object()
 
     monkeypatch.setattr(harness_engine, "_load_run_definition", _load_def, raising=False)
 
@@ -368,7 +371,9 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis, mock_async
     monkeypatch.setattr(harness_engine, "_resume_run", _run)
 
     async def _load_def(pool, run_id):
-        return None
+        # Truthy sentinel (see test_sweep_reruns_active_phase) — keeps the
+        # sweep's WR-02 missing-definition guard from skipping the run.
+        return object()
 
     monkeypatch.setattr(harness_engine, "_load_run_definition", _load_def, raising=False)
 

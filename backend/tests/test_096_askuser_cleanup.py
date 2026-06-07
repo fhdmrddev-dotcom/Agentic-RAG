@@ -194,7 +194,10 @@ def _resume_stubs(monkeypatch, harness_engine, run_id, thread_id, *, redrive):
                 "status": "active", "output": {}}
 
     async def _load_def(pool, rid):
-        return None  # the stubbed redrive ignores the definition
+        # Truthy sentinel — the stubbed redrive ignores the definition, but it
+        # must be non-None or the sweep's WR-02 missing-definition guard skips
+        # the run before the redrive (test_dual_mode_wiring.py uses object() too).
+        return object()
 
     monkeypatch.setattr(harness_engine, "find_resumable_runs", _find)
     monkeypatch.setattr(harness_engine, "claim_run", _claim)

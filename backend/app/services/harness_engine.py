@@ -1248,6 +1248,18 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
 
         # 3. Load the definition + ctx and re-drive (rides run_workflow).
         definition = await _load_run_definition(pool, run_id)
+        if definition is None:
+            # WR-02 (096 review): a gone/unloadable definition must not abort
+            # the WHOLE sweep — _resume_run(run_id, None, ...) would raise
+            # AttributeError and the loop's re-raise strands every remaining
+            # run until the next restart. Skip THIS run only (honoring the
+            # _load_run_definition docstring promise); it re-becomes claimable
+            # after harness_resume_lease_seconds expires.
+            logger.warning(
+                "resume sweep: run %s has no loadable definition — skipping "
+                "(re-claimable after lease expiry)", run_id,
+            )
+            continue
         ctx = await _build_resume_context(run, redis, pool)
         # Facet C (092-07): MANDATORY resume finalizer — terminalize the
         # producer-shell minted in _build_resume_context on EVERY exit path
