@@ -27,6 +27,7 @@ splits, available for fns that need run identity).
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Awaitable, Callable
 
@@ -38,6 +39,7 @@ __all__ = [
     "PROGRAMMATIC_PHASE_REGISTRY",
     "register_programmatic",
     "split_topic",
+    "eval_slow_step",
 ]
 
 
@@ -114,3 +116,22 @@ async def split_topic(input: dict, ctx: object) -> dict:
         sub_questions = [topic]
 
     return {"sub_questions": sub_questions}
+
+
+# Mid-`programmatic` kill window for the 096 restart smoke (D-08 / SC#4):
+# split_topic completes in microseconds — no human can land a uvicorn kill
+# inside its 2-phase-write window. eval_slow_step holds the phase `active`
+# for EVAL_SLOW_STEP_SECONDS so the operator-driven kill is real, never faked.
+EVAL_SLOW_STEP_SECONDS = 20
+
+
+@register_programmatic("eval_slow_step")
+async def eval_slow_step(input: dict, ctx: object) -> dict:
+    """split_topic semantics with a deliberate ~20s sleep.
+
+    PURE + IDEMPOTENT (Pattern 3): the sleep is not a side effect; output is
+    deterministic for the same input, so re-running on resume is safe.
+    Referenced ONLY by the eval_coverage seed workflow (migration 066).
+    """
+    await asyncio.sleep(EVAL_SLOW_STEP_SECONDS)
+    return await split_topic(input, ctx)
