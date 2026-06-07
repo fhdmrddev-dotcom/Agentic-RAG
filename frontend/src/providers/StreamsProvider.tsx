@@ -1879,6 +1879,28 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           }
         },
 
+        // SEED-064 — stop the active run on ANY thread (not just the viewed one).
+        // Mirrors stopStream but takes an explicit threadId so the sidebar Stop +
+        // the cross-thread active-runs tray can cancel a backgrounded run without
+        // navigating into it. Same durable cancel path (DELETE /runs/{id}); same
+        // stopped-by-user marking so the terminal renders "Response stopped".
+        stopThread: async (threadId: string) => {
+          if (!threadId) return
+          const bucket =
+            useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+          const streamingMsg = [...bucket]
+            .reverse()
+            .find((m) => m.role === "assistant" && m.runStatus === "streaming")
+          const runId = streamingMsg?.runId
+          if (!runId) return
+          stoppedByUserRef.current = true
+          try {
+            await cancelRun(runId)
+          } catch (err) {
+            console.error("Stop failed (thread", threadId, "):", err)
+          }
+        },
+
         // Phase 068 (L-068-07): resume retries via sendMessage; mirror
         // semantics inherited. Source: useMessages.ts:1158-1190.
         resumeFromFailed: async (failedMessage) => {
@@ -2601,6 +2623,34 @@ export const useStreamSubscriptions = (runId: string): boolean =>
 // ─────────────────────────────────────────────────────────────────────────────
 export const useStreamingForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) => (threadId ? s.streamingThreads.has(threadId) : false))
+
+// SEED-064 — cross-thread active-run surface (sidebar dots + active-runs tray).
+//
+// Returns the SET of thread ids with a live run. Selecting `streamingThreads`
+// directly is reference-stable across token deltas (the Set is reassigned ONLY
+// on stream start/stop — tokens never touch it), so consumers (NavPanel dots,
+// the tray counter) re-render on start/stop, NOT on every streamed token.
+export const useStreamingThreadIds = (): Set<string> =>
+  useStreamsStore((s) => s.streamingThreads)
+
+// Non-reactive read of a thread's live-run start epoch-ms (the streaming
+// assistant message's startedAt, falling back to created_at). Read imperatively
+// by the active-runs tray on its own 1s elapsed ticker so per-token bucket
+// mutations never re-render anything. Returns null when nothing is streaming or
+// the timestamp is unparseable.
+export const getActiveRunStartMs = (threadId: string): number | null => {
+  const bucket =
+    useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+  for (let i = bucket.length - 1; i >= 0; i--) {
+    const m = bucket[i]
+    if (m.role === "assistant" && m.runStatus === "streaming") {
+      const raw = m.startedAt ?? m.created_at
+      const t = raw ? Date.parse(raw) : NaN
+      return Number.isNaN(t) ? null : t
+    }
+  }
+  return null
+}
 
 export const useLoadingForThread = (threadId: string | null): boolean =>
   useStreamsStore((s) => (threadId ? s.loadingThreads.has(threadId) : false))

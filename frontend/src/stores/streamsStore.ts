@@ -174,6 +174,11 @@ export interface StreamsState {
     ) => Promise<void>
     reconcile: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
     stopStream: () => Promise<void>
+    /** SEED-064 — stop the active run on a SPECIFIC thread (not just the viewed
+     *  one). Powers the sidebar Stop + the cross-thread active-runs tray so a
+     *  backgrounded run can be cancelled without navigating into its thread.
+     *  No-op when the thread has no streaming run. */
+    stopThread: (threadId: string) => Promise<void>
     resumeFromFailed: (failedMessage: Message) => Promise<void>
     loadMessages: (threadId: string, surfaceId?: SurfaceId) => Promise<void>
     // ──────────────────────────────────────────────────────────────────────────
@@ -305,6 +310,7 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     sendMessage: notMounted,
     reconcile: notMounted,
     stopStream: notMounted,
+    stopThread: notMounted,
     resumeFromFailed: notMounted,
     loadMessages: notMounted,
     // Phase 086 Plan 01 (PATTERNS §1 Part C / RESEARCH Pitfall 5): synchronous

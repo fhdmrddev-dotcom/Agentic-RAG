@@ -16,10 +16,13 @@ import {
   MessageSquare, FileText, Activity, Zap, Settings,
   LogOut, Plus, Sparkles, Pencil, Trash2, MoreHorizontal,
   Moon, Sun, PanelLeftClose, PanelLeftOpen, Folder as FolderIcon,
-  AlertCircle,
+  AlertCircle, Square,
 } from "lucide-react"
 import type { ActiveView } from "@/App"
 import type { Folder, Thread } from "@/types"
+// SEED-064: cross-thread run visibility + Stop.
+import { useStreamingThreadIds, useStreamActions } from "@/providers/StreamsProvider"
+import { ActiveRunsTray } from "@/components/chat/ActiveRunsTray"
 
 interface Props {
   // From AppDock
@@ -73,6 +76,11 @@ export function NavPanel({
     })
   }
 
+  // SEED-064: which threads have a live run (reactive on start/stop, not tokens)
+  // + the cross-thread stop action.
+  const streamingThreadIds = useStreamingThreadIds()
+  const streamActions = useStreamActions()
+
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -118,6 +126,8 @@ export function NavPanel({
           const isMenuOpen = menuOpenId === thread.id
           const isHovered = hoveredId === thread.id
           const showActions = isHovered || isMenuOpen
+          // SEED-064: live run on this thread?
+          const isRunning = streamingThreadIds.has(thread.id)
 
           return (
             <div
@@ -163,16 +173,41 @@ export function NavPanel({
                     )}
                   </div>
 
-                  {/* Dots button overlaid on right */}
-                  {showActions && (
+                  {/* SEED-064: resting running dot — ambient "this chat is working"
+                      signal. Hidden while hovered (the Stop button takes its place). */}
+                  {isRunning && !showActions && (
                     <div
-                      className="absolute inset-y-0 right-0 flex items-center pr-1.5"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setMenuOpenId(isMenuOpen ? null : thread.id)
-                      }}
+                      className="absolute inset-y-0 right-0 flex items-center pr-2.5"
+                      aria-label="Run in progress"
+                      title="Run in progress"
                     >
-                      <span className="p-0.5 rounded-md bg-accent hover:bg-muted inline-flex transition-colors">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    </div>
+                  )}
+
+                  {/* Actions on hover: Stop (if running) + the rename/delete menu */}
+                  {showActions && (
+                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
+                      {isRunning && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void streamActions.stopThread(thread.id)
+                          }}
+                          className="p-1 rounded-md border border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20 inline-flex transition-colors"
+                          aria-label="Stop run"
+                          title="Stop run"
+                        >
+                          <Square className="h-2.5 w-2.5 fill-current" />
+                        </button>
+                      )}
+                      <span
+                        className="p-0.5 rounded-md bg-accent hover:bg-muted inline-flex transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpenId(isMenuOpen ? null : thread.id)
+                        }}
+                      >
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </span>
                     </div>
@@ -302,6 +337,9 @@ export function NavPanel({
                     Chats
                   </span>
                   <div className="flex items-center gap-1">
+                    {/* SEED-064: cross-thread active-runs counter + Stop tray
+                        (renders null when nothing is running). */}
+                    <ActiveRunsTray threads={threads} />
                     <button
                       onClick={() => {
                         onNewThread(selectedFolderId)
