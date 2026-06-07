@@ -95,6 +95,15 @@ class ToolContext:
     #            audit. Set once per phase by the harness executor (Plan 03), never
     #            queried per tool call.
     phase_whitelist: "frozenset[str] | None" = None
+    # 096 review WR-03 — the workflow_runs.id of the active harness run. Every
+    # other harness_audit row (phase_started / gate_failed / phase_completed /
+    # run_completed) is keyed on workflow_runs.id, but on the harness path
+    # ctx.run_id / ctx.parent_run_id carry PRODUCER `runs` ids (Facet A,
+    # phase_types.py) — so the tool_refused audit needs this field to land in the
+    # same per-run namespace the audit readers query. Set ONLY by
+    # _build_phase_tool_context (+ propagated onto sub_ctx in task_service);
+    # None on every Deep-Mode / tasks caller => byte-identical Deep dispatch.
+    workflow_run_id: "UUID | None" = None
 
 
 @dataclass
@@ -1508,8 +1517,13 @@ def _spawn_tool_refused_audit(ctx: ToolContext, tool_name: str, allowed: list[st
     spawn must not turn a clean refusal into an exception (the refusal is the point).
     Only reached when ``ctx.phase_whitelist is not None`` (a workflow is active), so
     in pure Deep-Mode calls this is never invoked.
+
+    096 review WR-03: prefer ``ctx.workflow_run_id`` (the workflow_runs.id) so the
+    refusal row lands in the SAME run namespace as every other harness_audit row —
+    ``parent_run_id``/``run_id`` are producer ``runs`` ids on the harness path, and
+    a row keyed there is invisible to per-workflow-run audit readers.
     """
-    run_id = ctx.parent_run_id or ctx.run_id
+    run_id = ctx.workflow_run_id or ctx.parent_run_id or ctx.run_id
     if ctx.pool is None or run_id is None:
         return  # no harness substrate on this ctx — nothing to audit against
     # Phase 092-05 F1: harness_audit.user_id is NOT NULL — bind the run-owner

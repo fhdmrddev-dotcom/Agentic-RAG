@@ -618,6 +618,11 @@ async def run_task_sub_agent(
         # regression lock). None (every Deep-Mode / tasks caller — the dataclass
         # default) keeps the guard a literal no-op → byte-identical Deep dispatch.
         phase_whitelist=parent_ctx.phase_whitelist,
+        # 096 review WR-03 — propagate the workflow_runs.id alongside the
+        # whitelist so the dispatch-time tool_refused audit (which fires on
+        # sub_ctx) is keyed to the SAME run namespace as every other
+        # harness_audit row. None (Deep/tasks callers) => byte-identical.
+        workflow_run_id=parent_ctx.workflow_run_id,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).

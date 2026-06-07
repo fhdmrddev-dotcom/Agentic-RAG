@@ -194,6 +194,10 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         available_tools=list(phase.config.available_tools),
         # D-05 layer 2 — the dispatch-time backstop for hallucinated tool names.
         phase_whitelist=frozenset(phase.config.available_tools),
+        # 096 review WR-03 — ctx.run_id IS workflow_runs.id on the harness ctx bag
+        # (Facet A docstring above); threads it through so the tool_refused audit
+        # lands in the same run namespace as every other harness_audit row.
+        workflow_run_id=getattr(ctx, "run_id", None),
     )
 
 
