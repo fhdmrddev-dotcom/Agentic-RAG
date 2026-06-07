@@ -611,14 +611,64 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         _HEARTBEAT_INTERVAL_S = 1.0
 
         _tool_index = ctx.tool_index
+        # 096 / SEED-063 — wall-clock ceiling for THIS execution. A runaway /
+        # non-terminating script must not wedge the run forever (UAT Test 3).
+        _exec_timeout_s = settings.sandbox_exec_timeout_seconds
 
         while True:
             try:
                 item = await asyncio.wait_for(sandbox_queue.get(), timeout=_HEARTBEAT_INTERVAL_S)
             except asyncio.TimeoutError:
                 now = time_mod.time()
+                elapsed = now - start_time
+                # ── 096 / SEED-063 wall-clock abort ─────────────────────────────
+                # The _run_sync thread is blocked in session.execute_command and a
+                # Python thread cannot be cancelled — kill+remove the container to
+                # free it, surface the abort to the user + the model, and return a
+                # tool-result error so the agent loop continues cleanly (never a
+                # 40-minute zombie). 0/negative disables the cap (operator escape
+                # hatch).
+                if _exec_timeout_s > 0 and elapsed > _exec_timeout_s:
+                    logger.warning(
+                        "execute_code wall-clock timeout (%.0fs > %ds) thread=%s — "
+                        "killing sandbox container", elapsed, _exec_timeout_s, ctx.thread_id,
+                    )
+                    try:
+                        await run_in_threadpool(sandbox_manager.kill_session, ctx.thread_id)
+                    except Exception:  # noqa: BLE001 — abort path never raises
+                        logger.exception(
+                            "kill_session failed after exec timeout thread=%s", ctx.thread_id,
+                        )
+                    # The blocked _run_sync thread will raise once the container is
+                    # gone; we've abandoned `fut`. Retrieve its exception in a
+                    # done-callback so Python doesn't log "exception never retrieved".
+                    fut.add_done_callback(
+                        lambda f: f.cancelled() or f.exception()
+                    )
+                    _msg = (
+                        f"[execution aborted: exceeded the {_exec_timeout_s}s "
+                        f"wall-clock limit]"
+                    )
+                    try:
+                        await ctx.emit(ctx.redis, ctx.run_id, 'code_stderr',
+                                       content=_msg, captured_at=now)
+                        await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete',
+                                       exit_code=124, error=_msg,
+                                       duration_ms=int(elapsed * 1000), output_files=[])
+                    except Exception:  # noqa: BLE001
+                        logger.exception("exec-timeout SSE emit failed thread=%s", ctx.thread_id)
+                    return ToolResult(result=json.dumps({
+                        "status": "error",
+                        "error": "execution_timeout",
+                        "exit_code": 124,
+                        "message": (
+                            f"Code execution exceeded the {_exec_timeout_s}s wall-clock "
+                            f"limit and was aborted. Reduce the input size, use a more "
+                            f"efficient approach, or split the work into smaller steps."
+                        ),
+                        "elapsed_seconds": round(elapsed, 1),
+                    }))
                 if now - _last_output_at >= _HEARTBEAT_INTERVAL_S:
-                    elapsed = now - start_time
                     await ctx.emit(ctx.redis, ctx.run_id, 'code_executing',
                                    tool_index=_tool_index, elapsed_seconds=round(elapsed, 1))
                 if now - _heartbeat_last >= 10.0:

@@ -135,6 +135,50 @@ class SandboxSessionManager:
             except Exception as e:
                 logger.warning("Error closing sandbox session %s: %s", thread_id, e)
 
+    def kill_session(self, thread_id: str) -> bool:
+        """Forcibly kill + remove a thread's sandbox container (096 / SEED-063).
+
+        Used on an execute_code wall-clock timeout: a worker thread is blocked in
+        ``session.execute_command`` waiting on a runaway container process, and a
+        Python thread cannot be cancelled — the ONLY way to free it is to destroy
+        the container the exec stream is attached to. ``remove(force=True)``
+        SIGKILLs then removes in one step, which (a) unblocks the thread and
+        (b) avoids a stale-name 409 on the next ``get_or_create``. Drops the
+        cached session so the next execute_code opens a fresh container.
+
+        Best-effort + idempotent: any Docker error is logged, never raised — an
+        abort path must not raise. Returns True if a container was removed.
+        """
+        removed = False
+        try:
+            import docker
+            from docker.errors import NotFound
+
+            if self._docker_client is None:
+                SandboxSessionManager._docker_client = docker.from_env()
+            try:
+                container = self._docker_client.containers.get(
+                    f"sandbox-{thread_id[:12]}"
+                )
+                container.remove(force=True)
+                removed = True
+                logger.warning(
+                    "Killed+removed sandbox container for thread %s (exec abort)",
+                    thread_id,
+                )
+            except NotFound:
+                pass
+        except Exception as e:  # noqa: BLE001 — abort path never raises
+            logger.warning(
+                "kill_session: docker remove failed for thread %s: %s",
+                thread_id, e,
+            )
+        # Drop the cached session WITHOUT calling session.close() — the container
+        # is already gone; close() would just error on a dead connection.
+        _sessions.pop(thread_id, None)
+        _last_used.pop(thread_id, None)
+        return removed
+
     def close_all(self) -> None:
         """Close all open sessions. Called during app shutdown."""
         for thread_id in list(_sessions.keys()):

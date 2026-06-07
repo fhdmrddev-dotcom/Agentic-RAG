@@ -748,6 +748,14 @@ class Settings(BaseSettings):
     # Code execution sandbox
     sandbox_enabled: bool = False
     sandbox_ttl_minutes: int = 30
+    # 096 / SEED-063 — wall-clock ceiling for a single execute_code call. A model
+    # can write a non-terminating or O(n²)-on-huge-input computation; without a
+    # cap it wedges the run forever (UAT Test 3: two runs stuck 40+ min, backend
+    # could not even shut down). On expiry the handler kills+removes the sandbox
+    # container (frees the blocked worker thread) and returns a tool-result error
+    # so the agent loop continues. Generous default so legitimate heavy analysis
+    # is unaffected; operator-tunable via env SANDBOX_EXEC_TIMEOUT_SECONDS.
+    sandbox_exec_timeout_seconds: int = 180
 
     # Concurrency (Phase 058 — D-058-07)
     # Total AnyIO thread-pool tokens. FastAPI defaults to 40, which is the
