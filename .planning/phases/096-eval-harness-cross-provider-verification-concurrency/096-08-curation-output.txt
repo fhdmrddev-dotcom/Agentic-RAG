@@ -1,0 +1,549 @@
+C:\Vibe Apps\Agentic RAG\backend\venv\Lib\site-packages\requests\__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.3) or chardet (7.4.3)/charset_normalizer (3.4.6) doesn't match a supported version!
+  warnings.warn(
+## Environment (presence only — secret VALUES are never printed)
+
+  - SUPABASE_URL: set
+  - DATABASE_URL: set
+  - OPENAI_API_KEY: set
+  - ANTHROPIC_API_KEY: set
+  - GOOGLE_API_KEY: set
+  - DEEPSEEK_API_KEY: set
+  - MOONSHOT_API_KEY: set
+  - ZHIPU_API_KEY: set
+  - MINIMAX_API_KEY: set
+  - OPENROUTER_API_KEY: set
+
+
+## openai — 22 live models
+
+CURATE_LIVE openai gpt-5.5-pro-2026-04-23
+CURATE_LIVE openai gpt-5.5-pro
+CURATE_LIVE openai gpt-5.5
+CURATE_LIVE openai gpt-5.4-mini
+CURATE_LIVE openai gpt-5.4-nano
+CURATE_LIVE openai gpt-5.4
+CURATE_LIVE openai gpt-5.4-pro
+CURATE_LIVE openai gpt-5.2
+CURATE_LIVE openai gpt-5.1-codex-max
+CURATE_LIVE openai gpt-5.1
+CURATE_LIVE openai gpt-5-nano
+CURATE_LIVE openai gpt-5-mini
+CURATE_LIVE openai gpt-5
+CURATE_LIVE openai gpt-4.1-nano
+CURATE_LIVE openai gpt-4.1-mini
+CURATE_LIVE openai gpt-4.1
+CURATE_LIVE openai o1
+CURATE_LIVE openai gpt-4o-mini
+CURATE_LIVE openai gpt-4o
+CURATE_LIVE openai text-embedding-3-large
+CURATE_LIVE openai text-embedding-3-small
+CURATE_LIVE openai gpt-4
+CURATE_MISSING openai gpt-5.5-pro-2026-04-23
+CURATE_MISSING openai gpt-5.5-pro
+CURATE_MISSING openai gpt-5.4-pro
+CURATE_MISSING openai gpt-5.2
+CURATE_MISSING openai gpt-5.1
+CURATE_MISSING openai gpt-5-nano
+CURATE_MISSING openai gpt-5-mini
+CURATE_MISSING openai gpt-4
+CURATE_STALE openai o3 MODEL_CAPABILITIES
+CURATE_STALE openai o4 MODEL_CAPABILITIES
+CURATE_STALE openai o3 available_models
+CURATE_STALE openai o4 available_models
+CURATE_DEFAULT openai current=gpt-5.4-mini live_newest=gpt-5.5-pro-2026-04-23
+
+## anthropic — 10 live models
+
+CURATE_LIVE anthropic claude-opus-4-8
+CURATE_LIVE anthropic claude-opus-4-7
+CURATE_LIVE anthropic claude-sonnet-4-6
+CURATE_LIVE anthropic claude-opus-4-6
+CURATE_LIVE anthropic claude-opus-4-5-20251101
+CURATE_LIVE anthropic claude-haiku-4-5-20251001
+CURATE_LIVE anthropic claude-sonnet-4-5-20250929
+CURATE_LIVE anthropic claude-opus-4-1-20250805
+CURATE_LIVE anthropic claude-opus-4-20250514
+CURATE_LIVE anthropic claude-sonnet-4-20250514
+CURATE_MISSING anthropic claude-opus-4-8
+CURATE_MISSING anthropic claude-opus-4-5-20251101
+CURATE_MISSING anthropic claude-sonnet-4-5-20250929
+CURATE_MISSING anthropic claude-opus-4-1-20250805
+CURATE_MISSING anthropic claude-opus-4-20250514
+CURATE_MISSING anthropic claude-sonnet-4-20250514
+CURATE_STALE anthropic claude-sonnet-4-5 MODEL_CAPABILITIES
+CURATE_STALE anthropic claude-haiku-4-5 EVAL_PROVIDERS
+CURATE_STALE anthropic claude-sonnet-4-5 available_models
+CURATE_DEFAULT anthropic current=claude-haiku-4-5-20251001 live_newest=claude-opus-4-8
+
+## google — 54 live models
+
+CURATE_LIVE google veo-3.1-lite-generate-preview
+CURATE_LIVE google veo-3.1-generate-preview
+CURATE_LIVE google veo-3.1-fast-generate-preview
+CURATE_LIVE google veo-3.0-generate-001
+CURATE_LIVE google veo-3.0-fast-generate-001
+CURATE_LIVE google veo-2.0-generate-001
+CURATE_LIVE google nano-banana-pro-preview
+CURATE_LIVE google lyria-3-pro-preview
+CURATE_LIVE google lyria-3-clip-preview
+CURATE_LIVE google imagen-4.0-ultra-generate-001
+CURATE_LIVE google imagen-4.0-generate-001
+CURATE_LIVE google imagen-4.0-fast-generate-001
+CURATE_LIVE google gemma-4-31b-it
+CURATE_LIVE google gemma-4-26b-a4b-it
+CURATE_LIVE google gemini-robotics-er-1.6-preview
+CURATE_LIVE google gemini-robotics-er-1.5-preview
+CURATE_LIVE google gemini-pro-latest
+CURATE_LIVE google gemini-flash-lite-latest
+CURATE_LIVE google gemini-flash-latest
+CURATE_LIVE google gemini-embedding-2-preview
+CURATE_LIVE google gemini-embedding-2
+CURATE_LIVE google gemini-embedding-001
+CURATE_LIVE google gemini-3.5-flash
+CURATE_LIVE google gemini-3.1-pro-preview-customtools
+CURATE_LIVE google gemini-3.1-pro-preview
+CURATE_LIVE google gemini-3.1-flash-tts-preview
+CURATE_LIVE google gemini-3.1-flash-live-preview
+CURATE_LIVE google gemini-3.1-flash-lite-preview
+CURATE_LIVE google gemini-3.1-flash-lite
+CURATE_LIVE google gemini-3.1-flash-image-preview
+CURATE_LIVE google gemini-3.1-flash-image
+CURATE_LIVE google gemini-3-pro-preview
+CURATE_LIVE google gemini-3-pro-image-preview
+CURATE_LIVE google gemini-3-pro-image
+CURATE_LIVE google gemini-3-flash-preview
+CURATE_LIVE google gemini-2.5-pro-preview-tts
+CURATE_LIVE google gemini-2.5-pro
+CURATE_LIVE google gemini-2.5-flash-preview-tts
+CURATE_LIVE google gemini-2.5-flash-native-audio-preview-12-2025
+CURATE_LIVE google gemini-2.5-flash-native-audio-preview-09-2025
+CURATE_LIVE google gemini-2.5-flash-native-audio-latest
+CURATE_LIVE google gemini-2.5-flash-lite
+CURATE_LIVE google gemini-2.5-flash-image
+CURATE_LIVE google gemini-2.5-flash
+CURATE_LIVE google gemini-2.5-computer-use-preview-10-2025
+CURATE_LIVE google gemini-2.0-flash-lite-001
+CURATE_LIVE google gemini-2.0-flash-lite
+CURATE_LIVE google gemini-2.0-flash-001
+CURATE_LIVE google gemini-2.0-flash
+CURATE_LIVE google deep-research-pro-preview-12-2025
+CURATE_LIVE google deep-research-preview-04-2026
+CURATE_LIVE google deep-research-max-preview-04-2026
+CURATE_LIVE google aqa
+CURATE_LIVE google antigravity-preview-05-2026
+CURATE_MISSING google gemini-robotics-er-1.6-preview
+CURATE_MISSING google gemini-robotics-er-1.5-preview
+CURATE_MISSING google gemini-pro-latest
+CURATE_MISSING google gemini-flash-lite-latest
+CURATE_MISSING google gemini-flash-latest
+CURATE_MISSING google gemini-3.1-pro-preview-customtools
+CURATE_MISSING google gemini-3.1-flash-live-preview
+CURATE_MISSING google gemini-3.1-flash-lite-preview
+CURATE_MISSING google gemini-3-pro-preview
+CURATE_MISSING google gemini-2.0-flash-lite-001
+CURATE_MISSING google gemini-2.0-flash-lite
+CURATE_MISSING google gemini-2.0-flash-001
+CURATE_MISSING google gemini-2.0-flash
+CURATE_DEFAULT google current=gemini-3.5-flash live_newest=gemini-robotics-er-1.6-preview
+
+## deepseek — 2 live models
+
+CURATE_LIVE deepseek deepseek-v4-pro
+CURATE_LIVE deepseek deepseek-v4-flash
+CURATE_STALE deepseek deepseek-chat MODEL_CAPABILITIES
+CURATE_STALE deepseek deepseek-reasoner MODEL_CAPABILITIES
+CURATE_DEFAULT deepseek current=deepseek-v4-flash live_newest=deepseek-v4-pro
+
+## moonshot — 9 live models
+
+CURATE_LIVE moonshot moonshot-v1-auto
+CURATE_LIVE moonshot moonshot-v1-8k-vision-preview
+CURATE_LIVE moonshot moonshot-v1-8k
+CURATE_LIVE moonshot moonshot-v1-32k-vision-preview
+CURATE_LIVE moonshot moonshot-v1-32k
+CURATE_LIVE moonshot moonshot-v1-128k-vision-preview
+CURATE_LIVE moonshot moonshot-v1-128k
+CURATE_LIVE moonshot kimi-k2.6
+CURATE_LIVE moonshot kimi-k2.5
+CURATE_MISSING moonshot moonshot-v1-auto
+CURATE_MISSING moonshot moonshot-v1-8k-vision-preview
+CURATE_MISSING moonshot moonshot-v1-32k-vision-preview
+CURATE_MISSING moonshot moonshot-v1-32k
+CURATE_MISSING moonshot moonshot-v1-128k-vision-preview
+CURATE_MISSING moonshot moonshot-v1-128k
+CURATE_MISSING moonshot kimi-k2.5
+CURATE_DEFAULT moonshot current=kimi-k2.6 live_newest=moonshot-v1-auto
+
+## zhipu — 7 live models
+
+CURATE_LIVE zhipu glm-5.1
+CURATE_LIVE zhipu glm-5-turbo
+CURATE_LIVE zhipu glm-5
+CURATE_LIVE zhipu glm-4.7
+CURATE_LIVE zhipu glm-4.6
+CURATE_LIVE zhipu glm-4.5-air
+CURATE_LIVE zhipu glm-4.5
+CURATE_DEFAULT zhipu current=glm-4.6 live_newest=glm-5.1
+
+## minimax — 8 live models
+
+CURATE_LIVE minimax MiniMax-M3
+CURATE_LIVE minimax MiniMax-M2.7-highspeed
+CURATE_LIVE minimax MiniMax-M2.7
+CURATE_LIVE minimax MiniMax-M2.5-highspeed
+CURATE_LIVE minimax MiniMax-M2.5
+CURATE_LIVE minimax MiniMax-M2.1-highspeed
+CURATE_LIVE minimax MiniMax-M2.1
+CURATE_LIVE minimax MiniMax-M2
+CURATE_MISSING minimax MiniMax-M3
+CURATE_DEFAULT minimax current=MiniMax-M2.5-highspeed live_newest=MiniMax-M3
+
+## openrouter — 341 live models
+
+CURATE_LIVE openrouter nvidia/nemotron-3.5-content-safety:free
+CURATE_LIVE openrouter nvidia/nemotron-3-ultra-550b-a55b:free
+CURATE_LIVE openrouter nvidia/nemotron-3-ultra-550b-a55b
+CURATE_LIVE openrouter qwen/qwen3.7-plus
+CURATE_LIVE openrouter minimax/minimax-m3
+CURATE_LIVE openrouter stepfun/step-3.7-flash
+CURATE_LIVE openrouter anthropic/claude-opus-4.8-fast
+CURATE_LIVE openrouter anthropic/claude-opus-4.8
+CURATE_LIVE openrouter qwen/qwen3.7-max
+CURATE_LIVE openrouter x-ai/grok-build-0.1
+CURATE_LIVE openrouter google/gemini-3.5-flash
+CURATE_LIVE openrouter anthropic/claude-opus-4.7-fast
+CURATE_LIVE openrouter openrouter/fusion
+CURATE_LIVE openrouter perceptron/perceptron-mk1
+CURATE_LIVE openrouter inclusionai/ring-2.6-1t
+CURATE_LIVE openrouter google/gemini-3.1-flash-lite
+CURATE_LIVE openrouter openai/gpt-chat-latest
+CURATE_LIVE openrouter x-ai/grok-4.3
+CURATE_LIVE openrouter ibm-granite/granite-4.1-8b
+CURATE_LIVE openrouter mistralai/mistral-medium-3-5
+CURATE_LIVE openrouter openrouter/owl-alpha
+CURATE_LIVE openrouter nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
+CURATE_LIVE openrouter poolside/laguna-xs.2:free
+CURATE_LIVE openrouter poolside/laguna-m.1:free
+CURATE_LIVE openrouter ~anthropic/claude-haiku-latest
+CURATE_LIVE openrouter ~openai/gpt-mini-latest
+CURATE_LIVE openrouter ~google/gemini-pro-latest
+CURATE_LIVE openrouter ~moonshotai/kimi-latest
+CURATE_LIVE openrouter ~google/gemini-flash-latest
+CURATE_LIVE openrouter ~anthropic/claude-sonnet-latest
+CURATE_LIVE openrouter ~openai/gpt-latest
+CURATE_LIVE openrouter qwen/qwen3.5-plus-20260420
+CURATE_LIVE openrouter qwen/qwen3.6-flash
+CURATE_LIVE openrouter qwen/qwen3.6-35b-a3b
+CURATE_LIVE openrouter qwen/qwen3.6-max-preview
+CURATE_LIVE openrouter qwen/qwen3.6-27b
+CURATE_LIVE openrouter openai/gpt-5.5-pro
+CURATE_LIVE openrouter openai/gpt-5.5
+CURATE_LIVE openrouter deepseek/deepseek-v4-pro
+CURATE_LIVE openrouter deepseek/deepseek-v4-flash
+CURATE_LIVE openrouter inclusionai/ling-2.6-1t
+CURATE_LIVE openrouter tencent/hy3-preview
+CURATE_LIVE openrouter xiaomi/mimo-v2.5-pro
+CURATE_LIVE openrouter xiaomi/mimo-v2.5
+CURATE_LIVE openrouter openai/gpt-5.4-image-2
+CURATE_LIVE openrouter inclusionai/ling-2.6-flash
+CURATE_LIVE openrouter ~anthropic/claude-opus-latest
+CURATE_LIVE openrouter openrouter/pareto-code
+CURATE_LIVE openrouter moonshotai/kimi-k2.6:free
+CURATE_LIVE openrouter moonshotai/kimi-k2.6
+CURATE_LIVE openrouter anthropic/claude-opus-4.7
+CURATE_LIVE openrouter anthropic/claude-opus-4.6-fast
+CURATE_LIVE openrouter z-ai/glm-5.1
+CURATE_LIVE openrouter google/gemma-4-26b-a4b-it:free
+CURATE_LIVE openrouter google/gemma-4-26b-a4b-it
+CURATE_LIVE openrouter google/gemma-4-31b-it:free
+CURATE_LIVE openrouter google/gemma-4-31b-it
+CURATE_LIVE openrouter qwen/qwen3.6-plus
+CURATE_LIVE openrouter z-ai/glm-5v-turbo
+CURATE_LIVE openrouter arcee-ai/trinity-large-thinking
+CURATE_LIVE openrouter x-ai/grok-4.20-multi-agent
+CURATE_LIVE openrouter x-ai/grok-4.20
+CURATE_LIVE openrouter google/lyria-3-pro-preview
+CURATE_LIVE openrouter google/lyria-3-clip-preview
+CURATE_LIVE openrouter kwaipilot/kat-coder-pro-v2
+CURATE_LIVE openrouter rekaai/reka-edge
+CURATE_LIVE openrouter minimax/minimax-m2.7
+CURATE_LIVE openrouter openai/gpt-5.4-nano
+CURATE_LIVE openrouter openai/gpt-5.4-mini
+CURATE_LIVE openrouter mistralai/mistral-small-2603
+CURATE_LIVE openrouter z-ai/glm-5-turbo
+CURATE_LIVE openrouter nvidia/nemotron-3-super-120b-a12b:free
+CURATE_LIVE openrouter nvidia/nemotron-3-super-120b-a12b
+CURATE_LIVE openrouter bytedance-seed/seed-2.0-lite
+CURATE_LIVE openrouter qwen/qwen3.5-9b
+CURATE_LIVE openrouter openai/gpt-5.4-pro
+CURATE_LIVE openrouter openai/gpt-5.4
+CURATE_LIVE openrouter inception/mercury-2
+CURATE_LIVE openrouter openai/gpt-5.3-chat
+CURATE_LIVE openrouter google/gemini-3.1-flash-lite-preview
+CURATE_LIVE openrouter bytedance-seed/seed-2.0-mini
+CURATE_LIVE openrouter google/gemini-3.1-flash-image-preview
+CURATE_LIVE openrouter qwen/qwen3.5-35b-a3b
+CURATE_LIVE openrouter qwen/qwen3.5-27b
+CURATE_LIVE openrouter qwen/qwen3.5-122b-a10b
+CURATE_LIVE openrouter qwen/qwen3.5-flash-02-23
+CURATE_LIVE openrouter liquid/lfm-2-24b-a2b
+CURATE_LIVE openrouter google/gemini-3.1-pro-preview-customtools
+CURATE_LIVE openrouter openai/gpt-5.3-codex
+CURATE_LIVE openrouter aion-labs/aion-2.0
+CURATE_LIVE openrouter google/gemini-3.1-pro-preview
+CURATE_LIVE openrouter anthropic/claude-sonnet-4.6
+CURATE_LIVE openrouter qwen/qwen3.5-plus-02-15
+CURATE_LIVE openrouter qwen/qwen3.5-397b-a17b
+CURATE_LIVE openrouter minimax/minimax-m2.5
+CURATE_LIVE openrouter z-ai/glm-5
+CURATE_LIVE openrouter qwen/qwen3-max-thinking
+CURATE_LIVE openrouter anthropic/claude-opus-4.6
+CURATE_LIVE openrouter qwen/qwen3-coder-next
+CURATE_LIVE openrouter openrouter/free
+CURATE_LIVE openrouter stepfun/step-3.5-flash
+CURATE_LIVE openrouter moonshotai/kimi-k2.5
+CURATE_LIVE openrouter upstage/solar-pro-3
+CURATE_LIVE openrouter minimax/minimax-m2-her
+CURATE_LIVE openrouter writer/palmyra-x5
+CURATE_LIVE openrouter liquid/lfm-2.5-1.2b-thinking:free
+CURATE_LIVE openrouter liquid/lfm-2.5-1.2b-instruct:free
+CURATE_LIVE openrouter openai/gpt-audio
+CURATE_LIVE openrouter openai/gpt-audio-mini
+CURATE_LIVE openrouter z-ai/glm-4.7-flash
+CURATE_LIVE openrouter openai/gpt-5.2-codex
+CURATE_LIVE openrouter bytedance-seed/seed-1.6-flash
+CURATE_LIVE openrouter bytedance-seed/seed-1.6
+CURATE_LIVE openrouter minimax/minimax-m2.1
+CURATE_LIVE openrouter z-ai/glm-4.7
+CURATE_LIVE openrouter google/gemini-3-flash-preview
+CURATE_LIVE openrouter xiaomi/mimo-v2-flash
+CURATE_LIVE openrouter nvidia/nemotron-3-nano-30b-a3b:free
+CURATE_LIVE openrouter nvidia/nemotron-3-nano-30b-a3b
+CURATE_LIVE openrouter openai/gpt-5.2-chat
+CURATE_LIVE openrouter openai/gpt-5.2-pro
+CURATE_LIVE openrouter openai/gpt-5.2
+CURATE_LIVE openrouter mistralai/devstral-2512
+CURATE_LIVE openrouter relace/relace-search
+CURATE_LIVE openrouter z-ai/glm-4.6v
+CURATE_LIVE openrouter nex-agi/deepseek-v3.1-nex-n1
+CURATE_LIVE openrouter essentialai/rnj-1-instruct
+CURATE_LIVE openrouter openrouter/bodybuilder
+CURATE_LIVE openrouter openai/gpt-5.1-codex-max
+CURATE_LIVE openrouter amazon/nova-2-lite-v1
+CURATE_LIVE openrouter mistralai/ministral-14b-2512
+CURATE_LIVE openrouter mistralai/ministral-8b-2512
+CURATE_LIVE openrouter mistralai/ministral-3b-2512
+CURATE_LIVE openrouter mistralai/mistral-large-2512
+CURATE_LIVE openrouter arcee-ai/trinity-mini
+CURATE_LIVE openrouter deepseek/deepseek-v3.2
+CURATE_LIVE openrouter prime-intellect/intellect-3
+CURATE_LIVE openrouter anthropic/claude-opus-4.5
+CURATE_LIVE openrouter allenai/olmo-3-32b-think
+CURATE_LIVE openrouter google/gemini-3-pro-image-preview
+CURATE_LIVE openrouter deepcogito/cogito-v2.1-671b
+CURATE_LIVE openrouter openai/gpt-5.1
+CURATE_LIVE openrouter openai/gpt-5.1-chat
+CURATE_LIVE openrouter openai/gpt-5.1-codex
+CURATE_LIVE openrouter openai/gpt-5.1-codex-mini
+CURATE_LIVE openrouter moonshotai/kimi-k2-thinking
+CURATE_LIVE openrouter amazon/nova-premier-v1
+CURATE_LIVE openrouter perplexity/sonar-pro-search
+CURATE_LIVE openrouter mistralai/voxtral-small-24b-2507
+CURATE_LIVE openrouter openai/gpt-oss-safeguard-20b
+CURATE_LIVE openrouter nvidia/nemotron-nano-12b-v2-vl:free
+CURATE_LIVE openrouter minimax/minimax-m2
+CURATE_LIVE openrouter qwen/qwen3-vl-32b-instruct
+CURATE_LIVE openrouter ibm-granite/granite-4.0-h-micro
+CURATE_LIVE openrouter microsoft/phi-4-mini-instruct
+CURATE_LIVE openrouter openai/gpt-5-image-mini
+CURATE_LIVE openrouter anthropic/claude-haiku-4.5
+CURATE_LIVE openrouter qwen/qwen3-vl-8b-thinking
+CURATE_LIVE openrouter qwen/qwen3-vl-8b-instruct
+CURATE_LIVE openrouter openai/gpt-5-image
+CURATE_LIVE openrouter openai/o3-deep-research
+CURATE_LIVE openrouter openai/o4-mini-deep-research
+CURATE_LIVE openrouter nvidia/llama-3.3-nemotron-super-49b-v1.5
+CURATE_LIVE openrouter google/gemini-2.5-flash-image
+CURATE_LIVE openrouter qwen/qwen3-vl-30b-a3b-thinking
+CURATE_LIVE openrouter qwen/qwen3-vl-30b-a3b-instruct
+CURATE_LIVE openrouter openai/gpt-5-pro
+CURATE_LIVE openrouter z-ai/glm-4.6
+CURATE_LIVE openrouter anthropic/claude-sonnet-4.5
+CURATE_LIVE openrouter deepseek/deepseek-v3.2-exp
+CURATE_LIVE openrouter thedrummer/cydonia-24b-v4.1
+CURATE_LIVE openrouter relace/relace-apply-3
+CURATE_LIVE openrouter google/gemini-2.5-flash-lite-preview-09-2025
+CURATE_LIVE openrouter qwen/qwen3-vl-235b-a22b-thinking
+CURATE_LIVE openrouter qwen/qwen3-vl-235b-a22b-instruct
+CURATE_LIVE openrouter qwen/qwen3-max
+CURATE_LIVE openrouter qwen/qwen3-coder-plus
+CURATE_LIVE openrouter openai/gpt-5-codex
+CURATE_LIVE openrouter deepseek/deepseek-v3.1-terminus
+CURATE_LIVE openrouter qwen/qwen3-coder-flash
+CURATE_LIVE openrouter qwen/qwen3-next-80b-a3b-thinking
+CURATE_LIVE openrouter qwen/qwen3-next-80b-a3b-instruct:free
+CURATE_LIVE openrouter qwen/qwen3-next-80b-a3b-instruct
+CURATE_LIVE openrouter qwen/qwen-plus-2025-07-28:thinking
+CURATE_LIVE openrouter qwen/qwen-plus-2025-07-28
+CURATE_LIVE openrouter nvidia/nemotron-nano-9b-v2:free
+CURATE_LIVE openrouter nvidia/nemotron-nano-9b-v2
+CURATE_LIVE openrouter moonshotai/kimi-k2-0905
+CURATE_LIVE openrouter qwen/qwen3-30b-a3b-thinking-2507
+CURATE_LIVE openrouter nousresearch/hermes-4-70b
+CURATE_LIVE openrouter nousresearch/hermes-4-405b
+CURATE_LIVE openrouter deepseek/deepseek-chat-v3.1
+CURATE_LIVE openrouter mistralai/mistral-medium-3.1
+CURATE_LIVE openrouter z-ai/glm-4.5v
+CURATE_LIVE openrouter ai21/jamba-large-1.7
+CURATE_LIVE openrouter openai/gpt-5-chat
+CURATE_LIVE openrouter openai/gpt-5
+CURATE_LIVE openrouter openai/gpt-5-mini
+CURATE_LIVE openrouter openai/gpt-5-nano
+CURATE_LIVE openrouter openai/gpt-oss-120b:free
+CURATE_LIVE openrouter openai/gpt-oss-120b
+CURATE_LIVE openrouter openai/gpt-oss-20b:free
+CURATE_LIVE openrouter openai/gpt-oss-20b
+CURATE_LIVE openrouter anthropic/claude-opus-4.1
+CURATE_LIVE openrouter mistralai/codestral-2508
+CURATE_LIVE openrouter qwen/qwen3-coder-30b-a3b-instruct
+CURATE_LIVE openrouter qwen/qwen3-30b-a3b-instruct-2507
+CURATE_LIVE openrouter z-ai/glm-4.5
+CURATE_LIVE openrouter z-ai/glm-4.5-air:free
+CURATE_LIVE openrouter z-ai/glm-4.5-air
+CURATE_LIVE openrouter qwen/qwen3-235b-a22b-thinking-2507
+CURATE_LIVE openrouter z-ai/glm-4-32b
+CURATE_LIVE openrouter qwen/qwen3-coder:free
+CURATE_LIVE openrouter qwen/qwen3-coder
+CURATE_LIVE openrouter bytedance/ui-tars-1.5-7b
+CURATE_LIVE openrouter google/gemini-2.5-flash-lite
+CURATE_LIVE openrouter qwen/qwen3-235b-a22b-2507
+CURATE_LIVE openrouter switchpoint/router
+CURATE_LIVE openrouter moonshotai/kimi-k2
+CURATE_LIVE openrouter cognitivecomputations/dolphin-mistral-24b-venice-edition:free
+CURATE_LIVE openrouter tencent/hunyuan-a13b-instruct
+CURATE_LIVE openrouter morph/morph-v3-large
+CURATE_LIVE openrouter morph/morph-v3-fast
+CURATE_LIVE openrouter baidu/ernie-4.5-vl-424b-a47b
+CURATE_LIVE openrouter mistralai/mistral-small-3.2-24b-instruct
+CURATE_LIVE openrouter minimax/minimax-m1
+CURATE_LIVE openrouter google/gemini-2.5-flash
+CURATE_LIVE openrouter google/gemini-2.5-pro
+CURATE_LIVE openrouter openai/o3-pro
+CURATE_LIVE openrouter google/gemini-2.5-pro-preview
+CURATE_LIVE openrouter deepseek/deepseek-r1-0528
+CURATE_LIVE openrouter anthropic/claude-opus-4
+CURATE_LIVE openrouter anthropic/claude-sonnet-4
+CURATE_LIVE openrouter google/gemma-3n-e4b-it
+CURATE_LIVE openrouter mistralai/mistral-medium-3
+CURATE_LIVE openrouter google/gemini-2.5-pro-preview-05-06
+CURATE_LIVE openrouter arcee-ai/maestro-reasoning
+CURATE_LIVE openrouter arcee-ai/virtuoso-large
+CURATE_LIVE openrouter arcee-ai/coder-large
+CURATE_LIVE openrouter meta-llama/llama-guard-4-12b
+CURATE_LIVE openrouter qwen/qwen3-30b-a3b
+CURATE_LIVE openrouter qwen/qwen3-8b
+CURATE_LIVE openrouter qwen/qwen3-14b
+CURATE_LIVE openrouter qwen/qwen3-32b
+CURATE_LIVE openrouter qwen/qwen3-235b-a22b
+CURATE_LIVE openrouter openai/o4-mini-high
+CURATE_LIVE openrouter openai/o3
+CURATE_LIVE openrouter openai/o4-mini
+CURATE_LIVE openrouter openai/gpt-4.1
+CURATE_LIVE openrouter openai/gpt-4.1-mini
+CURATE_LIVE openrouter openai/gpt-4.1-nano
+CURATE_LIVE openrouter meta-llama/llama-4-maverick
+CURATE_LIVE openrouter meta-llama/llama-4-scout
+CURATE_LIVE openrouter deepseek/deepseek-chat-v3-0324
+CURATE_LIVE openrouter openai/o1-pro
+CURATE_LIVE openrouter mistralai/mistral-small-3.1-24b-instruct
+CURATE_LIVE openrouter google/gemma-3-4b-it
+CURATE_LIVE openrouter google/gemma-3-12b-it
+CURATE_LIVE openrouter cohere/command-a
+CURATE_LIVE openrouter openai/gpt-4o-mini-search-preview
+CURATE_LIVE openrouter openai/gpt-4o-search-preview
+CURATE_LIVE openrouter rekaai/reka-flash-3
+CURATE_LIVE openrouter google/gemma-3-27b-it
+CURATE_LIVE openrouter thedrummer/skyfall-36b-v2
+CURATE_LIVE openrouter perplexity/sonar-reasoning-pro
+CURATE_LIVE openrouter perplexity/sonar-pro
+CURATE_LIVE openrouter perplexity/sonar-deep-research
+CURATE_LIVE openrouter mistralai/mistral-saba
+CURATE_LIVE openrouter meta-llama/llama-guard-3-8b
+CURATE_LIVE openrouter openai/o3-mini-high
+CURATE_LIVE openrouter aion-labs/aion-1.0
+CURATE_LIVE openrouter aion-labs/aion-1.0-mini
+CURATE_LIVE openrouter aion-labs/aion-rp-llama-3.1-8b
+CURATE_LIVE openrouter qwen/qwen2.5-vl-72b-instruct
+CURATE_LIVE openrouter qwen/qwen-plus
+CURATE_LIVE openrouter openai/o3-mini
+CURATE_LIVE openrouter mistralai/mistral-small-24b-instruct-2501
+CURATE_LIVE openrouter deepseek/deepseek-r1-distill-qwen-32b
+CURATE_LIVE openrouter perplexity/sonar
+CURATE_LIVE openrouter deepseek/deepseek-r1-distill-llama-70b
+CURATE_LIVE openrouter deepseek/deepseek-r1
+CURATE_LIVE openrouter minimax/minimax-01
+CURATE_LIVE openrouter microsoft/phi-4
+CURATE_LIVE openrouter sao10k/l3.1-70b-hanami-x1
+CURATE_LIVE openrouter deepseek/deepseek-chat
+CURATE_LIVE openrouter sao10k/l3.3-euryale-70b
+CURATE_LIVE openrouter openai/o1
+CURATE_LIVE openrouter cohere/command-r7b-12-2024
+CURATE_LIVE openrouter meta-llama/llama-3.3-70b-instruct:free
+CURATE_LIVE openrouter meta-llama/llama-3.3-70b-instruct
+CURATE_LIVE openrouter amazon/nova-lite-v1
+CURATE_LIVE openrouter amazon/nova-micro-v1
+CURATE_LIVE openrouter amazon/nova-pro-v1
+CURATE_LIVE openrouter openai/gpt-4o-2024-11-20
+CURATE_LIVE openrouter mistralai/mistral-large-2407
+CURATE_LIVE openrouter qwen/qwen-2.5-coder-32b-instruct
+CURATE_LIVE openrouter thedrummer/unslopnemo-12b
+CURATE_LIVE openrouter anthropic/claude-3.5-haiku
+CURATE_LIVE openrouter anthracite-org/magnum-v4-72b
+CURATE_LIVE openrouter qwen/qwen-2.5-7b-instruct
+CURATE_LIVE openrouter inflection/inflection-3-productivity
+CURATE_LIVE openrouter inflection/inflection-3-pi
+CURATE_LIVE openrouter thedrummer/rocinante-12b
+CURATE_LIVE openrouter meta-llama/llama-3.2-3b-instruct:free
+CURATE_LIVE openrouter meta-llama/llama-3.2-3b-instruct
+CURATE_LIVE openrouter meta-llama/llama-3.2-1b-instruct
+CURATE_LIVE openrouter meta-llama/llama-3.2-11b-vision-instruct
+CURATE_LIVE openrouter qwen/qwen-2.5-72b-instruct
+CURATE_LIVE openrouter cohere/command-r-plus-08-2024
+CURATE_LIVE openrouter cohere/command-r-08-2024
+CURATE_LIVE openrouter sao10k/l3.1-euryale-70b
+CURATE_LIVE openrouter nousresearch/hermes-3-llama-3.1-70b
+CURATE_LIVE openrouter nousresearch/hermes-3-llama-3.1-405b:free
+CURATE_LIVE openrouter nousresearch/hermes-3-llama-3.1-405b
+CURATE_LIVE openrouter sao10k/l3-lunaris-8b
+CURATE_LIVE openrouter openai/gpt-4o-2024-08-06
+CURATE_LIVE openrouter meta-llama/llama-3.1-8b-instruct
+CURATE_LIVE openrouter meta-llama/llama-3.1-70b-instruct
+CURATE_LIVE openrouter mistralai/mistral-nemo
+CURATE_LIVE openrouter openai/gpt-4o-mini-2024-07-18
+CURATE_LIVE openrouter openai/gpt-4o-mini
+CURATE_LIVE openrouter google/gemma-2-27b-it
+CURATE_LIVE openrouter openai/gpt-4o-2024-05-13
+CURATE_LIVE openrouter openai/gpt-4o
+CURATE_LIVE openrouter meta-llama/llama-3-8b-instruct
+CURATE_LIVE openrouter meta-llama/llama-3-70b-instruct
+CURATE_LIVE openrouter mistralai/mixtral-8x22b-instruct
+CURATE_LIVE openrouter microsoft/wizardlm-2-8x22b
+CURATE_LIVE openrouter openai/gpt-4-turbo
+CURATE_LIVE openrouter anthropic/claude-3-haiku
+CURATE_LIVE openrouter mistralai/mistral-large
+CURATE_LIVE openrouter openai/gpt-4-turbo-preview
+CURATE_LIVE openrouter openai/gpt-3.5-turbo-0613
+CURATE_LIVE openrouter openrouter/auto
+CURATE_LIVE openrouter openai/gpt-3.5-turbo-instruct
+CURATE_LIVE openrouter openai/gpt-3.5-turbo-16k
+CURATE_LIVE openrouter mancer/weaver
+CURATE_LIVE openrouter undi95/remm-slerp-l2-13b
+CURATE_LIVE openrouter gryphe/mythomax-l2-13b
+CURATE_LIVE openrouter openai/gpt-4
+CURATE_LIVE openrouter openai/gpt-3.5-turbo
+CURATE_STALE openrouter deepseek/deepseek-reasoner MODEL_CAPABILITIES
+CURATE_STALE openrouter minimax/minimax-m2.5:free MODEL_CAPABILITIES
+CURATE_STALE openrouter minimax/minimax-m2.5:free available_models
+CURATE_STALE openrouter deepseek/deepseek-reasoner available_models
+
+Curation targets diffed: MODEL_CAPABILITIES, _SUB_AGENT_MODEL_DEFAULTS, EVAL_PROVIDERS, available_models
