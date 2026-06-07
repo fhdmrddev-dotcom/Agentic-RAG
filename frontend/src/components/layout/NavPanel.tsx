@@ -174,35 +174,36 @@ export function NavPanel({
                   </div>
 
                   {/* SEED-064: resting running dot — ambient "this chat is working"
-                      signal. Hidden while hovered (the Stop button takes its place). */}
+                      signal. A short gradient scrim keeps it clear of a long title.
+                      Hidden while hovered (the Stop button takes its place). */}
                   {isRunning && !showActions && (
                     <div
-                      className="absolute inset-y-0 right-0 flex items-center pr-2.5"
+                      className="absolute inset-y-0 right-0 flex items-center pl-6 pr-3 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg pointer-events-none"
                       aria-label="Run in progress"
-                      title="Run in progress"
                     >
                       <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                     </div>
                   )}
 
-                  {/* Actions on hover: Stop (if running) + the rename/delete menu */}
+                  {/* Actions on hover: Stop (if running) + the rename/delete menu.
+                      The gradient scrim fades a long title out behind the buttons so
+                      they never visually collide with the text (SEED-064 polish). */}
                   {showActions && (
-                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pr-1.5">
+                    <div className="absolute inset-y-0 right-0 flex items-center gap-1 pl-10 pr-1.5 bg-gradient-to-l from-sidebar via-sidebar to-transparent rounded-r-lg">
                       {isRunning && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             void streamActions.stopThread(thread.id)
                           }}
-                          className="p-1 rounded-md border border-destructive/40 text-destructive bg-destructive/10 hover:bg-destructive/20 inline-flex transition-colors"
+                          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-destructive/40 text-destructive bg-destructive/15 hover:bg-destructive/25 transition-colors"
                           aria-label="Stop run"
-                          title="Stop run"
                         >
                           <Square className="h-2.5 w-2.5 fill-current" />
                         </button>
                       )}
                       <span
-                        className="p-0.5 rounded-md bg-accent hover:bg-muted inline-flex transition-colors"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent hover:bg-muted cursor-pointer transition-colors"
                         onClick={(e) => {
                           e.stopPropagation()
                           setMenuOpenId(isMenuOpen ? null : thread.id)
