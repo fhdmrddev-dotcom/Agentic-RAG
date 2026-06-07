@@ -49,9 +49,9 @@
 
 ### Cross-Provider Reliability & Eval
 
-- [ ] **EVAL-01**: A cross-provider eval (`scripts/eval_cross_provider.py`, extended) runs a multi-phase workflow on all **6 native providers** and asserts the locked phase sequence completes with correct tool round-trips — wired as the **CI regression gate**. *(SEED-034)*
-- [ ] **EVAL-02**: The harness passes the **4-axis UAT scoreboard** (cross-provider × multi-tool × parallel-thread × long-message) plus a **uvicorn-restart-mid-workflow** smoke per phase type (including mid-`ask_user`). *(SC#10)*
-- [ ] **CONC-01**: `llm_batch_agents` fan-out is bounded by `max_parallel_agents` (default 5) composing with the global Redis-Lua cap (20); a batch phase does not starve app-wide request latency (cross-tab GET stays <50ms). *(SEED-036a)* **Also covers the frontend stream-connection saturation (BUG-260530-01):** with ≥6 concurrent active runs, the HTTP/1.1 6-connection-per-host cap is saturated by one held-open streaming `fetch` per run → 15-30s thread-switch hang; fix = frontend cap-live-streams (only the viewed thread holds a live stream; background runs reconcile on return). Same parallel-thread responsiveness guarantee.
+- [x] **EVAL-01**: A cross-provider eval (`scripts/eval_cross_provider.py`, extended) runs a multi-phase workflow on all **6 native providers** and asserts the locked phase sequence completes with correct tool round-trips — wired as the **CI regression gate**. *(SEED-034)*
+- [x] **EVAL-02**: The harness passes the **4-axis UAT scoreboard** (cross-provider × multi-tool × parallel-thread × long-message) plus a **uvicorn-restart-mid-workflow** smoke per phase type (including mid-`ask_user`). *(SC#10)*
+- [x] **CONC-01**: `llm_batch_agents` fan-out is bounded by `max_parallel_agents` (default 5) composing with the global Redis-Lua cap (20); a batch phase does not starve app-wide request latency (cross-tab GET stays <50ms). *(SEED-036a)* **Also covers the frontend stream-connection saturation (BUG-260530-01):** with ≥6 concurrent active runs, the HTTP/1.1 6-connection-per-host cap is saturated by one held-open streaming `fetch` per run → 15-30s thread-switch hang; fix = frontend cap-live-streams (only the viewed thread holds a live stream; background runs reconcile on return). Same parallel-thread responsiveness guarantee.
 - [x] **TOOL-05
 **: A **tool-count budget guard** at `get_tools()` / per-provider `max_tools` soft ceiling in `MODEL_CAPABILITIES` protects providers (esp. Google) from accuracy degradation past their tool limit; the per-phase whitelist is the structural complement. *(SEED-035)*
 
@@ -139,9 +139,9 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | WORKSPACE-PARITY | Phase 095.1 | Code-complete, pending live verify (D-01/02 panel-fill selector 095.1-01 + TodosSection precedence 095.1-02; D-06 flat Generated-files list 095.1-05; GAP-1 095.1-06 — hasActivity now reaches useDerivedPanel so the derived panel actually renders on no-write_todos runs, honest count badge, real-panel guard test). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
 | RUN-HONESTY | Phase 095.1 | Code-complete, pending live verify (D-04 attribution run-sub + D-05 true reload timer 095.1-03; D-07 deliverable-aware Resume 095.1-05; GAP-2 095.1-07 — live attribution stamped onto the dispatch placeholder + run-sub turn decoupled from iterationCount so live==reload). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
 | PROVIDER-ERR | Phase 095.1 | In progress (Wave 0 classifier shipped 095.1-01; agent_loop wiring in 095.1-04) |
-| EVAL-01 | Phase 096 | Pending |
-| EVAL-02 | Phase 096 | Pending |
-| CONC-01 | Phase 096 | Pending |
+| EVAL-01 | Phase 096 | Complete |
+| EVAL-02 | Phase 096 | Complete |
+| CONC-01 | Phase 096 | Complete |
 
 **Coverage:**
 - v2.8 requirements: 25 active + 1 re-deferred (PARITY-01) — rescoped 2026-06-01 (discuss-093); +3 (WORKSPACE-PARITY / RUN-HONESTY / PROVIDER-ERR) added 2026-06-06 at plan-phase 095.1

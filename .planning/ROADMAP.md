@@ -255,14 +255,14 @@ Plans:
 **Plans**: 8 plans (3 waves)
 
 Plans:
-- [ ] 096-01-PLAN.md — Eval seed substrate: eval_slow_step fn + migration 066 eval_coverage 5-type workflow + [BLOCKING] SQL-editor apply (W1)
-- [ ] 096-02-PLAN.md — D-01 CI structural gate: test_096_ci_workflow_regression (fake gateway adapter at open_stream seam; sequencing/gate-retry/whitelist/resume legs) (W1)
-- [ ] 096-03-PLAN.md — D-06 backend: terminal-site ask_user expiry cleanup + /pending dual-namespace liveness filter (BUG-260605-01) (W1)
-- [ ] 096-04-PLAN.md — D-06 frontend: answerAskUser ApiError + PendingAskCard 404-honesty + created_at countdown (W1)
-- [ ] 096-05-PLAN.md — CONC-01 stream-cap: StreamsProvider thread-keyed LRU-3 pool + eviction bookkeeping + D-10 honest indicators (BUG-260530-01) (W1)
-- [ ] 096-06-PLAN.md — EVAL-01 eval extension: --workflow rows + D-02a ask_user auto-answer + D-04 capability table + D-01 operator-gate docs (W2)
-- [ ] 096-07-PLAN.md — D-08 restart_smoke.py (3 kill points) + conc_probe.py (N=10 fan-out, latency p95, AnyIO budget) (W2)
-- [ ] 096-08-PLAN.md — D-05 model curation: curate_models.py live /models pass + registry/defaults/PROVIDERS/Settings updates + operator approval (W3)
+- [x] 096-01-PLAN.md — Eval seed substrate: eval_slow_step fn + migration 066 eval_coverage 5-type workflow + [BLOCKING] SQL-editor apply (W1)
+- [x] 096-02-PLAN.md — D-01 CI structural gate: test_096_ci_workflow_regression (fake gateway adapter at open_stream seam; sequencing/gate-retry/whitelist/resume legs) (W1)
+- [x] 096-03-PLAN.md — D-06 backend: terminal-site ask_user expiry cleanup + /pending dual-namespace liveness filter (BUG-260605-01) (W1)
+- [x] 096-04-PLAN.md — D-06 frontend: answerAskUser ApiError + PendingAskCard 404-honesty + created_at countdown (W1)
+- [x] 096-05-PLAN.md — CONC-01 stream-cap: StreamsProvider thread-keyed LRU-3 pool + eviction bookkeeping + D-10 honest indicators (BUG-260530-01) (W1)
+- [x] 096-06-PLAN.md — EVAL-01 eval extension: --workflow rows + D-02a ask_user auto-answer + D-04 capability table + D-01 operator-gate docs (W2)
+- [x] 096-07-PLAN.md — D-08 restart_smoke.py (3 kill points) + conc_probe.py (N=10 fan-out, latency p95, AnyIO budget) (W2)
+- [x] 096-08-PLAN.md — D-05 model curation: curate_models.py live /models pass + registry/defaults/PROVIDERS/Settings updates + operator approval (W3)
 **Notes**: CONC-01 covers BOTH backend fan-out fairness (`llm_batch_agents`) AND the frontend stream-connection saturation (BUG-260530-01) — same parallel-thread responsiveness guarantee. The frontend cap-live-streams fix lands here because Phase 094's panel timeline rides the same `run:{run_id}` stream and must not be throttled by held-open background streams. Operator-chosen approach 2026-05-30 (rejected: single multiplexed transport, HTTP/2 serving).
 
 ### Progress
@@ -278,7 +278,7 @@ Plans:
 | 094. Workflow Legibility + Mode Clarity | 5/5 | Complete    | 2026-06-05 |
 | 095. Chat Tool-Card Unification | 5/5 + gap 4/4 | Gap-closure complete (06/07/08/09 ✅); ready for /gsd:verify-work | 2026-06-06 |
 | 095.1 Cross-Provider Run Honesty & Workspace Parity | 5/5 + gap 2/2 | Both gap plans shipped — 095.1-06 (GAP-1 derived-panel reachable) ✅ + 095.1-07 (GAP-2 live attribution + turn live==reload) ✅ 2026-06-06. Base 095.1-01..05 shipped (WORKSPACE-PARITY + RUN-HONESTY + PROVIDER-ERR delivered); GAP-1 closed at unit level (WorkspacePanel.hasActivity reaches useDerivedPanel → derived panel renders for no-write_todos runs); GAP-2 closed at unit level (dispatch response carries resolved model/provider → live attribution stamp; run-sub turn decoupled from iterationCount → live==reload; shared SSE path byte-identical). NEXT: /gsd:verify-work 095.1 (live Chrome-MCP re-UAT of both gaps + 4-axis cross-provider scoreboard) | - |
-| 096. Eval Harness + Cross-Provider Verification + Concurrency | 0/0 | Not started | - |
+| 096. Eval Harness + Cross-Provider Verification + Concurrency | 8/8 | Complete    | 2026-06-07 |
 
 ---
 
