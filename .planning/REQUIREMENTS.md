@@ -18,14 +18,14 @@
 
 - [x] **HARNESS-01
 **: A user can run an agent through an **ordered, locked workflow** with 5 phase types — `programmatic` (pure Python, no LLM), `llm_single` (one call), `llm_agent` (bounded agent loop), `llm_batch_agents` (N parallel sub-agents, merged), `llm_human_input` (pause for user) — where the backend drives transitions and the LLM cannot reorder or skip phases.
-- [ ] **HARNESS-02**: Workflow definitions are **versioned and immutable-on-publish** (`UNIQUE(slug, version)` + `BEFORE UPDATE` DB trigger + FK `ON DELETE RESTRICT`); a published workflow re-runs reproducibly.
+- [x] **HARNESS-02**: Workflow definitions are **versioned and immutable-on-publish** (`UNIQUE(slug, version)` + `BEFORE UPDATE` DB trigger + FK `ON DELETE RESTRICT`); a published workflow re-runs reproducibly. ✅ Phase 090 (migrations 056/057; live blocks A/B/C PASS — checkbox backfilled at v2.8 audit 2026-06-07).
 - [x] **HARNESS-03
 **: A workflow run is **resumable** — phase state persists to Postgres (`workflow_phases`) and survives a uvicorn restart and cross-worker resume via a two-phase write (mark `active` before work, `completed` only after output is durable).
 - [x] **HARNESS-04
 **: Each phase can declare **validation gates** (`json_schema`, `regex_match`, `workspace_file_exists`, `programmatic`) with a **bounded** `on_failure` policy (`fail_run` / `retry` with `max_retries=2` + consecutive-identical-output short-circuit / `skip_to_phase:<slug>`) — a deterministically-failing gate reaches `failed`, never loops forever.
 - [x] **HARNESS-05
 **: Per-phase **tool-whitelist enforcement** lives in `dispatch_tool()` — a tool call outside the current phase's whitelist is refused with a clean `tool_result` on all 6 native providers (no crash, no provider 400); the guard is a literal no-op when no workflow is active (Deep Mode unaffected).
-- [ ] **HARNESS-06**: Every phase transition, gate result, and tool refusal is recorded to an **INSERT-only `harness_audit` trail** the user/operator can inspect.
+- [x] **HARNESS-06**: Every phase transition, gate result, and tool refusal is recorded to an **INSERT-only `harness_audit` trail** the user/operator can inspect. ✅ Phase 090 (migration 059, INSERT-only RLS; live block E PASS; live tool_refused audit re-confirmed at 096 WR-03 — checkbox backfilled at v2.8 audit 2026-06-07).
 - [x] **HARNESS-07**: 2–3 **seed workflow templates** ship (e.g. Research→Summarize, Plan→Execute→Verify) as the end-to-end exercisers and UAT fixtures — v1 workflow authoring is seed/JSONB/API (no visual builder). ✅ Phase 091-07 (migration 061 — 4 seeds, all 5 phase types).
 
 ### Workflow Mode (Deep / Harness)
@@ -118,8 +118,8 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 |-------------|-------|--------|
 | FOUND-03 | Phase 089 | Complete |
 | CF-01 | Phase 089 | Complete |
-| HARNESS-02 | Phase 090 | Pending |
-| HARNESS-06 | Phase 090 | Pending |
+| HARNESS-02 | Phase 090 | Complete (backfilled at v2.8 audit — live-DB gate blocks A/B/C PASS 2026-05-31) |
+| HARNESS-06 | Phase 090 | Complete (backfilled at v2.8 audit — live block E PASS; 096 WR-03 live tool_refused confirm) |
 | HARNESS-01 | Phase 091 | Complete |
 | HARNESS-03 | Phase 091 | Complete |
 | HARNESS-04 | Phase 091 | Complete |
@@ -135,10 +135,10 @@ Mapped during roadmap creation (2026-05-30). Phase numbering continues from v2.7
 | PANEL-08 | Phase 094 | Complete |
 | PANEL-09 | Phase 094 | Complete |
 | A11Y-03 | Phase 094 | Complete |
-| CHAT-04 | Phase 095 | Pending |
-| WORKSPACE-PARITY | Phase 095.1 | Code-complete, pending live verify (D-01/02 panel-fill selector 095.1-01 + TodosSection precedence 095.1-02; D-06 flat Generated-files list 095.1-05; GAP-1 095.1-06 — hasActivity now reaches useDerivedPanel so the derived panel actually renders on no-write_todos runs, honest count badge, real-panel guard test). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
-| RUN-HONESTY | Phase 095.1 | Code-complete, pending live verify (D-04 attribution run-sub + D-05 true reload timer 095.1-03; D-07 deliverable-aware Resume 095.1-05; GAP-2 095.1-07 — live attribution stamped onto the dispatch placeholder + run-sub turn decoupled from iterationCount so live==reload). Live 8-provider Chrome-MCP UAT owned by /gsd:verify-work |
-| PROVIDER-ERR | Phase 095.1 | In progress (Wave 0 classifier shipped 095.1-01; agent_loop wiring in 095.1-04) |
+| CHAT-04 | Phase 095 | Complete (phase closed 2026-06-06: gap-closure 06-09 + WR-01; 3 operator gaps verified FIXED live; 095-HUMAN-UAT 3 PASS/2 PARTIAL/0 issues) |
+| WORKSPACE-PARITY | Phase 095.1 | Complete (verified & closed 2026-06-06 — live re-UAT PASS after GAP-1 095.1-06; all-8-provider DB-verified) |
+| RUN-HONESTY | Phase 095.1 | Complete (verified & closed 2026-06-06 — live re-UAT PASS after GAP-2 095.1-07; BUG-260606-02 + BUG-260518-01 closed) |
+| PROVIDER-ERR | Phase 095.1 | Complete (delivered 095.1-01 + 095.1-04 wiring; 30/30 tests; BUG-260606-01 closed; SEED-057 trade-off recorded) |
 | EVAL-01 | Phase 096 | Complete |
 | EVAL-02 | Phase 096 | Complete |
 | CONC-01 | Phase 096 | Complete |
