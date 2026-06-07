@@ -1528,9 +1528,22 @@ async def send_message(
                     # already wrote finish_run(..., 'completed'). Deep runs
                     # (_active_workflow_run_id is None) skip this entirely
                     # (byte-identical).
+                    #
+                    # 096-09 (UAT Test 2 restart-resumability fix): on a GRACEFUL
+                    # app shutdown, do NOT terminalize — leaving workflow_runs
+                    # 'active' + the thread anchor intact is PRECISELY what makes
+                    # the boot-time resume sweep re-claim and re-drive this run
+                    # (the active phase's output was never durable → re-running it
+                    # from the top is the correct, idempotent resume). Terminalizing
+                    # here (the pre-fix behavior) is what stranded the run. The gate
+                    # is the ONLY change: user-Stop / crash / timeout (flag False)
+                    # still terminalize exactly as before — byte-identical. Deep
+                    # runs are unaffected (_active_workflow_run_id is None).
+                    from app.services.harness_engine import is_app_shutting_down
                     if (
                         _active_workflow_run_id is not None
                         and _terminal_status != "completed"
+                        and not is_app_shutting_down()
                     ):
                         try:
                             from app.db.workflows import finish_run as _finish_wf
@@ -1544,6 +1557,16 @@ async def send_message(
                                 "F2 harness-failure terminalize failed for run %s",
                                 _active_workflow_run_id,
                             )
+                    elif (
+                        _active_workflow_run_id is not None
+                        and _terminal_status != "completed"
+                    ):
+                        # Shutdown path — left resumable on purpose.
+                        logger.info(
+                            "F2 skipped for workflow run %s — app shutting down, "
+                            "left active for the boot-time resume sweep (096-09)",
+                            _active_workflow_run_id,
+                        )
 
                 try:
                     await asyncio.shield(_shielded_finalize())

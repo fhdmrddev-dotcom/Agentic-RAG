@@ -68,6 +68,31 @@ from app.services.ask_user_service import resume_pending_prompt
 
 logger = logging.getLogger(__name__)
 
+# ── App-shutdown flag (096-09 restart-resumability fix / UAT Test 2) ──────────
+# A GRACEFUL uvicorn shutdown (SIGINT/SIGTERM — what dev Ctrl+C and production
+# deploys/restarts use) cancels in-flight harness producers. Without this flag,
+# the F2 backstop (threads.py) terminalizes the workflow_runs row to 'failed' and
+# clears the thread anchor on that cancel — so the boot-time resume sweep
+# (find_resumable_runs needs status active + anchor + an active phase) can NEVER
+# re-claim it. main.py sets this True immediately before cancelling RUN_TASKS, so
+# the producer's finalizer can tell "app is going down, leave me resumable" apart
+# from "user Stop / crash / timeout, terminalize me". A HARD kill (SIGKILL) runs
+# no code at all → row stays active → already resumable; this flag is ONLY about
+# the graceful path. Default False keeps every non-shutdown path byte-identical.
+_APP_SHUTTING_DOWN = False
+
+
+def set_app_shutting_down(value: bool = True) -> None:
+    """Mark the process as shutting down (called from main.py lifespan)."""
+    global _APP_SHUTTING_DOWN
+    _APP_SHUTTING_DOWN = value
+
+
+def is_app_shutting_down() -> bool:
+    """True once the lifespan shutdown has begun cancelling producers."""
+    return _APP_SHUTTING_DOWN
+
+
 # NOTE: ``run_gates`` (harness.validators) and ``parse_skip_target``
 # (harness.reachability) are imported LAZILY inside the functions that use them.
 # A top-level import of anything under the ``app.services.harness`` PACKAGE runs
@@ -842,17 +867,25 @@ async def run_workflow(
             # in flight) + best-effort: cleanup failure never masks the original
             # escape. The process-death case runs no code here by definition —
             # the startup sweep's re-emit contract (Plan 04) is untouched.
-            try:
-                await asyncio.shield(
-                    _expire_pending_ask_user(
-                        pool, getattr(ctx, "thread_id", None), run_id
+            #
+            # 096-09 (UAT Test 2): on a GRACEFUL app shutdown we must NOT expire
+            # the pending prompt — the run stays resumable and the boot-time sweep
+            # re-emits the SAME prompt (resume_pending_prompt). Expiring it here
+            # would make /pending serve nothing and force a fresh prompt on resume.
+            # The flag gate is the ONLY behavior change; user-Stop / crash / timeout
+            # (flag False) still expire exactly as before — byte-identical.
+            if not is_app_shutting_down():
+                try:
+                    await asyncio.shield(
+                        _expire_pending_ask_user(
+                            pool, getattr(ctx, "thread_id", None), run_id
+                        )
                     )
-                )
-            except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
-                logger.exception(
-                    "ask_user expiry cleanup failed on cancel/escape for run %s",
-                    run_id,
-                )
+                except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
+                    logger.exception(
+                        "ask_user expiry cleanup failed on cancel/escape for run %s",
+                        run_id,
+                    )
             raise
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─

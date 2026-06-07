@@ -500,6 +500,24 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     payload = await subscribe_for_response(
         redis, run_id, tool_call_id, float(timeout_seconds)
     )
+
+    # 096-09 (UAT Test 2 restart-resumability fix): a {"kind":"shutdown"} payload
+    # comes ONLY from main.py's broadcast_shutdown_sentinel_to_all (graceful app
+    # shutdown). For a HARNESS llm_human_input phase we must NOT complete with an
+    # empty answer — that would advance/finish the workflow and lose the pending
+    # question. Instead escape via CancelledError so this phase stays 'active' and
+    # the durable prompt row stays pending; the boot-time resume sweep then
+    # re-subscribes + re-emits the SAME prompt and blocks on the answer
+    # (BUG-260605-01). The engine's cancel/escape handler skips prompt-expiry on
+    # shutdown (is_app_shutting_down gate), so the prompt survives the restart.
+    # Deep-mode ask_user (the dispatcher tool) is unaffected — it keeps returning
+    # a normal "interrupted by server shutdown" ToolResult and finalizes.
+    if payload and payload.get("kind") == "shutdown":
+        raise asyncio.CancelledError(
+            "llm_human_input interrupted by server shutdown — phase left active "
+            "for the boot-time resume sweep (096-09)"
+        )
+
     answer = ""
     if payload and payload.get("kind") == "response":
         answer = payload.get("response_text") or ""

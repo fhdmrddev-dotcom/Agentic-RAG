@@ -251,6 +251,19 @@ async def lifespan(app_instance):
 
     yield
 
+    # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
+    # down as the FIRST shutdown step — before the ask_user sentinel broadcast and
+    # the producer-cancel loop below. Set first so there is NO wake-ordering race:
+    # any paused harness producer that the sentinel/cancel wakes will observe the
+    # flag and leave its workflow_runs row active+anchored for the next-boot resume
+    # sweep, instead of terminalizing to 'failed'. Deep runs are unaffected.
+    # Best-effort: a failed import never blocks shutdown.
+    try:
+        from app.services.harness_engine import set_app_shutting_down
+        set_app_shutting_down(True)
+    except Exception:  # noqa: BLE001
+        logger.exception("set_app_shutting_down failed at lifespan shutdown")
+
     # Phase 085 D-085-07 — broadcast ask_user shutdown sentinel BEFORE cancelling
     # the producer tasks below (RESEARCH §A.6 PUBLISH-first ordering). Allows
     # any paused _handle_ask_user calls to return a normal ToolResult
