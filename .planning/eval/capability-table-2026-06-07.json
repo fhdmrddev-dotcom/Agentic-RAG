@@ -1,0 +1,162 @@
+[
+  {
+    "provider": "openai",
+    "model_effective": "gpt-4o",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 49.0,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "anthropic",
+    "model_effective": "claude-haiku-4-5-20251001",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 126.7,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "google",
+    "model_effective": "gemini-3.5-flash",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 156.8,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "openrouter",
+    "model_effective": "gpt-4o",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 42.4,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": false
+  },
+  {
+    "provider": "deepseek",
+    "model_effective": "deepseek-v4-flash",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 117.6,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "moonshot",
+    "model_effective": "kimi-k2.6",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 301.3,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "zhipu",
+    "model_effective": "glm-5-turbo",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 207.9,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  },
+  {
+    "provider": "minimax",
+    "model_effective": "MiniMax-M2.7-highspeed",
+    "workflow_completed": true,
+    "phase_type_results": {
+      "programmatic": "completed",
+      "llm_batch_agents": "completed",
+      "llm_agent": "completed",
+      "llm_human_input": "completed",
+      "llm_single": "completed"
+    },
+    "tool_invocation_fidelity": true,
+    "arg_shape_ok": null,
+    "retry_count": 0,
+    "gate_failures": 0,
+    "wall_clock_s": 177.8,
+    "ask_user_roundtrip_ok": true,
+    "outcome": "completed",
+    "gated": true
+  }
+]
