@@ -26,11 +26,17 @@
  * (D4). On 0-countdown the card renders the calm grey .expired state (D5) — never
  * a crash/hang. All agent-supplied text (prompt, options) and the user's answer
  * render as plain React text children — never as raw HTML (T-087-11).
+ *
+ * 096-04 (BUG-260605-01 / D-06 honesty): the countdown seeds from created_at
+ * when present, so a reconciled stale prompt renders expired on mount (never a
+ * fresh 5:00 for a dead prompt). A 404 on submit (the backend's IDOR-safe "run
+ * not active" answer) flips the card to the expired state with a visible
+ * constant message; other failures show a retryable error line — never silence.
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { useAskUserPrompt, useViewingThread } from "@/providers/StreamsProvider"
-import { answerAskUser } from "@/lib/api"
+import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
 import {
   Dialog,
@@ -55,8 +61,8 @@ const LONG_DRAFT_WORD_THRESHOLD = 60
  * (UI-SPEC Copywriting Contract). A long draft shows a faded-mask preview + a
  * word count + "⤢ Review & edit full draft", which opens a WIDE overlay OVER the
  * chat (never auto-widens the panel — sketch 010-C D4, reuses the 005 overlay
- * pattern). The draft body renders as plain React text children — NEVER
- * dangerouslySetInnerHTML (T-094-05-02 / T-087-11 XSS guard).
+ * pattern). The draft body renders as plain React text children — NEVER as
+ * raw/innerHTML markup (T-094-05-02 / T-087-11 XSS guard).
  *
  * GUARD: callers render this only when a draft string is present — but it also
  * self-guards on an empty draft, returning null (DRAFT-MISSING, DATA-CONTRACT §6).
@@ -162,10 +168,23 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   const [state, setState] = useState<CardState>("pending")
   const [submitting, setSubmitting] = useState(false)
   const [answeredValue, setAnsweredValue] = useState<string>("")
+  // 096-04 (BUG-260605-01): non-404 submit failures surface a visible,
+  // retryable, CONSTANT-string error line — never silence, never raw server text.
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  // 096-04: a 404-driven expiry carries its own honesty message; null → the
+  // default countdown-timeout copy in the expired-state render.
+  const [expiredMessage, setExpiredMessage] = useState<string | null>(null)
 
-  // Countdown — drive the calm .expired state (D5). Recomputed from
-  // timeout_seconds on mount; ticks once a second while pending.
-  const [remaining, setRemaining] = useState<number>(timeout_seconds)
+  // Countdown — drive the calm .expired state (D5). 096-04 (BUG-260605-01):
+  // derive the initial remaining from created_at when present (GET-reconciled
+  // prompts carry it — panel.py:154) so a stale reconciled prompt renders
+  // expired on mount, never a misleading fresh 5:00. SSE-path prompts lack
+  // created_at (genuinely fresh — emission ≈ mount) and honestly seed at
+  // timeout_seconds. Ticks once a second while pending.
+  const initialRemaining = ask.created_at
+    ? Math.max(0, timeout_seconds - Math.floor((Date.now() - Date.parse(ask.created_at)) / 1000))
+    : timeout_seconds
+  const [remaining, setRemaining] = useState<number>(initialRemaining)
 
   useEffect(() => {
     if (state !== "pending") return
@@ -202,6 +221,7 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   const handleSubmit = async () => {
     if (!canSubmit || run_id == null) return
     setSubmitting(true)
+    setSubmitError(null)
     const valueForDisplay = selectedValue
     try {
       await answerAskUser(run_id, {
@@ -213,9 +233,20 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
       // removes the prompt from the store, reactively unmounting this card.
       setAnsweredValue(valueForDisplay)
       setState("answered")
-    } catch {
-      // Leave the card pending so the user can retry; never crash the panel.
+    } catch (err) {
+      // Never crash the panel — and never stay silent (096-04 / BUG-260605-01).
       setSubmitting(false)
+      if (err instanceof ApiError && err.status === 404) {
+        // D-06: the run is terminal — the 404 is the backend's correct
+        // IDOR-safe answer (runs.py anchor-confirm); surface it honestly as
+        // the calm expired state instead of a dead-but-submittable card.
+        setExpiredMessage("This prompt has expired — the run is no longer active")
+        setState("expired")
+      } else {
+        // Transient/unknown failure — leave the card pending so the user can
+        // retry, with a visible constant-string error line.
+        setSubmitError("Couldn't submit your answer — try again.")
+      }
     }
   }
 
@@ -237,9 +268,11 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
         </p>
         {/* IN-05: the card root is already role="status" (a polite live region),
             so this inner line must NOT also carry aria-live — a nested polite
-            region inside role="status" can double-announce. The root announces. */}
+            region inside role="status" can double-announce. The root announces.
+            096-04: a 404-driven expiry renders its own constant honesty message;
+            countdown-driven expiry keeps the timeout copy. */}
         <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]">
-          No response within {formatClock(timeout_seconds)} — agent stopped
+          {expiredMessage ?? `No response within ${formatClock(timeout_seconds)} — agent stopped`}
         </p>
       </div>
     )
@@ -352,6 +385,14 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
           {/* A2: a real run_id has not landed yet → quiet "preparing…" affordance. */}
           {hasAnswer && !runReady ? "Preparing…" : "Send Answer"}
         </button>
+        {/* 096-04: non-404 submit failure — visible + retryable. CONSTANT string,
+            never raw server text (T-096-04-01/02). role="alert" announces the
+            failure; it renders only on error so it never double-announces. */}
+        {submitError && (
+          <p role="alert" className="self-end text-[12px] text-[hsl(var(--destructive))]">
+            {submitError}
+          </p>
+        )}
       </div>
     </div>
   )
