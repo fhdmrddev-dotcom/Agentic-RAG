@@ -1490,7 +1490,21 @@ async def _handle_ask_user(args: dict, ctx: ToolContext) -> ToolResult:
 
         kind = payload.get("kind")
         if kind == "response":
-            return ToolResult(result=payload.get("response_text") or "")
+            # BUG-260607-01: a choice-click answer arrives as
+            # {response_text: "", choice_index: N} — resolving the chosen
+            # option text here is the authoritative defense (the frontend
+            # also sends the resolved text now, but the server must never
+            # hand the model an empty answer when the user actually chose).
+            _resp = (payload.get("response_text") or "").strip()
+            if not _resp and isinstance(options, list):
+                _ci = payload.get("choice_index")
+                try:
+                    _ci = int(_ci)
+                    if 0 <= _ci < len(options):
+                        _resp = str(options[_ci])
+                except (TypeError, ValueError):
+                    pass
+            return ToolResult(result=_resp)
         elif kind == "cancel":
             return ToolResult(result="ask_user cancelled by user stop")
         elif kind == "shutdown":

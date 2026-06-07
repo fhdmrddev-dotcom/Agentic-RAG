@@ -683,6 +683,38 @@ class TestPhaseExecutors:
         assert captured["timeout"] == 300
 
     @pytest.mark.asyncio
+    async def test_human_input_choice_click_resolves_option_text(self):
+        """BUG-260607-01 regression (harness twin of the Deep dispatcher fix):
+        a choice-click answer arrives as {response_text: "", choice_index: N} —
+        the phase must resolve options[N], never advance the workflow on a
+        silently-empty answer."""
+        from app.services.harness import phase_types
+
+        async def _fake_subscribe(redis, run_id, tool_call_id, timeout_seconds):
+            return {"kind": "response", "response_text": "", "choice_index": 1}
+
+        phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
+                        "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
+        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+        assert out["answer"] == "Doc B"
+
+    @pytest.mark.asyncio
+    async def test_human_input_choice_click_out_of_range_stays_empty(self):
+        """BUG-260607-01 guard rail: out-of-range choice_index + empty text
+        degrades to "" (no crash, no wrong option picked)."""
+        from app.services.harness import phase_types
+
+        async def _fake_subscribe(redis, run_id, tool_call_id, timeout_seconds):
+            return {"kind": "response", "response_text": "", "choice_index": 9}
+
+        phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
+                        "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
+        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+        assert out["answer"] == ""
+
+    @pytest.mark.asyncio
     async def test_human_input_clamps_timeout_to_hard_cap(self):
         from app.services.harness import phase_types
         from app.config import settings

@@ -95,7 +95,7 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
     expect(submit).toBeEnabled()
   })
 
-  it("calls answerAskUser(run_id, { tool_call_id, response_text, choice_index }) on submit with run_id present", async () => {
+  it("calls answerAskUser(run_id, { tool_call_id, response_text, choice_index }) on submit with run_id present — a choice-click sends the chosen OPTION TEXT, never \"\" (BUG-260607-01)", async () => {
     const user = userEvent.setup()
     render(<PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />)
     await user.click(screen.getAllByRole("radio")[0])
@@ -103,7 +103,10 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
     await waitFor(() =>
       expect(answerAskUser).toHaveBeenCalledWith("run-ask-1", {
         tool_call_id: "tc-ask-1",
-        response_text: "",
+        // BUG-260607-01 regression guard: the resolved option text rides
+        // response_text — the empty-string body fed the model an empty answer
+        // (run 92c7b64c, 2026-06-07) and the agent re-asked instead of acting.
+        response_text: "prod_sales_2026",
         choice_index: 0,
       }),
     )

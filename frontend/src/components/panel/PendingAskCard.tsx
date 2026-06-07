@@ -226,7 +226,11 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
     try {
       await answerAskUser(run_id, {
         tool_call_id,
-        response_text: hasText ? freeText.trim() : "",
+        // BUG-260607-01: a choice-click answer must carry the chosen option's
+        // TEXT — selectedValue resolves options[choiceIndex] for choices and
+        // freeText for typed answers (the documented contract at the top of
+        // this file). Sending "" for choices fed the model an empty answer.
+        response_text: selectedValue,
         choice_index: hasChoice ? choiceIndex : null,
       })
       // Optimistic green answered state (D4). The ask_user_response SSE then

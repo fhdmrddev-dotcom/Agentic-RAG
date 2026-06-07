@@ -520,7 +520,19 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
 
     answer = ""
     if payload and payload.get("kind") == "response":
-        answer = payload.get("response_text") or ""
+        # BUG-260607-01 (same defense as the Deep dispatcher ask_user handler):
+        # a choice-click answer arrives as {response_text: "", choice_index: N}
+        # — resolve the chosen option text so the workflow never advances on a
+        # silently-empty answer when the user actually chose.
+        answer = (payload.get("response_text") or "").strip()
+        if not answer and options:
+            _ci = payload.get("choice_index")
+            try:
+                _ci = int(_ci)
+                if 0 <= _ci < len(options):
+                    answer = str(options[_ci])
+            except (TypeError, ValueError):
+                pass
 
     return {"text": prompt, "answer": answer, "tool_call_id": tool_call_id}
 

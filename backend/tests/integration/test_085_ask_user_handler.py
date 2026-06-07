@@ -434,6 +434,89 @@ async def test_handle_ask_user_response_publish_returns_text(redis_client):
 
 
 @pytest.mark.asyncio
+async def test_handle_ask_user_choice_click_resolves_option_text(redis_client):
+    """BUG-260607-01 regression: a choice-click answer arrives as
+    ``{"kind": "response", "response_text": "", "choice_index": N}`` — the
+    handler must resolve ``options[N]`` instead of handing the model an empty
+    answer (live run 92c7b64c 2026-06-07: empty result → the agent re-asked
+    the question and ended the turn)."""
+    from app.services.tool_dispatcher import _handle_ask_user
+
+    run_id = uuid4()
+    tcid = "tcid-choice-click"
+    channel = f"ask_user:{run_id}:{tcid}"
+
+    async def _publisher():
+        await asyncio.sleep(0.4)
+        await redis_client.publish(channel, json.dumps({
+            "kind": "response",
+            "response_text": "",
+            "choice_index": 1,
+        }))
+
+    ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
+    pub_task = asyncio.create_task(_publisher())
+
+    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+        try:
+            result = await _handle_ask_user(
+                {
+                    "prompt": "full benchmark or smaller?",
+                    "options": ["Proceed with full benchmark", "Use a smaller maximum size"],
+                    "timeout_seconds": 5,
+                },
+                ctx,
+            )
+        finally:
+            await pub_task
+
+    try:
+        await redis_client.delete(f"ask_user:channels:{run_id}")
+    except Exception:
+        pass
+
+    assert result.result == "Use a smaller maximum size"
+
+
+@pytest.mark.asyncio
+async def test_handle_ask_user_choice_click_out_of_range_stays_empty(redis_client):
+    """BUG-260607-01 guard rail: an out-of-range / malformed choice_index with
+    empty response_text degrades to "" (no crash, no wrong option picked)."""
+    from app.services.tool_dispatcher import _handle_ask_user
+
+    run_id = uuid4()
+    tcid = "tcid-choice-oob"
+    channel = f"ask_user:{run_id}:{tcid}"
+
+    async def _publisher():
+        await asyncio.sleep(0.4)
+        await redis_client.publish(channel, json.dumps({
+            "kind": "response",
+            "response_text": "",
+            "choice_index": 7,
+        }))
+
+    ctx = _build_ctx(redis_client, tool_call_id=tcid, run_id=run_id)
+    pub_task = asyncio.create_task(_publisher())
+
+    with patch("app.services.tool_dispatcher.aexec", AsyncMock(return_value=MagicMock(data=[]))):
+        try:
+            result = await _handle_ask_user(
+                {"prompt": "pick one", "options": ["a", "b"], "timeout_seconds": 5},
+                ctx,
+            )
+        finally:
+            await pub_task
+
+    try:
+        await redis_client.delete(f"ask_user:channels:{run_id}")
+    except Exception:
+        pass
+
+    assert result.result == ""
+
+
+@pytest.mark.asyncio
 async def test_handle_ask_user_cancel_sentinel_returns_cancel_text(redis_client):
     """Test T2-4: PUBLISH ``{"kind": "cancel"}`` → ToolResult('ask_user cancelled by user stop')."""
     from app.services.tool_dispatcher import _handle_ask_user
