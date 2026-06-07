@@ -1,7 +1,7 @@
 ---
 seed_id: SEED-064
 title: Stop control missing for backgrounded / capped-out in-flight runs — user can't reach the working cancel path
-status: planted
+status: IMPLEMENTED — sketch 017 option C built (sidebar dots + hover-Stop + active-runs tray w/ Stop-all); tsc/build clean, net-new test failures 0; AWAITS live verification (run 2+ long chats, navigate away → dots + counter + Stop work)
 planted: 2026-06-07
 phase_origin: Phase 096 live UAT (Test 3 stream-cap storm) — operator-run, DB-verified
 category: B — real defect (frontend UX), slated for the same dedicated fix phase as SEED-063 (operator-approved 2026-06-07)
