@@ -98,7 +98,10 @@ KICKOFF_PROMPT_10 = (
     "carbon capture technology"
 )
 EXPECTED_FANOUT = 10
-MAX_ALLOWED_OVERLAP = 5            # Semaphore(max_parallel_agents) default — phase_types.py:347
+# NOTE (096 review WR-04): the overlap bound is NOT a constant — the fanout_bounded
+# assertion uses the LIVE max_parallel_agents read from the resolved definition's
+# batch phase (Semaphore(max_parallel_agents), phase_types.py:347; default 5), so a
+# --workflow-slug with a lower cap cannot produce a false PASS against a stale 5.
 LATENCY_P95_BUDGET_MS = 50.0       # SC#3 cross-tab GET p95 budget
 
 BACKPRESSURE_INTERVAL_S = 1.0      # GET /admin/backpressure cadence
@@ -673,11 +676,13 @@ def main(argv: list[str] | None = None) -> int:
             ))
         else:
             overlap = max_pairwise_overlap(windows)
-            ok = overlap <= MAX_ALLOWED_OVERLAP and len(windows) == EXPECTED_FANOUT
+            # WR-04: bound against the LIVE max_parallel_agents resolved from the
+            # definition above — never a hardcoded default (false-PASS guard).
+            ok = overlap <= max_parallel and len(windows) == EXPECTED_FANOUT
             results.append(_print_assert(
                 "fanout_bounded", ok,
                 f"sub_runs={len(windows)} (expected {EXPECTED_FANOUT}) "
-                f"max_overlap={overlap} (allowed <= {MAX_ALLOWED_OVERLAP})",
+                f"max_overlap={overlap} (allowed <= {max_parallel})",
             ))
 
         # ── 2. cross_tab_latency — p50/p95/max per probed endpoint ─────────
