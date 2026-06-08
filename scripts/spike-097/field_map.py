@@ -148,7 +148,9 @@ def emit_field_map(
     model: str,
     *,
     correction: str | None = None,
-    max_tokens: int = 4096,
+    max_tokens: int = 16384,  # a full cited register (N rows x 9 fields x 4 provenance attrs)
+    # easily exceeds 4096 output tokens; a low cap truncates the tool JSON and silently
+    # drops `rows` (default_factory=list). 16K fits the bound corpus comfortably.
 ) -> tuple[RiskRegisterFieldMap, dict]:
     """Force one structured emission of the cited field-map (Anthropic native SDK).
 

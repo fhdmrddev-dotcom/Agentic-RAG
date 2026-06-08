@@ -1,0 +1,453 @@
+{
+  "spike": "097-02",
+  "generated_at": "2026-06-08T19:36:41.920806+00:00",
+  "provider": "anthropic (native SDK, forced tool_choice)",
+  "model": "claude-opus-4-8",
+  "model_fallback_errors": [],
+  "retrieval": {
+    "query": "project risks, causes, owners, mitigation, impact, probability, status",
+    "bound_folder_ids": [
+      "75755ec9-5ba7-495b-ad93-7500011cf6f2"
+    ],
+    "retrieved_chunk_count": 5,
+    "avg_similarity": 0.484,
+    "retrieved_chunks": [
+      {
+        "spotlight_id": "chunk-1",
+        "filename": "Project-Meridian-Status-Report-Week09.docx",
+        "chunk_index": 3,
+        "document_id": "b5ae9906-1f74-432a-9da9-8a9fd6954438",
+        "version_number": 1,
+        "similarity": 0.5321
+      },
+      {
+        "spotlight_id": "chunk-2",
+        "filename": "Project-Meridian-Charter-Excerpt.docx",
+        "chunk_index": 2,
+        "document_id": "8b95ddd2-b834-4b25-83df-85f8614c0aed",
+        "version_number": 1,
+        "similarity": 0.5265
+      },
+      {
+        "spotlight_id": "chunk-3",
+        "filename": "Project-Meridian-Status-Report-Week09.docx",
+        "chunk_index": 4,
+        "document_id": "b5ae9906-1f74-432a-9da9-8a9fd6954438",
+        "version_number": 1,
+        "similarity": 0.5222
+      },
+      {
+        "spotlight_id": "chunk-4",
+        "filename": "Project-Meridian-Charter-Excerpt.docx",
+        "chunk_index": 1,
+        "document_id": "8b95ddd2-b834-4b25-83df-85f8614c0aed",
+        "version_number": 1,
+        "similarity": 0.5036
+      },
+      {
+        "spotlight_id": "chunk-5",
+        "filename": "Project-Meridian-Risk-Workshop-Notes.docx",
+        "chunk_index": 0,
+        "document_id": "ab8e2857-e769-47f1-b7f1-359c9e19f46a",
+        "version_number": 1,
+        "similarity": 0.4919
+      }
+    ]
+  },
+  "placeholder_keys": [
+    "project_name",
+    "report_date",
+    "rows"
+  ],
+  "covered_keys": [
+    "project_name",
+    "report_date",
+    "rows"
+  ],
+  "project_name": {
+    "value": "Project Meridian",
+    "source_chunk_id": "chunk-5",
+    "source_doc": "Project-Meridian-Risk-Workshop-Notes.docx",
+    "source_page": null
+  },
+  "report_date": {
+    "value": "Week 9, Thursday",
+    "source_chunk_id": "chunk-5",
+    "source_doc": "Project-Meridian-Risk-Workshop-Notes.docx",
+    "source_page": null
+  },
+  "rows": [
+    {
+      "risk_id": {
+        "value": "M-01",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "event": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "effect": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "probability": {
+        "value": "High",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "impact": {
+        "value": "High",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "A deterministic de-duplication pass plus a validation gate that blocks migration if the duplicate rate exceeds 0.5%.",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Priya Nair (Data Lead)",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "in progress",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      }
+    },
+    {
+      "risk_id": {
+        "value": "M-02 (Integration dependency)",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": "The contract for the third-party policy-rating API has not been finalised by the vendor, Acme Ratings Ltd.",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "event": {
+        "value": "Integration testing in Week 13 cannot start on time.",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "effect": {
+        "value": "A direct slip to the UAT entry date.",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "probability": {
+        "value": "Medium",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "impact": {
+        "value": "High",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "Escalate to vendor account management and prepare a stub-based fallback so internal testing is not blocked.",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Tom Becker (Integration Lead)",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "open and escalating",
+        "source_chunk_id": "chunk-1",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      }
+    },
+    {
+      "risk_id": {
+        "value": "M-03 (Resourcing)",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": "An unresolved allocation conflict (two senior engineers currently shared 50/50 with the parallel Billing programme).",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "event": {
+        "value": "Reduced migration throughput.",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "effect": {
+        "value": "A potential two-week schedule slip.",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "probability": {
+        "value": "Medium",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "impact": {
+        "value": "Medium",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "A dedicated-allocation request has been submitted to the resourcing board.",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Dana Whitfield (PM)",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "mitigating",
+        "source_chunk_id": "chunk-3",
+        "source_doc": "Project-Meridian-Status-Report-Week09.docx",
+        "source_page": null
+      }
+    },
+    {
+      "risk_id": {
+        "value": "SR-01",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": "An unengaged executive sponsor mid-programme.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "event": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "effect": {
+        "value": "Stalled decisions and funding uncertainty.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "probability": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "impact": {
+        "value": null,
+        "source_chunk_id": null,
+        "source_doc": null,
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "Name a deputy sponsor with delegated authority.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Marcus Alvarez (COO)",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "open",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      }
+    },
+    {
+      "risk_id": {
+        "value": "SR-02 (Regulatory approval)",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": "Brightline operates in a regulated insurance market; the cloud platform must pass an information-security assessment before holding customer data, and approval may be delayed.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "event": {
+        "value": "A blocked production cutover.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "effect": {
+        "value": "A schedule slip beyond the 24-week window.",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "probability": {
+        "value": "Low",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "impact": {
+        "value": "High",
+        "source_chunk_id": "chunk-4",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "Engage the regulator early and book the assessment in Week 14.",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Sade Okafor (Security Lead)",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "open",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      }
+    },
+    {
+      "risk_id": {
+        "value": "SR-03 (Legacy decommission dependency)",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "cause": {
+        "value": "A hidden downstream dependency (the legacy CRM also feeds the nightly actuarial reporting batch).",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "event": {
+        "value": "Decommissioning legacy breaks actuarial reporting.",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "effect": {
+        "value": "A gap in regulatory financial reporting.",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "probability": {
+        "value": "Medium",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "impact": {
+        "value": "High",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "response_strategy": {
+        "value": "Map and re-point the downstream feed before decommission.",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "owner": {
+        "value": "Priya Nair (Data Lead)",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      },
+      "status": {
+        "value": "open",
+        "source_chunk_id": "chunk-2",
+        "source_doc": "Project-Meridian-Charter-Excerpt.docx",
+        "source_page": null
+      }
+    }
+  ],
+  "row_count": 6,
+  "filled_value_count": 50,
+  "cited_value_count": 50,
+  "uncited_value_count": 0,
+  "invented_citation_count": 0,
+  "uncited_row_count": 0,
+  "uncited_row_indices": [],
+  "citation_coverage_pct": 100.0,
+  "null_rate": 0.1071,
+  "null_rate_per_field": {
+    "risk_id": 0.0,
+    "cause": 0.1667,
+    "event": 0.3333,
+    "effect": 0.1667,
+    "probability": 0.1667,
+    "impact": 0.1667,
+    "response_strategy": 0.0,
+    "owner": 0.0,
+    "status": 0.0
+  },
+  "multi_version_observed": false,
+  "freshness_note": "3 distinct source file(s); version spread per file: {Project-Meridian-Status-Report-Week09.docx: [1], Project-Meridian-Charter-Excerpt.docx: [1], Project-Meridian-Risk-Workshop-Notes.docx: [1]}. Single version per file — no freshness ambiguity in this corpus.",
+  "attempts": [
+    {
+      "attempt": 1,
+      "model": "claude-opus-4-8",
+      "stop_reason": "tool_use",
+      "input_tokens": 3183,
+      "output_tokens": 4063,
+      "row_count": 6,
+      "uncited_row_count": 0,
+      "uncited_value_count": 0,
+      "invented_citation_count": 0,
+      "citation_coverage_pct": 100.0
+    }
+  ]
+}
