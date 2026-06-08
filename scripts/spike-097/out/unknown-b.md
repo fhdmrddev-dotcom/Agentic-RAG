@@ -52,3 +52,16 @@ The six named failure modes are logged in `out/corruption.log` (the Phase 101 UA
 ## 6. Note for Task 3 (operator real-editor open)
 
 python-docx re-open proves the file PARSES; it does not prove Word/LibreOffice renders it without a repair banner. Task 3 is the operator opening `out/risk-register-filled.docx` in a real editor to confirm: no repair banner, the risk table grew one row per risk, scalar tags filled, and (on the synthetic `-1/-5/-20.docx`) the Score column shows P x I and the `&<>` probe shows as literal text. Their result is appended back to this file + corruption.log.
+
+## Real-editor confirmation (operator-approved 2026-06-09)
+
+**Verdict: APPROVED — opens CLEAN in a real editor.** The operator opened `out/risk-register-filled.docx` in a real editor (Word / LibreOffice) and confirmed:
+
+- **NO "Word needs to repair" banner** — the file opens directly, no recovery prompt. This upgrades Pitfall 3 from "parses via python-docx" to "renders clean in a real editor" — the strongest evidence for unknown (b).
+- **The risk table grew to 6 risk rows** — one row per risk, NOT a single un-repeated template row. The `{%tr %}` body-row repeat that python-docx verified is also what a human sees on screen.
+- **Scalar tags filled** — `project_name` and `report_date` resolved (not left as `{{ ... }}` placeholders).
+- **Blank Score column on the real doc — UNDERSTOOD AND ACCEPTED as expected, NOT a defect.** The real KB states probability/impact as WORDS (High/Medium/Low), which do not parse as ints, so the deterministic `score = P × I` compute correctly leaves the real doc's Score column blank (the synthetic `-1/-5/-20.docx` use numeric P/I and DO show P × I).
+
+### Phase 101 carry-forward — worded likelihood/impact → numeric Score mapping
+
+The blank Score on the real artifact is the one production gap this open surfaced: the deterministic `score = int(probability) × int(impact)` compute assumes numeric P/I, but real risk-register KB content commonly speaks in **High / Medium / Low**. **Phase 101 (TMPL-02/TMPL-03) production template-fill must add a High/Med/Low → numeric mapping** (e.g. Low=1, Medium=2, High=3, or a 5-point scale) so the Score column computes on worded inputs. This stays a deterministic, NON-LLM compute — only the categorical→ordinal mapping is added at context-build time. Until then, a worded-P/I register fills every field EXCEPT Score (a graceful, honest degrade — blank, not wrong).

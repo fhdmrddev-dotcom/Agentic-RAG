@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-09T00:15:00Z"
-last_activity: 2026-06-09 -- Phase 097 Plan 04 complete (unknowns c+d; unknown-d.md + 097-04-SUMMARY.md committed)
+last_updated: "2026-06-09T00:30:00Z"
+last_activity: 2026-06-09 -- Phase 097 Plan 03 complete (unknown b = GO; operator real-editor open confirmed clean; 097-03-SUMMARY.md committed)
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: --phase=097 (--name=spike-risk-register-template-fill-authoring-feel) — EXECUTING
-Plan: 3 of --plans=5 COMPLETE — **Wave 1 fully done** (097-02 unknown a + 097-04 unknowns c+d); next = Wave 2 (097-03 unknown b), then Wave 3 (097-05 go/no-go)
-Status: Executing Phase --phase=097 — Plans 01 + 02 + 04 done (unknown (a) YES; unknown (c) grounding inventory + unknown (d) feel = MIXED); only unknown (b) remains before the go/no-go
-Last activity: 2026-06-09 -- Phase 097 Plan 04 complete (unknowns c+d; unknown-d.md + 097-04-SUMMARY.md committed)
+Plan: 4 of --plans=5 COMPLETE — **Waves 0/1/2 fully done** (097-02 unknown a + 097-04 unknowns c+d + 097-03 unknown b); next = Wave 3 (097-05 go/no-go conclusion)
+Status: Executing Phase --phase=097 — Plans 01 + 02 + 03 + 04 done (unknown (a) YES; unknown (b) GO — operator-confirmed clean real-editor open; unknown (c) grounding inventory + unknown (d) feel = MIXED); all 4 unknowns answered — only the go/no-go conclusion (097-05) remains
+Last activity: 2026-06-09 -- Phase 097 Plan 03 complete (unknown b = GO; operator real-editor open confirmed clean; 097-03-SUMMARY.md committed)
 
 **Plan 097-01 progress (Wave 0) — COMPLETE:**
 
@@ -52,7 +52,15 @@ Last activity: 2026-06-09 -- Phase 097 Plan 04 complete (unknowns c+d; unknown-d
 - **Unknown (d) answer = MIXED.** Good: one sentence → correctly-typed 4-phase pipeline; refine absorbed as intent (no hand-edited JSON); human-confirm inferred from "pause for me to confirm." MIXED because the generator SILENTLY GUESSED on grey areas (substituted non-existent "Acme" folder → "Project Meridian — Risks" without asking; mapped spoken "/Risks subfolder" onto the whole folder — no such subfolder exists). Operator's two conditions for GOOD: (1) a clarify-as-you-go **grey-area validation loop** (surface every ambiguity — unresolvable folder ref / vague scope / unmapped placeholder / missing tool+skill — for user validation; NO silent substitution); (2) **post-build editability** — tweak → new version (immutability per-version, not per-workflow; `WorkflowDefinition.version` + "no-edit-published" already support republishing).
 - **Carry-forward:** Phase 103 (WFAUTH-02) acceptance bars = grey-area validation loop + tweak-to-new-version path (G-2 sketch-gated). Phase 098 (PROJ-02) = bound `folder_scope`/`project_folder_id` + path→id resolution.
 
-**Next action:** `/gsd:execute-phase 097` (continue — Wave 2 Plan 097-03 unknown b [docxtpl end-to-end fill + SSTI-contained render + integrity re-open + row-growth + Pitfall 1–6 log], then Wave 3 Plan 097-05 go/no-go). Phase 097 is a **throwaway spike (SEED-051)** — it answers the 4 schema-shaping unknowns and its output BECOMES the recommended `inputs`/`assets`/`folder_scope` schema shape; **no production schema locks before the spike.** Wave 1 is now fully done (a + c + d answered); only unknown (b) remains. Plan 05 (go/no-go) has a human checkpoint. Throwaway code lives in `scripts/spike-097/` (off the hot files). Single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
+**Plan 097-03 progress (Wave 2, unknown b) — COMPLETE:**
+
+- ✓ Task 1 (commit `19f8bdcc`): `render_docx.py` — `build_context` (deterministic `score = int(P)×int(I)` when numeric, else None — NOT an LLM field) + `render` (docxtpl `DocxTemplate.render(jinja_env=SandboxedEnvironment(autoescape=True))` — SSTI containment T-097-08 + XML-safe `&<>` T-097-09) + `assert_integrity` (python-docx re-open T-097-10 + residual-tag scan T-097-11) + `log_pitfall` writer. Render runs LOCAL in the venv (prod render = sealed Docker sandbox, Phase 101). The LLM produces DATA; docxtpl owns the OOXML bytes.
+- ✓ Task 2 (commit `b109df5b`): `run_spike.py` — the 6-step end-to-end run (parse → bound-scope retrieve → forced-tool field-map → coverage/cite check → render → integrity) produced `out/risk-register-filled.docx` (real KB → real cited field-map → real openable file, the SC#1 artifact; 5 chunks retrieved, 6 cited rows, 100% coverage, 1 table / 7 rows). Synthetic 1/5/20-row growth → 2/6/21 rows (Pitfall 5, the load-bearing surprise — PASS). `&<>` probe (`Acme & <Corp> risk`) survived as literal text (Pitfall 2 — autoescape contained it). `out/corruption.log` = one row per Pitfall 1–6 (all clean) + Pitfall 7 observe-only (single-version corpus) + pptx/xlsx not-exercised seed rows. `out/unknown-b.md` = verdict **YES / GO**.
+- ✓ Task 3 (human-verify checkpoint, **operator-approved 2026-06-09**): operator opened `out/risk-register-filled.docx` in a real editor (Word/LibreOffice) — **NO "needs repair" banner**, risk table grew to **6 risk rows** (one per risk, not a single template row), scalar tags (`project_name`/`report_date`) filled. Blank Score column on the real doc accepted as **expected** (KB states P/I as words High/Med/Low → don't parse to ints for the P×I compute — not a defect). Upgrades Pitfall 3 from "parses via python-docx" to "renders clean in a real editor" — the strongest evidence for unknown (b). Confirmation appended to `corruption.log` + `unknown-b.md`.
+- **Unknown (b) answer = YES / GO.** docxtpl is the recommended fill path for trusted project-library templates (the Phase 101 production target). No deviations.
+- **Phase 101 carry-forwards:** (i) **worded likelihood/impact → numeric Score mapping** (real KB speaks High/Med/Low → real-doc Score blank by design; prod TMPL-02 needs a deterministic categorical→ordinal map); (ii) **coarse table chunking** (Plan 01) reduced workshop-table risk retrieval — register-style tables need finer chunking so every tabulated risk is independently citable; (iii) **pptx/xlsx variable-row growth still unexercised** (docx-first; python-pptx can't grow tables / openpyxl chart-preservation untested — deferred, logged as Phase 101 UAT rows).
+
+**Next action:** `/gsd:execute-phase 097` (continue — **Wave 3 / Plan 097-05 the go/no-go conclusion**). All 4 schema-shaping unknowns are now answered: (a) cited field-map = YES; (b) docxtpl fill = GO (operator-confirmed clean real-editor open); (c) authoring grounding inventory; (d) describe→refine→publish feel = MIXED. Plan 05 writes the milestone go/no-go + the recommended `inputs`/`assets`/`folder_scope` schema shape (the spike's output BECOMES the locked schema — **no production schema locks before the spike**) + consolidates the Phase 101 UAT seed. **Plan 05 carries a human checkpoint.** Phase 097 is a **throwaway spike (SEED-051)**; throwaway code lives in `scripts/spike-097/` (off the hot files); single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
