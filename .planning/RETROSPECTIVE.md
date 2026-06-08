@@ -382,6 +382,68 @@ Living retrospective — updated at each milestone boundary.
 
 ---
 
+## Milestone: v2.8 — Harness Engine & Workflow Mode
+
+**Shipped:** 2026-06-07
+**Phases:** 10 (089-096, incl. inserted refactor 092.5 + inserted live-UAT phase 095.1) | **Plans:** 67
+**Timeline:** 2026-05-30 → 2026-06-07 (9 days)
+**Commits:** 498 (121 feat)
+**LOC delta:** +107,662 / −6,187 across 578 files
+
+### What Was Built
+
+- Agent-loop extraction from the `threads.py` god file into a byte-identical `agent_loop.py` (G-5) + the v2.7 carry-forward UAT sweep (Phase 089)
+- Harness Postgres substrate: versioned immutable-on-publish `workflow_definitions`, `workflow_runs`/`workflow_phases`, INSERT-only `harness_audit`, FK-chain RLS, typed Pydantic phase-config models (migrations 056-060, Phase 090)
+- The Harness Engine: hand-rolled async transition loop (2-phase write + reachability lint + `PHASE_TYPE_REGISTRY`), 5 phase-type executors, 4 validation-gate kinds + bounded retry + step/wall-clock caps, per-phase tool whitelist at `dispatch_tool` (Deep no-op), 4 seed templates — ~80% composition, zero new deps (Phase 091)
+- Dual-mode wiring: per-thread Deep/Harness toggle on `active_workflow_run_id`, server-enforced workflow lock (409), Cancel-clears-in-terminal-txn, SEED-029 Continue affordance (Phase 092)
+- Provider Gateway Extraction (inserted): per-provider dispatch + chunk-normalization lifted into a shared `provider_gateway/` Deep AND the harness consume; `calling_mode` surfaced through the seam — Deep proven byte-identical native-7 (Phase 092.5)
+- Harness cross-provider parity: consume-the-gateway rewrite, shared resolve-never-mutate model-resolver, ask_user round-trip, 3 never-run phase-types completed (`split_topic` → real N-way fan-out), Google `thought_signature` / Moonshot `reasoning_content` / GLM `max_steps` round-trips fixed — D-21 live re-UAT 8/8 (Phase 093)
+- Workflow legibility: live WCAG 2.1 AA phase-timeline + harness RunCard in the panel (`phasesByThread`, PANEL-06 zero chat re-renders), failure-with-reason honesty, mode disambiguation (Phase 094)
+- Chat tool-card unification + cross-provider run honesty: one frame / auto-scroll / no-duplicates / working download (095); deterministic activity-derived panel fill, gateway-boundary 429-vs-billing classification, true reload timer, model attribution, deliverable-aware Resume (inserted Phase 095.1)
+- Eval + concurrency + resumability: `eval_cross_provider.py` CI regression gate, offline harness regression test (caught a live `phase_whitelist`-to-sub-agent security gap), restart-mid-workflow smoke (3 kill points live, incl. graceful-shutdown resumability), `llm_batch_agents` fan-out bound, StreamsProvider LRU-3 stream cap, 8-provider model curation (Phase 096)
+
+### What Worked
+
+- **Composition over new infrastructure** — the harness was ~80% reuse of shipped, cross-provider-tested primitives (`tool_dispatcher`, `task`/`ask_user`, run-backed Redis) with ZERO new dependencies. The deliberate v2.7 investment in those primitives paid off directly; "build the runtime out of parts you've already battle-tested" held.
+- **Byte-identical red-line discipline** — Deep Mode never broke across the 089 extraction, the 092.5 gateway lift, or the 093 consumption, each *proven* (not asserted) via SSE-diff + eval + adversarial-agent residual analysis. A risky 3-phase refactor on the hottest path shipped with zero Deep regression.
+- **Evidence-driven mid-milestone rescope** — when 092-07 live UAT + a comprehensive audit proved the harness only worked on OpenAI, the response was a structural fix (092.5 gateway extraction + rescoped 093), not a pile of per-provider patches. "Investigate first, root-cause over band-aid" turned a substrate bug into one shared home.
+- **Inserting honesty phases from live UAT** — 095.1 was born from 095's all-8-provider UAT surfacing dishonest UX (panel-empty, 429-as-billing, lying timer). Treating "the run lies about what it did" as a real defect worth its own phase, rather than shipping it, is the right bar.
+- **Code review on the substrate caught what green tests missed** — 091 (CAS double-exec under WORKER_COUNT=2 + 64KB output loss), 096 (`phase_whitelist` never propagated to the sub-agent ctx — a real security gap, caught on the CI gate's first run). Adversarial review of the engine earned its keep.
+- **Repeatable verification rituals** — `restart_smoke.py` (3 kill points) + `conc_probe.py` (N=10 fan-out, p95, AnyIO budget) made shutdown/concurrency claims measurable and re-runnable instead of one-shot manual checks.
+
+### What Was Inefficient
+
+- **The harness-OpenAI-only gap surfaced far too late** — wire-format + mock checks passed green through 091/092 while the real cross-provider path failed; it took 092-07 *live* UAT to expose it. This is the SC#10 4-axis lesson re-learned the hard way, and it cost a mid-milestone rescope (092.5 + rescoped 093 + 4 gap plans).
+- **Boundary extracted after building on top of it** — 092.5 (gateway) arguably should have preceded the engine; building the harness on un-extracted provider dispatch baked in the OpenAI-only assumption that 093 then had to unwind.
+- **Persistent gap-closure waves post-"done"** — 092 (+3 gap plans), 093 (+4), 095 (+4), 095.1 (+2): live cross-provider UAT kept surfacing defects after a phase read complete. The plan-time success criteria didn't anticipate the cross-provider failure modes the live runs found.
+- **CONC-01 shipped partial** — cross-tab GET p95 improved 2.9× (8,564 → 2,958 ms) but the <50ms SC stayed unmet; the residual was precisely located (sync stream-create at `provider_gateway/dispatcher.py:94-115`) and deferred to SEED-065-B rather than solved in-milestone.
+- **Greenfield deploy gap** — seed workflow definitions live only in migration INSERTs; `full-schema.sql` (schema-only pg_dump) carries no seed rows, so a from-scratch env has zero workflows (DI-096-01-A, warning-level, carried).
+
+### Patterns Established
+
+- **Provider gateway = one home for all provider logic** — consume, never re-implement; Deep byte-identical is the non-negotiable red line. The seam Phase 093 (and every future provider feature) builds on.
+- **Resolve, never mutate** — model resolution reads the provider's effective settings and resolves a model for the run without writing back to saved settings (kills the stale-id + cross-contamination class).
+- **Run honesty = projection/classification over existing data** — attribution, true timer, error-kind, panel fill are all derived from data already persisted (no migration, no new SSE event, no shared-path edit).
+- **Error classification at the gateway boundary on structured status codes** — 429=rate-limit (always before billing), 401=auth, insufficient_quota=billing, else neutral — never keyword-soup over message text.
+- **Offline CI harness regression via a scripted fake gateway provider** — drives the REAL engine deterministically with no network; caught a security gap on first run and is now a standing gate.
+- **Restart-smoke + conc_probe before a shutdown/concurrency change closes** — a kill-at-each-phase-type ritual + a fan-out/latency probe as the binding evidence.
+
+### Key Lessons
+
+- **SC#10 is load-bearing, and skipping it early is expensive** — the milestone's biggest cost (the mid-flight rescope) traces directly to a cross-provider gap that single-provider wire checks couldn't see. The 4-axis mandate exists *because* of this exact failure mode; honor it at plan time, not at the verifier.
+- **Extract the shared boundary before building on it** — building the engine on un-extracted provider dispatch is what made it OpenAI-only. When a feature will sit on a provider/shared path, audit-and-extract first (G-5 in spirit), then build.
+- **Honesty defects are real defects** — a run that misreports who answered, how long it took, or whether Resume is safe is a trust bug; it earns a phase, not a shrug.
+- **Adversarial code review pays off on substrate code** — the criticals it caught (CAS double-exec, 64KB loss, whitelist-to-sub-agent security gap) were all invisible to passing tests.
+- **Partial-but-measured beats hand-wave** — CONC-01 closed honestly with a re-measured p95, a precisely-located residual, and a tracked seed — far better than a vague "good enough" or a silently-dropped SC.
+
+### Cost Observations
+
+- Model mix: Opus 4.x for orchestration / planning / execution; live cross-provider UAT + restart-smoke + conc_probe operator-driven (Chrome MCP + psycopg2 DB cross-checks against local Supabase :54322)
+- Sessions: many across 9 days — 67 plans / 9 days ≈ 7.4 plans/day
+- Notable: the mid-milestone rescope (092.5 + rescoped 093 + gap waves) and the two inserted phases (092.5, 095.1) were the bulk of the unplanned spend; **498 commits is the highest of any milestone to date** — a signal of how much live-UAT-driven gap closure this provider-surface milestone absorbed
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -395,3 +457,4 @@ Living retrospective — updated at each milestone boundary.
 | v2.5 Deployment Strategy | 16 (1 deferred) | 64 | 4.0 | 10 days |
 | v2.6 Foundation: RAG Quality + Multi-Worker + Polish | 35 | 91 | 2.6 | 16 days |
 | v2.7 Agent Workspace & Panel | 6 | 28 | 4.67 | 3 days |
+| v2.8 Harness Engine & Workflow Mode | 10 | 67 | 6.7 | 9 days |
