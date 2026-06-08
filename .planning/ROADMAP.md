@@ -70,7 +70,7 @@
   3. A written go/no-go on the `docxtpl` fill path plus a recommended `inputs` / `assets` / `folder_scope` schema shape — the spike's output BECOMES the locked schema; nothing is committed before this.
   4. Failure modes observed in the spike (run-split miss, XML corruption, won't-open) are logged as pre-named UAT rows for Phase 101.
 **Plans**: 5 plans (4 waves) — planned 2026-06-08
-- [ ] 097-01-PLAN.md — Wave 0: scaffold scripts/spike-097/ + docxtpl venv install + {%tr %} risk-register.docx template + confirm a real risk-content KB folder (out/spike-config.json)
+- [x] 097-01-PLAN.md — Wave 0: scaffold scripts/spike-097/ + docxtpl venv install + {%tr %} risk-register.docx template + confirm a real risk-content KB folder (out/spike-config.json) — DONE 2026-06-08 (folder 75755ec9… "Project Meridian — Risks" confirmed; synthetic corpus ingested)
 - [ ] 097-02-PLAN.md — Wave 1: unknown (a) — cited Pydantic field-map + bound-scope retrieval + forced-tool emission + coverage/citation check (out/field-map.json, unknown-a.md)
 - [ ] 097-03-PLAN.md — Wave 2: unknown (b) — docxtpl end-to-end fill + SSTI-contained render + integrity re-open + 1/5/20-row growth + Pitfall 1–6 log (out/risk-register-filled.docx, corruption.log, unknown-b.md)
 - [ ] 097-04-PLAN.md — Wave 1: unknowns (c)+(d) — grounded one-shot WorkflowDefinition generation + refine loop + feel verdict (out/transcript.md, unknown-c.md, unknown-d.md)
@@ -221,7 +221,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 0/5 | Not started | - |
+| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 1/5 | In progress | - |
 | 098. Project Binding + Server-Side KB Scope Governance | 0/TBD | Not started | - |
 | 099. Workflow ↔ Skill Composition | 0/TBD | Not started | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |

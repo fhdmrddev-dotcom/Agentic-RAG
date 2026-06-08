@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-08T18:59:26Z"
-last_activity: 2026-06-08 -- Phase 097 Plan 01 PAUSED at Task 3 human-action checkpoint (Tasks 1-2 committed)
+last_updated: "2026-06-08T19:21:00Z"
+last_activity: 2026-06-08 -- Phase 097 Plan 01 COMPLETE (Task 3 human-action resolved; risk-content folder confirmed + synthetic corpus ingested)
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
@@ -27,16 +27,16 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: --phase=097 (--name=spike-risk-register-template-fill-authoring-feel) — EXECUTING
-Plan: 1 of --plans=5 — PAUSED at Task 3 (checkpoint:human-action, blocking)
-Status: Executing Phase --phase=097 — Plan 01 Tasks 1+2 committed; awaiting operator KB-folder confirmation
-Last activity: 2026-06-08 -- Phase 097 Plan 01 paused at Task 3 human-action checkpoint
+Plan: 1 of --plans=5 COMPLETE — next = Wave 1 (097-02 + 097-04, parallelizable)
+Status: Executing Phase --phase=097 — Plan 01 done (all 3 tasks committed); Wave 0 prerequisites satisfied
+Last activity: 2026-06-08 -- Phase 097 Plan 01 complete (Task 3 human-action resolved + committed)
 
-**Plan 097-01 progress (Wave 0):**
+**Plan 097-01 progress (Wave 0) — COMPLETE:**
 - ✓ Task 1 (commit `75be6f92`): scaffolded `scripts/spike-097/`; installed `docxtpl==0.20.2` into the backend venv (venv-only, NOT Dockerfile.sandbox/requirements — Phase 101 does the prod add); generated `templates/risk-register.docx` with `{%tr %}` variable rows. Verified: `get_undeclared_template_variables() == {project_name, report_date, rows}`; throwaway 1/3-row render grows the table + re-opens clean.
-- ✓ Task 2 (commit `5b6a87f3`): `find_risk_folder.py` mirrors `get_supabase()` (service-role, every query filtered by user_id — T-097-01) + `kb.py:186` BFS subtree; wrote `out/kb-folders.json` (4 candidates, max doc_count 5). Resolved test-user `user_id = d8a54002-6a29-4b88-b918-cff2aa4a06d5`.
-- ⏸ Task 3 (BLOCKING human-action): operator must confirm which `folder_id` holds genuine risk content → continuation agent writes `out/spike-config.json` (NOT written yet). Top candidates: `Weekly reports` (5 docs, `2a33b3e3-4904-4671-af1c-d041805ded47`), `DBA` (2, `37380338-2ccd-4eec-84be-645036d37a09`), `Hybrid Search` (2, `0e479f7e-98bc-46d7-90ad-852d0f027d9b`), `Test Wasim` (1, `33358dfe-1ad0-4907-89d2-86cff44808e1`). None match the risk-name heuristic — operator judges semantically, or ingests a small risk corpus first and re-runs `find_risk_folder.py`.
+- ✓ Task 2 (commit `5b6a87f3`): `find_risk_folder.py` mirrors `get_supabase()` (service-role, every query filtered by user_id — T-097-01) + `kb.py:186` BFS subtree; wrote `out/kb-folders.json`. Resolved test-user `user_id = d8a54002-6a29-4b88-b918-cff2aa4a06d5`.
+- ✓ Task 3 (commit `61025148`, human-action resolved): existing KB had NO risk-name-matching folder, so a controlled synthetic corpus was generated (`make_sample_corpus.py` → 3 "Project Meridian" risk `.docx` in `sample-corpus/`) and the operator ingested it into a fresh folder. `find_risk_folder.py` re-ran; `out/spike-config.json` pins the confirmed `folder_id = 75755ec9-5ba7-495b-ad93-7500011cf6f2` ("Project Meridian — Risks", 3 docs / 9 embedded chunks), its `subtree_folder_ids` (bound retrieval scope), `user_id`, and `template_path`. Verify printed `confirmed folder 75755ec9…`. Citation-granularity note carried to Plan 03: one table-heavy doc chunked coarsely (1 chunk).
 
-**Next action:** `/gsd:execute-phase 097`. Phase 097 is a **throwaway spike (SEED-051)** — it answers the 4 schema-shaping unknowns and its output BECOMES the recommended `inputs`/`assets`/`folder_scope` schema shape; **no production schema locks before the spike.** Wave 0 (097-01) pauses for the operator to confirm which KB folder holds risk content; Plan 04 (unknown-d) and Plan 05 (go/no-go) have human checkpoints. Throwaway code lives in `scripts/spike-097/` (off the hot files). Single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
+**Next action:** `/gsd:execute-phase 097` (Wave 1 — Plans 097-02 + 097-04, both consume `out/spike-config.json`). Phase 097 is a **throwaway spike (SEED-051)** — it answers the 4 schema-shaping unknowns and its output BECOMES the recommended `inputs`/`assets`/`folder_scope` schema shape; **no production schema locks before the spike.** Plan 04 (unknown-d) and Plan 05 (go/no-go) have human checkpoints. Throwaway code lives in `scripts/spike-097/` (off the hot files). Single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
@@ -105,7 +105,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Accumulated Context
 
-**Open blockers:** Phase 097 Plan 01 Task 3 — BLOCKING human-action checkpoint: operator must visually confirm which KB folder (from `scripts/spike-097/out/kb-folders.json`) holds genuine risk content before the continuation agent writes `out/spike-config.json` and finishes the plan. Executor MUST NOT pick the folder.
+**Open blockers:** None. (Resolved 2026-06-08: Phase 097 Plan 01 Task 3 human-action checkpoint — operator confirmed folder `75755ec9-5ba7-495b-ad93-7500011cf6f2` "Project Meridian — Risks" and ingested a synthetic risk corpus to ground it; `out/spike-config.json` written + committed `61025148`.)
 
 **Key decisions** (full log in PROJECT.md → Key Decisions): D-v2.8-01 (harness now; Plugin Contract was deferred to v2.9 — **now reframed**: Plugin Contract OFF the v2.9 critical path, value-first Workflow Studio instead, lock `phase_type`+`file_preview` on flagship telemetry as STRETCH Phase 108), GATEWAY-01 (one shared provider gateway, Deep byte-identical — workflows consume it, never re-implement), D-094-UNIFY (panel = single live-execution surface for Deep + Harness), D-095.1 (run honesty = projection/classification over existing data; provider handling at the gateway boundary). New v2.9 design anchors from research: "project = folder" as the single scope object; immutability = "no-edit-published" not "no-grow-format" (additive optional fields keep old workflows validating); LLM produces DATA, deterministic code produces the FILE; output-quality judge gate is a HARD publish blocker.
 
