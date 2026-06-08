@@ -1,15 +1,14 @@
 ---
 gsd_state_version: 1.0
 milestone: v2.9
-milestone_name: "Workflow Studio"
-status: roadmap_created
-stopped_at: "v2.9 roadmap created — ready to plan Phase 097 (spike) 2026-06-08"
-last_updated: "2026-06-08"
-last_activity: 2026-06-08
+milestone_name: Workflow Studio
+status: planning
+last_updated: "2026-06-08T18:24:22.203Z"
+last_activity: "2026-06-08 — Phase 097 (spike) PLANNED: 5 plans in 4 waves; gsd-plan-checker VERIFICATION PASSED first pass (0 issues, 12 dimensions); RESEARCH.md + VALIDATION.md (spike-framed) created. Ready to execute."
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -23,16 +22,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v2.9 Workflow Studio — turn the v2.8 harness into an authorable, KB-grounded, skill-connected workflow capability that produces real deliverables (template-fill). Project management is the flagship demo. **Roadmap created; Phase 097 (spike) is next.**
+**Current focus:** v2.9 Workflow Studio — turn the v2.8 harness into an authorable, KB-grounded, skill-connected workflow capability that produces real deliverables (template-fill). Project management is the flagship demo. **Phase 097 (spike) planned (5 plans) — ready to execute.**
 
 ## Current Position
 
-Phase: 097 — Spike: Risk-Register Template-Fill + Authoring Feel (next, not started)
-Plan: —
-Status: Roadmap created / ready to plan Phase 097
-Last activity: 2026-06-08 — `.planning/ROADMAP.md` created: 8 CORE phases (097–104, incl. spike) + 5 STRETCH (105–109); 100% requirement coverage (14 CORE + 5 STRETCH REQ-IDs mapped, no orphans); REQUIREMENTS.md traceability filled.
+Phase: 097 — Spike: Risk-Register Template-Fill + Authoring Feel (PLANNED — ready to execute)
+Plan: 0/5 complete (5 plans, 4 waves)
+Status: Planned & verified — VERIFICATION PASSED first pass (gsd-plan-checker, 0 issues)
+Last activity: 2026-06-08 — Phase 097 spike planned: RESEARCH.md + VALIDATION.md (spike-framed) + 5 PLAN.md files committed; checker passed clean.
 
-**Next action:** `/gsd:plan-phase 097`. Phase 097 is **spike-first (SEED-051)** — it answers the 4 schema-shaping unknowns and BECOMES the `inputs`/`assets`/`folder_scope` schema; **no production schema locks before the spike.** Phase 103 (Workflows page / NL form editor / live graph) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
+**Next action:** `/gsd:execute-phase 097`. Phase 097 is a **throwaway spike (SEED-051)** — it answers the 4 schema-shaping unknowns and its output BECOMES the recommended `inputs`/`assets`/`folder_scope` schema shape; **no production schema locks before the spike.** Wave 0 (097-01) pauses for the operator to confirm which KB folder holds risk content; Plan 04 (unknown-d) and Plan 05 (go/no-go) have human checkpoints. Throwaway code lives in `scripts/spike-097/` (off the hot files). Single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
@@ -61,6 +60,7 @@ Last activity: 2026-06-08 — `.planning/ROADMAP.md` created: 8 CORE phases (097
 v2.9 = **Workflow Studio** — a value-first reframe of the provisional "Plugin Contract & Extension System." The headline insight from the deep research brief: v2.9 is ~80–90% composition of shipped v2.8 harness primitives; net-new is *authoring UX + a project/scope binding + ephemeral template upload + a small validation-gate library + the Workflows page* — NOT a new runtime, NOT the Plugin Contract.
 
 **5 scope forks resolved:**
+
 1. Scheduled/recurring execution → **DEFERRED** (hard-depends on a budget/spend-ceiling system that doesn't exist; v3.4 territory). v2.9 = author + run on demand. *(Carried as STRETCH Phase 105 with the hard budget prerequisite.)*
 2. Self-serve global sharing + operator role tier → **DEFERRED** (v3.1). v2.9 keeps drafts + per-user publish (RLS already enforces). *(Carried as STRETCH Phase 109.)*
 3. Template-fill magic → **BOTH** patterns: trusted project-library templates use docxtpl/Jinja; arbitrary uploads use non-Jinja run-replace. Spike sets how far the arbitrary path is pushed. *(Phase 097 spike → Phase 101 build.)*
@@ -105,3 +105,5 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 **Key decisions** (full log in PROJECT.md → Key Decisions): D-v2.8-01 (harness now; Plugin Contract was deferred to v2.9 — **now reframed**: Plugin Contract OFF the v2.9 critical path, value-first Workflow Studio instead, lock `phase_type`+`file_preview` on flagship telemetry as STRETCH Phase 108), GATEWAY-01 (one shared provider gateway, Deep byte-identical — workflows consume it, never re-implement), D-094-UNIFY (panel = single live-execution surface for Deep + Harness), D-095.1 (run honesty = projection/classification over existing data; provider handling at the gateway boundary). New v2.9 design anchors from research: "project = folder" as the single scope object; immutability = "no-edit-published" not "no-grow-format" (additive optional fields keep old workflows validating); LLM produces DATA, deterministic code produces the FILE; output-quality judge gate is a HARD publish blocker.
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
+
+**Planned Phase:** 097 (Spike — Risk-Register Template-Fill + Authoring Feel) — 5 plans — 2026-06-08T18:24:22.199Z
