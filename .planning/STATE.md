@@ -2,11 +2,11 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: planning
-last_updated: "2026-06-08T18:24:22.203Z"
-last_activity: "2026-06-08 — Phase 097 (spike) PLANNED: 5 plans in 4 waves; gsd-plan-checker VERIFICATION PASSED first pass (0 issues, 12 dimensions); RESEARCH.md + VALIDATION.md (spike-framed) created. Ready to execute."
+status: executing
+last_updated: "2026-06-08T18:59:26Z"
+last_activity: 2026-06-08 -- Phase 097 Plan 01 PAUSED at Task 3 human-action checkpoint (Tasks 1-2 committed)
 progress:
-  total_phases: 8
+  total_phases: 13
   completed_phases: 0
   total_plans: 5
   completed_plans: 0
@@ -22,14 +22,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v2.9 Workflow Studio — turn the v2.8 harness into an authorable, KB-grounded, skill-connected workflow capability that produces real deliverables (template-fill). Project management is the flagship demo. **Phase 097 (spike) planned (5 plans) — ready to execute.**
+**Current focus:** Phase --phase=097 — --name=spike-risk-register-template-fill-authoring-feel
 
 ## Current Position
 
-Phase: 097 — Spike: Risk-Register Template-Fill + Authoring Feel (PLANNED — ready to execute)
-Plan: 0/5 complete (5 plans, 4 waves)
-Status: Planned & verified — VERIFICATION PASSED first pass (gsd-plan-checker, 0 issues)
-Last activity: 2026-06-08 — Phase 097 spike planned: RESEARCH.md + VALIDATION.md (spike-framed) + 5 PLAN.md files committed; checker passed clean.
+Phase: --phase=097 (--name=spike-risk-register-template-fill-authoring-feel) — EXECUTING
+Plan: 1 of --plans=5 — PAUSED at Task 3 (checkpoint:human-action, blocking)
+Status: Executing Phase --phase=097 — Plan 01 Tasks 1+2 committed; awaiting operator KB-folder confirmation
+Last activity: 2026-06-08 -- Phase 097 Plan 01 paused at Task 3 human-action checkpoint
+
+**Plan 097-01 progress (Wave 0):**
+- ✓ Task 1 (commit `75be6f92`): scaffolded `scripts/spike-097/`; installed `docxtpl==0.20.2` into the backend venv (venv-only, NOT Dockerfile.sandbox/requirements — Phase 101 does the prod add); generated `templates/risk-register.docx` with `{%tr %}` variable rows. Verified: `get_undeclared_template_variables() == {project_name, report_date, rows}`; throwaway 1/3-row render grows the table + re-opens clean.
+- ✓ Task 2 (commit `5b6a87f3`): `find_risk_folder.py` mirrors `get_supabase()` (service-role, every query filtered by user_id — T-097-01) + `kb.py:186` BFS subtree; wrote `out/kb-folders.json` (4 candidates, max doc_count 5). Resolved test-user `user_id = d8a54002-6a29-4b88-b918-cff2aa4a06d5`.
+- ⏸ Task 3 (BLOCKING human-action): operator must confirm which `folder_id` holds genuine risk content → continuation agent writes `out/spike-config.json` (NOT written yet). Top candidates: `Weekly reports` (5 docs, `2a33b3e3-4904-4671-af1c-d041805ded47`), `DBA` (2, `37380338-2ccd-4eec-84be-645036d37a09`), `Hybrid Search` (2, `0e479f7e-98bc-46d7-90ad-852d0f027d9b`), `Test Wasim` (1, `33358dfe-1ad0-4907-89d2-86cff44808e1`). None match the risk-name heuristic — operator judges semantically, or ingests a small risk corpus first and re-runs `find_risk_folder.py`.
 
 **Next action:** `/gsd:execute-phase 097`. Phase 097 is a **throwaway spike (SEED-051)** — it answers the 4 schema-shaping unknowns and its output BECOMES the recommended `inputs`/`assets`/`folder_scope` schema shape; **no production schema locks before the spike.** Wave 0 (097-01) pauses for the operator to confirm which KB folder holds risk content; Plan 04 (unknown-d) and Plan 05 (go/no-go) have human checkpoints. Throwaway code lives in `scripts/spike-097/` (off the hot files). Single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
 
@@ -100,7 +105,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Accumulated Context
 
-**Open blockers:** none.
+**Open blockers:** Phase 097 Plan 01 Task 3 — BLOCKING human-action checkpoint: operator must visually confirm which KB folder (from `scripts/spike-097/out/kb-folders.json`) holds genuine risk content before the continuation agent writes `out/spike-config.json` and finishes the plan. Executor MUST NOT pick the folder.
 
 **Key decisions** (full log in PROJECT.md → Key Decisions): D-v2.8-01 (harness now; Plugin Contract was deferred to v2.9 — **now reframed**: Plugin Contract OFF the v2.9 critical path, value-first Workflow Studio instead, lock `phase_type`+`file_preview` on flagship telemetry as STRETCH Phase 108), GATEWAY-01 (one shared provider gateway, Deep byte-identical — workflows consume it, never re-implement), D-094-UNIFY (panel = single live-execution surface for Deep + Harness), D-095.1 (run honesty = projection/classification over existing data; provider handling at the gateway boundary). New v2.9 design anchors from research: "project = folder" as the single scope object; immutability = "no-edit-published" not "no-grow-format" (additive optional fields keep old workflows validating); LLM produces DATA, deterministic code produces the FILE; output-quality judge gate is a HARD publish blocker.
 
