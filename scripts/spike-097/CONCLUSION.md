@@ -14,7 +14,7 @@
 
 ## DECISION: GO
 
-**(recommended — pending operator confirmation at Plan 05 Task 2)** on the `docxtpl` **trusted-template** fill path, with the named **Conditions** below. The four unknowns are answered, the headline artifact opens clean in a real editor, the variable-row growth surprise (the load-bearing risk, A5) is clean, and the recommended schema shape is additive-optional (zero-migration). This is a **conditional GO** (`go-conditional`): proceed, and carry the conditions the evidence surfaced into Phase 098/100/101/103.
+**Operator-confirmed `go-conditional` (2026-06-09).** GO is **conditional on Conditions 1–8 below.** GO on the `docxtpl` **trusted-template** fill path. The four unknowns are answered, the headline artifact opens clean in a real editor, the variable-row growth surprise (the load-bearing risk, A5) is clean, and the recommended schema shape is additive-optional (zero-migration). This is a **conditional GO** (`go-conditional`): proceed, and carry the eight conditions the evidence + the go/no-go discussion surfaced into Phase 098/100/101/103. The recommended additive-optional `inputs` / `assets` / `folder_scope` shape (now extended with an OUTPUT-side dimension, §3) is the **Phase 098 lock candidate**.
 
 ---
 
@@ -61,7 +61,7 @@ The operator's subjective verdict (the call the spike could not automate — VAL
 
 ## 2. GO / NO-GO (SC#3)
 
-### DECISION: GO  *(recommended — conditional; pending operator confirmation)*
+### DECISION: GO  *(operator-confirmed `go-conditional` — 2026-06-09; conditional on Conditions 1–8 below)*
 
 **On:** the `docxtpl` **trusted, pre-authored library template** fill path (the Phase 101 production target for the trusted path).
 
@@ -80,6 +80,8 @@ The operator's subjective verdict (the call the spike could not automate — VAL
 4. **The Phase 103 authoring loop MUST add (i) a grey-area validation step (no silent substitution) and (ii) a tweak→new-version path** (the operator's two unknown-d conditions; `out/unknown-d.md`). These move the feel from MIXED to GOOD.
 5. **The arbitrary-upload fill path remains an OPEN unknown for Phase 100/101.** This GO covers TRUSTED, pre-authored Jinja templates only. The non-Jinja run-replace path for arbitrary uploads (Phase 101 SC#1's second path) was NOT exercised by the spike and is the harder, separate problem.
 6. **Findings A1 and A5 are recorded explicitly:** **A1** — Anthropic forced tool-use was sufficient; the OpenAI-strict pivot stays documented but **UNUSED** (invoke only if drift appears at scale). **A5** — `{%tr %}` row growth was **clean** at 1/5/20 rows; the single most go/no-go-affecting docx finding landed clean.
+7. **Cross-provider validation MUST cover the FULL native roster — NOT the SC#10 big-4** (operator correction). The spike ran on ONE provider (Anthropic native forced tool-use). The **production field-map emission composes the shared provider gateway**, so the typed/cited field-map structured-output must be validated across **ALL 7 natives — OpenAI, Anthropic, Google, DeepSeek, Moonshot (Kimi), Z.ai/GLM, MiniMax — plus OpenRouter (experimental).** Do NOT collapse this to the SC#10 representative-4. Explicitly cover the two known structured-output traps: (i) **GLM / MiniMax silently DROP native tool-use** → they narrate the field-map as **TEXT** when the model ID misses the case-sensitive `MODEL_CAPABILITIES` registry (structured mode bypassed); (ii) **DeepSeek / Moonshot reasoning models suffer token-budget starvation / truncation** of the structured emission — the same 4096-truncation class the spike already caught on Anthropic (`field-map.json` → `attempts[].output_tokens: 4063`). Provider-specific handling stays at the **service boundary**; the shared fill path never branches. Carry to Phase 098/101 (SC#10).
+8. **Living-document feedback loop — optional OUTPUT re-ingestion so produced artifacts stay live & accurate** (operator insight → **SEED-069**, see "Open design item" below). Workflows that produce **evolving** artifacts (the risk register, generalized) need an optional **OUTPUT re-ingestion** so the *next* run grounds on the latest consolidated version. **CRITICAL framing — the infra ALREADY EXISTS, do NOT rebuild it:** `backend/app/api/documents.py:402-423` = `content_hash` (sha256) dedup (identical re-upload short-circuits `200`, not re-ingested); `:425-449` = filename-keyed versioning (updated content → `version_number+1` AND retires all prior versions from retrieval via `is_latest=False` → "prefer latest" is already wired); `:656` = `POST /documents/{id}/reingest` already exists. **NET-NEW is only:** (a) wire a workflow's finalize step to call the existing upload/reingest API into a target folder; (b) tag workflow-produced docs as **derived/generated** (source-vs-derived provenance, so the AI / quality gate do NOT treat the model's own output as ground-truth — self-feedback amplification guard; this flag does not exist today); (c) a deliberate **scoped exception** to the CLAUDE.md "ingestion is manual upload only" rule (a workflow calling the user-scoped upload API on the user's behalf). Captured as **SEED-069**, linked to **SEED-005** (DM versioning, next milestone) + **GOV-02** (provenance receipt, STRETCH Phase 107).
 
 ---
 
@@ -92,6 +94,16 @@ The operator's subjective verdict (the call the spike could not automate — VAL
 project_folder_id: UUID | None = None          # PROJ-01: project = folder + subtree
 inputs:  list[InputFieldSpec] | None = None    # AI-derived launch form (dynamic@design, fixed@run)
 assets:  list[AssetRef]       | None = None    # Storage-backed workflow-owned templates/refs
+
+# OUTPUT-side dimension — living-document feedback loop (SEED-069; RECOMMENDATION only, additive-optional)
+output_target_folder: UUID | None = None       # where the produced artifact lands (None = no re-ingest)
+reingest_output: bool = False                  # opt-in: feed the produced file back into the KB
+version_policy: Literal["supersede-by-filename","keep-all"] = "supersede-by-filename"
+                                               # "supersede-by-filename" MATCHES the existing
+                                               #   documents.py:425-449 filename-keyed versioning
+                                               #   (new content → version+1, prior versions is_latest=False)
+provenance: Literal["source","derived"] = "source"   # tag workflow-produced docs as "derived"
+                                               #   (self-feedback amplification guard — flag does NOT exist today)
 
 class InputFieldSpec(_StrictBase):
     key: str
@@ -120,6 +132,17 @@ folder_scope: list[UUID] | None = None           # PROJ-02: per-phase retrieval 
 | (i) | Does `InputFieldSpec` need a `template_derived` provenance flag? | **YES — keep it, as a `source` enum value** (`"user" / "kb_auto" / "template_derived"`). The generator reliably distinguished template-placeholder-derived fields (`project_name`/`report_date`/`rows`) from description-derived intent, so authoring-time provenance is worth declaring on the input spec. | `out/transcript.md` (template placeholders used as a distinct grounding source); `out/unknown-c.md` (placeholder set is MUST-HAVE grounding) |
 | (ii) | Does `Cited` provenance belong in `inputs` or only in run OUTPUT? | **Run OUTPUT only.** `inputs` declares the *shape* (keys + types); the live `source_chunk_id`/`source_doc` provenance is a run-time artifact. The field-map JSON carries citations per value at run time, exactly where the `citations_required` gate reads them. | `out/field-map.json` (provenance lives on each run value: `value`+`source_chunk_id`); `out/unknown-a.md` §7 |
 | (iii) | Is `folder_scope` a string path or a resolved id list? | **A BOUND resolved-id list** (`list[UUID]`), with **authoring-time path→id resolution**. A string path is a hint the agent can widen; the engine binds resolved ids via the existing `ToolContext.folder_subtree_ids` seam. The generator must RESOLVE spoken folder names/paths against the real tree at authoring time. | `out/unknown-c.md` "folder_scope shape finding" (scope = resolved id(s), not a string path; `extra="forbid"` rejected an invented key, so scope leaked into prompt text); `out/transcript.md` (id embedded in prompt) |
+
+### Output-side additive dimension (NEW — the living-document feedback loop, SEED-069)
+
+Beyond the launch-form (`inputs`/`assets`/`folder_scope`) dimension the spike validated, the go/no-go discussion surfaced an **OUTPUT-side** additive dimension worth carrying to the Phase 098 lock candidate (RECOMMENDATION only — not committed here, additive-optional, **zero-migration**):
+
+- `output_target_folder: UUID | None` — the folder the produced artifact lands in (None = produce-only, no re-ingest).
+- `reingest_output: bool` (default `False`) — opt-in: feed the produced file back into the KB so the next run grounds on the latest consolidated version.
+- `version_policy: "supersede-by-filename" | "keep-all"` — `"supersede-by-filename"` **matches the existing** filename-keyed versioning already shipped in `backend/app/api/documents.py:425-449` (same filename + new content → `version_number+1`, all prior versions retired from retrieval via `is_latest=False` — "prefer latest" is already wired).
+- `provenance: "source" | "derived"` — classify a workflow-produced doc as `derived` so the AI and the output-quality gate do NOT treat the model's own prior output as ground-truth source (self-feedback amplification guard). **This flag does not exist today** — it is the one genuinely net-new field.
+
+**Why this is mostly already built (don't rebuild):** the underlying dedup / versioning / reingest infra already exists — `documents.py:402-423` (sha256 `content_hash` dedup — identical re-upload short-circuits `200`), `:425-449` (filename-keyed versioning + retire-priors), `:656` (`POST /documents/{id}/reingest`). The only net-new work is the thin wiring + the `provenance` flag + a scoped exception to the CLAUDE.md "ingestion is manual upload only" rule. Full framing in **SEED-069** (`.planning/seeds/SEED-069-living-document-workflow-output-reingestion.md`), linked to **SEED-005** (Enhanced Document Structure / DM versioning, next milestone) + **GOV-02** (per-run provenance receipt, STRETCH Phase 107). See the "Open design item" section below.
 
 **One sharp edge surfaced for the lock (carry-forward, not a blocker):** the retrieval layer does not expose a stable `document_chunks.id` on enriched chunks, so the spike assigned spotlight ids (`chunk-N`). The production `inputs`/citation design should surface a real end-to-end chunk id (`out/unknown-a.md` §7).
 
@@ -162,9 +185,38 @@ This is a **throwaway** spike (SEED-051). It commits NO production surface:
 
 ---
 
+## Open design item — living-document feedback loop (SEED-069)
+
+This is the generalized form of **Condition 8** — an open design item the go/no-go discussion surfaced, captured as **SEED-069** (planted 2026-06-09) and routed to Phase 098 (optional output schema dimension) + Phase 100/101 (output-target wiring).
+
+**The idea.** A workflow that produces an **evolving** artifact (the risk register is the canonical example, but generalize to any recurring deliverable — status report, rolling executive summary, decision log, meeting-notes digest) must be able to feed its output back into the KB as a new **version**, so the *next* run grounds on the latest consolidated state — not just the raw source documents. Without this, the workflow is **stateless**: every run re-derives from sources and forgets what prior runs accumulated, so the produced document can never stay "live and accurate."
+
+**The infra ALREADY EXISTS — do NOT rebuild (operator callout 2026-06-09):**
+
+| Capability | Where | Behavior |
+|---|---|---|
+| Dedup (reject identical) | `documents.py:402-423` | `content_hash = sha256(raw)`; an identical, already-`is_latest`/`completed` file in the same folder short-circuits with `200` — not re-ingested |
+| Versioning (detect updated) | `documents.py:425-449` | same filename + new content → `version_number + 1`; **all prior versions retired from retrieval** (`is_latest=False`) — "prefer latest" is already wired |
+| Re-ingest endpoint | `documents.py:656` | `POST /documents/{id}/reingest` already exists |
+
+So the freshness concern (Pitfall 7, Phase 102) is **less load-bearing than first assumed** — versioned "prefer latest" retrieval is shipped.
+
+**What is actually NET-NEW (the thin slice):** (a) **wiring** — a workflow's finalize step writes its produced file and calls the existing `/documents/upload` (or `/reingest`) into a target folder (filename-keyed versioning auto-creates v2 + retires v1, so living-document behavior comes essentially for free); (b) a **`provenance` flag (source vs derived)** — so the AI and the output-quality gate do NOT treat the model's own prior output as ground-truth source (self-feedback amplification risk — a re-ingested hallucination could compound); this flag **does not exist today**; (c) a **scoped exception** to the CLAUDE.md "ingestion is manual file upload only" rule — a workflow calling the user-scoped upload API on the user's behalf is a *contained* automated path (same endpoint a human upload hits) but crosses that line, so it needs an explicit, scoped decision (not a silent expansion).
+
+**Deliberately NOT in scope (thin slice):** new ingestion/dedup/versioning machinery (exists — wire it); scheduled/automatic re-ingestion on a timer (SEED-014 territory); full DM versioning UX (history browse / diff / restore — that's SEED-005, next milestone).
+
+**Links:** `.planning/seeds/SEED-069-living-document-workflow-output-reingestion.md` → SEED-005 (Enhanced Document Structure / DM versioning, next milestone) + GOV-02 (per-run provenance receipt, STRETCH Phase 107) + Phase 102 (freshness / output-quality gate, the self-feedback amplification guard).
+
+---
+
 ## Operator Sign-Off (Plan 05 Task 2 — checkpoint:decision)
 
-> The recommended decision above is `DECISION: GO` (conditional — `go-conditional`). A continuation agent records the operator's confirmed choice (`go` / `go-conditional` / `no-go`) and any added/removed conditions here, then closes the plan. **Pending operator confirmation.**
+> The operator confirmed the decision at the Plan 05 Task 2 `checkpoint:decision` on **2026-06-09**.
 
-**Confirmed decision:** _pending_
-**Conditions added/removed by operator:** _pending_
+**Confirmed decision:** `go-conditional` — **DECISION: GO**, conditional on **Conditions 1–8** above (§2). The `docxtpl` trusted-template fill path is a GO; the recommended additive-optional `inputs` / `assets` / `folder_scope` shape (now extended with the OUTPUT-side dimension, §3) is the **Phase 098 lock candidate**.
+
+**Conditions added/removed by operator:**
+- Conditions **1–6** kept as drafted.
+- Condition **7 replaced** with the **full-native-roster** version (validate the field-map structured-output across ALL 7 natives + OpenRouter — NOT the SC#10 representative-4 — and explicitly cover the GLM/MiniMax tool-use-drop + DeepSeek/Moonshot reasoning-truncation traps; provider handling at the service boundary, shared fill path never branches).
+- Condition **8 added** — the living-document feedback loop (optional OUTPUT re-ingestion; infra already exists, net-new = wiring + `provenance` flag + scoped manual-upload-rule exception), captured as **SEED-069**.
+- Output-side schema dimension (`output_target_folder` / `reingest_output` / `version_policy` / `provenance`) **added** to the §3 recommendation as additive-optional (zero-migration), backed by the existing `documents.py` dedup/versioning/reingest infra.

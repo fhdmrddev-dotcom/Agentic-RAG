@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-09T00:30:00Z"
-last_activity: 2026-06-09 -- Phase 097 Plan 03 complete (unknown b = GO; operator real-editor open confirmed clean; 097-03-SUMMARY.md committed)
+last_updated: "2026-06-09T01:15:00Z"
+last_activity: 2026-06-09 -- Phase 097 Plan 05 complete (go/no-go = DECISION GO, operator-confirmed go-conditional w/ 8 conditions; SEED-069 planted; 097-05-SUMMARY.md committed) -- ALL 5 plans done -> next = phase 097 verification
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: --phase=097 (--name=spike-risk-register-template-fill-authoring-feel) — EXECUTING
-Plan: 4 of --plans=5 COMPLETE — **Waves 0/1/2 fully done** (097-02 unknown a + 097-04 unknowns c+d + 097-03 unknown b); next = Wave 3 (097-05 go/no-go conclusion)
-Status: Executing Phase --phase=097 — Plans 01 + 02 + 03 + 04 done (unknown (a) YES; unknown (b) GO — operator-confirmed clean real-editor open; unknown (c) grounding inventory + unknown (d) feel = MIXED); all 4 unknowns answered — only the go/no-go conclusion (097-05) remains
-Last activity: 2026-06-09 -- Phase 097 Plan 03 complete (unknown b = GO; operator real-editor open confirmed clean; 097-03-SUMMARY.md committed)
+Phase: --phase=097 (--name=spike-risk-register-template-fill-authoring-feel) — EXECUTED (all 5 plans complete; awaiting phase verification)
+Plan: 5 of --plans=5 COMPLETE — **all waves done** (097-02 unknown a + 097-04 unknowns c+d + 097-03 unknown b + 097-05 go/no-go conclusion). Phase 097 is fully executed; the orchestrator's verify + complete step has NOT run yet.
+Status: Phase --phase=097 fully EXECUTED — all 5 plans done. Deliverable = `scripts/spike-097/CONCLUSION.md`: 4-unknown roll-up + operator-confirmed **DECISION: GO** (`go-conditional`, 8 conditions) + recommended additive-optional `inputs`/`assets`/`folder_scope` schema shape (+ a new OUTPUT-side dimension) = the Phase 098 lock candidate + the Phase 101 UAT seed (6 named pitfalls). SEED-069 (living-document feedback loop) planted. Phase NOT marked complete — that is the verify step.
+Last activity: 2026-06-09 -- Phase 097 Plan 05 complete (go/no-go = DECISION GO, operator-confirmed go-conditional w/ 8 conditions; SEED-069 planted; 097-05-SUMMARY.md committed)
 
 **Plan 097-01 progress (Wave 0) — COMPLETE:**
 
@@ -60,7 +60,13 @@ Last activity: 2026-06-09 -- Phase 097 Plan 03 complete (unknown b = GO; operato
 - **Unknown (b) answer = YES / GO.** docxtpl is the recommended fill path for trusted project-library templates (the Phase 101 production target). No deviations.
 - **Phase 101 carry-forwards:** (i) **worded likelihood/impact → numeric Score mapping** (real KB speaks High/Med/Low → real-doc Score blank by design; prod TMPL-02 needs a deterministic categorical→ordinal map); (ii) **coarse table chunking** (Plan 01) reduced workshop-table risk retrieval — register-style tables need finer chunking so every tabulated risk is independently citable; (iii) **pptx/xlsx variable-row growth still unexercised** (docx-first; python-pptx can't grow tables / openpyxl chart-preservation untested — deferred, logged as Phase 101 UAT rows).
 
-**Next action:** `/gsd:execute-phase 097` (continue — **Wave 3 / Plan 097-05 the go/no-go conclusion**). All 4 schema-shaping unknowns are now answered: (a) cited field-map = YES; (b) docxtpl fill = GO (operator-confirmed clean real-editor open); (c) authoring grounding inventory; (d) describe→refine→publish feel = MIXED. Plan 05 writes the milestone go/no-go + the recommended `inputs`/`assets`/`folder_scope` schema shape (the spike's output BECOMES the locked schema — **no production schema locks before the spike**) + consolidates the Phase 101 UAT seed. **Plan 05 carries a human checkpoint.** Phase 097 is a **throwaway spike (SEED-051)**; throwaway code lives in `scripts/spike-097/` (off the hot files); single provider (Anthropic native; OpenAI-strict documented pivot). Downstream: Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
+**Plan 097-05 progress (Wave 3, go/no-go conclusion) — COMPLETE:**
+
+- ✓ Task 1 (commit `f5f174bc`): drafted `scripts/spike-097/CONCLUSION.md` — the spike deliverable (SC#3): 4-unknown roll-up (a=YES / b=GO / c=grounding inventory / d=MIXED, each claim citing its `out/` artifact) + recommended `DECISION: GO` + recommended additive-optional `inputs`/`assets`/`folder_scope` schema shape (three open questions settled: `template_derived`→`source` enum value; `Cited` provenance→run OUTPUT only; `folder_scope`→BOUND resolved-id list) + the Phase 101 UAT seed (6 named pitfalls + pptx/xlsx deferrals). No `harness.py` edit, no migration, no `backend/` change.
+- ✓ Task 2 (checkpoint:decision resolved 2026-06-09 — operator-confirmed `go-conditional`; finalized this session): updated CONCLUSION.md to **operator-confirmed DECISION: GO** conditional on **Conditions 1–8**. Conditions 1–6 kept; **Condition 7 replaced** with the FULL-native-roster cross-provider version (validate the field-map structured-output across all 7 natives + OpenRouter — NOT the SC#10 representative-4; explicit GLM/MiniMax tool-use-drop + DeepSeek/Moonshot reasoning-truncation traps; provider handling at the service boundary, shared fill path never branches); **Condition 8 added** = living-document feedback loop (optional OUTPUT re-ingestion). Extended the §3 schema recommendation with an **OUTPUT-side dimension** (`output_target_folder` / `reingest_output` / `version_policy` / `provenance`) as the Phase 098 lock candidate (RECOMMENDATION only, zero-migration — leverages the already-shipped `documents.py:402-423`/`:425-449`/`:656` dedup/versioning/reingest infra). Added an "Open design item — living-document feedback loop (SEED-069)" section. `097-05-SUMMARY.md` written (Self-Check: PASS).
+- **SEED-069 planted** (`.planning/seeds/SEED-069-living-document-workflow-output-reingestion.md`): workflows that produce evolving artifacts need optional OUTPUT re-ingestion so the next run grounds on the latest version. CRITICAL — the dedup/versioning/reingest infra ALREADY EXISTS; net-new is only thin wiring + a `derived/source` provenance flag (self-feedback amplification guard) + a scoped exception to the CLAUDE.md manual-upload-only rule. Linked to SEED-005 (DM versioning, next milestone) + GOV-02 (provenance receipt, STRETCH 107).
+
+**Next action:** `/gsd:verify-work 097` — **Phase 097 verification**. All 5 plans are executed (5/5 = 100%); the spike's deliverable exists (`scripts/spike-097/CONCLUSION.md` — operator-confirmed DECISION: GO go-conditional w/ 8 conditions + recommended schema shape = Phase 098 lock candidate + Phase 101 UAT seed). **Phase 097 is NOT yet marked complete** — that is the orchestrator's verify + complete step. Phase 097 is a **throwaway spike (SEED-051)**; throwaway code lives in `scripts/spike-097/` (off the hot files); single provider (Anthropic native; OpenAI-strict documented pivot, UNUSED). Downstream after verify: Phase 098 (PROJ-01/02/GOV-01 — lock the schema candidate incl. the output-side dimension; Condition 7 full-roster cross-provider). Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 

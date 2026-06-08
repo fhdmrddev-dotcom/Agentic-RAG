@@ -74,7 +74,7 @@
 - [x] 097-02-PLAN.md — Wave 1: unknown (a) — cited Pydantic field-map + bound-scope retrieval + forced-tool emission + coverage/citation check (out/field-map.json, unknown-a.md) — DONE 2026-06-08 (verdict YES; 6 KB-grounded rows, 100% citation coverage, 11% decline-rate, 0 invented citations; Anthropic forced-tool held — no OpenAI-strict pivot)
 - [x] 097-03-PLAN.md — Wave 2: unknown (b) — docxtpl end-to-end fill + SSTI-contained render + integrity re-open + 1/5/20-row growth + Pitfall 1–6 log (out/risk-register-filled.docx, corruption.log, unknown-b.md) — DONE 2026-06-09 (verdict YES/GO; {%tr %} grew 1/5/20 → 2/6/21, autoescape contained &<>, SandboxedEnvironment SSTI containment wired, all 6 pitfalls clean; **operator-confirmed clean real-editor open — NO repair banner, 6 grown risk rows, scalar tags filled**; Phase 101 carry-forwards = worded P/I → numeric Score mapping + coarse-table chunking + pptx/xlsx unexercised)
 - [x] 097-04-PLAN.md — Wave 1: unknowns (c)+(d) — grounded one-shot WorkflowDefinition generation + refine loop + feel verdict (out/transcript.md, unknown-c.md, unknown-d.md) — DONE 2026-06-09 (unknown (c): folder tree + tool names + template placeholders = MUST-HAVE grounding, skill registry nice-to-have, PROJ-02 bound folder_scope gap surfaced; unknown (d): feel = MIXED — clarify-as-you-go grey-area validation loop + tweak-to-new-version are Phase 103 conditions for GOOD). Wave 1 fully complete (097-02 + 097-04).
-- [ ] 097-05-PLAN.md — Wave 3: conclusion — go/no-go + recommended inputs/assets/folder_scope schema shape + Phase 101 UAT seed (scripts/spike-097/CONCLUSION.md)
+- [x] 097-05-PLAN.md — Wave 3: conclusion — go/no-go + recommended inputs/assets/folder_scope schema shape + Phase 101 UAT seed (scripts/spike-097/CONCLUSION.md) — DONE 2026-06-09 (operator-confirmed **DECISION: GO** / `go-conditional` w/ 8 conditions: Cond 7 = FULL-native-roster cross-provider validation [all 7 natives + OpenRouter, NOT SC#10 big-4; GLM/MiniMax tool-use-drop + DeepSeek/Moonshot reasoning-truncation traps]; Cond 8 = living-document feedback loop → **SEED-069**; schema candidate extended with an OUTPUT-side dimension [output_target_folder/reingest_output/version_policy/provenance], additive-optional zero-migration = Phase 098 lock candidate; 6-pitfall Phase 101 UAT seed). All 5 plans complete — phase awaits verification.
 **Note**: Spike-first per SEED-051 + build-notes. Stack addition surfaced here: only `docxtpl` is new — add to `backend/Dockerfile.sandbox`, bump `SANDBOX_IMAGE` tag.
 
 ### Phase 098: Project Binding + Server-Side KB Scope Governance
@@ -221,7 +221,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 4/5 | In progress | - |
+| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Executed — awaiting verify | - |
 | 098. Project Binding + Server-Side KB Scope Governance | 0/TBD | Not started | - |
 | 099. Workflow ↔ Skill Composition | 0/TBD | Not started | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
