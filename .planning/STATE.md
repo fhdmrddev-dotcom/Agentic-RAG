@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: ready_to_plan
-last_updated: "2026-06-09T01:15:00Z"
-last_activity: 2026-06-09 -- Phase 097 Plan 05 complete (go/no-go = DECISION GO, operator-confirmed go-conditional w/ 8 conditions; SEED-069 planted; 097-05-SUMMARY.md committed) -- ALL 5 plans done -> next = phase 097 verification
+last_updated: "2026-06-09T01:30:00Z"
+last_activity: 2026-06-09 -- Phase 098 context gathered (discuss-phase; 098-CONTEXT.md committed 9aae09cb; 3 gray areas resolved + 3-agent adversarial verify pass, 4 medium precision fixes applied) -> next = /gsd:plan-phase 098
 progress:
   total_phases: 13
   completed_phases: 1
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase --phase=097 — --name=spike-risk-register-template-fill-authoring-feel
+**Current focus:** Phase 098 — Project Binding + Server-Side KB Scope Governance (context gathered; ready to plan)
 
 ## Current Position
 
 Phase: 098
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-08
+Status: Context gathered — ready to plan
+Last activity: 2026-06-09
 
 **Plan 097-01 progress (Wave 0) — COMPLETE:**
 
@@ -66,7 +66,7 @@ Last activity: 2026-06-08
 - ✓ Task 2 (checkpoint:decision resolved 2026-06-09 — operator-confirmed `go-conditional`; finalized this session): updated CONCLUSION.md to **operator-confirmed DECISION: GO** conditional on **Conditions 1–8**. Conditions 1–6 kept; **Condition 7 replaced** with the FULL-native-roster cross-provider version (validate the field-map structured-output across all 7 natives + OpenRouter — NOT the SC#10 representative-4; explicit GLM/MiniMax tool-use-drop + DeepSeek/Moonshot reasoning-truncation traps; provider handling at the service boundary, shared fill path never branches); **Condition 8 added** = living-document feedback loop (optional OUTPUT re-ingestion). Extended the §3 schema recommendation with an **OUTPUT-side dimension** (`output_target_folder` / `reingest_output` / `version_policy` / `provenance`) as the Phase 098 lock candidate (RECOMMENDATION only, zero-migration — leverages the already-shipped `documents.py:402-423`/`:425-449`/`:656` dedup/versioning/reingest infra). Added an "Open design item — living-document feedback loop (SEED-069)" section. `097-05-SUMMARY.md` written (Self-Check: PASS).
 - **SEED-069 planted** (`.planning/seeds/SEED-069-living-document-workflow-output-reingestion.md`): workflows that produce evolving artifacts need optional OUTPUT re-ingestion so the next run grounds on the latest version. CRITICAL — the dedup/versioning/reingest infra ALREADY EXISTS; net-new is only thin wiring + a `derived/source` provenance flag (self-feedback amplification guard) + a scoped exception to the CLAUDE.md manual-upload-only rule. Linked to SEED-005 (DM versioning, next milestone) + GOV-02 (provenance receipt, STRETCH 107).
 
-**Next action:** `/gsd:verify-work 097` — **Phase 097 verification**. All 5 plans are executed (5/5 = 100%); the spike's deliverable exists (`scripts/spike-097/CONCLUSION.md` — operator-confirmed DECISION: GO go-conditional w/ 8 conditions + recommended schema shape = Phase 098 lock candidate + Phase 101 UAT seed). **Phase 097 is NOT yet marked complete** — that is the orchestrator's verify + complete step. Phase 097 is a **throwaway spike (SEED-051)**; throwaway code lives in `scripts/spike-097/` (off the hot files); single provider (Anthropic native; OpenAI-strict documented pivot, UNUSED). Downstream after verify: Phase 098 (PROJ-01/02/GOV-01 — lock the schema candidate incl. the output-side dimension; Condition 7 full-roster cross-provider). Phase 103 (Workflows page) is **sketch-gated (G-2)** — run `/gsd:sketch` before `/gsd:spec-phase`.
+**Next action:** `/gsd:plan-phase 098` — **Phase 098 planning**. Discuss-phase complete 2026-06-09: `.planning/phases/098-project-binding-server-side-kb-scope-governance/098-CONTEXT.md` committed (`9aae09cb`). 3 gray areas resolved (all operator-accepted): **(1)** output-side schema shapes (`output_target_folder`/`reingest_output`/`version_policy`/`provenance`) **locked-now, behavior-deferred** [D-08]; **(2)** scope-violation = **clip + observable run-log warning** (`scope_violation` event on the existing run-event/`run:{run_id}` channel) + per-phase `folder_scope` **narrow-only enforced at definition-save validate** [D-06/D-07], with the ⊆ assert **GATED no-op when scope is None** to keep Deep byte-identical on the shared `search_documents` path [D-05a]; **(3)** **representative-4** cross-provider in 098, **full native-7 reserved for Phase 101** [D-09]. A 3-agent adversarial verify pass confirmed code seams + source fidelity (0 high) and drove 4 medium precision fixes. **Housekeeping still open:** Phase 097 was never formally run through `/gsd:verify-work 097` + complete — the 098 dependency (097 schema shape) is satisfied by the operator-confirmed CONCLUSION.md, but the 097 verify/complete step remains outstanding. Phase 103 (Workflows page) stays **sketch-gated (G-2)**.
 
 ## Roadmap shape (v2.9, created 2026-06-08)
 
