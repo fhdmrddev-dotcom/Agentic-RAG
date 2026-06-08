@@ -221,7 +221,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Executed — awaiting verify | - |
+| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Complete    | 2026-06-08 |
 | 098. Project Binding + Server-Side KB Scope Governance | 0/TBD | Not started | - |
 | 099. Workflow ↔ Skill Composition | 0/TBD | Not started | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
