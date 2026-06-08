@@ -1,0 +1,38 @@
+[
+  {
+    "folder_id": "2a33b3e3-4904-4671-af1c-d041805ded47",
+    "name": "Weekly reports",
+    "subtree_folder_ids": [
+      "2a33b3e3-4904-4671-af1c-d041805ded47"
+    ],
+    "doc_count": 5,
+    "name_match": false
+  },
+  {
+    "folder_id": "37380338-2ccd-4eec-84be-645036d37a09",
+    "name": "DBA",
+    "subtree_folder_ids": [
+      "37380338-2ccd-4eec-84be-645036d37a09"
+    ],
+    "doc_count": 2,
+    "name_match": false
+  },
+  {
+    "folder_id": "0e479f7e-98bc-46d7-90ad-852d0f027d9b",
+    "name": "Hybrid Search",
+    "subtree_folder_ids": [
+      "0e479f7e-98bc-46d7-90ad-852d0f027d9b"
+    ],
+    "doc_count": 2,
+    "name_match": false
+  },
+  {
+    "folder_id": "33358dfe-1ad0-4907-89d2-86cff44808e1",
+    "name": "Test Wasim",
+    "subtree_folder_ids": [
+      "33358dfe-1ad0-4907-89d2-86cff44808e1"
+    ],
+    "doc_count": 1,
+    "name_match": false
+  }
+]
