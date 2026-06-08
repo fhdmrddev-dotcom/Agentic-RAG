@@ -69,7 +69,12 @@
   2. Each of the 4 unknowns has a written answer: (a) can a model derive input fields from a template? (b) does KB-grounded docx fill produce a clean artifact? (c) what does authoring-time grounding need? (d) does describe→refine→publish *feel* good?
   3. A written go/no-go on the `docxtpl` fill path plus a recommended `inputs` / `assets` / `folder_scope` schema shape — the spike's output BECOMES the locked schema; nothing is committed before this.
   4. Failure modes observed in the spike (run-split miss, XML corruption, won't-open) are logged as pre-named UAT rows for Phase 101.
-**Plans**: TBD
+**Plans**: 5 plans (4 waves) — planned 2026-06-08
+- [ ] 097-01-PLAN.md — Wave 0: scaffold scripts/spike-097/ + docxtpl venv install + {%tr %} risk-register.docx template + confirm a real risk-content KB folder (out/spike-config.json)
+- [ ] 097-02-PLAN.md — Wave 1: unknown (a) — cited Pydantic field-map + bound-scope retrieval + forced-tool emission + coverage/citation check (out/field-map.json, unknown-a.md)
+- [ ] 097-03-PLAN.md — Wave 2: unknown (b) — docxtpl end-to-end fill + SSTI-contained render + integrity re-open + 1/5/20-row growth + Pitfall 1–6 log (out/risk-register-filled.docx, corruption.log, unknown-b.md)
+- [ ] 097-04-PLAN.md — Wave 1: unknowns (c)+(d) — grounded one-shot WorkflowDefinition generation + refine loop + feel verdict (out/transcript.md, unknown-c.md, unknown-d.md)
+- [ ] 097-05-PLAN.md — Wave 3: conclusion — go/no-go + recommended inputs/assets/folder_scope schema shape + Phase 101 UAT seed (scripts/spike-097/CONCLUSION.md)
 **Note**: Spike-first per SEED-051 + build-notes. Stack addition surfaced here: only `docxtpl` is new — add to `backend/Dockerfile.sandbox`, bump `SANDBOX_IMAGE` tag.
 
 ### Phase 098: Project Binding + Server-Side KB Scope Governance
@@ -216,7 +221,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 0/TBD | Not started | - |
+| 097. Spike — Risk-Register Template-Fill + Authoring Feel | 0/5 | Not started | - |
 | 098. Project Binding + Server-Side KB Scope Governance | 0/TBD | Not started | - |
 | 099. Workflow ↔ Skill Composition | 0/TBD | Not started | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
