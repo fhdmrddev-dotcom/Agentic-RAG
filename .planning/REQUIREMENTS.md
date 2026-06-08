@@ -90,11 +90,11 @@
 
 ## Build notes (carried into roadmap)
 
-- **Spike-first (SEED-051):** the first build step is a spike — fill a Risk Register from a KB folder — answering the 4 unknowns that BECOME the schema (can a model derive input fields from a template? does KB-grounded docx fill produce a clean artifact? what does authoring-time grounding need? does describe→refine→publish *feel* good?). **Do NOT pre-commit the `inputs`/`assets`/`folder_scope` schema before this.**
-- **Sketch-first (G-2):** the Workflows page / NL-form editor / live graph go through `/gsd:sketch` before spec/plan. `sketch-findings-agentic-rag` already names these surfaces.
-- **Failure criteria upfront (G-6):** template-fill known failure modes (docx run-split silent miss, unescaped XML corruption, pptx variable-row table can't grow, xlsx chart/image stripping, merged-cell mis-write, produced-file-won't-open) become UAT rows at spec time.
-- **Stack additions:** only `docxtpl` is new (python-docx/pptx/openpyxl/reportlab already in the sandbox). Add it to `backend/Dockerfile.sandbox` and bump the `SANDBOX_IMAGE` tag.
-- **Spec-phase re-confirmations** (against live harness code): (a) are gate verdicts-with-evidence already persisted to the run log? (b) does in-workflow retrieval already take a *bound* folder-scope parameter vs a prompt hint? (c) does the shared gateway uniformly capture token usage across all 7 providers (the spend-meter prerequisite for SCHED-01)?
+- **Spike-first (SEED-051):** the first build step is a spike — fill a Risk Register from a KB folder — answering the 4 unknowns that BECOME the schema (can a model derive input fields from a template? does KB-grounded docx fill produce a clean artifact? what does authoring-time grounding need? does describe→refine→publish *feel* good?). **Do NOT pre-commit the `inputs`/`assets`/`folder_scope` schema before this.** → **Phase 097.**
+- **Sketch-first (G-2):** the Workflows page / NL-form editor / live graph go through `/gsd:sketch` before spec/plan. `sketch-findings-agentic-rag` already names these surfaces. → **Phase 103** (run `/gsd:sketch` before `/gsd:spec-phase`).
+- **Failure criteria upfront (G-6):** template-fill known failure modes (docx run-split silent miss, unescaped XML corruption, pptx variable-row table can't grow, xlsx chart/image stripping, merged-cell mis-write, produced-file-won't-open) become UAT rows at spec time. → **Phase 101.**
+- **Stack additions:** only `docxtpl` is new (python-docx/pptx/openpyxl/reportlab already in the sandbox). Add it to `backend/Dockerfile.sandbox` and bump the `SANDBOX_IMAGE` tag. → surfaced in **Phase 097**, locked in **Phase 101**.
+- **Spec-phase re-confirmations** (against live harness code): (a) are gate verdicts-with-evidence already persisted to the run log? [Phase 102] (b) does in-workflow retrieval already take a *bound* folder-scope parameter vs a prompt hint? [Phase 098] (c) does the shared gateway uniformly capture token usage across all 7 providers (the spend-meter prerequisite for SCHED-01)? [Phase 105].
 
 ---
 
@@ -102,4 +102,26 @@
 
 | REQ-ID | Phase(s) | Status |
 |--------|----------|--------|
-| *(populated by ROADMAP.md)* | | |
+| PROJ-01 | Phase 098 | Pending |
+| PROJ-02 | Phase 098 | Pending |
+| GOV-01 | Phase 098 | Pending |
+| WFSKILL-01 | Phase 099 | Pending |
+| TMPL-01 | Phase 100 | Pending |
+| TMPL-02 | Phase 101 | Pending |
+| TMPL-03 | Phase 101 | Pending |
+| GATE-01 | Phase 102 | Pending |
+| QUAL-01 | Phase 102 | Pending |
+| WFAUTH-01 | Phase 103 | Pending |
+| WFAUTH-02 | Phase 103 | Pending |
+| WFAUTH-03 | Phase 103 | Pending |
+| WFAUTH-04 | Phase 103 | Pending |
+| PM-01 | Phase 104 | Pending |
+| SCHED-01 (STRETCH) | Phase 105 | Pending |
+| GRID-01 (STRETCH) | Phase 106 | Pending |
+| GOV-02 (STRETCH) | Phase 107 | Pending |
+| PLUG-01 (STRETCH) | Phase 108 | Pending |
+| ROLE-01 (STRETCH) | Phase 109 | Pending |
+
+**Spike note:** Phase 097 (SEED-051 spike) closes no REQ-ID directly — it precedes the schema lock and informs PROJ / TMPL / WFAUTH. Its output BECOMES the `inputs`/`assets`/`folder_scope` schema shape.
+
+**Coverage:** 14/14 CORE requirements mapped (each to exactly one phase) + 5/5 STRETCH requirements mapped. No orphans, no duplicates.
