@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: planning
-last_updated: "2026-06-09T22:14:56.310Z"
-last_activity: 2026-06-10 -- Phase 099 context gathered (discuss-phase)
+status: executing
+last_updated: "2026-06-09T23:27:04.366Z"
+last_activity: 2026-06-09 -- Phase 099 Plan 01 complete (skill-composition data contract)
 progress:
   total_phases: 13
   completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 100
+  total_plans: 14
+  completed_plans: 11
+  percent: 79
 ---
 
 # Project State
@@ -22,14 +22,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 099 — workflow ↔ skill composition
+**Current focus:** Phase 099 — workflow-skill-composition
 
 ## Current Position
 
-Phase: 099
-Plan: Not started
-Status: Context gathered — ready to plan
-Last activity: 2026-06-10 -- Phase 099 context gathered (12 decisions, 4 gray areas; resume file: .planning/phases/099-workflow-skill-composition/099-CONTEXT.md)
+Phase: 099 (workflow-skill-composition) — EXECUTING
+Plan: 2 of 4
+Status: Plan 01 complete — ready to execute Plan 02 (_skill_block + auto-whitelist)
+Last activity: 2026-06-09 -- Phase 099 Plan 01 complete
+
+**Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
+
+- ✓ Task 1 (commit `536a5cc5`): `backend/tests/test_099_skill_composition.py` — the 10 cross-plan TDD stubs (SC#1/SC#2/SC#3): 2 GREEN-this-plan + 8 `xfail(strict=False)` for Plans 02/03/04, plus a local `_FakeStorage` download/upload recorder + `_FakeSkillsDB`/live-skill query fakes for the downstream rows.
+- ✓ Task 2 (commit `81d0c5d3`, TDD GREEN): `SkillSnapshot(_StrictBase)` model (`skill_id`/`name`/`description`/`instructions`/`files`/`storage_prefix`) defined ABOVE the phase configs (forward-ref resolution under `from __future__ import annotations`); `skill_ref` + `skill_snapshot` additive-optional on all 3 LLM configs (zero-migration Pitfall 2 — pre-099 rows still `model_validate()`); `_skill_snapshot_requires_ref` sibling structural validator rejects snapshot-without-ref (T-099-06, pure shape).
+- ✓ Task 3 (commit `fcae5df0`, TDD GREEN): `ToolContext.skill_snapshot: Any = None` at the dataclass tail (after `workflow_run_id`); kept `Any` to avoid a harness-model import on the dispatcher hot path; `_handle_read_skill_file` UNCHANGED → Deep dispatch byte-identical (SC#3). `test_099_skill_composition.py` exits 0 (2 passed / 7 xfailed / 1 xpassed); harness/098 regression suites 22/22; full-suite net-new failures = 0 (114=114 pre-existing rot).
+- **No deviations.** WFSKILL-01 stays OPEN in REQUIREMENTS.md (the data contract landed; the actual composition behavior ships in Plans 02-04 — requirement marks complete at phase close).
+- **Next:** `/gsd:execute-phase 099` Plan 02 (`_skill_block` composition + `_build_phase_tool_context` auto-whitelist).
 
 ### Recent Completed Phases
 
@@ -149,4 +157,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 098 (project-binding-server-side-kb-scope-governance) — 5 plans — 2026-06-09T04:00:22.894Z
+**Planned Phase:** 099 (workflow-skill-composition) — 4 plans — 2026-06-09T23:00:12.316Z

@@ -15,7 +15,8 @@
 - [x] **PROJ-02**: A bound workflow's KB retrieval scope defaults to its project folder subtree; an optional per-phase `folder_scope` narrows retrieval for that phase. Scope comes from the binding, not a prompt hint.
 
 ### WFSKILL — Skill ↔ workflow composition
-- [ ] **WFSKILL-01**: An `llm_agent` / `llm_single` phase can reference a skill via an optional `skill_ref`; the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted. The skill version is snapshotted into the locked definition so a later edit/delete can't break a published workflow. *(Deep path byte-identical.)*
+- [ ] **WFSKILL-01
+**: An `llm_agent` / `llm_single` phase can reference a skill via an optional `skill_ref`; the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted. The skill version is snapshotted into the locked definition so a later edit/delete can't break a published workflow. *(Deep path byte-identical.)*
 
 ### TMPL — Template-fill
 - [ ] **TMPL-01**: A user can upload a template (docx/pptx/xlsx) into a thread **temporarily** — workspace-only, TTL + cron sweep, RLS-scoped, **never ingested into the KB and never appearing in search**. *(Also closes the injection-via-uploaded-doc vector.)*
