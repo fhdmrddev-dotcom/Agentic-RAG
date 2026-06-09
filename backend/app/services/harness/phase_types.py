@@ -175,6 +175,20 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
             "producer, startup-sweep resume, POST /continue resume) MUST set "
             "producer_run_id."
         )
+    # 098 PROJ-02 — per-phase folder_scope narrowing (the single ToolContext-build
+    # seam). The resolved PROJECT subtree (ctx.folder_subtree_ids, bound server-side
+    # at run-start) is narrowed by the phase's declared folder_scope (∩, narrow-ONLY).
+    # This is DEFENSIVE: the narrow-only *validity* of _phase_scope is enforced upstream
+    # by scope.assert_folder_scopes_subset (run-start, Plan 04), so the intersection
+    # never silently "fixes" an invalid scope — it only restricts to the declared subset.
+    # Keep the channel a list (Pitfall 1: a set would raise in supabase-py json.dumps on
+    # the RPC p_folder_ids param). None project subtree (unbound / Deep) → None (no narrowing).
+    _proj = getattr(ctx, "folder_subtree_ids", None)            # the resolved project subtree (or None)
+    _phase_scope = getattr(phase.config, "folder_scope", None)  # PROJ-02 resolved id list (or None on non-retrieval phases)
+    _effective = (
+        [f for f in _proj if f in set(map(str, _phase_scope))]  # narrow-only ∩ — keep a list (Pitfall 1)
+        if _proj is not None and _phase_scope else _proj
+    )
     return ToolContext(
         redis=getattr(ctx, "redis", None),
         run_id=_producer_id,
@@ -183,7 +197,7 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         pool=getattr(ctx, "pool", None),
         user_settings=getattr(ctx, "user_settings", None),
         current_user=getattr(ctx, "current_user", None) or {},
-        folder_subtree_ids=getattr(ctx, "folder_subtree_ids", None),
+        folder_subtree_ids=_effective,
         scoped_folder_path=getattr(ctx, "scoped_folder_path", None),
         emit=getattr(ctx, "emit", None),
         spawn=getattr(ctx, "spawn", None),
