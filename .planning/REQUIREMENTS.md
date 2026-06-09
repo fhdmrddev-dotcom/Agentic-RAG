@@ -11,8 +11,8 @@
 ## CORE Requirements (the milestone is incomplete without these)
 
 ### PROJ — Project & scope binding
-- [ ] **PROJ-01**: A workflow can be bound to a project (= a folder + its subtree) via an optional `project_folder_id`; the Workflows library can be filtered to a project. *(Additive optional field on `WorkflowDefinition`; zero-migration, old workflows still validate.)*
-- [ ] **PROJ-02**: A bound workflow's KB retrieval scope defaults to its project folder subtree; an optional per-phase `folder_scope` narrows retrieval for that phase. Scope comes from the binding, not a prompt hint.
+- [x] **PROJ-01**: A workflow can be bound to a project (= a folder + its subtree) via an optional `project_folder_id`; the Workflows library can be filtered to a project. *(Additive optional field on `WorkflowDefinition`; zero-migration, old workflows still validate.)*
+- [x] **PROJ-02**: A bound workflow's KB retrieval scope defaults to its project folder subtree; an optional per-phase `folder_scope` narrows retrieval for that phase. Scope comes from the binding, not a prompt hint.
 
 ### WFSKILL — Skill ↔ workflow composition
 - [ ] **WFSKILL-01**: An `llm_agent` / `llm_single` phase can reference a skill via an optional `skill_ref`; the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted. The skill version is snapshotted into the locked definition so a later edit/delete can't break a published workflow. *(Deep path byte-identical.)*
@@ -35,7 +35,7 @@
 - [ ] **GATE-01**: A reusable library of validator kinds is available to any phase, each riding the existing gate + bounded-retry loop: `citations_required` (deterministically reject uncited register rows before any judge call), `freshness` (a guaranteed-first "check the date first" preflight that branches to `ask_user` on stale/multiple versions), `structure_check`, `output_file_valid` (re-open the produced file), `llm_judge_rubric`.
 
 ### GOV — Governance / safety
-- [ ] **GOV-01**: Retrieval scope (`scope_folder_ids`) is resolved **server-side from the user's RLS context** at run start and bound to every retrieval call as a parameter the model cannot widen; retrieved `folder_id`s are asserted ⊆ scope (RLS as backstop). Read-untrusted-content and act/export stay separable across phases via the per-phase tool whitelist.
+- [x] **GOV-01**: Retrieval scope (`scope_folder_ids`) is resolved **server-side from the user's RLS context** at run start and bound to every retrieval call as a parameter the model cannot widen; retrieved `folder_id`s are asserted ⊆ scope (RLS as backstop). Read-untrusted-content and act/export stay separable across phases via the per-phase tool whitelist.
 
 ### PM — Flagship content pack
 - [ ] **PM-01**: A PM flagship content pack ships — example templates (project charter / weekly status report / risk register) + workflow definitions + register schemas — authored **entirely on the generic primitives** (domain-author-driven, NOT PM-hardcoded). Headline demo: a single template-fill (status report from the project KB).
@@ -102,9 +102,9 @@
 
 | REQ-ID | Phase(s) | Status |
 |--------|----------|--------|
-| PROJ-01 | Phase 098 | Pending |
-| PROJ-02 | Phase 098 | Pending |
-| GOV-01 | Phase 098 | Pending |
+| PROJ-01 | Phase 098 | Complete |
+| PROJ-02 | Phase 098 | Complete |
+| GOV-01 | Phase 098 | Complete |
 | WFSKILL-01 | Phase 099 | Pending |
 | TMPL-01 | Phase 100 | Pending |
 | TMPL-02 | Phase 101 | Pending |

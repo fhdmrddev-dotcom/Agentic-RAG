@@ -42,7 +42,7 @@
 **CORE (committed — 097–104):**
 
 - [ ] **Phase 097: Spike — Risk-Register Template-Fill + Authoring Feel** - De-risk the milestone end-to-end on one provider; answer the 4 schema-shaping unknowns before any schema locks (SEED-051)
-- [ ] **Phase 098: Project Binding + Server-Side KB Scope Governance** - Bind a workflow to a project (folder + subtree); resolve retrieval scope server-side so the model cannot widen it
+- [x] **Phase 098: Project Binding + Server-Side KB Scope Governance** ✓ COMPLETE (2026-06-10) - Bind a workflow to a project (folder + subtree); resolve retrieval scope server-side so the model cannot widen it
 - [ ] **Phase 099: Workflow ↔ Skill Composition** - A phase can pull a project skill's judgment via `skill_ref` with a version snapshot; Deep path byte-identical
 - [ ] **Phase 100: Ephemeral Template Upload** - Upload a docx/pptx/xlsx for one run, workspace-only, TTL + sweep, never ingested, never in search
 - [ ] **Phase 101: Template-Fill + Integrity Validation** - Fill that exact template from project-KB content via a cited field-map; re-open to assert integrity; SSTI contained
@@ -87,11 +87,11 @@
   3. Retrieval scope (`scope_folder_ids`) is resolved server-side from the user's RLS context at run start and bound to every retrieval call as a parameter the model cannot override; retrieved `folder_id`s are asserted ⊆ scope (RLS as backstop).
   4. A model attempt to retrieve outside its bound scope is rejected/clipped to scope and observable in the run log.
 **Plans**: 5 plans (3 waves)
-- [ ] 098-01-PLAN.md - Schema lock: project_folder_id + per-phase folder_scope + output-side shapes (Wave 1)
-- [ ] 098-02-PLAN.md - Workflows-library project filter (JSONB-path, zero-migration) (Wave 1)
-- [ ] 098-03-PLAN.md - Shared scope resolver + DB narrow-only subset validator + governance test suite (Wave 2)
-- [ ] 098-04-PLAN.md - Run-start scope resolution at all 3 ctx-build sites: kickoff/resume/Continue (Wave 3)
-- [ ] 098-05-PLAN.md - Subset clip + scope_violation emit + folder_id enrich + D-13 preserve (Wave 3)
+- [x] 098-01-PLAN.md - Schema lock: project_folder_id + per-phase folder_scope + output-side shapes (Wave 1)
+- [x] 098-02-PLAN.md - Workflows-library project filter (JSONB-path, zero-migration) (Wave 1)
+- [x] 098-03-PLAN.md - Shared scope resolver + DB narrow-only subset validator + governance test suite (Wave 2)
+- [x] 098-04-PLAN.md - Run-start scope resolution at all 3 ctx-build sites: kickoff/resume/Continue (Wave 3)
+- [x] 098-05-PLAN.md - Subset clip + scope_violation emit + folder_id enrich + D-13 preserve (Wave 3)
 **VALIDATION (SC#10)**: changes in-run retrieval scope across providers — author cross-provider × multi-tool × parallel-thread × long-message rows. Spec re-confirm (b): does in-workflow retrieval already take a *bound* folder-scope parameter vs a prompt hint?
 
 ### Phase 099: Workflow ↔ Skill Composition
@@ -227,7 +227,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Complete    | 2026-06-08 |
-| 098. Project Binding + Server-Side KB Scope Governance | 0/TBD | Not started | - |
+| 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 0/TBD | Not started | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
 | 101. Template-Fill + Integrity Validation | 0/TBD | Not started | - |

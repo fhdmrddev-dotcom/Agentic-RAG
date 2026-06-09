@@ -1,7 +1,9 @@
 ---
 phase: 098-project-binding-server-side-kb-scope-governance
 verified: 2026-06-09T15:30:00Z
-status: human_needed
+status: verified
+reconciled: 2026-06-10
+reconciled_by: "/gsd:verify-work 098 — human_needed resolved: 098-HUMAN-UAT.md complete 6/6 (all SC#10 live items) + /gsd:secure-phase 098 threats_open:0 (WR-03/IN-01 fixed, IN-02/IN-03 accepted)"
 score: 4/4 must-haves verified
 overrides_applied: 0
 human_verification:
@@ -29,8 +31,18 @@ human_verification:
 
 **Phase Goal:** A workflow can be bound to a project (a folder + its subtree); its KB retrieval scope is resolved server-side from that binding at run start and the model cannot widen it.
 **Verified:** 2026-06-09T15:30:00Z
-**Status:** human_needed
+**Status:** verified (reconciled 2026-06-10 — see below)
 **Re-verification:** No — initial verification
+
+> **Reconciliation (2026-06-10, `/gsd:verify-work 098`):** Status advanced from
+> `human_needed` → `verified`. The 6 human-verification items below were all the
+> SC#10 live-stack tests that code inspection could not cover. They are now
+> **complete 6/6** in `098-HUMAN-UAT.md` (cross-provider containment, multi-tool,
+> parallel-thread, long-message/restart-path, `scope_violation` observability,
+> D-13 whitelist refusal — each with live DB/UI evidence). The advisory code-review
+> findings (WR-03, IN-01/02/03) were dispositioned by `/gsd:secure-phase 098`:
+> WR-03 + IN-01 fixed in code, IN-02 + IN-03 accepted (`098-SECURITY.md`,
+> `threats_open: 0`). No gaps remain.
 
 ---
 
@@ -187,14 +199,15 @@ SC#10 mandate is satisfied at the documentation/planning level. Execution of the
 
 ## Gaps Summary
 
-No automated gaps. All 4 must-haves are verified. The 3 advisory findings from the code review (WR-03, IN-01, IN-02, IN-03) are open but are:
-- WR-03: a deliberate design tradeoff (fail-open scope resolution) with a clear remediation path — route to a future `/gsd:secure-phase 098`
-- IN-01/IN-02: low-severity hardening candidates in `scope.py`
-- IN-03: additive-and-inert Deep output key, not a correctness issue
+No automated gaps. All 4 must-haves are verified. The advisory code-review findings (WR-03, IN-01, IN-02, IN-03) were dispositioned by `/gsd:secure-phase 098` (2026-06-10) — all CLOSED:
+- WR-03: ✓ MITIGATED — fail-open scope resolution now emits a `scope_resolution_failed` run-event at all 3 run-start sites; kickoff fails closed for bound workflows (`098-SECURITY.md`)
+- IN-01: ✓ MITIGATED — cycle/visited guard added to `scope._walk` + `test_resolve_project_subtree_cycle_guard`
+- IN-02: ✓ ACCEPTED (AR-098-01) — RPC `match_user_id` is the independent backstop
+- IN-03: ✓ ACCEPTED (AR-098-02) — additive-and-inert Deep output key, behavior identical
 
-None of these are goal-blocking. The phase goal — a workflow can be bound to a project folder, scope resolved server-side, model cannot widen it — is achieved in the codebase.
+None of these were goal-blocking. The phase goal — a workflow can be bound to a project folder, scope resolved server-side, model cannot widen it — is achieved in the codebase and confirmed live.
 
-Status is `human_needed` because SC#10 mandates live cross-provider × multi-tool × parallel-thread × long-message UAT rows that cannot be auto-verified from code.
+Status advanced to `verified` (2026-06-10): the SC#10 live cross-provider × multi-tool × parallel-thread × long-message UAT rows that could not be auto-verified from code are now complete 6/6 in `098-HUMAN-UAT.md`, and the security gate is satisfied (`threats_open: 0`).
 
 ---
 
