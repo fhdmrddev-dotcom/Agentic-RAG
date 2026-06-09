@@ -116,7 +116,7 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
     doc_ids = list({row["document_id"] for row in rows})
     docs_result = await aexec(
         supabase.table("documents")
-        .select("id, filename, metadata, version_number")
+        .select("id, filename, metadata, version_number, folder_id")
         .in_("id", doc_ids)
     )
     doc_map = {doc["id"]: doc for doc in (docs_result.data or [])}
@@ -130,6 +130,9 @@ async def _enrich_with_filenames(rows: list[dict], supabase: Client) -> list[dic
             "chunk_index": row.get("chunk_index"),
             "similarity": row.get("similarity") or row.get("rrf_score") or row.get("rank") or 0.0,
             "version_number": doc.get("version_number", 1),
+            # Phase 098 GOV-01 — additive folder_id for the post-query ⊆ scope clip
+            # (Deep-inert: Deep consumers never read it; the return shape is unchanged).
+            "folder_id": doc.get("folder_id"),
         }
         if doc.get("metadata"):
             entry["metadata"] = doc["metadata"]

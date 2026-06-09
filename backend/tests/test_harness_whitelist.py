@@ -136,3 +136,34 @@ async def test_refusal_audit_failure_never_blocks_dispatch(make_tool_context):
     result = await dispatch_tool("execute_code", {}, ctx)
     payload = json.loads(result.result)
     assert payload["error"] == "tool_not_available_in_phase"
+
+
+# ── Phase 098 GOV-01 / D-13 — act/export separability (no regression) ──────────
+@pytest.mark.asyncio
+async def test_act_export_tool_excluded_from_read_only_phase(make_tool_context):
+    """D-13 — a read-only phase that excludes an act/export tool refuses it.
+
+    Phase 098 GOV-01 preserves the per-phase whitelist gate (act/export
+    separability) unchanged. A read-only research phase whitelists read tools
+    only; an act/export tool (here `workspace_write`, which writes a workspace
+    file) is NOT in that set, so `dispatch_tool` returns the clean refusal
+    envelope — never reaching the handler. Mirrors the refusal-envelope
+    assertion above; selectable by `-k exclude`.
+    """
+    def _close_spawn(coro, *a, **k):
+        try:
+            coro.close()  # discard the fire-and-forget tool_refused audit coro cleanly
+        except (AttributeError, RuntimeError):
+            pass
+
+    read_only_phase = frozenset({"search_documents", "read_document", "ls", "grep"})
+    ctx = make_tool_context(phase_whitelist=read_only_phase, spawn=_close_spawn)
+
+    result = await dispatch_tool("workspace_write", {}, ctx)
+
+    assert isinstance(result, ToolResult)
+    payload = json.loads(result.result)
+    assert payload["error"] == "tool_not_available_in_phase"
+    assert payload["tool"] == "workspace_write"
+    assert "workspace_write" not in payload["allowed"]  # the act/export tool is excluded
+    assert payload["allowed"] == sorted(read_only_phase)
