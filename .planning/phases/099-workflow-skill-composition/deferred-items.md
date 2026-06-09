@@ -14,3 +14,17 @@ Discoveries logged during execution that are OUT OF SCOPE for the current task
     and the whitelist is unchanged, so the gate-retry path is byte-identical).
   - Disposition: NOT fixed in this plan (out of scope). Route to a harness-gates
     polish pass / next harness-touching phase.
+
+- **`tests/integration/test_threads_skills.py` — 11 failures (FK-violation cluster)**
+  - Discovered during: Plan 099-03 Task 2 regression run.
+  - Symptom: `asyncpg.exceptions.ForeignKeyViolationError: insert or update on table
+    "runs" violates foreign key constraint "runs_thread_id_fkey"` — the live-Supabase
+    integration fixture inserts a `run` whose `thread_id` is not present in `threads`.
+  - Status: **PRE-EXISTING** — confirmed by stashing the Task 2 dispatcher change
+    (`_decode_skill_file_bytes` extraction + the gated snapshot branch) and re-running
+    at the Task-1 commit (`9fa2c364`): **11 failed identically** with NO dispatcher
+    change. The extraction is a pure refactor — the offline unit dispatcher suite
+    (`tests/unit/test_tool_dispatcher.py`, 15/15 green) and the 099 red-line proof
+    (`test_deep_noop`) confirm the live `read_skill_file` path is byte-identical.
+  - Disposition: NOT fixed (out of scope — live-DB fixture/teardown rot, part of the
+    98-failure cluster triaged in `075.4-TEST-TRIAGE.md` / MEMORY.md). Net-new = 0.

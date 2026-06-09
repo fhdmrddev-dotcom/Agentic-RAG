@@ -425,9 +425,74 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         return ToolResult(result=json.dumps({"status": "created", "name": name}))
 
 
+def _decode_skill_file_bytes(filename: str, raw_bytes: bytes) -> str:
+    """Decode skill-file bytes to a text tool_result by extension.
+
+    PURE EXTRACTION (099 Plan 03) of the ext-decode block that lived inline in
+    ``_handle_read_skill_file`` — byte-identical behavior (docx/xlsx/pptx/text/binary).
+    Shared by BOTH the live-skill read path (the SC#3 red line — unchanged behavior)
+    AND the 099 snapshot-routing branch, so the snapshot read decodes exactly as the
+    live read does. Behavior here MUST stay identical to the pre-099 inline block.
+    """
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if ext == "docx":
+        import docx as _docx  # python-docx
+        doc = _docx.Document(io.BytesIO(raw_bytes))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
+    elif ext == "xlsx":
+        import openpyxl as _openpyxl
+        wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
+        rows = []
+        for sheet in wb.worksheets:
+            for row_data in sheet.iter_rows(values_only=True):
+                line = "\t".join(str(c) if c is not None else "" for c in row_data)
+                if line.strip():
+                    rows.append(line)
+        return "\n".join(rows)
+    elif ext == "pptx":
+        from pptx import Presentation as _Presentation  # python-pptx
+        prs = _Presentation(io.BytesIO(raw_bytes))
+        slides = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    slides.append(shape.text)
+        return "\n".join(slides)
+    elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
+        return raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
+    else:
+        # Unrecognized or binary type
+        return json.dumps({
+            "error": f"File '{filename}' is a binary file that cannot be read as text. "
+                     "Upload a text-based version instead."
+        })
+
+
 async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
-    skill_name = args.get("skill_name", "")
     filename = args.get("filename", "")
+    # 099 D-04 GATE (mirrors the 098 search-scope gate at :187) — when a workflow
+    # phase carries a materialized skill snapshot, read from the IMMUTABLE snapshot
+    # copies, NOT the live skill. None (Deep mode + non-skill phases) => this branch
+    # is skipped and the live path below runs BYTE-IDENTICAL (SC#3 red line / Pitfall 4).
+    snapshot = getattr(ctx, "skill_snapshot", None)
+    if snapshot is not None:
+        if filename not in getattr(snapshot, "files", []):
+            return ToolResult(result=json.dumps(
+                {"error": f"File '{filename}' not in the workflow's skill snapshot."}
+            ))
+        storage_path = f"{snapshot.storage_prefix}/{filename}"
+        try:
+            # Un-wrapped .download() for byte-symmetry with the live path (Open Question 4 —
+            # single small file; only the multi-file WRITE materializer is threadpool-wrapped).
+            raw_bytes = ctx.supabase.storage.from_("skill-files").download(storage_path)
+            tool_result = _decode_skill_file_bytes(filename, raw_bytes)
+        except Exception as e:
+            tool_result = json.dumps({"error": f"File '{filename}' not found in snapshot: {e}"})
+        return ToolResult(result=tool_result)
+
+    # ── live-skill resolution below — UNCHANGED (the SC#3 red line; Pitfall 4) ──
+    skill_name = args.get("skill_name", "")
     # Resolve skill to get owner's user_id for storage path
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
@@ -456,39 +521,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     storage_path = f"{row['user_id']}/{row['id']}/{filename}"
     try:
         raw_bytes = ctx.supabase.storage.from_("skill-files").download(storage_path)
-        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
-        if ext == "docx":
-            import docx as _docx  # python-docx
-            doc = _docx.Document(io.BytesIO(raw_bytes))
-            tool_result = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-        elif ext == "xlsx":
-            import openpyxl as _openpyxl
-            wb = _openpyxl.load_workbook(io.BytesIO(raw_bytes), read_only=True, data_only=True)
-            rows = []
-            for sheet in wb.worksheets:
-                for row_data in sheet.iter_rows(values_only=True):
-                    line = "\t".join(str(c) if c is not None else "" for c in row_data)
-                    if line.strip():
-                        rows.append(line)
-            tool_result = "\n".join(rows)
-        elif ext == "pptx":
-            from pptx import Presentation as _Presentation  # python-pptx
-            prs = _Presentation(io.BytesIO(raw_bytes))
-            slides = []
-            for slide in prs.slides:
-                for shape in slide.shapes:
-                    if hasattr(shape, "text") and shape.text.strip():
-                        slides.append(shape.text)
-            tool_result = "\n".join(slides)
-        elif ext in {"txt", "md", "py", "csv", "json", "yaml", "yml", "toml", "html", "xml", "rst", "log"}:
-            tool_result = raw_bytes.decode("utf-8", errors="replace").replace('\x00', '')
-        else:
-            # Unrecognized or binary type
-            tool_result = json.dumps({
-                "error": f"File '{filename}' is a binary file that cannot be read as text. "
-                         "Upload a text-based version instead."
-            })
+        tool_result = _decode_skill_file_bytes(filename, raw_bytes)
     except Exception as e:
         tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
 

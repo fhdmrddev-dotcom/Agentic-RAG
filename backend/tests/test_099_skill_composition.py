@@ -273,8 +273,7 @@ def test_auto_whitelist():  # GREEN — Plan 02 (_build_phase_tool_context auto-
     assert "read_skill_file" not in tc_none.available_tools
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 03 (gated read branch)", strict=False)
-async def test_deep_noop(make_tool_context, monkeypatch):
+async def test_deep_noop(make_tool_context, monkeypatch):  # GREEN — Plan 03 (gated read branch) landed
     """Plan 03: _handle_read_skill_file with ctx.skill_snapshot=None takes the LIVE path
     (SC#3 red-line) — no snapshot-prefix download. Mirrors 098 test_deep_noop shape."""
     import app.services.tool_dispatcher as td
@@ -300,8 +299,7 @@ async def test_deep_noop(make_tool_context, monkeypatch):
     assert "live-bytes" in result.result
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 03 (snapshot routing)", strict=False)
-async def test_snapshot_routing(make_tool_context):
+async def test_snapshot_routing(make_tool_context):  # GREEN — Plan 03 (snapshot routing) landed
     """Plan 03: with ctx.skill_snapshot present, _handle_read_skill_file resolves against
     the snapshot manifest + downloads from the snapshot prefix."""
     from app.services.tool_dispatcher import _handle_read_skill_file
