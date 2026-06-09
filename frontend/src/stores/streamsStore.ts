@@ -253,6 +253,14 @@ export interface StreamsState {
      *  across the ask_user pause / a consumer reattach) WITHOUT a thread-switch.
      *  Scoped to the passed threadId (PANEL-09); writes phasesByThread ONLY. */
     finalizeAllPhasesForThread: (threadId: string) => void
+    /** BUG-260609-01 mid-run fix — when a LATER phase goes live (phase_started for
+     *  index N), flip every EARLIER phase (phaseIndex < N) still in {running,retrying}
+     *  to "done". A sequential engine cannot start phase N until earlier phases
+     *  finished, so this is a forward-only backstop for a missed phase_completed —
+     *  matched BY INDEX so it survives a placeholder-slug mismatch. Never touches
+     *  skipped/failed/pending or the current/later phases. Scoped to threadId
+     *  (PANEL-09); writes phasesByThread ONLY. */
+    finalizeEarlierPhasesForThread: (threadId: string, beforeIndex: number) => void
   }
 }
 
@@ -346,5 +354,6 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     setPhaseStatusForThread: () => {},
     replacePhasesForThread: () => {},
     finalizeAllPhasesForThread: () => {},
+    finalizeEarlierPhasesForThread: () => {},
   },
 })))

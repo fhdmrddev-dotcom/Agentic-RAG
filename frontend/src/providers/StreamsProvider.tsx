@@ -861,15 +861,26 @@ export function makeStreamCallbacks(opts: {
     // exclusively → zero chat re-renders). Provider-agnostic (honest producer
     // events, no provider branching).
     // ────────────────────────────────────────────────────────────────────────
-    onPhaseStarted: (p) =>
-      useStreamsStore.getState().actions.appendPhaseForThread(threadId, {
+    onPhaseStarted: (p) => {
+      // BUG-260609-01 mid-run honesty fix: a LATER phase going live is durable proof
+      // the EARLIER phases finished (sequential engine — phase N can't start until
+      // N-1 completed + advanced, harness_engine.py:963/973/994). Sweep any earlier
+      // phase still running/retrying → done BY INDEX before appending the new row.
+      // Index-matched so it survives a missed phase_completed AND a placeholder-slug
+      // mismatch (the two ways the live draft→done flip is lost across the ask_user
+      // pause / a consumer reattach). The finalizeAllPhasesForThread terminal sweep
+      // remains the run_completed floor. Closure threadId (PANEL-09); phasesByThread only.
+      const _actions = useStreamsStore.getState().actions
+      _actions.finalizeEarlierPhasesForThread(threadId, p.phaseIndex)
+      _actions.appendPhaseForThread(threadId, {
         slug: p.phase,
         phaseIndex: p.phaseIndex,
         phaseType: p.phaseType,
         status: "running",
         subAgents: [],
         pendingAsk: null,
-      }),
+      })
+    },
     onPhaseCompleted: (phase) =>
       useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, phase, "done"),
     onPhaseTransition: (from, _to, via) => {
@@ -1291,7 +1302,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               const liveTempPlaceholders = prev.filter((m) => {
                 if (!m.id.startsWith("temp-")) return false
                 if (m.runId) {
-                  return !dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)
+                  // BUG-260609-03 fix (symmetric with loadMessages): keep a runId-bearing
+                  // temp only while genuinely in flight — subscribed, or still STREAMING
+                  // and not yet persisted. A terminated, unsubscribed temp is a stale
+                  // duplicate of the snapshot's persisted answer (harness answers return
+                  // runId=undefined, so the old `!dbRunIds.has` survival orphaned it →
+                  // double-render on reload). The untyped-temp branch below is untouched
+                  // (it protects the 075.7 pre-stamp optimistic-placeholder race).
+                  return (
+                    subscriptionsRef.current.has(m.runId) ||
+                    (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
+                  )
                 }
                 return sendInFlightOnThisThread
               })
@@ -1981,9 +2002,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   (m) =>
                     m.id.startsWith("temp-") &&
                     m.runId &&
-                    // Keep when DB doesn't have this runId yet OR a live SSE
-                    // consumer is still bound via this runId (CR-01 fix).
-                    (!dbRunIds.has(m.runId) || subscriptionsRef.current.has(m.runId)),
+                    // Keep a runId-bearing temp ONLY while genuinely in flight: a live
+                    // SSE consumer is still bound, OR the run is still STREAMING and the
+                    // DB hasn't returned it yet. BUG-260609-03 fix: the prior bare
+                    // `!dbRunIds.has(m.runId)` survival orphaned a TERMINATED streamed
+                    // copy forever for harness runs — the harness producer-shell leaves
+                    // runs.message_id NULL (harness_engine.py:353-357) so the fetched
+                    // answer comes back with runId=undefined, dbRunIds never holds the
+                    // run_id, and the cached temp + the DB copy both rendered (double
+                    // answer on reload, persisted). A terminated, unsubscribed temp is a
+                    // stale duplicate of the just-fetched `data` answer → drop it (the
+                    // answer is preserved in `data`). Deep is unaffected (its fetched msg
+                    // carries runId, so it was already dropped via dbRunIds.has).
+                    (subscriptionsRef.current.has(m.runId) ||
+                      (!dbRunIds.has(m.runId) && m.runStatus === "streaming")),
                 )
                 return [...data, ...liveTempPlaceholders]
               })
@@ -2296,6 +2328,30 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             let changed = false
             const swept = prev.map((p) => {
               if (p.status === "running" || p.status === "retrying" || p.status === "pending") {
+                changed = true
+                return { ...p, status: "done" as const }
+              }
+              return p
+            })
+            if (!changed) return {}
+            next.set(threadId, swept)
+            return { phasesByThread: next }
+          }),
+        // BUG-260609-01 mid-run fix: flip EARLIER phases (phaseIndex < beforeIndex)
+        // still in {running,retrying} → done when a later phase goes live. By-INDEX
+        // (survives a placeholder-slug mismatch); never touches skipped/failed/pending
+        // or the current/later phases, so a real skip/failure is never masked.
+        finalizeEarlierPhasesForThread: (threadId, beforeIndex) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId)
+            if (!prev || prev.length === 0) return {}
+            let changed = false
+            const swept = prev.map((p) => {
+              if (
+                p.phaseIndex < beforeIndex &&
+                (p.status === "running" || p.status === "retrying")
+              ) {
                 changed = true
                 return { ...p, status: "done" as const }
               }
