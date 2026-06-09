@@ -104,6 +104,14 @@ class ToolContext:
     # _build_phase_tool_context (+ propagated onto sub_ctx in task_service);
     # None on every Deep-Mode / tasks caller => byte-identical Deep dispatch.
     workflow_run_id: "UUID | None" = None
+    # 099 WFSKILL-01 (D-04) — the materialized skill snapshot for a skill-bearing
+    # workflow phase. None on EVERY Deep-mode / non-skill-phase caller => the gated
+    # read branch in _handle_read_skill_file (Plan 03) is a literal no-op =>
+    # byte-identical Deep behavior (SC#3). Set ONLY by _build_phase_tool_context
+    # (Plan 02) when the phase config carries a skill_snapshot. Kept Any (like
+    # per_run_task_semaphore) to avoid importing the harness model on the
+    # dispatcher hot path.
+    skill_snapshot: Any = None  # SkillSnapshot | None — kept Any to avoid a model import on the dispatcher hot path
 
 
 @dataclass
