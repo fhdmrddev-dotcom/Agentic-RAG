@@ -512,6 +512,108 @@ async def test_build_resume_context_current_user_id_is_str(mock_asyncpg_pool, fa
     assert uuid.UUID(ctx.thread_id) == run["thread_id"]
 
 
+# ── 098 Plan 04 — run-start scope sourced from the project binding (LIVE) ─────
+#
+# GOV-01 / PROJ-02: a BOUND workflow's resume MUST resolve its retrieval scope
+# from the run's definition (definition.project_folder_id), closing the
+# folder_subtree_ids=None whole-KB bypass at _build_resume_context:1199 (the same
+# gap the Plan 03 RED test_run_start_resolution pins). Owner-scoped via the durable
+# run["user_id"] — the service-role resume path bypasses RLS, so the resolver's
+# user_id is the only thing keeping retrieval owner-scoped (harness_engine.py:1118).
+
+
+@pytest.mark.asyncio
+async def test_resume_resolves_project_scope(monkeypatch, fake_redis, mock_asyncpg_pool):
+    """Resume of a BOUND workflow rebuilds ctx with the project subtree (NOT None)."""
+    from app.services import harness_engine
+
+    bound_def = WorkflowDefinition.model_validate(
+        {
+            "slug": "wf",
+            "version": 1,
+            "name": "WF",
+            "project_folder_id": str(uuid.uuid4()),
+            "phases": [
+                {"slug": "p", "phase_index": 0,
+                 "config": {"phase_type": "llm_single", "prompt": "x"}}
+            ],
+        }
+    )
+
+    captured: dict = {}
+
+    async def _fake_load_def(pool, run_id):
+        return bound_def
+
+    async def _fake_resolve(project_folder_id, *, supabase, user_id):
+        if project_folder_id is None:
+            return None
+        captured["resolve_user_id"] = user_id
+        captured["resolve_root"] = str(project_folder_id)
+        return ["A", "B"]
+
+    async def _fake_assert(definition, *, supabase, user_id):
+        captured["assert_user_id"] = user_id
+        return None
+
+    # _load_run_definition is a harness_engine module global (patch it there); the
+    # scope helpers are LAZY-imported from their source module inside
+    # _build_resume_context (the harness-package cycle-safe pattern), so patch them at
+    # the SOURCE module — mirrors the Plan 03 governance test_run_start_resolution.
+    monkeypatch.setattr(harness_engine, "_load_run_definition", _fake_load_def, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.resolve_project_subtree", _fake_resolve, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.assert_folder_scopes_subset", _fake_assert, raising=False)
+
+    owner = uuid.uuid4()  # asyncpg returns UUID objects on the resume path
+    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": owner, "inputs": {}}
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+
+    assert ctx.folder_subtree_ids == ["A", "B"], (
+        "a bound workflow's resume MUST resolve the project subtree, NOT None"
+    )
+    assert isinstance(ctx.folder_subtree_ids, list)  # Pitfall 1 — never a set
+    # Owner-scoped: the service-role resume path passes the durable run owner (str).
+    assert captured.get("resolve_user_id") == str(owner)
+    assert captured.get("resolve_root") == str(bound_def.project_folder_id)
+
+
+@pytest.mark.asyncio
+async def test_resume_unbound_scope_stays_none(monkeypatch, fake_redis, mock_asyncpg_pool):
+    """Resume of an UNBOUND workflow keeps whole-KB scope (None) — unchanged."""
+    from app.services import harness_engine
+
+    unbound_def = WorkflowDefinition.model_validate(
+        {
+            "slug": "wf",
+            "version": 1,
+            "name": "WF",
+            "phases": [
+                {"slug": "p", "phase_index": 0,
+                 "config": {"phase_type": "llm_single", "prompt": "x"}}
+            ],
+        }
+    )
+
+    async def _fake_load_def(pool, run_id):
+        return unbound_def
+
+    async def _fake_resolve(project_folder_id, *, supabase, user_id):
+        # Mirror the real helper: None in → None out (unbound → whole-KB).
+        if project_folder_id is None:
+            return None
+        return ["SHOULD_NOT_APPEAR"]
+
+    monkeypatch.setattr(harness_engine, "_load_run_definition", _fake_load_def, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.resolve_project_subtree", _fake_resolve, raising=False)
+
+    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": uuid.uuid4(), "inputs": {}}
+    ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
+
+    assert ctx.folder_subtree_ids is None, (
+        "an unbound workflow's resume must stay whole-KB (None) — unchanged"
+    )
+
+
 def test_continuation_ctx_sources_current_user_from_auth_dict_not_row():
     """/continue _harness_continuation uses the request auth dict (id already str).
 

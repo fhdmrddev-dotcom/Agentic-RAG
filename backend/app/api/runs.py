@@ -804,6 +804,12 @@ async def continue_run(
         # fire-and-forget spawn surface Deep has.
         from app.api.threads import _spawn as _spawn_harness_resume  # noqa: PLC0415
         import asyncio as _asyncio  # noqa: PLC0415
+        # 098 (GOV-01/PROJ-02 — site 3 Continue): the shared run-start scope resolver
+        # + DB-aware ⊆ validator so a re-driven bound workflow stays inside its project.
+        from app.services.harness.scope import (  # noqa: PLC0415
+            assert_folder_scopes_subset as _assert_folder_scopes_subset,
+            resolve_project_subtree as _resolve_project_subtree,
+        )
 
         from app.db.runs import insert_run as _insert_run, finalize_run as _finalize_run  # noqa: PLC0415
         from uuid import uuid4 as _uuid4  # noqa: PLC0415
@@ -885,6 +891,38 @@ async def continue_run(
             _owner_settings = None
         _ctx_model = resolve_workflow_ctx_model(_owner_settings)
 
+        # 098 (GOV-01 / PROJ-02 — site 3 Continue): pre-resolve the run-start retrieval
+        # scope from the run's PROJECT binding BEFORE the async continuation closure
+        # (the closure runs in a background task — compute the value here, then close
+        # over it). Closes the folder_subtree_ids=None whole-KB bypass at the wf_ctx
+        # below so a bound workflow stays inside its project across a Continue. Owner-
+        # scoped via current_user["id"] (the verified run owner from the Step-1 ownership
+        # SELECT). An UNBOUND definition (project_folder_id None) resolves to None →
+        # whole-KB unchanged. Best-effort: a resolution failure must NEVER block the
+        # Continue (fall back to None + log, matching the never-block-the-Continue
+        # posture of the owner-settings load above).
+        _cont_subtree: "list[str] | None" = None
+        # getattr (not attribute access) defends the sentinel definitions some tests
+        # inject via a stubbed _load_run_definition; a real WorkflowDefinition always
+        # has the field. An unbound workflow (None) skips resolution → whole-KB.
+        _cont_project_folder_id = getattr(definition, "project_folder_id", None)
+        if _cont_project_folder_id is not None:
+            try:
+                await _assert_folder_scopes_subset(
+                    definition, supabase=supabase, user_id=current_user["id"]
+                )
+                _cont_subtree = await _resolve_project_subtree(
+                    _cont_project_folder_id,
+                    supabase=supabase,
+                    user_id=current_user["id"],
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "continue: project-scope resolution failed for run %s "
+                    "(falling back to unscoped search)", wf_run_uuid,
+                )
+                _cont_subtree = None
+
         async def _harness_continuation():
             wf_ctx = SimpleNamespace(
                 run_id=wf_run_uuid,
@@ -908,11 +946,13 @@ async def continue_run(
                 # re-driven phase's search_documents resolves (without it ctx.supabase
                 # is None → AttributeError on the first RPC). Owner-scoped retrieval is
                 # preserved: search_documents filters by current_user["id"] (this run's
-                # verified owner from the Step-1 ownership SELECT). Folder scope is not
-                # rehydrated on continue (best-effort None → unscoped search); spawn +
-                # a fresh per-run semaphore complete the tool substrate.
+                # verified owner from the Step-1 ownership SELECT). 098 (GOV-01): folder
+                # scope is now resolved from the run's project binding (_cont_subtree,
+                # pre-resolved above) so a bound workflow stays inside its project across
+                # a Continue; an unbound workflow stays None (unscoped, unchanged). spawn
+                # + a fresh per-run semaphore complete the tool substrate.
                 supabase=supabase,
-                folder_subtree_ids=None,
+                folder_subtree_ids=_cont_subtree,
                 scoped_folder_path=None,
                 spawn=_spawn_harness_resume,
                 per_run_task_semaphore=_asyncio.Semaphore(

@@ -43,6 +43,7 @@ from app.db.runs import insert_run, finalize_run, insert_assistant_message
 from app.db.workflows import create_workflow_run, list_published_workflows
 from app.models.thread import ThreadWorkflowState
 from app.utils.folder_utils import fetch_visible_folders
+from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
@@ -861,6 +862,20 @@ async def send_message(
             _raw_def = json.loads(_raw_def)
         _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
         _kickoff_definition_id = _def_row["id"]
+        # 098 (D-07 DB half — GOV-01): a non-⊆ declared phase scope is a definition
+        # VALIDITY error that must fail LOUDLY at run-start (NOT a silent runtime
+        # clip — Pitfall 5). Resolve the project subtree and assert every per-phase
+        # folder_scope ⊆ it; surface the ValueError as a 400 (a bad definition, not
+        # a runtime degrade). Owner-scoped via current_user["id"].
+        try:
+            await assert_folder_scopes_subset(
+                _kickoff_definition, supabase=supabase, user_id=current_user["id"]
+            )
+        except ValueError as _scope_err:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(_scope_err),
+            )
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new
@@ -1181,45 +1196,43 @@ async def send_message(
                     _wf_definition = await _load_run_definition(
                         _wf_pool, _active_workflow_run_id
                     )
-                    # F5 (092-07): resolve the SAME folder scope the Deep path
-                    # computes inside run_agent_loop (agent_loop.py:895-931) so a
-                    # harness phase's search_documents/ls/tree/grep stays scoped to
-                    # the thread's folder subtree. Computed inline here (threads.py
-                    # has supabase + current_user + thread_id + fetch_visible_folders
-                    # in scope; the Deep computation lives in agent_loop, not as a
-                    # threads.py local we could mirror by name). Mirrors the Deep
-                    # subtree-walk + path-build logic verbatim.
+                    # F5 (092-07) + 098 (GOV-01/PROJ-02 — site 1 kickoff): resolve the
+                    # run-start retrieval scope. For a BOUND workflow
+                    # (_kickoff_definition.project_folder_id set) the scope is the
+                    # PROJECT subtree, sourced from the binding the model cannot supply
+                    # (GOV-01) — NOT the thread folder. For an UNBOUND/legacy workflow
+                    # the scope stays the thread-folder subtree (unchanged — SC#1). Both
+                    # branches resolve through the shared scope.resolve_project_subtree
+                    # helper, so the inline recursive subtree walk is REMOVED
+                    # (G-5: threads.py must shrink, not grow). The scoped_folder_path is
+                    # the human-readable ls/tree/grep default-path hint (display only —
+                    # the real scope enforcement is folder_subtree_ids).
                     _wf_folder_subtree_ids: list[str] | None = None
                     _wf_scoped_folder_path: str | None = None
                     try:
-                        _wf_thread_data = await aexec(
-                            supabase.table("threads")
-                            .select("folder_id")
-                            .eq("id", thread_id)
-                            .single()
-                        )
-                        _wf_thread_folder_id = (
-                            _wf_thread_data.data.get("folder_id")
-                            if _wf_thread_data.data else None
-                        )
-                        if _wf_thread_folder_id:
+                        if _kickoff_definition.project_folder_id is not None:
+                            _wf_scope_root = str(_kickoff_definition.project_folder_id)
+                        else:
+                            _wf_thread_data = await aexec(
+                                supabase.table("threads")
+                                .select("folder_id")
+                                .eq("id", thread_id)
+                                .single()
+                            )
+                            _wf_scope_root = (
+                                _wf_thread_data.data.get("folder_id")
+                                if _wf_thread_data.data else None
+                            )
+                        if _wf_scope_root:
+                            _wf_folder_subtree_ids = await resolve_project_subtree(
+                                _wf_scope_root, supabase=supabase, user_id=current_user["id"]
+                            )
                             _wf_all_folders = await fetch_visible_folders(
                                 supabase, current_user["id"]
                             )
-
-                            def _wf_get_subtree(root_id, folders):
-                                result = [root_id]
-                                for f in folders:
-                                    if f["parent_id"] == root_id:
-                                        result.extend(_wf_get_subtree(f["id"], folders))
-                                return result
-
-                            _wf_folder_subtree_ids = _wf_get_subtree(
-                                _wf_thread_folder_id, _wf_all_folders
-                            )
                             _wf_folder_map = {f["id"]: f for f in _wf_all_folders}
                             _wf_path_parts: list[str] = []
-                            _wf_current_fid = _wf_thread_folder_id
+                            _wf_current_fid = _wf_scope_root
                             while _wf_current_fid:
                                 _f = _wf_folder_map.get(_wf_current_fid)
                                 if not _f:
@@ -1234,7 +1247,7 @@ async def send_message(
                         # Best-effort scope resolution — a failure here must not abort
                         # the workflow; fall through to unscoped (None) search.
                         logger.exception(
-                            "harness folder-scope resolution failed for thread %s "
+                            "harness run-start scope resolution failed for thread %s "
                             "(falling back to unscoped search)", thread_id
                         )
                     wf_ctx = SimpleNamespace(
