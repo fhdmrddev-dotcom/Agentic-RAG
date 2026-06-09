@@ -4,7 +4,7 @@ milestone: v2.9
 milestone_name: Workflow Studio
 status: planning
 last_updated: "2026-06-09T22:14:56.310Z"
-last_activity: 2026-06-10 -- Phase 098 verified + secured + marked complete
+last_activity: 2026-06-10 -- Phase 099 context gathered (discuss-phase)
 progress:
   total_phases: 13
   completed_phases: 2
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 Phase: 099
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-06-10 -- Phase 098 verified + secured + marked complete
+Status: Context gathered — ready to plan
+Last activity: 2026-06-10 -- Phase 099 context gathered (12 decisions, 4 gray areas; resume file: .planning/phases/099-workflow-skill-composition/099-CONTEXT.md)
 
 ### Recent Completed Phases
 
