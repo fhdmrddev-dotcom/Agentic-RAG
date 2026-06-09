@@ -1050,6 +1050,21 @@ export interface ThreadWorkflowState {
    *  terminal/absent. PURE additive read (no new query, no write — the 092-05 F2
    *  invariant holds). */
   latest_producer_run_id?: string | null
+  /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
+   *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
+   *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
+   *  blanked the timeline on revisit/reload of a finished workflow thread). null
+   *  for Deep / no run. Statuses are DB-native (pending/active/completed/failed/
+   *  skipped); reconcilePhases maps them to the Phase status union. */
+  phases?: WorkflowPhaseState[] | null
+}
+
+/** Phase 098-UAT run-honesty fix (B) — one workflow_phases row's durable per-phase
+ *  status (mirrors backend WorkflowPhaseState). status is DB-native. */
+export interface WorkflowPhaseState {
+  slug: string
+  phase_index: number
+  status: string
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py

@@ -45,6 +45,20 @@ class ThreadSnapshotResponse(BaseModel):
     since_cursors: dict[str, str]
 
 
+class WorkflowPhaseState(BaseModel):
+    """Phase 098-UAT run-honesty fix (B) — one ``workflow_phases`` row's durable
+    per-phase status, surfaced so the frontend reconcile floor can rebuild an
+    HONEST timeline for a terminal (completed/failed/cancelled) run instead of
+    blanking it. ``status`` is DB-native (``pending`` / ``active`` / ``completed``
+    / ``failed`` / ``skipped``); the frontend maps it to its Phase status union
+    (``active`` -> ``running``, ``completed`` -> ``done``). Additive read.
+    """
+
+    slug: str
+    phase_index: int
+    status: str
+
+
 class ThreadWorkflowState(BaseModel):
     """Phase 092 (SC#5 / D-v2.5-03) — the reconcile-via-fetch contract for a
     thread's Deep/Harness mode + workflow lock + current phase + Continue budget.
@@ -83,3 +97,9 @@ class ThreadWorkflowState(BaseModel):
     # no write; the 092-05 F2 invariant holds). Owner-scoped via the existing
     # get_thread_workflow ownership check.
     latest_producer_run_id: UUID | None = None
+    # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
+    # (ordered by phase_index), so the frontend reconcile floor can rebuild an
+    # honest timeline for a TERMINAL run (which previously returned [] / blanked).
+    # None for Deep / no run. Additive PURE read (one extra ordered SELECT on
+    # workflow_phases, owner-scoped via the existing ownership gate; no write).
+    phases: list[WorkflowPhaseState] | None = None

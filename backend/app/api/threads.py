@@ -41,7 +41,7 @@ from app.db.runs import insert_run, finalize_run, insert_assistant_message
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
 # the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
 from app.db.workflows import create_workflow_run, list_published_workflows
-from app.models.thread import ThreadWorkflowState
+from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset
 from app.models.user_settings import load_user_settings, override_provider
@@ -1699,6 +1699,7 @@ async def get_thread_workflow(
     current_phase_index = None
     total_phases = None
     wf_continues_used = 0
+    phases_list: list[WorkflowPhaseState] | None = None
     if active_workflow_run_id is not None:
         wf_row = await pool.fetchrow(
             """
@@ -1787,6 +1788,38 @@ async def get_thread_workflow(
             cap_paused = True
             continues_used = deep_row["continues_used"] or 0
 
+    # Phase 098-UAT run-honesty fix (B) — surface the run's DURABLE per-phase status
+    # array so the frontend reconcile floor can rebuild an HONEST timeline on
+    # revisit/reload. A COMPLETED harness run CLEARS the thread anchor (mode flips
+    # back to "deep"), so the timeline previously vanished on revisit — the panel
+    # had no run reference at all. Resolve the phases from the active anchor when
+    # set, ELSE from the thread's LATEST workflow_run (by thread_id) so a finished
+    # workflow thread still yields its historical timeline. mode/locked/lock_is_stale
+    # stay anchor-based and UNCHANGED — this is a pure additive read used only by the
+    # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
+    phases_source_run_id = active_workflow_run_id
+    if phases_source_run_id is None:
+        latest_wf = await pool.fetchrow(
+            "SELECT id FROM workflow_runs WHERE thread_id = $1 "
+            "ORDER BY created_at DESC LIMIT 1",
+            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+        )
+        if latest_wf is not None:
+            phases_source_run_id = latest_wf["id"]
+    if phases_source_run_id is not None:
+        phase_rows = await pool.fetch(
+            "SELECT slug, phase_index, status FROM workflow_phases "
+            "WHERE workflow_run_id = $1 ORDER BY phase_index",
+            UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
+        )
+        if phase_rows:
+            phases_list = [
+                WorkflowPhaseState(
+                    slug=r["slug"], phase_index=r["phase_index"], status=r["status"]
+                )
+                for r in phase_rows
+            ]
+
     return ThreadWorkflowState(
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         mode=mode,
@@ -1811,6 +1844,7 @@ async def get_thread_workflow(
             if isinstance(latest_producer_run_id, str)
             else latest_producer_run_id
         ),
+        phases=phases_list,
     )
 
 

@@ -246,6 +246,13 @@ export interface StreamsState {
     ) => void
     /** Full-state-replace of a thread's phase timeline (getThreadWorkflow reconcile). */
     replacePhasesForThread: (threadId: string, phases: Phase[]) => void
+    /** Phase 098-UAT run-honesty fix (A) — on a SUCCESSFUL run_completed, flip every
+     *  non-terminal (running/retrying/pending) phase for the OWNING thread to "done".
+     *  The DB ground truth for a completed run is every phase completed, so this
+     *  self-heals a phase node stranded on "running" (its phase_completed SSE missed
+     *  across the ask_user pause / a consumer reattach) WITHOUT a thread-switch.
+     *  Scoped to the passed threadId (PANEL-09); writes phasesByThread ONLY. */
+    finalizeAllPhasesForThread: (threadId: string) => void
   }
 }
 
@@ -338,5 +345,6 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     appendPhaseForThread: () => {},
     setPhaseStatusForThread: () => {},
     replacePhasesForThread: () => {},
+    finalizeAllPhasesForThread: () => {},
   },
 })))

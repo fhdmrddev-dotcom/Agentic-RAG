@@ -895,11 +895,18 @@ export function makeStreamCallbacks(opts: {
       useStreamsStore
         .getState()
         .actions.setPhaseStatusForThread(threadId, "", "failed", { error: reason }),
-    onRunCompleted: () => {
-      // No-op on phase status: the final phase already flipped to done via
-      // phase_completed. The run-level completion is surfaced elsewhere (the
-      // grounding union / receipt). Kept as an explicit handler so the wire
-      // event is consumed, not dropped.
+    onRunCompleted: (status) => {
+      // Phase 098-UAT run-honesty fix (A): a phase flips running→done ONLY when its
+      // own phase_completed SSE lands live. Across the ask_user pause / a consumer
+      // reattach, an earlier phase's completed can be missed — leaving it stuck
+      // "running" forever (this handler was previously a no-op, and the terminal
+      // reconcile floor returns []; neither corrects it in-session). On a SUCCESSFUL
+      // completion the DB ground truth is every phase completed, so sweep any
+      // lingering non-terminal phase for THIS owning thread to done. A failed/
+      // cancelled run is left alone (onRunFailed owns it) so a real failure is never
+      // masked as done. Closure threadId (PANEL-09); phasesByThread only.
+      if (status === "completed")
+        useStreamsStore.getState().actions.finalizeAllPhasesForThread(threadId)
     },
   }
 }
@@ -2272,6 +2279,32 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             next.set(threadId, phases)
             return { phasesByThread: next }
           }),
+        // Phase 098-UAT run-honesty fix (A): on a SUCCESSFUL run completion, sweep
+        // any lingering non-terminal phase to "done". A phase flips running→done
+        // ONLY when its own phase_completed SSE is observed live; across the
+        // ask_user pause / a consumer reattach phase-0's completed can be missed,
+        // and nothing else corrects it in-session (onRunCompleted was a no-op; the
+        // terminal reconcile floor returned []). Mirror the DB ground truth (every
+        // phase of a completed run IS completed). NEVER touch a phase that
+        // legitimately ended failed/skipped — those are terminal truths, not
+        // stragglers. Closure threadId only (PANEL-09); phasesByThread only.
+        finalizeAllPhasesForThread: (threadId) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId)
+            if (!prev || prev.length === 0) return {}
+            let changed = false
+            const swept = prev.map((p) => {
+              if (p.status === "running" || p.status === "retrying" || p.status === "pending") {
+                changed = true
+                return { ...p, status: "done" as const }
+              }
+              return p
+            })
+            if (!changed) return {}
+            next.set(threadId, swept)
+            return { phasesByThread: next }
+          }),
       },
     })
     // Touch all refs to satisfy lint and document the closure (they're read
@@ -2541,22 +2574,56 @@ export function useTasks(threadId: string | null): {
  * a no-op (returns []) when the thread is Deep / has no run, so the skeleton
  * only appears for an actual harness run.
  */
+// Phase 098-UAT run-honesty fix (B): map a DB-native workflow_phases.status to the
+// Phase status union the PhaseCard renders verbatim (active→running, completed→done).
+const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
+  pending: "pending",
+  active: "running",
+  completed: "done",
+  failed: "failed",
+  skipped: "skipped",
+}
+
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
-  if (wf.mode !== "harness" || wf.lock_is_stale) return []
-  const total = wf.total_phases ?? 0
-  if (total <= 0) return []
-  const current = wf.current_phase_index ?? 0
-  // Derive a skeleton: total pending rows, the current one running. Slugs are
-  // unknown ahead of live phase_started (only current_phase_slug is known), so
-  // non-current rows carry positional placeholder slugs the live events replace.
-  return Array.from({ length: total }, (_, i): Phase => ({
-    slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
-    phaseIndex: i,
-    phaseType: "unknown",
-    status: i < current ? "done" : i === current ? "running" : "pending",
-    subAgents: [],
-    pendingAsk: null,
+  // Live/ACTIVE harness run → the existing forward-only skeleton floor (UNCHANGED):
+  // total_phases rows, the current one running. Slugs are unknown ahead of live
+  // phase_started (only current_phase_slug is known), so non-current rows carry
+  // positional placeholder slugs the live events replace.
+  if (wf.mode === "harness" && !wf.lock_is_stale) {
+    const total = wf.total_phases ?? 0
+    if (total <= 0) return []
+    const current = wf.current_phase_index ?? 0
+    return Array.from({ length: total }, (_, i): Phase => ({
+      slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
+      phaseIndex: i,
+      phaseType: "unknown",
+      status: i < current ? "done" : i === current ? "running" : "pending",
+      subAgents: [],
+      pendingAsk: null,
+    }))
+  }
+  // Phase 098-UAT run-honesty fix (B): NOT a live/active harness run. A COMPLETED
+  // workflow run CLEARS the thread anchor (mode flips back to "deep"); a terminal
+  // anchored run reports lock_is_stale. BOTH previously returned [] here and
+  // BLANKED the timeline on revisit/reload of a finished workflow thread. When the
+  // backend supplies the durable per-phase array (the thread has a workflow run in
+  // its history), rebuild the HONEST historical timeline from it — real slugs +
+  // statuses (active→running, completed→done); genuinely skipped/failed phases stay
+  // honest, never masked as done. A pure-deep thread (never a workflow) carries
+  // phases=null → [] (no timeline), unchanged.
+  const rows = wf.phases ?? []
+  if (rows.length === 0) return []
+  return rows
+    .slice()
+    .sort((a, b) => a.phase_index - b.phase_index)
+    .map((r): Phase => ({
+      slug: r.slug,
+      phaseIndex: r.phase_index,
+      phaseType: "unknown",
+      status: DB_PHASE_STATUS[r.status] ?? "done",
+      subAgents: [],
+      pendingAsk: null,
   }))
 }
 
