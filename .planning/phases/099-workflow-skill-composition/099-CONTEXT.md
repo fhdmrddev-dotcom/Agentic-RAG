@@ -53,6 +53,18 @@ workflows (deferred below); template/asset handling (Phases 100/101).
   the current skill state — that is how an author intentionally picks up skill improvements.
   Code fact that simplifies this: drafts cannot execute (workflow kickoff requires
   `status='published'`, `threads.py` ~line 854) — so only snapshotted definitions ever run.
+- **D-03a (amendment, locked at plan time 2026-06-10):** Research verified the "definition
+  validate/save path that exists today" assumed by D-03 does NOT exist — `api/workflows.py`
+  has only a GET picker route; the publish endpoint is Phase 103 (WFAUTH-01), and the 098
+  publish-gate precedent actually enforces at workflow kickoff (`threads.py` ~871), not at
+  save. **Operator decision: snapshot at FIRST KICKOFF — lazy + idempotent.** The first run
+  of a published skill-bearing workflow materializes the snapshot (D-10 gate enforced at that
+  moment); all subsequent runs use it. Implemented as a standalone service function shaped so
+  Phase 103's publish endpoint can call the exact same code at true publish time; `threads.py`
+  gains only a one-line call into the service (G-5: do not grow the hot file). Accepted
+  trade-off: a skill edited between manual publish and first run snapshots at first-run state —
+  still immutable afterward. D-03's intent (drafts stay live; published runs are deterministic;
+  republish = re-snapshot) is unchanged.
 - **D-04 (derived; red line):** In skill-bearing workflow phases, `read_skill_file` resolves
   against the SNAPSHOT (not the live skill) via a **gated branch** — the gate is the presence
   of skill-snapshot context on the phase `ToolContext`. When absent (Deep mode, non-skill
