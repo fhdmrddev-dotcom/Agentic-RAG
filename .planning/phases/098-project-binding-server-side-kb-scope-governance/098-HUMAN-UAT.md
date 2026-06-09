@@ -8,10 +8,10 @@ updated: 2026-06-09
 
 ## Current Test
 
-number: 2
-name: Multi-tool scope holds (SC#10 — multi-tool axis)
+number: 6
+name: D-13 act/export whitelist refusal UX
 expected: |
-  A single agent turn that calls search_documents + execute_code keeps the search results clipped to the bound project subtree.
+  A read-only phase refuses an act/export (write) tool with a clear refusal message and the run continues gracefully — the per-phase whitelist is preserved in the live UI.
 awaiting: user response
 
 ## Tests
@@ -36,7 +36,19 @@ evidence: |
 
 ### 2. Multi-tool scope holds (SC#10 — multi-tool axis)
 expected: A single agent turn that calls `search_documents` + `execute_code` keeps the search results clipped to the bound project subtree (the execute_code tool does not provide a side channel to read out-of-scope docs).
-result: [pending]
+result: pass
+evidence: |
+  Fixture "Multi-tool scope (098 UAT — search + execute_code)" (slug multitool_scope_098uat), bound to
+  Weekly reports. Single llm_agent phase: search_documents + execute_code in one turn. Operator ran 2
+  providers (gpt-5.4-mini, gemini-3.5-flash) — both completed (searched the 5 weekly metrics, ran code,
+  printed them). DB cross-check: every cited document on BOTH runs is inside Weekly reports
+  (SKILL_INSTRUCTIONS.md, kb_doc3_metrics_decisions.md, kb_doc2_team_highlights.md) — scope held with a
+  SECOND tool (execute_code) active; no out-of-scope side channel. The phase runs as a task sub-agent
+  (run_task_sub_agent) which inherits ctx.folder_subtree_ids from the binding, so the clip holds in the
+  sub-agent context too.
+  Side observations (NOT scope defects): SUB-RESULTS "Sub-task" loses its description on nav (BUG-260609-02,
+  refined — reconcile gap); 1-2s empty assistant bubble before the one-shot answer surfaces (harness UX,
+  low severity, noted on BUG-260609-02).
 
 ### 3. Parallel-thread scope isolation (SC#10 — parallel-thread axis)
 expected: Thread A runs a bound workflow (scoped) while Thread B runs an unbound Deep chat (whole-KB). A's retrieval stays inside its project subtree and B's whole-KB Deep retrieval is unchanged — no scope bleed between threads while both stream concurrently.
@@ -57,9 +69,9 @@ result: [pending]
 ## Summary
 
 total: 6
-passed: 1
+passed: 2
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 
