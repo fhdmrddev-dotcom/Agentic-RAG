@@ -455,11 +455,13 @@ Authored under **VALIDATION.md, not PLAN tasks.** Representative-4 (D-09): OpenA
 | A3 | The Continue ctx-build site (`_harness_continuation`) sets `folder_subtree_ids` like resume and needs the same resolution | §2 | Not read line-by-line; if it already inherits scope differently, the wiring point shifts. Verify the exact site during planning. |
 | A4 | Putting `folder_id` on the enriched dict + the ⊆ assert in `_handle_search_documents` keeps Deep byte-identical | §3 | If any Deep assertion depends on the exact enriched-dict key set, the extra key could matter — but Deep consumers read by key, so additive keys are safe (consistent with how `metadata` is already conditionally added). |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`folder_scope` on `llm_batch_agents` (and `llm_single`)?** D-02 names only LlmAgent/LlmSingle; the retrieval phases are llm_agent + llm_batch_agents. Recommendation: cover both retrieval phases. *Resolve in plan-phase / a quick discuss confirm.*
-2. **Durable `scope_violation` audit row?** D-06's seam is the Redis run-event channel (no migration). If a durable `harness_audit` row is also wanted, the 9-kind CHECK needs a migration (067). *Default: no — Redis event only.*
-3. **`project_folder_id` denormalized column for an indexed filter?** Not needed for 098; the duplication precedent exists (slug/name/status are both columnar and in-jsonb). *Default: JSONB-path filter, zero migration.*
+> Resolved during /gsd:plan-phase 098 (2026-06-09). Each resolution is encoded in the named plan.
+
+1. **`folder_scope` on `llm_batch_agents` (and `llm_single`)?** D-02 names only LlmAgent/LlmSingle; the retrieval phases are llm_agent + llm_batch_agents. **RESOLVED:** add `folder_scope` to `LlmAgentPhaseConfig` + `LlmBatchAgentsPhaseConfig` (both retrieval-bearing) + `LlmSinglePhaseConfig` (inert but shape-consistent) — an explicit additive extension of D-02 per RESEARCH A2. See **Plan 098-01 Task 1 step 3**. Zero-migration (JSONB).
+2. **Durable `scope_violation` audit row?** D-06's seam is the Redis run-event channel (no migration). **RESOLVED: no** — Redis run-event channel only (`run:{run_id}`), no durable `harness_audit` row, no migration (`_AUDIT_EVENT_TYPES` untouched). Per locked decision D-06. See **Plan 098-05**.
+3. **`project_folder_id` denormalized column for an indexed filter?** Not needed for 098; the duplication precedent exists (slug/name/status are both columnar and in-jsonb). **RESOLVED:** JSONB-path filter (`definition->>'project_folder_id'`), zero migration — RESEARCH §5/§6. The optional expression index (#067) is deferred (not needed at current scale). See **Plan 098-02**.
 
 ## Environment Availability
 
