@@ -69,8 +69,15 @@ export function outerBannerLabel(
   activeTool: ToolCall | null,
   hasAnyTools: boolean,
   isPlanning: boolean,
+  // BUG-260609-02 polish: a Harness/workflow run shows the agent-mode copy
+  // "Setting up agent…" in the pre-first-output window, which reads oddly for a
+  // multi-phase workflow (whose real progress is in the workspace panel). When the
+  // thread is workflow-locked, surface "Starting workflow…" instead. Purely the
+  // pre-tools placeholder text — every other branch is unchanged and Deep mode
+  // (isHarness=false, the default) is byte-identical.
+  isHarness = false,
 ): string {
-  if (!hasAnyTools && !isPlanning) return "Setting up agent…"
+  if (!hasAnyTools && !isPlanning) return isHarness ? "Starting workflow…" : "Setting up agent…"
   if (isPlanning) return "Thinking…"
   if (!activeTool) return "Synthesizing answer…"
   if (activeTool.name === "search_documents") return "Searching knowledge base…"

@@ -283,7 +283,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
   const stickyLabelRef = useRef<string | null>(null)
   const isMessageStreaming = message.runStatus === "streaming"
   const computedLabel = isMessageStreaming
-    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false)
+    ? outerBannerLabel(activeTool, hasAnyTools, message.isPlanning ?? false, workflowLock != null)
     : null
   if (isMessageStreaming && computedLabel !== null) {
     stickyLabelRef.current = computedLabel
@@ -481,7 +481,7 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false)}</span>
+            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null)}</span>
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
