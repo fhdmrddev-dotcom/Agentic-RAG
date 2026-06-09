@@ -143,6 +143,37 @@ def _retry_suffix(ctx) -> str:
     return ("\n\n" + feedback) if feedback else ""
 
 
+def _skill_block(phase, ctx=None, *, with_files: bool | None = None) -> str:
+    """099 WFSKILL-01 (D-05/D-06) — the delimited skill framing block, or '' when no snapshot.
+
+    Composes the materialized snapshot the SAME way ``load_skill`` reads it (name +
+    instructions + a file-NAME list — NOT file contents; the agent pulls contents on
+    demand via the auto-whitelisted ``read_skill_file``). ``''`` when there is no
+    snapshot => a byte-identical no-op (mirrors ``_retry_suffix``).
+
+    ``with_files`` controls the file manifest (D-07): on ``llm_single`` (``tools=[]``,
+    ``read_skill_file`` inert) the file list is OMITTED — instructions only. When
+    ``with_files`` is left ``None`` it is DERIVED from the phase shape (an
+    ``llm_single`` phase type or an empty ``available_tools`` => omit), so the helper
+    composes correctly whether the caller passes the explicit kwarg (the three
+    executor seams below) or not (the unit test passes ``(phase, ctx)`` positionally).
+    ``ctx`` is accepted (unused) so the call shape matches the test contract.
+    """
+    snap = getattr(phase.config, "skill_snapshot", None)
+    if snap is None:
+        return ""
+    if with_files is None:
+        # Derive from the phase: llm_single (tool-less) omits the manifest (D-07).
+        _is_single = getattr(phase.config, "phase_type", None) == "llm_single"
+        _no_tools = not list(getattr(phase.config, "available_tools", []) or [])
+        with_files = not (_is_single or _no_tools)
+    block = f"\n\n## Skill: {snap.name}\n{snap.instructions}"
+    if with_files and getattr(snap, "files", None):
+        listed = "\n".join(f"- {f}" for f in snap.files)
+        block += f"\n\nAttached files (read with read_skill_file):\n{listed}"
+    return block
+
+
 def _effective_model(phase, ctx) -> str:
     """The per-phase model override or the run's inherited model."""
     return getattr(phase.config, "model", None) or getattr(ctx, "model", "") or ""
@@ -255,7 +286,12 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
     Re-running on resume is one paid call (Pitfall 5 — acceptable v1; no mid-stream
     checkpoint is possible). Consumes ctx.retry_feedback (producer = Plan 05).
     """
-    system_prompt = phase.config.prompt + _retry_suffix(ctx)
+    # 099 WFSKILL-01 (D-05/D-07): compose the skill framing BEFORE the retry suffix.
+    # llm_single runs tools=[], so read_skill_file is inert and the file manifest would
+    # be dead weight — pass no-files so only the instructions compose ('' when no snapshot).
+    system_prompt = (
+        phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+    )
     # F8 (092-07): first phase → the user's kickoff question; later phases → prior
     # output (chaining unchanged). Without this the first phase saw an empty user turn.
     content, _tool_calls = await _stream_one_iteration(
@@ -299,7 +335,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     if max_steps == _MODEL_DEFAULT_MAX_STEPS:
         max_steps = _EXPLORER_STEP_CAP
 
-    system_prompt = phase.config.prompt + _retry_suffix(ctx)
+    # 099 WFSKILL-01 (D-05/D-06): compose the skill framing (instructions + file
+    # manifest — read_skill_file is auto-whitelisted below) BEFORE the retry suffix.
+    # '' when no snapshot => byte-identical to pre-099.
+    system_prompt = phase.config.prompt + _skill_block(phase, ctx) + _retry_suffix(ctx)
     # F8 (092-07): the sub-agent's USER turn is its `description` (task_service.py:351
     # — messages=[system_prompt_override, {"role":"user","content":description}]).
     # Pre-F8 it was just the slug label `f"Phase: {phase.slug}"` — so the FIRST phase's
@@ -361,7 +400,10 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     if max_steps == _MODEL_DEFAULT_MAX_STEPS:
         max_steps = _EXPLORER_STEP_CAP
 
-    base_prompt = phase.config.prompt + _retry_suffix(ctx)
+    # 099 WFSKILL-01 (D-05/D-06): each parallel branch shares the same composed skill
+    # framing (instructions + file manifest); read_skill_file is auto-whitelisted on
+    # every branch's ToolContext below. '' when no snapshot => byte-identical.
+    base_prompt = phase.config.prompt + _skill_block(phase, ctx) + _retry_suffix(ctx)
     sem = asyncio.Semaphore(phase.config.max_parallel_agents)
 
     # F8 (092-07): the overall topic context — the user's kickoff question — so each

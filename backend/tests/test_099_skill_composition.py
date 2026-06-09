@@ -215,8 +215,7 @@ def test_toolcontext_field_default_none():
 
 
 # ── RED-by-design until downstream plans land (cross-plan TDD; xfail strict=False) ──
-@pytest.mark.xfail(reason="impl lands in Plan 02 (_skill_block)", strict=False)
-def test_skill_block_compose():
+def test_skill_block_compose():  # GREEN — Plan 02 (_skill_block) landed
     """Plan 02: _skill_block(phase, ctx) → "" with no snapshot, "## Skill:" block when present;
     llm_single omits the file list (D-07)."""
     from app.services.harness.phase_types import _skill_block  # noqa: F401 — lands in Plan 02
