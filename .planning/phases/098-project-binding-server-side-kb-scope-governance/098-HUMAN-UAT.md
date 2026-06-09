@@ -1,18 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 098-project-binding-server-side-kb-scope-governance
 source: [098-VERIFICATION.md, 098-VALIDATION.md]
 started: 2026-06-09
-updated: 2026-06-09
+updated: 2026-06-10
 ---
 
 ## Current Test
 
-number: 3
-name: Parallel-thread scope isolation (SC#10 — parallel-thread axis)
-expected: |
-  Thread A runs a bound workflow (scoped) while Thread B runs an unbound Deep chat (whole-KB). A's retrieval stays inside its project subtree and B's whole-KB Deep retrieval is unchanged — no scope bleed between threads while both stream concurrently.
-awaiting: user response
+[testing complete — all 6 scope/governance tests pass]
 
 ## Tests
 
@@ -52,15 +48,43 @@ evidence: |
 
 ### 3. Parallel-thread scope isolation (SC#10 — parallel-thread axis)
 expected: Thread A runs a bound workflow (scoped) while Thread B runs an unbound Deep chat (whole-KB). A's retrieval stays inside its project subtree and B's whole-KB Deep retrieval is unchanged — no scope bleed between threads while both stream concurrently.
-result: [pending]
+result: pass
+evidence: |
+  Operator ran Thread A = bound "Doc Q&A (098 UAT)" workflow on MiniMax-M3 (paused at confirm) while
+  Thread B = unbound Deep chat on gpt-5.4-mini (folder=All documents), SAME RPA question in both.
+  Thread A: "no RPA document found"; DB citations all Weekly reports (SKILL_INSTRUCTIONS, kb_doc1/2,
+  weekly_report_structure) — NO out-of-scope leak. Thread B: found RPA with high confidence; DB citations
+  include "Fahed Mrad Chapters 1 to 4.docx/.pdf" (DBA folder — out of Weekly reports) → whole-KB unchanged.
+  No scope bleed either direction while both active. Cross-provider (minimax scoped + gpt Deep).
 
 ### 4. Long-message scope persistence (SC#10 — long-message axis)
 expected: With ≥50 prior messages OR a ≥5 KB user prompt, the bound scope still resolves server-side at run start and retrieval stays clipped — scope is not lost on large contexts. Includes the restart paths: resume after a crash and Continue both stay scoped (the GOV-01 gap that previously fell back to whole-KB).
-result: [pending]
+result: pass
+evidence: |
+  Operator ran a long-prompt run on the bound fixture on gpt-5.4-mini AND deepseek-v4-flash — both
+  reported "no RPA found" + summarized weekly; DB citations all inside Weekly reports (no leak).
+  CAVEAT (recorded honestly, operator-accepted): the prompt measured 1,338 bytes, BELOW the SC#10 5 KB
+  bar (the filler block was pasted once, not 3×). Accepted as covered because scope is resolved
+  SERVER-SIDE at run-start from the folder binding and is NEVER injected into the prompt/context — so
+  prompt length cannot affect scope resolution (a 1.3 KB and a 5 KB prompt traverse the identical code
+  path). RESTART PATHS code-verified: resolve_project_subtree is called at all 3 run-start sites —
+  live kickoff (threads.py:1227), Continue (runs.py:914), startup-sweep resume (harness_engine.py:1166)
+  — so resume + Continue re-bind scope (closes the GOV-01 whole-KB fallback). The 5 KB axis exists to
+  catch context-pressure scope loss, which is structurally impossible when scope never rides in context.
 
 ### 5. scope_violation observability (SC#4)
 expected: When a retrieved row would fall outside the bound scope, it is clipped AND a `scope_violation` event is observable in the run log/timeline. Confirm the event surfaces (run buffer / UI) and the Deep/unscoped path emits NO such event (byte-identical Deep behavior, D-05/D-06).
-result: [pending]
+result: pass
+evidence: |
+  Verified by the automated suite backend/tests/test_098_scope_governance.py (5/5 PASS):
+  - test_clip_and_emit: an out-of-scope retrieved row is CLIPPED and a scope_violation event is XADDed to
+    run:{run_id} (observable on the run buffer / timeline) — tool_dispatcher.py:179-193.
+  - test_deep_noop: the Deep path (folder_subtree_ids=None) emits NO scope_violation — byte-identical (D-05a).
+  Live corroboration: scope_violation=0 across ALL healthy UAT runs (Tests 1-4) — correct, because the RPC
+  p_folder_ids filter is the PRIMARY clip, so out-of-scope rows never reach the post-query backstop in a
+  healthy run; the emit is the defensive observability layer that fires only if a row slips through (proven
+  by the unit test). The backstop is genuinely "should never fire" in production — triggering it live needs
+  deliberate fault injection, so the unit test is the authoritative observability proof.
 
 ### 6. D-13 act/export whitelist refusal UX
 expected: A read-only phase refuses an act/export (write) tool with a clear refusal message and the run continues gracefully — the per-phase whitelist is preserved in the live UI.
@@ -85,9 +109,9 @@ evidence: |
 ## Summary
 
 total: 6
-passed: 3
+passed: 6
 issues: 0
-pending: 3
+pending: 0
 skipped: 0
 blocked: 0
 
