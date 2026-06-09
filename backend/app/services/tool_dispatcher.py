@@ -170,6 +170,27 @@ async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
         user_settings=ctx.user_settings,
         folder_ids=ctx.folder_subtree_ids,
     )
+    # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
+    # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
+    # clip is the in-app guard for bugs / future tool paths (D-05/D-06). Gated on
+    # `folder_subtree_ids is not None` so the shared search path is byte-identical for
+    # Deep whole-KB (D-05a — mirrors _handle_glob:145); the additive folder_id enrich
+    # key is inert when this block is skipped.
+    if ctx.folder_subtree_ids is not None:
+        _scope = set(map(str, ctx.folder_subtree_ids))   # Pitfall 1: set()-ify LOCALLY; the ctx channel stays a list
+        _kept = [h for h in (results or []) if str(h.get("folder_id")) in _scope]
+        _dropped = [h for h in (results or []) if str(h.get("folder_id")) not in _scope]
+        if _dropped:   # RPC p_folder_ids is the primary filter → ~always empty in a healthy run (Pitfall 4)
+            results = _kept
+            try:
+                await ctx.emit(
+                    ctx.redis, ctx.run_id, "scope_violation",
+                    dropped=len(_dropped),
+                    out_of_scope_folders=sorted({str(h.get("folder_id")) for h in _dropped}),
+                    query=args["query"],
+                )
+            except Exception:   # best-effort (D-06) — an emit failure must NOT break a clean retrieval
+                logger.exception("scope_violation emit failed for run %s", getattr(ctx, "run_id", None))
     tool_result = json.dumps(results) if results else "No relevant documents found."
 
     source_refs: list[dict] = []
