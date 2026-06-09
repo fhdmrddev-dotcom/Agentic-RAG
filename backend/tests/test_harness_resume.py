@@ -60,6 +60,10 @@ async def test_two_phase_write_active_before_completed(
     async def _stub(phase, accumulated, ctx):
         return {"text": "done"}
 
+    # Save-then-restore the shared registry entry (don't pop — that would
+    # delete the real executor for any test that runs after us under
+    # whole-suite ordering, since register_all() only runs on first import).
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
     harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _stub
     try:
         ctx = type("C", (), {})()
@@ -67,7 +71,10 @@ async def test_two_phase_write_active_before_completed(
             run_id, wf, ctx, pool=mock_asyncpg_pool, redis=_NoopRedis()
         )
     finally:
-        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+        if _orig is not None:
+            harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _orig
+        else:
+            harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
 
     active_idx, completed_idx = _active_completed_indices(mock_asyncpg_pool.calls)
     assert active_idx is not None, "no status='active' UPDATE recorded"
@@ -94,6 +101,8 @@ async def test_crash_leaves_phase_active_not_completed(
     async def _boom(phase, accumulated, ctx):
         raise RuntimeError("phase blew up mid-work")
 
+    # Save-then-restore (see note above) — don't pop the shared real executor.
+    _orig = harness_engine.PHASE_TYPE_REGISTRY.get("llm_single")
     harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _boom
     try:
         ctx = type("C", (), {})()
@@ -102,7 +111,10 @@ async def test_crash_leaves_phase_active_not_completed(
                 run_id, wf, ctx, pool=mock_asyncpg_pool, redis=_NoopRedis()
             )
     finally:
-        harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
+        if _orig is not None:
+            harness_engine.PHASE_TYPE_REGISTRY["llm_single"] = _orig
+        else:
+            harness_engine.PHASE_TYPE_REGISTRY.pop("llm_single", None)
 
     active_idx, completed_idx = _active_completed_indices(mock_asyncpg_pool.calls)
     assert active_idx is not None, "phase should have been marked active first"
