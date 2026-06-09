@@ -328,8 +328,7 @@ async def test_snapshot_routing(make_tool_context):
     assert "snapshot-bytes" in result.result
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 03 (validate_skill_refs publish gate)", strict=False)
-async def test_publish_gate_rejects():
+async def test_publish_gate_rejects():  # GREEN — Plan 03 (validate_skill_refs publish gate) landed
     """Plan 03: validate_skill_refs raises ValueError for (a) missing id, (b) not-visible
     (another user's private skill), (c) is_enabled=false (D-10)."""
     from app.services.harness.skill_snapshot import validate_skill_refs
@@ -357,8 +356,7 @@ async def test_publish_gate_rejects():
         )
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 03 (materialize_skill_snapshots)", strict=False)
-async def test_snapshot_materialize():
+async def test_snapshot_materialize():  # GREEN — Plan 03 (materialize_skill_snapshots) landed
     """Plan 03: materialize_skill_snapshots copies instructions into the phase config's
     skill_snapshot + uploads once per skill file; a subsequent read uses the snapshot."""
     from app.services.harness.skill_snapshot import materialize_skill_snapshots
@@ -385,8 +383,7 @@ async def test_snapshot_materialize():
     assert len(storage.uploads) == 1  # one upload per skill file
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 03 (snapshot immutability)", strict=False)
-async def test_snapshot_immune_to_live_edit():
+async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot immutability) landed
     """Plan 03: after materialize, mutating the live skill's instructions / deleting a file
     does NOT change skill_snapshot.instructions or the snapshot file read."""
     from app.services.harness.skill_snapshot import materialize_skill_snapshots
