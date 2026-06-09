@@ -225,3 +225,36 @@ async def test_clip_and_emit(make_tool_context, fake_redis, monkeypatch):
     assert any(
         s == f"run:{ctx.run_id}" and p.get("type") == "scope_violation" for s, p in emitted
     )
+
+
+# ── secure-phase 098 hardening guards ─────────────────────────────────────────
+async def test_resolve_project_subtree_cycle_guard(monkeypatch):
+    """IN-01 (098 secure-phase): a cyclic / self-parented folder hierarchy resolves
+    without a RecursionError. The _walk visited-set guard makes the subtree finite and
+    de-duplicated even when the folder rows form a parent_id cycle (corrupt/legacy data
+    the UI normally prevents). The Deep copy in agent_loop.py is the RED LINE and is
+    intentionally NOT covered here — only the shared resolver is hardened."""
+    A = str(uuid4())
+    B = str(uuid4())
+    C = str(uuid4())
+
+    # A↔B is a 2-cycle (A's parent is B, B's parent is A) and C is a self-parent
+    # under B — both would recurse unbounded without the seen-set guard.
+    cyclic = [
+        {"id": A, "parent_id": B},
+        {"id": B, "parent_id": A},
+        {"id": C, "parent_id": C},  # self-parent
+        {"id": C, "parent_id": B},  # ...also a child of B
+    ]
+
+    async def _fake_fetch(supabase, user_id):
+        return cyclic
+
+    monkeypatch.setattr(scope_mod, "fetch_visible_folders", _fake_fetch)
+
+    out = await scope_mod.resolve_project_subtree(A, supabase=object(), user_id="u")
+
+    assert out is not None
+    assert isinstance(out, list)  # Pitfall 1: never a set
+    assert A in out  # root always included
+    assert len(out) == len(set(out))  # de-duplicated despite the cycle (no infinite walk)

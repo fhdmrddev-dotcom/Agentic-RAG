@@ -1133,6 +1133,10 @@ async def _build_resume_context(run, redis, pool):
     # Best-effort: a resolution failure must NEVER strand the resume sweep (fall back
     # to None + log, matching the owner-settings posture below).
     _resume_folder_subtree_ids: list[str] | None = None
+    # WR-03 (098 secure-phase): hoisted so the except below can tell a BOUND
+    # workflow (scope genuinely lost → emit) from an unbound one / a pre-load
+    # failure (nothing to signal) without risking a NameError.
+    _resume_project_folder_id = None
     if _user_id is not None:
         try:
             # LAZY import (the established harness-package pattern, :104-109): a
@@ -1174,6 +1178,32 @@ async def _build_resume_context(run, redis, pool):
                 "(falling back to unscoped search)", run.get("run_id"),
             )
             _resume_folder_subtree_ids = None
+            # WR-03 (098 secure-phase): only a BOUND workflow losing its scope is a
+            # governance degradation worth signaling (unbound resolves to None by
+            # design; a pre-load failure leaves _resume_project_folder_id None). EMIT
+            # scope_resolution_failed so the silent fall-open to whole-KB is OBSERVABLE
+            # in the run timeline — the Plan-05 clip + scope_violation are gated on
+            # `folder_subtree_ids is not None` and never fire on this None fallback.
+            # Resume is an in-flight re-drive (startup sweep) → stays fail-OPEN (never
+            # strand the sweep); the emit is the security signal, not a block.
+            if _resume_project_folder_id is not None:
+                try:
+                    await _emit(
+                        redis,
+                        run["run_id"],
+                        "scope_resolution_failed",
+                        site="resume",
+                        bound=True,
+                        detail=(
+                            "project-scope resolution failed; "
+                            "retrieval degraded to whole-KB"
+                        ),
+                    )
+                except Exception:  # noqa: BLE001 — emit is best-effort
+                    logger.debug(
+                        "resume: scope_resolution_failed emit failed for run %s",
+                        run.get("run_id"),
+                    )
 
     # F8 (092-07): rehydrate the original kickoff_prompt from the durable
     # workflow_runs.inputs jsonb (carried on the `run` row by find_resumable_runs'

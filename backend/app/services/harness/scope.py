@@ -70,11 +70,20 @@ async def resolve_project_subtree(
     root = str(project_folder_id)
     folders = await fetch_visible_folders(supabase, user_id)  # owner-scoped fetch
 
-    def _walk(rid: str) -> list[str]:
+    def _walk(rid: str, seen: set[str] | None = None) -> list[str]:
+        # IN-01 (098 secure-phase): cycle/visited guard. A self-parented row
+        # (parent_id == id) or any cyclic folder hierarchy (corrupt/legacy data the
+        # UI normally prevents) would otherwise recurse unbounded → RecursionError.
+        # The Deep copy (agent_loop.py) is the RED LINE and stays untouched; this
+        # shared helper is the right place to harden against bad data.
+        seen = seen if seen is not None else set()
+        if rid in seen:
+            return []
+        seen.add(rid)
         out = [rid]
         for f in folders:
             if f["parent_id"] == rid:
-                out.extend(_walk(f["id"]))
+                out.extend(_walk(f["id"], seen))
         return out
 
     return _walk(root)  # list[str] — Pitfall 1: NEVER a set

@@ -922,6 +922,32 @@ async def continue_run(
                     "(falling back to unscoped search)", wf_run_uuid,
                 )
                 _cont_subtree = None
+                # WR-03 (098 secure-phase): EMIT scope_resolution_failed so the
+                # fall-open is OBSERVABLE in the run timeline — otherwise a bound
+                # workflow silently degrades to whole-KB on a transient failure (the
+                # Plan-05 clip + scope_violation are gated on
+                # `folder_subtree_ids is not None` and never fire on this None
+                # fallback). This except only runs inside the bound branch
+                # (_cont_project_folder_id is not None), so bound=True always holds.
+                # Continue is an in-flight re-drive → stays fail-OPEN (never block the
+                # Continue); the emit is the security signal, not a block.
+                try:
+                    await _harness_emit(
+                        redis,
+                        wf_run_uuid,
+                        "scope_resolution_failed",
+                        site="continue",
+                        bound=True,
+                        detail=(
+                            "project-scope resolution failed; "
+                            "retrieval degraded to whole-KB"
+                        ),
+                    )
+                except Exception:  # noqa: BLE001 — emit is best-effort
+                    logger.debug(
+                        "continue: scope_resolution_failed emit failed for run %s",
+                        wf_run_uuid,
+                    )
 
         async def _harness_continuation():
             wf_ctx = SimpleNamespace(

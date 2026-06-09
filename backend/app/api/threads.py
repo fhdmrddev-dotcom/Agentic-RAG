@@ -1244,12 +1244,45 @@ async def send_message(
                                 if _wf_path_parts else None
                             )
                     except Exception:
-                        # Best-effort scope resolution — a failure here must not abort
-                        # the workflow; fall through to unscoped (None) search.
+                        # WR-03 (098 secure-phase): a scope-resolution failure must not
+                        # silently widen a BOUND workflow to the whole KB. The Plan-05
+                        # clip + scope_violation emit are gated on
+                        # `folder_subtree_ids is not None`, so on a None fallback neither
+                        # narrows nor fires — the degradation would be INVISIBLE. Kickoff
+                        # is the one site where the run has NOT started yet, so for a
+                        # bound workflow we fail CLOSED (emit + raise → a clean `failed`
+                        # terminal via the producer's outer `except Exception` below)
+                        # rather than run unscoped. An UNBOUND/legacy workflow keeps the
+                        # historical fall-through to whole-KB (SC#1 — losing the
+                        # thread-folder default hint is not a governance violation).
+                        _wf_bound = _kickoff_definition.project_folder_id is not None
                         logger.exception(
                             "harness run-start scope resolution failed for thread %s "
-                            "(falling back to unscoped search)", thread_id
+                            "(bound=%s)", thread_id, _wf_bound,
                         )
+                        if _wf_bound:
+                            try:
+                                await _harness_emit(
+                                    redis,
+                                    _active_workflow_run_id,
+                                    "scope_resolution_failed",
+                                    site="kickoff",
+                                    bound=True,
+                                    detail=(
+                                        "project-scope resolution failed at run start; "
+                                        "failing closed to avoid whole-KB retrieval"
+                                    ),
+                                )
+                            except Exception:  # noqa: BLE001 — emit is best-effort
+                                logger.debug(
+                                    "kickoff: scope_resolution_failed emit failed for run %s",
+                                    _active_workflow_run_id,
+                                )
+                            raise RuntimeError(
+                                "bound workflow scope resolution failed at run start "
+                                "(failing closed to avoid whole-KB retrieval)"
+                            )
+                        # unbound → fall through to unscoped (None) search (unchanged)
                     wf_ctx = SimpleNamespace(
                         run_id=_active_workflow_run_id,
                         # Facet A (092-07): the producer runs.run_id is the FK target
