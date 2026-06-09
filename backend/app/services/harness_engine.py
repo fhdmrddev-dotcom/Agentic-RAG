@@ -1147,10 +1147,13 @@ async def _build_resume_context(run, redis, pool):
                 resolve_project_subtree,
             )
             _resume_definition = await _load_run_definition(pool, run["run_id"])
-            if (
-                _resume_definition is not None
-                and _resume_definition.project_folder_id is not None
-            ):
+            # getattr (not attribute access) defends the sentinel definitions some
+            # tests inject via a stubbed _load_run_definition; a real WorkflowDefinition
+            # always has the field. An unbound workflow (None) skips → whole-KB.
+            _resume_project_folder_id = getattr(
+                _resume_definition, "project_folder_id", None
+            )
+            if _resume_project_folder_id is not None:
                 # D-07 (DB half): re-assert every per-phase folder_scope ⊆ the project
                 # subtree. It was validated at definition-save, so this normally passes;
                 # a raise here is caught below (unscoped fallback) rather than stranding
@@ -1161,7 +1164,7 @@ async def _build_resume_context(run, redis, pool):
                     user_id=str(_user_id),
                 )
                 _resume_folder_subtree_ids = await resolve_project_subtree(
-                    _resume_definition.project_folder_id,
+                    _resume_project_folder_id,
                     supabase=_service_supabase,
                     user_id=str(_user_id),
                 )

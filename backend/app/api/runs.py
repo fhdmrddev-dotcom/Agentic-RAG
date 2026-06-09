@@ -902,13 +902,17 @@ async def continue_run(
         # Continue (fall back to None + log, matching the never-block-the-Continue
         # posture of the owner-settings load above).
         _cont_subtree: "list[str] | None" = None
-        if definition is not None and definition.project_folder_id is not None:
+        # getattr (not attribute access) defends the sentinel definitions some tests
+        # inject via a stubbed _load_run_definition; a real WorkflowDefinition always
+        # has the field. An unbound workflow (None) skips resolution → whole-KB.
+        _cont_project_folder_id = getattr(definition, "project_folder_id", None)
+        if _cont_project_folder_id is not None:
             try:
                 await _assert_folder_scopes_subset(
                     definition, supabase=supabase, user_id=current_user["id"]
                 )
                 _cont_subtree = await _resolve_project_subtree(
-                    definition.project_folder_id,
+                    _cont_project_folder_id,
                     supabase=supabase,
                     user_id=current_user["id"],
                 )
