@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-09T23:27:04.366Z"
-last_activity: 2026-06-09 -- Phase 099 Plan 01 complete (skill-composition data contract)
+last_updated: "2026-06-09T23:47:00.000Z"
+last_activity: 2026-06-09 -- Phase 099 Plan 02 complete (_skill_block framing + read_skill_file auto-whitelist)
 progress:
   total_phases: 13
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
-  percent: 79
+  completed_plans: 12
+  percent: 86
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 099 (workflow-skill-composition) — EXECUTING
-Plan: 2 of 4
-Status: Plan 01 complete — ready to execute Plan 02 (_skill_block + auto-whitelist)
-Last activity: 2026-06-09 -- Phase 099 Plan 01 complete
+Plan: 3 of 4
+Status: Plan 02 complete — ready to execute Plan 03 (skill_snapshot.py publish gate + materialize + gated snapshot-routed read)
+Last activity: 2026-06-09 -- Phase 099 Plan 02 complete
 
 **Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
 
@@ -38,6 +38,14 @@ Last activity: 2026-06-09 -- Phase 099 Plan 01 complete
 - ✓ Task 3 (commit `fcae5df0`, TDD GREEN): `ToolContext.skill_snapshot: Any = None` at the dataclass tail (after `workflow_run_id`); kept `Any` to avoid a harness-model import on the dispatcher hot path; `_handle_read_skill_file` UNCHANGED → Deep dispatch byte-identical (SC#3). `test_099_skill_composition.py` exits 0 (2 passed / 7 xfailed / 1 xpassed); harness/098 regression suites 22/22; full-suite net-new failures = 0 (114=114 pre-existing rot).
 - **No deviations.** WFSKILL-01 stays OPEN in REQUIREMENTS.md (the data contract landed; the actual composition behavior ships in Plans 02-04 — requirement marks complete at phase close).
 - **Next:** `/gsd:execute-phase 099` Plan 02 (`_skill_block` composition + `_build_phase_tool_context` auto-whitelist).
+
+**Plan 099-02 (Wave 1, framing + auto-whitelist) — COMPLETE (2026-06-09):**
+
+- ✓ Task 1 (commit `3b638c7a`, TDD GREEN): `_skill_block(phase, ctx, *, with_files)` helper in `phase_types.py` — mirrors `_retry_suffix` (`''` when no snapshot = byte-identical no-op), else a delimited `## Skill: {name}\n{instructions}` block + a file-NAME manifest (D-06, names not contents). Composed at the `system_prompt =` seam BEFORE `_retry_suffix` in all 3 LLM executors: `_exec_llm_single` passes `with_files=False` (D-07 — `tools=[]`, manifest omitted), `_exec_llm_agent` + `_exec_llm_batch_agents` compose the full block. Flips `test_skill_block_compose` GREEN.
+- ✓ Task 2 (commit `46426f78`, TDD GREEN): `_effective_tools(phase)` helper (D-04 — `available_tools ∪ {read_skill_file}` when a snapshot is present; never drops a tool). `_build_phase_tool_context` computes `_tools` once → `available_tools=_tools` + `phase_whitelist=frozenset(_tools)` (layer-2) + attaches `skill_snapshot=getattr(phase.config, …)`. Both agent executors derive layer-1 `whitelist` AND pass `allowed_tools=_effective_tools(phase)` so the sub-agent's own subset admits `read_skill_file`. 098 folder_scope narrowing block untouched. Flips `test_auto_whitelist` GREEN.
+- **Deviation [Rule 1]:** `_skill_block` signature reconciled to the Plan-01 TDD contract — the stub calls `_skill_block(phase, ctx)` positionally and infers the llm_single manifest omission from the phase shape, so the signature is `(phase, ctx=None, *, with_files=None)` with `with_files` auto-deriving when not passed (executor seams still pass explicit `with_files=False` for llm_single). Preserves the plan's exact behavioral intent + every acceptance grep. No scope creep.
+- **Out of scope (deferred):** `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts` (`KeyError: 'tool_call_id'`) proven PRE-EXISTING via stash-at-base — logged to `099-workflow-skill-composition/deferred-items.md`, NOT fixed. `test_099_skill_composition.py` 4 passed / 5 xfailed / 1 xpassed; harness+098 regression 95 passed; net-new full-suite failures = 0.
+- **Next:** `/gsd:execute-phase 099` Plan 03 (`harness/skill_snapshot.py` D-10 publish gate + materialize + gated snapshot-routed read in `_handle_read_skill_file` — the red line).
 
 ### Recent Completed Phases
 
