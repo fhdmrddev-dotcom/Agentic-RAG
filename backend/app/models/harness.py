@@ -19,8 +19,9 @@ LOCKED (do NOT change them).
 from __future__ import annotations
 
 from typing import Annotated, Literal, Union
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class _StrictBase(BaseModel):
@@ -45,6 +46,10 @@ class LlmSinglePhaseConfig(_StrictBase):
     # Per-phase overrides; None = inherit the thread's effective settings.
     model: str | None = None
     temperature: float | None = None
+    # D-02 named llm_agent/llm_single; RESEARCH A2 added llm_batch_agents (the OTHER
+    # retrieval phase). Load-bearing on llm_agent + llm_batch_agents; inert on
+    # llm_single (no tools). Carried here for shape symmetry across the family.
+    folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
 
 
 class LlmAgentPhaseConfig(_StrictBase):
@@ -59,6 +64,7 @@ class LlmAgentPhaseConfig(_StrictBase):
     # None → engine default (sized in Plan 05 from existing cap knobs).
     wall_clock_seconds: int | None = None
     model: str | None = None  # None = inherit thread settings
+    folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
 
 
 class LlmBatchAgentsPhaseConfig(_StrictBase):
@@ -75,6 +81,7 @@ class LlmBatchAgentsPhaseConfig(_StrictBase):
     merge_strategy: Literal["concat", "concat_numbered"] = "concat"
     wall_clock_seconds: int | None = None  # None → engine default (Plan 05)
     model: str | None = None  # None = inherit thread settings
+    folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
 
 
 class LlmHumanInputPhaseConfig(_StrictBase):
@@ -115,9 +122,54 @@ class PhaseSpec(_StrictBase):
     validators: list[ValidatorSpec] = Field(default_factory=list)
 
 
+# ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──
+# co-lock free, so Phases 100/103 don't re-touch this model). Behavior deferred:
+# `inputs` (launch form) lands in Phase 103; `assets` (template/reference refs) in
+# Phase 100. Provenance lives in run OUTPUT only (open-Q ii / D-11) — NO `Cited`
+# field on InputFieldSpec.
+class InputFieldSpec(_StrictBase):
+    key: str
+    label: str
+    type: Literal["text", "number", "date", "enum", "file", "kb_auto"]
+    required: bool = True
+    source: Literal["user", "kb_auto", "template_derived"] = "user"  # open-Q (i) settled
+    enum_options: list[str] = []
+    folder_scope: list[UUID] | None = None  # if kb_auto: RESOLVED ids, not a path (open-Q iii)
+
+
+class AssetRef(_StrictBase):
+    asset_id: str
+    filename: str
+    kind: Literal["template", "reference"]
+    mime: str
+
+
 class WorkflowDefinition(_StrictBase):
     slug: str
     version: int
     name: str
     status: Literal["draft", "published"] = "draft"
     phases: list[PhaseSpec]  # the JSONB column parsed via model_validate()
+
+    # ── 098 additive-optional schema lock (zero-migration; old JSONB rows model_validate() to defaults) ──
+    project_folder_id: UUID | None = None                                                    # D-01 / PROJ-01
+    output_target_folder: UUID | None = None                                                 # D-08 (shape only)
+    reingest_output: bool = False                                                            # D-08 (shape only)
+    version_policy: Literal["supersede-by-filename", "keep-all"] = "supersede-by-filename"   # D-08 (shape only)
+    provenance: Literal["source", "derived"] = "source"                                      # D-08 (net-new flag)
+    inputs: list[InputFieldSpec] | None = None                                               # co-lock (Phase 103 behavior)
+    assets: list[AssetRef] | None = None                                                     # co-lock (Phase 100 behavior)
+
+    @model_validator(mode="after")
+    def _folder_scope_requires_project(self) -> "WorkflowDefinition":
+        # D-07 STRUCTURAL half only: a per-phase folder_scope needs a project_folder_id
+        # to be a subset of. The DB-aware ⊆ check (against the real folder subtree)
+        # lives in Plan 03's scope.py — do NOT add DB logic here.
+        for phase in self.phases:
+            scope = getattr(phase.config, "folder_scope", None)
+            if scope and self.project_folder_id is None:
+                raise ValueError(
+                    f"phase '{phase.slug}' declares folder_scope but the workflow has no "
+                    f"project_folder_id for it to be a subset of"
+                )
+        return self
