@@ -20,6 +20,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.db.workflows import list_published_workflows
+
 
 # ── LIVE structural anchor ───────────────────────────────────────────────────
 
@@ -215,3 +217,54 @@ def test_get_workflow_is_pure_read_never_writes(
         assert "UPDATE" not in upper and "INSERT" not in upper and "DELETE" not in upper, (
             f"GET reconcile must not write; saw: {sql}"
         )
+
+
+# ── Phase 098 / PROJ-01 (D-03): published-workflows project_folder_id filter ──
+# Offline filter unit tests — assert the JSONB-path predicate + the TEXT-bound
+# param only appear when a project_folder_id is supplied, and that user-scope is
+# preserved. mock_asyncpg_pool.fetch records (sql, args) on .calls (conftest
+# _RecordingConnection.fetch), so we introspect the emitted query directly — no
+# live Postgres. See backend/app/db/workflows.py::list_published_workflows.
+
+async def test_list_published_workflows_project_filter(mock_asyncpg_pool):
+    """A supplied project_folder_id emits the JSONB-path predicate and binds the
+    value as TEXT (``str(P)``) as the SECOND positional arg — never a UUID, and
+    never interpolated (T-098-10). The user-scope clause stays FIRST and intact
+    (T-098-09 — the filter narrows, never widens).
+    """
+    user_id = uuid.uuid4()
+    project_id = uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result([])  # no rows needed — we assert the query
+
+    await list_published_workflows(
+        mock_asyncpg_pool, user_id=user_id, project_folder_id=project_id
+    )
+
+    sql, args = mock_asyncpg_pool.calls[-1]
+    # JSONB-path predicate present, user-scope preserved and evaluated first.
+    assert "definition->>'project_folder_id'" in sql
+    assert "is_global = true OR created_by = $1" in sql
+    assert sql.index("is_global = true OR created_by = $1") < sql.index(
+        "definition->>'project_folder_id'"
+    )
+    # Exactly two bound params: user_id ($1), then the project folder as TEXT ($2).
+    assert len(args) == 2
+    assert args[0] == user_id
+    assert args[1] == str(project_id)
+    assert not isinstance(args[1], uuid.UUID)  # definition->>'key' is TEXT — bind str
+
+
+async def test_list_published_workflows_no_filter_omits_predicate(mock_asyncpg_pool):
+    """Omitting project_folder_id leaves the query byte-compatible with pre-098:
+    no JSONB-path predicate, and only the user_id ($1) is bound (full published
+    list — backward compatible).
+    """
+    user_id = uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result([])
+
+    await list_published_workflows(mock_asyncpg_pool, user_id=user_id)
+
+    sql, args = mock_asyncpg_pool.calls[-1]
+    assert "definition->>'project_folder_id'" not in sql
+    assert len(args) == 1
+    assert args[0] == user_id
