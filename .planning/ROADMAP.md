@@ -105,7 +105,7 @@
 **Plans**: 4 plans across 3 waves
   - [x] 099-01-PLAN.md — schema contract (skill_ref + SkillSnapshot on 3 LLM configs) + ToolContext.skill_snapshot field + Wave 0 test stubs
   - [x] 099-02-PLAN.md — skill-block framing compose at the system_prompt seam + read_skill_file auto-whitelist + snapshot ctx attach (phase_types.py)
-  - [ ] 099-03-PLAN.md — harness/skill_snapshot.py (D-10 publish gate + materialize) + gated snapshot-routed read in _handle_read_skill_file (the red line)
+  - [x] 099-03-PLAN.md — harness/skill_snapshot.py (D-10 publish gate + materialize) + gated snapshot-routed read in _handle_read_skill_file (the red line)
   - [ ] 099-04-PLAN.md — kickoff host: validate_skill_refs (ValueError→400) + first-run lazy materialize wired into threads.py (G-5 one-liner)
 **VALIDATION (SC#10)**: changes phase framing inside runs across providers — author the 4-axis cross-provider rows. Additive seam on `phase_types.py` (`_exec_llm_agent`); Deep path untouched (the red line).
 
@@ -232,7 +232,7 @@
 |-------|----------------|--------|-----------|
 | 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Complete    | 2026-06-08 |
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
-| 099. Workflow ↔ Skill Composition | 2/4 | In progress | - |
+| 099. Workflow ↔ Skill Composition | 3/4 | In progress | - |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
 | 101. Template-Fill + Integrity Validation | 0/TBD | Not started | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |

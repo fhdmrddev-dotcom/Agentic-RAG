@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-09T23:47:00.000Z"
-last_activity: 2026-06-09 -- Phase 099 Plan 02 complete (_skill_block framing + read_skill_file auto-whitelist)
+last_updated: "2026-06-10T04:00:00.000Z"
+last_activity: 2026-06-10 -- Phase 099 Plan 03 complete (skill_snapshot.py publish gate + materializer + gated snapshot-routed read)
 progress:
   total_phases: 13
   completed_phases: 2
   total_plans: 14
-  completed_plans: 12
-  percent: 86
+  completed_plans: 13
+  percent: 93
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 099 (workflow-skill-composition) — EXECUTING
-Plan: 3 of 4
-Status: Plan 02 complete — ready to execute Plan 03 (skill_snapshot.py publish gate + materialize + gated snapshot-routed read)
-Last activity: 2026-06-09 -- Phase 099 Plan 02 complete
+Plan: 4 of 4
+Status: Plan 03 complete — ready to execute Plan 04 (threads.py kickoff wiring: validate + materialize-if-needed, ValueError→400)
+Last activity: 2026-06-10 -- Phase 099 Plan 03 complete
 
 **Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
 
@@ -46,6 +46,14 @@ Last activity: 2026-06-09 -- Phase 099 Plan 02 complete
 - **Deviation [Rule 1]:** `_skill_block` signature reconciled to the Plan-01 TDD contract — the stub calls `_skill_block(phase, ctx)` positionally and infers the llm_single manifest omission from the phase shape, so the signature is `(phase, ctx=None, *, with_files=None)` with `with_files` auto-deriving when not passed (executor seams still pass explicit `with_files=False` for llm_single). Preserves the plan's exact behavioral intent + every acceptance grep. No scope creep.
 - **Out of scope (deferred):** `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts` (`KeyError: 'tool_call_id'`) proven PRE-EXISTING via stash-at-base — logged to `099-workflow-skill-composition/deferred-items.md`, NOT fixed. `test_099_skill_composition.py` 4 passed / 5 xfailed / 1 xpassed; harness+098 regression 95 passed; net-new full-suite failures = 0.
 - **Next:** `/gsd:execute-phase 099` Plan 03 (`harness/skill_snapshot.py` D-10 publish gate + materialize + gated snapshot-routed read in `_handle_read_skill_file` — the red line).
+
+**Plan 099-03 (Wave 1, snapshot host service + gated read) — COMPLETE (2026-06-10):**
+
+- ✓ Task 1 (commit `9fa2c364`, TDD GREEN): `backend/app/services/harness/skill_snapshot.py` (NEW, cloned from `scope.py`'s two-function async-service shape). `validate_skill_refs` = the D-10 publish gate (owned-or-global `.or_` + `.eq("is_enabled", True)` resolve per `skill_ref`; generic `ValueError` on missing/not-visible/disabled — no IDOR existence leak, T-099-01/02). `materialize_skill_snapshots` = idempotent (D-03a) instructions→JSONB copy + threadpool-wrapped Storage copy (download+upload, T-099-10/Pitfall 1) to the author-scoped `{user_id}/_snapshots/{slug}-v{version}/{skill_id}` prefix (Pitfall 7); optional `definition_id` persist (no-op when None — offline-safe). `materialize_skill_snapshots_if_needed` alias for the plan-prose name. Flips `test_publish_gate_rejects` / `test_snapshot_materialize` / `test_snapshot_immune_to_live_edit` GREEN.
+- ✓ Task 2 (commit `bbd06422`, TDD GREEN): gated branch at the TOP of `_handle_read_skill_file` (`getattr(ctx, "skill_snapshot", None) is not None` → read from `{storage_prefix}/{filename}`; None → live path byte-identical, SC#3 red line / Pitfall 4). Extracted the docx/xlsx/pptx/text/binary decode block into `_decode_skill_file_bytes` (PURE refactor) shared by both the live path AND the snapshot branch (un-wrapped `.download()` for byte-symmetry, Open Question 4). Flips `test_deep_noop` / `test_snapshot_routing` GREEN.
+- **Deviation [Rule 1] ×2:** (1) materializer named `materialize_skill_snapshots` (the binding Plan-01 TDD stub import) not the plan-prose `_if_needed`; `_if_needed` kept as an alias (same precedent as Plan 02's `_skill_block` reconciliation). (2) dropped the Python owned-or-global re-check in `_is_resolvable` (it wrongly rejected an owned skill whose owner ≠ run-user in the materialize fake) — visibility is enforced by the DB `.or_` clause; `_is_resolvable` checks only `is_enabled` + the test-only `visible` flag. No scope creep.
+- **Out of scope (deferred):** `tests/integration/test_threads_skills.py` 11 FK-violation failures (`runs_thread_id_fkey`) proven PRE-EXISTING via stash-at-Task-1 (11 failed identically with no dispatcher change) — live-DB fixture rot from the 98-failure cluster (`075.4-TEST-TRIAGE.md`), logged to `deferred-items.md`, NOT fixed. `test_099_skill_composition.py` 9 passed / 1 xfailed (Plan-04 kickoff stub); harness+098+unit-dispatcher 29 passed; net-new failures = 0.
+- **Next:** `/gsd:execute-phase 099` Plan 04 (LAST — `threads.py` `_ensure_skill_snapshots` kickoff wiring: validate + materialize-if-needed, `ValueError` → `HTTPException(400)`; flips the last xfail `test_kickoff_snapshot_wiring`).
 
 ### Recent Completed Phases
 
