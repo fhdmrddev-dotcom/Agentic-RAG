@@ -8,10 +8,10 @@ updated: 2026-06-09
 
 ## Current Test
 
-number: 6
-name: D-13 act/export whitelist refusal UX
+number: 3
+name: Parallel-thread scope isolation (SC#10 — parallel-thread axis)
 expected: |
-  A read-only phase refuses an act/export (write) tool with a clear refusal message and the run continues gracefully — the per-phase whitelist is preserved in the live UI.
+  Thread A runs a bound workflow (scoped) while Thread B runs an unbound Deep chat (whole-KB). A's retrieval stays inside its project subtree and B's whole-KB Deep retrieval is unchanged — no scope bleed between threads while both stream concurrently.
 awaiting: user response
 
 ## Tests
@@ -64,14 +64,30 @@ result: [pending]
 
 ### 6. D-13 act/export whitelist refusal UX
 expected: A read-only phase refuses an act/export (write) tool with a clear refusal message and the run continues gracefully — the per-phase whitelist is preserved in the live UI.
-result: [pending]
+result: pass
+evidence: |
+  Fixture "Read-only refusal (098 UAT — D-13 whitelist)" (slug readonly_refusal_098uat): phase
+  available_tools=['search_documents'] only; prompt forces a workspace_write call. Ran gpt-5.4-mini.
+  LAYER 1 (primary — model only sees whitelisted tools): gpt got only search_documents, did NOT write,
+  and reported clearly: "I'm unable to complete the required file write because no workspace_write tool
+  is available in this environment, so the write was refused" — then returned the search summary; run
+  completed gracefully. No tool_refused audit fired because gpt did NOT hallucinate the unlisted call
+  (well-behaved — respected layer 1).
+  LAYER 2 (dispatch backstop — refuses a HALLUCINATED unlisted tool + tool_refused audit): verified by 4
+  historical harness_audit tool_refused events (all tool=execute_code, allowed=['search_documents']) — the
+  backstop demonstrably fires when a model attempts an unlisted tool. dispatch_tool returns
+  tool_not_available_in_phase + audits (tool_dispatcher.py:1636-1647).
+  VERDICT: whitelist holds at both layers; read-only phase cannot write; clear message; graceful finish.
+  Side finding (NOT a scope/whitelist defect): the panel showed the phase slug as the placeholder "phase-0"
+  instead of the real DB slug "readonly_probe" → BUG-260609-04 (reconcile-floor placeholder clobbers the
+  real slug; this is the "why Phase 0" the operator flagged).
 
 ## Summary
 
 total: 6
-passed: 2
+passed: 3
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 
