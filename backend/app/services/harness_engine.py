@@ -1122,6 +1122,56 @@ async def _build_resume_context(run, redis, pool):
     from app.dependencies import get_supabase
     _service_supabase = get_supabase()
 
+    # 098 (GOV-01 / PROJ-02 — site 2 resume): source the run-start retrieval scope
+    # from the run's PROJECT binding so a bound workflow stays inside its project
+    # across a restart. Closes the folder_subtree_ids=None whole-KB bypass below
+    # (the GOV-01 resume gap RESEARCH §2 / Pitfall 3 found). Owner-scoped via the
+    # durable run owner (str(_user_id)): this path uses the SERVICE-ROLE client
+    # (RLS bypassed), so the resolver's user_id is the only guard keeping retrieval
+    # owner-scoped — same posture as the search owner-scope note above. An UNBOUND
+    # definition (project_folder_id None) resolves to None → whole-KB unchanged.
+    # Best-effort: a resolution failure must NEVER strand the resume sweep (fall back
+    # to None + log, matching the owner-settings posture below).
+    _resume_folder_subtree_ids: list[str] | None = None
+    if _user_id is not None:
+        try:
+            # LAZY import (the established harness-package pattern, :104-109): a
+            # top-level import of anything under app.services.harness runs that
+            # package's __init__ → phase_types.register_all() → imports back from THIS
+            # module before PHASE_TYPE_REGISTRY is bound (circular import). At call
+            # time the package is fully loaded, so the lazy import is cycle-safe — and
+            # the governance test patches app.services.harness.scope.* (the source
+            # module) so the fake is still picked up here.
+            from app.services.harness.scope import (  # noqa: PLC0415
+                assert_folder_scopes_subset,
+                resolve_project_subtree,
+            )
+            _resume_definition = await _load_run_definition(pool, run["run_id"])
+            if (
+                _resume_definition is not None
+                and _resume_definition.project_folder_id is not None
+            ):
+                # D-07 (DB half): re-assert every per-phase folder_scope ⊆ the project
+                # subtree. It was validated at definition-save, so this normally passes;
+                # a raise here is caught below (unscoped fallback) rather than stranding
+                # the sweep — distinct from the kickoff site, which 400s loudly.
+                await assert_folder_scopes_subset(
+                    _resume_definition,
+                    supabase=_service_supabase,
+                    user_id=str(_user_id),
+                )
+                _resume_folder_subtree_ids = await resolve_project_subtree(
+                    _resume_definition.project_folder_id,
+                    supabase=_service_supabase,
+                    user_id=str(_user_id),
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "resume: project-scope resolution failed for run %s "
+                "(falling back to unscoped search)", run.get("run_id"),
+            )
+            _resume_folder_subtree_ids = None
+
     # F8 (092-07): rehydrate the original kickoff_prompt from the durable
     # workflow_runs.inputs jsonb (carried on the `run` row by find_resumable_runs'
     # `wr.inputs` SELECT) so a resumed first phase still acts on the user's question
@@ -1191,12 +1241,14 @@ async def _build_resume_context(run, redis, pool):
         retry_feedback=None,
         # F5 (092-07): the tool-context substrate every Supabase tool reads via
         # ctx.<field>. supabase = the service-role client (owner-scoped retrieval
-        # enforced above). Folder scope is not durably recoverable from the run on
-        # resume → None (unscoped search, acceptable per the gap-plan). spawn = the
-        # module-level asyncio task spawner so a resumed sub-agent's task() can fan
-        # out; per_run_task_semaphore = a fresh per-run gate for this resumed run.
+        # enforced above). 098 (GOV-01): folder scope is now resolved from the run's
+        # project binding (resolved above) — a bound workflow stays inside its project
+        # across the restart instead of falling back to whole-KB. An unbound workflow
+        # resolves to None (unscoped, unchanged). spawn = the module-level asyncio task
+        # spawner so a resumed sub-agent's task() can fan out; per_run_task_semaphore =
+        # a fresh per-run gate for this resumed run.
         supabase=_service_supabase,
-        folder_subtree_ids=None,
+        folder_subtree_ids=_resume_folder_subtree_ids,
         scoped_folder_path=None,
         spawn=_resume_spawn,
         per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),

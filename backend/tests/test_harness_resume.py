@@ -556,9 +556,13 @@ async def test_resume_resolves_project_scope(monkeypatch, fake_redis, mock_async
         captured["assert_user_id"] = user_id
         return None
 
+    # _load_run_definition is a harness_engine module global (patch it there); the
+    # scope helpers are LAZY-imported from their source module inside
+    # _build_resume_context (the harness-package cycle-safe pattern), so patch them at
+    # the SOURCE module — mirrors the Plan 03 governance test_run_start_resolution.
     monkeypatch.setattr(harness_engine, "_load_run_definition", _fake_load_def, raising=False)
-    monkeypatch.setattr(harness_engine, "resolve_project_subtree", _fake_resolve, raising=False)
-    monkeypatch.setattr(harness_engine, "assert_folder_scopes_subset", _fake_assert, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.resolve_project_subtree", _fake_resolve, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.assert_folder_scopes_subset", _fake_assert, raising=False)
 
     owner = uuid.uuid4()  # asyncpg returns UUID objects on the resume path
     run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": owner, "inputs": {}}
@@ -600,7 +604,7 @@ async def test_resume_unbound_scope_stays_none(monkeypatch, fake_redis, mock_asy
         return ["SHOULD_NOT_APPEAR"]
 
     monkeypatch.setattr(harness_engine, "_load_run_definition", _fake_load_def, raising=False)
-    monkeypatch.setattr(harness_engine, "resolve_project_subtree", _fake_resolve, raising=False)
+    monkeypatch.setattr("app.services.harness.scope.resolve_project_subtree", _fake_resolve, raising=False)
 
     run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": uuid.uuid4(), "inputs": {}}
     ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
