@@ -248,8 +248,7 @@ def test_skill_block_compose():  # GREEN — Plan 02 (_skill_block) landed
     assert "rubric.md" not in single_block
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 02 (_build_phase_tool_context auto-whitelist)", strict=False)
-def test_auto_whitelist():
+def test_auto_whitelist():  # GREEN — Plan 02 (_build_phase_tool_context auto-whitelist) landed
     """Plan 02: read_skill_file auto-whitelisted on BOTH layers when a snapshot is present;
     inert on a tool-less phase; the snapshot is attached on the returned ctx."""
     from app.services.harness.phase_types import _build_phase_tool_context

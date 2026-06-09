@@ -174,6 +174,22 @@ def _skill_block(phase, ctx=None, *, with_files: bool | None = None) -> str:
     return block
 
 
+def _effective_tools(phase) -> list[str]:
+    """099 D-04 auto-whitelist: ``available_tools ∪ {'read_skill_file'}`` when the
+    phase carries a ``skill_snapshot``; else ``available_tools`` unchanged (a
+    byte-identical no-op).
+
+    Never DROPS a tool — only appends the one fixed, already-registered
+    ``read_skill_file`` (``tool_dispatcher.py``), and only when a snapshot is present
+    (T-099-07). ``apply_tool_budget`` never drops a whitelisted tool, so the appended
+    name survives the per-provider max_tools cap on layer 1.
+    """
+    base = list(phase.config.available_tools)
+    if getattr(phase.config, "skill_snapshot", None) is not None and "read_skill_file" not in base:
+        base.append("read_skill_file")
+    return base
+
+
 def _effective_model(phase, ctx) -> str:
     """The per-phase model override or the run's inherited model."""
     return getattr(phase.config, "model", None) or getattr(ctx, "model", "") or ""
@@ -206,6 +222,10 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
             "producer, startup-sweep resume, POST /continue resume) MUST set "
             "producer_run_id."
         )
+    # 099 D-04 auto-whitelist — read_skill_file ∪ available_tools when the phase
+    # carries a skill_snapshot (else unchanged). Computed ONCE; feeds BOTH the layer-2
+    # phase_whitelist (dispatch backstop) and the available_tools the ctx advertises.
+    _tools = _effective_tools(phase)
     # 098 PROJ-02 — per-phase folder_scope narrowing (the single ToolContext-build
     # seam). The resolved PROJECT subtree (ctx.folder_subtree_ids, bound server-side
     # at run-start) is narrowed by the phase's declared folder_scope (∩, narrow-ONLY).
@@ -236,13 +256,19 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         previous_files_in_run={},
         parent_run_id=None,
         per_run_task_semaphore=getattr(ctx, "per_run_task_semaphore", None),
-        available_tools=list(phase.config.available_tools),
+        # 099 D-04 — the effective list (auto-whitelisted read_skill_file when a
+        # snapshot is present; else byte-identical to available_tools).
+        available_tools=_tools,
         # D-05 layer 2 — the dispatch-time backstop for hallucinated tool names.
-        phase_whitelist=frozenset(phase.config.available_tools),
+        phase_whitelist=frozenset(_tools),
         # 096 review WR-03 — ctx.run_id IS workflow_runs.id on the harness ctx bag
         # (Facet A docstring above); threads it through so the tool_refused audit
         # lands in the same run namespace as every other harness_audit row.
         workflow_run_id=getattr(ctx, "run_id", None),
+        # 099 D-04 attach — the materialized snapshot threaded onto the per-phase
+        # dispatch ctx (Plan 03's gated read branch consumes it). None when absent
+        # => Plan 03 read is a no-op => Deep/non-skill phases byte-identical.
+        skill_snapshot=getattr(phase.config, "skill_snapshot", None),
     )
 
 
@@ -316,7 +342,9 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     The step cap clamps to the Explorer=8 convention (D-12) when the config carries
     the model default. Consumes ctx.retry_feedback (producer = Plan 05).
     """
-    whitelist = frozenset(phase.config.available_tools)
+    # 099 D-04 — layer-1 whitelist over the EFFECTIVE list so the budget-capped tools
+    # the MODEL sees include read_skill_file when the phase carries a skill_snapshot.
+    whitelist = frozenset(_effective_tools(phase))
     model = _effective_model(phase, ctx)
 
     # D-05 layer 1 — the model only SEES the whitelisted, budget-capped tools.
@@ -354,8 +382,10 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     result = await run_task_sub_agent(
         parent_ctx=phase_ctx,
         description=description,
+        # 099 D-04 — the sub-agent's own allowed_tools subset must ADMIT read_skill_file
+        # when present, else layer-1 exposes it but the sub-agent rejects the call.
+        allowed_tools=_effective_tools(phase),
         instructions=None,
-        allowed_tools=list(phase.config.available_tools),
         max_steps=max_steps,
         system_prompt_override=system_prompt,
         tools_override=tools_override,
@@ -389,7 +419,9 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         # Nothing to fan out over — degrade to a single sub-agent on the prompt.
         sub_questions = [phase.config.prompt]
 
-    whitelist = frozenset(phase.config.available_tools)
+    # 099 D-04 — layer-1 whitelist over the EFFECTIVE list (read_skill_file ∪ tools
+    # when a snapshot is present), so each branch's budget-capped schemas include it.
+    whitelist = frozenset(_effective_tools(phase))
     model = _effective_model(phase, ctx)
     # WR-04 (091-08): pass the budget-capped list to each sub-agent (was discarded).
     tools_override = apply_tool_budget(
@@ -425,8 +457,9 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
             return await run_task_sub_agent(
                 parent_ctx=phase_ctx,
                 description=description,
+                # 099 D-04 — admit read_skill_file on the sub-agent's own subset too.
+                allowed_tools=_effective_tools(phase),
                 instructions=None,
-                allowed_tools=list(phase.config.available_tools),
                 max_steps=max_steps,
                 system_prompt_override=f"{base_prompt}\n\nSub-question: {question}",
                 tools_override=tools_override,
