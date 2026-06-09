@@ -128,7 +128,7 @@ async def create_workflow_run(
 
 
 async def list_published_workflows(
-    pool: asyncpg.Pool, *, user_id: UUID
+    pool: asyncpg.Pool, *, user_id: UUID, project_folder_id: UUID | None = None
 ) -> list[dict]:
     """Published workflow definitions visible to a user (the picker feed).
 
@@ -136,17 +136,33 @@ async def list_published_workflows(
     (``is_global`` OR ``created_by = $1``) — a user never sees another user's
     unpublished or private definitions (T-092-07). Returns the id/slug/name the
     picker needs. ``$N`` placeholders only.
+
+    PROJECT BINDING (Phase 098 / PROJ-01, D-03): when ``project_folder_id`` is
+    supplied, the result is additionally filtered to definitions whose JSONB
+    ``definition->>'project_folder_id'`` equals that folder — the queryable
+    half of "a project (folder) owns a library of workflows". This is a
+    JSONB-path predicate on the existing ``definition`` column: NO new column,
+    NO expression index, ZERO migration (RESEARCH §5/§6 — sufficient at current
+    scale). The user-scope clause is evaluated FIRST and the project filter is
+    AND-appended, so it can only NARROW, never widen, visibility (T-098-09 /
+    V4 — a caller cannot see another user's private workflow by guessing a
+    ``project_folder_id``). The value is bound as a positional ``$N`` parameter
+    as ``str(project_folder_id)`` because ``definition->>'key'`` yields TEXT —
+    never string-interpolated into the SQL (T-098-10 / V5; only the placeholder
+    INDEX ``$N`` — a code-derived int — is f-string-built). When omitted the
+    query is byte-identical to the pre-098 full published list (backward
+    compatible).
     """
-    rows = await pool.fetch(
-        """
-        SELECT id, slug, name
-        FROM workflow_definitions
-        WHERE status = 'published'
-          AND (is_global = true OR created_by = $1)
-        ORDER BY name
-        """,
-        user_id,
+    sql = (
+        "SELECT id, slug, name FROM workflow_definitions "
+        "WHERE status = 'published' AND (is_global = true OR created_by = $1)"
     )
+    params: list = [user_id]
+    if project_folder_id is not None:
+        params.append(str(project_folder_id))  # definition->>'key' returns TEXT → bind str
+        sql += f" AND definition->>'project_folder_id' = ${len(params)}"
+    sql += " ORDER BY name"
+    rows = await pool.fetch(sql, *params)
     return [dict(r) for r in rows]
 
 
