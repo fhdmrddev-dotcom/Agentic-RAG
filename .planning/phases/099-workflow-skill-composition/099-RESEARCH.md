@@ -417,24 +417,28 @@ supabase.table("skills")
 
 **Note:** This table is intentionally short — the bulk of this research is `[VERIFIED]` against live code, not `[ASSUMED]`. The three assumptions above are the only material unknowns and all are low-risk with documented mitigations.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where does the snapshot materialize, given no publish endpoint exists? (THE decision — Pitfall 6)**
+   - **RESOLVED by operator decision D-03a (CONTEXT.md, 2026-06-10):** snapshot at FIRST KICKOFF — lazy + idempotent, via the standalone `harness/skill_snapshot.py` service, one-liner call from `threads.py`, shaped for Phase 103's publish endpoint to reuse. Implemented by Plans 099-03 + 099-04.
    - What we know: no save/publish API today; kickoff is the only enforcement seam; drafts can't run.
    - What's unclear: snapshot-at-first-kickoff (lazy/idempotent, ships in 099) vs build-the-publish-endpoint-now (overlaps Phase 103 WFAUTH-01).
    - Recommendation: snapshot-at-first-kickoff via a `harness/skill_snapshot.py` service called as a one-liner from `threads.py` kickoff (mirrors `assert_folder_scopes_subset`), structured so a Phase-103 publish endpoint reuses the same materializer. Surface to discuss-phase — this changes the plan shape.
 
 2. **Snapshot JSONB shape: per-phase `skill_snapshot` object vs a definition-level snapshot map? (Claude's Discretion)**
+   - **RESOLVED by planner discretion:** per-phase co-located `skill_snapshot` on the phase config (the recommendation) — Plan 099-01 Task 2.
    - What we know: `skill_ref` rides each phase config (D-08); a phase references at most one skill (D-11).
    - What's unclear: whether the materialized content sits on the same phase config (co-located, simplest) or in a `WorkflowDefinition`-level `skill_snapshots: dict[skill_id, SkillSnapshot]` (de-duplicated if two phases reference the same skill).
    - Recommendation: per-phase co-located `skill_snapshot` on the phase config — simplest, serializes cleanly with `_StrictBase`, matches the "phase is self-contained" model. De-dup is a non-issue at current scale (files are small). Planner picks.
 
 3. **Storage bucket/prefix + RLS for snapshot copies (Claude's Discretion — Pitfall 7)**
+   - **RESOLVED by planner discretion:** `{user_id}/_snapshots/{def-slug}-v{version}/{skill_id}/...` in the existing `skill-files` bucket (author-scoped first segment keeps existing RLS valid, no migration) — Plan 099-03 Task 1. Global-publish variant noted for Phase 109.
    - What we know: existing `skill-files` RLS keys read on the first path segment = reader's user id; harness runs as service role.
    - What's unclear: `{user_id}/_snapshots/...` (author-readable, not global-readable) vs service-role-only vs a new bucket.
    - Recommendation: `{user_id}/_snapshots/{def_id}/{version}/{filename}` in the existing `skill-files` bucket (no migration, author-readable). Note for Phase 109 that global publish needs a global-readable variant.
 
 4. **Wrap the gated READ branch in `run_in_threadpool` or match the existing un-wrapped read? (Pitfall 1)**
+   - **RESOLVED by planner discretion:** match the existing un-wrapped `.download()` on the snapshot READ (byte-symmetry with the live path); wrap only the multi-file WRITE materializer — Plan 099-03 Task 2.
    - Recommendation: match the existing un-wrapped `.download()` for the read (byte-symmetry with the live path; single small file); wrap only the multi-file WRITE materializer. Low stakes.
 
 ## Environment Availability
