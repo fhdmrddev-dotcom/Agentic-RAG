@@ -149,12 +149,7 @@ async def test_deep_noop(make_tool_context, fake_redis, monkeypatch):
     assert not any(p.get("type") == "scope_violation" for p in emitted)
 
 
-# ── RED-by-design (cross-plan TDD targets) ────────────────────────────────────
-@pytest.mark.xfail(
-    reason="RED until Plan 04 wires run-start scope resolution at the 3 ctx-build sites "
-    "(kickoff / resume / Continue); asserts the TARGET behavior",
-    strict=False,
-)
+# ── Cross-plan governance guards (Plans 04/05 shipped — now GREEN, active regression protection) ──
 async def test_run_start_resolution(fake_redis, mock_asyncpg_pool, monkeypatch):
     # RED until Plan 04 — run-start MUST source scope from definition.project_folder_id
     # (not the thread folder). Drives the resume resolution helper (_build_resume_context);
@@ -207,11 +202,6 @@ async def test_run_start_resolution(fake_redis, mock_asyncpg_pool, monkeypatch):
     assert ctx.folder_subtree_ids == [A]  # RED now (None); GREEN once Plan 04 resolves from the binding
 
 
-@pytest.mark.xfail(
-    reason="RED until Plan 05 wires the gated ⊆ clip + scope_violation emit in "
-    "_handle_search_documents; asserts the TARGET behavior",
-    strict=False,
-)
 async def test_clip_and_emit(make_tool_context, fake_redis, monkeypatch):
     # RED until Plan 05 — INJECT an out-of-scope row (Pitfall 4: the RPC p_folder_ids
     # primary filter means a live run never naturally emits one). Target: the out-of-scope

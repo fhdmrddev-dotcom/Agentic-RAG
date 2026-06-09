@@ -66,7 +66,7 @@ class ToolContext:
     pool: Any  # asyncpg pool
     user_settings: Any  # UserEffectiveSettings
     current_user: dict  # {"id": str, ...}
-    folder_subtree_ids: set[str] | None
+    folder_subtree_ids: list[str] | None  # list, NOT set — p_folder_ids is json.dumps'd (Pitfall 1)
     scoped_folder_path: str | None
     emit: Callable[..., Awaitable[None]]  # reference to _emit
     spawn: Callable  # reference to _spawn
