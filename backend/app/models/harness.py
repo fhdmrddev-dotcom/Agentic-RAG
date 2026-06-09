@@ -30,6 +30,24 @@ class _StrictBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class SkillSnapshot(_StrictBase):
+    """099 WFSKILL-01 — the materialized, immutable copy of a referenced skill.
+
+    Lives inside the locked WorkflowDefinition JSONB so a later live-skill edit/delete
+    cannot change a published run (D-01). Materialized at first kickoff (D-03a) by the
+    Plan 03 ``skill_snapshot.py`` service. Inner fields may be required: this object only
+    exists when a skill is present. Defined ABOVE the phase configs so the
+    ``skill_snapshot: SkillSnapshot | None`` annotations resolve at class build.
+    """
+
+    skill_id: UUID                       # the source skill id (provenance/routing; D-09)
+    name: str                            # display + read_skill_file routing-by-name within the phase
+    description: str | None = None       # display metadata
+    instructions: str                    # the copied skill instructions (D-01 content copy)
+    files: list[str] = Field(default_factory=list)   # filenames (the D-06 manifest — names, NOT contents)
+    storage_prefix: str                  # the snapshot Storage prefix the copies live under (D-02)
+
+
 # ── 5 phase-type configs (HARNESS-01 / 091 SC#1) ────────────────────────────
 class ProgrammaticPhaseConfig(_StrictBase):
     phase_type: Literal["programmatic"]
@@ -50,6 +68,10 @@ class LlmSinglePhaseConfig(_StrictBase):
     # retrieval phase). Load-bearing on llm_agent + llm_batch_agents; inert on
     # llm_single (no tools). Carried here for shape symmetry across the family.
     folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
+    # 099 WFSKILL-01 (D-07/D-08): carried for shape symmetry. llm_single composes the
+    # skill instructions only — the file manifest is inert here (no read_skill_file tool).
+    skill_ref: UUID | None = None             # 099 WFSKILL-01 (D-09): resolved skill id, NOT a name
+    skill_snapshot: SkillSnapshot | None = None  # materialized at first kickoff (D-01/D-02/D-03a); None on drafts
 
 
 class LlmAgentPhaseConfig(_StrictBase):
@@ -65,6 +87,8 @@ class LlmAgentPhaseConfig(_StrictBase):
     wall_clock_seconds: int | None = None
     model: str | None = None  # None = inherit thread settings
     folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
+    skill_ref: UUID | None = None             # 099 WFSKILL-01 (D-09): resolved skill id, NOT a name
+    skill_snapshot: SkillSnapshot | None = None  # materialized at first kickoff (D-01/D-02/D-03a); None on drafts
 
 
 class LlmBatchAgentsPhaseConfig(_StrictBase):
@@ -82,6 +106,8 @@ class LlmBatchAgentsPhaseConfig(_StrictBase):
     wall_clock_seconds: int | None = None  # None → engine default (Plan 05)
     model: str | None = None  # None = inherit thread settings
     folder_scope: list[UUID] | None = None  # 098 PROJ-02 (D-02 + RESEARCH A2): resolved id list, NOT a prompt hint
+    skill_ref: UUID | None = None             # 099 WFSKILL-01 (D-09): resolved skill id, NOT a name
+    skill_snapshot: SkillSnapshot | None = None  # materialized at first kickoff (D-01/D-02/D-03a); None on drafts
 
 
 class LlmHumanInputPhaseConfig(_StrictBase):
@@ -171,5 +197,21 @@ class WorkflowDefinition(_StrictBase):
                 raise ValueError(
                     f"phase '{phase.slug}' declares folder_scope but the workflow has no "
                     f"project_folder_id for it to be a subset of"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _skill_snapshot_requires_ref(self) -> "WorkflowDefinition":
+        # 099 WFSKILL-01 (T-099-06) STRUCTURAL half only: a materialized skill_snapshot
+        # cannot exist without the skill_ref it was materialized from — a snapshot
+        # without a ref is a half-formed locked definition. Pure shape: the DB-aware
+        # publish gate (skill existence / visibility / is_enabled) lives in Plan 03's
+        # skill_snapshot.py, which needs supabase + user_id — do NOT add DB logic here.
+        for phase in self.phases:
+            snapshot = getattr(phase.config, "skill_snapshot", None)
+            ref = getattr(phase.config, "skill_ref", None)
+            if snapshot is not None and ref is None:
+                raise ValueError(
+                    f"phase '{phase.slug}' carries a skill_snapshot but no skill_ref"
                 )
         return self
