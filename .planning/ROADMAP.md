@@ -121,7 +121,14 @@
   1. A user can upload a docx/pptx/xlsx into a thread temporarily (workspace-only via `POST /threads/{tid}/workspace/files`, `kind='template_input'`, RLS-scoped to the owner).
   2. The uploaded template is never ingested, never embedded, and never appears in KB search results — closing the injection-via-uploaded-doc vector.
   3. The uploaded template expires via TTL (`expires_at`) + a cron sweep and is no longer retrievable after expiry.
-**Plans**: TBD
+**Plans**: 6 plans (4 waves)
+Plans:
+- [ ] 100-01-PLAN.md (Wave 0) — TDD test scaffold: OOXML fixtures + 12 backend stubs + FilesSection render stubs
+- [ ] 100-02-PLAN.md (Wave 1) — Migration 068 (kind + expires_at + partial index + app_settings.template_ttl_hours) + [BLOCKING] live apply + full-schema regen + harness.py co-lock repoint
+- [ ] 100-03-PLAN.md (Wave 2) — asyncpg data layer: gate the 2 tool read seams (D-06/D-11), is_expired flag (D-10), write_file kind/expires_at, OOXML binary-MIME hygiene
+- [ ] 100-04-PLAN.md (Wave 3) — POST upload route + OOXML magic-byte validation (D-12) + 4 gated REST GET routes (signed-URL bypass closed) + template_ttl_hours settings field (D-05)
+- [ ] 100-05-PLAN.md (Wave 3) — template_service (idempotent sweep D-07 + GREATEST-only run-pin D-09) + main.py lifespan sweep + thin threads.py kickoff pin (G-5) + D-10 tool error
+- [ ] 100-06-PLAN.md (Wave 4) — panel upload affordance (D-01) + Template badge/countdown/amber/per-ext card (D-02) + reconcile; agent files byte-identical (D-11)
 **UI hint**: yes
 **Note**: The one genuinely net-new plumbing piece (reuses the v2.7 per-thread workspace table additively; low blast radius).
 
