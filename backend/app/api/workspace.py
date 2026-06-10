@@ -190,6 +190,17 @@ async def upload_template(
 upload_workspace_template = upload_template
 
 
+def _now_iso() -> str:
+    """Current UTC time as an ISO-8601 string for the supabase-py expiry gate (D-06).
+
+    The gated PostgREST ``.or_`` filter is applied to each of the 4 REST GET routes
+    (D-06 / D-11): a NULL-expiry agent row matches the IS-NULL branch and is returned
+    exactly as today (byte-identical); a template row passes only while its expiry is
+    in the future. The 098 D-05a / 099 D-04 gated-no-op pattern.
+    """
+    return datetime.now(timezone.utc).isoformat()
+
+
 @router.get("/files")
 async def list_workspace_files(
     thread_id: str,
@@ -206,8 +217,9 @@ async def list_workspace_files(
 
     query = (
         supabase.table("workspace_files")
-        .select("id, path, size_bytes, mime_type, created_at, updated_at")
+        .select("id, path, size_bytes, mime_type, created_at, updated_at, kind, expires_at")
         .eq("thread_id", thread_id)
+        .or_("expires_at.is.null,expires_at.gt." + _now_iso())  # D-06: exclude expired templates; agent files pass
         .order("path")
     )
     if prefix:
@@ -230,11 +242,14 @@ async def get_workspace_file_content(
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)
 
+    # Pitfall 2: gate THIS row SELECT (before the 60s signed URL is minted below)
+    # so an expired template's row reads as None -> 404 -> no URL ever minted (D-06).
     resp = await aexec(
         supabase.table("workspace_files")
-        .select("id, path, size_bytes, mime_type, content_inline, content_storage_path")
+        .select("id, path, size_bytes, mime_type, content_inline, content_storage_path, kind, expires_at")
         .eq("id", file_id)
         .eq("thread_id", thread_id)
+        .or_("expires_at.is.null,expires_at.gt." + _now_iso())
         .maybe_single()
     )
     row = resp.data if resp is not None else None
@@ -312,6 +327,7 @@ async def list_workspace_file_versions(
         .select("id")
         .eq("id", file_id)
         .eq("thread_id", thread_id)
+        .or_("expires_at.is.null,expires_at.gt." + _now_iso())  # D-06: expired template versions not listable
         .maybe_single()
     )
     file_row = file_resp.data if file_resp is not None else None
@@ -351,6 +367,7 @@ async def get_workspace_file_diff(
         .select("id, path, thread_id")
         .eq("id", file_id)
         .eq("thread_id", thread_id)
+        .or_("expires_at.is.null,expires_at.gt." + _now_iso())  # D-06: expired template diff not retrievable
         .maybe_single()
     )
     file_row = file_resp.data if file_resp is not None else None
