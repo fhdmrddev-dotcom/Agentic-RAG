@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: planning
-last_updated: "2026-06-10T07:59:50.729Z"
+last_updated: "2026-06-10T09:26:24.365Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 18
+  completed_plans: 18
   percent: 100
 ---
 
@@ -72,6 +72,15 @@ Last activity: 2026-06-10
 - ✓ Task 4 (commit `f4b39d5f`): regression sweep — 099 suite 15/15; harness+098 39 passed + 1 pre-existing (`bounded_retry` KeyError, re-proven PRE-EXISTING via stash-at-base since Task 3 touched `harness_engine.py`); dispatcher+harness-engine/resume 93 passed. **Net-new failures = 0.**
 - **No deviations.** All 6 STRIDE threats addressed (T-099-07-01..06). Deep-mode byte-identical (graft only on workflow defs; `ToolContext.skill_snapshot` default None).
 - **Next:** operator re-runs UAT row L1 live (first kickoff should now succeed — no 500, run streams, title resolves, `read_skill_file` round-trips), then L2-L10. Then `/gsd:verify-work 099` finalize + `/gsd:secure-phase 099`.
+
+**Plan 099-08 (gap closure — UAT L10) — Tasks 1-3 COMPLETE, Task 4 checkpoint AWAITING OPERATOR (2026-06-10):** Closes the L10 frontend half (backend gate already DB-verified fail-closed). The send path no longer swallows non-409 HTTP refusals — a disabled-skill 400 now surfaces the server `detail` in the owning thread's error banner, both optimistic temps roll back, and the typed prompt repopulates the composer.
+
+- ✓ Task 1 (commit `c899cbb9`): `api.ts postMessage` reads the body before throwing → `ApiError(detail, status)` (string-detail guard + generic fallback); byte-equivalent for 409; +4 postMessage error tests.
+- ✓ Task 2 (commit `6c0ee970`): `StreamsProvider` non-409 `ApiError` catch branch (rollback both temps + per-thread banner = server detail + stash prompt); `streamsStore.failedSendDrafts` Map + `useFailedSendDraftForThread`; +4 099-08 tests; 409 + network + success unchanged.
+- ✓ Task 3 (commit `9b376fbc`): `ChatArea` banner shows `reconcileError.message` for ANY ApiError (no Retry for non-retryable 400/403/404/409/422); failed draft → prefill seam (cleared on consume + dismiss); text-children render (no `dangerouslySetInnerHTML`, T-099-08-01); new `ChatAreaBanner.test.tsx` (4 cases). `tsc` clean; **net-new vitest failures = 0** (10 streamsProvider failures = pre-existing SEED-056 rot, stash-at-base proven).
+- ⏸ Task 4 (`checkpoint:human-verify`, G-4): live L10 re-run across glm/minimax/gpt-5.4-mini — operator-driven acceptance bar, NOT executed. Resume signal = "approved".
+- **No deviations.** Zero backend files touched; additive-only inside the existing catch. SUMMARY: `.planning/phases/099-workflow-skill-composition/099-08-SUMMARY.md`.
+- **Next:** operator runs the Task 4 live L10 re-run (see SUMMARY "Checkpoint — Awaiting Operator Verification").
 
 ### Recent Completed Phases
 
