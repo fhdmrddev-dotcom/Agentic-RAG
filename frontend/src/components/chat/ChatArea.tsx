@@ -383,6 +383,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onSend={handleSend}
       onStop={stopStreaming}
       disabled={isStreaming}
+      threadId={thread?.id ?? null}
       providers={providers}
       selectedProvider={selectedProvider}
       onProviderChange={handleProviderChange}

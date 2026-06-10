@@ -29,6 +29,11 @@ interface Props {
   onSend: (content: string) => void
   onStop?: () => void
   disabled: boolean
+  /** 099-08 follow-up (per-thread drafts): the thread this composer is serving.
+   *  Switching threads saves the current text under the OUTGOING thread and
+   *  restores the INCOMING thread's saved draft (new chat = empty). Without
+   *  this, one global composer value follows the user across threads. */
+  threadId?: string | null
   providers?: Provider[]
   selectedProvider?: string
   onProviderChange?: (providerId: string) => void
@@ -75,10 +80,23 @@ const PROVIDER_LABELS: Record<string, string> = {
   ollama: "Ollama",
 }
 
+// Per-thread unsent composer drafts (session-scoped, Slack-style). Keyed by
+// thread id; the pre-creation "new chat" composer uses NEW_CHAT_DRAFT_KEY.
+// Module-level on purpose: survives MessageInput re-renders and thread
+// navigation without persisting anything.
+const NEW_CHAT_DRAFT_KEY = "__new__"
+const composerDraftsByThread = new Map<string, string>()
+
+/** Test-only: reset the module-scoped draft map between test cases. */
+export function _resetComposerDraftsForTest() {
+  composerDraftsByThread.clear()
+}
+
 export function MessageInput({
   onSend,
   onStop,
   disabled,
+  threadId,
   providers = [],
   selectedProvider,
   onProviderChange,
@@ -103,6 +121,24 @@ export function MessageInput({
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Per-thread drafts: on thread switch, stash the outgoing thread's unsent
+  // text and restore the incoming thread's stash (or empty). First mount is a
+  // no-op (prevDraftKeyRef seeds to the current key). valueRef mirrors `value`
+  // so the switch effect reads the LATEST text, not a stale closure.
+  const draftKey = threadId ?? NEW_CHAT_DRAFT_KEY
+  const prevDraftKeyRef = useRef(draftKey)
+  const valueRef = useRef(value)
+  valueRef.current = value
+  useEffect(() => {
+    const prevKey = prevDraftKeyRef.current
+    if (prevKey === draftKey) return
+    const outgoing = valueRef.current
+    if (outgoing.trim()) composerDraftsByThread.set(prevKey, outgoing)
+    else composerDraftsByThread.delete(prevKey)
+    setValue(composerDraftsByThread.get(draftKey) ?? "")
+    prevDraftKeyRef.current = draftKey
+  }, [draftKey])
+
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -125,6 +161,8 @@ export function MessageInput({
     if (!trimmed || disabled || workflowLocked) return
     onSend(trimmed)
     setValue("")
+    // Per-thread drafts: a successful hand-off consumes the draft.
+    composerDraftsByThread.delete(draftKey)
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto"
     }
