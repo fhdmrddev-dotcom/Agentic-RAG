@@ -671,6 +671,144 @@ async def test_096_whitelist_refusal(
 
 
 # ───────────────────────────────────────────────────────────────────────────────
+# Test 3b — 099 CR-02: the materialized skill_snapshot reaches the dispatch ctx
+#           on the LIVE harness chain (run_task_sub_agent -> dispatch_tool)
+# ───────────────────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_099_snapshot_routing_live_chain(
+    mock_asyncpg_pool, fake_redis, build_workflow_definition, monkeypatch
+):
+    """CR-02 regression lock (verification truth #6): a skill-bearing
+    ``llm_batch_agents`` phase fires ``read_skill_file``; the REAL
+    ``run_task_sub_agent`` -> REAL ``dispatch_tool`` chain MUST hand the leaf a
+    ``ctx.skill_snapshot`` that is the materialized snapshot (NOT None).
+
+    ``_build_phase_tool_context`` attaches the snapshot onto the PARENT phase
+    ctx (phase_types.py:271); ``run_task_sub_agent`` rebuilds a fresh sub_ctx and
+    must propagate it (task_service.py — the Task-1 fix). Before that fix the
+    sub_ctx.skill_snapshot defaulted to None, so the snapshot-routing gate at
+    tool_dispatcher.py:479 was structurally unreachable on the live path and
+    read_skill_file silently tracked the LIVE skill (breaking D-01 immutability).
+
+    Mirrors ``test_096_whitelist_refusal``: drives the REAL engine + REAL
+    run_task_sub_agent + REAL dispatch_tool through the ScriptedGateway, NEVER
+    patches run_task_sub_agent, substitutes ONLY the read_skill_file leaf via
+    _TOOL_REGISTRY. The assertion is on WHAT CTX the real dispatch chain handed
+    the leaf — exactly the sub_ctx the fix populates. FAILS pre-fix
+    (captured snapshot is None), PASSES post-fix.
+    """
+    from app.models.harness import SkillSnapshot
+    from app.services import harness_engine, task_service
+
+    pool = mock_asyncpg_pool
+
+    # The materialized, immutable snapshot the phase config carries (D-01/D-02).
+    snap = SkillSnapshot(
+        skill_id=uuid.uuid4(),
+        name="Risk Reviewer",
+        description=None,
+        instructions="Always cite the date first.",
+        files=["rubric.md"],
+        storage_prefix="u/_snapshots/ci-skill-v1/skill",
+    )
+
+    # A single-branch llm_batch_agents phase carrying skill_ref + skill_snapshot.
+    # _build_phase_tool_context attaches the snapshot onto the parent phase ctx and
+    # _effective_tools auto-whitelists read_skill_file (so the layer-2 whitelist
+    # guard admits it). Pass the snapshot as a JSON-shaped dict — WorkflowDefinition
+    # model-validates the discriminated phase config and coerces it back to the model.
+    wf = build_workflow_definition(
+        [
+            {"slug": "review", "phase_index": 0,
+             "config": {"phase_type": "llm_batch_agents",
+                        "prompt": "CI-SNAPSHOT: review against the skill rubric.",
+                        "available_tools": ["read_skill_file"],
+                        "max_parallel_agents": 5,
+                        "merge_strategy": "concat",
+                        "skill_ref": str(snap.skill_id),
+                        "skill_snapshot": snap.model_dump(mode="json")}},
+        ],
+        slug="ci_snapshot",
+        name="CI snapshot routing",
+    )
+    run_id = uuid.uuid4()
+    phase_id = uuid.uuid4()
+    pool.set_fetch_result(
+        [{"id": phase_id, "slug": "review", "phase_index": 0,
+          "status": "pending", "output": {}}]
+    )
+
+    def route(request):
+        sys_prompt = request.system_prompt
+        if "CI-SNAPSHOT" not in sys_prompt:
+            raise AssertionError(f"unexpected LLM call: {sys_prompt[:80]!r}")
+        if _has_tool_result(request):
+            return _final_events("Read the rubric.")
+        # First turn: fire read_skill_file on the (auto-whitelisted) skill tool.
+        return _tool_call_events(
+            "read_skill_file",
+            {"skill_name": "Risk Reviewer", "filename": "rubric.md"},
+            "call_read_1",
+        )
+
+    gw = ScriptedGateway(route, pool=pool)
+
+    # The regression sentinel: capture the ctx.skill_snapshot the REAL dispatch
+    # chain hands the leaf. Substituting only the leaf keeps dispatch_tool (the
+    # whitelist guard + the ctx that flows in) REAL — the SAME technique
+    # test_096_whitelist_refusal uses for execute_code/search_documents.
+    captured = {"snapshot": "UNSET"}
+
+    async def _sentinel_read_skill_file(args, ctx) -> ToolResult:
+        captured["snapshot"] = getattr(ctx, "skill_snapshot", None)
+        return ToolResult(result=json.dumps({"content": "rubric body"}))
+
+    monkeypatch.setitem(_TOOL_REGISTRY, "read_skill_file", _sentinel_read_skill_file)
+
+    spawned: list[asyncio.Task] = []
+    ctx = _make_workflow_ctx(
+        run_id=run_id, pool=pool, redis=fake_redis,
+        inputs={"kickoff_prompt": "CI snapshot kickoff."},
+        spawned=spawned,
+    )
+
+    with patch.object(task_service, "open_stream", gw.open_stream), \
+         patch.object(task_service, "get_pg_pool", _make_get_pool(pool)), \
+         patch("app.config.get_model_capability_async", _fake_capability):
+        await asyncio.wait_for(
+            harness_engine.run_workflow(
+                run_id, wf, ctx, pool=pool, redis=fake_redis
+            ),
+            timeout=30,
+        )
+    if spawned:
+        await asyncio.wait_for(asyncio.gather(*spawned), timeout=30)
+
+    # ── The read_skill_file leaf was actually reached on the live chain ───────
+    assert captured["snapshot"] != "UNSET", (
+        "the read_skill_file leaf was never dispatched — the scripted tool call "
+        "did not reach the real dispatch chain"
+    )
+
+    # ── CR-02 regression lock: the snapshot reached the sub_ctx dispatch ──────
+    assert captured["snapshot"] is not None, (
+        "CR-02 regression: run_task_sub_agent must propagate skill_snapshot onto "
+        "sub_ctx; the read_skill_file leaf saw ctx.skill_snapshot=None (the "
+        "dispatch gate at tool_dispatcher.py:479 is unreachable on the live path)"
+    )
+    assert captured["snapshot"].storage_prefix == snap.storage_prefix, (
+        "the leaf must receive the SAME materialized snapshot the phase config "
+        "carried (immutable-copy routing, D-01)"
+    )
+
+    # ── The phase did NOT crash — it completed and the run terminalized ───────
+    active, completed = _phase_write_indices(pool.calls, phase_id)
+    assert active and completed and active[0] < completed[0]
+    assert _run_terminal_status(pool.calls, run_id) == "completed"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
 # Test 4 — resume 2-phase writes: crash-leaves-active, sweep re-runs from the top
 # ───────────────────────────────────────────────────────────────────────────────
 
