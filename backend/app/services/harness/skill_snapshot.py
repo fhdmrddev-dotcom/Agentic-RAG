@@ -236,17 +236,56 @@ async def materialize_skill_snapshots(
         phase.config.skill_snapshot = snap
         changed = True
 
-    # PERSISTENCE NOTE (D-03a): persisting back makes materialize truly one-time across
-    # runs; skipped when no definition_id (keeps the unit test offline). The kickoff
-    # caller (Plan 04) has the id.
+    # PERSISTENCE (D-03a / 099-07): persist the materialized snapshots to the
+    # skill_snapshots SIBLING column (migration 067) — NOT the definition JSONB,
+    # which is locked by the published-immutability trigger (056). Keyed by phase
+    # slug. The `.is_("skill_snapshots", "null")` CAS guard means a concurrent
+    # double-kickoff LOSER updates 0 rows and proceeds with its identical in-memory
+    # snapshot (deterministic storage_prefix → same content); closes IN-03 (no-CAS
+    # race, REVIEW.md). Skipped when no definition_id (keeps unit tests offline).
     if changed and definition_id is not None:
+        snapshots_map = {
+            p.slug: p.config.skill_snapshot.model_dump(mode="json")
+            for p in skill_phases
+            if getattr(p.config, "skill_snapshot", None) is not None
+        }
         await run_in_threadpool(
             lambda: supabase.table("workflow_definitions")
-            .update({"definition": definition.model_dump(mode="json")})
+            .update({"skill_snapshots": snapshots_map})
             .eq("id", definition_id)
+            .is_("skill_snapshots", "null")
             .execute()
         )
 
+    return definition
+
+
+def graft_skill_snapshots(definition, snapshots_map):
+    """Re-attach persisted snapshots (099-07) onto a freshly-parsed definition.
+
+    The materialized snapshots live in the workflow_definitions.skill_snapshots
+    sibling column (NOT the locked definition JSONB), so a definition parsed from
+    the DB carries None on every phase.config.skill_snapshot. This grafts each
+    persisted snapshot back, keyed by phase slug, BEFORE validate/materialize at the
+    read points (kickoff + run-definition load). For a phase that has a skill_ref but
+    no snapshot yet, if `snapshots_map` carries its slug, validate + assign a
+    SkillSnapshot. A None/empty/missing-slug map is a no-op (graft is safe to call
+    unconditionally). Malformed stored JSON raises pydantic.ValidationError
+    (fail-closed — never silently runs a half-grafted definition).
+    """
+    if not snapshots_map:
+        return definition
+    from app.models.harness import SkillSnapshot
+
+    for phase in definition.phases:
+        if getattr(phase.config, "skill_ref", None) is None:
+            continue
+        if getattr(phase.config, "skill_snapshot", None) is not None:
+            continue
+        stored = snapshots_map.get(phase.slug)
+        if stored is None:
+            continue
+        phase.config.skill_snapshot = SkillSnapshot.model_validate(stored)
     return definition
 
 

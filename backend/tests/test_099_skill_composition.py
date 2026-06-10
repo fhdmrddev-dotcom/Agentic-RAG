@@ -50,6 +50,8 @@ import pytest
 
 import pydantic
 
+from postgrest.exceptions import APIError
+
 from app.models.harness import (
     LlmSinglePhaseConfig,
     LlmAgentPhaseConfig,
@@ -360,6 +362,7 @@ async def test_snapshot_materialize():  # GREEN — Plan 03 (materialize_skill_s
     from app.services.harness.skill_snapshot import materialize_skill_snapshots
 
     skill_id = uuid4()
+    def_id = str(uuid4())
     storage = _FakeStorage()
     storage.register(f"owner-id/{skill_id}/rubric.md", b"live-rubric")
 
@@ -368,17 +371,25 @@ async def test_snapshot_materialize():  # GREEN — Plan 03 (materialize_skill_s
         [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
           "instructions": "ORIGINAL instructions", "name": "Risk Reviewer"}],
         skill_files={str(skill_id): ["rubric.md"]},
+        workflow_defs={def_id: {"status": "published", "skill_snapshots": None,
+                                "definition": {"untouched": True}}},
     )
 
     materialized = await materialize_skill_snapshots(
         definition, run_id=uuid4(), supabase=SimpleNamespace(storage=storage, table=db.table),
-        user_id="u",
+        user_id="u", definition_id=def_id,
     )
 
     snap = materialized.phases[0].config.skill_snapshot
     assert snap is not None
     assert snap.instructions == "ORIGINAL instructions"
     assert len(storage.uploads) == 1  # one upload per real skill_files row
+    # New persist shape: the snapshots map landed in skill_snapshots (keyed by phase slug),
+    # the immutable definition JSONB was NOT written.
+    persisted = db._workflow_defs[def_id]
+    assert persisted["skill_snapshots"] is not None
+    assert "p1" in persisted["skill_snapshots"]  # _pre099_definition_dict phase slug
+    assert persisted["definition"] == {"untouched": True}
 
 
 async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot immutability) landed
@@ -387,20 +398,26 @@ async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot im
     from app.services.harness.skill_snapshot import materialize_skill_snapshots
 
     skill_id = uuid4()
+    def_id = str(uuid4())
     storage = _FakeStorage()
     storage.register(f"owner-id/{skill_id}/rubric.md", b"live-rubric")
     db = _FakeSkillsDB(
         [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
           "instructions": "ORIGINAL", "name": "Risk Reviewer"}],
         skill_files={str(skill_id): ["rubric.md"]},
+        workflow_defs={def_id: {"status": "published", "skill_snapshots": None,
+                                "definition": {"untouched": True}}},
     )
     definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
 
     materialized = await materialize_skill_snapshots(
         definition, run_id=uuid4(),
         supabase=SimpleNamespace(storage=storage, table=db.table), user_id="u",
+        definition_id=def_id,
     )
     original = materialized.phases[0].config.skill_snapshot.instructions
+    # The immutable definition JSONB was NOT written by the materializer.
+    assert db._workflow_defs[def_id]["definition"] == {"untouched": True}
 
     # Mutate the live skill + delete its file.
     db.mutate(str(skill_id), instructions="EDITED", files=[])
@@ -408,6 +425,109 @@ async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot im
 
     # Snapshot instructions unchanged; the snapshot file copy is still readable.
     assert materialized.phases[0].config.skill_snapshot.instructions == original == "ORIGINAL"
+
+
+async def test_persist_survives_published_trigger():
+    """099-07: materialize against a PUBLISHED faked def row (skill_snapshots=None)
+    with definition_id set → no exception (persist targets the sibling column, NOT
+    the locked definition JSONB); the row's skill_snapshots now carries the phase
+    key; AND the fake enforces the trigger — a definition-touching update on the same
+    published row DOES raise APIError (proves the de-mock models the 067 lock)."""
+    from app.services.harness.skill_snapshot import materialize_skill_snapshots
+
+    skill_id = uuid4()
+    def_id = str(uuid4())
+    storage = _FakeStorage()
+    storage.register(f"owner-id/{skill_id}/rubric.md", b"live-rubric")
+    db = _FakeSkillsDB(
+        [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
+          "instructions": "ORIGINAL", "name": "Risk Reviewer"}],
+        skill_files={str(skill_id): ["rubric.md"]},
+        workflow_defs={def_id: {"status": "published", "skill_snapshots": None,
+                                "definition": {"untouched": True}}},
+    )
+    definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+
+    # No exception even though the row is PUBLISHED (the persist hits skill_snapshots).
+    await materialize_skill_snapshots(
+        definition, run_id=uuid4(),
+        supabase=SimpleNamespace(storage=storage, table=db.table), user_id="u",
+        definition_id=def_id,
+    )
+    persisted = db._workflow_defs[def_id]
+    assert persisted["skill_snapshots"] is not None
+    assert "p1" in persisted["skill_snapshots"]
+
+    # Prove the fake enforces the trigger: a definition-touching update raises 23514.
+    with pytest.raises(APIError) as ei:
+        db.table("workflow_definitions").update({"definition": {"changed": True}}).eq("id", def_id).execute()
+    assert ei.value.code == "23514"
+
+
+def test_graft_skill_snapshots():
+    """099-07: graft_skill_snapshots re-attaches a SkillSnapshot onto every phase that
+    has a skill_ref + no snapshot, keyed by phase slug; a None / missing-slug map is a no-op."""
+    from app.services.harness.skill_snapshot import graft_skill_snapshots
+
+    skill_id = uuid4()
+    definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+    assert definition.phases[0].config.skill_snapshot is None
+
+    snapshots_map = {
+        "p1": {
+            "skill_id": str(skill_id),
+            "name": "Risk Reviewer",
+            "description": None,
+            "instructions": "Always cite the date first.",
+            "files": ["rubric.md"],
+            "storage_prefix": "u/_snapshots/wf-v1/" + str(skill_id),
+        }
+    }
+    grafted = graft_skill_snapshots(definition, snapshots_map)
+    snap = grafted.phases[0].config.skill_snapshot
+    assert snap is not None
+    assert snap.storage_prefix == "u/_snapshots/wf-v1/" + str(skill_id)
+    assert snap.instructions == "Always cite the date first."
+
+    # None map → no-op (a fresh parse, snapshot stays None).
+    def2 = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+    assert graft_skill_snapshots(def2, None).phases[0].config.skill_snapshot is None
+
+    # Missing-slug map → no-op for the unlisted phase.
+    def3 = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+    assert graft_skill_snapshots(def3, {"other-slug": snapshots_map["p1"]}).phases[0].config.skill_snapshot is None
+
+
+async def test_cas_second_materialize_no_op():
+    """099-07: a workflow_defs row whose skill_snapshots is ALREADY non-null → the
+    .is_('skill_snapshots','null') CAS filter yields 0 rows, no error, the pre-existing
+    skill_snapshots value is unchanged (the concurrent double-kickoff loser path / IN-03)."""
+    from app.services.harness.skill_snapshot import materialize_skill_snapshots
+
+    skill_id = uuid4()
+    def_id = str(uuid4())
+    storage = _FakeStorage()
+    storage.register(f"owner-id/{skill_id}/rubric.md", b"live-rubric")
+    preexisting = {"p1": {"skill_id": str(skill_id), "name": "x", "instructions": "PRIOR",
+                          "files": ["rubric.md"], "storage_prefix": "prior/prefix"}}
+    db = _FakeSkillsDB(
+        [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
+          "instructions": "ORIGINAL", "name": "Risk Reviewer"}],
+        skill_files={str(skill_id): ["rubric.md"]},
+        workflow_defs={def_id: {"status": "published", "skill_snapshots": dict(preexisting),
+                                "definition": {"untouched": True}}},
+    )
+    definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+
+    # The in-memory definition has NO snapshot yet (parsed fresh), so materialize will
+    # build one and attempt the persist — but the CAS filter (row already non-null) → 0 rows.
+    await materialize_skill_snapshots(
+        definition, run_id=uuid4(),
+        supabase=SimpleNamespace(storage=storage, table=db.table), user_id="u",
+        definition_id=def_id,
+    )
+    # No error raised; the pre-existing persisted value is unchanged (CAS loser).
+    assert db._workflow_defs[def_id]["skill_snapshots"] == preexisting
 
 
 async def test_kickoff_snapshot_wiring(monkeypatch):
@@ -464,17 +584,21 @@ class _FakeSkillsDB:
     gate / materializer; ``table('skill_files')`` serves the file manifest the way the
     fixed materializer fetches it (mirrors _handle_load_skill, tool_dispatcher.py)."""
 
-    def __init__(self, skill_rows, skill_files=None):
+    def __init__(self, skill_rows, skill_files=None, workflow_defs=None):
         # skill_rows: skills-table rows (NO ``files`` key — the real schema has none).
         self._skills = {r["id"]: dict(r) for r in skill_rows}
         # skill_files: optional {skill_id (str) -> [filename str]} (defaults to {}).
         self._skill_files = dict(skill_files or {})
+        # {definition_id: {"status": "published"|"draft", "skill_snapshots": <jsonb|None>}}
+        self._workflow_defs = {k: dict(v) for k, v in (workflow_defs or {}).items()}
 
     def table(self, name=None, *_a, **_k):
         # Route by table name the way production calls supabase.table("skills") /
-        # supabase.table("skill_files").
+        # supabase.table("skill_files") / supabase.table("workflow_definitions").
         if name == "skill_files":
             return _FakeSkillFilesQuery(self._skill_files)
+        if name == "workflow_definitions":
+            return _FakeWorkflowDefsQuery(self._workflow_defs)
         return _FakeSkillsQuery(self._skills)
 
     def mutate(self, skill_id, **fields):
@@ -536,3 +660,55 @@ class _FakeSkillFilesQuery:
     def execute(self):
         names = sorted(self._skill_files.get(self._skill_id, []))
         return SimpleNamespace(data=[{"filename": n} for n in names])
+
+
+_AUTHORED_COLS = {
+    "slug", "version", "name", "description", "status",
+    "definition", "created_by", "is_global", "org_id",
+}
+
+
+class _FakeWorkflowDefsQuery:
+    """Models migration-067 trigger semantics: a published row's .update()
+    raises APIError(23514) if the payload touches any AUTHORED column; an
+    update touching ONLY skill_snapshots succeeds. Honors the .is_(col,'null')
+    CAS filter (a non-null skill_snapshots → 0 rows updated, no error)."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self._payload = None
+        self._id = None
+        self._require_null_snapshots = False
+
+    def update(self, payload):
+        self._payload = dict(payload)
+        return self
+
+    def eq(self, col, val):
+        if col == "id":
+            self._id = val
+        return self
+
+    def is_(self, col, val):
+        if col == "skill_snapshots" and val == "null":
+            self._require_null_snapshots = True
+        return self
+
+    def execute(self):
+        row = self._rows.get(self._id)
+        if row is None:
+            return SimpleNamespace(data=[])
+        # CAS: a non-null skill_snapshots + the null-filter → 0 rows (loser path).
+        if self._require_null_snapshots and row.get("skill_snapshots") is not None:
+            return SimpleNamespace(data=[])
+        # Trigger: published + an authored column in the payload → 23514.
+        if row.get("status") == "published" and (_AUTHORED_COLS & set(self._payload)):
+            raise APIError({
+                "message": (
+                    "workflow_definitions row is published and immutable; "
+                    "create a new version instead"
+                ),
+                "code": "23514",
+            })
+        row.update(self._payload)
+        return SimpleNamespace(data=[dict(row)])
