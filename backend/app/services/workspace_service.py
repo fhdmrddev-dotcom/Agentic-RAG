@@ -4,6 +4,7 @@ import difflib
 import logging
 import mimetypes
 import re
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -47,6 +48,11 @@ _BINARY_MIME_PREFIXES = (
     "application/zip",
     "application/gzip",
     "application/octet-stream",
+    # Phase 100 (TMPL-01) — A1 hygiene: a workspace_read of an uploaded OOXML
+    # template (docx/pptx/xlsx) must return the clean binary stub. Without this
+    # the OOXML ZIP bytes would be UTF-8-decoded into garbage in the read_file
+    # text branch (and raw ZIP bytes would leak into the agent context).
+    "application/vnd.openxmlformats-officedocument",
 )
 
 
@@ -215,10 +221,18 @@ async def write_file(
     path: str,
     content: bytes,
     inline_threshold: int = DEFAULT_INLINE_THRESHOLD,
+    kind: str | None = None,
+    expires_at: datetime | None = None,
 ) -> dict:
     """Write or update a workspace file with auto-versioning.
 
-    Returns dict with keys: file_id, path, version, size_bytes, mime_type, warning.
+    Returns dict with keys: file_id, path, version, size_bytes, mime_type,
+    kind, expires_at, warning.
+
+    Phase 100 (TMPL-01): ``kind`` / ``expires_at`` thread through to the row. The
+    template upload handler (Plan 100-04) passes kind='template_input' + a future
+    expiry (D-12); every existing agent caller passes neither -> both default None
+    -> NULL/NULL -> byte-identical (D-11).
     """
     path = validate_path(path)
     size = len(content)
@@ -240,6 +254,8 @@ async def write_file(
         content_inline=content if is_inline else None,
         content_storage_path=None,
         created_by=user_id,
+        kind=kind,
+        expires_at=expires_at,
     )
 
     storage_path: str | None = None
@@ -289,6 +305,8 @@ async def write_file(
         "version": version_num,
         "size_bytes": size,
         "mime_type": mime,
+        "kind": kind,
+        "expires_at": expires_at.isoformat() if expires_at is not None else None,
         "is_new": is_new,
         "warning": warning,
     }
@@ -312,6 +330,12 @@ async def read_file(
     file_row = await get_file_by_path(pool, thread_id, path)
     if not file_row:
         raise FileNotFoundError_(f"File not found: {path}")
+    if file_row.get("is_expired"):
+        # D-10: an expired template is present in the row but past its TTL. Name
+        # expiry explicitly so the model can relay honestly (run-honesty) rather
+        # than confabulating about a file the user knows they uploaded — NOT a
+        # generic not-found. NULL-expiry agent rows never set is_expired (D-11).
+        raise FileNotFoundError_("template expired")
 
     mime = file_row["mime_type"]
 
