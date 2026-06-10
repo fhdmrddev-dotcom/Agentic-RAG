@@ -20,6 +20,7 @@ from supabase import Client
 from app.dependencies import get_current_user, get_pg_pool, get_supabase
 from app.models.user_settings import load_app_settings_async
 from app.services.workspace_service import (
+    MAX_FILE_SIZE,
     FileTooLargeError,
     WorkspaceError,
     write_file as ws_write_file,
@@ -119,12 +120,17 @@ def validate_ooxml(filename: str, raw: bytes) -> str:
     End-of-Central-Directory record — so a renamed binary / truncated file /
     non-ZIP PDF fails even though a 4-byte sniff would pass. A per-extension
     part-name marker (``word/`` / ``ppt/`` / ``xl/``) plus ``[Content_Types].xml``
-    rejects an arbitrary (non-Office) ZIP. Returns the canonical extension;
-    raises HTTPException(422) on any failure (nothing is persisted).
+    rejects an arbitrary (non-Office) ZIP. A defense-in-depth size guard
+    (workspace_service.MAX_FILE_SIZE) trips before any ZIP parsing — the route
+    also pre-checks the declared part size before buffering (WR-04). Returns the
+    canonical extension; raises HTTPException(422) on any failure (nothing is
+    persisted).
     """
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in _ALLOWED_EXT:
         raise HTTPException(422, f"Unsupported type {ext}. Allowed: .docx, .pptx, .xlsx")
+    if len(raw) > MAX_FILE_SIZE:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     bio = io.BytesIO(raw)
     if not zipfile.is_zipfile(bio):
         raise HTTPException(422, "File is not a valid Office document (not a ZIP/OOXML container)")
@@ -154,10 +160,15 @@ async def upload_template(
     context; the panel reconciles by upserting the returned row (Plan 100-06).
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
+    # WR-04 (100-REVIEW): reject by the parser-declared part size BEFORE
+    # materializing the body in one bytes object — uvicorn/FastAPI impose no body
+    # cap, so .read() of a multi-GB part would otherwise buffer it all in RAM.
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     raw = await file.read()
     if len(raw) == 0:
         raise HTTPException(422, "File is empty")
-    if len(raw) > 10 * 1024 * 1024:
+    if len(raw) > MAX_FILE_SIZE:
         raise HTTPException(422, "File too large. Maximum size is 10 MB.")
     ext = validate_ooxml(file.filename or "", raw)  # D-12 magic-byte gate
     ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
