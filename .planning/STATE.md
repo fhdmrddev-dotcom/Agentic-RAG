@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: ready_to_plan
-last_updated: "2026-06-10T06:26:58.055Z"
-last_activity: 2026-06-10 -- Phase 099 complete (verified 7/7 after gap closure)
+status: planning
+last_updated: "2026-06-10T07:59:50.729Z"
+last_activity: 2026-06-10
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 16
-  percent: 23
+  total_plans: 17
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -62,6 +62,16 @@ Last activity: 2026-06-10
 - **Out of scope (deferred, NOT this plan's):** `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts` (`KeyError: 'tool_call_id'` in `harness_engine.py:219`) proven PRE-EXISTING via stash-at-base (identical failure with edits stashed) — already logged to `deferred-items.md` by Plan 02. `test_099_skill_composition.py` 10 passed / **0 xfail**; 098+099 16 passed; net-new full-suite failures = 0.
 - **WFSKILL-01 behavior is now complete end-to-end** (data contract → framing/auto-whitelist → snapshot host + gated read → kickoff wiring). Requirement marked complete in REQUIREMENTS.md; phase verification confirms at close.
 - **Next:** `/gsd:verify-work 099` (live cross-provider UAT rows L1-L10 — representative-4 × SC#10 4 axes + SC#3 Deep byte-identical diff + SC#2 immutability/gate live probes) then `/gsd:secure-phase 099`. **`threads.py` extraction remains DUE** (G-5 — this plan added only the smallest seam; do not grow further).
+
+**Plan 099-07 (GAP CLOSURE — UAT Test 1 23514 blocker) — COMPLETE (2026-06-10):**
+
+- The first kickoff of ANY skill-bearing PUBLISHED workflow was 500ing with SQLSTATE 23514 (the 056/091 immutable-on-publish trigger rejected the D-03a materializer's `.update({"definition": ...})` persist-back). Operator-locked sibling-column fix shipped across 4 tasks.
+- ✓ Task 1 (commit `17b3e47d`): **migration 067 applied to the live local DB** (psycopg2 direct, no reset) + `full-schema.sql` regenerated. Added `workflow_definitions.skill_snapshots jsonb` (exempt from immutability) + amended `workflow_definitions_block_published_update()` to raise 23514 ONLY on a 9-column authored-column change (`slug/version/name/description/status/definition/created_by/is_global/org_id`). Live-DB verified (column + `IS DISTINCT FROM` body). UAT fixture row `skill_compose_099uat` (id `8a11b1b1...`) now has `skill_snapshots = NULL` (first-kickoff target state).
+- ✓ Task 2 (commit `9dd578c9`, TDD): `skill_snapshot.py` persists `{phase_slug: snapshot}` to the sibling column with `.is_("skill_snapshots","null")` CAS (closes IN-03 double-kickoff race); old `definition` update GONE; new pure `graft_skill_snapshots()` helper. De-mocked `_FakeWorkflowDefsQuery` models the 067 trigger.
+- ✓ Task 3 (commit `a6a2a656`, TDD): read-point grafts at kickoff (`threads.py` — SELECT + graft before validate, **G-5 thin-wrapper honored**) + `_load_run_definition` (`harness_engine.py`, local import); unexpected materializer faults → structured `HTTPException(500)` (no naked traceback — the reported blank-thread symptom).
+- ✓ Task 4 (commit `f4b39d5f`): regression sweep — 099 suite 15/15; harness+098 39 passed + 1 pre-existing (`bounded_retry` KeyError, re-proven PRE-EXISTING via stash-at-base since Task 3 touched `harness_engine.py`); dispatcher+harness-engine/resume 93 passed. **Net-new failures = 0.**
+- **No deviations.** All 6 STRIDE threats addressed (T-099-07-01..06). Deep-mode byte-identical (graft only on workflow defs; `ToolContext.skill_snapshot` default None).
+- **Next:** operator re-runs UAT row L1 live (first kickoff should now succeed — no 500, run streams, title resolves, `read_skill_file` round-trips), then L2-L10. Then `/gsd:verify-work 099` finalize + `/gsd:secure-phase 099`.
 
 ### Recent Completed Phases
 
