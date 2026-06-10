@@ -489,6 +489,110 @@ EXECUTE_CODE_TOOL = {
 
 
 # ---------------------------------------------------------------------------
+# Phase 101 (TMPL-02 / TMPL-03) — the render_template tool schema (101-06 WR-01)
+# ---------------------------------------------------------------------------
+# WR-01 root cause: the render_template HANDLER is registered + whitelist-admitted,
+# but there was NO function-schema for it anywhere, so the model never SAW the tool
+# and physically could not call it. apply_tool_budget can only FILTER existing
+# schemas — a whitelisted NAME with no SCHEMA is a no-op. This constant is that
+# missing schema.
+#
+# RED LINE (Deep byte-identical): this schema is DELIBERATELY NOT appended into
+# get_tools(). Deep Mode calls get_tools() directly and must stay byte-unchanged.
+# The harness injects RENDER_TEMPLATE_TOOL into its per-phase tools_override
+# candidate list ONLY when the fill phase whitelists "render_template"
+# (phase_types._render_template_candidates). So the tool is visible ONLY on a
+# declaring harness fill phase; Deep + every non-declaring phase stay identical.
+#
+# Pitfall 4 intact: build_field_map_tool_schema([]) touches ONLY Pydantic schema
+# (GenericFieldMap.model_json_schema()) — NO docxtpl/python-docx import. The heavy
+# libs are imported function-locally / shipped into the sandbox driver only.
+def _build_render_template_tool() -> dict:
+    """Construct the render_template OpenAI function-schema.
+
+    ``field_map``'s shape is the GenericFieldMap envelope (built from the Pydantic
+    model's JSON schema, with the template-key hint in its description). The other
+    args mirror exactly what ``_handle_render_template`` reads (tool_dispatcher.py):
+    ``retrieved_ids`` (the spotlight ids the citation gate validates against),
+    ``out_filename`` (the OOXML basename — handler-side validated/sanitized — CR-01),
+    ``asset`` (optional AssetRef → trusted library path; omitted ⇒ ephemeral upload),
+    ``emission_meta`` (optional truncation metadata the D-08 guard reads).
+    """
+    from app.services.template_render_service import build_field_map_tool_schema
+
+    field_map_schema = build_field_map_tool_schema([])
+    return {
+        "type": "function",
+        "function": {
+            "name": "render_template",
+            "description": (
+                "Fill a template document (docx/pptx/xlsx) into a real, downloadable "
+                "deliverable using a CITED field-map. The LLM produces DATA (the cited "
+                "field-map); deterministic code produces the FILE. Put every scalar "
+                "placeholder value under field_map.scalars and every list/table value "
+                "under field_map.collections, and for EVERY non-null value set "
+                "source_chunk_id to the <doc id> it actually came from — never invent a "
+                "value or a citation (an uncited or invented value is rejected before "
+                "render). Set retrieved_ids to the spotlight/source ids you were given "
+                "so the citation gate can validate. Pass `asset` to fill a trusted "
+                "library template; omit it to fill an ephemeral uploaded template. The "
+                "produced file is integrity-checked (re-opened, residual-token scanned) "
+                "before delivery — a corrupt or half-filled file is never delivered."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "field_map": field_map_schema,
+                    "retrieved_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "The spotlight/source ids (<doc id=...>) that were retrieved "
+                            "for this turn. The citation gate validates every value's "
+                            "source_chunk_id against this set."
+                        ),
+                    },
+                    "out_filename": {
+                        "type": "string",
+                        "description": (
+                            "The output filename, e.g. 'risk-register.docx'. A single "
+                            "basename with a .docx/.pptx/.xlsx extension — no path "
+                            "separators (a bad name is sanitized to a safe default)."
+                        ),
+                    },
+                    "asset": {
+                        "type": "object",
+                        "description": (
+                            "Optional. A trusted library template reference. Omit to "
+                            "fill an ephemeral uploaded template instead."
+                        ),
+                        "properties": {
+                            "asset_id": {"type": "string"},
+                            "filename": {"type": "string"},
+                            "kind": {"type": "string", "enum": ["template", "reference"]},
+                            "mime": {"type": "string"},
+                        },
+                        "required": ["asset_id", "filename", "kind", "mime"],
+                    },
+                    "emission_meta": {
+                        "type": "object",
+                        "description": (
+                            "Optional. Truncation metadata (stop_reason / finish_reason) "
+                            "so a cut-off field-map emission is rejected, not shipped."
+                        ),
+                    },
+                },
+                "required": ["field_map", "retrieved_ids", "out_filename"],
+            },
+        },
+    }
+
+
+# Built once at import (pure Pydantic schema — Pitfall 4 safe; no heavy-lib import).
+RENDER_TEMPLATE_TOOL = _build_render_template_tool()
+
+
+# ---------------------------------------------------------------------------
 # Phase 084: Workspace tools
 # ---------------------------------------------------------------------------
 

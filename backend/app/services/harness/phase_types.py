@@ -50,7 +50,7 @@ from uuid import UUID, uuid4
 from app.config import settings
 from app.services.ask_user_service import subscribe_for_response
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
-from app.services.openai_service import apply_tool_budget, get_tools
+from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
 from app.services.task_service import _stream_one_iteration, run_task_sub_agent
 from app.services.tool_dispatcher import ToolContext
 
@@ -185,29 +185,64 @@ def _effective_tools(phase) -> list[str]:
     name survives the per-provider max_tools cap on layer 1.
 
     101 TMPL-02 (D-04/D-05) — ``render_template`` is admitted to a harness FILL phase
-    via this SAME never-drop pattern with NO new code here: a fill phase declares
-    ``render_template`` in its ``available_tools`` and it flows through ``base`` UNCHANGED.
-    Because this helper never drops a declared tool, the whitelisted ``render_template``
-    survives ``apply_tool_budget``'s per-provider max_tools cap on layer 1 EXACTLY like
-    ``read_skill_file``, and ``_build_phase_tool_context`` threads it into both
-    ``available_tools=_tools`` (layer 1 — the schemas the model sees) and
-    ``phase_whitelist=frozenset(_tools)`` (layer 2 — the dispatch backstop,
-    ``tool_dispatcher.dispatch_tool``). There is DELIBERATELY no provenance-based
-    auto-injection of ``render_template``: a phase must EXPLICITLY declare it (auto-
-    injecting it into every phase would WIDEN the tool surface and is not D-04's intent,
-    and would break the gated-no-op Deep invariant). A future fill ``phase_type`` that
-    wants auto-injection would extend with the SAME shape as the snapshot append above —
-    ``if <fill-phase-condition> and "render_template" not in base: base.append("render_template")``
-    — but that condition is NOT added now (no fill ``phase_type`` flag exists; the
-    Plugin Contract ``phase_type`` lock is STRETCH Phase 108). The field-map emission the
-    fill phase produces as ``render_template``'s typed argument rides the UNMODIFIED shared
-    gateway (``_stream_one_iteration`` / ``resolve_calling_mode``) — provider quirks live
-    at the service boundary, the fill path NEVER branches per provider (D-14 / Cond 7).
+    via this SAME never-drop pattern: a fill phase declares ``render_template`` in its
+    ``available_tools`` and it flows through ``base`` UNCHANGED, so it survives
+    ``apply_tool_budget``'s per-provider max_tools cap EXACTLY like ``read_skill_file``.
+
+    101-06 WR-01 CORRECTION — the TWO-LAYER mechanism (this docstring previously
+    misdescribed it; the original claim that the whitelist NAME flows into
+    "available_tools (layer 1 — the schemas the model sees)" was WRONG and is the
+    root cause WR-01 shipped):
+
+      - **Layer 1 — the SCHEMAS the model actually sees** are NOT the names on
+        ``ToolContext.available_tools``; they are the function-schemas in the
+        ``tools_override`` list built by ``apply_tool_budget(<candidates>, model,
+        whitelist)``. ``apply_tool_budget`` can only FILTER schemas it is GIVEN — a
+        whitelisted NAME with no SCHEMA in the candidate list is a no-op. The base
+        candidate list is ``get_tools(user_settings)``, which has NO render_template
+        schema (Deep stays byte-identical — that schema is NEVER added to
+        ``get_tools()``). So ``_exec_llm_agent`` / ``_exec_llm_batch_agents`` AUGMENT
+        the candidate list with ``RENDER_TEMPLATE_TOOL`` BEFORE the budget call, but
+        ONLY when the phase whitelist contains ``"render_template"`` (the
+        ``_render_template_candidates`` helper). The whitelist filter then KEEPS the
+        schema; the max_tools cap never drops it (it is whitelisted).
+      - **Layer 2 — the DISPATCH backstop** is ``ToolContext.available_tools`` /
+        ``phase_whitelist=frozenset(_tools)`` (consumed by
+        ``tool_dispatcher.dispatch_tool``): it refuses a hallucinated tool NAME at
+        dispatch time. It does NOT control which schemas the model sees.
+
+    There is DELIBERATELY no provenance-based auto-injection of ``render_template``: a
+    phase must EXPLICITLY declare it (auto-injecting it into every phase would WIDEN the
+    tool surface and break the gated-no-op Deep invariant). The field-map emission the
+    fill phase produces as ``render_template``'s typed argument rides the UNMODIFIED
+    shared gateway (``_stream_one_iteration`` / ``resolve_calling_mode``) — provider
+    quirks live at the service boundary, the fill path NEVER branches per provider
+    (D-14 / Cond 7).
     """
     base = list(phase.config.available_tools)
     if getattr(phase.config, "skill_snapshot", None) is not None and "read_skill_file" not in base:
         base.append("read_skill_file")
     return base
+
+
+def _phase_tools_override(whitelist, model, user_settings) -> list[dict]:
+    """101-06 WR-01 — build the per-phase ``tools_override`` (LAYER 1: the SCHEMAS the
+    model actually sees). Factored so ``_exec_llm_agent`` and ``_exec_llm_batch_agents``
+    cannot drift.
+
+    1. Base candidates = ``get_tools(user_settings)`` — which has NO ``render_template``
+       schema, so Deep (which calls ``get_tools`` directly) stays BYTE-IDENTICAL.
+    2. When — and ONLY when — the phase whitelist admits ``"render_template"``, append
+       the ``RENDER_TEMPLATE_TOOL`` schema so ``apply_tool_budget``'s whitelist filter
+       has a schema to KEEP (a whitelisted name with no schema is a no-op — the exact
+       WR-01 root cause that neutered the whole fill feature).
+    3. ``apply_tool_budget`` filters to the whitelist and applies the per-provider
+       max_tools cap; the render schema is whitelisted so the cap never drops it.
+    """
+    cand = get_tools(user_settings)
+    if "render_template" in (whitelist or frozenset()):
+        cand = cand + [RENDER_TEMPLATE_TOOL]
+    return apply_tool_budget(cand, model, whitelist)
 
 
 def _effective_model(phase, ctx) -> str:
@@ -372,8 +407,13 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # tools_override (was previously computed-then-discarded), so the TOOL-05
     # per-provider max_tools cap actually applies to the schemas the sub-agent
     # model sees — not just the dispatch-time backstop (layer 2).
-    tools_override = apply_tool_budget(
-        get_tools(getattr(ctx, "user_settings", None)), model, whitelist
+    # 101-06 WR-01: _phase_tools_override augments the candidate list with the
+    # RENDER_TEMPLATE_TOOL schema BEFORE the budget call when the phase whitelists
+    # render_template (else byte-identical to the old get_tools()-only path; Deep
+    # untouched). Without the schema in the candidate list, the whitelisted NAME is a
+    # no-op and the model never sees the tool.
+    tools_override = _phase_tools_override(
+        whitelist, model, getattr(ctx, "user_settings", None)
     )
 
     phase_ctx = _build_phase_tool_context(phase, ctx)
@@ -444,8 +484,10 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     whitelist = frozenset(_effective_tools(phase))
     model = _effective_model(phase, ctx)
     # WR-04 (091-08): pass the budget-capped list to each sub-agent (was discarded).
-    tools_override = apply_tool_budget(
-        get_tools(getattr(ctx, "user_settings", None)), model, whitelist
+    # 101-06 WR-01: same render_template schema augmentation as _exec_llm_agent — the
+    # shared _phase_tools_override helper guarantees the two paths cannot drift.
+    tools_override = _phase_tools_override(
+        whitelist, model, getattr(ctx, "user_settings", None)
     )
 
     max_steps = phase.config.max_steps
