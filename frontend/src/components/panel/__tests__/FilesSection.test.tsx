@@ -224,10 +224,14 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
       error: null,
       reconcile: vi.fn(),
     })
-    const { container } = render(<FilesSection />)
-    // The generic lucide File icon carries class "lucide-file"; the per-ext
-    // office icon must NOT be the generic one.
-    const icon = container.querySelector("svg")
+    render(<FilesSection />)
+    // WR-07 (100-REVIEW): scope the query to the ROW — the upload affordance
+    // renders a lucide-upload svg ABOVE the listbox, so container.querySelector
+    // grabbed the wrong icon and the assertion was vacuous (stayed green even if
+    // iconFor regressed to the generic FileIcon). docx -> FileText.
+    const row = screen.getByRole("option")
+    const icon = row.querySelector("svg")
+    expect(icon?.classList.contains("lucide-file-text")).toBe(true)
     expect(icon?.classList.contains("lucide-file")).toBe(false)
   })
 })
