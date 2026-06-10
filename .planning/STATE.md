@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: planning
-last_updated: "2026-06-10T09:26:24.365Z"
+last_updated: "2026-06-10T10:31:19.112Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 13
