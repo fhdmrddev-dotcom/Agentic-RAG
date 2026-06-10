@@ -34,6 +34,12 @@ FROM python:3.11-slim
 # (operator-reported). reportlab is part of Claude.ai's analysis-tool set, which
 # this comment cites as the bar. Rebuild + bump SANDBOX_IMAGE to pick it up
 # (new chats only — sessions are cached per thread_id until idle eviction).
+# 2026-06-10 (Phase 101 / TMPL-02): docxtpl — the trusted-path Jinja render engine
+# (the LLM produces the cited field-map, docxtpl produces the OOXML bytes). The ONLY
+# net-new sandbox dep; python-docx/pptx/openpyxl already present. Rebuild + bump
+# SANDBOX_IMAGE to pick it up (new chats only — sessions are cached per thread_id
+# until idle eviction). NOT added to backend/requirements.txt: production code never
+# imports docxtpl (render runs in the sandbox; a backend import would be Pitfall 4).
 RUN pip install --no-cache-dir \
     python-pptx==1.0.2 \
     matplotlib==3.9.2 \
@@ -43,6 +49,7 @@ RUN pip install --no-cache-dir \
     python-docx==1.1.2 \
     pypdf==5.1.0 \
     reportlab==4.2.5 \
+    docxtpl==0.20.2 \
     seaborn==0.13.2 \
     scipy==1.14.1 \
     scikit-learn==1.5.2 \
