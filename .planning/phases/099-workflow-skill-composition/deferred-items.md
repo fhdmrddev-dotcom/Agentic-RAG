@@ -14,6 +14,12 @@ Discoveries logged during execution that are OUT OF SCOPE for the current task
     and the whitelist is unchanged, so the gate-retry path is byte-identical).
   - Disposition: NOT fixed in this plan (out of scope). Route to a harness-gates
     polish pass / next harness-touching phase.
+  - **Re-confirmed Plan 099-07 Task 4 regression sweep (2026-06-10):** still fails
+    identically. Proven PRE-EXISTING again by checking out `harness_engine.py` at the
+    phase base (`b169b29d`) and re-running — fails identically with the 099-07
+    `_load_run_definition` graft reverted. 099-07's only `harness_engine.py` change is in
+    `_load_run_definition` (lines ~1055-1067, the skill_snapshots SELECT + graft); it does
+    NOT touch `_expire_pending_ask_user` (line 219) where the `KeyError` raises. Net-new = 0.
 
 - **`tests/integration/test_threads_skills.py` — 11 failures (FK-violation cluster)**
   - Discovered during: Plan 099-03 Task 2 regression run.
