@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T00:00:00.000Z"
-last_activity: 2026-06-11 -- Phase 101 Plan 02 (deterministic template-fill core) complete
+last_updated: "2026-06-10T21:55:24.408Z"
+last_activity: 2026-06-11 -- Phase 101 Plan 03 complete
 progress:
   total_phases: 13
   completed_phases: 4
   total_plans: 29
-  completed_plans: 26
-  percent: 90
+  completed_plans: 27
+  percent: 93
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 101 — EXECUTING
-Plan: 101-02 (deterministic template-fill core) of 5 — COMPLETE; next = Plan 101-03
+Plan: 101-03 (template asset resolution by provenance) of 5 — COMPLETE; next = Plan 101-04
 Status: Executing (sequential on main tree)
-Last activity: 2026-06-11 -- Phase 101 Plan 02 complete
+Last activity: 2026-06-11 -- Phase 101 Plan 03 complete
 
 **Plan 101-01 (Wave 0 scaffold) — COMPLETE (2026-06-10):**
 
@@ -47,7 +47,16 @@ Last activity: 2026-06-11 -- Phase 101 Plan 02 complete
 - **No deviations.** One behavioral detail the test contract surfaced (within plan discretion, not a deviation): the arbitrary-path residual contract is "blank unmatched `{{token}}` placeholders," not "leave them" — `test_run_merge_replaces_split_token` passes only `client_name` yet asserts `residual_tags_in == []` despite the fixture's unmatched `{{report_title}}` control. The plan's action 6(c) named this a planner's-choice ("leave OR blank; lean blank for clean cells"); I implemented the regex-guarded BLANK (only bare-identifier tokens → literal braces the user wanted survive, failure mode (b)).
 - **SEED-056 net-new-failure proof:** full suite `115 failed / 1227 passed` = at the documented rot baseline. ZERO of the 115 touch `test_template_render`/`test_template_integrity` (grep-confirmed; my 11 are GREEN). The failing modules (`test_sql_service`, `test_streaming_reliability`, `test_077_cross_cancel`) fail IDENTICALLY at baseline (proven in isolation: `13 failed` with/without my changes) — pure pre-existing rot. The new service module is a brand-new file no pre-existing test imports. **Net-new failures = 0.**
 - All 5 STRIDE threats addressed (T-101-02-01..05): SandboxedEnvironment(autoescape=True), python-docx `.text` auto-escape, deterministic citation set-membership, provenance-routed non-Jinja upload engine, residual-scan silent-miss detector. SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-02-SUMMARY.md` (Self-Check: PASSED).
-- **Next:** `/gsd:execute-phase 101` Plan 03 — the `_handle_render_template` tool handler: ship these render functions INTO the sandbox via `copy_to_runtime`, drive the field-map emission through the SHARED gateway (all 8 providers inherit NATIVE/STRUCTURED trap handling — D-14, never branch the fill path), run `check_coverage` + `assert_integrity` as the two D-08 gates, persist via `write_file` + reuse `workspace_file_written` SSE. The deterministic core it composes is now complete.
+- **Next (DONE):** Plan 03 implemented the template byte-resolution seam (`template_asset_service.resolve_template_source`) — see the Plan 101-03 block below. The `_handle_render_template` tool handler (sandbox render + gateway field-map emission + the two D-08 gates + persist/SSE) is Plan 04.
+
+**Plan 101-03 (Wave 1, template asset resolution by provenance) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (commit `60e0da5d`): `backend/app/services/template_asset_service.py` (NEW, 210 lines — exceeds the 60 min-lines must-have). `resolve_template_source(*, pool, supabase, thread_id, user_id, asset_ref=None) -> dict` — the byte-resolution seam Plan 04's render tool calls BEFORE shipping template bytes into the sandbox. **Library branch** (asset_ref present, trusted → docxtpl): downloads `asset_ref.asset_id` (a `workspace-files` Storage path) via the REUSED `_read_from_storage` (run_in_threadpool-wrapped, D-v2.5-01) → `provenance="library"`; download failure → clean relay-able error, never a raw 404. **Ephemeral branch** (asset_ref None, untrusted → run_replace): newest-wins non-expired `kind='template_input'` `workspace_files` row, user-scoped on `created_by`, expiry-gated `(expires_at IS NULL OR expires_at > now())` (100 D-10); reads bytes via REUSED `_get_file_content`; two-query expired-vs-never-uploaded split (gated SELECT then a second non-gated user-scoped SELECT → "expired" D-10 vs "no template" D-05). Always returns the full `{bytes, filename, provenance, mime, error}` envelope; every failure path returns `bytes=None` + an `error` STRING (no raise, no traceback, no cross-user bytes — V4/404-not-403). Does NOT import `template_render_service` (no cycle; Plan 04 composes resolver + `select_engine`); no `app.api.threads` import (G-5).
+- ✓ Task 2 (commit `18d70589`): `backend/app/models/harness.py` comment-only edit — the 098 co-lock comment block (~line 154) + the `assets:` field comment (~line 189) now read "implemented in Phase 101 (template_asset_service)" (D-09 intent → done). Zero schema change, zero migration, no field added/renamed (AssetRef/assets[] locked in Phase 098; `grep -c "assets: list[AssetRef]"` unchanged = 1). Model imports clean.
+- **No deviations.** One faithful implementation adjustment (NOT a deviation): the plan prose said "filter by `user_id`", but `054_workspace_files.sql` has no `user_id` column — the owner column is `created_by` (set to `user_id` by `write_file`). User-scoping on `created_by` IS the plan's stated security intent ("cross-user → no row → clean error, never another user's bytes"). The two-query expired/no-template split is exactly the plan's action 2 ("a separate count to distinguish").
+- **SEED-056 net-new-failure proof:** full suite `115 failed / 1227 passed / 7 skipped / 3 xfailed` = the documented rot baseline (matches Plan 02's recorded count). The one harness-named failure (`test_bounded_retry_reaches_failed_after_3_attempts`, `KeyError: 'tool_call_id'` in `harness_engine.py:219`) proven PRE-EXISTING: with my comment-only `harness.py` edit reverted to parent `b4773f03` it fails IDENTICALLY, then `harness.py` was restored clean to HEAD. The new `template_asset_service.py` is a brand-new file no pre-existing test imports. **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-101-03-01..04): user-scoped ephemeral query (created_by), expiry read gate, provenance→engine routing (template_input → run_replace, SSTI boundary starts here), Storage download run_in_threadpool-wrapped. SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-03-SUMMARY.md` (Self-Check: PASSED). **TMPL-02 stays OPEN in REQUIREMENTS.md** — the asset-resolution seam landed, but TMPL-02's end-to-end fill behavior (render tool Plan 04 + phase admission Plan 05) is not yet observable; the requirement marks complete at phase verification (the 099/WFSKILL-01 multi-plan convention).
+- **Next:** `/gsd:execute-phase 101` Plan 04 — the `_handle_render_template` tool handler (tool_dispatcher.py + one registry line, G-5): call `resolve_template_source` → feed `provenance` to `select_engine` → ship bytes + the pinned render driver INTO the sandbox via `copy_to_runtime`, drive the field-map emission through the SHARED gateway (all 8 providers inherit NATIVE/STRUCTURED trap handling — D-14, never branch the fill path), run `check_coverage` + `assert_integrity` as the two D-08 gates, persist via `write_file` + reuse `workspace_file_written` SSE.
 
 **Phase 100 (Ephemeral Template Upload) — COMPLETE (2026-06-10), TMPL-01 closed.** 6/6 plans, 4 waves, wave-based parallel execution. Migration 068 applied live (psycopg2 direct, no reset) + full-schema regenerated. Code review 0C/8W → ALL 8 fixed via /gsd:code-review-fix (incl. the 3 verifier-confirmed SC#3 blockers: WR-01 COALESCE upsert, WR-02 get_diff expiry gate, WR-03 bytes-first sweep). VERIFICATION passed (3/3 truths); **live UAT 7/7 PASS, Claude-driven end-to-end** (Chrome MCP drove the real UI; psycopg2 cross-checks): upload+badge+countdown, never-in-search (marker probe), expiry end-to-end (panel vanish + "template expired" tool error + in-process sweep GC'd row+bytes), 3-way bad-file rejection, run-pin straddle (workflow completed, GREATEST extend held), cross-user 404 ×5 routes, agent files byte-identical. **One G-4 defect found+fixed live:** upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit) → TemplateUpload extracted + rendered in the calm empty state + 2 reachability tests (this was the operator's "no UI changes" report). Backend 37 passed/0 failures (xfail stubs upgraded to behavioral); FilesSection 11/11; panel suites 40/40. UAT fixtures kept: uat-files/ + user B (uat100-userb@example.com) + the UAT thread.
 
