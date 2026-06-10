@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 100 (ephemeral-template-upload) — EXECUTING
-Plan: 3 of 6 complete (Waves 1-2 done: scaffold, migration 068 live, asyncpg layer gated)
+Plan: 5 of 6 complete (Waves 1-3 done: scaffold, migration 068 live, asyncpg layer, upload route + REST gates, sweep/run-pin lifecycle)
 Status: Executing Phase 100
-Last activity: 2026-06-10 -- Wave 2 complete (100-03); Wave 3 (100-04 + 100-05) next
+Last activity: 2026-06-10 -- Wave 3 complete (100-04, 100-05); backend contract fully green (35 passed, 10 xpassed); Wave 4 (100-06 panel UI) next
 
 **Phase 100 discuss-phase COMPLETE (2026-06-10):** `100-CONTEXT.md` committed (`1c0aafcf`). 4 gray areas resolved (all operator-accepted recommendations): (1) Upload UX = panel FilesSection button + Template badge/expiry countdown + vanish-on-expiry + no chat artifact (sketch-aligned; 2-pill composer untouched); (2) TTL = 24h in app_settings; guarantee = gated read-path filter (`expires_at IS NOT NULL` — 098 D-05a pattern), physical deletion = idempotent in-process janitor task (rows + Storage bytes); (3) fixed TTL + run-pin at kickoff (thin seam, threads.py must not grow) + "template expired" tool error + **D-11 invariant: templates optional everywhere** + 7 operator-defined G-4 UAT rows; (4) strict .docx/.pptx/.xlsx allowlist + magic-byte OOXML check; AssetRef/library-asset behavior DEFERRED to Phase 101; runs find templates by `kind='template_input'` in-thread (zero kickoff-API changes). Resume file: `.planning/phases/100-ephemeral-template-upload/100-CONTEXT.md`. **Next: `/gsd:plan-phase 100`.**
 
