@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-10T04:00:00.000Z"
-last_activity: 2026-06-10 -- Phase 099 Plan 03 complete (skill_snapshot.py publish gate + materializer + gated snapshot-routed read)
+last_updated: "2026-06-10T00:06:00.000Z"
+last_activity: 2026-06-10 -- Phase 099 Plan 04 complete (threads.py kickoff wiring — validate + materialize-if-needed, ValueError->400). Phase 099 all 4 plans EXECUTED — ready for /gsd:verify-work 099
 progress:
   total_phases: 13
   completed_phases: 2
   total_plans: 14
-  completed_plans: 13
-  percent: 93
+  completed_plans: 14
+  percent: 100
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 099 (workflow-skill-composition) — EXECUTING
-Plan: 4 of 4
-Status: Plan 03 complete — ready to execute Plan 04 (threads.py kickoff wiring: validate + materialize-if-needed, ValueError→400)
-Last activity: 2026-06-10 -- Phase 099 Plan 03 complete
+Phase: 099 (workflow-skill-composition) — ALL 4 PLANS EXECUTED
+Plan: 4 of 4 — COMPLETE
+Status: Plan 04 complete — Phase 099 fully executed (4/4 plans). Next: `/gsd:verify-work 099` (live cross-provider UAT rows L1-L10 in 099-VALIDATION.md) then `/gsd:secure-phase 099`
+Last activity: 2026-06-10 -- Phase 099 Plan 04 complete (threads.py kickoff wiring)
 
 **Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
 
@@ -54,6 +54,14 @@ Last activity: 2026-06-10 -- Phase 099 Plan 03 complete
 - **Deviation [Rule 1] ×2:** (1) materializer named `materialize_skill_snapshots` (the binding Plan-01 TDD stub import) not the plan-prose `_if_needed`; `_if_needed` kept as an alias (same precedent as Plan 02's `_skill_block` reconciliation). (2) dropped the Python owned-or-global re-check in `_is_resolvable` (it wrongly rejected an owned skill whose owner ≠ run-user in the materialize fake) — visibility is enforced by the DB `.or_` clause; `_is_resolvable` checks only `is_enabled` + the test-only `visible` flag. No scope creep.
 - **Out of scope (deferred):** `tests/integration/test_threads_skills.py` 11 FK-violation failures (`runs_thread_id_fkey`) proven PRE-EXISTING via stash-at-Task-1 (11 failed identically with no dispatcher change) — live-DB fixture rot from the 98-failure cluster (`075.4-TEST-TRIAGE.md`), logged to `deferred-items.md`, NOT fixed. `test_099_skill_composition.py` 9 passed / 1 xfailed (Plan-04 kickoff stub); harness+098+unit-dispatcher 29 passed; net-new failures = 0.
 - **Next:** `/gsd:execute-phase 099` Plan 04 (LAST — `threads.py` `_ensure_skill_snapshots` kickoff wiring: validate + materialize-if-needed, `ValueError` → `HTTPException(400)`; flips the last xfail `test_kickoff_snapshot_wiring`).
+
+**Plan 099-04 (Wave 2, kickoff wiring) — COMPLETE (2026-06-10) — LAST PLAN OF PHASE 099:**
+
+- ✓ Task 1 (commit `d963b5fb`, TDD GREEN): `_ensure_skill_snapshots(*, definition, run_id, supabase, user_id, definition_id=None)` seam in `backend/app/api/threads.py` — runs `validate_skill_refs` first (D-10 gate; `ValueError` → `HTTPException(400)`, the VERBATIM 098 `assert_folder_scopes_subset` mapping shape — never a silent run on a disabled/missing/non-visible skill), then `materialize_skill_snapshots_if_needed` (D-03a lazy first-kickoff, idempotent, persisted by `definition_id`). Service imported as a MODULE (`from app.services.harness import skill_snapshot as _skill_snapshot`) so the seam stays patchable. Called in the kickoff block BELOW the 098 scope assert + ABOVE the user-message insert, reassigning `_kickoff_definition` so the downstream run reads the materialized snapshot. **G-5 honored** — grep-verified no inline `table("skills")` query / `skill-files` Storage path in `threads.py` (the hot file gains only the import + the thin wrapper; nothing extractable). No-skill workflow stays byte-identical (both calls no-op). Un-marked `test_kickoff_snapshot_wiring` xfail → green.
+- **Deviation [Rule 1]:** wired as a thin `_ensure_skill_snapshots` HELPER (not the inline code the plan prose described) because the binding Plan-01 TDD stub imports + calls `_ensure_skill_snapshots(definition, run_id, supabase, user_id)` and asserts the `ValueError`→400 translation against THAT function — same TDD-contract precedent as Plans 02 (`_skill_block`) and 03 (`materialize_skill_snapshots`). The helper IS the one-call-into-service seam (only 2 service calls + the reused 400 mapping; no extractable domain logic), so G-5 is honored AND the test passes. Added optional `definition_id` param (defaults None) so the real call-site passes the `workflow_definitions.id` persist key. No scope creep.
+- **Out of scope (deferred, NOT this plan's):** `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts` (`KeyError: 'tool_call_id'` in `harness_engine.py:219`) proven PRE-EXISTING via stash-at-base (identical failure with edits stashed) — already logged to `deferred-items.md` by Plan 02. `test_099_skill_composition.py` 10 passed / **0 xfail**; 098+099 16 passed; net-new full-suite failures = 0.
+- **WFSKILL-01 behavior is now complete end-to-end** (data contract → framing/auto-whitelist → snapshot host + gated read → kickoff wiring). Requirement marked complete in REQUIREMENTS.md; phase verification confirms at close.
+- **Next:** `/gsd:verify-work 099` (live cross-provider UAT rows L1-L10 — representative-4 × SC#10 4 axes + SC#3 Deep byte-identical diff + SC#2 immutability/gate live probes) then `/gsd:secure-phase 099`. **`threads.py` extraction remains DUE** (G-5 — this plan added only the smallest seam; do not grow further).
 
 ### Recent Completed Phases
 

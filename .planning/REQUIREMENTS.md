@@ -15,7 +15,8 @@
 - [x] **PROJ-02**: A bound workflow's KB retrieval scope defaults to its project folder subtree; an optional per-phase `folder_scope` narrows retrieval for that phase. Scope comes from the binding, not a prompt hint.
 
 ### WFSKILL — Skill ↔ workflow composition
-- [ ] **WFSKILL-01
+- [x] **WFSKILL-01
+
 **: An `llm_agent` / `llm_single` phase can reference a skill via an optional `skill_ref`; the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted. The skill version is snapshotted into the locked definition so a later edit/delete can't break a published workflow. *(Deep path byte-identical.)*
 
 ### TMPL — Template-fill
