@@ -26,12 +26,13 @@ symbols (the contract the stubs assert against) are:
   - ``select_engine``                  — "docxtpl" for AssetRef/library, "run_replace"
                                           for kind='template_input'
 
-  RED-by-design until Plan 101-02 lands (cross-plan TDD); each asserts the TARGET
-  behavior and is marked ``pytest.mark.xfail(strict=False)`` so the full suite
-  stays exit-0 in the interim — the 098/099/100 convention
-  (test_099_skill_composition.py:14-21). Imports of not-yet-created symbols live
-  INSIDE the test body so an ImportError surfaces as an xfail, NOT a collection
-  error.
+  Plan 101-02 has landed: ``app.services.template_render_service`` now exists, so
+  the RED-by-design ``pytest.mark.xfail(strict=False)`` stubs in this file were
+  upgraded to real BEHAVIORAL tests (every ``xfail`` marker dropped — a silent
+  XPASS can no longer mask a regression; the 098/099/100 un-mark-on-landing
+  convention — test_workspace_template.py:53-57). Imports of the now-created
+  symbols stay INSIDE each test body (no behavior change). Offline-friendly: no
+  live DB / Storage; the cross-provider half stays MANUAL in 101-VALIDATION.md.
 
     Plan 101-02 (template_render_service.py — the deterministic helpers):
       - test_field_map_covers_template_keys        — the cited field-map shape covers
@@ -69,7 +70,6 @@ SPLIT_TOKEN_DOCX = _FIXTURES / "arbitrary-split-token.docx"
 # ── Plan 101-02 — the cited field-map shape + coverage oracle ─────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: template_render_service field-map shape not yet implemented")
 def test_field_map_covers_template_keys():
     """The Plan-02 generic field-map covers risk-register.docx's placeholder keys,
     and the ``Cited`` leaf is all-nullable (``Cited().value is None``)."""
@@ -100,7 +100,6 @@ def test_field_map_covers_template_keys():
     assert model_cls is not None
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: check_coverage not yet implemented")
 def test_check_coverage_flags_uncited_and_invented():
     """The deterministic citation check (NO LLM) flags an invented citation
     (source_chunk_id not in the retrieved set) and an uncited value (value present,
@@ -123,7 +122,6 @@ def test_check_coverage_flags_uncited_and_invented():
     assert stats["uncited_value_count"] == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: is_truncated guard not yet implemented")
 def test_truncated_emission_rejected():
     """A truncated tool-JSON emission (stop_reason=max_tokens / finish_reason=length)
     is rejected — never accept a truncated empty field-map as 'no data found'
@@ -137,7 +135,6 @@ def test_truncated_emission_rejected():
     assert is_truncated({"finish_reason": "stop"}) is False
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: build_context + render_docx_template not yet implemented")
 @pytest.mark.parametrize("n_rows", [1, 5, 20])
 def test_trusted_render_grows_rows(tmp_path, n_rows):
     """The trusted docxtpl path grows the {%tr %} register once per row — the
@@ -177,7 +174,6 @@ def test_trusted_render_grows_rows(tmp_path, n_rows):
     assert verdict["rows"] == 1 + n_rows
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: run_replace_docx not yet implemented")
 def test_run_merge_replaces_split_token(tmp_path):
     """The arbitrary non-Jinja run-merge engine reassembles a {{token}} split across
     multiple <w:r> runs and replaces it (SC#4 #1). After fill, the residual-tag scan
@@ -197,7 +193,6 @@ def test_run_merge_replaces_split_token(tmp_path):
     assert residual_tags_in(str(out), "docx") == []
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: select_engine not yet implemented")
 def test_engine_selection_by_provenance():
     """Engine selection is by PROVENANCE (D-02): a library AssetRef → docxtpl/Jinja;
     an ephemeral kind='template_input' upload → the non-Jinja run-replace engine

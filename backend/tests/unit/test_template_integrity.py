@@ -1,11 +1,12 @@
 """Phase 101 — template integrity gate + SSTI containment (TMPL-03).
 
 The TMPL-03 half of the cross-plan TDD contract (see test_template_render.py for
-the TMPL-02 half + the full symbol contract). Same conventions:
-``pytest.mark.xfail(strict=False)`` RED-by-design stubs (the 098/099/100
-convention) with the not-yet-created ``app.services.template_render_service``
-imports INSIDE each test body so an ImportError surfaces as an xfail, not a
-collection error.
+the TMPL-02 half + the full symbol contract). Plan 101-02 has landed:
+``app.services.template_render_service`` now exists, so the RED-by-design
+``pytest.mark.xfail(strict=False)`` stubs were upgraded to real BEHAVIORAL tests
+(every ``xfail`` marker dropped — the 098/099/100 un-mark-on-landing convention,
+test_workspace_template.py:53-57). The ``app.services.template_render_service``
+imports stay INSIDE each test body (no behavior change).
 
   Plan 101-02 (template_render_service.py — the integrity + autoescape helpers):
     - test_corrupt_file_never_delivered          — assert_integrity on truncated /
@@ -26,14 +27,11 @@ from __future__ import annotations
 
 import pathlib
 
-import pytest
-
 # backend/tests/unit/test_template_integrity.py -> parents[1] == backend/tests
 _FIXTURES = pathlib.Path(__file__).resolve().parents[1] / "fixtures" / "templates"
 RISK_REGISTER_DOCX = _FIXTURES / "risk-register.docx"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: assert_integrity not yet implemented")
 def test_corrupt_file_never_delivered(tmp_path):
     """The integrity re-open gate catches a corrupt file before delivery: feeding
     truncated / garbage bytes written to a .docx path makes assert_integrity RAISE
@@ -56,7 +54,6 @@ def test_corrupt_file_never_delivered(tmp_path):
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: render_docx_template autoescape not yet implemented")
 def test_autoescape_contains_xml_special_chars(tmp_path):
     """SandboxedEnvironment(autoescape=True) escapes XML-special chars so a value
     like ``Acme & <Corp>`` survives as literal text on re-open with no repair
@@ -86,7 +83,6 @@ def test_autoescape_contains_xml_special_chars(tmp_path):
     assert "Acme & <Corp>" in text
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 101-02: select_engine SSTI guard not yet implemented")
 def test_template_input_routes_to_non_jinja_engine():
     """An ephemeral upload (kind='template_input') resolves to the run_replace
     engine and NEVER to docxtpl/Jinja — the SSTI-structurally-impossible guard
