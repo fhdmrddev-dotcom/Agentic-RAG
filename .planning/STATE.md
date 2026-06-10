@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-10T17:42:21.767Z"
-last_activity: 2026-06-10 -- Phase 101 Plan 01 (Wave 0 scaffold) complete
+last_updated: "2026-06-11T00:00:00.000Z"
+last_activity: 2026-06-11 -- Phase 101 Plan 02 (deterministic template-fill core) complete
 progress:
   total_phases: 13
   completed_phases: 4
   total_plans: 29
-  completed_plans: 25
-  percent: 86
+  completed_plans: 26
+  percent: 90
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 101 — EXECUTING
-Plan: 101-01 (Wave 0 scaffold) of 5 — COMPLETE; next = Plan 101-02
+Plan: 101-02 (deterministic template-fill core) of 5 — COMPLETE; next = Plan 101-03
 Status: Executing (sequential on main tree)
-Last activity: 2026-06-10 -- Phase 101 Plan 01 complete
+Last activity: 2026-06-11 -- Phase 101 Plan 02 complete
 
 **Plan 101-01 (Wave 0 scaffold) — COMPLETE (2026-06-10):**
 
@@ -39,7 +39,15 @@ Last activity: 2026-06-10 -- Phase 101 Plan 01 complete
 - ✓ Task 4 (commit `dbb50152`): seeded the trusted-path library-asset fixture (D-09) into the live local stack — published `WorkflowDefinition` id `00000000-0000-0000-0000-0000000101a0` whose `assets[]` AssetRef points at a real `workspace-files` Storage object at `{user_id}/_library/risk-register-101uat.docx`; IDs emitted to `backend/tests/fixtures/uat_fixture_ids.json` (definition_id + asset_id + storage_path). `seed_library_asset.py` is idempotent (`ON CONFLICT (id) DO NOTHING` + INSERT-published-in-one-statement → never trips the 056/067 immutability trigger; proven by a clean 2nd run). Storage byte length matches the source fixture (36992 B).
 - **No deviations.** The Task-2 venv `pip install docxtpl` was a no-op (already 0.20.2 from the 097 spike — the desired state). Full backend suite collects clean (1353 tests, exit 0); net-new failures = 0 (test/fixture/Dockerfile/data-seed only — no `backend/app/**` touched).
 - **Operator setup before live UAT (Plan 03+):** rebuild + bump the sandbox image — `docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/` then set `SANDBOX_IMAGE=agentic-rag-sandbox:101.1` in `backend/.env` (NEW chats only; cached sessions keep the old image until idle eviction). Local Supabase stack must stay UP for the seed (already satisfied; seed is re-runnable).
-- **Next:** `/gsd:execute-phase 101` Plan 02 — implement `backend/app/services/template_render_service.py` (Cited, the generic field-map shape, check_coverage, is_truncated, build_context, render_docx_template, run_replace_docx, assert_integrity, residual_tags_in, select_engine) → flips the 9 xfail stubs GREEN.
+- **Next (DONE):** Plan 02 implemented `template_render_service.py` → see the Plan 101-02 block below.
+
+**Plan 101-02 (Wave 1, the deterministic template-fill core) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (commit `f0549733`, TDD GREEN): `backend/app/services/template_render_service.py` (NEW, 686 lines — exceeds the 220 min-lines must-have). The pure, importable, sandbox-shippable deterministic core: `Cited` (port) + `GenericFieldMap` FIXED two-bucket envelope (`scalars` + `collections`) + `build_generic_field_map_model`/`build_field_map_tool_schema` (RESEARCH Open Q 2 — fixed envelope, not per-template dynamic); `check_coverage` + generalized `_iter_leaves` (deterministic citation gate — flags uncited + invented, NO second LLM call); `is_truncated` (stop_reason=max_tokens / finish_reason=length guard, Pitfall 3); `build_context` + `_num`/`_cell`/`_build_row` (D-11 generic worded→numeric hook, default None = no derived compute; default-blank `score` so the trusted `risk-register.docx` renders); `render_docx_template` (trusted docxtpl through `SandboxedEnvironment(autoescape=True)` — TMPL-03); **`run_replace_docx` — THE net-new run-coalescing scalar replace** (Pitfall 1, no analog) reassembling a `{{token}}` split across `<w:r>` runs, AST-verified Jinja-free (SSTI structurally impossible), blanks unmatched placeholder-shaped tokens for a clean delivered file; `residual_tags_in` + `assert_integrity` (universal re-open oracle for docx/pptx/xlsx + `documented_limit` for pptx-table-growth + xlsx-chart-strip, D-06 no-silent-caps); `select_engine` (provenance routing — library→docxtpl, template_input→run_replace — with the hard D-02 `assert engine != "docxtpl"` SSTI boundary). All heavy-lib imports function-local (Pitfall 4 — the backend venv has no docxtpl; render is sandbox-only). Upgraded the 9 Wave-0 `xfail(strict=False)` stubs in `test_template_render.py` + `test_template_integrity.py` to real GREEN behavioral tests (098/099/100 un-mark-on-landing convention). **11 passed.**
+- **No deviations.** One behavioral detail the test contract surfaced (within plan discretion, not a deviation): the arbitrary-path residual contract is "blank unmatched `{{token}}` placeholders," not "leave them" — `test_run_merge_replaces_split_token` passes only `client_name` yet asserts `residual_tags_in == []` despite the fixture's unmatched `{{report_title}}` control. The plan's action 6(c) named this a planner's-choice ("leave OR blank; lean blank for clean cells"); I implemented the regex-guarded BLANK (only bare-identifier tokens → literal braces the user wanted survive, failure mode (b)).
+- **SEED-056 net-new-failure proof:** full suite `115 failed / 1227 passed` = at the documented rot baseline. ZERO of the 115 touch `test_template_render`/`test_template_integrity` (grep-confirmed; my 11 are GREEN). The failing modules (`test_sql_service`, `test_streaming_reliability`, `test_077_cross_cancel`) fail IDENTICALLY at baseline (proven in isolation: `13 failed` with/without my changes) — pure pre-existing rot. The new service module is a brand-new file no pre-existing test imports. **Net-new failures = 0.**
+- All 5 STRIDE threats addressed (T-101-02-01..05): SandboxedEnvironment(autoescape=True), python-docx `.text` auto-escape, deterministic citation set-membership, provenance-routed non-Jinja upload engine, residual-scan silent-miss detector. SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-02-SUMMARY.md` (Self-Check: PASSED).
+- **Next:** `/gsd:execute-phase 101` Plan 03 — the `_handle_render_template` tool handler: ship these render functions INTO the sandbox via `copy_to_runtime`, drive the field-map emission through the SHARED gateway (all 8 providers inherit NATIVE/STRUCTURED trap handling — D-14, never branch the fill path), run `check_coverage` + `assert_integrity` as the two D-08 gates, persist via `write_file` + reuse `workspace_file_written` SSE. The deterministic core it composes is now complete.
 
 **Phase 100 (Ephemeral Template Upload) — COMPLETE (2026-06-10), TMPL-01 closed.** 6/6 plans, 4 waves, wave-based parallel execution. Migration 068 applied live (psycopg2 direct, no reset) + full-schema regenerated. Code review 0C/8W → ALL 8 fixed via /gsd:code-review-fix (incl. the 3 verifier-confirmed SC#3 blockers: WR-01 COALESCE upsert, WR-02 get_diff expiry gate, WR-03 bytes-first sweep). VERIFICATION passed (3/3 truths); **live UAT 7/7 PASS, Claude-driven end-to-end** (Chrome MCP drove the real UI; psycopg2 cross-checks): upload+badge+countdown, never-in-search (marker probe), expiry end-to-end (panel vanish + "template expired" tool error + in-process sweep GC'd row+bytes), 3-way bad-file rejection, run-pin straddle (workflow completed, GREATEST extend held), cross-user 404 ×5 routes, agent files byte-identical. **One G-4 defect found+fixed live:** upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit) → TemplateUpload extracted + rendered in the calm empty state + 2 reachability tests (this was the operator's "no UI changes" report). Backend 37 passed/0 failures (xfail stubs upgraded to behavioral); FilesSection 11/11; panel suites 40/40. UAT fixtures kept: uat-files/ + user B (uat100-userb@example.com) + the UAT thread.
 

@@ -143,7 +143,7 @@ Plans:
   4. The named failure modes (run-split miss, XML corruption, pptx variable-row table, xlsx chart strip, merged-cell mis-write, won't-open) are each exercised as a UAT row and pass or are documented.
 **Plans**: 5 plans (4 waves) — planned 2026-06-10
 - [x] 101-01-PLAN.md (Wave 0) — TDD scaffold: 2 cross-plan test files (9 named xfail tests) + 4 OOXML fixtures + make_fixtures.py + docxtpl==0.20.2 Dockerfile.sandbox add + seeded library-asset fixture (D-09) → uat_fixture_ids.json — DONE 2026-06-10 (4 commits 1d078221/315cbe57/3c70fc10/dbb50152; suite exit-0, 11 xfailed; seed idempotent, no 23514 trip)
-- [ ] 101-02-PLAN.md (Wave 1) — deterministic core (template_render_service.py): generic cited field-map + coverage/citation gate + truncation guard + docxtpl render + run-merge + universal integrity re-open + engine-by-provenance
+- [x] 101-02-PLAN.md (Wave 1) — deterministic core (template_render_service.py): generic cited field-map + coverage/citation gate + truncation guard + docxtpl render + run-merge + universal integrity re-open + engine-by-provenance — DONE 2026-06-11 (commit f0549733; 686-line pure core, 9 Wave-0 stubs flipped GREEN/11 passed; run_replace AST-verified Jinja-free; heavy-lib imports function-local; net-new failures = 0 vs SEED-056 rot baseline)
 - [ ] 101-03-PLAN.md (Wave 1) — template byte resolution by provenance (template_asset_service.resolve_template_source: AssetRef→Storage / template_input→workspace) + harness.py assets[] co-lock comment (D-09)
 - [ ] 101-04-PLAN.md (Wave 2) — render_template agent tool (tool_dispatcher.py + one registry line, G-5): resolve + citation-gate-before-render + sealed-sandbox render driver + integrity-gate-after-render + persist/SSE + D-08 two-failure-class fallback
 - [ ] 101-05-PLAN.md (Wave 3) — admit render_template to a fill phase via the 099 whitelist pattern (phase_types.py); field-map emission rides the unmodified gateway (D-14, no per-provider branch); Deep byte-identical
@@ -250,7 +250,7 @@ Plans:
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
-| 101. Template-Fill + Integrity Validation | 0/5 | Planned | - |
+| 101. Template-Fill + Integrity Validation | 2/5 | Executing | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
