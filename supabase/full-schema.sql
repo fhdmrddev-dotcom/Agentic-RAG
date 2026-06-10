@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sIacZKxNphs0e9CaQpnlbGknws67viWG6xvmBdrJnoNzFjL4pAU37grhkwffIi8
+\restrict nrNfMPdRGfmIHgi7S7LgzOqemLDMkLD1574ANSAVhVBkNnPprakUl8Tuz4VyYo0
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -301,6 +301,7 @@ CREATE TABLE public.app_settings (
     title_drafting_config jsonb DEFAULT '{"max_length": 60, "max_tokens": 30}'::jsonb,
     sub_agent_config jsonb DEFAULT '{"max_output_tokens": 32768}'::jsonb,
     token_capture_enabled boolean DEFAULT true,
+    template_ttl_hours integer DEFAULT 24,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -310,6 +311,13 @@ CREATE TABLE public.app_settings (
 --
 
 COMMENT ON COLUMN public.app_settings.chat_tool_args_progress_emit_boundary_bytes IS 'Byte boundary at which provider services emit tool_args_progress SSE events during tool argument generation. Lower = more visible streaming (per Claude.ai) but more SSE bandwidth. Default 256 ≈ a line of Python every event. Was hardcoded 5120 pre-075.10.';
+
+
+--
+-- Name: COLUMN app_settings.template_ttl_hours; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.app_settings.template_ttl_hours IS 'Phase 100 D-05. Hours an uploaded template_input file lives before expiry. Default 24. No new RLS — app_settings is the single global-row config table.';
 
 
 --
@@ -854,9 +862,26 @@ CREATE TABLE public.workspace_files (
     created_by uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    kind text,
+    expires_at timestamp with time zone,
+    CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
 );
+
+
+--
+-- Name: COLUMN workspace_files.kind; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.kind IS 'Phase 100 TMPL-01. NULL/''agent'' = agent-written (permanent, byte-identical to pre-100). ''template_input'' = user-uploaded ephemeral template (TTL-bound).';
+
+
+--
+-- Name: COLUMN workspace_files.expires_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL = never expires (agent files). Non-NULL = read-path filter excludes the row once now() passes it (D-06); the lifespan sweep GCs row + Storage bytes (D-07); kickoff run-pin extends it to cover the run (D-09).';
 
 
 --
@@ -1317,6 +1342,13 @@ CREATE INDEX idx_workflow_runs_thread ON public.workflow_runs USING btree (threa
 --
 
 CREATE INDEX idx_workflow_runs_user_id ON public.workflow_runs USING btree (user_id);
+
+
+--
+-- Name: idx_workspace_files_expires_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_expires_at ON public.workspace_files USING btree (expires_at) WHERE (expires_at IS NOT NULL);
 
 
 --
@@ -2481,5 +2513,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sIacZKxNphs0e9CaQpnlbGknws67viWG6xvmBdrJnoNzFjL4pAU37grhkwffIi8
+\unrestrict nrNfMPdRGfmIHgi7S7LgzOqemLDMkLD1574ANSAVhVBkNnPprakUl8Tuz4VyYo0
 
