@@ -1055,7 +1055,7 @@ async def _load_run_definition(pool, run_id: UUID) -> WorkflowDefinition | None:
     """
     row = await pool.fetchrow(
         """
-        SELECT wd.definition
+        SELECT wd.definition, wd.skill_snapshots
         FROM workflow_runs wr
         JOIN workflow_definitions wd ON wd.id = wr.definition_id
         WHERE wr.id = $1
@@ -1067,7 +1067,19 @@ async def _load_run_definition(pool, run_id: UUID) -> WorkflowDefinition | None:
     definition = row["definition"]
     if isinstance(definition, str):
         definition = json.loads(definition)
-    return WorkflowDefinition.model_validate(definition)
+    parsed = WorkflowDefinition.model_validate(definition)
+    # 099-07: the materialized snapshots live in the skill_snapshots SIBLING column
+    # (not the locked definition JSONB) → graft them back so a resumed / index-driven
+    # run reads the immutable snapshot. May arrive as a str via the asyncpg default
+    # codec (mirror the definition parse). LOCAL import — harness_engine does not
+    # import skill_snapshot at module top (avoid any cycle).
+    _snaps = row.get("skill_snapshots")
+    if isinstance(_snaps, str):
+        _snaps = json.loads(_snaps)
+    if _snaps:
+        from app.services.harness.skill_snapshot import graft_skill_snapshots
+        parsed = graft_skill_snapshots(parsed, _snaps)
+    return parsed
 
 
 async def _build_resume_context(run, redis, pool):

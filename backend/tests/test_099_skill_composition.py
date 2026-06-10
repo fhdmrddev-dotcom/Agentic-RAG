@@ -551,6 +551,76 @@ async def test_kickoff_snapshot_wiring(monkeypatch):
     assert ei.value.status_code == 400
 
 
+async def test_kickoff_grafts_before_materialize(monkeypatch):
+    """099-07: _ensure_skill_snapshots grafts the persisted snapshots_map onto the parsed
+    definition BEFORE validate/materialize, so a second kickoff hands the materializer a
+    definition whose phase already carries a snapshot (→ idempotent early-return)."""
+    import app.services.harness.skill_snapshot as snap_mod
+    from app.api.threads import _ensure_skill_snapshots
+
+    skill_id = uuid4()
+    definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+    snapshots_map = {
+        "p1": {
+            "skill_id": str(skill_id),
+            "name": "Risk Reviewer",
+            "description": None,
+            "instructions": "i",
+            "files": ["rubric.md"],
+            "storage_prefix": "u/_snapshots/wf-v1/" + str(skill_id),
+        }
+    }
+
+    async def _noop_validate(*a, **k):
+        return None
+
+    seen = {}
+
+    async def _record_materialize(definition, **k):
+        seen["snapshot_present"] = definition.phases[0].config.skill_snapshot is not None
+        return definition
+
+    monkeypatch.setattr(snap_mod, "validate_skill_refs", _noop_validate, raising=False)
+    monkeypatch.setattr(
+        snap_mod, "materialize_skill_snapshots_if_needed", _record_materialize, raising=False
+    )
+
+    await _ensure_skill_snapshots(
+        definition=definition, run_id=None, supabase=object(), user_id="u",
+        definition_id=str(uuid4()), skill_snapshots=snapshots_map,
+    )
+    assert seen["snapshot_present"] is True  # the graft ran BEFORE materialize
+
+
+async def test_kickoff_unexpected_error_maps_500(monkeypatch):
+    """099-07: an unexpected materializer failure (NOT the ValueError→400 gate) maps to a
+    structured HTTPException(500), never a naked ASGI traceback."""
+    from fastapi import HTTPException
+    import app.services.harness.skill_snapshot as snap_mod
+    from app.api.threads import _ensure_skill_snapshots
+
+    skill_id = uuid4()
+    definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
+
+    async def _noop_validate(*a, **k):
+        return None
+
+    async def _boom_materialize(*a, **k):
+        raise RuntimeError("trigger edge / unexpected DB fault")
+
+    monkeypatch.setattr(snap_mod, "validate_skill_refs", _noop_validate, raising=False)
+    monkeypatch.setattr(
+        snap_mod, "materialize_skill_snapshots_if_needed", _boom_materialize, raising=False
+    )
+
+    with pytest.raises(HTTPException) as ei:
+        await _ensure_skill_snapshots(
+            definition=definition, run_id=None, supabase=object(), user_id="u",
+            definition_id=str(uuid4()), skill_snapshots=None,
+        )
+    assert ei.value.status_code == 500
+
+
 # ── local fakes used only by the xfail (Plan 02/03/04) stubs ──────────────────
 def _definition_with_skill_ref(skill_id: UUID) -> dict:
     d = _pre099_definition_dict()

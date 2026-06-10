@@ -785,25 +785,36 @@ async def get_messages(
 
 
 async def _ensure_skill_snapshots(
-    *, definition, run_id, supabase, user_id, definition_id=None
+    *, definition, run_id, supabase, user_id, definition_id=None, skill_snapshots=None
 ):
     """099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot) — the kickoff seam.
 
     Delegates ALL gate/copy logic to ``skill_snapshot.py`` (G-5: the hot file gains
     only this thin wrapper + the import — no inline skill-resolution query or Storage
-    call). Runs the D-10 publish gate first (``ValueError → HTTPException 400``, the
-    exact shape the 098 ``assert_folder_scopes_subset`` call-site uses — never a silent
-    run on a disabled/missing/non-visible skill), then materializes the immutable
-    snapshot at FIRST kickoff (idempotent: subsequent runs reuse the persisted snapshot,
-    keyed by ``definition_id`` for the persist-back). Returns the (possibly
-    snapshot-augmented) definition so the caller reassigns it for the downstream run.
-    A no-skill workflow is byte-identical: validate is a no-op and materialize returns
-    the definition unchanged.
+    call). 099-07: grafts the persisted snapshots (the ``skill_snapshots`` sibling
+    column, NOT the locked ``definition`` JSONB) onto the parsed definition FIRST, so a
+    2nd+ kickoff hands the materializer a fully-snapshotted definition → idempotent
+    early-return (no persist, no 23514); a ``None`` map is a no-op (first kickoff).
+    Then runs the D-10 publish gate (``ValueError → HTTPException 400``, the exact shape
+    the 098 ``assert_folder_scopes_subset`` call-site uses — never a silent run on a
+    disabled/missing/non-visible skill) and materializes the immutable snapshot at FIRST
+    kickoff (idempotent, keyed by ``definition_id`` for the persist-back). An UNEXPECTED
+    materializer failure (anything that is NOT the ValueError→400 gate) maps to a
+    structured ``HTTPException(500)`` — never a naked ASGI traceback (the reported blank-
+    thread symptom); the fail-closed ordering (before the user-message insert) is
+    unchanged. Returns the (possibly snapshot-augmented) definition so the caller
+    reassigns it for the downstream run. A no-skill workflow is byte-identical: graft +
+    validate are no-ops and materialize returns the definition unchanged.
 
     The service functions are called THROUGH the module object (``_skill_snapshot.``)
     so the seam stays patchable. Structured so the Phase-103 publish endpoint can call
     the same materializer at true publish time.
     """
+    # 099-07: graft persisted snapshots (sibling column) onto the parsed definition
+    # BEFORE validate/materialize. On a 2nd+ kickoff every phase is already
+    # snapshotted → materialize early-returns (no persist, no 23514). A None map is
+    # a no-op (first kickoff). Delegated to skill_snapshot.py (G-5: thin wrapper).
+    definition = _skill_snapshot.graft_skill_snapshots(definition, skill_snapshots)
     try:
         await _skill_snapshot.validate_skill_refs(
             definition, supabase=supabase, user_id=user_id
@@ -813,13 +824,26 @@ async def _ensure_skill_snapshots(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(_skill_err),
         )
-    return await _skill_snapshot.materialize_skill_snapshots_if_needed(
-        definition,
-        run_id=run_id,
-        supabase=supabase,
-        user_id=user_id,
-        definition_id=definition_id,
-    )
+    try:
+        return await _skill_snapshot.materialize_skill_snapshots_if_needed(
+            definition,
+            run_id=run_id,
+            supabase=supabase,
+            user_id=user_id,
+            definition_id=definition_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as _mat_err:   # noqa: BLE001 — structured fail-closed (099-07)
+        # An unexpected materializer failure (e.g. a DB trigger edge) must return
+        # structured JSON, NOT a naked ASGI traceback. 500 (not 503): a true server
+        # fault, not a transient upstream — the operator wants a stable error body
+        # so the kickoff dies cleanly BEFORE the user-message insert (no blank
+        # thread). The fail-closed ordering is unchanged.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"skill snapshot materialization failed: {_mat_err}",
+        )
 
 
 @router.post("/{thread_id}/messages")
@@ -882,7 +906,7 @@ async def send_message(
         # existence) — a user cannot start another user's private workflow.
         _def_resp = await aexec(
             supabase.table("workflow_definitions")
-            .select("id, definition, status, is_global, created_by")
+            .select("id, definition, status, is_global, created_by, skill_snapshots")
             .eq("id", str(body.workflow_definition_id))
             .or_(f"is_global.eq.true,created_by.eq.{current_user['id']}")
             .maybe_single()
@@ -904,6 +928,13 @@ async def send_message(
             _raw_def = json.loads(_raw_def)
         _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
         _kickoff_definition_id = _def_row["id"]
+        # 099-07: the materialized snapshots live in the skill_snapshots SIBLING column
+        # (not the locked definition JSONB) → load them so the kickoff seam can graft
+        # them back onto the parsed definition (idempotent 2nd-kickoff). May arrive as a
+        # JSON string via PostgREST — mirror the definition parse (json imported above).
+        _kickoff_skill_snapshots = _def_row.get("skill_snapshots")
+        if isinstance(_kickoff_skill_snapshots, str):
+            _kickoff_skill_snapshots = json.loads(_kickoff_skill_snapshots)
         # 098 (D-07 DB half — GOV-01): a non-⊆ declared phase scope is a definition
         # VALIDITY error that must fail LOUDLY at run-start (NOT a silent runtime
         # clip — Pitfall 5). Resolve the project subtree and assert every per-phase
@@ -934,6 +965,7 @@ async def send_message(
             supabase=supabase,
             user_id=current_user["id"],
             definition_id=str(_kickoff_definition_id),
+            skill_snapshots=_kickoff_skill_snapshots,
         )
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
