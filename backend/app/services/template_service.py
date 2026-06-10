@@ -42,8 +42,16 @@ async def sweep_expired(pool: asyncpg.Pool, supabase) -> int:
 
     Idempotency (WORKER_COUNT=2 safe, no lock):
       - a row a sibling worker already deleted isn't in THIS SELECT
-      - the DELETE RETURNING / rowcount check skips a row another worker raced us to
+      - the DELETE rowcount check skips a row another worker raced us to
       - an already-removed Storage object is a no-op ``remove`` (best-effort)
+
+    Ordering (WR-03, 100-REVIEW): Storage bytes are removed FIRST, the row LAST.
+    The row is the sweep's retry pointer — deleting it before the Storage remove
+    meant a transient Storage failure orphaned the bytes permanently (the next
+    sweep's SELECT no longer finds the row). With bytes-first ordering a failed
+    remove skips the row delete, the row stays in the next sweep's SELECT, and the
+    whole operation self-heals on the next cadence (an already-removed object is a
+    no-op remove, so the retry stays idempotent).
     """
     expired = await pool.fetch(
         "SELECT id FROM workspace_files "
@@ -55,20 +63,27 @@ async def sweep_expired(pool: asyncpg.Pool, supabase) -> int:
         # Gather ALL version + file Storage paths BEFORE deleting the row (Pitfall 3:
         # the CASCADE drops workspace_file_versions, so the paths must be read first).
         paths = await get_storage_paths_for_file(pool, file_id)
-        # DELETE the row (FK ON DELETE CASCADE drops workspace_file_versions).
-        res = await pool.execute("DELETE FROM workspace_files WHERE id = $1", file_id)
-        if res.endswith("0"):  # already deleted by a sibling worker — idempotent
-            continue
-        deleted += 1
+        # Remove Storage objects FIRST (WR-03) — on any failure keep the row so the
+        # next sweep retries both halves.
+        failed = False
         for sp in paths:
             try:
                 await run_in_threadpool(
                     supabase.storage.from_(BUCKET_NAME).remove, [sp]
                 )
             except Exception:
+                failed = True
                 logger.warning(
-                    "Template sweep: failed to remove storage object %s", sp
+                    "Template sweep: failed to remove storage object %s "
+                    "(row kept; will retry next sweep)", sp
                 )
+        if failed:
+            continue  # row stays in the next sweep's SELECT -> full retry
+        # DELETE the row (FK ON DELETE CASCADE drops workspace_file_versions).
+        res = await pool.execute("DELETE FROM workspace_files WHERE id = $1", file_id)
+        if res.split()[-1] == "0":  # already deleted by a sibling worker — idempotent
+            continue
+        deleted += 1
     return deleted
 
 
