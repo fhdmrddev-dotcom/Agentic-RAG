@@ -155,17 +155,45 @@ def test_upload_sets_kind_and_ttl(client):
     assert isinstance(_dt.timedelta(hours=24), _dt.timedelta)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-03 — expired template tool read -> 'template expired'")
-def test_expired_tool_read_errors():
-    """An expired template read via the asyncpg tool path (workspace_read) returns
-    the D-10 'template expired' error rather than the file bytes."""
-    from app.services.tool_dispatcher import _handle_workspace_read  # gated by Plan 100-03
+async def test_expired_tool_read_errors():
+    """D-10 (Plan 100-05 Task 3): an expired template read via the asyncpg tool path
+    (workspace_read) surfaces the literal "template expired" error rather than the
+    file bytes — run-honesty, NOT a generic not-found.
 
-    # The gate: when the workspace_files row's expires_at < now(), the tool read
-    # short-circuits to {"error": "template expired"} (never returns stale bytes).
-    assert _handle_workspace_read is not None
-    # Asserted live by the implementing plan against an inserted near-past
-    # expires_at row: result JSON contains "template expired".
+    ``read_file`` (Plan 100-03) raises ``FileNotFoundError_("template expired")`` on
+    ``is_expired``. ``FileNotFoundError_`` subclasses ``WorkspaceError``, so the
+    message flows through the EXISTING ``except WorkspaceError as e: return
+    ToolResult(result=json.dumps({"error": str(e)}))`` surface in
+    ``_handle_workspace_read`` — NO new branch needed. This test pins that the
+    literal "template expired" reaches the ToolResult JSON intact (the message is
+    not swallowed/reshaped into a generic "File not found")."""
+    import json
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.tool_dispatcher import _handle_workspace_read, ToolContext
+    from app.services.workspace_service import FileNotFoundError_
+
+    async def _fake_read_expired(pool, supabase, *, thread_id, path, start_line, end_line):
+        # Exactly what read_file raises on an is_expired row (Plan 100-03 D-10).
+        raise FileNotFoundError_("template expired")
+
+    ctx = ToolContext(
+        redis=None, run_id=None, thread_id="00000000-0000-0000-0000-000000000001",
+        supabase=None, pool="fake_pool", user_settings=None,
+        current_user={"id": "u"}, folder_subtree_ids=None,
+        scoped_folder_path=None, emit=AsyncMock(), spawn=lambda c: None,
+    )
+    with patch(
+        "app.services.tool_dispatcher.ws_read_file",
+        side_effect=_fake_read_expired,
+    ):
+        result = await _handle_workspace_read({"path": "/template.docx"}, ctx)
+
+    payload = json.loads(result.result)
+    assert payload["error"] == "template expired", (
+        "D-10: the expired-template tool read must surface the literal "
+        f"'template expired' (got {payload!r}) — not a generic not-found."
+    )
 
 
 @pytest.mark.xfail(strict=False, reason="Plan 100-03 — agent files (NULL expiry) byte-identical (D-11)")
