@@ -1,9 +1,18 @@
 ---
 phase: 100-ephemeral-template-upload
 verified: 2026-06-10T16:45:00Z
-status: human_needed
-score: 3/3 roadmap truths verified (automated evidence)
+reverified: 2026-06-10T15:10:00Z
+status: passed
+score: 3/3 roadmap truths verified (automated evidence + live UAT 7/7)
 overrides_applied: 0
+closure_note: >
+  All 3 gaps closed by /gsd:code-review-fix (WR-01 COALESCE 055f0f5b, WR-02 get_diff
+  expiry gate d48ac96a, WR-03 bytes-first sweep bf6a0b19 — each pinned by a behavioral
+  test; backend suite 37 passed 0 failures). All 7 human_verification rows executed
+  LIVE (Chrome DevTools MCP drove the real UI; DB cross-checks via psycopg2) — 7/7
+  PASS, recorded in 100-HUMAN-UAT.md. One additional G-4 defect found and fixed live:
+  upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit);
+  fixed via TemplateUpload extraction + empty-state render + 2 reachability tests.
 gaps:
   - truth: "The uploaded template expires via TTL (expires_at) + a sweep and is no longer retrievable after expiry"
     status: partial
@@ -47,7 +56,7 @@ human_verification:
 
 **Phase Goal:** A user can hand the workflow a template file for one run without it ever entering the knowledge base.
 **Verified:** 2026-06-10T16:45:00Z
-**Status:** human_needed (3 warnings in code review require targeted fixes before the 3 expiry guarantee gaps close; 7 G-4 UAT rows require live operator verification)
+**Status:** passed (re-verified 2026-06-10 after gap closure — WR-01/02/03 fixed via /gsd:code-review-fix with behavioral test pins; all 7 G-4 UAT rows executed live, 7/7 PASS — see 100-HUMAN-UAT.md)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement
