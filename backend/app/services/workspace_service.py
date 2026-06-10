@@ -435,6 +435,11 @@ async def get_diff(
     file_row = await get_file_by_path(pool, thread_id, path)
     if not file_row:
         raise FileNotFoundError_(f"File not found: {path}")
+    if file_row.get("is_expired"):
+        # D-10 (WR-02, 100-REVIEW): mirror the read_file gate — an expired template
+        # must be hidden from ALL read paths, including the workspace_diff tool
+        # (ws_get_diff). NULL-expiry agent rows never set is_expired (D-11).
+        raise FileNotFoundError_("template expired")
 
     file_id = file_row["id"]
     latest = await get_latest_version_number(pool, file_id)
