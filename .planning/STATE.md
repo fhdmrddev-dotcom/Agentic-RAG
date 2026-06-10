@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: ready_to_plan
-last_updated: "2026-06-10T15:33:24.975Z"
-last_activity: 2026-06-10 -- Phase 101 context gathered
+status: planning
+last_updated: "2026-06-10T16:20:10.614Z"
+last_activity: 2026-06-10
 progress:
   total_phases: 13
   completed_phases: 4
-  total_plans: 24
-  completed_plans: 18
-  percent: 31
+  total_plans: 29
+  completed_plans: 24
+  percent: 83
 ---
 
 # Project State
@@ -204,4 +204,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 100 (Ephemeral Template Upload) — 6 plans — 2026-06-10T11:11:52.949Z
+**Planned Phase:** 101 (Template-Fill + Integrity Validation) — 5 plans — 2026-06-10T16:20:10.608Z
