@@ -102,11 +102,13 @@
   1. An `llm_agent` / `llm_single` phase can reference a skill (optional `skill_ref`); the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted for that phase.
   2. The referenced skill's version is snapshotted into the locked definition, so editing or deleting the skill later cannot change or break an already-published workflow.
   3. Deep-mode chat behavior is byte-identical — the `skill_ref` path is a literal no-op outside workflow phases.
-**Plans**: 4 plans across 3 waves
+**Plans**: 6 plans (4 build + 2 gap-closure) across 4 waves
   - [x] 099-01-PLAN.md — schema contract (skill_ref + SkillSnapshot on 3 LLM configs) + ToolContext.skill_snapshot field + Wave 0 test stubs
   - [x] 099-02-PLAN.md — skill-block framing compose at the system_prompt seam + read_skill_file auto-whitelist + snapshot ctx attach (phase_types.py)
   - [x] 099-03-PLAN.md — harness/skill_snapshot.py (D-10 publish gate + materialize) + gated snapshot-routed read in _handle_read_skill_file (the red line)
   - [x] 099-04-PLAN.md — kickoff host: validate_skill_refs (ValueError→400) + first-run lazy materialize wired into threads.py (G-5 one-liner)
+  - [ ] 099-05-PLAN.md — GAP CR-01: source the snapshot file manifest from the skill_files table (not a nonexistent skills.files column) + de-mock test fakes to the real two-table shape
+  - [ ] 099-06-PLAN.md — GAP CR-02: propagate parent_ctx.skill_snapshot onto sub_ctx in run_task_sub_agent (snapshot gate reachable on live path) + live-chain regression test
 **VALIDATION (SC#10)**: changes phase framing inside runs across providers — author the 4-axis cross-provider rows. Additive seam on `phase_types.py` (`_exec_llm_agent`); Deep path untouched (the red line).
 
 ### Phase 100: Ephemeral Template Upload
