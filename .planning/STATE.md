@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: verifying
-last_updated: "2026-06-10T22:20:24.943Z"
-last_activity: 2026-06-10 -- Phase 101 Plan 05 complete (LAST plan — phase awaits verification)
+last_updated: "2026-06-11T00:10:00.000Z"
+last_activity: 2026-06-11 -- Phase 101 gap-closure (Plan 06) complete — 5 code-review findings fixed
 progress:
   total_phases: 13
   completed_phases: 5
   total_plans: 29
-  completed_plans: 29
+  completed_plans: 30
   percent: 100
 ---
 
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101 — Template-Fill + Integrity Validation (ALL 5 plans complete — awaiting `/gsd:verify-work 101` + cross-provider live UAT)
+**Current focus:** Phase 101 — Template-Fill + Integrity Validation (5 plans + gap-closure Plan 06 [5 code-review findings fixed] complete — awaiting `/gsd:verify-work 101` + cross-provider live UAT)
 
 ## Current Position
 
-Phase: 101 — EXECUTION COMPLETE (5/5 plans), awaiting verification
-Plan: 101-05 (admit render_template to a fill phase) of 5 — COMPLETE (LAST plan)
-Status: Phase execution complete — ready for `/gsd:verify-work 101` (TMPL-02 / TMPL-03 mark complete at phase verification)
-Last activity: 2026-06-10 -- Phase 101 Plan 05 complete
+Phase: 101 — EXECUTION COMPLETE (5/5 plans) + gap-closure Plan 06, awaiting verification
+Plan: 101-06 (gap closure — 5 code-review findings fixed) — COMPLETE
+Status: Phase execution + gap-closure complete — ready for `/gsd:verify-work 101` (TMPL-02 / TMPL-03 mark complete at phase verification)
+Last activity: 2026-06-11 -- Phase 101 gap-closure (Plan 06) complete
 
 **Plan 101-01 (Wave 0 scaffold) — COMPLETE (2026-06-10):**
 
@@ -78,6 +78,21 @@ Last activity: 2026-06-10 -- Phase 101 Plan 05 complete
 - **Phase 101 plan execution is COMPLETE end-to-end** (5/5): deterministic core (02) → byte resolution by provenance (03) → render_template agent tool + D-08 two-gate flow (04) → fill-phase admission via the 099 whitelist (05). **TMPL-02 / TMPL-03 stay OPEN in REQUIREMENTS.md** — they mark complete at phase verification (the 099/WFSKILL-01 multi-plan convention).
 - **Operator setup before live UAT:** rebuild + bump the sandbox image (`docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/` then `SANDBOX_IMAGE=agentic-rag-sandbox:101.1` in `backend/.env`; NEW chats only). Without docxtpl in the image the `render_template` handler returns the honest `sandbox_image_stale` error.
 - **Next:** `/gsd:verify-work 101` — phase verification + the cross-provider live UAT (operator-driven, VALIDATION.md Manual-Only: field-map emission across the full native roster + the G-6 failure-mode rows — run-split miss / XML corruption / pptx row-growth / xlsx chart strip / merged-cell mis-write / produced-file-won't-open). `backend/app/api/threads.py` extraction remains DUE (G-5 carry-forward) — untouched by this plan.
+
+**Plan 101-06 (GAP CLOSURE — fix the 5 confirmed code-review findings) — COMPLETE (2026-06-11):**
+
+The adversarial code review (`101-REVIEW.md`, 1 critical + 4 warnings) found the render_template feature was NON-FUNCTIONAL end-to-end + carried a command-injection. All 5 fixed atomically (each its own `fix(101-06): ...` commit), happy-path + visibility tests added (the gap that let WR-01/WR-02 ship green), seed fixture re-run live.
+
+- **WR-01 (BLOCKER, commit `6c5424d2`):** render_template had NO tool schema, so the model never saw the tool. Added `RENDER_TEMPLATE_TOOL` (`openai_service.py`, built from `build_field_map_tool_schema([])` — Pitfall 4 safe) + `_phase_tools_override` helper (`phase_types.py`) that augments the per-phase `tools_override` candidate list with the schema ONLY when the fill phase whitelists `render_template`, BEFORE `apply_tool_budget`. Wired into `_exec_llm_agent` + `_exec_llm_batch_agents`. **Deep byte-identical: `get_tools()` body UNCHANGED (not in diff); `render_template` ABSENT from its return** (verified programmatically + by test). Corrected the misleading `_effective_tools` docstring (the two-layer mechanism: layer-1 = schemas the model sees via apply_tool_budget; layer-2 = the dispatch backstop).
+- **CR-01 (SECURITY, commit `1cd8fb21`):** model-controlled, prompt-injectable `out_filename` was interpolated unquoted into the sandbox shell command. Added `_safe_out_filename` (strict `^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)$` allow-list → safe default `deliverable.<ext>` on reject), built the command argv-safely with `shlex.quote` per token, whitelisted the engine token (`_VALID_RENDER_ENGINES`).
+- **WR-02 (BLOCKER, commit `1cd8fb21`):** every render passing both gates failed to persist — `ws_write_file(path=out_filename)` with a bare basename hit `validate_path`'s leading-slash requirement → silent `persist_failed`. Normalize to `ws_path = "/" + out_filename` (after the CR-01 basename validation); harvest still keys on the bare basename.
+- **WR-03 (correctness, commit `037280e5`):** the integrity gate ignored `residual_clean`, shipping silent half-fills. Folded `residual_clean` into the gate (`.get(..., True)` back-compat default); a residual-only fail returns `reason=residual_tokens` + surfaces `residual_tags` for the harness retry loop.
+- **WR-04 (correctness / IR-01, commit `19aefacb`):** the sandbox driver's `_replace_in_paragraph` used `if blanked_text == full: return` (vs original), skipping a coalesce when a matched token's net text equals the original → token survived. Made the driver helper a verbatim behavioral mirror of the audited production helper (`touched = matched or (blanked_text != replaced_text)`) so the two copies cannot drift.
+- **Seed fixture (commit `cc0a59ff`):** the seeded UAT WorkflowDefinition fill phase had NO `available_tools` (a REQUIRED field — would also fail `model_validate()`), so `_effective_tools` never whitelisted render_template. Declared `available_tools: [search_documents, render_template]`. Seeder upgraded to DELETE-then-INSERT idempotent for a STALE published fixture row (the 056/067 immutability trigger is BEFORE-UPDATE only; DELETE permitted). **Re-ran live** against the local stack — row `00000000-…-0000000101a0` now carries the corrected config (psycopg2 read-back confirmed).
+- **Tests (commit `bade0db2`):** 6 new gap-closure tests in `test_template_render.py` — schema-reaches-model + Deep-absent (WR-01/IR-02), harness tools_override contains render_template, success-path persists with leading slash (WR-02), malicious out_filename never reaches the command (CR-01), residual tokens not delivered (WR-03), driver coalesces matched-token-equal-to-original (WR-04).
+- **SEED-056 net-new-failure proof:** target suites (`test_template_render` + `test_template_integrity` + `test_tool_dispatcher` + `test_harness_whitelist`) = **46 passed, 0 failed**. Full suite **115 failed / 1239 passed / 7 skipped / 3 xfailed** = the documented rot baseline; grep-confirmed NONE of the 115 touch any file/test I changed; `test_bounded_retry_reaches_failed_after_3_attempts` proven PRE-EXISTING by reverting the 3 touched source files to base (fails identically). **Net-new failures = 0.**
+- **RED LINES held:** Deep byte-identical (get_tools unchanged); shared provider gateway not branched (field-map rides the unmodified gateway); Pitfall 4 intact (no docxtpl at module top — schema build uses only Pydantic `model_json_schema()`); threads.py untouched (G-5). SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-06-SUMMARY.md` (Self-Check: PASSED).
+- **Next:** `/gsd:verify-work 101` — phase verification + cross-provider live UAT against the re-seeded fixture (rebuild + bump the sandbox image with docxtpl first); secure-phase 101 should re-confirm CR-01 CLOSED.
 
 **Phase 100 (Ephemeral Template Upload) — COMPLETE (2026-06-10), TMPL-01 closed.** 6/6 plans, 4 waves, wave-based parallel execution. Migration 068 applied live (psycopg2 direct, no reset) + full-schema regenerated. Code review 0C/8W → ALL 8 fixed via /gsd:code-review-fix (incl. the 3 verifier-confirmed SC#3 blockers: WR-01 COALESCE upsert, WR-02 get_diff expiry gate, WR-03 bytes-first sweep). VERIFICATION passed (3/3 truths); **live UAT 7/7 PASS, Claude-driven end-to-end** (Chrome MCP drove the real UI; psycopg2 cross-checks): upload+badge+countdown, never-in-search (marker probe), expiry end-to-end (panel vanish + "template expired" tool error + in-process sweep GC'd row+bytes), 3-way bad-file rejection, run-pin straddle (workflow completed, GREATEST extend held), cross-user 404 ×5 routes, agent files byte-identical. **One G-4 defect found+fixed live:** upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit) → TemplateUpload extracted + rendered in the calm empty state + 2 reachability tests (this was the operator's "no UI changes" report). Backend 37 passed/0 failures (xfail stubs upgraded to behavioral); FilesSection 11/11; panel suites 40/40. UAT fixtures kept: uat-files/ + user B (uat100-userb@example.com) + the UAT thread.
 
