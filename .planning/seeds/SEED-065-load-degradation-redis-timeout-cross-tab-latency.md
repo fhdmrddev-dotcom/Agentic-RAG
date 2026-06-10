@@ -6,7 +6,7 @@ planted: 2026-06-07
 phase_origin: Phase 096 live UAT (Test 3 stream-cap storm + Test 4 conc_probe) — operator-run + script, DB-verified
 category: B/C — needs a diagnosis spike BEFORE any fix (operator-approved routing 2026-06-07); may split into a real fix + a "dev-box artifact, no action" finding
 severity: major (unverified portion may be lower once dev-artifact is separated)
-related_seeds: [SEED-063, SEED-064, SEED-036a]
+related_seeds: [SEED-063, SEED-064, SEED-036a, SEED-001, SEED-003, SEED-036, SEED-077, SEED-081]
 relates_to:
   - "`scripts/conc_probe.py` PROBE_RESULT FAIL — cross_tab_latency: snapshot p95=8563ms / list p95=2644ms (budget 50ms); fanout_bounded PASS; PROBE_BUDGET total=200 peak_borrowed=5 (threadpool NOT starved)"
   - "deepseek-v4-pro run failed: `TimeoutError: Timeout reading from localhost:6379` under the storm"
@@ -122,3 +122,80 @@ being maxed out (single worker, 8 runaway sandboxes); some might be a real
 slowdown in how we serve requests during streaming. Before fixing anything, we
 re-test on a proper setup to see what's actually broken versus what was just the
 overloaded laptop — so we don't chase a ghost.
+
+## Strengthen — 2026-06-10 alignment sweep (Phase 101, workflow wf_13ed5033)
+
+The original seed was framed around the *symptom* — a `TimeoutError: Timeout
+reading from localhost:6379` under storm and the cross_tab_latency p95 explosion.
+That diagnosis-first lens is correct for the event-loop blockers it found, but it
+deliberately stops at the connection-level timeout. The strengthening here widens
+the scope from "why does one Redis read time out" to "how does Redis itself get
+*shaped* for scale," because at thousands of concurrent runs the timeout is the
+downstream effect of three sizing decisions we have never published:
+
+1. **Connection-pool sizing.** The Redis client that backs the run-buffer
+   (`run:{run_id}` streams, `runs_by_thread:{thread_id}`, `runs:active` — the
+   key conventions defined in CLAUDE.md "Run-buffer key conventions") needs an
+   explicitly sized pool, the same way the DB side does. Today the `socket_timeout`
+   is the only knob the symptom exposed; the pool size, `max_connections`, and
+   timeout-vs-retry posture are all implicit. Under a WORKER_COUNT=2 (or N) prod
+   config plus a multi-way `llm_batch_agents` fan-out, every sub-agent and every
+   SSE drain wants a connection — an unsized or undersized pool turns into exactly
+   the `Timeout reading from ...:6379` seen in the storm. Publish a pool-size
+   formula keyed to worker count × peak concurrent runs × per-run connection
+   footprint.
+
+2. **MAXLEN / TTL trim policy so the streams don't grow unbounded.** The
+   `run:{run_id}` Redis Streams and the `runs:active` / `runs_by_thread:{thread_id}`
+   sorted sets accumulate one entry per run. Across thousands of runs with no
+   `XADD ... MAXLEN` cap and no TTL/eviction on completed-run keys, memory grows
+   without bound — the slow-then-timeout degradation eventually becomes a hard
+   Redis OOM rather than a transient contention blip. Publish a capped-stream
+   policy (`MAXLEN ~` on `XADD`, TTL on terminal run keys, and a global
+   `runs:active` cleanup pass — the cleanup set already exists per the key
+   conventions, so the trim hook has a home). This is the durability sibling of
+   the event-loop fix: Blocker A/B keep the loop responsive *per request*; the
+   trim policy keeps the datastore bounded *across the fleet's lifetime*.
+
+3. **Managed-Redis (Upstash `rediss://`) per-connection / per-command limits.**
+   The local-vs-cloud switch (CLAUDE.md "Local-vs-cloud switch": `REDIS_URL`
+   pointing at a local container vs an Upstash `rediss://...`, also documented in
+   `REDIS-SETUP.md`) means the same code runs against a managed Redis with HARD
+   ceilings that the local container does not impose: max concurrent connections
+   per plan, per-command request limits, and request-size caps. The pool sizing in
+   (1) must be reconciled against the chosen Upstash tier's connection ceiling —
+   oversizing the pool against a tier cap reproduces the timeout from the *cloud*
+   side. Publish the per-tier connection/command guidance alongside the pool
+   formula so an operator picking a tier knows the safe pool ceiling.
+
+**Pairing — one "datastore sizing published-requirements" artifact for v3.1
+presets.** This Redis-shape guidance is the Redis half of a single deliverable.
+The Postgres/asyncpg half lives in SEED-001 (scale readiness) — connection-pool
+sizing for the supabase-py / pgvector path. Pair the two into ONE published
+"datastore sizing" artifact that ships as v3.1 presets: a single table an
+operator reads to size BOTH Redis (pool + MAXLEN/TTL + Upstash tier) and Postgres
+(asyncpg pool, per the asyncpg sizing in SEED-001) for a target concurrency,
+rather than discovering the ceilings empirically via timeouts in production.
+
+Cross-links (additive — these strengthen, do not replace, the related_seeds
+above): SEED-001 (asyncpg / DB pool sizing — the paired half of the datastore
+sizing artifact); SEED-003 (deployment flexibility — local container vs Upstash
+`rediss://` is exactly the deploy-target switch this guidance must cover);
+SEED-036 (`task()` concurrency quota — caps the fan-out width that drives peak
+connection demand against the pool); SEED-077 (durable ingestion job queue +
+throughput at scale — a second heavy producer of run-like keys/streams that the
+same trim + pool policy must account for); SEED-081 (provider rate-limit
+resilience + fan-out admission control — admission control is the upstream lever
+that bounds how many concurrent runs ever reach the Redis pool, the demand-side
+complement to sizing the supply side here).
+
+### Vibe-coder plain summary (this strengthen)
+
+The first investigation fixed *why a request freezes* during streaming. This note
+adds *how Redis itself should be set up for big scale*: how many connections to
+allow, automatically trimming old run records so memory doesn't fill up forever,
+and respecting the limits of the hosted Redis (Upstash) plan we'd run in
+production. We bundle this with the matching database-sizing note (SEED-001) into
+one "how big to size your data stores" cheat-sheet that ships as v3.1 presets —
+so operators get the right numbers up front instead of finding the ceiling by
+hitting a timeout in production.

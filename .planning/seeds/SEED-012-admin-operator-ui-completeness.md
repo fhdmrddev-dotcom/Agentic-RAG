@@ -11,6 +11,14 @@ relates_to:
   - PROJECT.md "Settings live in `user_settings` / `app_settings` and the Settings UI; env vars are for secrets and infra only" — current rule that this seed extends from "rule" into "shipped surface"
   - Memory: project_target_scale.md (organizational scale, scale-ready defaults)
   - Memory: project_settings_design_guidance.md (Settings page redesign deferred to Skill Studio milestone)
+  - SEED-005 (Enhanced Document Structure / next milestone) — ships schema changes the operator must apply through whatever migration-apply surface v3.1 lands
+  - SEED-024 (Settings Unification) — where the operator shell nests
+  - SEED-073 (Per-model cost-rate registry + token→USD) — feeds the operator cost/observability dashboard (§2/§3)
+  - SEED-074 (Workflow/harness + sub-agent token-usage rollup) — feeds the operator cost/observability dashboard (§2/§3)
+  - SEED-075 (Backup, Restore & Disaster Recovery) — natural home for the migration snapshot/rollback contract; co-design migration_state_snapshots
+  - SEED-078 (Unified runtime feature-flag / kill-switch / maintenance-mode) — operator lever to gate a migration apply (maintenance-mode before applying)
+  - SEED-079 (PII detection / redaction / DLP) — further system-level operator lever under /admin
+  - SEED-080 (Entitlement / feature-gating primitive) — further system-level operator lever under /admin
 trigger_when:
   - Any user (especially a non-developer operator) reports having to "ssh into the server" / "edit a file" / "paste SQL" to do something operational
   - Planning a v3.x or later milestone scoped to "admin", "operator", "platform UX", "self-service", or "tenant management"
@@ -122,3 +130,21 @@ Full scope is probably a 4–8 phase milestone. Phasing suggestion if shipped in
 - `supabase/SETUP.md`, `REDIS-SETUP.md` — current operator runbooks (to merge / link from `OPERATOR.md`)
 - `scripts/regenerate-full-schema.sh` — example of "wrapped dangerous lever"
 - `backend/app/api/runs.py` — already exposes per-run cancel; foundation for "kill stuck run" admin affordance
+
+## Strengthen — 2026-06-10 alignment sweep (Phase 101, workflow wf_13ed5033)
+
+The §5 "Migrations & schema state" chunk above leaves the *apply mechanism* as an unresolved fork — line 85 hedges between "an 'Apply migration' button that pastes into the live DB via a secured backend route" **or** "generates the SQL for the operator to paste — depends on Supabase deployment shape." That hedge is the seam this sweep wants to harden into a falsifiable requirement, because it is the single biggest gap between the current dev-only discipline and the operator-friendly product this seed promises.
+
+**The core mismatch.** Today's discipline — paste each `supabase/migrations/NNN_*.sql` into the Supabase SQL editor, then run `scripts/regenerate-full-schema.sh`, and *never* `supabase db push` / `db reset` (CLAUDE.md; line 36; line 86) — is a **developer** workflow that assumes shell + SQL-editor access. A non-developer production operator has neither. So the dev path does not translate, and the gap is exactly the friction that SEED-003's deployment-flexibility thesis (and the v3.1 milestone built on it) exists to remove. A "configure once, then it just works" promise (this seed's own trigger, line 19) is hollow if applying schema changes still demands the operator open a SQL console.
+
+**Two deployment shapes, two different safe answers — and they must be enumerated, not hedged.** The fork is not one decision; it is two distinct operator personas with two distinct safe paths:
+- **Co-tenant SaaS operator** — the operator does NOT own the database; the platform vendor runs migrations centrally. The "Apply migration" button must NOT exist per-tenant (a tenant-triggered DDL apply is a cross-tenant blast-radius and data-isolation hazard, see below). The operator surface here is *visibility* (schema-version banner, "your tenant is at 067, platform latest is 069") and *gating*, never *execution*.
+- **Dedicated / on-prem operator** — the operator owns the DB and legitimately needs to apply pending migrations without a shell. Here the secured-backend-route apply path is appropriate, but only with the rollback/snapshot contract below.
+
+**Falsifiable v3.1 requirement (what this seed now asks v3.1 to answer concretely):**
+1. For each persona above, *how does the operator apply a pending migration safely* without shell/SQL-editor access — which surface, which auth gate, which preview-diff, which dry-run?
+2. *What is the rollback / snapshot contract?* The reference note in memory (`project_098_uat_timeline_fix.md` lineage) and the broader audit-trail tables imply a `migration_state_snapshots` concept, but its rollback semantics are **undefined** — there is no answer to "the apply half-failed; what state am I in and how do I get back?" v3.1 must define: is a pre-apply snapshot taken automatically, is rollback transactional-per-migration or restore-from-snapshot, and who can trigger a rollback.
+
+**Cross-seam to v3.2 (RLS rewrite) — why an unsafe apply path is a security hazard, not just an inconvenience.** v3.2's planned Row-Level-Security rewrite across the 18 user-data tables means a migration apply path that runs operator-supplied or mis-sequenced DDL is a **data-isolation hazard**, not merely an operational annoyance: a botched apply can drop or weaken an RLS policy and silently expose one tenant's rows to another. This raises the bar on requirement #1 — the apply mechanism must be incapable of leaving RLS in a partially-applied state. This couples directly to SEED-004 (org multi-tenancy: the RLS/tenant data model) and to SEED-005 (enhanced document structure, the *next* milestone, which itself ships schema changes the operator will eventually have to apply through whatever surface v3.1 lands).
+
+**Cross-links opened by this sweep.** This apply-path gap also touches the new operator-surface seeds planted this batch — they are levers that, like migrations, currently live outside any operator UI: SEED-073 (per-model cost-rate registry + token→USD) and SEED-074 (workflow/harness + sub-agent token-usage rollup) feed the cost/observability dashboard in §2/§3; SEED-075 (Backup, Restore & Disaster Recovery) is the natural home for the snapshot/rollback contract this section demands and should co-design `migration_state_snapshots` with it; SEED-078 (unified runtime feature-flag / kill-switch / maintenance-mode) is the operator lever that should *gate* a migration apply (flip to maintenance-mode before applying); SEED-080 (entitlement / feature-gating) and SEED-079 (PII detection / DLP) are further system-level levers that belong under `/admin`. Adjacent existing seeds remain in scope: SEED-024 (settings unification — where the operator shell nests), SEED-001 (scale readiness), SEED-048 (embeddings SPOF), SEED-053 (sub-agent events surfaced up), SEED-061/062/065/069/071/036/055 (operational observability and degradation levers the dashboard renders).

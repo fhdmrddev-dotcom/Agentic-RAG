@@ -4,7 +4,7 @@ title: Error handling, surfacing & observability lift — global handler + struc
 status: planted
 planted: 2026-05-18
 phase_origin: 074-seed-009-seed-011-polish-bundle (user-flagged 2026-05-18 between phases — "we need to give real error messages and handle errors more efficiently, user should see customized errors but admin should know exactly what is the error. also error logs should be monitored and recorded")
-related_seeds: [SEED-001, SEED-012, SEED-013, SEED-025]
+related_seeds: [SEED-001, SEED-012, SEED-013, SEED-025, SEED-072, SEED-079]
 relates_to:
   - `backend/app/main.py` — no global FastAPI exception handler today; unhandled exceptions leak as raw 500s with no error context
   - `backend/app/api/*.py` — HTTPException with plaintext `detail` strings throughout; no structured error model (no `error_code`, `trace_id`, `timestamp`, `user_message` vs `admin_message` split)
@@ -167,3 +167,77 @@ This seed is the natural home for closing D-074-01-DEFER-1 (the missing
 `logging.basicConfig` surfaced during the SEED-009 Live UAT 2026-05-18).
 Pillar 3 of Phase 082.5 will add the `basicConfig` call in the same patch
 as the JSON formatter and trace_id middleware.
+
+## Strengthen — 2026-06-10 alignment sweep (Phase 101, workflow wf_13ed5033)
+
+**This is a ROUTING gap only — not a scope gap.** The 5-pillar scope above is
+adequate and well-specified; the global handler (Pillar 1,
+`backend/app/main.py`), the structured `ErrorResponse` model (Pillar 2), the
+`logging.basicConfig` + JSON formatter + `app_errors` audit sink (Pillar 3),
+the `sonner` toast + error-code mapping in `frontend/src/lib/api.ts:29-45`
+(Pillar 4), and the `/admin/errors` inspector (Pillar 5) all describe the right
+work. What's missing is a **milestone home** for the half of this seed that the
+roadmap does NOT yet cover.
+
+The v3.1 milestone ships `/metrics` (Prometheus), an audit-log browser, and
+health probes. That covers **metrics** — the time-series, dashboard-able,
+scrape-able numbers. It does **not** cover the two observability pillars that
+ops teams actually point at their log aggregation stack:
+
+1. **A structured-error pipeline** — Pillars 1-3 here: the global handler that
+   sanitizes SDK internals at a single point, the `ErrorResponse` shape with a
+   `trace_id` correlating to LangSmith + the log sink, and the `app_errors`
+   audit table. Metrics tell you the 500-rate went up; only the structured-error
+   pipeline tells you *what failed for user X in run Y at timestamp Z*.
+2. **A forwardable log sink** — the JSON-formatted, env-configurable sink from
+   Pillar 3 that an operator can wire to **Splunk / ELK / Datadog** (or
+   Sentry / Logtail / Loki per the existing Pillar 3 open question). v3.1's
+   `/metrics` endpoint is a pull-based scrape target; it is categorically NOT a
+   place log lines get forwarded.
+
+### Action at `/gsd:new-milestone` for v3.1
+
+Name SEED-026 **explicitly** as a candidate REQ when v3.1 opens, and
+**cross-link it to the Prometheus `/metrics` work already on that milestone** so
+the three pieces ship as ONE coherent observability theme:
+
+- structured errors (Pillars 1-3 — global handler + `ErrorResponse` + `app_errors`)
+- log forwarding (Pillar 3 — the forwardable JSON sink → Splunk/ELK/Datadog)
+- the admin error inspector (Pillar 5 — `/admin/errors`)
+
+Bundling these under the v3.1 observability umbrella alongside `/metrics`,
+the audit-log browser, and health probes is what stops SEED-026 from staying
+perpetually planted. Metrics + structured errors + forwardable logs + the admin
+inspector are the four faces of the same operator-visibility story; splitting
+them across milestones is exactly how the error-pipeline half keeps getting
+deferred while only the metrics half lands.
+
+### Cross-links into the wider observability / ops theme
+
+- **SEED-012 (Admin/Operator UI Completeness)** — already linked above; the
+  `/admin/errors` inspector (Pillar 5) is a tile in SEED-012's operator UI, and
+  the audit-log browser v3.1 already plans is its sibling surface. Co-ship.
+- **SEED-072 (Data-Subject Rights & Account Lifecycle)** — the `app_errors` /
+  log-sink records hold `user_id`; deletion/erasure flows must reach into the
+  error-and-log retention path, but the immutable-audit constraint means error
+  records may need pseudonymization rather than hard delete. Wire the retention
+  contract when both land.
+- **SEED-079 (PII detection / redaction — DLP across retrieval, prompts,
+  provider egress, logs)** — the forwardable log sink is itself a PII egress
+  surface: `admin_message` strings and request context can carry user data into
+  Splunk/ELK/Datadog. The redaction layer must sit on the sink before forward,
+  so SEED-026's log pipeline and SEED-079's log-DLP are the same seam.
+- **SEED-048 (embeddings SPOF)** and **SEED-081 (provider rate-limit resilience
+  + fan-out admission control)** — both are failure modes whose *first
+  observable signal* should be a stable `ErrorResponse.code`
+  (`EMBEDDINGS_UNAVAILABLE`, `PROVIDER_RATE_LIMITED`) flowing through this seed's
+  handler; design those codes when the resilience seeds plan so the inspector
+  can filter on them.
+- **SEED-074 (workflow/harness + sub-agent token-usage rollup)** and
+  **SEED-053 (sub-agent events surfaced up)** — errors raised inside a sub-agent
+  or harness phase must carry the producer `run_id` / `thread_id` (already in the
+  `ErrorResponse` model) up to the originating run so the inspector shows the
+  whole tree, not the orphaned leaf.
+- **SEED-065 (load degradation / Redis)** — run-buffer expiry / Redis-down is the
+  canonical `RUN_BUFFER_EXPIRED` code already named in Pillar 2; the log sink is
+  where a degradation event becomes operator-visible.

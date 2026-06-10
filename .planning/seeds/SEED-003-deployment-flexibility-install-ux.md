@@ -5,6 +5,7 @@ planted: 2026-05-02
 planted_during: v2.5 (after Phase 059 ship, before Phase 060 kickoff)
 trigger_when: planning a milestone scoped to "distribution", "self-host", "packaging", "install", "deployment", "one-click setup", "enterprise install", or any milestone where the install/config experience for a non-developer operator becomes the bottleneck
 scope: Large
+related_seeds: [SEED-001, SEED-004, SEED-005, SEED-065, SEED-071, SEED-072, SEED-075, SEED-076, SEED-077, SEED-079]
 ---
 
 # SEED-003: Deployment Flexibility & Install/Config UX
@@ -114,3 +115,15 @@ Documentation can explain a process; it cannot detect that the user's Docker dae
 
 ---
 *Planted 2026-05-02 between Phase 059 ship and Phase 060 kickoff. User flagged that the existing scale seed (SEED-001) covers concurrent-user runtime load but does not cover the install/config flexibility needed to actually serve a single local user, a personal cloud install, a 50-person org, or a 10,000-person org from the same codebase.*
+
+## Strengthen — 2026-06-10 alignment sweep (Phase 101, workflow wf_13ed5033)
+
+The Scope section above already names the "officially supported deployment targets" and the scale-tier presets (Section 6) as part of the operator promise. The 2026-06-10 sweep clarifies what the **PUBLISHED requirements** half of that promise actually has to ship — and that it is NOT the same artifact as the v3.1 preset config (the runtime knobs baked into Tier 1/2/3). The preset config tells the *running app* how to behave; the published requirements tell a *prospective buyer/operator* what they must bring to the table before they ever deploy, and how they verify they got it right afterward. Those are two distinct deliverables, and neither one currently exists:
+
+1. **Buyer-facing capacity-sizing matrix, per tier.**
+   A document an operator reads BEFORE provisioning that converts "I expect N documents and M concurrent users" into concrete hardware. It must give, per scale tier (single-user-local / small-org / enterprise): CPU and RAM floors; disk capacity AND disk-IOPS targets; Postgres instance size plus storage-growth-per-N-docs (corpus + embeddings + pgvector index footprint); Redis memory-per-N-concurrent-runs; whether a GPU is required (yes/no, and for what — embeddings vs none); and sandbox-host sizing (container fleet headroom). This is the missing translation layer between the runtime defaults and a purchase decision. It pulls its real numbers from: SEED-071 (sandbox fleet scaling — the sandbox-host sizing inputs), SEED-076 (filtered-vector-search recall + pgvector index strategy at corpus scale — the Postgres/pgvector storage-and-index growth curve), SEED-077 (durable ingestion job queue + throughput at scale — the ingestion-host and queue sizing), SEED-001 (scale readiness — the concurrent-user runtime load model), and SEED-065 (load degradation / Redis — the Redis-memory-per-concurrent-run figures and degradation thresholds).
+
+2. **Published deployment-security-requirements + tenant-isolation-guarantee + shared-responsibility-model document.**
+   A document that draws the line between what the *customer* provides (network boundary, secrets storage, TLS termination, backup retention policy, their own IdP) and what the *platform* guarantees (RLS-enforced per-user data isolation, sandbox containment, provider-egress controls). It must also tell a customer HOW to **verify isolation post-deploy** — concrete, runnable checks that prove tenant A cannot read tenant B's data after the install is live, not just an assertion in a datasheet. The cross-links: SEED-072 (data-subject rights & account lifecycle — deletion/erasure/export vs immutable audit; the shared-responsibility split decides who owns the erasure obligation and where the audit immutability boundary sits), SEED-075 (backup, restore & disaster recovery — the customer-vs-platform responsibility for backup cadence, retention, and restore drills belongs in the shared-responsibility model), and SEED-079 (PII detection / redaction / DLP across retrieval, prompts, provider egress, and logs — the egress-and-logging guarantees the security-requirements doc must enumerate so the customer knows what leaves their boundary and what is scrubbed).
+
+Net of the sweep: when this seed becomes a milestone, the "operator promise" deliverable list grows by two published-document artifacts (capacity-sizing matrix; deployment-security-requirements + isolation-guarantee + shared-responsibility-model) that sit alongside — not inside — the v3.1 scale-tier preset config. They are written for the human making the deploy/buy decision, the preset config is written for the machine.
