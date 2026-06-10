@@ -623,6 +623,17 @@ async def run_task_sub_agent(
         # sub_ctx) is keyed to the SAME run namespace as every other
         # harness_audit row. None (Deep/tasks callers) => byte-identical.
         workflow_run_id=parent_ctx.workflow_run_id,
+        # 099 CR-02 / D-04 — propagate the materialized skill snapshot onto the
+        # SUB-agent ctx, where dispatch_tool actually runs (the SAME structural
+        # unreachability class as the 096-02 phase_whitelist fix above). The
+        # harness phase-ctx builder (phase_types.py:271) sets skill_snapshot on
+        # the PARENT phase ctx only, but every harness tool call dispatches with
+        # sub_ctx — so the snapshot-routing gate in tool_dispatcher.py:479 was
+        # dead code on the live path (read_skill_file silently tracked the LIVE
+        # skill, breaking D-01 immutability). None (every Deep-Mode / tasks
+        # caller — the dataclass default) keeps the gate a literal no-op =>
+        # byte-identical Deep dispatch.
+        skill_snapshot=parent_ctx.skill_snapshot,
     )
 
     # 4. Build the constrained tool-schema list once (subset of parent's tool schemas).
