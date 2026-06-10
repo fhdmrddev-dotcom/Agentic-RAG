@@ -1808,7 +1808,24 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   ),
                 ),
               }))
+            } else if (err instanceof ApiError) {
+              // 099-08 (UAT L10): a non-409 kickoff/send refusal (e.g. the 400
+              // disabled-skill gate). Mirror the 409 rollback shape — drop BOTH
+              // optimistic temps so reconcile (the preserve-guard ~1295-1319)
+              // cannot resurrect a dead blank thread — but surface the SERVER's
+              // descriptive detail (already a plain string from api.ts; rendered
+              // as React text in ChatArea, never HTML → T-099-08-01). Stash the
+              // typed prompt per-thread so the composer can recover it via the
+              // existing prefill seam.
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.filter((m) => m.id !== assistantId && m.id !== userMsg.id),
+              )
+              useStreamsStore.setState((s) => ({
+                reconcileErrors: new Map(s.reconcileErrors).set(threadId, err),
+                failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+              }))
             } else {
+              // genuine network / non-HTTP failure — unchanged swallow-to-failed-placeholder.
               console.error("sendMessage failed:", err)
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
                 prev.map((m) =>
@@ -2783,6 +2800,12 @@ export const useReconcileErrorForThread = (threadId: string | null): Error | nul
 
 export const useFallbackNoticeForThread = (threadId: string | null): string | null =>
   useStreamsStore((s) => (threadId ? (s.fallbackNotices.get(threadId) ?? null) : null))
+
+// 099-08 (UAT L10): per-thread stashed prompt from a send/kickoff refusal.
+// ChatArea reads this keyed by the active thread and feeds it into the
+// MessageInput prefill seam so the user's typed prompt is recoverable.
+export const useFailedSendDraftForThread = (threadId: string | null): string | null =>
+  useStreamsStore((s) => (threadId ? (s.failedSendDrafts.get(threadId) ?? null) : null))
 
 // Phase 092 (MODE-01/02 — SC#3): the per-thread workflow-lock reader. Returns the
 // lock record (or null) for the OWNING thread id. Every composer/selector

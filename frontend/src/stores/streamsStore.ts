@@ -84,6 +84,10 @@ export interface StreamsState {
   /** Per-thread reconcile error state (Plan 068.5 retry banner). Replaces the
    *  old global `reconcileError: { threadId; error } | null`. */
   reconcileErrors: Map<string, Error>
+  /** 099-08 (UAT L10): per-thread stashed prompt text from a kickoff/send
+   *  refusal, so ChatArea can feed it back to the composer via the existing
+   *  prefill seam. Cleared when consumed or when the banner is dismissed. */
+  failedSendDrafts: Map<string, string>
   /** Set of thread IDs whose loadMessages is currently in flight. Replaces
    *  the old global `loadingThreadId: string | null`. MessageList gates the
    *  cold-load skeleton on `loadingThreads.has(activeThreadId) &&
@@ -290,6 +294,8 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   fallbackNotices: new Map<string, string>(),
   // Type: reconcileErrors: Map<string, Error>
   reconcileErrors: new Map<string, Error>(),
+  // Type: failedSendDrafts: Map<string, string> (099-08 / UAT L10)
+  failedSendDrafts: new Map<string, string>(),
   // Type: loadingThreads: Set<string>
   loadingThreads: new Set<string>(),
   // Type: subscriptionsByThread: Map<string, Set<string>>
