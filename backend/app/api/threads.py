@@ -44,6 +44,10 @@ from app.db.workflows import create_workflow_run, list_published_workflows
 from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
 from app.utils.folder_utils import fetch_visible_folders
 from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset
+# 099 WFSKILL-01: imported as a MODULE (not bound names) so the kickoff helper calls
+# validate_skill_refs / materialize_skill_snapshots_if_needed through the module
+# object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
+from app.services.harness import skill_snapshot as _skill_snapshot
 from app.models.user_settings import load_user_settings, override_provider
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability, get_model_capability_async, get_per_call_timeout_async
 from app.services.openai_service import create_adaptive_streaming_chat, get_llm_client, get_explorer_tools, EXPLORER_SYSTEM_PROMPT, _uses_max_completion_tokens, CallingMode, get_tools, resolve_calling_mode, normalize_finish_reason
@@ -780,6 +784,44 @@ async def get_messages(
 # test_tool_memory.py) keeps resolving. Definition removed here (one canonical copy).
 
 
+async def _ensure_skill_snapshots(
+    *, definition, run_id, supabase, user_id, definition_id=None
+):
+    """099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot) — the kickoff seam.
+
+    Delegates ALL gate/copy logic to ``skill_snapshot.py`` (G-5: the hot file gains
+    only this thin wrapper + the import — no inline skill-resolution query or Storage
+    call). Runs the D-10 publish gate first (``ValueError → HTTPException 400``, the
+    exact shape the 098 ``assert_folder_scopes_subset`` call-site uses — never a silent
+    run on a disabled/missing/non-visible skill), then materializes the immutable
+    snapshot at FIRST kickoff (idempotent: subsequent runs reuse the persisted snapshot,
+    keyed by ``definition_id`` for the persist-back). Returns the (possibly
+    snapshot-augmented) definition so the caller reassigns it for the downstream run.
+    A no-skill workflow is byte-identical: validate is a no-op and materialize returns
+    the definition unchanged.
+
+    The service functions are called THROUGH the module object (``_skill_snapshot.``)
+    so the seam stays patchable. Structured so the Phase-103 publish endpoint can call
+    the same materializer at true publish time.
+    """
+    try:
+        await _skill_snapshot.validate_skill_refs(
+            definition, supabase=supabase, user_id=user_id
+        )
+    except ValueError as _skill_err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(_skill_err),
+        )
+    return await _skill_snapshot.materialize_skill_snapshots_if_needed(
+        definition,
+        run_id=run_id,
+        supabase=supabase,
+        user_id=user_id,
+        definition_id=definition_id,
+    )
+
+
 @router.post("/{thread_id}/messages")
 async def send_message(
     thread_id: str,
@@ -876,6 +918,23 @@ async def send_message(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(_scope_err),
             )
+
+        # 099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot): validate every phase
+        # skill_ref resolves to a visible, enabled skill (ValueError → 400, same as the
+        # 098 scope assert — never a silent run on a disabled/missing skill), then
+        # materialize the immutable snapshot at FIRST kickoff (idempotent: subsequent
+        # runs reuse the persisted snapshot, keyed by definition id). Drafts can't reach
+        # here (status='published' enforced above), so first-kickoff IS the first moment
+        # a snapshot is needed. The seam delegates ALL gate/copy logic to
+        # skill_snapshot.py (G-5: no inline query/Storage call in this hot file). The
+        # materialized definition rides the phase configs the downstream run reads.
+        _kickoff_definition = await _ensure_skill_snapshots(
+            definition=_kickoff_definition,
+            run_id=None,
+            supabase=supabase,
+            user_id=current_user["id"],
+            definition_id=str(_kickoff_definition_id),
+        )
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new

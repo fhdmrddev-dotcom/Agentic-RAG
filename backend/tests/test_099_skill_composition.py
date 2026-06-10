@@ -409,7 +409,6 @@ async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot im
     assert materialized.phases[0].config.skill_snapshot.instructions == original == "ORIGINAL"
 
 
-@pytest.mark.xfail(reason="impl lands in Plan 04 (threads.py kickoff wiring)", strict=False)
 async def test_kickoff_snapshot_wiring(monkeypatch):
     """Plan 04: the kickoff path calls validate + materialize-if-needed and maps
     ValueError → HTTPException(400). Import-light: patch the service functions."""
