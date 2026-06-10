@@ -1176,6 +1176,31 @@ export async function uploadDocument(file: File, folderId?: string | null): Prom
   return { doc, isDuplicate: res.status === 200 }
 }
 
+// Phase 100 (TMPL-01 / D-01): upload an ephemeral OOXML template into the
+// thread's workspace via POST /threads/{tid}/workspace/files (workspace.py
+// `upload_template`). Mirrors uploadDocument's FormData + Bearer shape — the
+// NO-Content-Type detail is load-bearing so the browser sets the multipart
+// boundary itself. The server is the real gate (validate_ooxml magic-byte
+// check, Plan 100-04); the panel reconciles by upserting the returned row.
+export async function uploadWorkspaceTemplate(
+  threadId: string,
+  file: File,
+): Promise<WorkspaceFile> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  const res = await fetch(`${API_BASE}/threads/${threadId}/workspace/files`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+    body: formData,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Upload failed" }))
+    throw new Error((err as { detail: string }).detail ?? "Upload failed")
+  }
+  return (await res.json()) as WorkspaceFile
+}
+
 // Phase 067.3 (D-067.3-R2-01/02/04): JS blob fetch+download for
 // /sandbox-outputs/{path}. Plain <a href> clicks send only cookies and
 // the FastAPI get_current_user dependency reads Authorization: Bearer

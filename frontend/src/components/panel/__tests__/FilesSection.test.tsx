@@ -14,9 +14,21 @@ import { mockWorkspaceFiles } from "./fixtures"
 
 const useWorkspaceFiles = vi.fn()
 const useViewingThread = vi.fn()
+// Phase 100-06: FilesSection now reads setWorkspaceFileForThread off the
+// stream actions to optimistically reconcile an upload (D-01). The action is a
+// no-op spy here — the upload-reconcile path is exercised live (G-4 UAT), and
+// the render tests below only need the hook to resolve without throwing.
+const setWorkspaceFileForThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
   useViewingThread: (...a: unknown[]) => useViewingThread(...a),
+  useStreamActions: () => ({ setWorkspaceFileForThread }),
+}))
+
+// Phase 100-06: stub the upload client so importing FilesSection never reaches
+// the real fetch path (the button-click upload flow is a live G-4 UAT row).
+vi.mock("@/lib/api", () => ({
+  uploadWorkspaceTemplate: vi.fn(),
 }))
 
 vi.mock("@/components/panel/FilePreview", () => ({
@@ -66,7 +78,11 @@ describe("FilesSection (PANEL-03) — list rows + drill-in", () => {
   it("Enter on a focused row opens the preview (keyboard path, no mouse-only)", async () => {
     render(<FilesSection />)
     const user = userEvent.setup()
-    await user.tab() // focus the roving-tabindex active row
+    // Phase 100-06: the "Upload template" button (D-01) is now the first tab
+    // stop above the listbox — tab past it to reach the roving-tabindex active
+    // row, then Enter opens the preview (the keyboard contract is unchanged).
+    await user.tab() // Upload template button
+    await user.tab() // roving-tabindex active row
     await user.keyboard("{Enter}")
     expect(screen.getByTestId("file-preview")).toBeInTheDocument()
   })
@@ -171,9 +187,9 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
     expect(screen.queryByText(/expires in/i)).toBeNull()
   })
 
-  it.skip("template file renders a Template badge + /expires in \\d+h/ caption", () => {
-    // TODO Plan 100-06 — un-skip once FilesSection renders the badge + countdown
-    // for a kind='template_input' row with a future expires_at.
+  it("template file renders a Template badge + /expires in \\d+h/ caption", () => {
+    // Plan 100-06: FilesSection renders the badge + countdown for a
+    // kind='template_input' row with a future expires_at.
     useWorkspaceFiles.mockReturnValue({
       data: [templateFile],
       isLoading: false,
@@ -185,9 +201,9 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
     expect(screen.getByText(/expires in \d+h/i)).toBeInTheDocument()
   })
 
-  it.skip("a soon-to-expire template caption carries the amber needs-attention class", () => {
-    // TODO Plan 100-06 — un-skip once the countdown caption gets the amber
-    // needs-attention color when expires_at is < 1h out (sketch D-02 / sketch-016).
+  it("a soon-to-expire template caption carries the amber needs-attention class", () => {
+    // Plan 100-06: the countdown caption gets the amber needs-attention color
+    // when expires_at is < 1h out (sketch D-02 / sketch-016).
     useWorkspaceFiles.mockReturnValue({
       data: [expiringSoonFile],
       isLoading: false,
@@ -199,9 +215,9 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
     expect(caption.className).toMatch(/amber/)
   })
 
-  it.skip("a docx/pptx/xlsx template renders a distinct per-extension icon (not FileIcon)", () => {
-    // TODO Plan 100-06 — un-skip once iconFor() returns a per-extension office
-    // icon for the OOXML template mime types (sketch-016 per-extension icons).
+  it("a docx/pptx/xlsx template renders a distinct per-extension icon (not FileIcon)", () => {
+    // Plan 100-06: iconFor() returns a per-extension office icon for the OOXML
+    // template mime types (sketch-016 per-extension icons).
     useWorkspaceFiles.mockReturnValue({
       data: [templateFile],
       isLoading: false,
