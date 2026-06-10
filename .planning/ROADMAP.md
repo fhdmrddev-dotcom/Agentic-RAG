@@ -142,7 +142,7 @@ Plans:
   3. Rendering runs inside the sealed, network-less sandbox with `jinja2.sandbox.SandboxedEnvironment` — an untrusted template cannot execute server-side (SSTI contained).
   4. The named failure modes (run-split miss, XML corruption, pptx variable-row table, xlsx chart strip, merged-cell mis-write, won't-open) are each exercised as a UAT row and pass or are documented.
 **Plans**: 5 plans (4 waves) — planned 2026-06-10
-- [ ] 101-01-PLAN.md (Wave 0) — TDD scaffold: 2 cross-plan test files + 4 OOXML fixtures + docxtpl venv install + docxtpl==0.20.2 Dockerfile.sandbox add
+- [x] 101-01-PLAN.md (Wave 0) — TDD scaffold: 2 cross-plan test files (9 named xfail tests) + 4 OOXML fixtures + make_fixtures.py + docxtpl==0.20.2 Dockerfile.sandbox add + seeded library-asset fixture (D-09) → uat_fixture_ids.json — DONE 2026-06-10 (4 commits 1d078221/315cbe57/3c70fc10/dbb50152; suite exit-0, 11 xfailed; seed idempotent, no 23514 trip)
 - [ ] 101-02-PLAN.md (Wave 1) — deterministic core (template_render_service.py): generic cited field-map + coverage/citation gate + truncation guard + docxtpl render + run-merge + universal integrity re-open + engine-by-provenance
 - [ ] 101-03-PLAN.md (Wave 1) — template byte resolution by provenance (template_asset_service.resolve_template_source: AssetRef→Storage / template_input→workspace) + harness.py assets[] co-lock comment (D-09)
 - [ ] 101-04-PLAN.md (Wave 2) — render_template agent tool (tool_dispatcher.py + one registry line, G-5): resolve + citation-gate-before-render + sealed-sandbox render driver + integrity-gate-after-render + persist/SSE + D-08 two-failure-class fallback
