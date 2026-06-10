@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JBuGUgEGGrKOvYQUmC2CfUIsDtLRTYMRfwQrMbkz67VTmYqbbFtFCea1HEnbetz
+\restrict sIacZKxNphs0e9CaQpnlbGknws67viWG6xvmBdrJnoNzFjL4pAU37grhkwffIi8
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -227,11 +227,21 @@ CREATE FUNCTION public.workflow_definitions_block_published_update() RETURNS tri
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  IF OLD.status = 'published' THEN
+  IF OLD.status = 'published' AND (
+        NEW.slug        IS DISTINCT FROM OLD.slug
+     OR NEW.version     IS DISTINCT FROM OLD.version
+     OR NEW.name        IS DISTINCT FROM OLD.name
+     OR NEW.description  IS DISTINCT FROM OLD.description
+     OR NEW.status      IS DISTINCT FROM OLD.status
+     OR NEW.definition  IS DISTINCT FROM OLD.definition
+     OR NEW.created_by  IS DISTINCT FROM OLD.created_by
+     OR NEW.is_global   IS DISTINCT FROM OLD.is_global
+     OR NEW.org_id      IS DISTINCT FROM OLD.org_id
+  ) THEN
     RAISE EXCEPTION
       'workflow_definitions row % is published and immutable; create a new version instead',
       OLD.id
-      USING ERRCODE = 'check_violation';   -- SQLSTATE 23514, distinguishable in tests
+      USING ERRCODE = 'check_violation';
   END IF;
   RETURN NEW;
 END;
@@ -704,6 +714,7 @@ CREATE TABLE public.workflow_definitions (
     org_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    skill_snapshots jsonb,
     CONSTRAINT workflow_definitions_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'published'::text])))
 );
 
@@ -713,6 +724,13 @@ CREATE TABLE public.workflow_definitions (
 --
 
 COMMENT ON COLUMN public.workflow_definitions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN workflow_definitions.skill_snapshots; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_definitions.skill_snapshots IS 'Phase 099 D-03a materialization state (derived at FIRST kickoff), NOT authored content. Keyed by phase slug -> SkillSnapshot JSON. EXCLUDED from the immutable-on-publish guarantee (the amended block-published trigger lets a published row change ONLY this column). Nullable, no default; NULL until first kickoff materializes the referenced skills.';
 
 
 --
@@ -2463,5 +2481,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JBuGUgEGGrKOvYQUmC2CfUIsDtLRTYMRfwQrMbkz67VTmYqbbFtFCea1HEnbetz
+\unrestrict sIacZKxNphs0e9CaQpnlbGknws67viWG6xvmBdrJnoNzFjL4pAU37grhkwffIi8
 
