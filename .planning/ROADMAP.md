@@ -141,7 +141,12 @@ Plans:
   2. A filled template is re-opened with the same library to assert integrity before delivery — a corrupt or unopenable file is caught and never delivered.
   3. Rendering runs inside the sealed, network-less sandbox with `jinja2.sandbox.SandboxedEnvironment` — an untrusted template cannot execute server-side (SSTI contained).
   4. The named failure modes (run-split miss, XML corruption, pptx variable-row table, xlsx chart strip, merged-cell mis-write, won't-open) are each exercised as a UAT row and pass or are documented.
-**Plans**: TBD
+**Plans**: 5 plans (4 waves) — planned 2026-06-10
+- [ ] 101-01-PLAN.md (Wave 0) — TDD scaffold: 2 cross-plan test files + 4 OOXML fixtures + docxtpl venv install + docxtpl==0.20.2 Dockerfile.sandbox add
+- [ ] 101-02-PLAN.md (Wave 1) — deterministic core (template_render_service.py): generic cited field-map + coverage/citation gate + truncation guard + docxtpl render + run-merge + universal integrity re-open + engine-by-provenance
+- [ ] 101-03-PLAN.md (Wave 1) — template byte resolution by provenance (template_asset_service.resolve_template_source: AssetRef→Storage / template_input→workspace) + harness.py assets[] co-lock comment (D-09)
+- [ ] 101-04-PLAN.md (Wave 2) — render_template agent tool (tool_dispatcher.py + one registry line, G-5): resolve + citation-gate-before-render + sealed-sandbox render driver + integrity-gate-after-render + persist/SSE + D-08 two-failure-class fallback
+- [ ] 101-05-PLAN.md (Wave 3) — admit render_template to a fill phase via the 099 whitelist pattern (phase_types.py); field-map emission rides the unmodified gateway (D-14, no per-provider branch); Deep byte-identical
 **UI hint**: yes
 **VALIDATION (SC#10)**: workflow-run-bearing + produces files across providers — author the full 4-axis cross-provider scoreboard. **G-6**: the SC#4 failure modes are the pre-named "How we'd know this failed" UAT rows.
 
@@ -245,7 +250,7 @@ Plans:
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
-| 101. Template-Fill + Integrity Validation | 0/TBD | Not started | - |
+| 101. Template-Fill + Integrity Validation | 0/5 | Planned | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |
