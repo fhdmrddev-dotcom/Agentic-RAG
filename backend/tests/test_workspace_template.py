@@ -50,11 +50,14 @@ downstream Plan 100-0X `<verify>` command runs a `-k` slice of THIS file.
       - test_run_pin_extends_and_noop     — a run pin extends expires_at (GREATEST);
         no-op when the thread has no template_input row.
 
-Offline-friendly: the two GREEN tests (SC#2 guard) need no DB. The xfail target
-tests reference live-DB / asyncpg / REST seams the implementing plans build; where
-a pure function exists (validate_ooxml) the stub asserts against it directly. The
-cross-provider / live UAT half stays MANUAL (100-VALIDATION.md "Manual-Only
-Verifications" — all 7 G-4 rows).
+Post-review upgrade (100-REVIEW WR-06): the implementing plans (100-02..100-06)
+have ALL landed, so the RED-by-design symbol-existence stubs in this file were
+upgraded to BEHAVIORAL tests against the offline seams (the conftest
+``mock_asyncpg_pool`` recorder, the shared supabase mock + TestClient, and the
+pure ``validate_ooxml``) and every ``xfail(strict=False)`` marker was dropped —
+a silent XPASS can no longer mask a regression. Offline-friendly: no live DB /
+Storage needed. The cross-provider / live UAT half stays MANUAL
+(100-VALIDATION.md "Manual-Only Verifications" — all 7 G-4 rows).
 """
 
 from __future__ import annotations
@@ -98,7 +101,6 @@ def test_workspace_files_not_in_ingestion():
 # ── Plan 100-04 — OOXML magic-byte validator (validate_ooxml) ──────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-04 — validate_ooxml magic-byte gate")
 def test_valid_ooxml_accepted(valid_docx_bytes, valid_pptx_bytes, valid_xlsx_bytes):
     """validate_ooxml accepts a real docx/pptx/xlsx and returns its canonical
     extension (the magic-byte allowlist — D-12)."""
@@ -109,7 +111,6 @@ def test_valid_ooxml_accepted(valid_docx_bytes, valid_pptx_bytes, valid_xlsx_byt
     assert validate_ooxml("sheet.xlsx", valid_xlsx_bytes) == ".xlsx"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-04 — validate_ooxml rejects renamed binary")
 def test_bad_file_rejected(renamed_binary_bytes):
     """A renamed binary (fake .docx that is not a ZIP) is rejected with
     HTTPException(422); no workspace_files row is created (D-12)."""
@@ -122,10 +123,10 @@ def test_bad_file_rejected(renamed_binary_bytes):
     assert exc.value.status_code == 422
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-04 — validate_ooxml size guard")
 def test_oversized_rejected(oversized_ooxml_bytes):
     """An OOXML container padded past the 10 MB size limit is rejected 422 even
-    though its magic bytes are valid (the size guard trips first)."""
+    though its magic bytes are valid (validate_ooxml's defense-in-depth size
+    guard — the route also pre-checks file.size before buffering, WR-04)."""
     from fastapi import HTTPException
 
     from app.api.workspace import validate_ooxml  # built by Plan 100-04
@@ -138,21 +139,42 @@ def test_oversized_rejected(oversized_ooxml_bytes):
 # ── Plan 100-03 — write_file persists kind + TTL; D-10 expired tool read ───────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-03 — upload sets kind='template_input' + expires_at")
-def test_upload_sets_kind_and_ttl(client):
-    """A template upload sets kind='template_input' and expires_at ~= now + the
-    configured TTL on the persisted workspace_files row (D-05 / D-06)."""
-    import datetime as _dt
+async def test_upload_sets_kind_and_ttl(mock_asyncpg_pool):
+    """A template upload persists kind='template_input' and expires_at on the
+    workspace_files row (D-05 / D-06). Behavioral: drive ``write_file`` (the seam
+    ``upload_template`` delegates to with exactly these kwargs) against the
+    recording pool and assert the upsert args carry the kind + expiry AND the
+    returned dict echoes them."""
+    import uuid as _uuid
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import MagicMock
 
-    from app.api.workspace import upload_template  # built by Plan 100-03/04
+    from app.services.workspace_service import write_file
 
-    # The implementing plan returns the persisted row; assert the contract shape.
-    row = upload_template  # symbol existence is the RED gate here
-    assert row is not None
-    # When wired live, the persisted row carries:
-    #   row["kind"] == "template_input"
-    #   row["expires_at"] is a future timestamptz ~= now + template_ttl_hours
-    assert isinstance(_dt.timedelta(hours=24), _dt.timedelta)
+    pool = mock_asyncpg_pool
+    fid = _uuid.uuid4()
+    pool.set_fetchrow_result({"id": fid, "is_new": True})  # upsert RETURNING
+    pool.set_fetchval_result(1)  # get_next_version -> 1; count_files_in_thread -> 1
+
+    expires = datetime.now(timezone.utc) + timedelta(hours=24)
+    result = await write_file(
+        pool, MagicMock(),
+        thread_id=_uuid.uuid4(), user_id=_uuid.uuid4(),
+        path="/a1b2c3d4-report.docx", content=b"PK-fake-template-bytes",
+        kind="template_input", expires_at=expires,
+    )
+
+    assert result["kind"] == "template_input"
+    assert result["expires_at"] == expires.isoformat()
+
+    upsert_sql, upsert_args = next(
+        (sql, args) for sql, args in pool.calls
+        if "ON CONFLICT (thread_id, path)" in sql
+    )
+    # VALUES ($1..$9): thread_id, path, size, mime, inline, storage, created_by,
+    #                  kind, expires_at
+    assert upsert_args[7] == "template_input"
+    assert upsert_args[8] == expires
 
 
 async def test_expired_tool_read_errors():
@@ -196,90 +218,201 @@ async def test_expired_tool_read_errors():
     )
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-03 — agent files (NULL expiry) byte-identical (D-11)")
-def test_agent_files_unchanged():
-    """The D-11 RED LINE: agent-written workspace files (expires_at IS NULL) list /
-    read / diff exactly as today. Templates are optional everywhere; the gated read
-    path is a literal no-op when expires_at is NULL."""
-    from app.db.workspace import get_file_by_path, list_files_in_thread  # read seams
+async def test_agent_files_unchanged(mock_asyncpg_pool):
+    """The D-11 RED LINE: an agent write passes kind=None / expires_at=None
+    (NULL/NULL on the row — the gated read seams are a literal no-op), AND the
+    upsert's ON CONFLICT COALESCE (WR-01, 100-REVIEW) means an agent overwrite of
+    a template path can never CLEAR the template lifecycle — which would make the
+    original template bytes permanent and bypass the ephemeral guarantee."""
+    import uuid as _uuid
+    from unittest.mock import MagicMock
 
-    # These read seams must stay byte-identical for NULL-expiry rows — the
-    # implementing plan proves it by listing/reading an agent file before AND
-    # after the template gate lands and asserting identical output.
-    assert get_file_by_path is not None
-    assert list_files_in_thread is not None
+    from app.services.workspace_service import write_file
+
+    pool = mock_asyncpg_pool
+    fid = _uuid.uuid4()
+    pool.set_fetchrow_result({"id": fid, "is_new": True})
+    pool.set_fetchval_result(1)
+
+    result = await write_file(
+        pool, MagicMock(),
+        thread_id=_uuid.uuid4(), user_id=_uuid.uuid4(),
+        path="/notes.md", content=b"agent-written content",
+        # NO kind / expires_at — the agent caller signature, unchanged from 084
+    )
+
+    assert result["kind"] is None
+    assert result["expires_at"] is None
+
+    upsert_sql, upsert_args = next(
+        (sql, args) for sql, args in pool.calls
+        if "ON CONFLICT (thread_id, path)" in sql
+    )
+    assert upsert_args[7] is None       # kind   -> NULL on the row
+    assert upsert_args[8] is None       # expiry -> NULL (never expires)
+    # WR-01: agent NULLs must not clobber a template row's lifecycle on overwrite
+    # (COALESCE keeps the stored kind/expires_at; NULL-over-NULL stays NULL).
+    assert "kind = COALESCE(EXCLUDED.kind, workspace_files.kind)" in upsert_sql
+    assert (
+        "expires_at = COALESCE(EXCLUDED.expires_at, workspace_files.expires_at)"
+        in upsert_sql
+    )
 
 
 # ── Plan 100-04 — REST routes gated (expired excluded) + cross-user RLS ────────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-04 — expired rows excluded from REST list + content")
-def test_expired_excluded_rest(client):
-    """An expired template row is absent from the REST list AND its content route
-    404s — the signed-URL bypass is closed (D-06). The gated filter is
-    `expires_at IS NULL OR expires_at > now()`."""
-    # The implementing plan inserts a near-past expires_at row and asserts:
-    #   GET /threads/{tid}/workspace/files            -> row absent
-    #   GET /.../workspace/files/{file_id}/content    -> 404
-    from app.api.workspace import list_workspace_files  # gated by Plan 100-04
+def test_expired_excluded_rest(client, mock_builder, mock_execute_result):
+    """D-06: the REST read routes carry the PostgREST expiry gate
+    (``expires_at.is.null,expires_at.gt.<now>``) and a row the gate filters out
+    reads as ABSENT -> /content 404s BEFORE any signed URL is minted (Pitfall 2 —
+    the signed-URL bypass stays closed). The supabase mock cannot evaluate the
+    filter server-side, so this pins (a) the gate is ON the wire for the list
+    route and (b) the content route 404s when the gated row SELECT comes back
+    empty — exactly what PostgREST returns for an expired row."""
+    from unittest.mock import MagicMock
 
-    assert list_workspace_files is not None
+    tid = "00000000-0000-0000-0000-000000000001"
+
+    # (a) list route applies the expiry gate on the wire
+    mock_execute_result.data = [{"id": "row-1", "path": "/t.docx"}]
+    r = client.get(f"/threads/{tid}/workspace/files")
+    assert r.status_code == 200
+    assert any(
+        c.args and str(c.args[0]).startswith("expires_at.is.null,expires_at.gt.")
+        for c in mock_builder.or_.call_args_list
+    ), "list route must apply the expires_at PostgREST gate (D-06)"
+
+    # (b) content route: ownership passes, the GATED row SELECT returns nothing
+    # (an expired row through the filter) -> 404, no signed URL ever minted.
+    own = MagicMock()
+    own.data = {"id": tid}
+    gone = MagicMock()
+    gone.data = None
+    mock_builder.or_.reset_mock()
+    mock_builder.execute.side_effect = [own, gone]
+    r2 = client.get(f"/threads/{tid}/workspace/files/file-1/content")
+    assert r2.status_code == 404
+    assert any(
+        c.args and str(c.args[0]).startswith("expires_at.is.null,expires_at.gt.")
+        for c in mock_builder.or_.call_args_list
+    ), "content route must apply the expires_at gate before minting any URL"
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-04 — second user 404 on list/content/download (RLS)")
-def test_cross_user_isolation(client):
-    """SC#1 (RLS half): a second user's list / content / download of the first
-    user's template all return 404. Thread ownership + RLS isolates per-user."""
-    from app.api.workspace import _verify_thread_ownership  # ownership seam
+def test_cross_user_isolation(client, mock_execute_result):
+    """SC#1 (RLS half): ``_verify_thread_ownership`` scopes the thread lookup by
+    the CALLER's user_id, so a thread the caller does not own reads as absent ->
+    EVERY workspace read route 404s (existence-leak-safe, D-062-12) before any
+    file row / content / version / diff is touched."""
+    tid = "00000000-0000-0000-0000-00000000dead"
+    mock_execute_result.data = None  # ownership lookup: no row for this user_id
 
-    # The implementing plan drives a two-user scenario; here the symbol existence
-    # is the RED gate. Live assertion: every cross-user route -> 404.
-    assert _verify_thread_ownership is not None
+    assert client.get(f"/threads/{tid}/workspace/files").status_code == 404
+    assert client.get(f"/threads/{tid}/workspace/files/f1/content").status_code == 404
+    assert client.get(f"/threads/{tid}/workspace/files/f1/versions").status_code == 404
+    assert (
+        client.get(f"/threads/{tid}/workspace/files/f1/diff?from=1&to=2").status_code
+        == 404
+    )
 
 
 # ── Plan 100-05 — sweep janitor + kickoff run-pin ──────────────────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-05 — sweep deletes expired rows + ALL Storage bytes; idempotent")
-def test_sweep_deletes_rows_and_bytes():
-    """The in-process sweep janitor removes expired template rows AND every version
-    Storage object for them, and is idempotent on a second run (D-07)."""
-    from app.services.template_service import sweep_expired_templates  # built by Plan 100-05
+async def test_sweep_deletes_rows_and_bytes(mock_asyncpg_pool):
+    """D-07: the sweep removes every Storage version object FIRST, then DELETEs
+    the row (WR-03 ordering, 100-REVIEW — a failed Storage remove keeps the row
+    so the NEXT sweep retries both halves; deleting the row first orphaned the
+    bytes permanently). A sweep with nothing expired is a no-op (idempotent)."""
+    import uuid as _uuid
+    from unittest.mock import MagicMock
 
-    # Live assertion (implementing plan): after sweep, the row is gone from
-    # workspace_files AND storage.from_('workspace-files') has no leftover version
-    # objects; a second sweep is a no-op (idempotent).
-    assert sweep_expired_templates is not None
+    from app.services.template_service import sweep_expired_templates
+
+    pool = mock_asyncpg_pool
+    fid = _uuid.uuid4()
+    supabase = MagicMock()
+    bucket = supabase.storage.from_.return_value
+
+    # Happy path: 1 expired row with 1 Storage object -> remove + DELETE, count 1.
+    pool.set_fetch_results([
+        [{"id": fid}],                            # expired-rows SELECT
+        [{"content_storage_path": "u/t/f/v1"}],   # get_storage_paths_for_file
+    ])
+    assert await sweep_expired_templates(pool, supabase) == 1
+    bucket.remove.assert_called_once_with(["u/t/f/v1"])
+    assert any("DELETE FROM workspace_files" in sql for sql, _ in pool.calls)
+
+    # Idempotent second run: nothing expired -> no remove, no DELETE.
+    pool.calls.clear()
+    bucket.remove.reset_mock()
+    pool.set_fetch_results([[]])
+    assert await sweep_expired_templates(pool, supabase) == 0
+    bucket.remove.assert_not_called()
+    assert not any("DELETE FROM workspace_files" in sql for sql, _ in pool.calls)
+
+    # WR-03: Storage remove FAILS -> the row is NOT deleted (it stays in the next
+    # sweep's SELECT so the whole operation self-heals on the next cadence).
+    pool.calls.clear()
+    pool.set_fetch_results([
+        [{"id": fid}],
+        [{"content_storage_path": "u/t/f/v1"}],
+    ])
+    bucket.remove.side_effect = Exception("storage transiently down")
+    assert await sweep_expired_templates(pool, supabase) == 0
+    assert not any("DELETE FROM workspace_files" in sql for sql, _ in pool.calls)
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-05 — run pin extends expires_at (GREATEST); no-op when no template")
-def test_run_pin_extends_and_noop():
-    """A workflow-run kickoff pin extends a template's expires_at via GREATEST
-    (never shortens), and is a no-op when the thread has no template_input row
-    (D-09). The pin is a thin seam — no inline logic in threads.py (G-5)."""
-    from app.services.template_service import pin_templates_for_run  # built by Plan 100-05
+async def test_run_pin_extends_and_noop(mock_asyncpg_pool):
+    """D-09: the kickoff pin extends expires_at via GREATEST (extend-only — D-08
+    fixed-from-upload preserved) and is scoped to ``kind = 'template_input' AND
+    expires_at IS NOT NULL`` so an agent/NULL-expiry row can NEVER acquire an
+    expiry via the pin; a templateless thread -> 0 rows -> literal no-op (D-11).
+    The pin is a thin seam — no inline logic in threads.py (G-5)."""
+    import uuid as _uuid
 
-    # Live assertion (implementing plan): pin sets
-    #   expires_at = GREATEST(expires_at, now() + ttl)
-    # for template_input rows in the thread; returns/changes nothing when none
-    # exist (the templateless-workflow byte-identical path).
-    assert pin_templates_for_run is not None
+    from app.services.template_service import pin_templates_for_run
+
+    pool = mock_asyncpg_pool
+    pool.set_execute_result("UPDATE 1")
+    pinned = await pin_templates_for_run(
+        pool, thread_id=_uuid.uuid4(), run_wall_clock_cap=4200
+    )
+    assert pinned == 1
+    sql, args = pool.calls[-1]
+    assert "GREATEST(expires_at" in sql                  # extend-only (D-08)
+    assert "kind = 'template_input'" in sql              # template rows only
+    assert "expires_at IS NOT NULL" in sql               # agent rows unreachable
+    assert args[1] == "4200"                             # the run wall-clock cap
+
+    pool.set_execute_result("UPDATE 0")                  # templateless thread
+    assert (
+        await pin_templates_for_run(
+            pool, thread_id=_uuid.uuid4(), run_wall_clock_cap=60
+        )
+        == 0
+    )
 
 
 # ── Plan 100-02 — migration 068 smoke (NULL kind/expires_at still valid) ───────
 
 
-@pytest.mark.xfail(strict=False, reason="Plan 100-02 — migration 068 smoke (existing rows NULL/NULL valid)")
 def test_existing_rows_valid():
-    """Migration 068 adds nullable kind + expires_at columns with NO default and a
-    CHECK that allows NULL — so every pre-068 workspace_files row (agent files)
-    stays valid (NULL kind, NULL expires_at). Zero-migration / byte-identical.
+    """Migration 068 keeps every pre-068 (agent) workspace_files row valid: both
+    new columns are nullable ADDs with NO default/backfill, and the kind CHECK
+    explicitly allows NULL (Pitfall 6) — zero-migration / byte-identical (D-11).
 
-    Run after the operator applies migration 068 via the Supabase SQL editor
-    (per the CLAUDE.md migration rule)."""
+    Static contract on the migration file (the live-DB apply happens via the
+    Supabase SQL editor per the CLAUDE.md migration rule)."""
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     migration = repo_root / "supabase" / "migrations" / "068_workspace_template_ephemeral.sql"
-    # The migration file existence + the nullable/CHECK shape is the contract.
     assert migration.exists(), "migration 068 not yet authored (Plan 100-02)"
     sql = migration.read_text(encoding="utf-8")
-    assert "expires_at" in sql and "kind" in sql
+    # Nullable column ADDs (no default, no backfill).
+    assert "ADD COLUMN IF NOT EXISTS kind text" in sql
+    assert "ADD COLUMN IF NOT EXISTS expires_at timestamptz" in sql
+    # The CHECK must allow NULL or existing rows would become invalid (Pitfall 6).
+    assert "kind IS NULL OR" in sql
+    # No NOT NULL constraint sneaks onto the new columns (the partial index's
+    # `WHERE expires_at IS NOT NULL` is the only legitimate NOT-NULL in the file).
+    assert "NOT NULL" not in sql.replace("IS NOT NULL", "")
