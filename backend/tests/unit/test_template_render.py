@@ -201,3 +201,180 @@ def test_engine_selection_by_provenance():
 
     assert select_engine("library") == "docxtpl"
     assert select_engine("template_input") == "run_replace"
+
+
+# ── Plan 101-04 — the render_template tool handler (the integration piece) ────
+#
+# These are the OFFLINE-testable slices of the BEFORE-render citation gate and the
+# AFTER-render integrity gate. The full sandbox render + the cross-provider field-map
+# emission are LIVE UAT (101-VALIDATION.md Manual-Only). Both tests monkeypatch the
+# resolver + the sandbox session to PROVE the gate short-circuits BEFORE the sandbox
+# is ever reached (the BEFORE gate) and that an integrity failure preserves the
+# field-map without persisting (the AFTER gate).
+
+import asyncio
+import json
+
+
+def _make_ctx(**overrides):
+    """A minimal duck-typed ToolContext for the offline handler tests.
+
+    The handler only touches: pool, supabase, thread_id, current_user, redis,
+    run_id, emit, and settings.sandbox_enabled (module-level). We provide stub
+    attributes and let the monkeypatched resolver / sandbox short-circuit before
+    any real I/O.
+    """
+    from app.services.tool_dispatcher import ToolContext
+
+    base = dict(
+        redis=None,
+        run_id="00000000-0000-0000-0000-0000000000ff",
+        thread_id="11111111-1111-1111-1111-111111111111",
+        supabase=object(),
+        pool=object(),
+        user_settings=None,
+        current_user={"id": "22222222-2222-2222-2222-222222222222"},
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        emit=_noop_emit,
+        spawn=lambda *a, **k: None,
+    )
+    base.update(overrides)
+    return ToolContext(**base)
+
+
+async def _noop_emit(*args, **kwargs):
+    return None
+
+
+def test_render_template_rejects_uncited_before_render(monkeypatch):
+    """The BEFORE-render citation gate (D-08 class 1): a field-map carrying an INVENTED
+    citation (source_chunk_id not in retrieved_ids) is rejected WITHOUT resolving the
+    template or touching the sandbox. We poison resolve_template_source + the sandbox
+    manager so a reject is the ONLY way the test can pass — if the gate let the call
+    through, these would raise."""
+    import app.services.tool_dispatcher as td
+
+    def _boom_resolve(*args, **kwargs):
+        raise AssertionError("resolve_template_source must NOT be called before the citation gate")
+
+    def _boom_sandbox(*args, **kwargs):
+        raise AssertionError("the sandbox must NOT be reached before the citation gate")
+
+    # Patch at the import sites the handler uses (function-scope imports resolve to the
+    # service modules, so patch there).
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _boom_resolve
+    )
+    monkeypatch.setattr(td.sandbox_manager, "get_or_create", _boom_sandbox)
+
+    args = {
+        "field_map": {
+            "scalars": {
+                # invented: source_chunk_id is not in retrieved_ids
+                "project_name": {"value": "Meridian", "source_chunk_id": "chunk-99"},
+            },
+            "collections": {},
+        },
+        "retrieved_ids": ["chunk-1", "chunk-2"],
+        "out_filename": "out.docx",
+    }
+    ctx = _make_ctx()
+
+    result = asyncio.run(td._handle_render_template(args, ctx))
+    payload = json.loads(result.result)
+    assert payload["status"] == "rejected"
+    assert payload["reason"] == "uncited_or_invented"
+    # The invented citation was actually counted (gate ran the real check_coverage).
+    assert payload["stats"]["invented_citation_count"] == 1
+
+
+def test_render_template_integrity_fail_preserves_field_map(monkeypatch):
+    """The AFTER-render integrity gate (D-08 class 2): when the sandbox verdict reports
+    opened=False, the handler returns status=failed, PRESERVES the cited field-map as
+    fallback output, and does NOT call ws_write_file (a corrupt file is NEVER
+    delivered — SC#4 #3)."""
+    import app.services.tool_dispatcher as td
+
+    # A clean, fully-cited field-map so the BEFORE gate passes.
+    field_map = {
+        "scalars": {"project_name": {"value": "Meridian", "source_chunk_id": "chunk-1"}},
+        "collections": {},
+    }
+
+    # Resolver returns real-looking bytes + provenance (library → docxtpl engine).
+    async def _fake_resolve(*args, **kwargs):
+        return {
+            "bytes": b"PK\x03\x04 fake docx bytes",
+            "filename": "template.docx",
+            "provenance": "library",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "error": None,
+        }
+
+    monkeypatch.setattr(
+        "app.services.template_asset_service.resolve_template_source", _fake_resolve
+    )
+    # Force sandbox_enabled True so the handler proceeds to the sandbox run.
+    monkeypatch.setattr(td.settings, "sandbox_enabled", True)
+
+    # Fake the sandbox ship+run to return an integrity FAILURE verdict (opened=False).
+    async def _fake_threadpool(fn, *args, **kwargs):
+        return {
+            "verdict": {"rendered": True, "opened": False, "error": "won't open"},
+            "stdout": '{"rendered": true, "opened": false}',
+            "produced": None,
+        }
+
+    monkeypatch.setattr(td, "run_in_threadpool", _fake_threadpool)
+
+    # ws_write_file must NEVER be called — poison it.
+    async def _boom_write(*args, **kwargs):
+        raise AssertionError("ws_write_file must NOT be called when integrity fails")
+
+    monkeypatch.setattr(td, "ws_write_file", _boom_write)
+
+    args = {
+        "field_map": field_map,
+        "retrieved_ids": ["chunk-1"],
+        "out_filename": "out.docx",
+        "asset": {
+            "asset_id": "user/_library/template.docx",
+            "filename": "template.docx",
+            "kind": "template",
+            "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+    }
+    ctx = _make_ctx()
+
+    result = asyncio.run(td._handle_render_template(args, ctx))
+    payload = json.loads(result.result)
+    assert payload["status"] == "failed"
+    assert payload["reason"] == "integrity"
+    # The cited field-map is preserved as fallback so the extracted data isn't lost (D-08).
+    assert payload["field_map"] == field_map
+
+
+def test_render_driver_is_self_contained():
+    """The sandbox render driver (_RENDER_DRIVER_SRC) is syntactically valid Python and
+    is dependency-free w.r.t. the backend package — the container has no `app` on its
+    path, so the driver must NOT import `app.*`."""
+    from app.services.tool_dispatcher import _RENDER_DRIVER_SRC
+
+    # Compiles without SyntaxError — it is valid, shippable Python.
+    compile(_RENDER_DRIVER_SRC, "<render_driver>", "exec")
+
+    # No backend-package imports (the sandbox has no backend/app on its path).
+    assert "import app." not in _RENDER_DRIVER_SRC
+    assert "from app." not in _RENDER_DRIVER_SRC
+
+    # The docxtpl branch uses the SandboxedEnvironment(autoescape=True) (TMPL-03)...
+    assert "SandboxedEnvironment(autoescape=True)" in _RENDER_DRIVER_SRC
+    # ...and prints exactly one JSON verdict line.
+    assert "json.dumps" in _RENDER_DRIVER_SRC
+    assert "print(" in _RENDER_DRIVER_SRC
+
+    # The integrity re-open uses the SAME library per format (docx/pptx/xlsx).
+    assert "Document(" in _RENDER_DRIVER_SRC
+    assert "Presentation(" in _RENDER_DRIVER_SRC
+    assert "load_workbook(" in _RENDER_DRIVER_SRC
