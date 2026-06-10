@@ -151,7 +151,8 @@ class PhaseSpec(_StrictBase):
 # ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──
 # co-lock free, so Phases 100/103 don't re-touch this model). Behavior deferred:
 # `inputs` (launch form) lands in Phase 103;
-# `assets` (template/reference refs) in Phase 101 (the trusted-library fill path);
+# `assets` (template/reference refs) — IMPLEMENTED in Phase 101 (the trusted-library
+#   fill path; byte resolution in template_asset_service.resolve_template_source);
 # Provenance lives in run OUTPUT only (open-Q ii / D-11) — NO `Cited`
 # field on InputFieldSpec.
 class InputFieldSpec(_StrictBase):
@@ -185,7 +186,7 @@ class WorkflowDefinition(_StrictBase):
     version_policy: Literal["supersede-by-filename", "keep-all"] = "supersede-by-filename"   # D-08 (shape only)
     provenance: Literal["source", "derived"] = "source"                                      # D-08 (net-new flag)
     inputs: list[InputFieldSpec] | None = None                                               # co-lock (Phase 103 behavior)
-    assets: list[AssetRef] | None = None                                                     # co-lock (Phase 101 behavior)
+    assets: list[AssetRef] | None = None                                                     # co-lock — implemented in Phase 101 (template_asset_service)
 
     @model_validator(mode="after")
     def _folder_scope_requires_project(self) -> "WorkflowDefinition":
