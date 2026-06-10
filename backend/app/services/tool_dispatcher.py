@@ -1274,19 +1274,31 @@ def render_docx_template(template_path, context, out_path):
 
 
 def _replace_in_paragraph(paragraph, flat_scalars):
+    # 101-06 WR-04 / IR-01: this is a VERBATIM mirror of the audited production helper
+    # (template_render_service._replace_in_paragraph) so the two copies cannot diverge.
+    # The OLD driver guard `if blanked_text == full: return` compared the BLANKED text to
+    # the ORIGINAL — so a matched token whose net text equals the original was SKIPPED and
+    # the token could survive in a later run fragment (a silent non-fill WR-03 then shipped).
+    # Production tracks `matched` and uses `touched = matched or (blanked_text != replaced_text)`.
     runs = paragraph.runs
     if not runs:
         return
     full = paragraph.text
+    matched = set()
     replaced_text = full
     for key, value in flat_scalars.items():
         token = "{{" + key + "}}"
         if token in replaced_text:
+            matched.add(key)
             replaced_text = replaced_text.replace(token, value)
+    # Blank any remaining placeholder-shaped token (unmatched intended placeholders).
     blanked_text = _PLACEHOLDER_TOKEN_RE.sub("", replaced_text)
-    if blanked_text == full:
-        return  # nothing changed -> leave runs (and formatting) intact
-    runs[0].text = blanked_text
+    touched = matched or (blanked_text != replaced_text)
+    replaced_text = blanked_text
+    if not touched:
+        return  # no token here -> leave runs (and their formatting) intact
+    # Coalesce: whole replaced text into run[0], clear the rest.
+    runs[0].text = replaced_text
     for r in runs[1:]:
         r.text = ""
 
