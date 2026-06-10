@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: executing
-last_updated: "2026-06-10T22:12:30.000Z"
-last_activity: 2026-06-10 -- Phase 101 Plan 04 complete
+status: verifying
+last_updated: "2026-06-10T22:20:24.943Z"
+last_activity: 2026-06-10 -- Phase 101 Plan 05 complete (LAST plan — phase awaits verification)
 progress:
   total_phases: 13
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 29
-  completed_plans: 28
-  percent: 97
+  completed_plans: 29
+  percent: 100
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101 — Template-Fill + Integrity Validation (executing, sequential on main tree)
+**Current focus:** Phase 101 — Template-Fill + Integrity Validation (ALL 5 plans complete — awaiting `/gsd:verify-work 101` + cross-provider live UAT)
 
 ## Current Position
 
-Phase: 101 — EXECUTING
-Plan: 101-04 (render_template agent tool) of 5 — COMPLETE; next = Plan 101-05
-Status: Executing (sequential on main tree)
-Last activity: 2026-06-10 -- Phase 101 Plan 04 complete
+Phase: 101 — EXECUTION COMPLETE (5/5 plans), awaiting verification
+Plan: 101-05 (admit render_template to a fill phase) of 5 — COMPLETE (LAST plan)
+Status: Phase execution complete — ready for `/gsd:verify-work 101` (TMPL-02 / TMPL-03 mark complete at phase verification)
+Last activity: 2026-06-10 -- Phase 101 Plan 05 complete
 
 **Plan 101-01 (Wave 0 scaffold) — COMPLETE (2026-06-10):**
 
@@ -66,7 +66,18 @@ Last activity: 2026-06-10 -- Phase 101 Plan 04 complete
 - **SEED-056 net-new-failure proof:** full suite `116 failed` on first run = `115` documented rot baseline + the one registry-count test (the ONLY net-new, and it is the directly-required registry change, now fixed → back to 115). The remaining 115 (`test_sql_service`, `test_streaming_reliability::test_persist_assistant_message_is_sync`, `test_077_cross_cancel`) are the documented SEED-056 rot — grep-confirmed none import `template_render_service`/`template_asset_service`/`render_template`. **Net-new failures = 0.**
 - **No other deviations.** All 7 STRIDE threats addressed (T-101-04-01..07). SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-04-SUMMARY.md` (Self-Check: PASSED). **TMPL-02 / TMPL-03 stay OPEN in REQUIREMENTS.md** — the render tool landed, but the end-to-end fill (live sandbox render + phase admission Plan 05 + cross-provider UAT) is not yet observable; the requirements mark complete at phase verification (the 099/WFSKILL-01 multi-plan convention).
 - **Operator setup before live UAT:** rebuild + bump the sandbox image (`docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/` then `SANDBOX_IMAGE=agentic-rag-sandbox:101.1` in `backend/.env`; NEW chats only). Without docxtpl in the image the handler returns the honest `sandbox_image_stale` error.
-- **Next:** `/gsd:execute-phase 101` Plan 05 — admit `render_template` to a fill phase via the 099 whitelist pattern (`phase_types.py`); field-map emission rides the unmodified gateway (D-14, no per-provider branch); Deep byte-identical.
+- **Next (DONE):** Plan 05 admitted `render_template` to a fill phase via the 099 whitelist pattern — see the Plan 101-05 block below.
+
+**Plan 101-05 (Wave 3, admit render_template to a fill phase — the LAST seam) — COMPLETE (2026-06-10) — LAST PLAN OF PHASE 101:**
+
+- ✓ Task 1 (commit `abb1c18c`): `render_template` admitted to a harness FILL phase via the 099 per-phase whitelist pattern (`backend/app/services/harness/phase_types.py`). **The core insight held: ZERO new code** — `_effective_tools(phase)` already returns `available_tools` UNCHANGED when no skill snapshot is present, so a fill phase that lists `render_template` in its `available_tools` is ALREADY admitted on BOTH layers (`apply_tool_budget` layer-1 = the schemas the model sees + `phase_whitelist=frozenset` layer-2 = the dispatch backstop) because `_build_phase_tool_context` threads `_effective_tools(phase)` into both `available_tools=_tools` AND `phase_whitelist=frozenset(_tools)` (unchanged). The change is a **20-line documenting comment** in `_effective_tools` naming `render_template` as a declared FILL-phase tool admitted via the SAME never-drop pattern as `read_skill_file` (the executable `base = list(...)` line + the snapshot append are byte-unchanged; the 098 folder_scope narrowing + 099 snapshot attach in `_build_phase_tool_context` are byte-unchanged). **DELIBERATELY no auto-injection** of `render_template` — a phase must EXPLICITLY declare it (auto-injecting into every phase would widen the tool surface against D-04's intent + break the gated-no-op Deep invariant); the future-extension shape (`if <fill-phase-condition> and "render_template" not in base: base.append(...)`) is documented but NOT added (no fill `phase_type` flag exists — STRETCH 108). 3 offline tests in `test_template_render.py`: `test_fill_phase_admits_render_template` (a declaring phase gets it on both layers + read_skill_file NOT injected with no snapshot), `test_non_fill_phase_excludes_render_template` (a non-declaring phase never gets it — no auto-injection), `test_deep_mode_whitelist_none_noop` (Deep `phase_whitelist=None` → the dispatch guard predicate is False → byte-identical). The verify slice `-k "phase or render_template or deep"` = **5 passed**; full `test_template_render.py` **14/14**; +integrity **17/17**; dispatcher **15/15**.
+- **No deviations.** Plan executed exactly as written (action items 1-4 followed precisely: documenting comment added; no auto-injection; both-layer threading confirmed-by-reading; RED LINE held).
+- **RED LINE held — cross-provider (D-14 / Cond 7):** `git diff --stat` shows the only `backend/app/**` change is `phase_types.py` (+20, comment-only) + the test file. NO provider/gateway file touched (`task_service.py` / `openai_service.py` / any `*_service`) — the field-map emission rides the UNMODIFIED `_stream_one_iteration` / `resolve_calling_mode`, so all 8 providers inherit NATIVE/STRUCTURED resolution + the GLM/MiniMax registry-miss recovery + the DeepSeek/Moonshot truncation handling at the service boundary; the fill path never branches per provider.
+- **SEED-056 net-new-failure proof:** harness slice (`-k "harness or 099 or 098"`) = **143 passed, 1 pre-existing failure** (`test_bounded_retry_reaches_failed_after_3_attempts`, `KeyError: 'tool_call_id'` at `harness_engine.py:219`) proven PRE-EXISTING via stash-at-base (fails IDENTICALLY with my `phase_types.py`+test changes stashed, then restored clean). My change is comment-only and cannot affect `harness_engine.py`'s bounded-retry path. **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-101-05-01..04): EoP — render_template admitted only when declared (layer-2 backstop refuses hallucinated names); Tampering/Deep byte-identity — phase_whitelist=None in Deep → gated no-op + no auto-injection; Tampering/shared gateway — field-map rides unmodified `_stream_one_iteration`, no per-provider branch; EoP/retrieval scope — the fill phase retrieves under the 098 bound folder_scope (server-side, narrow-only ∩ in `_build_phase_tool_context`, untouched). SUMMARY: `.planning/phases/101-template-fill-integrity-validation/101-05-SUMMARY.md` (Self-Check: PASSED).
+- **Phase 101 plan execution is COMPLETE end-to-end** (5/5): deterministic core (02) → byte resolution by provenance (03) → render_template agent tool + D-08 two-gate flow (04) → fill-phase admission via the 099 whitelist (05). **TMPL-02 / TMPL-03 stay OPEN in REQUIREMENTS.md** — they mark complete at phase verification (the 099/WFSKILL-01 multi-plan convention).
+- **Operator setup before live UAT:** rebuild + bump the sandbox image (`docker build -f backend/Dockerfile.sandbox -t agentic-rag-sandbox:101.1 backend/` then `SANDBOX_IMAGE=agentic-rag-sandbox:101.1` in `backend/.env`; NEW chats only). Without docxtpl in the image the `render_template` handler returns the honest `sandbox_image_stale` error.
+- **Next:** `/gsd:verify-work 101` — phase verification + the cross-provider live UAT (operator-driven, VALIDATION.md Manual-Only: field-map emission across the full native roster + the G-6 failure-mode rows — run-split miss / XML corruption / pptx row-growth / xlsx chart strip / merged-cell mis-write / produced-file-won't-open). `backend/app/api/threads.py` extraction remains DUE (G-5 carry-forward) — untouched by this plan.
 
 **Phase 100 (Ephemeral Template Upload) — COMPLETE (2026-06-10), TMPL-01 closed.** 6/6 plans, 4 waves, wave-based parallel execution. Migration 068 applied live (psycopg2 direct, no reset) + full-schema regenerated. Code review 0C/8W → ALL 8 fixed via /gsd:code-review-fix (incl. the 3 verifier-confirmed SC#3 blockers: WR-01 COALESCE upsert, WR-02 get_diff expiry gate, WR-03 bytes-first sweep). VERIFICATION passed (3/3 truths); **live UAT 7/7 PASS, Claude-driven end-to-end** (Chrome MCP drove the real UI; psycopg2 cross-checks): upload+badge+countdown, never-in-search (marker probe), expiry end-to-end (panel vanish + "template expired" tool error + in-process sweep GC'd row+bytes), 3-way bad-file rejection, run-pin straddle (workflow completed, GREATEST extend held), cross-user 404 ×5 routes, agent files byte-identical. **One G-4 defect found+fixed live:** upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit) → TemplateUpload extracted + rendered in the calm empty state + 2 reachability tests (this was the operator's "no UI changes" report). Backend 37 passed/0 failures (xfail stubs upgraded to behavioral); FilesSection 11/11; panel suites 40/40. UAT fixtures kept: uat-files/ + user B (uat100-userb@example.com) + the UAT thread.
 
