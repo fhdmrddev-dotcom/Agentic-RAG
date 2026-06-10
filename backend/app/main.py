@@ -249,6 +249,28 @@ async def lifespan(app_instance):
 
     asyncio.create_task(_resume_stranded())
 
+    # Phase 100 (TMPL-01, D-07) — in-process janitor: GC expired template rows +
+    # ALL their Storage version bytes every ~15 min. Best-effort (failure logs +
+    # the app continues; the NEXT cadence re-runs). Idempotent by construction
+    # (sweep_expired SELECTs only `expires_at <= now()` and DELETE-rowcount-skips a
+    # row a sibling worker raced), so WORKER_COUNT=2 is safe with NO lock — every
+    # worker can run its own sweep harmlessly. ALL sweep logic lives in
+    # template_service (this is a thin call-through). The guarantee is the read
+    # filter (Plans 03/04); this sweep is pure garbage collection.
+    async def _sweep_expired_templates():
+        while True:
+            try:
+                from app.services.template_service import sweep_expired
+                from app.dependencies import get_supabase
+                n = await sweep_expired(pool=await get_pg_pool(), supabase=get_supabase())
+                if n:
+                    logger.info("Template sweep deleted %d expired template(s)", n)
+            except Exception:
+                logger.exception("Template sweep failed (app continues)")
+            await asyncio.sleep(15 * 60)   # D-07 ~15 min cadence
+
+    asyncio.create_task(_sweep_expired_templates())
+
     yield
 
     # 096-09 (UAT Test 2 restart-resumability fix): mark the process as shutting
