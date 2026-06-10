@@ -92,3 +92,56 @@ No threat flags were raised in any Phase 099 SUMMARY.md file that lack a corresp
 - [x] `status: verified` set in frontmatter
 
 **Approval:** verified 2026-06-10
+
+---
+
+## Security Audit Addendum 2026-06-10 (gap plans 099-07 / 099-08)
+
+> Scope: verifies the 9 new STRIDE threats declared in 099-07-PLAN.md and 099-08-PLAN.md
+> threat_model blocks. The original 19-threat register (above) remains unchanged and closed.
+> ASVS Level 1. block_on: high.
+
+### Trust Boundaries (addendum)
+
+| Boundary | Description |
+|----------|-------------|
+| published `workflow_definitions` row → amended trigger | `skill_snapshots` column is the only mutable field; every authored column (`slug/version/name/description/status/definition/created_by/is_global/org_id`) still raises SQLSTATE 23514 on change |
+| stored `skill_snapshots` JSONB → in-memory `SkillSnapshot` | re-grafted via `SkillSnapshot.model_validate` at every read point (kickoff + `_load_run_definition`) |
+| backend `{detail}` HTTP error body → frontend DOM | server-controlled string crosses into the chat banner; rendered as React text children only |
+
+### Threat Register (addendum)
+
+| Threat ID | Category | Disposition | Status | Evidence |
+|-----------|----------|-------------|--------|----------|
+| T-099-07-01 | Tampering — amended trigger preserves immutability | mitigate | closed | `067_skill_snapshots_sibling_column.sql`: 9-column `IS DISTINCT FROM` allowlist confirmed present in file. Live DB (psycopg2 127.0.0.1:54322): amended function body contains the allowlist; `AUTHORED_COLS_IN_TRIGGER = ['created_by','definition','description','is_global','name','org_id','slug','status','version']`. Test `test_persist_survives_published_trigger` asserts a definition-touching update on a published fake row raises `APIError(23514)`. |
+| T-099-07-02 | Tampering / Race — concurrent double-kickoff CAS | mitigate | closed | `skill_snapshot.py:254-256`: `.update({"skill_snapshots": snapshots_map}).eq("id", definition_id).is_("skill_snapshots", "null")` confirmed. The CAS filter means a second writer updates 0 rows with no error. `test_cas_second_materialize_no_op` verifies the 0-row no-op path. |
+| T-099-07-03 | Tampering / Integrity — malformed stored snapshot JSON | mitigate | closed | `skill_snapshot.py:288`: `phase.config.skill_snapshot = SkillSnapshot.model_validate(stored)` — `extra="forbid"` on `_StrictBase`; a malformed stored map raises `ValidationError`, kickoff fails closed. The `except Exception → HTTPException(500)` wrapper in `threads.py:837-846` returns structured JSON (no naked traceback). `test_kickoff_unexpected_error_maps_500` verifies. |
+| T-099-07-04 | Denial of Service / UX — naked ASGI 500 on materializer failure | mitigate | closed | `threads.py:837-846`: `except Exception as _mat_err … raise HTTPException(status_code=500, detail=f"skill snapshot materialization failed: {_mat_err}")`. Graft confirmed wired before validate/materialize at `threads.py:817`. |
+| T-099-07-05 | Information Disclosure — `skill_snapshots` column readability | accept | closed | Accepted: same `workflow_definitions` row, same owned-or-global SELECT RLS (056:43-45); adding the column does not widen row scope. No new exposure surface. Documented in addendum accepted risks log below. |
+| T-099-07-06 | Elevation (IDOR) — kickoff definition resolve | n/a (unchanged) | closed | The owned-or-global `.or_` predicate is unchanged (T-092-05); only the SELECT column list was widened. No auth-posture change. No new mitigation required. |
+| T-099-08-01 | Tampering / XSS — server `detail` rendered in DOM | mitigate | closed | `frontend/src/components/chat/ChatArea.tsx:534-537`: `reconcileError instanceof ApiError ? reconcileError.message : "Couldn't load…"` rendered as JSX `<span>` text children. Grep count of `dangerouslySetInnerHTML` in ChatArea.tsx = 1 (one code comment only, no live JSX usage). React text children auto-escape HTML. |
+| T-099-08-02 | Information Disclosure — raw server `detail` passed to UI | accept | closed | Accepted: the 400 detail originates from the app's own gate (`threads.py` / `skill_snapshot.py` `ValueError`) — a generic message, no PII, no IDOR existence leak (T-099-01/02 still closed). 409 stays on fixed client copy, never the raw body. Documented in addendum accepted risks log below. |
+| T-099-08-03 | DoS — stale `failedSendDrafts` re-fills composer unexpectedly | mitigate | closed | `StreamsProvider.tsx`: draft cleared on consume (`onClearPrefill` in ChatArea) AND on banner dismiss (`dismissReconcileError`). Keyed by `threadId` — no cross-thread bleed, mirrors the per-thread `reconcileErrors` isolation. `streamsStore.ts` state field `failedSendDrafts: Map<string, string>` confirmed present (grep count ≥ 2 per 099-08-SUMMARY). |
+
+### Addendum Accepted Risks Log
+
+| Risk ID | Threat Ref | Rationale | Accepted By | Date |
+|---------|------------|-----------|-------------|------|
+| AR-099-07-01 | T-099-07-05 | The `skill_snapshots` column lives on the `workflow_definitions` row under the existing owned-or-global SELECT RLS. A user who can read the definition row can read its materialized snapshots — same trust level as reading the definition JSONB. No new exposure surface introduced by 067. | gsd-secure-phase | 2026-06-10 |
+| AR-099-08-01 | T-099-08-02 | The 400 `detail` string is the app's own gate message (disabled/missing/non-visible skill) from `validate_skill_refs` / `_ensure_skill_snapshots`. It contains no PII, no secret material, no cross-user identifiers. The generic `ValueError` message was already verified non-leaking under T-099-01/02 in the original audit. 409 continues to use a fixed client-side copy, never the raw server body. | gsd-secure-phase | 2026-06-10 |
+
+### Unregistered Threat Flags (addendum)
+
+099-08-SUMMARY.md `## Threat Flags` section states: "None — this plan introduces no new network endpoints, auth paths, file access, or schema changes." No unregistered flags to log.
+
+099-07-SUMMARY.md has no `## Threat Flags` section. The single WR-02 observation (un-wrapped `.download()` in `_handle_read_skill_file` snapshot branch) was already accepted as AR-099-03 in the original audit register and is not a new threat surface.
+
+### Addendum Audit Trail
+
+| Audit Date | Gap Plans | Threats Total (addendum) | Closed | Open | Run By |
+|------------|-----------|--------------------------|--------|------|--------|
+| 2026-06-10 | 099-07 / 099-08 | 9 | 9 | 0 | gsd-secure-phase (claude-sonnet-4-6) |
+
+**Cumulative (original + addendum): 28 threats, 28 closed, 0 open.**
+
+**Addendum sign-off:** verified 2026-06-10
