@@ -496,7 +496,12 @@ function expiryCaption(expiresAt?: string): string | null {
 | A3 | The Supabase Storage `workspace-files` bucket already exists in the live env (used by `write_file` today). | Janitor / Pattern 4 | LOW — the bucket is referenced by shipped code (`BUCKET_NAME = "workspace-files"`); large agent files already round-trip through it. |
 | A4 | A `get_supabase_admin()` (service-role) client exists for the sweep (the lifespan task has no per-user auth context). | Pattern 4 | MEDIUM — the sweep runs outside any request, so it can't use the request-scoped `get_supabase` (which carries the user JWT). It needs a service-role client to delete across all users' rows + Storage. The harness resume sweep precedent (`get_pg_pool`) uses the raw pool (no RLS) for DB; for Storage it needs an admin supabase client. **Planner must confirm/locate the service-role Storage client** (or the sweep deletes rows via pool but can't reach Storage → orphans bytes). This is the single highest-risk unknown. |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three questions were resolved during pattern mapping — see `100-PATTERNS.md`
+> (Q1: `get_supabase()` at `dependencies.py:16-20` IS the service-role client, harness sweep precedent
+> `harness_engine.py:1134`; Q2: OOXML prefix added to `_BINARY_MIME_PREFIXES` in Plan 03-T2;
+> Q3: request-driven refetch per CONTEXT.md Claude's-Discretion — no SSE emit needed).
 
 1. **Service-role client for the sweep (A4 — HIGH priority)**
    - What we know: the sweep runs in the lifespan with no user JWT; DB deletes can use the raw asyncpg pool (no RLS), but Storage deletion needs a supabase client with the Storage API.
