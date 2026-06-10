@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 ## Current Position
 
 Phase: 100 (ephemeral-template-upload) — EXECUTING
-Plan: 6 of 6 complete (all 4 waves executed)
-Status: Executing Phase 100 — post-execution gates (code review, regression, verification)
-Last activity: 2026-06-10 -- Wave 4 complete (100-06 panel UI; FilesSection 11/11); all plans merged; running phase-end gates
+Plan: 6 of 6 complete (all 4 waves executed) — AWAITING OPERATOR LIVE UAT (7 G-4 rows in 100-HUMAN-UAT.md)
+Status: Phase 100 executed; verification = human_needed; all 3 verifier gaps (WR-01/02/03) + all 8 review warnings FIXED (review-fix 8/8, backend 37 passed/0 xfail-stubs-left, frontend 11/11)
+Last activity: 2026-06-10 -- Post-execution gates done: review 0C/8W→all_fixed, regression 97+38 passed (1 known pre-existing rot), schema-drift clean. Phase completion blocked ONLY on live UAT approval.
 
 **Phase 100 discuss-phase COMPLETE (2026-06-10):** `100-CONTEXT.md` committed (`1c0aafcf`). 4 gray areas resolved (all operator-accepted recommendations): (1) Upload UX = panel FilesSection button + Template badge/expiry countdown + vanish-on-expiry + no chat artifact (sketch-aligned; 2-pill composer untouched); (2) TTL = 24h in app_settings; guarantee = gated read-path filter (`expires_at IS NOT NULL` — 098 D-05a pattern), physical deletion = idempotent in-process janitor task (rows + Storage bytes); (3) fixed TTL + run-pin at kickoff (thin seam, threads.py must not grow) + "template expired" tool error + **D-11 invariant: templates optional everywhere** + 7 operator-defined G-4 UAT rows; (4) strict .docx/.pptx/.xlsx allowlist + magic-byte OOXML check; AssetRef/library-asset behavior DEFERRED to Phase 101; runs find templates by `kind='template_input'` in-thread (zero kickoff-API changes). Resume file: `.planning/phases/100-ephemeral-template-upload/100-CONTEXT.md`. **Next: `/gsd:plan-phase 100`.**
 
