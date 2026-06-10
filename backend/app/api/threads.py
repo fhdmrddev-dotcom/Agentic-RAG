@@ -968,6 +968,18 @@ async def send_message(
             skill_snapshots=_kickoff_skill_snapshots,
         )
 
+        # 100 D-09 run-pin: extend each template_input file's expiry to cover this
+        # run's wall-clock cap so it can't die mid-flight from template expiry (D-09).
+        # Thin delegating call — ALL logic (the extend-only expiry write + the cap
+        # formula) lives in template_service (G-5: no inline query/Storage call in this
+        # hot file). D-11: a thread with no template_input row → the write no-ops.
+        from app.services import template_service as _template_service
+        await _template_service.pin_templates_for_run(
+            pool=await get_pg_pool(),
+            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
+            run_wall_clock_cap=_template_service.run_cap_seconds(_kickoff_definition),
+        )
+
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new
     # JSONResponse contract — the frontend uses this to deduplicate its
