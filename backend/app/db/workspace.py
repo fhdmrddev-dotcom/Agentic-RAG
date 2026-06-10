@@ -25,6 +25,13 @@ async def upsert_workspace_file(
     columns (migration 068). Agent callers omit both -> NULL/NULL -> the gated read
     seams treat NULL expiry as never-expires (D-11 byte-identical). Only the template
     upload caller (Plan 100-04) passes ``kind='template_input'`` + a future expiry.
+
+    WR-01 (100-REVIEW): the ON CONFLICT path COALESCEs ``kind``/``expires_at`` so an
+    agent overwrite of a template path (kind=None/expires_at=None) PRESERVES the
+    row's template lifecycle instead of NULLing it — otherwise the row never expires,
+    the sweep never touches it, and the original template bytes leak permanently in
+    workspace_file_versions. Agent rows stay byte-identical: COALESCE(NULL, NULL) is
+    NULL, and a template re-upload's non-NULL EXCLUDED values still win.
     """
     row = await pool.fetchrow(
         """
@@ -38,8 +45,8 @@ async def upsert_workspace_file(
             mime_type = EXCLUDED.mime_type,
             content_inline = EXCLUDED.content_inline,
             content_storage_path = EXCLUDED.content_storage_path,
-            kind = EXCLUDED.kind,
-            expires_at = EXCLUDED.expires_at,
+            kind = COALESCE(EXCLUDED.kind, workspace_files.kind),
+            expires_at = COALESCE(EXCLUDED.expires_at, workspace_files.expires_at),
             updated_at = now()
         RETURNING id, (xmax = 0) AS is_new
         """,
