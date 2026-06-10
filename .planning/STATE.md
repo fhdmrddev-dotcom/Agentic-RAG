@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: planning
-last_updated: "2026-06-10T10:31:19.112Z"
-last_activity: 2026-06-10
+status: executing
+last_updated: "2026-06-10T11:15:59.316Z"
+last_activity: 2026-06-10 -- Phase 100 execution started
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 18
+  total_plans: 24
   completed_plans: 18
-  percent: 100
+  percent: 75
 ---
 
 # Project State
@@ -22,14 +22,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 100 — ephemeral-template-upload (099 complete: skill_ref + snapshot shipped, verified 7/7)
+**Current focus:** Phase 100 — Ephemeral Template Upload
 
 ## Current Position
 
-Phase: 100
-Plan: Not started
-Status: Context gathered — ready to plan
-Last activity: 2026-06-10
+Phase: 100 (ephemeral-template-upload) — EXECUTING
+Plan: 2 of 6 complete (Wave 1 done: 100-01 scaffold + 100-02 migration 068 applied live)
+Status: Executing Phase 100
+Last activity: 2026-06-10 -- Wave 1 complete (100-01, 100-02); migration 068 live; Wave 2 next
 
 **Phase 100 discuss-phase COMPLETE (2026-06-10):** `100-CONTEXT.md` committed (`1c0aafcf`). 4 gray areas resolved (all operator-accepted recommendations): (1) Upload UX = panel FilesSection button + Template badge/expiry countdown + vanish-on-expiry + no chat artifact (sketch-aligned; 2-pill composer untouched); (2) TTL = 24h in app_settings; guarantee = gated read-path filter (`expires_at IS NOT NULL` — 098 D-05a pattern), physical deletion = idempotent in-process janitor task (rows + Storage bytes); (3) fixed TTL + run-pin at kickoff (thin seam, threads.py must not grow) + "template expired" tool error + **D-11 invariant: templates optional everywhere** + 7 operator-defined G-4 UAT rows; (4) strict .docx/.pptx/.xlsx allowlist + magic-byte OOXML check; AssetRef/library-asset behavior DEFERRED to Phase 101; runs find templates by `kind='template_input'` in-thread (zero kickoff-API changes). Resume file: `.planning/phases/100-ephemeral-template-upload/100-CONTEXT.md`. **Next: `/gsd:plan-phase 100`.**
 
@@ -202,4 +202,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 099 (Workflow ↔ Skill Composition) — 6 plans — 2026-06-10T06:23:07.327Z
+**Planned Phase:** 100 (Ephemeral Template Upload) — 6 plans — 2026-06-10T11:11:52.949Z

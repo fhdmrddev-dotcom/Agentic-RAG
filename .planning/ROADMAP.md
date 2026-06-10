@@ -123,8 +123,8 @@
   3. The uploaded template expires via TTL (`expires_at`) + a cron sweep and is no longer retrievable after expiry.
 **Plans**: 6 plans (4 waves)
 Plans:
-- [ ] 100-01-PLAN.md (Wave 0) — TDD test scaffold: OOXML fixtures + 12 backend stubs + FilesSection render stubs
-- [ ] 100-02-PLAN.md (Wave 1) — Migration 068 (kind + expires_at + partial index + app_settings.template_ttl_hours) + [BLOCKING] live apply + full-schema regen + harness.py co-lock repoint
+- [x] 100-01-PLAN.md (Wave 0) — TDD test scaffold: OOXML fixtures + 12 backend stubs + FilesSection render stubs — DONE 2026-06-10
+- [x] 100-02-PLAN.md (Wave 1) — Migration 068 (kind + expires_at + partial index + app_settings.template_ttl_hours) + [BLOCKING] live apply + full-schema regen + harness.py co-lock repoint — DONE 2026-06-10 (applied live via psycopg2, no reset)
 - [ ] 100-03-PLAN.md (Wave 2) — asyncpg data layer: gate the 2 tool read seams (D-06/D-11), is_expired flag (D-10), write_file kind/expires_at, OOXML binary-MIME hygiene
 - [ ] 100-04-PLAN.md (Wave 3) — POST upload route + OOXML magic-byte validation (D-12) + 4 gated REST GET routes (signed-URL bypass closed) + template_ttl_hours settings field (D-05)
 - [ ] 100-05-PLAN.md (Wave 3) — template_service (idempotent sweep D-07 + GREATEST-only run-pin D-09) + main.py lifespan sweep + thin threads.py kickoff pin (G-5) + D-10 tool error
@@ -244,7 +244,7 @@ Plans:
 | 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Complete    | 2026-06-08 |
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
-| 100. Ephemeral Template Upload | 0/TBD | Not started | - |
+| 100. Ephemeral Template Upload | 2/6 | In progress | - |
 | 101. Template-Fill + Integrity Validation | 0/TBD | Not started | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
