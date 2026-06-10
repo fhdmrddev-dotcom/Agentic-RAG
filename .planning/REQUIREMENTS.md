@@ -20,7 +20,7 @@
 **: An `llm_agent` / `llm_single` phase can reference a skill via an optional `skill_ref`; the skill's instructions + referenced files compose into the phase framing and `read_skill_file` is auto-whitelisted. The skill version is snapshotted into the locked definition so a later edit/delete can't break a published workflow. *(Deep path byte-identical.)*
 
 ### TMPL — Template-fill
-- [ ] **TMPL-01**: A user can upload a template (docx/pptx/xlsx) into a thread **temporarily** — workspace-only, TTL + cron sweep, RLS-scoped, **never ingested into the KB and never appearing in search**. *(Also closes the injection-via-uploaded-doc vector.)*
+- [x] **TMPL-01**: A user can upload a template (docx/pptx/xlsx) into a thread **temporarily** — workspace-only, TTL + cron sweep, RLS-scoped, **never ingested into the KB and never appearing in search**. *(Also closes the injection-via-uploaded-doc vector.)*
 - [ ] **TMPL-02**: A workflow can fill a template from project-KB content — the LLM emits a **cited** Pydantic field-map (each field nullable, carrying source chunk/page), and pinned sandbox code renders the file deterministically. **Both** the trusted path (library templates, `docxtpl`/Jinja) and the arbitrary-upload path (non-Jinja run-replace) are supported.
 - [ ] **TMPL-03**: A filled template is validated before delivery — **re-opened with the same library to assert integrity** (a corrupt file can never reach the user as "done") — and rendering runs inside the sealed sandbox with `jinja2.sandbox.SandboxedEnvironment` (SSTI contained).
 
@@ -108,7 +108,7 @@
 | PROJ-02 | Phase 098 | Complete |
 | GOV-01 | Phase 098 | Complete |
 | WFSKILL-01 | Phase 099 | Complete |
-| TMPL-01 | Phase 100 | Pending |
+| TMPL-01 | Phase 100 | Complete |
 | TMPL-02 | Phase 101 | Pending |
 | TMPL-03 | Phase 101 | Pending |
 | GATE-01 | Phase 102 | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: executing
+status: ready_to_plan
 last_updated: "2026-06-10T11:15:59.316Z"
 last_activity: 2026-06-10 -- Phase 100 execution started
 progress:
   total_phases: 13
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 24
   completed_plans: 18
-  percent: 75
+  percent: 31
 ---
 
 # Project State
@@ -22,14 +22,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 100 — Ephemeral Template Upload
+**Current focus:** Phase 101 — Template-Fill + Integrity Validation (ready to plan)
 
 ## Current Position
 
-Phase: 100 (ephemeral-template-upload) — EXECUTING
-Plan: 6 of 6 complete (all 4 waves executed) — AWAITING OPERATOR LIVE UAT (7 G-4 rows in 100-HUMAN-UAT.md)
-Status: Phase 100 executed; verification = human_needed; all 3 verifier gaps (WR-01/02/03) + all 8 review warnings FIXED (review-fix 8/8, backend 37 passed/0 xfail-stubs-left, frontend 11/11)
-Last activity: 2026-06-10 -- Post-execution gates done: review 0C/8W→all_fixed, regression 97+38 passed (1 known pre-existing rot), schema-drift clean. Phase completion blocked ONLY on live UAT approval.
+Phase: 101
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-06-10
+
+**Phase 100 (Ephemeral Template Upload) — COMPLETE (2026-06-10), TMPL-01 closed.** 6/6 plans, 4 waves, wave-based parallel execution. Migration 068 applied live (psycopg2 direct, no reset) + full-schema regenerated. Code review 0C/8W → ALL 8 fixed via /gsd:code-review-fix (incl. the 3 verifier-confirmed SC#3 blockers: WR-01 COALESCE upsert, WR-02 get_diff expiry gate, WR-03 bytes-first sweep). VERIFICATION passed (3/3 truths); **live UAT 7/7 PASS, Claude-driven end-to-end** (Chrome MCP drove the real UI; psycopg2 cross-checks): upload+badge+countdown, never-in-search (marker probe), expiry end-to-end (panel vanish + "template expired" tool error + in-process sweep GC'd row+bytes), 3-way bad-file rejection, run-pin straddle (workflow completed, GREATEST extend held), cross-user 404 ×5 routes, agent files byte-identical. **One G-4 defect found+fixed live:** upload affordance was unreachable on no-activity threads (PanelEmpty short-circuit) → TemplateUpload extracted + rendered in the calm empty state + 2 reachability tests (this was the operator's "no UI changes" report). Backend 37 passed/0 failures (xfail stubs upgraded to behavioral); FilesSection 11/11; panel suites 40/40. UAT fixtures kept: uat-files/ + user B (uat100-userb@example.com) + the UAT thread.
 
 **Phase 100 discuss-phase COMPLETE (2026-06-10):** `100-CONTEXT.md` committed (`1c0aafcf`). 4 gray areas resolved (all operator-accepted recommendations): (1) Upload UX = panel FilesSection button + Template badge/expiry countdown + vanish-on-expiry + no chat artifact (sketch-aligned; 2-pill composer untouched); (2) TTL = 24h in app_settings; guarantee = gated read-path filter (`expires_at IS NOT NULL` — 098 D-05a pattern), physical deletion = idempotent in-process janitor task (rows + Storage bytes); (3) fixed TTL + run-pin at kickoff (thin seam, threads.py must not grow) + "template expired" tool error + **D-11 invariant: templates optional everywhere** + 7 operator-defined G-4 UAT rows; (4) strict .docx/.pptx/.xlsx allowlist + magic-byte OOXML check; AssetRef/library-asset behavior DEFERRED to Phase 101; runs find templates by `kind='template_input'` in-thread (zero kickoff-API changes). Resume file: `.planning/phases/100-ephemeral-template-upload/100-CONTEXT.md`. **Next: `/gsd:plan-phase 100`.**
 
