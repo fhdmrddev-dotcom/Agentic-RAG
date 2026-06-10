@@ -28,8 +28,10 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 Phase: 100
 Plan: Not started
-Status: Ready to plan
+Status: Context gathered — ready to plan
 Last activity: 2026-06-10
+
+**Phase 100 discuss-phase COMPLETE (2026-06-10):** `100-CONTEXT.md` committed (`1c0aafcf`). 4 gray areas resolved (all operator-accepted recommendations): (1) Upload UX = panel FilesSection button + Template badge/expiry countdown + vanish-on-expiry + no chat artifact (sketch-aligned; 2-pill composer untouched); (2) TTL = 24h in app_settings; guarantee = gated read-path filter (`expires_at IS NOT NULL` — 098 D-05a pattern), physical deletion = idempotent in-process janitor task (rows + Storage bytes); (3) fixed TTL + run-pin at kickoff (thin seam, threads.py must not grow) + "template expired" tool error + **D-11 invariant: templates optional everywhere** + 7 operator-defined G-4 UAT rows; (4) strict .docx/.pptx/.xlsx allowlist + magic-byte OOXML check; AssetRef/library-asset behavior DEFERRED to Phase 101; runs find templates by `kind='template_input'` in-thread (zero kickoff-API changes). Resume file: `.planning/phases/100-ephemeral-template-upload/100-CONTEXT.md`. **Next: `/gsd:plan-phase 100`.**
 
 **Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
 
