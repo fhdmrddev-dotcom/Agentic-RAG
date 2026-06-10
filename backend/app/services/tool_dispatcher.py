@@ -1789,17 +1789,32 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
         }))
 
     # ── 5. Integrity gate — AFTER render (D-08 failure class 2) ──────────────────
-    if not (verdict.get("rendered") and verdict.get("opened")):
-        # A corrupt / non-opening file is NEVER delivered (SC#4 #3). Preserve the
-        # cited field-map as fallback output so the extracted data isn't lost (D-08),
-        # and the harness bounded-retry loop re-renders.
+    # 101-06 WR-03: the gate must ALSO consult residual_clean. A file that opens cleanly
+    # but still contains unsubstituted placeholder markup ({{token}} survivors — a silent
+    # non-fill, T-101-02-05) was previously delivered. The VALIDATION contract (SC#4 #1)
+    # makes residual-scan == [] the PASS signal. Default residual_clean=True so an OLDER
+    # driver verdict missing the key doesn't hard-fail (back-compat); the CURRENT driver
+    # always emits it. residual_tags surfaces in the failure payload so the harness
+    # bounded-retry loop can re-render rather than ship a half-filled file.
+    residual_clean = verdict.get("residual_clean", True)
+    if not (verdict.get("rendered") and verdict.get("opened") and residual_clean):
+        # A corrupt / non-opening / residual-tainted file is NEVER delivered (SC#4 #3).
+        # Preserve the cited field-map as fallback output so the extracted data isn't
+        # lost (D-08), and the harness bounded-retry loop re-renders.
+        reason = "residual_tokens" if (verdict.get("rendered") and verdict.get("opened")) else "integrity"
+        msg = (
+            "The rendered file opened but still contains unsubstituted placeholder tokens "
+            "(a silent non-fill) and was NOT delivered. The cited field-map is preserved "
+            "below as fallback."
+            if reason == "residual_tokens"
+            else "The rendered file failed the integrity re-open and was NOT delivered. "
+                 "The cited field-map is preserved below as fallback."
+        )
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
-            "reason": "integrity",
-            "message": (
-                "The rendered file failed the integrity re-open and was NOT delivered. "
-                "The cited field-map is preserved below as fallback."
-            ),
+            "reason": reason,
+            "message": msg,
+            "residual_tags": verdict.get("residual_tags") or [],
             "verdict": verdict,
             "field_map": field_map,
         }))
