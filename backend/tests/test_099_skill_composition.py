@@ -366,8 +366,8 @@ async def test_snapshot_materialize():  # GREEN — Plan 03 (materialize_skill_s
     definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
     db = _FakeSkillsDB(
         [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
-          "instructions": "ORIGINAL instructions", "name": "Risk Reviewer",
-          "files": ["rubric.md"]}]
+          "instructions": "ORIGINAL instructions", "name": "Risk Reviewer"}],
+        skill_files={str(skill_id): ["rubric.md"]},
     )
 
     materialized = await materialize_skill_snapshots(
@@ -378,7 +378,7 @@ async def test_snapshot_materialize():  # GREEN — Plan 03 (materialize_skill_s
     snap = materialized.phases[0].config.skill_snapshot
     assert snap is not None
     assert snap.instructions == "ORIGINAL instructions"
-    assert len(storage.uploads) == 1  # one upload per skill file
+    assert len(storage.uploads) == 1  # one upload per real skill_files row
 
 
 async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot immutability) landed
@@ -391,7 +391,8 @@ async def test_snapshot_immune_to_live_edit():  # GREEN — Plan 03 (snapshot im
     storage.register(f"owner-id/{skill_id}/rubric.md", b"live-rubric")
     db = _FakeSkillsDB(
         [{"id": str(skill_id), "user_id": "owner-id", "is_enabled": True, "visible": True,
-          "instructions": "ORIGINAL", "name": "Risk Reviewer", "files": ["rubric.md"]}]
+          "instructions": "ORIGINAL", "name": "Risk Reviewer"}],
+        skill_files={str(skill_id): ["rubric.md"]},
     )
     definition = WorkflowDefinition.model_validate(_definition_with_skill_ref(skill_id))
 
@@ -457,21 +458,35 @@ class _LiveSkillQuery:
 
 
 class _FakeSkillsDB:
-    """Records visible skill rows and exposes a minimal ``table('skills')`` fluent query
-    so the Plan 03 publish-gate / materializer can resolve refs offline."""
+    """Models the REAL two-table shape: ``skills`` and ``skill_files`` as SEPARATE
+    rowsets, so the fake can no longer carry a phantom ``files`` column the production
+    ``skills`` schema lacks (CR-01). ``table('skills')`` resolves refs for the publish
+    gate / materializer; ``table('skill_files')`` serves the file manifest the way the
+    fixed materializer fetches it (mirrors _handle_load_skill, tool_dispatcher.py)."""
 
-    def __init__(self, rows):
-        self._rows = {r["id"]: dict(r) for r in rows}
+    def __init__(self, skill_rows, skill_files=None):
+        # skill_rows: skills-table rows (NO ``files`` key — the real schema has none).
+        self._skills = {r["id"]: dict(r) for r in skill_rows}
+        # skill_files: optional {skill_id (str) -> [filename str]} (defaults to {}).
+        self._skill_files = dict(skill_files or {})
 
-    def table(self, *_a, **_k):
-        return _FakeSkillsQuery(self._rows)
+    def table(self, name=None, *_a, **_k):
+        # Route by table name the way production calls supabase.table("skills") /
+        # supabase.table("skill_files").
+        if name == "skill_files":
+            return _FakeSkillFilesQuery(self._skill_files)
+        return _FakeSkillsQuery(self._skills)
 
     def mutate(self, skill_id, **fields):
-        self._rows.setdefault(skill_id, {}).update(fields)
+        # A ``files`` kwarg targets the skill_files rowset (never a phantom skills column).
+        if "files" in fields:
+            self._skill_files[skill_id] = list(fields.pop("files"))
+        if fields:
+            self._skills.setdefault(skill_id, {}).update(fields)
 
     # Allow `validate_skill_refs(..., supabase=_FakeSkillsDB(...))` to call .table directly.
     def __iter__(self):
-        return iter(self._rows.values())
+        return iter(self._skills.values())
 
 
 class _FakeSkillsQuery:
@@ -497,3 +512,27 @@ class _FakeSkillsQuery:
         if self._filter_id is not None:
             return SimpleNamespace(data=self._rows.get(self._filter_id))
         return SimpleNamespace(data=list(self._rows.values()))
+
+
+class _FakeSkillFilesQuery:
+    """Models the skill_files fluent chain the fixed materializer uses
+    (``select("filename").eq("skill_id", val).order("filename").execute()``)."""
+
+    def __init__(self, skill_files):
+        self._skill_files = skill_files
+        self._skill_id = None
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, col, val):
+        if col == "skill_id":
+            self._skill_id = val
+        return self
+
+    def order(self, *_a, **_k):
+        return self
+
+    def execute(self):
+        names = sorted(self._skill_files.get(self._skill_id, []))
+        return SimpleNamespace(data=[{"filename": n} for n in names])
