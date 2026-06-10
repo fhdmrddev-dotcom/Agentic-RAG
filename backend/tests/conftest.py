@@ -868,3 +868,108 @@ def _flushdb_at_session_end():
         _client.close()
     except Exception:
         pass   # best-effort hygiene; do not mask real test failures
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 100 Wave-0 — Ephemeral template OOXML byte fixtures (Plan 01 Task 1)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Deterministic, dependency-free OOXML containers for the TMPL-01 validation
+# tests (test_workspace_template.py). Built in-memory with stdlib `zipfile`
+# (NOT python-docx) so they stay tiny + reproducible + never touch a real
+# bucket (T-100-01-01 — synthetic bytes only, no untrusted input).
+#
+# An OOXML file (.docx/.pptx/.xlsx) is just a ZIP whose first entry is
+# `[Content_Types].xml` plus a part under a format-specific prefix
+# (`word/`, `ppt/`, `xl/`). The magic-byte validator Plan 100-04 builds
+# (`validate_ooxml`) checks `zipfile.is_zipfile` + the `[Content_Types].xml`
+# + the prefix part — these fixtures satisfy that contract; the renamed-binary
+# fixture deliberately FAILS the ZIP check (the bad-file-rejection path).
+#
+# Owning tests:
+#   valid_docx/pptx/xlsx_bytes -> test_valid_ooxml_accepted (Plan 100-04)
+#   renamed_binary_bytes       -> test_bad_file_rejected     (Plan 100-04)
+#   oversized_ooxml_bytes      -> test_oversized_rejected    (Plan 100-04)
+#   DISTINCTIVE_TEMPLATE_TEXT  -> the never-in-search UAT (G-4 row 2)
+import io as _io  # noqa: E402
+import zipfile as _zipfile  # noqa: E402
+
+# Same byte budget the workspace `workspace_files_size_limit` CHECK enforces
+# (workspace_service.MAX_FILE_SIZE = 10 MB). Kept local so the fixture stays
+# import-light (no app import needed for a pure-stdlib byte builder).
+_TEMPLATE_MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# The literal a real uploaded template embeds so the SC#2 never-in-search UAT
+# (G-4 row 2) can assert it never appears in `search_documents` / KB search.
+# The same literal is used by the manual UAT instructions in 100-VALIDATION.md.
+DISTINCTIVE_TEMPLATE_TEXT = "ZZ-TMPL-MARKER-100"
+
+
+def _make_ooxml(part_prefix: str, content_types_extra: str = "") -> bytes:
+    """Build a minimal-but-real OOXML ZIP container in memory.
+
+    Returns bytes that pass ``zipfile.is_zipfile`` AND contain a
+    ``[Content_Types].xml`` entry AND a part under ``{part_prefix}/`` —
+    the three things the Plan 100-04 ``validate_ooxml`` magic-byte gate
+    checks. ``part_prefix`` selects the format: ``word`` (docx),
+    ``ppt`` (pptx), ``xl`` (xlsx).
+    """
+    bio = _io.BytesIO()
+    with _zipfile.ZipFile(bio, "w", _zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/'
+            'package/2006/content-types">'
+            + content_types_extra
+            + "</Types>",
+        )
+        # Embed the distinctive marker inside the document part so the
+        # never-in-search UAT (G-4 row 2) has a real literal to probe.
+        zf.writestr(
+            f"{part_prefix}/document_marker.xml",
+            f"<x>{DISTINCTIVE_TEMPLATE_TEXT}</x>",
+        )
+    return bio.getvalue()
+
+
+@pytest.fixture
+def valid_docx_bytes() -> bytes:
+    """A real (tiny) .docx OOXML container: `[Content_Types].xml` + `word/` part."""
+    return _make_ooxml("word")
+
+
+@pytest.fixture
+def valid_pptx_bytes() -> bytes:
+    """A real (tiny) .pptx OOXML container: `[Content_Types].xml` + `ppt/` part."""
+    return _make_ooxml("ppt")
+
+
+@pytest.fixture
+def valid_xlsx_bytes() -> bytes:
+    """A real (tiny) .xlsx OOXML container: `[Content_Types].xml` + `xl/` part."""
+    return _make_ooxml("xl")
+
+
+@pytest.fixture
+def renamed_binary_bytes() -> bytes:
+    """A fake PE/EXE header renamed to .docx — MUST FAIL ``zipfile.is_zipfile``.
+
+    Drives the bad-file-rejection path (Plan 100-04 ``validate_ooxml`` -> 422):
+    the bytes start with the ``MZ`` DOS/PE signature, not a ZIP ``PK`` header,
+    so the magic-byte gate rejects them before any persistence.
+    """
+    return b"MZ\x90\x00\x03\x00\x00\x00" + b"\x00" * 64
+
+
+@pytest.fixture
+def oversized_ooxml_bytes() -> bytes:
+    """A valid ZIP container padded one byte PAST the 10 MB size limit.
+
+    Valid OOXML magic, but ``len == _TEMPLATE_MAX_FILE_SIZE + 1`` so the
+    upload size guard (Plan 100-04 -> 422) rejects it. Padding is appended
+    AFTER the ZIP end-of-central-directory record so ``is_zipfile`` still
+    returns True (the magic check passes; only the size guard trips).
+    """
+    base = _make_ooxml("word")
+    pad = _TEMPLATE_MAX_FILE_SIZE + 1 - len(base)
+    return base + b"\x00" * pad
