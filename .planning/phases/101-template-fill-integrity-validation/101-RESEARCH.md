@@ -469,7 +469,13 @@ def _num(cited):  # int() when parseable, else None -> blank cell (honest degrad
 | A4 | The generic field-map (scalars dict + collections dict) derived from `get_undeclared_template_variables()` generalizes cleanly beyond the risk-register | Code Examples | Medium — the spike's model was risk-specific. Deriving a generic Pydantic shape from arbitrary placeholder keys at runtime needs design (dynamic model or a flat `dict[str, Cited]` + `dict[str, list]`). Planner should pin the generic shape early. |
 | A5 | Reusing `workspace_file_written` SSE + OutputFileCard needs no UI change (G-2 not fired) | CONTEXT discretion | Low — the surface already renders produced files; only the integrity-fail-with-data-fallback state is novel (the sketch skill covers run-honesty error surfaces; ui-phase/planner confirms whether a new sketch is needed). |
 
-## Open Questions
+## Open Questions (RESOLVED during planning)
+
+> All three resolved at plan time. Q1 + Q2 are settled decisions in the plans; Q3 is an intentional live-UAT validation open routed to VALIDATION.md.
+>
+> - **Q1 → RESOLVED (Plan 101-01 Task 4 + Plan 101-03):** seed via psycopg2 to local :54322 (Phase 100 pattern); bucket = `workspace-files`, no-TTL row (`kind='agent'`, `expires_at=NULL` — the 068 CHECK permits `NULL|template_input|agent`), `AssetRef.asset_id` = the `{user_id}/_library/...` Storage path the Plan-03 resolver downloads. Fixture IDs → `backend/tests/fixtures/uat_fixture_ids.json`.
+> - **Q2 → RESOLVED (Plan 101-02):** fixed generic envelope (`GenericFieldMap` — `scalars: dict[str, Cited]` + `collections: dict[str, list[...]]`), chosen for cross-provider robustness on STRUCTURED-mode recovery.
+> - **Q3 → OPEN by design (validated via live UAT — VALIDATION.md cross-provider row):** STRUCTURED-mode recovery of the nested cited field-map for GLM/MiniMax/OpenRouter is validated first in the cross-provider scoreboard; worst case documents those providers native-only (D-15 "pass OR document").
 
 1. **The SEEDED library-asset fixture (D-09) — what exactly does it require?**
    - What we know: the trusted-path UAT needs a published `WorkflowDefinition` whose `assets: [AssetRef(asset_id, filename, kind='template', mime)]` points at a real Storage object containing a `{%tr %}` docx template. `AssetRef.asset_id` is a "Storage path / id" `[SEAM: harness.py:167]`.
