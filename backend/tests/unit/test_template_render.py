@@ -378,3 +378,117 @@ def test_render_driver_is_self_contained():
     assert "Document(" in _RENDER_DRIVER_SRC
     assert "Presentation(" in _RENDER_DRIVER_SRC
     assert "load_workbook(" in _RENDER_DRIVER_SRC
+
+
+# ── Plan 101-05 — admit render_template to a fill phase (the 099 whitelist pattern) ──
+#
+# The last seam: a harness FILL phase that DECLARES render_template in its
+# available_tools gets it admitted on BOTH layers (the schemas the model sees +
+# the phase_whitelist dispatch backstop) via the 099 _effective_tools /
+# _build_phase_tool_context pattern — with NO Deep widening and NO gateway branch.
+# Offline: SimpleNamespace phase/ctx (mirrors test_099_skill_composition.py:71-100);
+# no live LLM, no DB, no sandbox.
+
+from types import SimpleNamespace
+from uuid import uuid4
+
+
+def _fill_phase(available_tools, *, skill_snapshot=None):
+    """A minimal llm_agent phase namespace for _effective_tools /
+    _build_phase_tool_context (mirrors test_099_skill_composition.py:_phase)."""
+    return SimpleNamespace(
+        config=SimpleNamespace(
+            phase_type="llm_agent",
+            skill_ref=None,
+            skill_snapshot=skill_snapshot,
+            available_tools=list(available_tools),
+            folder_scope=None,
+            model=None,
+        )
+    )
+
+
+def _harness_ctx():
+    """A minimal harness ctx bag — producer_run_id is REQUIRED (the seam raises without it)."""
+    return SimpleNamespace(
+        producer_run_id=uuid4(),
+        run_id=uuid4(),
+        folder_subtree_ids=None,
+        skill_snapshot=None,
+        model="m",
+    )
+
+
+def test_fill_phase_admits_render_template():
+    """A fill phase that DECLARES render_template (no skill snapshot) gets it admitted
+    on BOTH layers via the 099 pattern: _effective_tools returns it unchanged, and
+    _build_phase_tool_context threads it into available_tools (layer 1) AND the
+    phase_whitelist frozenset (layer 2 — the dispatch backstop). No new code path —
+    the declared tool simply flows through the never-drop helper."""
+    from app.services.harness.phase_types import (
+        _build_phase_tool_context,
+        _effective_tools,
+    )
+
+    phase = _fill_phase(["search_documents", "render_template"])
+
+    # Layer-0: the helper returns the declared tool unchanged (never dropped).
+    eff = _effective_tools(phase)
+    assert "render_template" in eff
+    # No skill snapshot → read_skill_file is NOT injected (only the declared tools).
+    assert "read_skill_file" not in eff
+
+    # Both layers admit it: available_tools (model sees) + phase_whitelist (dispatch).
+    tc = _build_phase_tool_context(phase, _harness_ctx())
+    assert "render_template" in tc.available_tools
+    assert tc.phase_whitelist is not None and "render_template" in tc.phase_whitelist
+
+
+def test_non_fill_phase_excludes_render_template():
+    """A phase that does NOT declare render_template never gets it — there is no
+    auto-injection (no Deep widening; the gated-no-op invariant holds). The tool is
+    admitted ONLY when the phase explicitly lists it in available_tools."""
+    from app.services.harness.phase_types import (
+        _build_phase_tool_context,
+        _effective_tools,
+    )
+
+    phase = _fill_phase(["search_documents"])
+
+    eff = _effective_tools(phase)
+    assert "render_template" not in eff
+
+    tc = _build_phase_tool_context(phase, _harness_ctx())
+    assert "render_template" not in tc.available_tools
+    assert tc.phase_whitelist is not None and "render_template" not in tc.phase_whitelist
+
+
+def test_deep_mode_whitelist_none_noop():
+    """In Deep mode phase_whitelist is None, so the dispatch_tool guard is a literal
+    no-op (byte-identical to pre-091 dispatch). A plain ToolContext defaults
+    phase_whitelist=None; the guard's predicate (`ctx.phase_whitelist is not None`)
+    is therefore False and render_template (or any tool) is never refused by the
+    backstop — the admission this plan adds is gated to harness fill phases only.
+    Mirrors the 099 test_deep_noop shape (assert the gate short-circuits)."""
+    from app.services.tool_dispatcher import ToolContext
+
+    # A plain Deep-mode ToolContext: phase_whitelist defaults to None.
+    ctx = ToolContext(
+        redis=None,
+        run_id="00000000-0000-0000-0000-0000000000ff",
+        thread_id="11111111-1111-1111-1111-111111111111",
+        supabase=object(),
+        pool=object(),
+        user_settings=None,
+        current_user={"id": "22222222-2222-2222-2222-222222222222"},
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        emit=None,
+        spawn=lambda *a, **k: None,
+    )
+    # The dispatch guard branch (tool_dispatcher.dispatch_tool:2314) is entered ONLY
+    # when phase_whitelist is not None — in Deep it is None, so the backstop is skipped.
+    assert ctx.phase_whitelist is None
+    # Therefore the guard predicate is False — render_template would NOT be refused by
+    # the whitelist backstop in Deep (the gated-no-op invariant; Deep byte-identical).
+    assert (ctx.phase_whitelist is not None and "render_template" not in ctx.phase_whitelist) is False

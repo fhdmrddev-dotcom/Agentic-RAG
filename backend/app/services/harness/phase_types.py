@@ -183,6 +183,26 @@ def _effective_tools(phase) -> list[str]:
     ``read_skill_file`` (``tool_dispatcher.py``), and only when a snapshot is present
     (T-099-07). ``apply_tool_budget`` never drops a whitelisted tool, so the appended
     name survives the per-provider max_tools cap on layer 1.
+
+    101 TMPL-02 (D-04/D-05) — ``render_template`` is admitted to a harness FILL phase
+    via this SAME never-drop pattern with NO new code here: a fill phase declares
+    ``render_template`` in its ``available_tools`` and it flows through ``base`` UNCHANGED.
+    Because this helper never drops a declared tool, the whitelisted ``render_template``
+    survives ``apply_tool_budget``'s per-provider max_tools cap on layer 1 EXACTLY like
+    ``read_skill_file``, and ``_build_phase_tool_context`` threads it into both
+    ``available_tools=_tools`` (layer 1 — the schemas the model sees) and
+    ``phase_whitelist=frozenset(_tools)`` (layer 2 — the dispatch backstop,
+    ``tool_dispatcher.dispatch_tool``). There is DELIBERATELY no provenance-based
+    auto-injection of ``render_template``: a phase must EXPLICITLY declare it (auto-
+    injecting it into every phase would WIDEN the tool surface and is not D-04's intent,
+    and would break the gated-no-op Deep invariant). A future fill ``phase_type`` that
+    wants auto-injection would extend with the SAME shape as the snapshot append above —
+    ``if <fill-phase-condition> and "render_template" not in base: base.append("render_template")``
+    — but that condition is NOT added now (no fill ``phase_type`` flag exists; the
+    Plugin Contract ``phase_type`` lock is STRETCH Phase 108). The field-map emission the
+    fill phase produces as ``render_template``'s typed argument rides the UNMODIFIED shared
+    gateway (``_stream_one_iteration`` / ``resolve_calling_mode``) — provider quirks live
+    at the service boundary, the fill path NEVER branches per provider (D-14 / Cond 7).
     """
     base = list(phase.config.available_tools)
     if getattr(phase.config, "skill_snapshot", None) is not None and "read_skill_file" not in base:
