@@ -11,7 +11,7 @@
  */
 import { Inbox } from "lucide-react"
 
-export function PanelEmpty() {
+export function PanelEmpty({ children }: { children?: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center text-panel-muted-foreground-dim">
       <Inbox className="h-7 w-7 opacity-50" aria-hidden="true" />
@@ -22,6 +22,9 @@ export function PanelEmpty() {
         When the agent writes files, tracks todos, or needs your input, it'll show
         up here.
       </p>
+      {/* Phase 100 (D-01): the calm state may carry ONE quiet action (e.g. the
+          template-upload affordance) — still one centered state, no headers. */}
+      {children}
     </div>
   )
 }

@@ -23,17 +23,15 @@ import {
   FileImage,
   File as FileIcon,
   Presentation,
-  Upload,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   useWorkspaceFiles,
   useViewingThread,
-  useStreamActions,
 } from "@/providers/StreamsProvider"
 import type { WorkspaceFile } from "@/types"
-import { uploadWorkspaceTemplate } from "@/lib/api"
 import { FilePreview } from "./FilePreview"
+import { TemplateUpload } from "./TemplateUpload"
 
 // Copied verbatim from OutputFileCard.tsx:24-28 (the plan instructs copy, not
 // re-derive — the source fn is not exported). Keep byte-for-byte identical.
@@ -104,40 +102,9 @@ export interface FilesSectionProps {
 export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   const threadId = useViewingThread()
   const { data: files } = useWorkspaceFiles(threadId)
-  const { setWorkspaceFileForThread } = useStreamActions()
 
   const [selected, setSelected] = useState<WorkspaceFile | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
-
-  // ── Ephemeral template upload (D-01): a panel-local affordance, NOT the
-  //    composer (a composer attach would read as "add to KB"). The hidden
-  //    file input is triggered by the Upload button; on select we POST and
-  //    optimistically upsert the returned row (panel reconciles, no refresh,
-  //    D-03). Errors surface inline — nothing renders in chat (D-04). ──
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-
-  const handleUpload = async (f: File) => {
-    if (!threadId) return
-    setUploading(true)
-    try {
-      const uploaded = await uploadWorkspaceTemplate(threadId, f)
-      setWorkspaceFileForThread(threadId, uploaded)   // optimistic reconcile (no refresh)
-      setUploadError(null)
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "Upload failed")
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]
-    // Reset the input so re-selecting the same file fires change again.
-    e.target.value = ""
-    if (f) void handleUpload(f)
-  }
 
   const rowRefs = useRef<Map<string, HTMLDivElement | null>>(new Map())
   // The row to restore focus to after returning from a preview (D1 / A11Y).
@@ -227,46 +194,13 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
 
   const rows = files
 
-  // ── Upload affordance (D-01): hidden OOXML-only file input + a quiet button.
-  //    accept= is a UX hint only — the server's validate_ooxml is the real gate
-  //    (T-100-06-01). Rendered in BOTH the empty state and the populated list. ──
-  const uploadAffordance = (
-    <div className="flex flex-col gap-1 px-1 pb-1">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".docx,.pptx,.xlsx"
-        aria-label="Upload template file"
-        tabIndex={-1}
-        className="hidden"
-        onChange={onFileInputChange}
-      />
-      <button
-        type="button"
-        disabled={!threadId || uploading}
-        onClick={() => fileInputRef.current?.click()}
-        className={cn(
-          "flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5",
-          "text-[12px] font-medium text-foreground/80 transition-colors",
-          "hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-        )}
-      >
-        <Upload className="h-3.5 w-3.5" aria-hidden="true" />
-        {uploading ? "Uploading…" : "Upload template"}
-      </button>
-      {uploadError && (
-        <p role="alert" className="px-0.5 text-[11px] text-destructive">
-          {uploadError}
-        </p>
-      )}
-    </div>
-  )
-
+  // ── Upload affordance (D-01): extracted to <TemplateUpload/> so the panel's
+  //    no-activity empty state (WorkspacePanel) can render it too. Rendered in
+  //    BOTH the empty state and the populated list. ──
   if (rows.length === 0) {
     return (
       <div className="flex flex-col gap-1 p-1">
-        {uploadAffordance}
+        <TemplateUpload />
         <p className="px-2 py-3 text-[13px] text-panel-muted-foreground">No files yet.</p>
       </div>
     )
@@ -274,7 +208,7 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
 
   return (
     <div className="flex flex-col gap-0.5 p-1">
-      {uploadAffordance}
+      <TemplateUpload />
       <div role="listbox" aria-label="Workspace files" className="flex flex-col gap-0.5">
         {rows.map((file, index) => {
           const key = fileKey(file)

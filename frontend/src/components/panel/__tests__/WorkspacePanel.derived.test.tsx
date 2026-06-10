@@ -62,6 +62,11 @@ vi.mock("@/components/panel/BatchResultList", () => ({
 vi.mock("@/components/panel/FilesSection", () => ({
   FilesSection: () => <div data-testid="files-section">files</div>,
 }))
+// Phase 100 (D-01): the empty short-circuit renders the REAL TemplateUpload
+// (reads useStreamActions, absent from this file's StreamsProvider mock).
+vi.mock("@/components/panel/TemplateUpload", () => ({
+  TemplateUpload: () => <div data-testid="template-upload">upload</div>,
+}))
 vi.mock("@/components/panel/VersionDiff", () => ({
   VersionDiff: () => <div data-testid="version-diff">diff</div>,
 }))

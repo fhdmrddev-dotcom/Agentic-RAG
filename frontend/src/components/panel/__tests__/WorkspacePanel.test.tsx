@@ -73,6 +73,13 @@ vi.mock("@/components/panel/BatchResultList", () => ({
   BatchResultList: () => <div data-testid="batch-result-list">sub-results</div>,
 }))
 
+// Phase 100 (D-01): WorkspacePanel renders the REAL TemplateUpload inside the
+// empty short-circuit (it reads useStreamActions, which this file's
+// StreamsProvider mock omits) — sentinel-mock it like the other section bodies.
+vi.mock("@/components/panel/TemplateUpload", () => ({
+  TemplateUpload: () => <div data-testid="template-upload">upload</div>,
+}))
+
 vi.mock("@/components/panel/TodosSection", () => ({
   TodosSection: () => <div data-testid="todos-section">todos</div>,
 }))
@@ -235,6 +242,22 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
     expect(screen.queryByTestId("todos-section")).toBeNull()
     expect(screen.queryByTestId("files-section")).toBeNull()
+  })
+
+  // Phase 100 (D-01) reachability: the empty short-circuit must still carry the
+  // template-upload affordance when a thread is open — otherwise the first
+  // template upload on a fresh thread is structurally impossible (G-4 UAT gap).
+  it("keeps the template-upload affordance reachable inside the empty state when a thread is open (Phase 100 D-01)", () => {
+    setHooks({ todos: [], files: [], asks: [] })
+    renderPanel({ state: "open" })
+    expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
+    expect(screen.getByTestId("template-upload")).toBeInTheDocument()
+  })
+
+  it("omits the template-upload affordance in the empty state when no thread is viewed", () => {
+    setHooks({ todos: [], files: [], asks: [], viewing: null })
+    renderPanel({ state: "open" })
+    expect(screen.queryByTestId("template-upload")).toBeNull()
   })
 
   it("pins the pending ask_user stack to the very top of the panel scroll", () => {

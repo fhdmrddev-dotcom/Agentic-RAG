@@ -45,6 +45,7 @@ import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { PanelSection } from "./PanelSection"
 import { PanelEmpty } from "./PanelEmpty"
+import { TemplateUpload } from "./TemplateUpload"
 import { PanelRail } from "./PanelRail"
 import { TodosSection } from "./TodosSection"
 import { FilesSection } from "./FilesSection"
@@ -147,7 +148,10 @@ export function WorkspacePanel({
 
       {!hasActivity ? (
         // Empty short-circuit (D3): ONE calm centered state, never four headers.
-        <PanelEmpty />
+        // Phase 100 (D-01): the template-upload affordance must stay reachable on
+        // a no-activity thread — without this, the FilesSection copy of the button
+        // is structurally unreachable exactly where a template-fill flow starts.
+        <PanelEmpty>{threadId ? <TemplateUpload /> : null}</PanelEmpty>
       ) : (
         <>
           {/* Phase 095.1 Plan 06 (GAP-1): keep the Todos count badge HONEST. With
