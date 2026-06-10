@@ -107,8 +107,8 @@
   - [x] 099-02-PLAN.md — skill-block framing compose at the system_prompt seam + read_skill_file auto-whitelist + snapshot ctx attach (phase_types.py)
   - [x] 099-03-PLAN.md — harness/skill_snapshot.py (D-10 publish gate + materialize) + gated snapshot-routed read in _handle_read_skill_file (the red line)
   - [x] 099-04-PLAN.md — kickoff host: validate_skill_refs (ValueError→400) + first-run lazy materialize wired into threads.py (G-5 one-liner)
-  - [ ] 099-05-PLAN.md — GAP CR-01: source the snapshot file manifest from the skill_files table (not a nonexistent skills.files column) + de-mock test fakes to the real two-table shape
-  - [ ] 099-06-PLAN.md — GAP CR-02: propagate parent_ctx.skill_snapshot onto sub_ctx in run_task_sub_agent (snapshot gate reachable on live path) + live-chain regression test
+  - [x] 099-05-PLAN.md — GAP CR-01: source the snapshot file manifest from the skill_files table (not a nonexistent skills.files column) + de-mock test fakes to the real two-table shape
+  - [x] 099-06-PLAN.md — GAP CR-02: propagate parent_ctx.skill_snapshot onto sub_ctx in run_task_sub_agent (snapshot gate reachable on live path) + live-chain regression test
 **VALIDATION (SC#10)**: changes phase framing inside runs across providers — author the 4-axis cross-provider rows. Additive seam on `phase_types.py` (`_exec_llm_agent`); Deep path untouched (the red line).
 
 ### Phase 100: Ephemeral Template Upload
