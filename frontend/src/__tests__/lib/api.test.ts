@@ -39,6 +39,8 @@ import {
   moveDocument,
   reingestDocument,
   subscribeToRun,
+  postMessage,
+  ApiError,
   type StreamCallbacks,
 } from "@/lib/api"
 import type { Message } from "@/types"
@@ -738,5 +740,56 @@ describe("subscribeToRun — Phase 063.1 onCursor parser", () => {
     // Should not throw.
     await subscribeToRun("run-1", "0", callbacks)
     expect(onDelta).toHaveBeenCalledWith("hi")
+  })
+})
+
+// ── 099-08 (UAT L10): postMessage must surface the server {detail} on refusal ──
+describe("postMessage error handling", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", API_BASE)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+  })
+
+  it("throws the server detail message as an ApiError on a non-409 refusal (400)", async () => {
+    const detail = "Skill 'risk-lens' is disabled; enable it or remove the reference."
+    globalThis.fetch = mockFetch({ detail }, 400)
+    await expect(postMessage("t1", "hi")).rejects.toMatchObject({
+      message: detail,
+      status: 400,
+    })
+    // It must be an ApiError instance (the 409-distinguisher type downstream).
+    const err = await postMessage("t1", "hi").catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+  })
+
+  it("throws an ApiError with status 409 (message irrelevant — 409 branch overrides downstream)", async () => {
+    globalThis.fetch = mockFetch({ detail: "ignored by the 409 branch" }, 409)
+    const err = await postMessage("t1", "hi").catch((e) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(409)
+  })
+
+  it("falls back to the generic message when the body is unparseable (500)", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error("no body")),
+      body: null,
+    })
+    await expect(postMessage("t1", "hi")).rejects.toMatchObject({
+      message: "Failed to send message",
+      status: 500,
+    })
+  })
+
+  it("returns the parsed PostMessageResponse unchanged on success (200)", async () => {
+    const response = { run_id: "run-abc", message_id: "msg-1" }
+    globalThis.fetch = mockFetch(response, 200)
+    const result = await postMessage("t1", "hi")
+    expect(result).toEqual(response)
   })
 })

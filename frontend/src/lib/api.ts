@@ -448,7 +448,18 @@ export async function postMessage(
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
   // distinguishable in StreamsProvider.sendMessage's catch (roll back both
   // optimistic bubbles + surface a per-thread error instead of leaving ghosts).
-  if (!res.ok) throw new ApiError("Failed to send message", res.status)
+  // 099-08 (UAT L10 fix): read the body BEFORE throwing so FastAPI's {detail}
+  // (the actionable gate message, e.g. a disabled skill_ref) survives. The
+  // downstream 409 branch matches on status and overrides this message with
+  // fixed copy → byte-equivalent for 409. Generic fallback when no string
+  // detail (unparseable body, or detail is a non-string FastAPI validation array).
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    throw new ApiError(
+      typeof body?.detail === "string" ? body.detail : "Failed to send message",
+      res.status,
+    )
+  }
   return (await res.json()) as PostMessageResponse
 }
 
