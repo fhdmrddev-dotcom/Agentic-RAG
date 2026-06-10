@@ -83,6 +83,15 @@ DEFINITION_JSON = {
             "config": {
                 "phase_type": "llm_agent",
                 "prompt": "Fill the risk-register template from the bound KB.",
+                # 101-06: the fill flow needs BOTH tools — search_documents to retrieve
+                # the KB content the cited field-map draws from, and render_template to
+                # actually fill the template. WITHOUT render_template here, _effective_tools
+                # never whitelists it, so _phase_tools_override never admits the
+                # RENDER_TEMPLATE_TOOL schema and the model can't call the tool (WR-01).
+                # available_tools is a REQUIRED field on LlmAgentPhaseConfig (no default),
+                # so a fill phase MUST declare it — this also fixes the prior fixture
+                # which omitted it and would fail model_validate().
+                "available_tools": ["search_documents", "render_template"],
             },
             "validators": [],
         }
@@ -144,12 +153,33 @@ def upsert_definition(conn) -> None:
     """Step 2 — INSERT the PUBLISHED WorkflowDefinition row (psycopg2, service-role).
 
     INSERT it already published in ONE statement. The 056/067 immutable-on-publish
-    trigger blocks later authored-column UPDATEs of a published row, so a re-run must
-    NOT UPDATE the published row — use ON CONFLICT DO NOTHING on BOTH idempotency keys
-    (id and slug+version) and treat an existing row as success (read it back + assert
-    its assets[0].filename).
+    trigger is a BEFORE-UPDATE trigger that blocks authored-column UPDATEs of a
+    published row — but DELETE is allowed. So this fixture seeder is DELETE-then-INSERT
+    idempotent: if a row at DEFINITION_ID already exists but carries a STALE definition
+    (e.g. the pre-101-06 fill config WITHOUT `available_tools`), DELETE it first, then
+    re-INSERT the corrected definition. This is LOCAL-dev fixture data scoped to the
+    test user — safe to replace. A fresh insert simply lands the corrected row.
+
+    101-06: the fill phase config now DECLARES `available_tools: [search_documents,
+    render_template]` (DEFINITION_JSON). Without a refresh, an old published row would
+    keep the old config and the live UAT would still see render_template unadmitted.
     """
+    target_def = json.dumps(DEFINITION_JSON)
     with conn.cursor() as cur:
+        # Refresh a STALE fixture row (different definition jsonb) — DELETE-then-reinsert.
+        cur.execute(
+            "SELECT definition::text FROM public.workflow_definitions WHERE id = %s",
+            (DEFINITION_ID,),
+        )
+        existing = cur.fetchone()
+        if existing is not None and existing[0] != target_def:
+            # Stale fixture row — drop it so the corrected definition can be inserted.
+            # DELETE is permitted (the immutability trigger is BEFORE UPDATE only).
+            cur.execute(
+                "DELETE FROM public.workflow_definitions WHERE id = %s",
+                (DEFINITION_ID,),
+            )
+
         cur.execute(
             """
             INSERT INTO public.workflow_definitions
@@ -162,7 +192,7 @@ def upsert_definition(conn) -> None:
                 SLUG,
                 VERSION,
                 NAME,
-                json.dumps(DEFINITION_JSON),
+                target_def,
                 USER_ID,
             ),
         )
@@ -170,9 +200,11 @@ def upsert_definition(conn) -> None:
         # different id is also acceptable — DO NOTHING covers the unique constraint.
         conn.commit()
 
-        # Read-back assertion: the row exists and carries the one-entry assets[].
+        # Read-back assertion: the row exists, carries the one-entry assets[], AND the
+        # fill phase now declares render_template in available_tools (101-06).
         cur.execute(
-            "SELECT definition->'assets'->0->>'filename' "
+            "SELECT definition->'assets'->0->>'filename', "
+            "definition->'phases'->0->'config'->'available_tools' "
             "FROM public.workflow_definitions WHERE id = %s",
             (DEFINITION_ID,),
         )
@@ -181,6 +213,12 @@ def upsert_definition(conn) -> None:
             raise SystemExit(
                 f"Definition read-back failed: expected assets[0].filename={FILENAME!r}, "
                 f"got {row}"
+            )
+        tools = row[1] or []
+        if "render_template" not in tools:
+            raise SystemExit(
+                "Definition read-back failed: fill phase available_tools must include "
+                f"'render_template' (101-06 WR-01), got {tools!r}"
             )
 
 
