@@ -57,6 +57,10 @@ if TYPE_CHECKING:  # pragma: no cover — typing only
 
 # The OWNED-OR-GLOBAL + enabled resolve predicate (adapted from
 # tool_dispatcher.py:346-353 _handle_load_skill, .eq("name")→.eq("id") per D-09).
+# NOTE: there is NO ``files`` column on the ``skills`` table — the file MANIFEST is
+# fetched SEPARATELY from the ``skill_files`` table inside materialize_skill_snapshots
+# (D-06 — names, not contents), exactly as _handle_load_skill does. Do NOT add a
+# ``files`` token here.
 _SKILL_SELECT = "id, name, description, instructions, user_id, is_enabled, is_global"
 
 
@@ -160,6 +164,12 @@ async def materialize_skill_snapshots(
         p for p in definition.phases if getattr(p.config, "skill_ref", None) is not None
     ]
     # Idempotency first (D-03a / Pitfall 3): nothing to do if every skill phase is snapshotted.
+    # RE-MATERIALIZATION LIMITATION (CR-01 / VERIFICATION.md): the empty-manifest snapshots
+    # persisted BEFORE this fix (when ``filenames`` always came back ``[]`` from the phantom
+    # ``skills.files`` read) are LOCKED by this idempotency check — a definition whose phases
+    # already carry a ``skill_snapshot`` with ``files: []`` will NOT auto-heal. A one-off
+    # re-materialization sweep is a future concern, NOT this gap's scope (it would change the
+    # idempotency semantics); the dev DB likely has no such rows.
     if skill_phases and all(
         getattr(p.config, "skill_snapshot", None) is not None for p in skill_phases
     ):
@@ -182,7 +192,17 @@ async def materialize_skill_snapshots(
             )
 
         owner = row.get("user_id")
-        filenames = list(row.get("files") or [])
+        # CR-01 — files live in the skill_files table, NOT a skills column (mirrors
+        # _handle_load_skill, tool_dispatcher.py:375-383). Keyed by the resolved
+        # (validated) skill id; .eq("skill_id", str(skill_ref)) has no injection surface
+        # (skill_ref is a Pydantic-validated UUID). T-099-CR01-01.
+        _files_resp = await aexec(
+            supabase.table("skill_files")
+            .select("filename")
+            .eq("skill_id", str(skill_ref))
+            .order("filename")
+        )
+        filenames = [f["filename"] for f in (_files_resp.data or [])]
         storage_prefix = (
             f"{user_id}/_snapshots/{definition.slug}-v{definition.version}/{skill_ref}"
         )
