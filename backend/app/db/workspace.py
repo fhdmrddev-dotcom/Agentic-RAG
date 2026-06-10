@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -15,24 +16,36 @@ async def upsert_workspace_file(
     content_inline: bytes | None,
     content_storage_path: str | None,
     created_by: UUID,
+    kind: str | None = None,
+    expires_at: datetime | None = None,
 ) -> tuple[UUID, bool]:
-    """Upsert a workspace file. Returns (file_id, is_new)."""
+    """Upsert a workspace file. Returns (file_id, is_new).
+
+    Phase 100 (TMPL-01): ``kind`` / ``expires_at`` are nullable ephemeral-template
+    columns (migration 068). Agent callers omit both -> NULL/NULL -> the gated read
+    seams treat NULL expiry as never-expires (D-11 byte-identical). Only the template
+    upload caller (Plan 100-04) passes ``kind='template_input'`` + a future expiry.
+    """
     row = await pool.fetchrow(
         """
         INSERT INTO workspace_files
             (thread_id, path, size_bytes, mime_type,
-             content_inline, content_storage_path, created_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+             content_inline, content_storage_path, created_by,
+             kind, expires_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (thread_id, path) DO UPDATE SET
             size_bytes = EXCLUDED.size_bytes,
             mime_type = EXCLUDED.mime_type,
             content_inline = EXCLUDED.content_inline,
             content_storage_path = EXCLUDED.content_storage_path,
+            kind = EXCLUDED.kind,
+            expires_at = EXCLUDED.expires_at,
             updated_at = now()
         RETURNING id, (xmax = 0) AS is_new
         """,
         thread_id, path, size_bytes, mime_type,
         content_inline, content_storage_path, created_by,
+        kind, expires_at,
     )
     return row["id"], row["is_new"]
 
@@ -101,12 +114,21 @@ async def count_files_in_thread(pool: asyncpg.Pool, thread_id: UUID) -> int:
 
 
 async def get_file_by_path(pool: asyncpg.Pool, thread_id: UUID, path: str) -> dict | None:
-    """Fetch a workspace file row by thread_id + path. Returns dict or None."""
+    """Fetch a workspace file row by thread_id + path. Returns dict or None.
+
+    Phase 100 (TMPL-01): deliberately UNFILTERED on expiry — the D-10 'template
+    expired' error needs to distinguish an expired-but-present row from a truly
+    absent one. The computed ``is_expired`` flag carries that distinction; the
+    service layer raises FileNotFoundError_('template expired') on it. NULL-expiry
+    (agent) rows get is_expired = False (byte-identical, D-11).
+    """
     row = await pool.fetchrow(
         """
         SELECT id, thread_id, path, size_bytes, mime_type,
                content_inline, content_storage_path,
-               created_by, created_at, updated_at
+               created_by, created_at, updated_at,
+               kind, expires_at,
+               (expires_at IS NOT NULL AND expires_at <= now()) AS is_expired
         FROM workspace_files
         WHERE thread_id = $1 AND path = $2
         """,
@@ -116,12 +138,19 @@ async def get_file_by_path(pool: asyncpg.Pool, thread_id: UUID, path: str) -> di
 
 
 async def get_file_by_id(pool: asyncpg.Pool, file_id: UUID) -> dict | None:
-    """Fetch a workspace file row by id. Returns dict or None."""
+    """Fetch a workspace file row by id. Returns dict or None.
+
+    Phase 100 (TMPL-01): same D-10 distinction as get_file_by_path — kept UNFILTERED
+    so the REST content route (Plan 100-04) can tell expired-present from absent and
+    404 on either. NULL-expiry rows -> is_expired = False (byte-identical, D-11).
+    """
     row = await pool.fetchrow(
         """
         SELECT id, thread_id, path, size_bytes, mime_type,
                content_inline, content_storage_path,
-               created_by, created_at, updated_at
+               created_by, created_at, updated_at,
+               kind, expires_at,
+               (expires_at IS NOT NULL AND expires_at <= now()) AS is_expired
         FROM workspace_files
         WHERE id = $1
         """,
@@ -135,13 +164,22 @@ async def list_files_in_thread(
     thread_id: UUID,
     prefix: str | None = None,
 ) -> list[dict]:
-    """List workspace files in a thread, optionally filtered by path prefix."""
+    """List workspace files in a thread, optionally filtered by path prefix.
+
+    Phase 100 (TMPL-01): GATED on expiry — expired template rows
+    (``expires_at <= now()``) are hidden from the listing, while NULL-expiry agent
+    files always pass (``expires_at IS NULL`` short-circuits the OR). This is the
+    SC#3-critical consumer (Pitfall 1 — a filter on the REST layer is invisible
+    here). The gate is a literal no-op for agent files (D-11 byte-identical).
+    """
     if prefix:
         rows = await pool.fetch(
             """
-            SELECT id, path, size_bytes, mime_type, created_at, updated_at
+            SELECT id, path, size_bytes, mime_type, created_at, updated_at,
+                   kind, expires_at
             FROM workspace_files
             WHERE thread_id = $1 AND path LIKE $2
+              AND (expires_at IS NULL OR expires_at > now())
             ORDER BY path
             """,
             thread_id, f"{prefix}%",
@@ -149,9 +187,11 @@ async def list_files_in_thread(
     else:
         rows = await pool.fetch(
             """
-            SELECT id, path, size_bytes, mime_type, created_at, updated_at
+            SELECT id, path, size_bytes, mime_type, created_at, updated_at,
+                   kind, expires_at
             FROM workspace_files
             WHERE thread_id = $1
+              AND (expires_at IS NULL OR expires_at > now())
             ORDER BY path
             """,
             thread_id,
