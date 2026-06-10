@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import re
 import zipfile
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
@@ -173,7 +174,13 @@ async def upload_template(
     ext = validate_ooxml(file.filename or "", raw)  # D-12 magic-byte gate
     ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
     expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
-    safe_name = (file.filename or f"template{ext}").replace("/", "_").replace("\\", "_")
+    # WR-05 (100-REVIEW): sanitize the ORIGINAL filename to validate_path's charset
+    # (^/[a-zA-Z0-9._/\- ]+$, no '..') so ordinary names — "Q3 Report (final).docx",
+    # "P&L 2026.xlsx", "Übersicht.docx", "report..v2.docx" — don't surface a
+    # confusing "invalid path characters" 422 to a user who never typed a path.
+    stem = file.filename or f"template{ext}"
+    safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", stem)
+    safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
     path = f"/{uuid4().hex[:8]}-{safe_name}"
     try:
         result = await ws_write_file(
