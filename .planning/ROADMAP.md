@@ -43,7 +43,7 @@
 
 - [ ] **Phase 097: Spike — Risk-Register Template-Fill + Authoring Feel** - De-risk the milestone end-to-end on one provider; answer the 4 schema-shaping unknowns before any schema locks (SEED-051)
 - [x] **Phase 098: Project Binding + Server-Side KB Scope Governance** ✓ COMPLETE (2026-06-10) - Bind a workflow to a project (folder + subtree); resolve retrieval scope server-side so the model cannot widen it
-- [ ] **Phase 099: Workflow ↔ Skill Composition** - A phase can pull a project skill's judgment via `skill_ref` with a version snapshot; Deep path byte-identical
+- [x] **Phase 099: Workflow ↔ Skill Composition** ✓ COMPLETE (2026-06-10) - A phase can pull a project skill's judgment via `skill_ref` with a version snapshot; Deep path byte-identical
 - [ ] **Phase 100: Ephemeral Template Upload** - Upload a docx/pptx/xlsx for one run, workspace-only, TTL + sweep, never ingested, never in search
 - [ ] **Phase 101: Template-Fill + Integrity Validation** - Fill that exact template from project-KB content via a cited field-map; re-open to assert integrity; SSTI contained
 - [ ] **Phase 102: Reusable Validation-Gate Library + Output-Quality Gate** - A library of validator kinds for any phase + a HARD publish-blocking output-quality judge gate
@@ -234,7 +234,7 @@
 |-------|----------------|--------|-----------|
 | 097. Spike — Risk-Register Template-Fill + Authoring Feel | 5/5 | Complete    | 2026-06-08 |
 | 098. Project Binding + Server-Side KB Scope Governance | 5/5 | Complete    | 2026-06-09 |
-| 099. Workflow ↔ Skill Composition | 4/4 | Executed (verify pending) | - |
+| 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 0/TBD | Not started | - |
 | 101. Template-Fill + Integrity Validation | 0/TBD | Not started | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |

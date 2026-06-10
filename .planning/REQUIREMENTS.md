@@ -107,7 +107,7 @@
 | PROJ-01 | Phase 098 | Complete |
 | PROJ-02 | Phase 098 | Complete |
 | GOV-01 | Phase 098 | Complete |
-| WFSKILL-01 | Phase 099 | Pending |
+| WFSKILL-01 | Phase 099 | Complete |
 | TMPL-01 | Phase 100 | Pending |
 | TMPL-02 | Phase 101 | Pending |
 | TMPL-03 | Phase 101 | Pending |
