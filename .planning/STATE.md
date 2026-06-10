@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-10T00:06:00.000Z"
-last_activity: 2026-06-10 -- Phase 099 Plan 04 complete (threads.py kickoff wiring — validate + materialize-if-needed, ValueError->400). Phase 099 all 4 plans EXECUTED — ready for /gsd:verify-work 099
+last_updated: "2026-06-10T06:26:58.055Z"
+last_activity: 2026-06-10 -- Phase 099 execution started
 progress:
   total_phases: 13
   completed_phases: 2
-  total_plans: 14
+  total_plans: 16
   completed_plans: 14
-  percent: 100
+  percent: 88
 ---
 
 # Project State
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: 099 (workflow-skill-composition) — ALL 4 PLANS EXECUTED
-Plan: 4 of 4 — COMPLETE
-Status: Plan 04 complete — Phase 099 fully executed (4/4 plans). Next: `/gsd:verify-work 099` (live cross-provider UAT rows L1-L10 in 099-VALIDATION.md) then `/gsd:secure-phase 099`
-Last activity: 2026-06-10 -- Phase 099 Plan 04 complete (threads.py kickoff wiring)
+Phase: 099 (workflow-skill-composition) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 099
+Last activity: 2026-06-10 -- Phase 099 execution started
 
 **Plan 099-01 (Wave 0, data contract) — COMPLETE (2026-06-09):**
 
@@ -181,4 +181,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 099 (workflow-skill-composition) — 4 plans — 2026-06-09T23:00:12.316Z
+**Planned Phase:** 099 (Workflow ↔ Skill Composition) — 6 plans — 2026-06-10T06:23:07.327Z
