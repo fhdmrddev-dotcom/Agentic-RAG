@@ -8,6 +8,7 @@ import {
   useLoadingForThread,
   useReconcileErrorForThread,
   useFallbackNoticeForThread,
+  useFailedSendDraftForThread,
   useWorkflowLockForThread,
   useStreamActions,
 } from "@/providers/StreamsProvider"
@@ -77,6 +78,16 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const isStreaming = useStreamingForThread(thread?.id ?? null)
   const fallbackNotice = useFallbackNoticeForThread(thread?.id ?? null)
   const reconcileError = useReconcileErrorForThread(thread?.id ?? null)
+  // 099-08 (UAT L10): refusals the user cannot fix by retrying the SAME send —
+  // the gate-refusal status set (400/403/404/422) + the 409 lock-refusal. The
+  // banner hides Retry for these (Retry on a gate refusal is misleading).
+  const NON_RETRYABLE = new Set([400, 403, 404, 409, 422])
+  const hideRetry =
+    reconcileError instanceof ApiError && NON_RETRYABLE.has(reconcileError.status)
+  // 099-08 (UAT L10): the per-thread stashed prompt from a send refusal. When
+  // present it pre-fills the composer (preferred over the parent prefill prop)
+  // so the user's typed prompt is recoverable, then is cleared on consume.
+  const failedDraft = useFailedSendDraftForThread(thread?.id ?? null)
   // Phase 092 (MODE-02 — SC#3): the per-thread workflow lock, keyed by the
   // OWNING thread id (thread?.id) — never viewedThreadId or a global flag, so a
   // background workflow on another thread cannot lock THIS composer. Drives the
@@ -106,10 +117,23 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     // Plan 075.4-01 D-075.4-A1: per-thread reconcileErrors clear.
     if (!thread) return
     useStreamsStore.setState((s) => {
-      if (!s.reconcileErrors.has(thread.id)) return {}
-      const next = new Map(s.reconcileErrors)
-      next.delete(thread.id)
-      return { reconcileErrors: next }
+      const hasErr = s.reconcileErrors.has(thread.id)
+      // 099-08 (UAT L10): clear the stashed draft symmetrically so dismissing
+      // the banner does not leave a stale draft that re-fills the composer.
+      const hasDraft = s.failedSendDrafts.has(thread.id)
+      if (!hasErr && !hasDraft) return {}
+      const patch: Partial<typeof s> = {}
+      if (hasErr) {
+        const next = new Map(s.reconcileErrors)
+        next.delete(thread.id)
+        patch.reconcileErrors = next
+      }
+      if (hasDraft) {
+        const nextDrafts = new Map(s.failedSendDrafts)
+        nextDrafts.delete(thread.id)
+        patch.failedSendDrafts = nextDrafts
+      }
+      return patch
     })
   }, [thread])
 
@@ -367,8 +391,20 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       onModelChange={setSelectedModel}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
-      prefillMessage={prefillMessage}
-      onClearPrefill={onClearPrefill}
+      prefillMessage={failedDraft ?? prefillMessage}
+      onClearPrefill={() => {
+        // 099-08 (UAT L10): clear the stashed draft once the composer consumes
+        // it so it pre-fills exactly once per refusal (not on every render).
+        if (thread?.id) {
+          useStreamsStore.setState((s) => {
+            if (!s.failedSendDrafts.has(thread.id)) return {}
+            const next = new Map(s.failedSendDrafts)
+            next.delete(thread.id)
+            return { failedSendDrafts: next }
+          })
+        }
+        onClearPrefill?.()
+      }}
       workflowMode={workflowMode}
       onWorkflowModeChange={setWorkflowMode}
       // Phase 094 (D-02 — server truth): the DISPLAYED mode badge derives from
@@ -490,17 +526,18 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           role="status"
           aria-live="polite"
         >
-          {/* Phase 092 (092-06 / F3): a 409 lock-refusal reuses the per-thread
-              error surface but shows the fixed lock copy (T-092-06-03) and only
-              a Dismiss control — retrying a doomed send is meaningless. The
-              reconcile-failure case keeps its cached-version copy + Retry. */}
+          {/* 099-08 (UAT L10): any ApiError (the 409 lock copy OR a server gate
+              detail, e.g. a disabled-skill 400) shows its server-provided
+              message. Rendered as React text children — never HTML
+              (T-099-08-01). A plain reconcile Error (no status) keeps the
+              cached-version copy + Retry. */}
           <span>
-            {reconcileError instanceof ApiError && reconcileError.status === 409
+            {reconcileError instanceof ApiError
               ? reconcileError.message
               : "Couldn't load latest messages. Showing cached version."}
           </span>
           <span className="flex gap-2 items-center">
-            {!(reconcileError instanceof ApiError && reconcileError.status === 409) && (
+            {!hideRetry && (
               <button
                 type="button"
                 onClick={handleRetryReconcile}
