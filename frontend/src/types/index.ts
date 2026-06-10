@@ -312,6 +312,8 @@ export interface WorkspaceFile {
   version?: number
   created_at?: string
   updated_at?: string
+  kind?: string          // 100: 'template_input' for ephemeral uploads (D-02 badge)
+  expires_at?: string    // 100: ISO timestamp; drives countdown + amber tint (D-02)
 }
 
 /** GET /threads/{tid}/ask_user/pending (panel.py:103) +
