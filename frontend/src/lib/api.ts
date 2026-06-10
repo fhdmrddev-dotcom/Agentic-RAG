@@ -1198,7 +1198,12 @@ export async function uploadWorkspaceTemplate(
     const err = await res.json().catch(() => ({ detail: "Upload failed" }))
     throw new Error((err as { detail: string }).detail ?? "Upload failed")
   }
-  return (await res.json()) as WorkspaceFile
+  // WR-08 (100-REVIEW): the backend route returns write_file's dict whose key is
+  // `file_id` (no `id`). Map it at the API boundary instead of a blind cast so the
+  // optimistically upserted store row carries a real id — 088-05 D-16 history:
+  // missing workspace-file ids caused live `/files//content` 404s.
+  const row = (await res.json()) as WorkspaceFile & { file_id?: string }
+  return { ...row, id: row.id ?? row.file_id }
 }
 
 // Phase 067.3 (D-067.3-R2-01/02/04): JS blob fetch+download for
