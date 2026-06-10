@@ -7,13 +7,23 @@ on workspace_files ensure users can only access files in their own threads).
 from __future__ import annotations
 
 import base64
+import io
 import logging
+import zipfile
+from datetime import datetime, timedelta, timezone
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_pg_pool, get_supabase
+from app.models.user_settings import load_app_settings_async
+from app.services.workspace_service import (
+    FileTooLargeError,
+    WorkspaceError,
+    write_file as ws_write_file,
+)
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -93,6 +103,91 @@ def _decode_inline_content(value) -> str:
         )
         return ""
     return ""
+
+
+# ── Phase 100 (TMPL-01) — ephemeral template upload (D-12) ────────────────────
+
+_ALLOWED_EXT = {".docx", ".pptx", ".xlsx"}
+# OOXML part-name prefix that distinguishes the three OOXML types (defense-in-depth).
+_OOXML_MARKER = {".docx": "word/", ".pptx": "ppt/", ".xlsx": "xl/"}
+
+
+def validate_ooxml(filename: str, raw: bytes) -> str:
+    """Magic-byte gate for .docx/.pptx/.xlsx uploads (D-12, stdlib only).
+
+    OOXML files are ZIP (PK) containers. ``zipfile.is_zipfile`` validates the
+    End-of-Central-Directory record — so a renamed binary / truncated file /
+    non-ZIP PDF fails even though a 4-byte sniff would pass. A per-extension
+    part-name marker (``word/`` / ``ppt/`` / ``xl/``) plus ``[Content_Types].xml``
+    rejects an arbitrary (non-Office) ZIP. Returns the canonical extension;
+    raises HTTPException(422) on any failure (nothing is persisted).
+    """
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if ext not in _ALLOWED_EXT:
+        raise HTTPException(422, f"Unsupported type {ext}. Allowed: .docx, .pptx, .xlsx")
+    bio = io.BytesIO(raw)
+    if not zipfile.is_zipfile(bio):
+        raise HTTPException(422, "File is not a valid Office document (not a ZIP/OOXML container)")
+    with zipfile.ZipFile(bio) as zf:
+        names = zf.namelist()
+        if "[Content_Types].xml" not in names:
+            raise HTTPException(422, "File is not a valid OOXML document")
+        if not any(n.startswith(_OOXML_MARKER[ext]) for n in names):
+            raise HTTPException(422, f"File contents do not match a {ext} document")
+    return ext
+
+
+@router.post("/files")
+async def upload_template(
+    thread_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Upload an ephemeral .docx/.pptx/.xlsx template (TMPL-01, D-12/D-05).
+
+    The single net-new workspace WRITE endpoint. Validates OOXML by magic bytes
+    (D-12), reads the TTL from app_settings (D-05), and persists via write_file
+    with kind='template_input' + expires_at = now + TTL. Bad files -> 422 at the
+    door (nothing persisted); a thread the user does not own -> 404 (RLS half of
+    SC#1 via _verify_thread_ownership). No SSE emit — the handler has no run
+    context; the panel reconciles by upserting the returned row (Plan 100-06).
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
+    raw = await file.read()
+    if len(raw) == 0:
+        raise HTTPException(422, "File is empty")
+    if len(raw) > 10 * 1024 * 1024:
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    ext = validate_ooxml(file.filename or "", raw)  # D-12 magic-byte gate
+    ttl_hours = (await load_app_settings_async()).template_ttl_hours  # D-05
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+    safe_name = (file.filename or f"template{ext}").replace("/", "_").replace("\\", "_")
+    path = f"/{uuid4().hex[:8]}-{safe_name}"
+    try:
+        result = await ws_write_file(
+            await get_pg_pool(),
+            supabase,
+            thread_id=UUID(thread_id),
+            user_id=UUID(current_user["id"]),
+            path=path,
+            content=raw,
+            kind="template_input",  # D-12
+            expires_at=expires_at,  # D-05
+        )
+    except FileTooLargeError as e:
+        raise HTTPException(422, str(e))
+    except WorkspaceError as e:
+        raise HTTPException(422, str(e))
+    result["kind"] = "template_input"
+    result["expires_at"] = expires_at.isoformat()
+    return result
+
+
+# Must-haves export alias: the route handler is named ``upload_template`` to
+# satisfy the Plan 100-01 TDD contract (``from app.api.workspace import
+# upload_template``); ``upload_workspace_template`` is the must_haves export name.
+upload_workspace_template = upload_template
 
 
 @router.get("/files")
