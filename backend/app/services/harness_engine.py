@@ -995,7 +995,10 @@ async def run_workflow(
         # has no ``failure`` key, so this is a literal no-op on the shared path.
         _emit_failure = output.get("failure") if isinstance(output, dict) else None
         if _emit_failure:
-            await fail_phase(pool, phase_id, str(_emit_failure))
+            # 101.1 review WR-02: persist the FULL failure output (incl. the cited
+            # field_map states b/c/d carry) on the phase row — fail_phase merges it
+            # under _failure_reason, so the extracted data survives durably (D-08).
+            await fail_phase(pool, phase_id, str(_emit_failure), output=durable_output)
         else:
             await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output

@@ -369,15 +369,25 @@ async def complete_phase(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> No
     )
 
 
-async def fail_phase(pool: asyncpg.Pool, phase_id: UUID, reason: str) -> None:
+async def fail_phase(
+    pool: asyncpg.Pool, phase_id: UUID, reason: str, output: dict | None = None
+) -> None:
     """Mark a phase ``failed`` with the failure reason in ``output`` (Plan 05).
 
+    101.1 review WR-02: ``output`` (optional, ADDITIVE — both pre-existing callers
+    pass nothing and are byte-identical) persists the FULL failure output dict
+    alongside the reason — e.g. the cited ``field_map`` an honest emit failure
+    carries (D-08: a non-opening render never loses the extracted data). Without
+    it the in-memory field-map was dropped on every honest failure, contradicting
+    the user-facing "the cited field-map is preserved" copy. ``_failure_reason``
+    always wins on a key collision (it is the status-repair scripts' key).
     PHASE-KEYED write → ``WHERE id=$1``.
     """
+    payload: dict = {**(output or {}), "_failure_reason": reason}
     await pool.execute(
         "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now() WHERE id = $1",
         phase_id,
-        json.dumps({"_failure_reason": reason}),
+        json.dumps(payload),
     )
 
 

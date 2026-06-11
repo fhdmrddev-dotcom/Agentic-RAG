@@ -1244,7 +1244,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 "The emitted field-map has uncited or invented values or is missing required "
                 "template keys — every non-null value must cite a source that was actually "
                 "retrieved, and every template placeholder must be present. The deliverable "
-                "was NOT produced; the cited field-map is preserved below."
+                "was NOT produced; the cited field-map is preserved in the run's phase record."
             )
             await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
             await _surface_failure_message(ctx, run_id, msg, pool)
@@ -1304,7 +1304,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             msg = (
                 "The filled file failed the integrity re-open (it will not open cleanly or "
                 "still contains unsubstituted placeholders) and was NOT delivered. The cited "
-                "field-map is preserved below as fallback."
+                "field-map is preserved in the run's phase record as fallback."
             )
             await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
                 definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
@@ -1319,7 +1319,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         msg = (
             "The template render failed: "
             + str((render_out or {}).get("message") or reason or "unknown render error")
-            + ". The deliverable was NOT produced; the cited field-map is preserved below."
+            + ". The deliverable was NOT produced; the cited field-map is preserved in "
+            "the run's phase record."
         )
         await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
