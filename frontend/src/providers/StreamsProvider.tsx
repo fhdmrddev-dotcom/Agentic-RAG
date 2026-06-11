@@ -918,7 +918,43 @@ export function makeStreamCallbacks(opts: {
       // masked as done. Closure threadId (PANEL-09); phasesByThread only.
       if (status === "completed")
         useStreamsStore.getState().actions.finalizeAllPhasesForThread(threadId)
+      // Phase 101.1-09 (gap 4 frontend): on a SUCCESSFUL harness terminal, refetch
+      // the workspace files so a just-persisted deliverable's file + phase status
+      // self-heal WITHOUT an F5 (the UAT log showed FILES fetched ~2 min BEFORE the
+      // emit's row existed and never refetched → "No files yet" until refresh).
+      // Scoped to the OWNING threadId (PANEL-09 closure). run_completed is a
+      // HARNESS-ONLY event (Deep never emits it), so a Deep completion never reaches
+      // here — no guard needed beyond the status==="completed" check. The Plan-08
+      // snapshot degrade ensures this refetch path doesn't 503 on a GC'd buffer.
+      if (status === "completed") {
+        getThreadWorkspaceFiles(threadId)
+          .then((files) =>
+            useStreamsStore.getState().actions.replaceWorkspaceFilesForThread(threadId, files),
+          )
+          .catch(() => {
+            // Best-effort self-heal — a failed refetch is non-fatal (the panel's
+            // own mount/visibility reconcile remains the floor); never throw into
+            // the SSE consumer.
+          })
+      }
     },
+    // ────────────────────────────────────────────────────────────────────────
+    // Phase 101.1-09 (gap 6 / GAP-C / D-11) — the phase_substep demux Plan 04
+    // deferred. ADDITIVE + PANEL-ONLY: writes phasesByThread (like the 094
+    // lifecycle demux), NEVER bucketsBySurface — the chat selector reads
+    // bucketsBySurface exclusively → Deep byte-identical, no chat re-render.
+    // Closes over the factory threadId (Pitfall 6 — a background run never
+    // corrupts the viewed thread's rail). PhaseCard already renders emitSubStep/
+    // emitFailure (Plan 04) — this populates them from the wire. One shared event
+    // for every provider (no provider branch — D-14).
+    // ────────────────────────────────────────────────────────────────────────
+    onPhaseSubstep: (sub) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseEmitSubstepForThread(threadId, sub.phase, sub.phaseIndex, {
+          emitSubStep: sub.status,
+          emitFailure: sub.failure,
+        }),
   }
 }
 
@@ -2326,6 +2362,28 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           useStreamsStore.setState((s) => {
             const next = new Map(s.phasesByThread)
             next.set(threadId, phases)
+            return { phasesByThread: next }
+          }),
+        // Phase 101.1-09 (gap 6 / GAP-C / D-11): patch a phase's emitSubStep/
+        // emitFailure from a phase_substep event. ADDITIVE + PANEL-ONLY — copies
+        // phasesByThread (new Map → set), merges the patch onto the matching row,
+        // and writes phasesByThread EXCLUSIVELY (never bucketsBySurface), exactly
+        // like setPhaseStatusForThread. Match by slug; fall back to phaseIndex when
+        // the slug is the reconcile placeholder (`phase-${i}`) — the same draft→
+        // real-slug race the 094 demux handles. PhaseCard (Plan 04) renders the
+        // populated fields → the live emit sub-step rail.
+        setPhaseEmitSubstepForThread: (threadId, slug, phaseIndex, patch) =>
+          useStreamsStore.setState((s) => {
+            const next = new Map(s.phasesByThread)
+            const prev = next.get(threadId) ?? EMPTY_PHASES
+            if (prev.length === 0) return {}
+            let targetIdx = prev.findIndex((p) => p.slug === slug)
+            if (targetIdx === -1) targetIdx = prev.findIndex((p) => p.phaseIndex === phaseIndex)
+            if (targetIdx === -1) return {}
+            next.set(
+              threadId,
+              prev.map((p, i) => (i === targetIdx ? { ...p, ...patch } : p)),
+            )
             return { phasesByThread: next }
           }),
         // Phase 098-UAT run-honesty fix (A): on a SUCCESSFUL run completion, sweep
