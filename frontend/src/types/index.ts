@@ -376,6 +376,29 @@ export interface TaskRunIndexItem {
  *   pendingAsk ← a tool_call_id POINTER into pendingAsksByThread (the ask card
  *                already has a store — do NOT duplicate the ask here)
  */
+/** Phase 101.1-04 (GAP-C / D-11) — the discrete emit-moment sub-step the harness
+ *  streams via `phase_substep` (status field). A sealed forced emit is ATOMIC (it
+ *  cannot stream tokens), so the emit moment surfaces as these honest sub-steps on the
+ *  EXISTING status-node rail instead of a static "Step 0 · working…" box. Optional —
+ *  only a `llm_emit` fill phase ever carries one; every other phase leaves it undefined. */
+export type EmitSubStep =
+  | "forcing"
+  | "emitting"
+  | "recovering"
+  | "validating"
+  | "rendering"
+  | "validated"
+
+/** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
+ *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail
+ *  (closed taxonomy + reason_unknown fallback) — never an empty "done" card (RC-4). */
+export type EmitFailure =
+  | "model_failed_to_emit"
+  | "citation_gate_rejected"
+  | "render_failed"
+  | "integrity_failed"
+  | "no_template_bound"
+
 export interface Phase {
   slug: string
   phaseIndex: number
@@ -385,6 +408,12 @@ export interface Phase {
   error?: string
   subAgents: TaskRunIndexItem[]
   pendingAsk: string | null
+  /** GAP-C (D-11) — the live emit sub-step (the latest `phase_substep` status), rendered
+   *  as a sub-row on the existing rail. Undefined on non-emit phases. */
+  emitSubStep?: EmitSubStep
+  /** GAP-C (D-11) — the terminal emit failure value (the `phase_substep` failure field).
+   *  Renders failed-as-failed via the closed taxonomy. Undefined unless an emit failed. */
+  emitFailure?: EmitFailure
 }
 
 // ────────────────────────────────────────────────────────────────────────────

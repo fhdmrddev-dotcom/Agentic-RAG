@@ -28,7 +28,7 @@
  */
 import { useEffect, useId, useState } from "react"
 import { cn } from "@/lib/utils"
-import type { Phase } from "@/types"
+import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -76,12 +76,60 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
 }
 
+// ── SUBSTEP_META (Phase 101.1-04 / GAP-C / D-11) — the emit-moment sub-steps the
+//    harness streams via `phase_substep` (RESEARCH §5). A sealed forced emit is ATOMIC
+//    (no token stream), so the moment surfaces as these DISCRETE sub-step nodes on the
+//    EXISTING status-node rail (sketch 014 — active node blooms; sketch 010 — `recovering`
+//    is the amber/degraded-but-honest tint; `validated` is the done/green node). NOT a new
+//    affordance — a sub-row under the fill phase's card (A5 / G-2 does not fire). Each
+//    carries a glyph + REAL text label + an AA-contrast color token (non-color-only). ──
+interface SubStepMeta {
+  glyph: string
+  text: string
+  textClass: string
+  /** The node state on the rail: active (pulsing-primary), degraded (amber), done (green). */
+  node: "active" | "degraded" | "done"
+}
+const SUBSTEP_META: Record<EmitSubStep, SubStepMeta> = {
+  forcing: { glyph: "◇", text: "Forcing the structured emit", node: "active",
+    textClass: "text-[hsl(var(--panel-status-active))]" },
+  emitting: { glyph: "◈", text: "Emitting the field-map", node: "active",
+    textClass: "text-[hsl(var(--panel-status-active))]" },
+  // recovering = degraded-but-honest (D-06 NATIVE narration recovery) → amber tint.
+  recovering: { glyph: "↺", text: "Recovering a narrated emit", node: "degraded",
+    textClass: "text-accent-violet-text" },
+  validating: { glyph: "✓", text: "Validating citations", node: "active",
+    textClass: "text-[hsl(var(--panel-status-active))]" },
+  rendering: { glyph: "▦", text: "Rendering the deliverable", node: "active",
+    textClass: "text-[hsl(var(--panel-status-active))]" },
+  validated: { glyph: "✓", text: "Deliverable produced", node: "done",
+    textClass: "text-[hsl(var(--panel-status-done))]" },
+}
+
+function subStepMeta(s: EmitSubStep): SubStepMeta {
+  // Unknown sub-step value (forward-compat) falls back to a neutral active node — never
+  // crashes, never renders as a 'done'/success node (A5 / RC-4 discipline).
+  return SUBSTEP_META[s] ?? {
+    glyph: "•", text: "Working", node: "active",
+    textClass: "text-[hsl(var(--panel-status-active))]",
+  }
+}
+
 // ── FAILURE TAXONOMY (UI-SPEC Copywriting Contract :169-172) — the closed set,
 //    classified UI-side over the error string + which event fired (there is no
 //    typed failure_kind field on the wire). Returns the VERBATIM reason copy +
 //    the real where-line components (omit model/sub-agent-index/step-ratio — those
 //    are sub-stream; render only phase.slug + the real attempt/max). ──
-type FailureKind = "max_steps" | "gate_failed" | "wall_clock_timeout" | "reason_unknown"
+type FailureKind =
+  | "max_steps"
+  | "gate_failed"
+  | "wall_clock_timeout"
+  // Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states. Each is a
+  // CLOSED taxonomy member with verbatim reason copy (rendered failed-as-failed, never an
+  // empty 'done' card — RC-4). They classify off the typed `phase.emitFailure` field (the
+  // `phase_substep` failure value), NOT a free-text error string.
+  | EmitFailure
+  | "reason_unknown"
 
 interface ClassifiedFailure {
   kind: FailureKind
@@ -91,9 +139,47 @@ interface ClassifiedFailure {
   where: string
 }
 
+// The closed emit-failure copy (Phase 101.1-04 / D-11) — one fixed reason + where-line
+// per failure value. Fixed labels (not the agent string) = the XSS-safe, never-empty
+// render the closed taxonomy guarantees.
+const EMIT_FAILURE_COPY: Record<EmitFailure, { reason: string; where: string }> = {
+  model_failed_to_emit: {
+    reason:
+      "The model did not emit a structured field-map (it narrated prose or was cut off). The deliverable was NOT produced — no Markdown stand-in is delivered as the artifact.",
+    where: "emit · the model never committed the forced field-map",
+  },
+  citation_gate_rejected: {
+    reason:
+      "The emitted field-map had uncited or invented values — every value must cite a source that was actually retrieved. Rejected before render; the cited data is preserved.",
+    where: "emit · citation gate rejected (uncited / invented)",
+  },
+  render_failed: {
+    reason:
+      "The template render failed before producing a file. The deliverable was NOT produced; the cited field-map is preserved.",
+    where: "emit · render error",
+  },
+  integrity_failed: {
+    reason:
+      "The filled file failed the integrity re-open (it will not open cleanly or still contains unsubstituted placeholders) and was NOT delivered. The cited field-map is preserved.",
+    where: "emit · integrity re-open failed",
+  },
+  no_template_bound: {
+    reason:
+      "No template is bound to this workflow phase and no usable template was found, so nothing could be filled.",
+    where: "emit · no template bound",
+  },
+}
+
 function classifyFailure(phase: Phase): ClassifiedFailure {
   const raw = (phase.error ?? "").trim()
   const slug = phase.slug || "this phase"
+
+  // GAP-C (D-11): a typed emit-failure value takes precedence — it is the closed-taxonomy
+  // failed-as-failed render (never the generic gate copy, never an empty 'done').
+  if (phase.emitFailure && phase.emitFailure in EMIT_FAILURE_COPY) {
+    const copy = EMIT_FAILURE_COPY[phase.emitFailure]
+    return { kind: phase.emitFailure, reason: copy.reason, where: `phase: ${slug} · ${copy.where}` }
+  }
 
   // reason_unknown — MANDATORY fallback when the error/reason is empty. Never an
   // empty red card (DATA-CONTRACT §6).
@@ -157,8 +243,17 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
   const status = STATUS_META[phase.status]
   const isRunning = phase.status === "running"
-  const isFailed = phase.status === "failed"
+  // GAP-C (D-11): a typed emit-failure value is failed-as-failed even before the phase
+  // status flips to "failed" — the closed taxonomy renders the reason, never a 'done'.
+  const hasEmitFailure = phase.emitFailure != null
+  const isFailed = phase.status === "failed" || hasEmitFailure
   const isTerminal = phase.status === "done" || phase.status === "failed" || phase.status === "skipped"
+
+  // GAP-C: the live emit sub-step (only present on a `llm_emit` fill phase). The terminal
+  // `validated` sub-step is the done node; a failure value suppresses any sub-step (the
+  // failure block renders instead — never both a 'done' node AND a failed card).
+  const subStep =
+    phase.emitSubStep && !hasEmitFailure ? subStepMeta(phase.emitSubStep) : null
 
   // Active (running) + failed phases auto-expand; done/pending/skipped collapse to
   // a summary row. The running phase is FORCED open (aria-disabled, no-op toggle).
@@ -260,6 +355,33 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
         className="flex flex-col gap-2 px-3 pb-3"
       >
         <p className="text-[12px] leading-relaxed text-panel-muted-foreground">{meta.oneLiner}</p>
+
+        {/* GAP-C (D-11) emit sub-step — a status-node SUB-ROW on the EXISTING rail (NOT a
+            new container / affordance, A5). The node fills per the sub-step state: active
+            (pulsing-primary), `recovering` amber (degraded-but-honest), `validated` green.
+            The label is a fixed plain-text child (XSS rule); a `validated` sub-step is the
+            done node, never a fake percent. Only a `llm_emit` fill phase carries one. */}
+        {subStep && (
+          <div
+            data-emit-substep={phase.emitSubStep}
+            className="flex items-center gap-2 rounded-md border border-border/50 bg-card/50 px-2.5 py-1.5"
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex-none text-[12px] leading-none",
+                subStep.node === "done"
+                  ? "text-[hsl(var(--panel-status-done))]"
+                  : subStep.node === "degraded"
+                    ? "text-accent-violet-text"
+                    : "text-[hsl(var(--panel-status-active))] animate-pulse",
+              )}
+            >
+              {subStep.glyph}
+            </span>
+            <span className={cn("text-[12px] font-medium", subStep.textClass)}>{subStep.text}</span>
+          </div>
+        )}
 
         {/* Failure block (RC-4 render half) — a SEPARATE role=alert (assertive),
             distinct from the timeline's polite announcer. Verbatim taxonomy copy. */}
