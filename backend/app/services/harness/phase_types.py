@@ -61,6 +61,7 @@ from app.services.template_render_service import (
     EmitFieldMap,
     check_coverage,
     emit_field_map_to_legacy,
+    parse_docx_template_variables,
 )
 from app.services.tool_dispatcher import ToolContext
 
@@ -769,6 +770,22 @@ _EMIT_SPOTLIGHT_MAX_PASSAGE = 1600
 _EMIT_MAX_ATTEMPTS = 3
 
 
+def _template_oracle(src: dict) -> dict | None:
+    """The 097 "parse template first" coverage oracle, productized (101.1-06).
+
+    Parses the RESOLVED template's placeholder names (docx only for now — the same
+    docx-first scope as the rest of the phase) so the forced shot can name EXACTLY
+    the keys the template needs and the citation gate can validate coverage BEFORE
+    the sandbox render. ``None`` (no oracle, behavior unchanged) for non-docx
+    templates, unreadable bytes, or token-free files — never a crash."""
+    if not str(src.get("filename") or "").lower().endswith(".docx"):
+        return None
+    data = src.get("bytes")
+    if not data:
+        return None
+    return parse_docx_template_variables(data)
+
+
 def _emit_evidence(accumulated_outputs: dict) -> tuple[str, set[str]]:
     """The grounding evidence for the forced emit — ``(spotlight, valid_ids)`` from ONE walk.
 
@@ -1048,6 +1065,19 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     spotlight, retrieved_ids = _emit_evidence(accumulated_outputs)
     if spotlight:
         user_turn = f"{user_turn}\n\n{spotlight}" if user_turn else spotlight
+    # 101.1-06: the template-placeholder oracle — the model must emit EXACTLY the keys
+    # the template dereferences (live run 7fa36d2a invented its own collection name and
+    # the render died on UndefinedError). Parsed server-side from the resolved bytes.
+    oracle = _template_oracle(src)
+    if oracle:
+        oracle_text = (
+            "TEMPLATE PLACEHOLDERS — emit EXACTLY these keys, names verbatim: "
+            f"scalars: {', '.join(oracle['scalars']) or '(none)'}; "
+            f"collections (one entry per row): {', '.join(oracle['collections']) or '(none)'}. "
+            "Every listed key must appear in the field-map; set a value to null when the "
+            "sources do not support it."
+        )
+        user_turn = f"{user_turn}\n\n{oracle_text}" if user_turn else oracle_text
     messages = [{"role": "user", "content": user_turn}] if user_turn else []
 
     # ── 2b + 3. Bounded forced shot + citation gate (D-08 layers 2-5) ─────────────
@@ -1112,13 +1142,23 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         legacy_map = emit_field_map_to_legacy(emitted)
         # retrieved_ids computed above by the SAME _emit_evidence walk that built the
         # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
+        # placeholder_keys: the PARSED template oracle when available (real coverage —
+        # an uncovered key would die in the render as UndefinedError); else the emitted
+        # map's own keys (the pre-oracle behavior for non-docx emitters).
         placeholder_keys = (
-            list(legacy_map.get("scalars", {}).keys())
-            + list(legacy_map.get("collections", {}).keys())
+            (oracle["scalars"] + oracle["collections"]) if oracle else (
+                list(legacy_map.get("scalars", {}).keys())
+                + list(legacy_map.get("collections", {}).keys())
+            )
         )
         await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
         gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
-        if gate["uncited_value_count"] == 0 and gate["invented_citation_count"] == 0:
+        missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
+        if (
+            gate["uncited_value_count"] == 0
+            and gate["invented_citation_count"] == 0
+            and not (oracle and missing_keys)
+        ):
             break  # gate passed — proceed to render
 
         # Rejected — per-attempt receipt, then retry-with-feedback or honest fail.
@@ -1132,23 +1172,27 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
             offenders = ", ".join(
                 (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
-            ) or "unknown"
+            ) or "none"
+            missing = ", ".join(missing_keys) or "none"
             citation_feedback = (
                 f"\n\nYour previous field-map (attempt {attempt}) was REJECTED by the "
-                f"citation gate: {gate['uncited_value_count']} value(s) had no citation and "
-                f"{gate['invented_citation_count']} cited an id that was never shown. "
-                f"Offending fields: {offenders}. For EVERY non-null value set "
-                "source_chunk_id to the exact `id` attribute of a <doc> source block; if "
-                "the sources do not support a value, set its value to null (a null is "
-                "acceptable; an uncited or invented value is not)."
+                f"citation gate: {gate['uncited_value_count']} value(s) had no citation, "
+                f"{gate['invented_citation_count']} cited an id that was never shown, and "
+                f"these REQUIRED template keys were missing: {missing}. "
+                f"Offending fields: {offenders}. Emit EXACTLY the template's keys; for "
+                "EVERY non-null value set source_chunk_id to the exact `id` attribute of "
+                "a <doc> source block; if the sources do not support a value, set its "
+                "value to null (a null is acceptable; an uncited or invented value is not)."
             )
             continue
 
-        # State (b): uncited / invented — final (no evidence to cite, or attempts exhausted).
+        # State (b): uncited / invented / missing keys — final (no evidence to cite,
+        # or attempts exhausted).
         msg = (
-            "The emitted field-map has uncited or invented values — every non-null value "
-            "must cite a source that was actually retrieved. The deliverable was NOT "
-            "produced; the cited field-map is preserved below."
+            "The emitted field-map has uncited or invented values or is missing required "
+            "template keys — every non-null value must cite a source that was actually "
+            "retrieved, and every template placeholder must be present. The deliverable "
+            "was NOT produced; the cited field-map is preserved below."
         )
         await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
         await _surface_failure_message(ctx, run_id, msg, pool)

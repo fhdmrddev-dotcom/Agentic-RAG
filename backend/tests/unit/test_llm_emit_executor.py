@@ -793,3 +793,96 @@ async def test_citation_reject_no_evidence_fails_fast(_patch_executor):
     events = [ev for ev, _ in bag["audit"]]
     assert events.count("emit_forced") == 1, "no retry without evidence"
     assert out.get("failure") == "citation_gate_rejected"
+
+
+# ── 101.1-06 template-placeholder oracle (the 097 "parse template first" step) ──
+
+
+def _real_template_bytes():
+    import pathlib
+
+    return pathlib.Path(__file__).resolve().parents[1].joinpath(
+        "fixtures", "templates", "risk-register.docx"
+    ).read_bytes()
+
+
+def test_parse_docx_template_variables_real_fixture():
+    """The stdlib parser (no docxtpl — Pitfall 4) extracts the REAL trusted fixture's
+    oracle: dotted Cited derefs root to scalars, loop vars excluded, loop target is the
+    collection. Matches the 097 get_undeclared_template_variables ground truth."""
+    from app.services.template_render_service import parse_docx_template_variables
+
+    oracle = parse_docx_template_variables(_real_template_bytes())
+    assert oracle == {"scalars": ["project_name", "report_date"], "collections": ["rows"]}
+    # Not-a-docx => None (no oracle, never a crash).
+    assert parse_docx_template_variables(b"PK..garbage") is None
+
+
+@pytest.mark.asyncio
+async def test_oracle_keys_reach_model_and_gate_coverage(_patch_executor):
+    """With a REAL docx template resolved, the forced shot's user turn names EXACTLY
+    the template's keys, and an emission that misses them is rejected with the missing
+    keys named in the retry feedback; a compliant retry passes and renders.
+    (Live regression: run 7fa36d2a passed citations 24/24 but died in the render with
+    UndefinedError 'project_name' is undefined — the model invented its own keys.)"""
+    from app.services.harness.phase_types import _exec_llm_emit
+    from app.services.template_render_service import EmitFieldMap
+
+    bag = _patch_executor
+    bag["resolve_result"] = dict(bag["resolve_result"], bytes=_real_template_bytes())
+
+    wrong_keys = EmitFieldMap.model_validate({
+        "scalars": [],
+        "rows": [{
+            "collection": "risks",  # the template wants "rows"
+            "cells": [{"key": "cause", "value": "Legacy CRM",
+                       "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1}],
+        }],
+    })
+    right_keys = EmitFieldMap.model_validate({
+        "scalars": [
+            {"key": "project_name", "value": "Meridian",
+             "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1},
+            {"key": "report_date", "value": None,
+             "source_chunk_id": None, "source_doc": None, "source_page": None},
+        ],
+        "rows": [{
+            "collection": "rows",
+            "cells": [{"key": "cause", "value": "Legacy CRM",
+                       "source_chunk_id": _LIVE_COMPOSITE, "source_doc": "c.docx", "source_page": 1}],
+        }],
+    })
+    bag["forced_queue"] = [_forced_ok(wrong_keys), _forced_ok(right_keys)]
+
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    # The oracle reached the model verbatim.
+    user_turn = bag["forced_calls"][0]["messages"][0]["content"]
+    assert "TEMPLATE PLACEHOLDERS" in user_turn
+    assert "project_name" in user_turn and "report_date" in user_turn and "rows" in user_turn
+    # Attempt 1 (wrong keys) rejected with the missing keys named; attempt 2 passed.
+    events = [ev for ev, _ in bag["audit"]]
+    assert events.count("emit_rejected") == 1
+    assert "emit_validated" in events and "emit_rendered" in events
+    retry_prompt = bag["forced_calls"][1]["system_prompt"]
+    assert "project_name" in retry_prompt and "rows" in retry_prompt
+    assert out.get("failure") is None
+    # A null-valued scalar (report_date unsupported by sources) is acceptable coverage.
+    assert len(bag["render_calls"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_no_oracle_for_unparseable_template_keeps_old_behavior(_patch_executor):
+    """Unparseable template bytes (the fixture default) => no oracle => the gate keys
+    off the emitted map exactly as before (no coverage rejection, no crash)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor  # resolve_result bytes are b"PK\x03\x04docx" — not a real zip
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+    out = await _exec_llm_emit(_fake_phase(), _retrieved_accumulated("chunk-1"), ctx)
+
+    assert "TEMPLATE PLACEHOLDERS" not in bag["forced_calls"][0]["messages"][0]["content"]
+    assert out.get("failure") is None  # the chunk-1-cited _VALID_FM still passes

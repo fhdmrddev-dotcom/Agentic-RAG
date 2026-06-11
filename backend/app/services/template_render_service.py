@@ -353,6 +353,52 @@ def _iter_leaves(fm_dict: dict):
         # other shapes (bare scalars, nested non-cited) are ignored as non-leaves
 
 
+def parse_docx_template_variables(data: bytes) -> dict | None:
+    """Parse a TRUSTED docx template's Jinja placeholders WITHOUT docxtpl (Pitfall 4 —
+    the heavy lib never enters backend/app/**; a docx is a zip and the tokens are plain
+    text once XML tags are stripped — the stripping also coalesces run-split tokens).
+
+    Returns ``{"scalars": [names], "collections": [loop targets]}`` (sorted, deduped),
+    or ``None`` when the bytes are not a readable docx or carry no tokens. A scalar is
+    the ROOT identifier of a ``{{ root(.attr)* }}`` token (the 097/101 trusted templates
+    dereference ``Cited`` dicts: ``{{ project_name.value }}`` → context key
+    ``project_name``); roots that are loop VARIABLES (``{{ r.cause.value }}`` where
+    ``{%tr for r in rows %}``) or collection names are excluded — those are loop-local.
+
+    101.1-06: this is the 097 "parse template first" coverage oracle, productized — the
+    emit prompt names EXACTLY these keys and ``check_coverage`` validates against them
+    BEFORE the sandbox render (live run 7fa36d2a failed integrity with
+    ``UndefinedError: 'project_name' is undefined`` because the model, never shown the
+    template's placeholders, invented its own key names)."""
+    import io
+    import zipfile
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+        parts = [
+            n for n in zf.namelist()
+            if n == "word/document.xml" or re.match(r"word/(?:header|footer)\d*\.xml$", n)
+        ]
+        text = "".join(
+            re.sub(r"<[^>]+>", "", zf.read(n).decode("utf-8", errors="ignore"))
+            for n in parts
+        )
+    except Exception:  # noqa: BLE001 — not-a-docx / corrupt zip => no oracle, never a crash
+        return None
+    loop_vars = set()
+    collections = set()
+    for var, coll in re.findall(
+        r"\{%[^%]*?\bfor\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)[^%]*?%\}", text
+    ):
+        loop_vars.add(var)
+        collections.add(coll)
+    roots = set(re.findall(r"\{\{\s*([A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*\s*\}\}", text))
+    scalars = roots - loop_vars - collections
+    if not scalars and not collections:
+        return None
+    return {"scalars": sorted(scalars), "collections": sorted(collections)}
+
+
 def check_coverage(
     fm_dict: dict, retrieved_ids: set[str], placeholder_keys: list[str]
 ) -> dict:
