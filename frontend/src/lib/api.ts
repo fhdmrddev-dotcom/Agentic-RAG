@@ -386,6 +386,11 @@ export interface StreamCallbacks {
   onPhaseStarted?: (p: { phase: string; phaseIndex: number; phaseType: string }) => void
   /** phase_completed SSE — a phase finished (FLAT phase/phase_index). */
   onPhaseCompleted?: (phase: string, phaseIndex: number) => void
+  /** 101.1 review WR-01: phase_failed SSE — a phase ended FAILED (an honest emit
+   *  failure flipped workflow_phases.status='failed'; the engine no longer emits
+   *  phase_completed for it). FLAT phase/phase_index/failure. Panel-only — the
+   *  handler writes phasesByThread, never bucketsBySurface. */
+  onPhaseFailed?: (phase: string, phaseIndex: number, failure?: string) => void
   /** phase_transition SSE — moved between phases (FLAT from_phase/to_phase/via;
    *  via==="skip_to_phase" marks the from-phase skipped). */
   onPhaseTransition?: (from: string, to: string, via: string) => void
@@ -762,6 +767,15 @@ export async function subscribeToRun(
           })
         else if (t === "phase_completed" && callbacks.onPhaseCompleted)
           callbacks.onPhaseCompleted(parsed.phase as string, parsed.phase_index as number)
+        // 101.1 review WR-01: a phase that ended FAILED gets its own event (the
+        // engine no longer emits phase_completed for it). NO return (cursor still
+        // advances, exactly like phase_completed). Panel-only.
+        else if (t === "phase_failed" && callbacks.onPhaseFailed)
+          callbacks.onPhaseFailed(
+            parsed.phase as string,
+            parsed.phase_index as number,
+            parsed.failure as string | undefined,
+          )
         else if (t === "phase_transition" && callbacks.onPhaseTransition)
           callbacks.onPhaseTransition(
             parsed.from_phase as string,

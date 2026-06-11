@@ -883,6 +883,15 @@ export function makeStreamCallbacks(opts: {
     },
     onPhaseCompleted: (phase) =>
       useStreamsStore.getState().actions.setPhaseStatusForThread(threadId, phase, "done"),
+    // 101.1 review WR-01: an honest emit failure terminalizes its phase as FAILED
+    // (the engine no longer emits phase_completed for it). Flip the card to failed
+    // so the sweeps (finalizeEarlierPhasesForThread / finalizeAllPhasesForThread) —
+    // which skip terminal statuses — never repaint a "✓ Complete" pill over the
+    // emitFailure alert. Closure threadId (PANEL-09); phasesByThread only.
+    onPhaseFailed: (phase, _phaseIndex, failure) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, phase, "failed", { error: failure }),
     onPhaseTransition: (from, _to, via) => {
       // A skip_to_phase routing marks the FROM phase skipped (it was bypassed by
       // a gate's on_failure='skip_to_phase'). A normal advance is a no-op on

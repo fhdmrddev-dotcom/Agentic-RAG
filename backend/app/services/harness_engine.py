@@ -993,8 +993,9 @@ async def run_workflow(
         # schema) so workflow_phases never strands in active/completed while the
         # deliverable was never produced. Additive + harness-only: a Deep success output
         # has no ``failure`` key, so this is a literal no-op on the shared path.
-        if isinstance(output, dict) and output.get("failure"):
-            await fail_phase(pool, phase_id, str(output.get("failure")))
+        _emit_failure = output.get("failure") if isinstance(output, dict) else None
+        if _emit_failure:
+            await fail_phase(pool, phase_id, str(_emit_failure))
         else:
             await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
@@ -1007,18 +1008,51 @@ async def run_workflow(
         # 4. Advance current_phase + audit/emit the transition.
         next_phase_id = ordered[i + 1]["id"] if i + 1 < len(ordered) else None
         await advance_current_phase(pool, run_id, next_phase_id)
-        await write_audit(
-            pool,
-            run_id,
-            user_id=_audit_user_id,
-            event_type="phase_completed",
-            metadata={"phase": phase.slug, "phase_index": phase.phase_index},
-        )
-        await _emit(redis, stream_run_id,
-            "phase_completed",
-            phase=phase.slug,
-            phase_index=phase.phase_index,
-        )
+        if _emit_failure:
+            # 101.1 review WR-01: NEVER record/emit ``phase_completed`` for a phase
+            # just flipped to ``failed`` — the audit trail (Phase 107 / GOV-02 reads
+            # harness_audit rows as receipts) and the live rail must reflect the
+            # phase's TRUE terminal status. The audit row rides the EXISTING
+            # ``phase_transition`` kind (the 069 CHECK constraint has no phase_failed
+            # kind; the executor's emit_failed/emit_rejected receipts carry the full
+            # failure detail). The SSE is a NEW additive ``phase_failed`` event the
+            # frontend maps to a failed card — the finalize sweeps skip terminal
+            # statuses, so the card is never repainted "done" over the failure alert.
+            # Run-level semantics are EXPLICITLY preserved (decided, not silent): the
+            # run continues to the next phase and terminalizes ``completed`` — the
+            # honest failure message IS this phase's output, and the gap-4 terminal
+            # workspace refetch (plan 09) keys off run_completed and must keep firing.
+            await write_audit(
+                pool,
+                run_id,
+                user_id=_audit_user_id,
+                event_type="phase_transition",
+                metadata={
+                    "phase": phase.slug,
+                    "phase_index": phase.phase_index,
+                    "via": "emit_failed",
+                    "failure": str(_emit_failure),
+                },
+            )
+            await _emit(redis, stream_run_id,
+                "phase_failed",
+                phase=phase.slug,
+                phase_index=phase.phase_index,
+                failure=str(_emit_failure),
+            )
+        else:
+            await write_audit(
+                pool,
+                run_id,
+                user_id=_audit_user_id,
+                event_type="phase_completed",
+                metadata={"phase": phase.slug, "phase_index": phase.phase_index},
+            )
+            await _emit(redis, stream_run_id,
+                "phase_completed",
+                phase=phase.slug,
+                phase_index=phase.phase_index,
+            )
         if next_phase_id is not None:
             await write_audit(
                 pool,
