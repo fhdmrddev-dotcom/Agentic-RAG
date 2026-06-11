@@ -172,6 +172,9 @@ def _patch_executor(monkeypatch):
 
     async def _fake_forced_emit(**kwargs):
         bag["forced_calls"].append(kwargs)
+        # 101.1-06 retry tests: an optional per-attempt queue; static result otherwise.
+        if bag.get("forced_queue"):
+            return bag["forced_queue"].pop(0)
         return bag["forced_result"]
 
     async def _fake_resolve(**kwargs):
@@ -713,4 +716,80 @@ async def test_fabricated_citation_still_rejected_with_live_refs(_patch_executor
     assert "emit_rejected" in events
     assert "emit_validated" not in events
     assert bag["render_calls"] == []
+    assert out.get("failure") == "citation_gate_rejected"
+
+
+# ── 101.1-06 layer-5 bounded retry — citation reject feeds back, then honest fail ─
+
+
+@pytest.mark.asyncio
+async def test_citation_reject_retries_with_named_feedback(_patch_executor):
+    """With real retrieval evidence, a citation reject triggers a bounded retry whose
+    system prompt NAMES the offending leaves; a compliant second attempt passes the
+    gate and renders. Receipts carry the attempt trail (2x emit_forced, 1x rejected)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_queue"] = [
+        _forced_ok(_fm_citing(None)),             # attempt 1: filled but UNCITED -> reject
+        _forced_ok(_fm_citing(_LIVE_COMPOSITE)),  # attempt 2: cited from the spotlight -> pass
+    ]
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    events = [ev for ev, _ in bag["audit"]]
+    assert events.count("emit_forced") == 2, f"one retry expected: {events}"
+    assert events.count("emit_rejected") == 1
+    assert "emit_validated" in events and "emit_rendered" in events
+    assert len(bag["render_calls"]) == 1
+    assert out.get("failure") is None
+    # The retry's system prompt names the offending leaf (cite-or-null feedback).
+    retry_prompt = bag["forced_calls"][1]["system_prompt"]
+    assert "REJECTED by the citation gate" in retry_prompt
+    assert "scalar.project_name" in retry_prompt
+    # The first attempt got NO feedback (clean prompt).
+    assert "REJECTED" not in bag["forced_calls"][0]["system_prompt"]
+    # Per-attempt receipts carry the attempt number.
+    forced_metas = [m for k, m in bag["audit"] if k == "emit_forced"]
+    assert [m.get("attempt") for m in forced_metas] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_citation_reject_exhausts_attempts_then_honest_fail(_patch_executor):
+    """A model that never cites exhausts the 3 bounded attempts and lands the honest
+    state-(b) fail — render never reached, the last field-map preserved."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_result"] = _forced_ok(_fm_citing(None))  # always uncited
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    events = [ev for ev, _ in bag["audit"]]
+    assert events.count("emit_forced") == 3, "bounded at 3 total attempts"
+    assert events.count("emit_rejected") == 3
+    assert "emit_validated" not in events
+    assert bag["render_calls"] == []
+    assert out.get("failure") == "citation_gate_rejected"
+
+
+@pytest.mark.asyncio
+async def test_citation_reject_no_evidence_fails_fast(_patch_executor):
+    """With NO retrieval evidence the model can never cite validly — the first reject
+    is final (no wasted retries; the pre-101.1-06 single-shot behavior preserved)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_result"] = _forced_ok(_fm_citing("fabricated"))
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), {}, ctx)
+
+    events = [ev for ev, _ in bag["audit"]]
+    assert events.count("emit_forced") == 1, "no retry without evidence"
     assert out.get("failure") == "citation_gate_rejected"

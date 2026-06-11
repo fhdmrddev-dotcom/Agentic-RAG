@@ -392,6 +392,14 @@ def check_coverage(
     uncited_value_count = 0  # value present, source_chunk_id null (Pitfall 6)
     invented_citation_count = 0  # source_chunk_id present but NOT retrieved (T-101-02-03)
 
+    # 101.1-06: NAME the offending leaves (capped) so the executor's bounded-retry
+    # feedback can tell the model exactly which values to cite-or-null, and the
+    # emit_rejected receipt records what was rejected (additive keys — count-field
+    # consumers unchanged).
+    _LEAF_NAME_CAP = 20
+    uncited_leaves: list[str] = []
+    invented_leaves: list[str] = []
+
     for _location, _fname, cited in _iter_leaves(fm_dict):
         cited = cited or {}
         total_leaves += 1
@@ -403,8 +411,12 @@ def check_coverage(
         filled_leaves += 1
         if src is None:
             uncited_value_count += 1
+            if len(uncited_leaves) < _LEAF_NAME_CAP:
+                uncited_leaves.append(f"{_location}.{_fname}")
         elif src not in retrieved_ids:
             invented_citation_count += 1
+            if len(invented_leaves) < _LEAF_NAME_CAP:
+                invented_leaves.append(f"{_location}.{_fname}")
         else:
             cited_leaves += 1
 
@@ -422,6 +434,8 @@ def check_coverage(
         "uncited_value_count": uncited_value_count,
         "invented_citation_count": invented_citation_count,
         "citation_coverage_pct": round(coverage_pct, 1),
+        "uncited_leaves": uncited_leaves,
+        "invented_leaves": invented_leaves,
     }
 
 

@@ -760,9 +760,13 @@ def _ref_spotlight_id(ref: dict) -> str | None:
 
 
 # Spotlight bounds: enough for a register-style retrieval set without blowing the
-# emit call's context (the forced shot is a single sealed call — no second chance).
+# emit call's context (each forced shot is a single sealed call).
 _EMIT_SPOTLIGHT_MAX_REFS = 40
 _EMIT_SPOTLIGHT_MAX_PASSAGE = 1600
+
+# D-08 layer 5 — bounded citation-gate retry (101.1-06): total sealed attempts,
+# matching the engine's ≤3 validator-retry convention (SC#3: bounded, never loops).
+_EMIT_MAX_ATTEMPTS = 3
 
 
 def _emit_evidence(accumulated_outputs: dict) -> tuple[str, set[str]]:
@@ -1046,71 +1050,106 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         user_turn = f"{user_turn}\n\n{spotlight}" if user_turn else spotlight
     messages = [{"role": "user", "content": user_turn}] if user_turn else []
 
-    await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
-    await _emit_audit(ctx, event_type="emit_forced", metadata=_emit_audit_metadata(
-        definition=definition, phase=phase, emitter=emitter,
-        result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
-                "recovered_from_narration": None, "truncated": None},
-        gate=None, render_verdict=None, output_file=None,
-    ))
-
-    await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
-    result = await forced_emit(
-        messages=messages,
-        model=model,
-        provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
-        emitter=emitter,
-        tools=_emit_forced_tool(emitter),
-        user_settings=getattr(ctx, "user_settings", None),
-        system_prompt=system_prompt,
-    )
-
-    if result.get("recovered_from_narration"):
-        # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
-        await _emit_phase_substep(ctx, phase, status="recovering")  # amber tint = degraded but honest
-        await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result,
+    # ── 2b + 3. Bounded forced shot + citation gate (D-08 layers 2-5) ─────────────
+    # 101.1-06: the engine's _run_phase_with_gates retry only fires for phases that
+    # CONFIGURE validators — the llm_emit citation gate is executor-internal, so the
+    # designed layer-5 bounded retry lives HERE: ≤ _EMIT_MAX_ATTEMPTS sealed single
+    # shots, each rejection feeding the NAMED offending leaves back (cite-or-null),
+    # then the honest state-(b) fail. Retry fires ONLY when there IS retrieval
+    # evidence (a non-empty valid set) — with nothing retrieved the model can never
+    # cite validly, so the first reject is final (live run cef463f7: 28/32 cited,
+    # 0 invented, 4 uncited — exactly the case one feedback round fixes).
+    # Receipts are per-attempt (INSERT-only — the attempt trail IS the audit story).
+    citation_feedback = ""
+    for attempt in range(1, _EMIT_MAX_ATTEMPTS + 1):
+        await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
+        forced_md = _emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter,
+            result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
+                    "recovered_from_narration": None, "truncated": None},
             gate=None, render_verdict=None, output_file=None,
-        ))
-
-    if result.get("failure"):
-        # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
-        msg = (
-            "The model did not emit a structured field-map for the template "
-            "(it narrated prose or was truncated) and the deliverable was NOT produced. "
-            "This is an honest failure — no Markdown stand-in is delivered as the artifact."
         )
-        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+        forced_md["attempt"] = attempt
+        await _emit_audit(ctx, event_type="emit_forced", metadata=forced_md)
+
+        await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
+        result = await forced_emit(
+            messages=messages,
+            model=model,
+            provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
+            emitter=emitter,
+            tools=_emit_forced_tool(emitter),
+            user_settings=getattr(ctx, "user_settings", None),
+            system_prompt=system_prompt + citation_feedback,
+        )
+
+        if result.get("recovered_from_narration"):
+            # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
+            await _emit_phase_substep(ctx, phase, status="recovering")  # amber tint = degraded but honest
+            await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=None, render_verdict=None, output_file=None,
+            ))
+
+        if result.get("failure"):
+            # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
+            msg = (
+                "The model did not emit a structured field-map for the template "
+                "(it narrated prose or was truncated) and the deliverable was NOT produced. "
+                "This is an honest failure — no Markdown stand-in is delivered as the artifact."
+            )
+            await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=None, render_verdict=None, output_file=None,
+            ))
+            await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
+            await _surface_failure_message(ctx, run_id, msg, pool)
+            return _emit_failure_output("model_failed_to_emit", msg)
+
+        emitted: EmitFieldMap = result["emitted"]
+
+        # Citation gate (layer 4) — BEFORE render (reject without touching the sandbox).
+        legacy_map = emit_field_map_to_legacy(emitted)
+        # retrieved_ids computed above by the SAME _emit_evidence walk that built the
+        # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
+        placeholder_keys = (
+            list(legacy_map.get("scalars", {}).keys())
+            + list(legacy_map.get("collections", {}).keys())
+        )
+        await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
+        gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
+        if gate["uncited_value_count"] == 0 and gate["invented_citation_count"] == 0:
+            break  # gate passed — proceed to render
+
+        # Rejected — per-attempt receipt, then retry-with-feedback or honest fail.
+        rejected_md = _emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result,
-            gate=None, render_verdict=None, output_file=None,
-        ))
-        await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
-        await _surface_failure_message(ctx, run_id, msg, pool)
-        return _emit_failure_output("model_failed_to_emit", msg)
+            gate=gate, render_verdict=None, output_file=None,
+        )
+        rejected_md["attempt"] = attempt
+        await _emit_audit(ctx, event_type="emit_rejected", metadata=rejected_md)
 
-    emitted: EmitFieldMap = result["emitted"]
+        if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
+            offenders = ", ".join(
+                (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
+            ) or "unknown"
+            citation_feedback = (
+                f"\n\nYour previous field-map (attempt {attempt}) was REJECTED by the "
+                f"citation gate: {gate['uncited_value_count']} value(s) had no citation and "
+                f"{gate['invented_citation_count']} cited an id that was never shown. "
+                f"Offending fields: {offenders}. For EVERY non-null value set "
+                "source_chunk_id to the exact `id` attribute of a <doc> source block; if "
+                "the sources do not support a value, set its value to null (a null is "
+                "acceptable; an uncited or invented value is not)."
+            )
+            continue
 
-    # ── 3. Citation gate (layer 4) — BEFORE render (reject without touching sandbox) ─
-    legacy_map = emit_field_map_to_legacy(emitted)
-    # retrieved_ids computed above by the SAME _emit_evidence walk that built the
-    # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
-    placeholder_keys = (
-        list(legacy_map.get("scalars", {}).keys())
-        + list(legacy_map.get("collections", {}).keys())
-    )
-    await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
-    gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
-    if gate["uncited_value_count"] > 0 or gate["invented_citation_count"] > 0:
-        # State (b): uncited / invented — rejected BEFORE render (deterministic, no LLM).
+        # State (b): uncited / invented — final (no evidence to cite, or attempts exhausted).
         msg = (
             "The emitted field-map has uncited or invented values — every non-null value "
             "must cite a source that was actually retrieved. The deliverable was NOT "
             "produced; the cited field-map is preserved below."
         )
-        await _emit_audit(ctx, event_type="emit_rejected", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result,
-            gate=gate, render_verdict=None, output_file=None,
-        ))
         await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
