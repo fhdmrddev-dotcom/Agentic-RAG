@@ -28,7 +28,10 @@ from app.dependencies import get_current_user, get_supabase, get_redis
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
 # probe → 503+Retry-After:10 fallback (mirrors runs.py:354-370 pattern).
-from redis.exceptions import RedisError
+# 101.1-08 (gap 4): ResponseError ('no such key') distinguishes a GC'd terminal-run
+# buffer (degrade — skip that cursor) from a genuine outage (503). ResponseError is a
+# RedisError subclass, so the specific branch is handled BEFORE the broad except.
+from redis.exceptions import RedisError, ResponseError
 from app.models.message import MessageCreate, MessageResponse
 from app.models.run import ActiveRunResponse
 from app.models.thread import ThreadCreate, ThreadResponse, ThreadSnapshotResponse, ThreadUpdate
@@ -439,6 +442,27 @@ async def get_snapshot(
             info = await asyncio.wait_for(
                 redis.xinfo_stream(f"run:{rid}"),
                 timeout=2.0,
+            )
+        except ResponseError as e:
+            # 101.1-08 (gap 4 backend): a GC'd run buffer raises
+            # ResponseError('no such key') — that run is simply terminal, not a
+            # Redis outage. Degrade to skipping its cursor (the DB reconcile is the
+            # source of truth, D-v2.5-03) instead of 503-ing the whole snapshot. A
+            # real connection-level RedisError still returns 503 below. A
+            # non-missing-key ResponseError is still a real fault — re-raise it into
+            # the broad handler's 503 path.
+            if "no such key" in str(e).lower():
+                # T-073-04 / D-074-03: identifier-only log (run id, no content).
+                logger.debug(
+                    "Snapshot skipping GC'd run buffer on GET /threads/%s/snapshot run=%s",
+                    thread_id, rid,
+                )
+                continue
+            logger.exception("Redis unreachable on GET /threads/%s/snapshot", thread_id)
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={"detail": "Streaming infrastructure unavailable"},
+                headers={"Retry-After": "10"},
             )
         except (RedisError, asyncio.TimeoutError, OSError):
             # T-073-04 / D-074-03: identifier-only log format string —
