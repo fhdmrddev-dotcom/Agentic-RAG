@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody } from "../types"
+import type { Thread, Message, Document, Folder, Skill, SkillCreate, SkillUpdate, SkillFile, OutputFile, SourceReference, Citation, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, WorkspaceFileContent, WorkspaceVersion, WorkspaceDiff, AskUserAnswerBody, EmitSubStep, EmitFailure } from "../types"
 
 export interface SkillImportResult {
   created: Skill[]
@@ -397,6 +397,14 @@ export interface StreamCallbacks {
   /** run_completed SSE — the run finished (FLAT status; the done phase already
    *  flipped via phase_completed — no-op on phase status). */
   onRunCompleted?: (status?: string) => void
+  /** Phase 101.1-09 (gap 6 / GAP-C / D-11): phase_substep SSE — a discrete emit
+   *  sub-step (forcing → emitting → [recovering] → validating → rendering →
+   *  validated) OR a terminal emit failure. The backend emits all 12 via
+   *  _emit_phase_substep (phase_types.py); Plan 04 shipped the PhaseCard render
+   *  contract but deferred this demux (the G-5 StreamsProvider hot file). FLAT
+   *  payload {phase, phase_index, status?, failure?}. Panel-only (writes
+   *  phasesByThread); the branch carries NO return (cursor still advances). */
+  onPhaseSubstep?: (p: { phase: string; phaseIndex: number; status?: EmitSubStep; failure?: EmitFailure }) => void
   /**
    * Phase 063.1 (D-063.1-01/02): per-event Redis Stream cursor advancement.
    * Fires AFTER each successfully-dispatched `data:` event with the most
@@ -770,6 +778,17 @@ export async function subscribeToRun(
           callbacks.onRunFailed(parsed.reason as string | undefined)
         else if (t === "run_completed" && callbacks.onRunCompleted)
           callbacks.onRunCompleted(parsed.status as string | undefined)
+        // Phase 101.1-09 (gap 6): the phase_substep branch Plan 04 deferred.
+        // Reads the FLAT payload verbatim (parsed.phase / phase_index / status /
+        // failure); NO return (cursor still advances, exactly like phase_started).
+        // Panel-only — the callback writes phasesByThread, never bucketsBySurface.
+        else if (t === "phase_substep" && callbacks.onPhaseSubstep)
+          callbacks.onPhaseSubstep({
+            phase: parsed.phase as string,
+            phaseIndex: parsed.phase_index as number,
+            status: parsed.status as EmitSubStep | undefined,
+            failure: parsed.failure as EmitFailure | undefined,
+          })
 
         // Phase 063.1 (D-063.1-01/02): cursor advancement fires AFTER the
         // type-specific callback so the consumer's lastSeenOffsetRef only

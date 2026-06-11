@@ -35,7 +35,7 @@
  */
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
-import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, Phase } from "@/types"
+import type { Message, Todo, WorkspaceFile, PendingAsk, TaskRunIndexItem, Phase, EmitSubStep, EmitFailure } from "@/types"
 import { readSnapshotSyncOrEmpty, readTodosSyncOrEmpty, readTasksSyncOrEmpty } from "@/lib/streamsCache"
 
 export type SurfaceId = string
@@ -250,6 +250,17 @@ export interface StreamsState {
     ) => void
     /** Full-state-replace of a thread's phase timeline (getThreadWorkflow reconcile). */
     replacePhasesForThread: (threadId: string, phases: Phase[]) => void
+    /** Phase 101.1-09 (gap 6 / GAP-C / D-11) — patch a phase's emitSubStep/emitFailure
+     *  by slug (or phaseIndex when the slug is a placeholder) from a phase_substep
+     *  event. ADDITIVE + PANEL-ONLY: writes phasesByThread exclusively (never
+     *  bucketsBySurface), mirroring setPhaseStatusForThread's immutable update. The
+     *  PhaseCard render contract (Plan 04) consumes these fields. */
+    setPhaseEmitSubstepForThread: (
+      threadId: string,
+      slug: string,
+      phaseIndex: number,
+      patch: { emitSubStep?: EmitSubStep; emitFailure?: EmitFailure },
+    ) => void
     /** Phase 098-UAT run-honesty fix (A) — on a SUCCESSFUL run_completed, flip every
      *  non-terminal (running/retrying/pending) phase for the OWNING thread to "done".
      *  The DB ground truth for a completed run is every phase completed, so this
@@ -359,6 +370,7 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     appendPhaseForThread: () => {},
     setPhaseStatusForThread: () => {},
     replacePhasesForThread: () => {},
+    setPhaseEmitSubstepForThread: () => {},
     finalizeAllPhasesForThread: () => {},
     finalizeEarlierPhasesForThread: () => {},
   },
