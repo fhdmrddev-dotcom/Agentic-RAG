@@ -163,7 +163,7 @@ Plans:
   4. The bound library template AssetRef is resolved server-side and injected into emit args at phase-build time (GAP-B); the FILL phase produces a real openable .docx on every forceable provider attempt-1, and an honest receipt-bearing failure (never silent 0-docx, never Markdown stand-in) where a tier can't land (GAP-A/GAP-D).
   5. Emit-moment run honesty: discrete `forcing → emitting → rendering → validating` sub-events with distinguishable failure states (GAP-C). Every transition writes an INSERT-only `harness_audit` row keyed to `run_id` + `definition@version` (the Phase 107 receipt substrate).
 **Plans**: 5 plans (G-5 routing decided: tightly-scoped additive gateway seam, not an anthropic_service.py extraction — D-14 guard test ships in Plan 02)
-- [ ] 101.1-01-PLAN.md — Foundation: flat EmitFieldMap + closed EMITTER_REGISTRY + LlmEmitPhaseConfig (6th union member) + default-SAFE MODEL_CAPABILITIES flags + migration 069 (ALTER harness_audit) + Wave 0 test stubs
+- [x] 101.1-01-PLAN.md — Foundation: flat EmitFieldMap + closed EMITTER_REGISTRY + LlmEmitPhaseConfig (6th union member) + default-SAFE MODEL_CAPABILITIES flags + migration 069 (ALTER harness_audit) + Wave 0 test stubs ✅ 2026-06-11 (e4f93251/23375e20/d2905b2f)
 - [ ] 101.1-02-PLAN.md — Cross-provider core: capability-tiered forcing at the gateway boundary (D-05) + forced_emit substrate with D-06 NATIVE narrated-JSON recovery + the D-14 shared-path guard test
 - [ ] 101.1-03-PLAN.md — The _exec_llm_emit executor: sealed forced shot (never the open loop) + GAP-B server-side AssetRef inject + the D-08 6-layer no-fail ladder + per-transition audit receipt; render_template demoted to the EMITTER_REGISTRY post_processor
 - [ ] 101.1-04-PLAN.md — GAP-C run honesty: phase_substep sub-events + 5 failure states on the existing PhaseCard rail (no new UI) + the flat-map ↔ citation-gate/docxtpl-driver re-touch with parity tests
@@ -272,7 +272,7 @@ Plans:
 | 099. Workflow ↔ Skill Composition | 6/6 | Complete    | 2026-06-10 |
 | 100. Ephemeral Template Upload | 6/6 | Complete    | 2026-06-10 |
 | 101. Template-Fill + Integrity Validation | 5/5 | Blocked (live UAT) → 101.1 | - |
-| 101.1. Guaranteed Structured Emission Layer | 0/TBD | Discussed (CONTEXT) | - |
+| 101.1. Guaranteed Structured Emission Layer | 1/5 | Executing | - |
 | 102. Reusable Validation-Gate Library + Output-Quality Gate | 0/TBD | Not started | - |
 | 103. Workflows Page + Authoring API + NL Authoring | 0/TBD | Not started | - |
 | 104. PM Flagship Content Pack | 0/TBD | Not started | - |

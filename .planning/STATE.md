@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
-status: discussing
-last_updated: "2026-06-11T12:00:00.000Z"
-last_activity: 2026-06-11 -- Phase 101.1 (Guaranteed Emission Layer) DISCUSSED + CONTEXT written; foundational forced-emit fix for GAP-A..D ratified
+status: executing
+last_updated: "2026-06-11T07:50:51.164Z"
+last_activity: 2026-06-11 -- Phase 101.1 Plan 01 (foundation substrate) COMPLETE
 progress:
-  total_phases: 13
-  completed_phases: 4
-  total_plans: 29
-  completed_plans: 30
-  percent: 83
+  total_phases: 14
+  completed_phases: 5
+  total_plans: 34
+  completed_plans: 31
+  percent: 91
 ---
 
 # Project State
@@ -22,14 +22,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101.1 — **Guaranteed Structured Emission Layer** (Template-Fill Gap-Closure) — DISCUSSED 2026-06-11, CONTEXT written. Foundational forced-emit layer (`llm_emit` + emitter registry + capability-tiered gateway forcing + native-path recovery + audit receipt) that closes the Phase 101 live 0-docx failure (GAP-A..D) AND becomes the rail 102/103/104 ride. Operator ratified the foundational path (not a minimal patch) + the line: **no model-written code touches the deliverable — cited data + pinned renderer only**. Next = `/gsd:plan-phase 101.1`.
+**Current focus:** Phase 101.1 — guaranteed-emission-layer
 
 ## Current Position
 
-Phase: 101.1 — discussed, CONTEXT captured (`.planning/phases/101.1-guaranteed-emission-layer/101.1-CONTEXT.md`). Phase 101 stays Blocked-on-live-UAT until 101.1 ships (TMPL-02/03 OPEN).
-Plan: none yet — next = `/gsd:plan-phase 101.1`.
-Status: direction LOCKED via two adversarial multi-agent investigations (root-cause + forward-aligned architecture). 15 decisions D-01..D-15 in CONTEXT. G-5 fires on `anthropic_service.py` (decide adapter audit vs scoped seam at plan-phase).
-Last activity: 2026-06-11 -- Phase 101.1 discussed; CONTEXT.md + ROADMAP insert + STATE update committed.
+Phase: 101.1 (guaranteed-emission-layer) — EXECUTING
+Plan: 2 of 5 (Plan 01 COMPLETE)
+Status: Executing Phase 101.1
+Last activity: 2026-06-11 -- Phase 101.1 Plan 01 (foundation substrate) COMPLETE
+
+**Plan 101.1-01 (Wave 1, the foundation substrate) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (commit `e4f93251`, TDD RED): 5 Wave 0 test files under `backend/tests/unit/` matching the VALIDATION.md Per-Task map — `test_emit_field_map.py` (flat-model strict-schema + back-compat + normalizer roundtrip), `test_forced_emit.py` (D-06 NATIVE recovery + D-08 truncation), `test_gateway_forcing.py` (D-14 shared-path guard + per-tier stubs, mirrors `test_provider_gateway_seam.py` imports), `test_llm_emit_executor.py` (Pitfall-5 no-agent-loop + GAP-B + D-12), `test_harness_audit_emit.py` (emit-kind acceptance + receipt shape). All not-yet-implemented behaviors `xfail(strict=False)`; imports INSIDE test bodies; suite exits 0.
+- ✓ Task 2 (commit `23375e20`, TDD GREEN): the D-09 flat `EmitFieldMap` (`FlatScalar`/`FlatRow`, `extra="forbid"` everywhere → `additionalProperties:false`, citation-as-sibling, bounded depth-3, no minLength/maxLength) + `emit_field_map_to_legacy` normalizer in `template_render_service.py` (ADDITIVE — `GenericFieldMap`/`Cited` byte-untouched, gate/driver NOT re-touched — that is Plan 04); closed `EMITTER_REGISTRY` + `register_emitter`/`resolve_emitter` in NEW `harness/emitters.py` (mirrors `programmatic.py`; unknown name RAISES — T-101.1-01-02; `render_template` v1 entry, `post_processor=None` until the executor plan); `LlmEmitPhaseConfig` 6th discriminated `PhaseConfig` member in `models/harness.py` (additive, zero-migration); `forced_emission`/`strict_json_schema` `ModelCapability` flags in `config.py` default-SAFE (forced_emission True on TIER-FORCE rows, ABSENT on Kimi/Moonshot/Ollama; strict only on verified OpenAI/DeepSeek-v4). Un-marked the 3 model tests to GREEN.
+- ✓ Task 3 (commit `d2905b2f`): migration `069_harness_audit_emit_kinds.sql` (ALTER the event_type CHECK, NOT a CREATE — table exists since 059; does NOT touch INSERT-only RLS; no new columns) + `_AUDIT_EVENT_TYPES` extended 9→16 in LOCKSTEP with the 069 CHECK; `write_audit` docstring/error 9→16, no new function. Un-marked the 2 audit tests to GREEN. **Migration NOT applied — Plan 05 operator step.**
+- **No deviations.** Plan executed exactly as written (the 3 model tests RED-in-Task-1-then-GREEN-in-Task-2 is the project TDD un-mark-on-landing convention, not a deviation).
+- **SEED-056 net-new-failure proof:** the 5 target files = `5 passed / 3 skipped / 4 xfailed / 2 xpassed` (exits 0). Wave slice `11 failed / 244 passed` — all 11 PRE-EXISTING rot: `test_infer_openai_from_gpt_prefix` (`assert 300 == 90`) proven by stash-at-base (fails IDENTICALLY with `config.py` at pre-plan `f1fd0716`, untouched by my flags); the other 10 grep-confirmed import NONE of my changed modules. **Net-new failures = 0.**
+- All 5 STRIDE threats addressed (T-101.1-01-01 `extra="forbid"`; -02 closed-dict raise; -03 ALTER-only no-RLS-touch; -04/-05 accepted = default-SAFE flag by construction + pure-schema no-DB). SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-01-SUMMARY.md` (Self-Check: PASSED). **TMPL-02 stays OPEN** — marks complete at phase verification (live cross-provider UAT).
+- **Next:** `/gsd:execute-phase 101.1` Plan 02 (capability-tiered forcing at the gateway boundary + the `forced_emit` substrate with D-06 NATIVE narrated-JSON recovery + the D-14 shared-path guard test — un-marks `test_gateway_forcing.py`/`test_forced_emit.py`).
 
 **Phase 101 LIVE UAT (2026-06-11) — code verified, feature NOT yet usable. See `101-LIVE-UAT-FINDINGS.md` + `101-HUMAN-UAT.md`:**
 
@@ -96,7 +106,19 @@ _Historical (Phase 101 per-plan execution detail below — all code-complete + 1
 The adversarial code review (`101-REVIEW.md`, 1 critical + 4 warnings) found the render_template feature was NON-FUNCTIONAL end-to-end + carried a command-injection. All 5 fixed atomically (each its own `fix(101-06): ...` commit), happy-path + visibility tests added (the gap that let WR-01/WR-02 ship green), seed fixture re-run live.
 
 - **WR-01 (BLOCKER, commit `6c5424d2`):** render_template had NO tool schema, so the model never saw the tool. Added `RENDER_TEMPLATE_TOOL` (`openai_service.py`, built from `build_field_map_tool_schema([])` — Pitfall 4 safe) + `_phase_tools_override` helper (`phase_types.py`) that augments the per-phase `tools_override` candidate list with the schema ONLY when the fill phase whitelists `render_template`, BEFORE `apply_tool_budget`. Wired into `_exec_llm_agent` + `_exec_llm_batch_agents`. **Deep byte-identical: `get_tools()` body UNCHANGED (not in diff); `render_template` ABSENT from its return** (verified programmatically + by test). Corrected the misleading `_effective_tools` docstring (the two-layer mechanism: layer-1 = schemas the model sees via apply_tool_budget; layer-2 = the dispatch backstop).
-- **CR-01 (SECURITY, commit `1cd8fb21`):** model-controlled, prompt-injectable `out_filename` was interpolated unquoted into the sandbox shell command. Added `_safe_out_filename` (strict `^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)$` allow-list → safe default `deliverable.<ext>` on reject), built the command argv-safely with `shlex.quote` per token, whitelisted the engine token (`_VALID_RENDER_ENGINES`).
+- **CR-01 (SECURITY, commit `1cd8fb21`):** model-controlled, prompt-injectable `out_filename` was interpolated unquoted into the sandbox shell command. Added `_safe_out_filename` (strict `^[A-Za-z0-9._ -]+\.(docx|pptx|xlsx)# Project State
+
+> `total_phases: 8` = the CORE committed scope (Phases 097–104, incl. the spike). STRETCH Phases 105–109 (SCHED-01 / GRID-01 / GOV-02 / PLUG-01 / ROLE-01) are optional and excluded from the progress denominator until promoted. Full phase detail in `.planning/ROADMAP.md` → "## v2.9 Workflow Studio".
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
+
+**Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
+**Current focus:** Phase --phase — 101.1
+
+ allow-list → safe default `deliverable.<ext>` on reject), built the command argv-safely with `shlex.quote` per token, whitelisted the engine token (`_VALID_RENDER_ENGINES`).
+
 - **WR-02 (BLOCKER, commit `1cd8fb21`):** every render passing both gates failed to persist — `ws_write_file(path=out_filename)` with a bare basename hit `validate_path`'s leading-slash requirement → silent `persist_failed`. Normalize to `ws_path = "/" + out_filename` (after the CR-01 basename validation); harvest still keys on the bare basename.
 - **WR-03 (correctness, commit `037280e5`):** the integrity gate ignored `residual_clean`, shipping silent half-fills. Folded `residual_clean` into the gate (`.get(..., True)` back-compat default); a residual-only fail returns `reason=residual_tokens` + surfaces `residual_tags` for the harness retry loop.
 - **WR-04 (correctness / IR-01, commit `19aefacb`):** the sandbox driver's `_replace_in_paragraph` used `if blanked_text == full: return` (vs original), skipping a coalesce when a matched token's net text equals the original → token survived. Made the driver helper a verbatim behavioral mirror of the audited production helper (`touched = matched or (blanked_text != replaced_text)`) so the two copies cannot drift.
@@ -279,4 +301,4 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 **Deferred items carried from v2.8 close (2026-06-07):** 43 acknowledged items — full inventory in `.planning/milestones/v2.8-MILESTONE-AUDIT.md` (and the prior STATE.md in git history). Headline: CONC-01 partial → SEED-065-B (cross-tab GET p95 ~3 s residual); PARITY-01 re-deferred; 11 dormant forward seeds (SEED-002/003/004/005/040/041/042/043/044/045/046); SEED-048/050/057 carried/active.
 
-**Planned Phase:** 101 (Template-Fill + Integrity Validation) — 5 plans — 2026-06-10T16:20:10.608Z
+**Planned Phase:** 101.1 (guaranteed-emission-layer) — 5 plans — 2026-06-11T07:25:19.717Z
