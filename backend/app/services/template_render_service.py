@@ -198,6 +198,88 @@ class EmitFieldMap(BaseModel):
     rows: list[FlatRow]
 
 
+def _flat_cell_to_cited(cell: dict) -> dict:
+    """One flat ``{key, value, source_chunk_id, source_doc, source_page}`` cell → the
+    legacy ``Cited`` dict (drop ``key`` — it becomes the dict KEY). Tolerant of a partial
+    cell (missing provenance keys default to None) so the normalizer is robust to either a
+    ``FlatScalar.model_dump()`` or a hand-built flat dict."""
+    return {
+        "value": cell.get("value"),
+        "source_chunk_id": cell.get("source_chunk_id"),
+        "source_doc": cell.get("source_doc"),
+        "source_page": cell.get("source_page"),
+    }
+
+
+def _is_flat_emit_field_map_dict(fm_dict: dict) -> bool:
+    """True iff ``fm_dict`` is the FLAT ``EmitFieldMap`` shape (D-09): a ``scalars`` LIST
+    of flat cells (each a dict with a ``key`` field) and/or a ``rows`` LIST of
+    ``{collection, cells}`` row objects.
+
+    Three shapes flow into the gate/driver and MUST be told apart precisely:
+
+      1. generic envelope    — ``scalars`` is a DICT, ``collections`` is a DICT.
+      2. flat spike-style    — top-level ``{key: cited}`` scalars + ``rows`` is a list of
+                               bare ``{col: cited}`` row dicts (NO ``collection``/``cells``
+                               wrapper). Phase-101 tests pass this (test_template_render
+                               :112). This is NOT the EmitFieldMap shape.
+      3. flat EmitFieldMap    — ``scalars`` is a LIST of ``{key, value, ...}`` cells AND/OR
+                               ``rows`` is a list of ``{collection, cells: [...]}`` objects.
+
+    The discriminator is structural, not just "is rows a list": a ``rows`` list is the flat
+    EmitFieldMap ONLY when its first element carries the ``collection``+``cells`` wrapper —
+    otherwise it is the spike-style shape (which the existing flat branch already walks).
+    A ``scalars`` LIST is unambiguous (the envelope's ``scalars`` is always a dict)."""
+    if not isinstance(fm_dict, dict):
+        return False
+    scalars = fm_dict.get("scalars")
+    if isinstance(scalars, list):
+        return True
+    rows = fm_dict.get("rows")
+    if isinstance(rows, list) and rows:
+        first = rows[0]
+        return isinstance(first, dict) and "collection" in first and "cells" in first
+    return False
+
+
+def _flat_emit_field_map_to_legacy_dict(fm_dict: dict) -> dict:
+    """Normalize a FLAT ``EmitFieldMap`` *dict* to the LEGACY generic-envelope dict.
+
+    This is the ONE place the flat→legacy mapping lives (WR-04 "two copies cannot
+    drift"): both ``emit_field_map_to_legacy`` (model entry) and the third
+    ``_iter_leaves`` / ``check_coverage`` / ``build_context`` branch route through this
+    function, so the flat path and the nested path produce the SAME legacy shape — and
+    therefore the SAME gate verdict + render context + bytes.
+
+      - ``scalars`` (list) → ``{key: {value, source_chunk_id, source_doc, source_page}}``
+      - ``rows`` (list)    → ``{collection: [{col_key: {...cited...}}, ...]}``
+
+    Rows with the same ``collection`` accumulate into that collection's list in emission
+    order. A missing ``scalars``/``rows`` key is treated as empty (a flat map may carry
+    only one).
+    """
+    scalars: dict[str, dict] = {}
+    for cell in fm_dict.get("scalars") or []:
+        if isinstance(cell, dict) and "key" in cell:
+            scalars[cell["key"]] = _flat_cell_to_cited(cell)
+
+    collections: dict[str, list[dict]] = {}
+    for row in fm_dict.get("rows") or []:
+        if not isinstance(row, dict):
+            continue
+        cname = row.get("collection")
+        if cname is None:
+            continue
+        built = {
+            cell["key"]: _flat_cell_to_cited(cell)
+            for cell in (row.get("cells") or [])
+            if isinstance(cell, dict) and "key" in cell
+        }
+        collections.setdefault(cname, []).append(built)
+
+    return {"scalars": scalars, "collections": collections}
+
+
 def emit_field_map_to_legacy(fm: EmitFieldMap) -> dict:
     """Normalize a flat ``EmitFieldMap`` to the LEGACY flat-dict shape the existing
     ``_iter_leaves`` / ``check_coverage`` / ``build_context`` already consume.
@@ -212,25 +294,12 @@ def emit_field_map_to_legacy(fm: EmitFieldMap) -> dict:
     A ``FlatRow``'s ``cells`` become one ``{col_key: cited}`` dict (keyed by each
     cell's ``key``); rows with the same ``collection`` accumulate into that
     collection's list in emission order.
+
+    Delegates to ``_flat_emit_field_map_to_legacy_dict`` (the ONE flat→legacy mapping —
+    WR-04) over the model's ``model_dump()`` so the model entry and the dict entry (the
+    third gate/driver branch) can never drift.
     """
-
-    def _cited(s: FlatScalar) -> dict:
-        return {
-            "value": s.value,
-            "source_chunk_id": s.source_chunk_id,
-            "source_doc": s.source_doc,
-            "source_page": s.source_page,
-        }
-
-    scalars: dict[str, dict] = {s.key: _cited(s) for s in fm.scalars}
-
-    collections: dict[str, list[dict]] = {}
-    for row in fm.rows:
-        collections.setdefault(row.collection, []).append(
-            {cell.key: _cited(cell) for cell in row.cells}
-        )
-
-    return {"scalars": scalars, "collections": collections}
+    return _flat_emit_field_map_to_legacy_dict(fm.model_dump())
 
 
 # ---------------------------------------------------------------------------
@@ -252,7 +321,14 @@ def _iter_leaves(fm_dict: dict):
     Wave-0 ``check_coverage`` stub (which passes a flat ``{project_name, report_date,
     rows}`` dict — test_template_render.py:113) and the production generic envelope both
     work without the caller pre-normalizing.
+
+    THIRD branch (Plan 101.1-04 / D-09): a FLAT ``EmitFieldMap`` dict (``scalars`` is a
+    LIST + ``rows`` is a list of ``{collection, cells}``) is normalized to the legacy
+    generic envelope via the SAME mapping ``emit_field_map_to_legacy`` uses (WR-04 — one
+    code path, the flat + nested walks cannot drift), then walked as the envelope below.
     """
+    if _is_flat_emit_field_map_dict(fm_dict):
+        fm_dict = _flat_emit_field_map_to_legacy_dict(fm_dict)
     scalars = fm_dict.get("scalars")
     collections = fm_dict.get("collections")
     if scalars is not None or collections is not None:
@@ -290,7 +366,13 @@ def check_coverage(
     Returns the same keys the spike returned (so downstream / 102 generalization is a
     drop-in): covered_keys, covers_template, uncited_value_count, invented_citation_count,
     citation_coverage_pct, null_rate, null_leaf_count (+ counts the spike exposed).
+
+    THIRD branch (Plan 101.1-04 / D-09): a FLAT ``EmitFieldMap`` dict is normalized to
+    the legacy envelope FIRST (the SAME mapping the nested path consumes) so the
+    uncited/invented/null-rate verdicts are IDENTICAL on the flat vs nested shape (WR-04).
     """
+    if _is_flat_emit_field_map_dict(fm_dict):
+        fm_dict = _flat_emit_field_map_to_legacy_dict(fm_dict)
     # Which template keys are present? Support both the generic envelope and flat shapes.
     present_keys: set[str] = set()
     scalars = fm_dict.get("scalars")
@@ -427,7 +509,14 @@ def build_context(field_map_dict: dict, *, numeric_hook: Optional[Callable[[dict
     the trusted ``risk-register.docx`` template (which references ``{{ r.score }}``)
     rendering with the default hook, every collection row gets a blank ``score`` key
     unless the hook supplies one.
+
+    THIRD branch (Plan 101.1-04 / D-09): a FLAT ``EmitFieldMap`` dict is normalized to
+    the legacy envelope FIRST (the SAME mapping the nested path consumes) so the render
+    context — and therefore the rendered bytes through the UNCHANGED docxtpl driver — is
+    IDENTICAL to the equivalent nested map (WR-04 "two copies cannot drift").
     """
+    if _is_flat_emit_field_map_dict(field_map_dict):
+        field_map_dict = _flat_emit_field_map_to_legacy_dict(field_map_dict)
     ctx: dict = {}
 
     scalars = field_map_dict.get("scalars")
