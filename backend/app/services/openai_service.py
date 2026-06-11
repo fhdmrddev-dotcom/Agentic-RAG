@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import logging
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -1376,16 +1377,37 @@ def create_adaptive_streaming_chat(
     # set. NEVER reached on the auto path (the byte-identical RED LINE).
     if force_tool_name is not None:
         _forced_tools = tools_override if tools_override is not None else get_tools(user_settings)
+        if strict_response_format:
+            # 101.1 review WR-05 (1): strictness for FORCED TOOL ARGUMENTS belongs
+            # on the FUNCTION DEFINITION ("strict": true) — on OpenAI-compat APIs,
+            # ``response_format`` constrains the assistant CONTENT channel, not the
+            # forced tool-call arguments (the thing the executor validates). The
+            # schema is already strict-shaped (additionalProperties:false +
+            # all-required-with-null from EmitFieldMap — D-09). Deep-copy FIRST: the
+            # fallback list is the SHARED get_tools() catalog — never mutate it.
+            _forced_tools = copy.deepcopy(_forced_tools)
+            for _t in _forced_tools or []:
+                _fn = _t.get("function") if isinstance(_t, dict) else None
+                if _fn and _fn.get("name") == force_tool_name:
+                    _fn["strict"] = True
+                    break
         kwargs["tools"] = _forced_tools
         kwargs["tool_choice"] = {
             "type": "function",
             "function": {"name": force_tool_name},
         }
-        if strict_response_format:
-            # Build a strict json_schema response_format from the forced tool's
-            # parameters (already additionalProperties:false + all-required-with-null
-            # from EmitFieldMap — D-09). Defensive: only inject when the named tool's
-            # schema is present in the tool list.
+        if strict_response_format and provider == "openai":
+            # 101.1 review WR-05 (2): ``json_schema`` response_format is verified on
+            # OpenAI ONLY — DeepSeek's documented response_format support is
+            # ``json_object``, so an unverified ``json_schema`` would 400 EVERY
+            # DeepSeek TIER-FORCE emit (the exact "docs said forceable!" trap
+            # 101.1-07 hit; the layer-6 backstop catches it honestly but the feature
+            # dies). Gate per-provider; the plan-10 live re-verify must assert a
+            # forced=true + emit_rendered receipt on DeepSeek with the function-level
+            # strict flag above — widen this gate only on live evidence.
+            # Build the strict json_schema response_format from the forced tool's
+            # parameters. Defensive: only inject when the named tool's schema is
+            # present in the tool list.
             _schema = None
             for _t in _forced_tools or []:
                 _fn = _t.get("function") if isinstance(_t, dict) else None
