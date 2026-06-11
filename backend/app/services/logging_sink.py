@@ -154,6 +154,17 @@ def install_file_log_sink() -> str | None:
     path = Path(raw_path)
     if not path.is_absolute():
         path = _BACKEND_DIR / path
+
+    # Per-process log filename — multi-worker Windows-rename root cause.
+    # Multi-worker uvicorn (WORKER_COUNT>=2, D-PRD-12 default) installs this sink
+    # in EVERY worker process, each on the SAME backend.log. When one worker
+    # rotates (RotatingFileHandler.doRollover -> os.rename backend.log ->
+    # backend.log.1) Windows raises WinError 32 because another worker still holds
+    # the file open. Inserting os.getpid() into the filename (backend.log ->
+    # backend.<pid>.log) gives each worker its OWN rotation target so no rename
+    # ever collides — and on POSIX also stops two workers interleaving lines into
+    # one file. Safe-by-construction, zero new dependency, cross-platform.
+    path = path.with_name(f"{path.stem}.{os.getpid()}{path.suffix}")
     resolved = str(path)
 
     root = logging.getLogger()

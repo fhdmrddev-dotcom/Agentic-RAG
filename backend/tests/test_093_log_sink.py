@@ -16,6 +16,8 @@ asyncio_mode = auto (backend/pytest.ini); these are plain sync tests.
 from __future__ import annotations
 
 import logging
+import os
+from pathlib import Path
 
 import pytest
 
@@ -25,6 +27,18 @@ from app.services.logging_sink import install_file_log_sink
 def _read(path: str) -> str:
     with open(path, "r", encoding="utf-8") as fh:
         return fh.read()
+
+
+def _sink_file() -> str:
+    """The actual file the installed sink handler writes to (per-PID name).
+
+    Reads ``.baseFilename`` off the single installed sink handler so redaction
+    tests assert against the real on-disk file, not the hardcoded configured name
+    (which the per-PID rename no longer matches). Asserts exactly one sink handler.
+    """
+    handlers = _sink_handlers()
+    assert len(handlers) == 1, f"expected exactly one sink handler, got {len(handlers)}"
+    return handlers[0].baseFilename  # type: ignore[attr-defined]
 
 
 def _sink_handlers() -> list[logging.Handler]:
@@ -70,20 +84,30 @@ def test_opt_in_no_env_returns_none_and_installs_no_handler(clean_sink):
 
 
 def test_installs_rotating_file_handler_when_env_set(clean_sink, tmp_path, monkeypatch):
-    """LOG_FILE_PATH set → handler added, parent dir created, resolved path returned."""
+    """LOG_FILE_PATH set → handler added, parent dir created, resolved path returned.
+
+    The resolved path is the per-PID variant of the configured file (backend.log →
+    backend.<pid>.log) so each multi-worker process owns its own rotation target
+    (Windows WinError-32 fix). We assert on the ACTUAL sink file, not the bare
+    configured name — its parent dir (the configured ``logs/``) is still created.
+    """
     logfile = tmp_path / "logs" / "backend.log"
     monkeypatch.setenv("LOG_FILE_PATH", str(logfile))
 
     result = install_file_log_sink()
 
-    assert result == str(logfile)
+    # Per-PID filename: same parent + stem + suffix, with the pid inserted.
+    assert result is not None
+    resolved = Path(result)
+    assert resolved.parent == logfile.parent
+    assert resolved.name == f"backend.{os.getpid()}.log"
     assert logfile.parent.is_dir()
     assert len(_sink_handlers()) == 1
 
     logging.getLogger("test093").info("a clean diagnostic line: runs.usage missing")
     for h in _sink_handlers():
         h.flush()
-    contents = _read(str(logfile))
+    contents = _read(result)  # read the actual sink file the handler writes to
     assert "runs.usage missing" in contents  # the signal the re-UAT greps for
 
 
@@ -96,7 +120,7 @@ def test_redacts_openai_style_key(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert secret not in contents
     assert "REDACTED" in contents
 
@@ -110,7 +134,7 @@ def test_redacts_authorization_bearer_token(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert token not in contents
     assert "REDACTED" in contents
 
@@ -124,7 +148,7 @@ def test_redacts_jwt_shaped_token(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert jwt not in contents
     assert "REDACTED-JWT" in contents
 
@@ -141,7 +165,7 @@ def test_redacts_live_provider_env_value(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert env_value not in contents
     assert "REDACTED-KEY" in contents
 
@@ -161,7 +185,7 @@ def test_redacts_url_embedded_credentials(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert redis_pw not in contents
     assert pg_pw not in contents
     assert "REDACTED" in contents
@@ -181,7 +205,7 @@ def test_redacts_dynamic_secret_named_env_value(clean_sink, tmp_path, monkeypatc
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert rerank_value not in contents
     assert "REDACTED-KEY" in contents
 
@@ -209,7 +233,7 @@ def test_clean_record_is_not_mangled(clean_sink, tmp_path, monkeypatch):
     for h in _sink_handlers():
         h.flush()
 
-    contents = _read(str(tmp_path / "backend.log"))
+    contents = _read(_sink_file())
     assert msg in contents
     assert "REDACTED" not in contents
 
@@ -221,5 +245,9 @@ def test_idempotent_second_call_adds_no_second_handler(clean_sink, tmp_path, mon
     first = install_file_log_sink()
     second = install_file_log_sink()
 
-    assert first == second == str(logfile)
+    # Both calls resolve to the SAME per-PID file (the idempotency guard returns the
+    # already-resolved path on the second call) — proves no second handler is added.
+    assert first is not None
+    assert first == second == _sink_file()
+    assert Path(first).name == f"backend.{os.getpid()}.log"
     assert len(_sink_handlers()) == 1
