@@ -22,6 +22,11 @@ a forced emission OR an honest failure. This module owns D-08 layers 1-4:
   - **Layer 4 (validation + truncation):** ``is_truncated`` rejects a
     ``stop_reason=max_tokens`` / ``finish_reason=length`` half-object BEFORE
     acceptance; the accepted emission is validated against ``EmitFieldMap``.
+  - **Layer 6 (substrate half — gap 1b / Phase 101.1-07):** a provider call that
+    RAISES (a 400, a mid-stream decode error) is caught and converted to an honest
+    ``failure="provider_error"`` result — NEVER a silent escape to threads.py
+    agent_runner (G-5 frozen). The executor (Plan 03 / Plan 07 Task 3) owns the
+    executor half of layer 6 (render/persist raises → honest receipt).
 
 Layers 5-6 (bounded retry / honest-fail surface) are the executor's (Plan 03) via the
 shipped ``_retry_suffix`` / ``_surface_failure_message`` — this substrate returns a
@@ -130,8 +135,21 @@ def _iter_fenced_json(text: str):
             yield cand
 
 
-def _failure(tier: str, provider: str, *, forced: bool, truncated: bool = False) -> dict:
-    """The honest-failure result shape (D-08 layer 4 boundary → executor layers 5-6)."""
+def _failure(
+    tier: str,
+    provider: str,
+    *,
+    forced: bool,
+    truncated: bool = False,
+    failure_override: str | None = None,
+) -> dict:
+    """The honest-failure result shape (D-08 layer 4 boundary → executor layers 5-6).
+
+    ``failure_override`` (Phase 101.1-07, gap 1b) lets the RAISED-exception backstop
+    distinguish a provider call that *threw* (``"provider_error"``) from a model that
+    simply failed to emit (``"model_failed_to_emit"``) — the happy-failure values
+    (model_failed_to_emit / truncated) are unchanged.
+    """
     return {
         "emitted": None,
         "tier": tier,
@@ -139,7 +157,7 @@ def _failure(tier: str, provider: str, *, forced: bool, truncated: bool = False)
         "forced": forced,
         "recovered_from_narration": False,
         "truncated": truncated,
-        "failure": "model_failed_to_emit",
+        "failure": failure_override or "model_failed_to_emit",
     }
 
 
@@ -210,9 +228,20 @@ async def forced_emit(
             tool_choice="auto",
         )
 
-    stream, calling_mode = await open_stream(provider, req)
-
-    content, tool_calls, finish_reason = await run_in_threadpool(_drain, stream)
+    # Phase 101.1-07 (gap 1b / D-08 layer 6 — the substrate half): a provider call
+    # that RAISES (a 400, a mid-stream decode error) is an HONEST failure, NEVER a
+    # silent escape to threads.py agent_runner (G-5 frozen). Wrap ONLY the provider
+    # call sites — the truncation guard / recovery / validate loop stay AFTER the try
+    # so they run on the SUCCESS path only. Log identifier-only (T-073-04 — never the
+    # message/args content).
+    try:
+        stream, calling_mode = await open_stream(provider, req)
+        content, tool_calls, finish_reason = await run_in_threadpool(_drain, stream)
+    except Exception:  # noqa: BLE001 — a provider raise is an honest failure, not a crash
+        logger.warning(
+            "forced_emit: provider call raised tier=%s provider=%s", tier, provider
+        )
+        return _failure(tier, provider, forced=forced, failure_override="provider_error")
 
     # D-08 layer 4: reject a truncated half-object BEFORE acceptance.
     if is_truncated(finish_reason=finish_reason):
