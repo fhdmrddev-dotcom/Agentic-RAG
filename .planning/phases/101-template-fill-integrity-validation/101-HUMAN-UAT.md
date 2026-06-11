@@ -8,7 +8,7 @@ updated: 2026-06-11
 
 ## Current Test
 
-[awaiting human testing]
+[live UAT run 2026-06-11 — BLOCKED: no run produced a .docx. See `101-LIVE-UAT-FINDINGS.md` (GAP-A forced-emission, GAP-B library-asset-not-wired, GAP-C run-honesty, GAP-D cross-provider). The 101-06 code fixes are verified working (opus called render_template; resolver executed); the blockers are workflow-wiring + run-honesty above the dispatcher.]
 
 > **Operator prerequisite for ALL rows below:** rebuild + bump the sandbox image so it carries `docxtpl`:
 > ```
@@ -54,9 +54,16 @@ result: [pending]
 
 total: 8
 passed: 0
-issues: 0
-pending: 8
+issues: 4
+pending: 1
 skipped: 0
-blocked: 0
+blocked: 3
 
 ## Gaps
+
+- **GAP-A — fill phase never commits to render_template** (open agent loop, auto tool-choice): models narrate/write Markdown instead of emitting the tool call. DeepSeek narrated JSON; opus (vague) wrote Markdown; opus (directive) said "Let me render…" then stopped. → forced single-emission pattern (spike 097).
+- **GAP-B — library template (assets[] AssetRef) not wired**: opus DID call render_template (tight prompt) but the resolver fell to the ephemeral-upload path (no `asset` injected) → "please upload a template." The D-09 trusted docxtpl/library path is unreachable end-to-end.
+- **GAP-C — run-honesty**: fill phase shows static "Step 0 · working…" with no live tool cards; internal agent steps invisible (1 phase, N hidden steps).
+- **GAP-D — cross-provider**: DeepSeek emits the field-map as narrated text (reasoning-model tool-call trap).
+
+Full detail + fix directions: `101-LIVE-UAT-FINDINGS.md`. VERIFIED working: 101-06 code fixes (schema reaches model, tool callable, resolver executes), retrieval + citations excellent, sandbox image carries docxtpl.
