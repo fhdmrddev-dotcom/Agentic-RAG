@@ -108,6 +108,14 @@ _VALID_FM = {
 }
 
 
+def _retrieved_accumulated(*chunk_ids):
+    """A prior-retrieval-phase output carrying the spotlight ids the citation gate
+    validates the emission's source_chunk_id against (the D-13 two-step grounding)."""
+    return {"retrieval": {"text": "retrieved", "source_refs": [
+        {"chunk_id": cid} for cid in (chunk_ids or ("chunk-1",))
+    ]}}
+
+
 def _forced_ok(emitted=None):
     """A forced_emit success result (the happy path the executor consumes)."""
     from app.services.template_render_service import EmitFieldMap
@@ -230,7 +238,7 @@ async def test_emit_runs_forced_shot_not_open_loop(_patch_executor):
     phase = _fake_phase()
     ctx = _fake_ctx(definition, audit_sink=_patch_executor)
 
-    out = await phase_types._exec_llm_emit(phase, {}, ctx)
+    out = await phase_types._exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
     assert _patch_executor["forced_calls"], "forced_emit was not called (the sealed shot)"
     assert isinstance(out, dict) and "text" in out
 
@@ -304,7 +312,7 @@ async def test_emit_audit_receipt_transitions(_patch_executor):
     phase = _fake_phase()
     ctx = _fake_ctx(definition, audit_sink=_patch_executor)
 
-    await _exec_llm_emit(phase, {}, ctx)
+    await _exec_llm_emit(phase, _retrieved_accumulated("chunk-1"), ctx)
     kinds = [k for k, _ in _patch_executor["audit"]]
     # The forced shot, the validated gate, and the rendered file each leave a receipt.
     assert "emit_forced" in kinds

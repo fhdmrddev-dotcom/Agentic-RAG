@@ -43,16 +43,32 @@ Phase 096/CONC-01, deferred).
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 from uuid import UUID, uuid4
 
 from app.config import settings
+from app.db.workflows import write_audit
 from app.services.ask_user_service import subscribe_for_response
+from app.services.forced_emit import forced_emit
+from app.services.harness.emitters import resolve_emitter
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
 from app.services.task_service import _stream_one_iteration, run_task_sub_agent
+from app.services.template_asset_service import resolve_template_source
+from app.services.template_render_service import (
+    EmitFieldMap,
+    check_coverage,
+    emit_field_map_to_legacy,
+)
 from app.services.tool_dispatcher import ToolContext
+
+# Imported lazily-at-call (NOT at module top) to avoid a harness import cycle
+# (harness_engine imports the harness package which imports phase_types): the
+# honest-fail surface lives in harness_engine and is fetched inside the executor.
+# ``_surface_failure_message`` is exposed as a module attribute below so tests can
+# monkeypatch it; the executor reads it via the module-level name.
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +146,21 @@ def _first_phase_user_turn(accumulated_outputs: dict, ctx) -> str:
     """
     prior = _prior_output_text(accumulated_outputs)
     return prior or _kickoff_prompt(ctx)
+
+
+async def _surface_failure_message(ctx, run_id, reason, pool):
+    """101.1 (D-08 layer 6 / RC-4) — persist a real failure reason before an emit
+    failure return, via the engine's owner-scoped honest-fail surface.
+
+    Lazy-delegates to ``harness_engine._surface_failure_message`` (the SAME helper the
+    engine's fail_run / skip_to branches use), keeping the harness import cycle broken
+    (harness_engine imports the harness package → phase_types → harness_engine). Exposed
+    as a module-level name so the executor's honest-fail path is a single seam and tests
+    can monkeypatch it. Best-effort: a persist failure never crashes the failing emit.
+    """
+    from app.services.harness_engine import _surface_failure_message as _engine_surface
+
+    return await _engine_surface(ctx, run_id, reason, pool)
 
 
 def _retry_suffix(ctx) -> str:
@@ -688,6 +719,375 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     return {"text": prompt, "answer": answer, "tool_call_id": tool_call_id}
 
 
+# ── 101.1 (D-01/D-04/D-08/D-10/D-12) — the 6th executor: a SEALED FORCED EMIT ──
+def _emit_bound_asset_ref(definition):
+    """GAP-B / D-10 — the bound library template ``AssetRef`` the executor resolves
+    SERVER-SIDE (the model never selects it).
+
+    Picks the ``WorkflowDefinition.assets[]`` entry of ``kind=="template"`` (a
+    ``reference`` asset is NOT a fill template). Returns ``None`` when the definition has
+    no template asset — the executor then falls through to the ephemeral-upload branch
+    (``resolve_template_source(asset_ref=None)``), and an unresolved upload is the honest
+    ``no_template_bound`` state (e). Definition may be absent on a minimal/legacy ctx →
+    ``None`` (the same fall-through).
+    """
+    if definition is None:
+        return None
+    assets = getattr(definition, "assets", None) or []
+    for asset in assets:
+        if getattr(asset, "kind", None) == "template":
+            return asset
+    return None
+
+
+def _retrieved_ids(accumulated_outputs: dict) -> set[str]:
+    """The spotlight/source ids the citation gate validates against (D-08 layer 4).
+
+    A prior retrieval phase (the D-13 two-step: an ``llm_agent`` ``search_documents``
+    phase feeding the emit) threads its grounding up as ``source_refs`` / ``citations``
+    on its phase output. Union every ``chunk_id`` / ``id`` seen across the accumulated
+    outputs so a cited ``source_chunk_id`` is "retrieved" iff it was actually in the
+    evidence set the prior phase gathered. Empty when nothing retrieved (then any
+    non-null cited value is invented → state b — the correct honest reject).
+    """
+    ids: set[str] = set()
+    for out in accumulated_outputs.values():
+        if not isinstance(out, dict):
+            continue
+        for key in ("source_refs", "citations"):
+            for ref in out.get(key) or []:
+                if isinstance(ref, dict):
+                    for idk in ("chunk_id", "source_chunk_id", "id"):
+                        v = ref.get(idk)
+                        if v:
+                            ids.add(str(v))
+                elif ref:
+                    ids.add(str(ref))
+    return ids
+
+
+def _emit_forced_tool(emitter: str) -> list[dict]:
+    """The forced-tool schema list ``forced_emit`` targets — named ``emitter`` with the
+    FLAT ``EmitFieldMap`` parameters (the strict cross-provider forcing target ``forced_emit``
+    validates against). NOT the legacy GenericFieldMap envelope: ``forced_emit`` parses the
+    forced tool-call arguments as ``EmitFieldMap`` (Plan 02), so the model must be forced
+    against the flat shape it then validates."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": emitter,
+                "description": (
+                    "Emit the CITED, structured field-map for the template. Put every "
+                    "scalar placeholder under `scalars` (one object each: key, value, "
+                    "source_chunk_id, source_doc, source_page) and every table row under "
+                    "`rows`. For EVERY non-null value set source_chunk_id to the <doc id> "
+                    "it came from; if the KB does not support a value set value to null. "
+                    "Never invent a value or a citation."
+                ),
+                "parameters": EmitFieldMap.model_json_schema(),
+            },
+        }
+    ]
+
+
+def _emit_audit_metadata(
+    *, definition, phase, emitter: str, result: dict | None, gate: dict | None,
+    render_verdict: dict | None, output_file: dict | None,
+) -> dict:
+    """Build the D-12 receipt ``metadata`` dict (RESEARCH §4 shape). Keyed to
+    definition@version; the per-transition writes share this base + the verdict.
+
+    Every field is JSON-serializable (``write_audit`` json.dumps the metadata): the raw
+    field-map rides as its legacy dict, the output-file sha256 is a stdlib ``hashlib``
+    hex digest (V6 — never hand-rolled), and the gate/integrity verdicts are the
+    deterministic stat dicts. Absent stages are ``None`` (an emit_forced receipt has no
+    integrity verdict yet) — never a fabricated value."""
+    meta: dict = {
+        "definition_version": getattr(definition, "version", None),
+        "definition_id": getattr(definition, "definition_id", None)
+        or getattr(definition, "id", None),
+        "phase_slug": getattr(phase, "slug", None),
+        "emitter": emitter,
+    }
+    if result is not None:
+        meta.update(
+            tier=result.get("tier"),
+            provider=result.get("provider"),
+            model=getattr(phase.config, "model", None),
+            forced=result.get("forced"),
+            thinking=False,  # the emit call ALWAYS runs thinking-OFF (D-05 TIER-FORCE-NOTHINK)
+            recovered_from_narration=result.get("recovered_from_narration"),
+            truncated=result.get("truncated"),
+        )
+    if gate is not None:
+        meta["gate_verdict"] = gate
+    if render_verdict is not None:
+        meta["integrity_verdict"] = render_verdict
+    if output_file is not None:
+        meta["output_file"] = output_file
+    return meta
+
+
+async def _emit_audit(ctx, *, event_type: str, metadata: dict) -> None:
+    """Write ONE INSERT-only emit receipt (D-12). Owner-scoped on ``ctx.current_user``;
+    keyed to the workflow ``ctx.run_id`` (the audit run namespace — Facet A). Best-effort:
+    a receipt-write failure (missing pool on a minimal ctx) must never crash the emit."""
+    pool = getattr(ctx, "pool", None)
+    if pool is None:
+        return
+    run_id = getattr(ctx, "run_id", None)
+    user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+    try:
+        await write_audit(pool, run_id, user_id=user_id, event_type=event_type, metadata=metadata)
+    except Exception:  # noqa: BLE001 — a receipt write must never crash the failing emit
+        logger.warning("llm_emit: audit receipt %s write failed run=%s", event_type, run_id)
+
+
+def _emit_failure_output(failure: str, message: str, *, field_map=None) -> dict:
+    """The phase output for an honest emit failure (state a-e). Carries ``text`` (the real
+    reason — never an empty 'done', RC-4), the ``failure`` taxonomy value (GAP-C, the
+    frontend's closed-taxonomy render), and — when available — the cited ``field_map`` as
+    a preserved fallback (D-08: a non-opening render never loses the extracted data)."""
+    out: dict = {"text": message, "failure": failure}
+    if field_map is not None:
+        out["field_map"] = field_map
+    return out
+
+
+async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
+    """The 6th phase type (D-04) — a SEALED, capability-tiered FORCED EMIT.
+
+    Composes the Plan 01 substrate (flat ``EmitFieldMap`` + ``EMITTER_REGISTRY`` + the
+    audit kinds) and the Plan 02 core (the gateway forcing seam + ``forced_emit`` with
+    D-06 NATIVE recovery + the D-08 truncation guard) into a working forced-emit phase.
+    Owns the D-08 6-layer no-fail ladder and the D-12 audit receipt.
+
+    THE DIVERGENCE (D-01 / Pitfall 5): this executor calls ``forced_emit`` (a SEALED
+    single shot) — it NEVER drives the open auto-tool-choice agent loop the other LLM
+    executors use, the exact GAP-A root cause (reasoning-native models narrate a
+    field-map as prose under ``tool_choice=auto`` in an open loop). The guard test
+    asserts the open-loop runner name never appears in this function's source.
+
+    Sequence (each transition writes an INSERT-only D-12 receipt):
+      1. **GAP-B inject (D-10):** resolve the bound library template AssetRef server-side
+         (``_emit_bound_asset_ref`` → ``resolve_template_source``); the model NEVER selects
+         it. No template AND no ephemeral upload that resolves => state (e) no_template_bound.
+      2. **Layer 1-4 (forced shot):** ``emit_forced`` receipt → ``forced_emit`` (isolation +
+         tiered forcing + NATIVE recovery + truncation guard, all inherited from Plan 02).
+         A narrated recovery also writes ``emit_recovered``. ``failure=model_failed_to_emit``
+         (after Plan 02 recovery + truncation) => state (a) honest fail.
+      3. **Citation gate (layer 4):** normalize the flat emission via
+         ``emit_field_map_to_legacy`` → ``check_coverage`` BEFORE render. Uncited/invented
+         => state (b) citation_gate_rejected (``emit_rejected``) — the render is NEVER
+         reached. Else ``emit_validated``.
+      4. **Render (post_processor):** ``EMITTER_REGISTRY[emitter].post_processor`` re-dispatches
+         the HARDENED ``_handle_render_template`` (one render code path — Task 2 wires it).
+         Render error => state (c) render_failed (``emit_failed``). Integrity fail => state
+         (d) integrity_failed (``emit_integrity_failed``) — the non-opening file is NEVER
+         persisted; the cited field-map is preserved as fallback. Success => ``emit_rendered``.
+      5. **Bounded retry (layer 5):** a recoverable failure returns a phase output the
+         engine's EXISTING ``_run_phase_with_gates`` re-runs (≤3) — the retry feedback is
+         consumed via ``_retry_suffix(ctx)`` in the system prompt. No new loop here.
+      6. **Honest failure (layer 6):** every terminal failure persists a real reason via
+         ``_surface_failure_message`` (the harness-only branch — never the shared Deep+harness
+         terminal path) — never an empty 'done'.
+    """
+    definition = getattr(ctx, "definition", None)
+    emitter = getattr(phase.config, "emitter", "render_template")
+    model = _effective_model(phase, ctx)
+    run_id = getattr(ctx, "run_id", None)
+    pool = getattr(ctx, "pool", None)
+
+    # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
+    asset_ref = _emit_bound_asset_ref(definition)
+    src = await resolve_template_source(
+        pool=pool,
+        supabase=getattr(ctx, "supabase", None),
+        thread_id=getattr(ctx, "thread_id", None),
+        user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+        asset_ref=asset_ref,  # the bound template (NOT None) — the model never selects it
+    )
+    if not src.get("bytes"):
+        # State (e): no template bound AND no ephemeral upload resolved — honest fail.
+        msg = (
+            "No template is bound to this workflow phase and no usable template was "
+            f"found: {src.get('error') or 'no template available'}."
+        )
+        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
+            render_verdict={"failure": "no_template_bound"}, output_file=None,
+        ))
+        await _surface_failure_message(ctx, run_id, msg, pool)
+        return _emit_failure_output("no_template_bound", msg)
+
+    # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
+    # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
+    # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
+    system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+    user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
+    messages = [{"role": "user", "content": user_turn}] if user_turn else []
+
+    await _emit_audit(ctx, event_type="emit_forced", metadata=_emit_audit_metadata(
+        definition=definition, phase=phase, emitter=emitter,
+        result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
+                "recovered_from_narration": None, "truncated": None},
+        gate=None, render_verdict=None, output_file=None,
+    ))
+
+    result = await forced_emit(
+        messages=messages,
+        model=model,
+        provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
+        emitter=emitter,
+        tools=_emit_forced_tool(emitter),
+        user_settings=getattr(ctx, "user_settings", None),
+        system_prompt=system_prompt,
+    )
+
+    if result.get("recovered_from_narration"):
+        # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
+        await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result,
+            gate=None, render_verdict=None, output_file=None,
+        ))
+
+    if result.get("failure"):
+        # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
+        msg = (
+            "The model did not emit a structured field-map for the template "
+            "(it narrated prose or was truncated) and the deliverable was NOT produced. "
+            "This is an honest failure — no Markdown stand-in is delivered as the artifact."
+        )
+        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result,
+            gate=None, render_verdict=None, output_file=None,
+        ))
+        await _surface_failure_message(ctx, run_id, msg, pool)
+        return _emit_failure_output("model_failed_to_emit", msg)
+
+    emitted: EmitFieldMap = result["emitted"]
+
+    # ── 3. Citation gate (layer 4) — BEFORE render (reject without touching sandbox) ─
+    legacy_map = emit_field_map_to_legacy(emitted)
+    retrieved_ids = _retrieved_ids(accumulated_outputs)
+    placeholder_keys = (
+        list(legacy_map.get("scalars", {}).keys())
+        + list(legacy_map.get("collections", {}).keys())
+    )
+    gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
+    if gate["uncited_value_count"] > 0 or gate["invented_citation_count"] > 0:
+        # State (b): uncited / invented — rejected BEFORE render (deterministic, no LLM).
+        msg = (
+            "The emitted field-map has uncited or invented values — every non-null value "
+            "must cite a source that was actually retrieved. The deliverable was NOT "
+            "produced; the cited field-map is preserved below."
+        )
+        await _emit_audit(ctx, event_type="emit_rejected", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result,
+            gate=gate, render_verdict=None, output_file=None,
+        ))
+        await _surface_failure_message(ctx, run_id, msg, pool)
+        return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+
+    await _emit_audit(ctx, event_type="emit_validated", metadata=_emit_audit_metadata(
+        definition=definition, phase=phase, emitter=emitter, result=result,
+        gate=gate, render_verdict=None, output_file=None,
+    ))
+
+    # ── 4. Render (post_processor) — re-dispatch the HARDENED handler (one path) ──
+    entry = resolve_emitter(emitter)
+    if entry.post_processor is None:
+        # Defensive: a registered emitter with no driver cannot produce a deliverable.
+        msg = f"The emitter {emitter!r} has no render driver registered."
+        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result,
+            gate=gate, render_verdict={"failure": "render_failed"}, output_file=None,
+        ))
+        await _surface_failure_message(ctx, run_id, msg, pool)
+        return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+
+    render_out = await entry.post_processor(legacy_map, src, ctx)
+    status = (render_out or {}).get("status")
+
+    if status == "ok":
+        output_file = render_out.get("output_file") or _output_file_meta(render_out)
+        await _emit_audit(ctx, event_type="emit_rendered", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+            render_verdict=render_out.get("verdict"), output_file=output_file,
+        ))
+        path = render_out.get("path") or (output_file or {}).get("path")
+        return {
+            "text": f"Produced the filled deliverable: {path}" if path else "Produced the filled deliverable.",
+            "output_file": output_file,
+            "path": path,
+            "field_map": legacy_map,
+            "source_refs": [],
+            "citations": [],
+        }
+
+    # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
+    reason = (render_out or {}).get("reason")
+    if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
+        # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
+        msg = (
+            "The filled file failed the integrity re-open (it will not open cleanly or "
+            "still contains unsubstituted placeholders) and was NOT delivered. The cited "
+            "field-map is preserved below as fallback."
+        )
+        await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+            render_verdict=(render_out or {}).get("verdict") or {"failure": "integrity_failed"},
+            output_file=None,
+        ))
+        await _surface_failure_message(ctx, run_id, msg, pool)
+        return _emit_failure_output("integrity_failed", msg, field_map=legacy_map)
+
+    # State (c): a render error (sandbox error / bad asset / resolution) — honest fail.
+    msg = (
+        "The template render failed: "
+        + str((render_out or {}).get("message") or reason or "unknown render error")
+        + ". The deliverable was NOT produced; the cited field-map is preserved below."
+    )
+    await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+        definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+        render_verdict={"failure": "render_failed", "reason": reason}, output_file=None,
+    ))
+    await _surface_failure_message(ctx, run_id, msg, pool)
+    return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+
+
+def _provider_for_model(model: str, ctx) -> str | None:
+    """Resolve the provider for the forced shot from the model registry (default-SAFE).
+
+    The forced-emit substrate routes the gateway by provider; source it from the model's
+    own MODEL_CAPABILITIES row (the same registry ``forced_emit`` reads for the tier).
+    ``None`` when unknown — ``forced_emit``'s default-SAFE tier resolution then coerces."""
+    from app.config import get_model_capability
+
+    cap = get_model_capability(model) or {}
+    return cap.get("provider")
+
+
+def _output_file_meta(render_out: dict) -> dict | None:
+    """Derive the D-12 output-file receipt (path + sha256 + bytes) from a render result
+    that returned the produced bytes inline rather than a pre-built ``output_file`` dict.
+
+    The sha256 is a stdlib ``hashlib`` hex digest (V6 — never hand-rolled). ``None`` when
+    the render result carries no path/bytes to hash."""
+    path = render_out.get("path")
+    produced = render_out.get("produced")
+    if path is None and produced is None:
+        return None
+    meta: dict = {"path": path}
+    if isinstance(produced, (bytes, bytearray)):
+        meta["sha256"] = hashlib.sha256(bytes(produced)).hexdigest()
+        meta["bytes"] = len(produced)
+    elif render_out.get("size_bytes") is not None:
+        meta["bytes"] = render_out.get("size_bytes")
+    return meta
+
+
 def _collect_sub_questions(accumulated_outputs: dict) -> list[str]:
     """Find the latest upstream ``sub_questions`` list (from a split_topic phase)."""
     for out in reversed(list(accumulated_outputs.values())):
@@ -710,19 +1110,22 @@ def _latest_phase_text(accumulated_outputs: dict) -> str:
 
 
 # ── registration ──────────────────────────────────────────────────────────
-# The 5 executors keyed by phase_type — the engine's PHASE_TYPE_REGISTRY dispatch
-# seam (Plan 02) resolves each of these.
+# The 6 executors keyed by phase_type — the engine's PHASE_TYPE_REGISTRY dispatch
+# seam (Plan 02) resolves each of these. 101.1 (D-04) adds the 6th: ``llm_emit`` (the
+# SEALED FORCED EMIT — the only path that produces a typed deliverable).
 PHASE_TYPE_REGISTRY_ENTRIES: dict = {
     "programmatic": _exec_programmatic,
     "llm_single": _exec_llm_single,
     "llm_agent": _exec_llm_agent,
     "llm_batch_agents": _exec_llm_batch_agents,
     "llm_human_input": _exec_llm_human_input,
+    # 101.1 — the 6th (the forced-emit phase, D-04):
+    "llm_emit": _exec_llm_emit,
 }
 
 
 def register_all() -> None:
-    """Register the 5 executors into the engine's PHASE_TYPE_REGISTRY dispatch seam.
+    """Register the 6 executors into the engine's PHASE_TYPE_REGISTRY dispatch seam.
 
     Imported by ``harness/__init__`` so registration happens whenever the harness
     package (and therefore the engine) is used.

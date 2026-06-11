@@ -760,6 +760,20 @@ async def run_workflow(
         else None
     )
 
+    # Phase 101.1 (D-10 / GAP-B): the llm_emit executor resolves the bound library
+    # template AssetRef SERVER-SIDE off the parsed definition (the model never selects
+    # it). The executor receives only ``(phase, accumulated_outputs, ctx)`` — the
+    # definition is NOT on the live/resume ctx bag (built in threads.py / the resume
+    # builder, neither of which this plan may touch — G-5). Thread it here, the ONE
+    # site where ``run_workflow`` holds both the parsed definition AND the ctx, so the
+    # executor reads ``ctx.definition.assets`` / ``.version`` / ``.id`` via getattr.
+    # Additive + defensive (mirrors ``_clear_retry_feedback``): Deep never reaches this
+    # path (Deep does not run a workflow), so it stays byte-identical.
+    try:
+        ctx.definition = definition
+    except (AttributeError, TypeError):
+        pass
+
     # Facet B (092-07): every engine SSE event must reach the PRODUCER stream the
     # frontend watches (run:{producer_run_id}), NOT run:{workflow_run_id} (a stream
     # nobody subscribes to). The explicit ``stream_run_id`` (passed by the live
