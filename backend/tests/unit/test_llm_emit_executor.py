@@ -900,3 +900,84 @@ async def test_no_oracle_for_unparseable_template_keeps_old_behavior(_patch_exec
 
     assert "TEMPLATE PLACEHOLDERS" not in bag["forced_calls"][0]["messages"][0]["content"]
     assert out.get("failure") is None  # the chunk-1-cited _VALID_FM still passes
+
+
+# ── Phase 101.1-07 (gap 1b executor half) — the layer-6 catch-all backstop ─────
+# ANY raise inside the emit ladder (render dispatch raising, an unexpected error)
+# is caught → emit_failed receipt + a phase_substep failure + one surfaced message
+# + an honest flagged output. No exception escapes to the engine's generic run-
+# failed catch (which would leave the phase stuck 'active' forever).
+
+
+@pytest.mark.asyncio
+async def test_render_dispatch_raise_caught_as_honest_failure(_patch_executor):
+    """When the render post_processor RAISES, _exec_llm_emit does NOT propagate — it
+    writes an emit_failed receipt, surfaces one honest message, and returns a flagged
+    failure output (text non-empty, failure set). No exception escapes."""
+    from app.services.harness import emitters, phase_types
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    async def _boom_render(validated_map, resolved_template, ctx):
+        raise RuntimeError("docxtpl crashed mid-render")
+
+    entry = emitters.EMITTER_REGISTRY["render_template"]
+    monkeypatch_entry = emitters.EmitterEntry(
+        schema_builder=entry.schema_builder, post_processor=_boom_render
+    )
+    emitters.EMITTER_REGISTRY["render_template"] = monkeypatch_entry
+    try:
+        definition = _fake_definition([_fake_asset_ref()])
+        ctx = _fake_ctx(definition, audit_sink=_patch_executor["audit"])
+        # No exception escapes.
+        out = await _exec_llm_emit(_fake_phase(), _retrieved_accumulated("chunk-1"), ctx)
+    finally:
+        emitters.EMITTER_REGISTRY["render_template"] = entry
+
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    assert "emit_failed" in kinds
+    assert _patch_executor["surface_calls"], "an honest reason must be surfaced once"
+    assert out.get("failure") is not None
+    assert out.get("text"), "the honest output carries a non-empty reason (RC-4)"
+
+
+@pytest.mark.asyncio
+async def test_provider_error_is_honest_state_a(_patch_executor):
+    """A forced_emit result carrying failure='provider_error' (Task 2's backstop) is
+    treated as an honest model/provider failure (state a family) — emit_failed receipt,
+    a surfaced reason, an honest flagged output (not a crash, not a silent success)."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    _patch_executor["forced_result"] = {
+        "emitted": None, "tier": "TIER-FORCE", "provider": "deepseek",
+        "forced": True, "recovered_from_narration": False, "truncated": False,
+        "failure": "provider_error",
+    }
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor["audit"])
+    out = await _exec_llm_emit(_fake_phase(), {}, ctx)
+
+    kinds = [k for k, _ in _patch_executor["audit"]]
+    assert "emit_failed" in kinds
+    assert _patch_executor["surface_calls"], "a provider error must surface honestly (RC-4)"
+    assert out.get("failure") is not None
+    assert out.get("text")
+
+
+@pytest.mark.asyncio
+async def test_failure_output_is_surfaced_flagged(_patch_executor):
+    """gap 2 — single-owner persist: a failure output returned by _exec_llm_emit carries
+    a _surfaced flag (the executor already wrote the message via _surface_failure_message),
+    so the engine knows not to persist it a second time."""
+    from app.services.harness.phase_types import _exec_llm_emit, _emit_failure_output
+
+    # _emit_failure_output flags its output.
+    out = _emit_failure_output("model_failed_to_emit", "honest reason")
+    assert out.get("_surfaced") is True
+
+    # And the executor's honest-fail return carries the flag end-to-end.
+    _patch_executor["forced_result"] = _forced_fail()
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=_patch_executor["audit"])
+    failed = await _exec_llm_emit(_fake_phase(), {}, ctx)
+    assert failed.get("_surfaced") is True
+    assert failed.get("failure") == "model_failed_to_emit"
