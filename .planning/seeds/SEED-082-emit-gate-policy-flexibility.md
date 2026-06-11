@@ -1,7 +1,7 @@
 ---
 seed_id: SEED-082
 title: Emit-gate policy flexibility — per-workflow citation/integrity strictness (strict | flag | partial | draft) + model-fit routing + failure-UX escalation
-status: planted
+status: partially-folded (102 half folded at Phase 102 discuss-phase 2026-06-12 — engine-side policy enum strict|flag|partial|draft + integrity strict|documented_limit + judge-verdict co-design captured as D-01/D-02 in 102-CONTEXT.md; 103 half — builder UX, model-fit routing, per-run override — stays pending its own trigger)
 planted: 2026-06-12
 phase_origin: "Phase 101.1 gaps-only live re-verify 2026-06-12 — operator direction after observing 4 weak-model honest failures"
 category: workflow engine product semantics — what the citation/integrity gates DO with their verdict, per workflow; NOT a change to how the verdict is computed
