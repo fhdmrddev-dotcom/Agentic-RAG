@@ -21,8 +21,8 @@
 
 ### TMPL — Template-fill
 - [x] **TMPL-01**: A user can upload a template (docx/pptx/xlsx) into a thread **temporarily** — workspace-only, TTL + cron sweep, RLS-scoped, **never ingested into the KB and never appearing in search**. *(Also closes the injection-via-uploaded-doc vector.)*
-- [ ] **TMPL-02**: A workflow can fill a template from project-KB content — the LLM emits a **cited** Pydantic field-map (each field nullable, carrying source chunk/page), and pinned sandbox code renders the file deterministically. **Both** the trusted path (library templates, `docxtpl`/Jinja) and the arbitrary-upload path (non-Jinja run-replace) are supported.
-- [ ] **TMPL-03**: A filled template is validated before delivery — **re-opened with the same library to assert integrity** (a corrupt file can never reach the user as "done") — and rendering runs inside the sealed sandbox with `jinja2.sandbox.SandboxedEnvironment` (SSTI contained).
+- [x] **TMPL-02**: A workflow can fill a template from project-KB content — the LLM emits a **cited** Pydantic field-map (each field nullable, carrying source chunk/page), and pinned sandbox code renders the file deterministically. **Both** the trusted path (library templates, `docxtpl`/Jinja) and the arbitrary-upload path (non-Jinja run-replace) are supported.
+- [x] **TMPL-03**: A filled template is validated before delivery — **re-opened with the same library to assert integrity** (a corrupt file can never reach the user as "done") — and rendering runs inside the sealed sandbox with `jinja2.sandbox.SandboxedEnvironment` (SSTI contained).
 
 ### WFAUTH — Workflow authoring & the Workflows page
 - [ ] **WFAUTH-01**: A user can create/edit a workflow as a draft (CRUD) via a new API + the new **Workflows page**, with publish-time structural lint (reachable, terminal, satisfiable inputs) blocking invalid publishes.
@@ -109,8 +109,8 @@
 | GOV-01 | Phase 098 | Complete |
 | WFSKILL-01 | Phase 099 | Complete |
 | TMPL-01 | Phase 100 | Complete |
-| TMPL-02 | Phase 101 | Pending |
-| TMPL-03 | Phase 101 | Pending |
+| TMPL-02 | Phase 101 / 101.1 | Complete (2026-06-12, 101.1 live verify) |
+| TMPL-03 | Phase 101 / 101.1 | Complete (2026-06-12, 101.1 live verify) |
 | GATE-01 | Phase 102 | Pending |
 | QUAL-01 | Phase 102 | Pending |
 | WFAUTH-01 | Phase 103 | Pending |
