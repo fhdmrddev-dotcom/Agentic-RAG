@@ -102,6 +102,34 @@ def guess_mime_type(path: str) -> str:
     return mime or "application/octet-stream"
 
 
+# A small allowlist of mimes that are text even though they are not ``text/*``.
+_TEXTISH_MIMES = frozenset({"application/json", "text/csv"})
+
+
+def _is_binary_mime(mime: str) -> bool:
+    """Return True for mimes whose bytes are NOT safe to unified-text-diff.
+
+    101.1-08 (gap 5a): a binary delta (docx/pptx/xlsx) decodes ``\\x00`` zip bytes
+    to a NUL which Postgres JSONB rejects (UntranslatableCharacterError — UAT run
+    4ea9bc56). We skip the unified-text delta for binary mimes; a missing delta is
+    harmless (the version row is still recorded), a crash is not.
+
+    Conservative by construction: anything not clearly text is treated as binary.
+    True for the 3 OOXML office mimes, application/octet-stream, application/pdf,
+    image/* (and audio/video), and any mime NOT starting with ``text/`` and not in
+    the small textish allowlist. False for ``text/*`` and {application/json,
+    text/csv}.
+    """
+    if not mime:
+        return True
+    mime = mime.lower()
+    if mime.startswith("text/"):
+        return False
+    if mime in _TEXTISH_MIMES:
+        return False
+    return True
+
+
 def compute_diff(old_text: str, new_text: str, from_label: str, to_label: str) -> dict:
     """Compute structured unified diff between two text strings.
 
@@ -209,6 +237,14 @@ async def _compute_delta_from_prev(
     except Exception:
         return {"format": "binary", "note": "Binary file changed"}
 
+    # 101.1-08 (gap 5a) defense-in-depth: errors="replace" turns invalid bytes into
+    # the replacement char but a literal \x00 in the source decodes straight to a NUL
+    # — and a NUL in a JSONB delta raises UntranslatableCharacterError at insert. If a
+    # binary slipped past _is_binary_mime classification (a mis-typed extension), a NUL
+    # in either side returns the NUL-free binary verdict so no NUL can ever reach JSONB.
+    if "\x00" in new_text or "\x00" in old_text:
+        return {"format": "binary", "note": "Binary file changed"}
+
     return compute_diff(old_text, new_text, f"v{current_version - 1}", f"v{current_version}")
 
 
@@ -275,8 +311,14 @@ async def write_file(
     else:
         version_num = await get_next_version(pool, file_id)
 
+    # 101.1-08 (gap 5a): a binary (docx/pptx/xlsx) delta decodes \x00 zip bytes to
+    # a NUL which Postgres JSONB rejects (UntranslatableCharacterError — UAT run
+    # 4ea9bc56). _compute_delta_from_prev's errors="replace" never raises so its
+    # binary guard was dead. Skip the delta for binary mimes — versioning still
+    # records the version row; only the unified-text diff (meaningless for binaries)
+    # is omitted.
     delta = None
-    if version_num > 1:
+    if version_num > 1 and not _is_binary_mime(mime):
         delta = await _compute_delta_from_prev(
             pool, supabase, file_id, version_num, content, path
         )
