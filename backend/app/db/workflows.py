@@ -37,10 +37,13 @@ import asyncpg
 
 from app.models.harness import WorkflowDefinition
 
-# harness_audit.event_type CHECK (migration 059, 9 kinds). Validate in code so a
-# typo fails fast in tests, not as a Postgres 23514 mid-run (Pitfall 6).
+# harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
+# kinds → 16 total). Validate in code so a typo fails fast in tests, not as a Postgres
+# 23514 mid-run (Pitfall 6). MUST stay IN LOCKSTEP with the 069 CHECK — a mismatch is
+# the exact fail-fast this set exists for (Phase 101.1 D-12).
 _AUDIT_EVENT_TYPES = frozenset(
     {
+        # 059 — the 9 original harness lifecycle/gate kinds:
         "phase_started",
         "phase_completed",
         "phase_transition",
@@ -50,6 +53,14 @@ _AUDIT_EVENT_TYPES = frozenset(
         "run_started",
         "run_completed",
         "run_failed",
+        # 069 (Phase 101.1 D-12) — the 7 emit-transition kinds:
+        "emit_forced",
+        "emit_recovered",
+        "emit_validated",
+        "emit_rejected",
+        "emit_rendered",
+        "emit_integrity_failed",
+        "emit_failed",
     }
 )
 
@@ -485,7 +496,8 @@ async def write_audit(
 ) -> None:
     """INSERT one ``harness_audit`` row (INSERT-only RLS).
 
-    ``event_type`` MUST be one of the 9 kinds in the 059 CHECK — asserted here
+    ``event_type`` MUST be one of the 16 kinds in the 059 + 069 CHECK (9 harness
+    lifecycle/gate kinds + 7 Phase-101.1 emit-transition kinds) — asserted here
     against ``_AUDIT_EVENT_TYPES`` so a typo fails fast in tests (ValueError),
     not as a Postgres 23514 mid-run (Pitfall 6). The ``harness_audit`` table's
     own foreign-key column IS ``run_id`` — this predicate is correct.
@@ -500,8 +512,8 @@ async def write_audit(
     """
     if event_type not in _AUDIT_EVENT_TYPES:
         raise ValueError(
-            f"write_audit event_type must be one of the 9 harness_audit kinds, "
-            f"got {event_type!r}"
+            f"write_audit event_type must be one of the 16 harness_audit kinds "
+            f"(059 + 069), got {event_type!r}"
         )
     await pool.execute(
         "INSERT INTO harness_audit (run_id, user_id, event_type, metadata) "

@@ -15,8 +15,6 @@ symbol never breaks COLLECTION.
 
 from __future__ import annotations
 
-import pytest
-
 # The 7 emit-transition kinds migration 069 adds to the CHECK (lockstep with
 # _AUDIT_EVENT_TYPES). RESEARCH §4 / D-12.
 _EMIT_KINDS = [
@@ -30,7 +28,6 @@ _EMIT_KINDS = [
 ]
 
 
-@pytest.mark.xfail(strict=False, reason="101.1-01 Task 3 — migration 069 + _AUDIT_EVENT_TYPES extension (un-marked there)")
 def test_write_audit_accepts_emit_kinds():
     """After migration 069 + the ``_AUDIT_EVENT_TYPES`` extension, every emit kind is
     accepted by ``write_audit``'s fail-fast guard (no ``ValueError`` raised). The guard
@@ -58,7 +55,6 @@ def test_write_audit_accepts_emit_kinds():
     assert len(_AUDIT_EVENT_TYPES) == 16
 
 
-@pytest.mark.xfail(strict=False, reason="101.1-01 Task 3 — receipt metadata shape (un-marked there)")
 def test_receipt_metadata_shape():
     """The D-12 emit-receipt metadata (RESEARCH §4) carries the substrate keys
     Phase 107 reads: tier / provider / raw field-map / gate verdict / integrity verdict
