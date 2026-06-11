@@ -1353,7 +1353,15 @@ def create_adaptive_streaming_chat(
     # round-trip is handled in threads.py agent loop (076.2 Plan 01 Task 1).
     # reasoning_effort="high" is DeepSeek's default (D-04); "max" available
     # but not enabled this phase.
-    if provider == "deepseek" or effective_model.startswith("deepseek-"):
+    #
+    # Phase 101.1-07 (gap 1a / D-15 / TIER-FORCE-NOTHINK): DeepSeek shares
+    # Anthropic's no-force-under-thinking constraint — a named tool_choice WITH
+    # thinking ON returns "Thinking mode does not support this tool_choice"
+    # (UAT runs 575e7345/a7f415ad). The D-13 two-step already moves reasoning to
+    # the gather phase, so the forced emit call runs thinking-OFF. Provider-scoped,
+    # inside the forced branch's precondition (force_tool_name is None) — the auto
+    # path (force_tool_name None) is byte-identical.
+    if (provider == "deepseek" or effective_model.startswith("deepseek-")) and force_tool_name is None:
         kwargs.setdefault("extra_body", {})
         kwargs["extra_body"]["thinking"] = {
             "type": "enabled",
