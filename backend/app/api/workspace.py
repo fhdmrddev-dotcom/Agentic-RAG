@@ -14,16 +14,18 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
+from app.db.workspace import get_file_by_id
 from app.dependencies import get_current_user, get_pg_pool, get_supabase
 from app.models.user_settings import load_app_settings_async
 from app.services.workspace_service import (
     MAX_FILE_SIZE,
     FileTooLargeError,
     WorkspaceError,
+    _get_file_content,
     write_file as ws_write_file,
 )
 from app.utils.db import aexec
@@ -325,6 +327,66 @@ async def get_workspace_file_content(
         "storage_type": "bucket",
         "signed_url": url,
     }
+
+
+def _safe_download_filename(path: str) -> str:
+    """Derive a header-safe attachment filename from a workspace path basename.
+
+    101.1-09 (gap 3): the Content-Disposition value is attacker-influenced (the
+    path comes from a tool-written file). Strip the directory, then replace any
+    char outside a conservative allow-list (the same charset validate_path
+    accepts, minus the slash) so no CR/LF/quote can break out of the header.
+    """
+    base = path.rsplit("/", 1)[-1] or "download"
+    safe = re.sub(r"[^A-Za-z0-9._\- ]", "_", base).strip()
+    return safe or "download"
+
+
+@router.get("/files/{file_id}/raw")
+async def download_workspace_file_raw(
+    thread_id: str,
+    file_id: str,
+    current_user: dict = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase),
+):
+    """Stream the EXACT bytes of a workspace file as an attachment (101.1-09, gap 3).
+
+    The existing /content route base64-DECODES inline content to TEXT (corrupts a
+    binary docx) and only mints a signed URL for BUCKET files. A produced docx/pptx/
+    xlsx deliverable is stored INLINE (size < DEFAULT_INLINE_THRESHOLD), so its bytes
+    are NOT downloadable via /content — this route returns them verbatim.
+
+    Bytes come from the pg pool (``get_file_by_id`` → ``_get_file_content``): asyncpg
+    returns ``content_inline`` as raw ``bytes`` (NOT the hex-string the supabase-py
+    client returns), so the inline round-trip is byte-exact; a bucket file is
+    downloaded from Storage. SAME guards as /content: ``_verify_thread_ownership``
+    (404 non-owner) + the expiry check (404 on an expired template, via the
+    ``is_expired`` flag get_file_by_id computes) + the thread-scope check —
+    missing-and-IDOR collapsed to 404 (the existence-leak rule, D-062-12).
+    """
+    await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
+
+    pool = await get_pg_pool()
+    row = await get_file_by_id(pool, UUID(file_id))
+    # Collapse missing / cross-thread / expired ALL to 404 (no existence leak).
+    if (
+        not row
+        or str(row.get("thread_id")) != thread_id
+        or row.get("is_expired")
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    try:
+        content_bytes = await _get_file_content(pool, supabase, row)
+    except WorkspaceError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    filename = _safe_download_filename(row["path"])
+    return Response(
+        content=bytes(content_bytes),
+        media_type=row.get("mime_type") or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/files/{file_id}/versions")

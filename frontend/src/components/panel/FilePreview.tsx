@@ -25,7 +25,7 @@
  */
 import { useEffect, useRef, useState } from "react"
 import { ChevronLeft, Download, Loader2 } from "lucide-react"
-import { getWorkspaceFileContent } from "@/lib/api"
+import { downloadWorkspaceFile, getWorkspaceFileContent, DownloadError } from "@/lib/api"
 import { useResolvedFileId } from "@/hooks/useResolvedFileId"
 import type { WorkspaceFile, WorkspaceFileContent } from "@/types"
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
@@ -91,12 +91,19 @@ function classifyInline(mime: string, path: string): Kind {
   return "fallback"
 }
 
+/** Basename of a workspace path → the download filename (101.1-09, gap 3). */
+function deriveFilename(path: string): string {
+  return path.split("/").pop() || "download"
+}
+
 function Fallback({
   message,
   onDownload,
+  downloadError,
 }: {
   message: string
   onDownload?: () => void
+  downloadError?: string | null
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
@@ -110,6 +117,11 @@ function Fallback({
           <Download className="h-3.5 w-3.5" aria-hidden="true" />
           Download
         </button>
+      )}
+      {downloadError && (
+        <p className="text-[12px] text-destructive" role="alert">
+          {downloadError}
+        </p>
       )}
     </div>
   )
@@ -179,6 +191,27 @@ function FilePreviewContent({
   // no `/files//content` 404).
   const resolved = useResolvedFileId(threadId, file)
 
+  // Phase 101.1-09 (gap 3): the Fallback Download control. It fetches the EXACT
+  // bytes (Bearer-authed raw-bytes route) so a produced deliverable is reachable
+  // from the panel (UAT Test 2: Download was dead text). A graceful inline error
+  // surfaces if the helper throws (no new toast system — a local string).
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const onDownload =
+    resolved.status === "ready"
+      ? () => {
+          setDownloadError(null)
+          downloadWorkspaceFile(threadId, resolved.id, deriveFilename(file.path)).catch(
+            (err: unknown) => {
+              setDownloadError(
+                err instanceof DownloadError
+                  ? err.message
+                  : "Download failed — try again.",
+              )
+            },
+          )
+        }
+      : undefined
+
   useEffect(() => {
     // Still backfilling the id from the GET listing → hold the spinner.
     if (resolved.status === "resolving") {
@@ -227,7 +260,13 @@ function FilePreviewContent({
   }
 
   if (error || !content) {
-    return <Fallback message="No preview available · Download" />
+    return (
+      <Fallback
+        message="No preview available · Download"
+        onDownload={onDownload}
+        downloadError={downloadError}
+      />
+    )
   }
 
   if (content.storage_type === "bucket") {
@@ -243,7 +282,13 @@ function FilePreviewContent({
         </div>
       )
     }
-    return <Fallback message="No preview available · Download" />
+    return (
+      <Fallback
+        message="No preview available · Download"
+        onDownload={onDownload}
+        downloadError={downloadError}
+      />
+    )
   }
 
   const kind = classifyInline(content.mime_type, file.path)
@@ -269,6 +314,12 @@ function FilePreviewContent({
         </pre>
       )
     default:
-      return <Fallback message="No preview available · Download" />
+      return (
+        <Fallback
+          message="No preview available · Download"
+          onDownload={onDownload}
+          downloadError={downloadError}
+        />
+      )
   }
 }

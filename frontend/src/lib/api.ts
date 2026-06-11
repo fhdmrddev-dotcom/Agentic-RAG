@@ -1285,6 +1285,62 @@ export async function downloadSandboxOutput(
   }
 }
 
+// Phase 101.1-09 (gap 3): the 067.3 blob-download pattern for a workspace
+// deliverable. A produced docx/pptx/xlsx is stored INLINE, so its bytes are NOT
+// reachable via the /content route (which str-decodes inline content and corrupts
+// the binary). This helper hits the raw-bytes route (workspace.py
+// /files/{id}/raw) with the Bearer token, blobs the EXACT bytes, and triggers a
+// programmatic <a download> click — mirroring downloadSandboxOutput's contract
+// (DownloadError on 401/404/5xx; the missing-and-IDOR-collapsed 404 maps to the
+// same "File not found"). Closes the "Download is dead text" last mile of TMPL-02.
+export async function downloadWorkspaceFile(
+  threadId: string,
+  fileId: string,
+  filename: string,
+): Promise<void> {
+  let token: string
+  try {
+    token = await getAuthToken()
+  } catch {
+    throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+  }
+
+  const url = `${API_BASE}/threads/${threadId}/workspace/files/${fileId}/raw`
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch {
+    throw new DownloadError("network", "Download failed — try again.")
+  }
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new DownloadError(401, "Session expired — please refresh the page and try again.")
+    }
+    if (res.status === 404) {
+      // Backend collapses missing-and-IDOR-and-expired to 404 (existence-leak rule).
+      throw new DownloadError(404, "File not found.")
+    }
+    throw new DownloadError(res.status, "Download failed — try again.")
+  }
+
+  const blob = await res.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement("a")
+    a.href = blobUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
+  }
+}
+
 export async function deleteDocument(id: string, scope?: "version" | "all"): Promise<void> {
   const headers = await getAuthHeaders()
   const url = scope

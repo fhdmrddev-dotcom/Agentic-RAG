@@ -416,3 +416,139 @@ def test_existing_rows_valid():
     # No NOT NULL constraint sneaks onto the new columns (the partial index's
     # `WHERE expires_at IS NOT NULL` is the only legitimate NOT-NULL in the file).
     assert "NOT NULL" not in sql.replace("IS NOT NULL", "")
+
+
+# ── Phase 101.1-09 (gap 3) — raw-bytes download route ──────────────────────────
+
+# The conftest TestClient caller (mirrors conftest.mock_user_data); used by the
+# direct-call route tests below so an owned-thread row passes the ownership check.
+mock_user_data = {"id": "00000000-0000-0000-0000-000000000001", "email": "test@example.com"}
+
+
+def test_safe_download_filename_strips_header_injection():
+    """The Content-Disposition filename comes from a tool-written path, so any
+    CR/LF/quote must be neutralized — no header-splitting out of the attachment
+    value (101.1-09 T-101.1-09-01 hardening, defense-in-depth)."""
+    from app.api.workspace import _safe_download_filename
+
+    # basename only; CR/LF/quote/semicolon replaced; ordinary names preserved.
+    assert _safe_download_filename("/risk-register.docx") == "risk-register.docx"
+    assert _safe_download_filename("/a/b/deliverable.pptx") == "deliverable.pptx"
+    out = _safe_download_filename('/evil"\r\nSet-Cookie: x.docx')
+    assert "\r" not in out and "\n" not in out and '"' not in out
+    # An all-illegal / empty basename never yields an empty header value.
+    assert _safe_download_filename("/") == "download"
+
+
+def test_raw_route_cross_user_404(client, mock_execute_result):
+    """SC#1 (RLS half): a non-owner's raw download 404s at _verify_thread_ownership
+    BEFORE any pg-pool read — existence-leak-safe (D-062-12)."""
+    tid = "00000000-0000-0000-0000-00000000dead"
+    mock_execute_result.data = None  # ownership lookup: no row for this user_id
+    assert client.get(f"/threads/{tid}/workspace/files/f1/raw").status_code == 404
+
+
+async def test_raw_route_returns_exact_inline_bytes(monkeypatch):
+    """An owned INLINE binary file's raw route returns the EXACT bytes with a
+    binary content-type + an attachment Content-Disposition (the gap-3 fix — a
+    37 KB docx is stored inline, so its bytes are not reachable via /content which
+    str-decodes them). Bytes come from the pg pool (asyncpg returns raw bytes)."""
+    import app.api.workspace as ws
+
+    tid = mock_user_data["id"]  # the conftest caller owns a thread with this id-shape
+    fid = "11111111-1111-1111-1111-111111111111"
+    docx_bytes = b"PK\x03\x04\x00\x00binary-zip-\x00-bytes"
+
+    async def _noop_ownership(thread_id, current_user, supabase):
+        return None  # owner — passes
+
+    async def _fake_get_pool():
+        return object()
+
+    async def _fake_get_file_by_id(pool, file_id):
+        return {
+            "id": fid,
+            "thread_id": tid,
+            "path": "/risk-register.docx",
+            "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "content_inline": docx_bytes,
+            "content_storage_path": None,
+            "is_expired": False,
+        }
+
+    async def _fake_get_content(pool, supabase, row):
+        return row["content_inline"]
+
+    monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
+    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
+    monkeypatch.setattr(ws, "_get_file_content", _fake_get_content)
+
+    resp = await ws.download_workspace_file_raw(
+        thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+    )
+    assert resp.status_code == 200
+    assert resp.body == docx_bytes  # EXACT bytes, not str-decoded
+    assert resp.media_type.endswith("wordprocessingml.document")
+    assert "attachment" in resp.headers["content-disposition"]
+    assert "risk-register.docx" in resp.headers["content-disposition"]
+
+
+async def test_raw_route_expired_template_404(monkeypatch):
+    """An expired template (is_expired) 404s on the raw route — collapsed with
+    missing + cross-thread (no existence leak)."""
+    import app.api.workspace as ws
+    from fastapi import HTTPException
+
+    tid = mock_user_data["id"]
+    fid = "22222222-2222-2222-2222-222222222222"
+
+    async def _noop_ownership(thread_id, current_user, supabase):
+        return None
+
+    async def _fake_get_pool():
+        return object()
+
+    async def _fake_get_file_by_id(pool, file_id):
+        return {"id": fid, "thread_id": tid, "path": "/t.docx", "is_expired": True}
+
+    monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
+    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
+
+    with pytest.raises(HTTPException) as ei:
+        await ws.download_workspace_file_raw(
+            thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+        )
+    assert ei.value.status_code == 404
+
+
+async def test_raw_route_cross_thread_404(monkeypatch):
+    """A file whose row.thread_id differs from the path thread_id 404s (IDOR
+    collapsed to 404)."""
+    import app.api.workspace as ws
+    from fastapi import HTTPException
+
+    tid = mock_user_data["id"]
+    fid = "33333333-3333-3333-3333-333333333333"
+
+    async def _noop_ownership(thread_id, current_user, supabase):
+        return None
+
+    async def _fake_get_pool():
+        return object()
+
+    async def _fake_get_file_by_id(pool, file_id):
+        # The row belongs to a DIFFERENT thread than the URL's thread_id.
+        return {"id": fid, "thread_id": "99999999-9999-9999-9999-999999999999",
+                "path": "/t.docx", "is_expired": False}
+
+    monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
+    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
+
+    with pytest.raises(HTTPException) as ei:
+        await ws.download_workspace_file_raw(
+            thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+        )
+    assert ei.value.status_code == 404

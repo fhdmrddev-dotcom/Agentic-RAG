@@ -42,6 +42,9 @@ function file(overrides: Partial<WorkspaceFile> = {}): WorkspaceFile {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // downloadWorkspaceFile is async — return a resolved promise so the handler's
+  // `.catch()` has a promise to attach to (the real helper always returns one).
+  mockDownload.mockResolvedValue(undefined)
 })
 afterEach(() => cleanup())
 
