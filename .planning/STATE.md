@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T08:59:01.515Z"
-last_activity: 2026-06-11
+last_updated: "2026-06-11T18:08:16.012Z"
+last_activity: 2026-06-11 -- Plan 101.1-07 (gap-closure: DeepSeek FORCE-NOTHINK + D-08 layer-6 backstop + single-owner persist) COMPLETE
 progress:
   total_phases: 14
   completed_phases: 5
-  total_plans: 34
-  completed_plans: 34
-  percent: 100
+  total_plans: 39
+  completed_plans: 37
+  percent: 95
 ---
 
 # Project State
@@ -22,14 +22,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone started)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 101.1 — guaranteed-emission-layer
+**Current focus:** Phase --phase — 101.1
 
 ## Current Position
 
-Phase: 101.1 (guaranteed-emission-layer) — EXECUTING
-Plan: 6 of 6 (Plans 01-05 + gap-closure 06 COMPLETE; the Task-3 smoke bar MET — orchestrator-driven, openable cited .docx produced live)
-Status: **THE FEATURE WORKS LIVE** — run `4d035a65` (gpt-5.4-mini, the exact pair that 0-docx'd every prior attempt) produced `/risk-register.docx` (37,636 B): emit_forced→emit_validated (36/36 cited 100%, covers_template true)→emit_rendered→persisted; bytes re-opened clean, table grown 5 rows, zero residual. Gap-closure 101.1-06 peeled 5 live-only layers (citation-id namespace → dead retry wiring → placeholder oracle → column oracle → os.join harvest). Next = `/gsd:verify-work 101.1` (8 UAT rows + SC#10 4-axis cross-provider)
-Last activity: 2026-06-11
+Phase: --phase (101.1) — EXECUTING (gap-closure plans 07-10)
+Plan: 07 of 10 (gap-closure) — COMPLETE
+Status: Executing Phase 101.1 gap-closure
+Last activity: 2026-06-11 -- Plan 101.1-07 COMPLETE (gap 1a DeepSeek FORCE-NOTHINK + gap 1b layer-6 backstop + gap 2 single-owner persist)
+
+**Plan 101.1-07 (GAP CLOSURE — gap 1 DeepSeek silent run-crash + missing D-08 layer-6 backstop; gap 2 duplicate honest-failure message) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (RED `ebf2331b` / GREEN `d9f530f3`, TDD): **DeepSeek FORCE-NOTHINK (gap 1a).** Gated the DeepSeek thinking-enable block (`openai_service.py:1356`) with `force_tool_name is None` — a forced emit now sends a named `tool_choice` with thinking OFF, so DeepSeek v4 stops 400ing on "Thinking mode does not support this tool_choice" (UAT runs 575e7345/a7f415ad — docs SAID forceable). The non-forced (Deep) path keeps thinking ON byte-identical; symmetric sibling of the Anthropic thinking-OFF seam Plan 02 shipped (D-14/TIER-FORCE-NOTHINK now covers DeepSeek too). 3 capture-kwargs tests.
+- ✓ Task 2 (RED `e29fc3b1` / GREEN `314b13f1`, TDD): **forced_emit provider-error backstop (gap 1b substrate half, D-08 layer 6).** Wrapped `open_stream` + `_drain` (`forced_emit.py:213`) in a try/except → honest `failure="provider_error"` (new `failure_override` kwarg on `_failure`, distinct from `model_failed_to_emit`). A provider 400 / mid-stream raise no longer escapes to `threads.py` agent_runner (G-5 frozen). Truncation/recovery/validate loop stay on the success path. 3 tests (open_stream raise, drain raise, happy-path unchanged).
+- ✓ Task 3 (RED `9f98be24` / GREEN `e326bc6d`, TDD): **`_exec_llm_emit` catch-all + single-owner persist + phase flip (gap 1b executor half + gap 2).** (A) wrapped the executor body in a catch-all → `_emit_unexpected_failure` (emit_failed receipt + render_failed phase_substep + ONE surfaced message + a flagged honest output) so a render-dispatch raise / any unexpected error is auditable, not a silent run-crash; the existing `provider_error` result already surfaces via the state-a branch. (B) `_emit_failure_output` flags `_surfaced=True`; `harness_engine._surface_final_answer` SKIPS the second persist (and the live delta) for a `_surfaced` failure → exactly ONE assistant message (gap 2). (C) `run_workflow`'s completed-branch flips a `failure`-bearing phase output to `failed` (reusing `fail_phase`, no new schema) → the `workflow_phases` row never strands `active`/`completed`. 7 tests (catch-all, provider_error state-a, _surfaced flag, engine skip-persist, byte-identical success, source-flip guard).
+- **No deviations.** Plan executed exactly as written. threads.py untouched (G-5); no docxtpl added to backend/app (Pitfall 4); the auto/Deep path byte-identical (openai diff = one-line gate + comment). One implementation detail: the catch-all wraps the executor body via a mechanical +4 re-indent (inline state a-e returns sit inside the try and return normally; the except only fires on a RAISED exception).
+- **SEED-056 net-new-failure proof:** target suite **106 passed / 0 failed** (forced_emit + gateway_forcing + llm_emit_executor + emit_single_owner_persist + emit_field_map + harness_audit_emit + template_render + template_integrity + tool_dispatcher). Wider unit suite `56 failed / 706 passed` — all 56 proven PRE-EXISTING rot via base-checkout (4 changed source files reverted to base `55ad5b9c` → SAME 56 failed IDENTICALLY; none import a changed module). **Net-new failures = 0.**
+- All 4 STRIDE threats addressed (T-101.1-07-01 DoS catch-all; -02 D-14 guard green + auto byte-identical; -03 emit_failed receipt on unexpected; -04 identifier-only logs). SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-07-SUMMARY.md` (Self-Check: PASSED). **TMPL-02/TMPL-03 stay OPEN** — mark complete at phase verification (live cross-provider UAT; Plan 10 re-verify).
+- **Next:** the remaining gap plans (101.1-08..10) then `/gsd:verify-work 101.1` (Plan 10 live re-verify: DeepSeek forced emit + a deliberately-failed emit surfacing ONE honest message + a flipped phase) + `/gsd:secure-phase 101.1`.
 
 **Plan 101.1-06 (GAP CLOSURE — the live success path) — COMPLETE (2026-06-11):**
 
