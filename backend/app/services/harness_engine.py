@@ -357,7 +357,18 @@ async def _surface_final_answer(ctx, run_id: UUID, stream_run_id, redis, pool) -
     producer-shell ``runs`` row has no aggregated SDK usage either).
     """
     # The engine already set these on ctx at the completion block (:665-687).
-    final_text = (getattr(ctx, "final_output", None) or {}).get("text", "") or ""
+    _final_output = getattr(ctx, "final_output", None) or {}
+    final_text = _final_output.get("text", "") or ""
+    # Phase 101.1-07 (gap 2 — single-owner persist): an honest emit failure has ALREADY
+    # been persisted as the assistant ``messages`` row by ``_surface_failure_message``
+    # (the executor's RC-4 surface) and carries the ``_surfaced`` flag on the final
+    # output. Skip BOTH the durable persist AND the live delta here — a second insert
+    # would render the SAME failure text twice (the duplicate-honest-failure-message
+    # bug). The already-persisted row renders on the next reconcile, so nothing is lost.
+    # Harness-only: Deep never returns a ``_surfaced`` final_output (Deep does not run
+    # _exec_llm_emit), so this guard is a literal no-op on the shared path.
+    if _final_output.get("_surfaced"):
+        return None
     source_refs = getattr(ctx, "final_source_refs", None) or []
     citations = getattr(ctx, "final_citations", None) or []
     confidence = getattr(ctx, "final_confidence", None) or None
@@ -974,7 +985,18 @@ async def run_workflow(
         # ── completed: persist output (2-phase write step 2), advance ──────────
         output = outcome.output
         durable_output = _persist_output(output)
-        await complete_phase(pool, phase_id, durable_output)
+        # Phase 101.1-07 (gap 1 — the "phase stuck active" half): a GRACEFUL emit
+        # failure (an honest state a-e return from _exec_llm_emit, or the layer-6
+        # catch-all) comes back as a NORMAL phase output carrying a ``failure`` key —
+        # the run would otherwise "complete" and the active phase would never flip.
+        # Flip THIS phase to ``failed`` (reusing the existing fail_phase write — no new
+        # schema) so workflow_phases never strands in active/completed while the
+        # deliverable was never produced. Additive + harness-only: a Deep success output
+        # has no ``failure`` key, so this is a literal no-op on the shared path.
+        if isinstance(output, dict) and output.get("failure"):
+            await fail_phase(pool, phase_id, str(output.get("failure")))
+        else:
+            await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
         last_output = output
         # F7 (092-07): fold this phase's grounding into the run-level union.

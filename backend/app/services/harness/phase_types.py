@@ -980,11 +980,45 @@ def _emit_failure_output(failure: str, message: str, *, field_map=None) -> dict:
     """The phase output for an honest emit failure (state a-e). Carries ``text`` (the real
     reason — never an empty 'done', RC-4), the ``failure`` taxonomy value (GAP-C, the
     frontend's closed-taxonomy render), and — when available — the cited ``field_map`` as
-    a preserved fallback (D-08: a non-opening render never loses the extracted data)."""
-    out: dict = {"text": message, "failure": failure}
+    a preserved fallback (D-08: a non-opening render never loses the extracted data).
+
+    Phase 101.1-07 (gap 2 — single-owner persist): every state a-e return ALREADY wrote
+    the failure ``messages`` row via ``_surface_failure_message``. Flag the output
+    ``_surfaced=True`` so the engine's ``_surface_final_answer`` SKIPS a SECOND persist
+    (one writer, one message — closes the duplicate-honest-failure-message bug). Deep
+    never returns a ``_surfaced`` final_output (Deep does not run ``_exec_llm_emit``), so
+    the engine guard is a literal no-op on the shared path.
+    """
+    out: dict = {"text": message, "failure": failure, "_surfaced": True}
     if field_map is not None:
         out["field_map"] = field_map
     return out
+
+
+async def _emit_unexpected_failure(phase, *, definition, emitter, run_id, pool, ctx, exc) -> dict:
+    """Phase 101.1-07 (gap 1b — the executor half of the D-08 layer-6 backstop).
+
+    The single seam the ``_exec_llm_emit`` catch-all calls on ANY unexpected raise (the
+    render post_processor throwing, or any error NOT already handled by the inline state
+    a-e returns). It writes an ``emit_failed`` receipt, emits a ``render_failed``
+    phase_substep, surfaces ONE honest message, and returns a flagged honest output — so
+    a raised provider/render/persist error becomes an auditable honest failure instead of
+    a silent run-crash that strands the ``workflow_phases`` row in ``active`` forever
+    (UAT Test 2, runs 575e7345 / a7f415ad). Logs identifier-only (T-073-04 — never the
+    message/args content).
+    """
+    logger.exception("llm_emit: unexpected failure run=%s", run_id)
+    msg = (
+        "The deliverable could not be produced due to an unexpected error in the emit "
+        "pipeline; no Markdown stand-in is delivered as the artifact."
+    )
+    await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+        definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
+        render_verdict={"failure": "render_failed", "reason": "unexpected"}, output_file=None,
+    ))
+    await _emit_phase_substep(ctx, phase, failure="render_failed")
+    await _surface_failure_message(ctx, run_id, msg, pool)
+    return _emit_failure_output("render_failed", msg)
 
 
 async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
@@ -1031,268 +1065,278 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     run_id = getattr(ctx, "run_id", None)
     pool = getattr(ctx, "pool", None)
 
-    # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
-    asset_ref = _emit_bound_asset_ref(definition)
-    src = await resolve_template_source(
-        pool=pool,
-        supabase=getattr(ctx, "supabase", None),
-        thread_id=getattr(ctx, "thread_id", None),
-        user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
-        asset_ref=asset_ref,  # the bound template (NOT None) — the model never selects it
-    )
-    if not src.get("bytes"):
-        # State (e): no template bound AND no ephemeral upload resolved — honest fail.
-        msg = (
-            "No template is bound to this workflow phase and no usable template was "
-            f"found: {src.get('error') or 'no template available'}."
+    try:
+        # ── 1. GAP-B inject (D-10) — resolve the bound template SERVER-SIDE ──────────
+        asset_ref = _emit_bound_asset_ref(definition)
+        src = await resolve_template_source(
+            pool=pool,
+            supabase=getattr(ctx, "supabase", None),
+            thread_id=getattr(ctx, "thread_id", None),
+            user_id=(getattr(ctx, "current_user", None) or {}).get("id"),
+            asset_ref=asset_ref,  # the bound template (NOT None) — the model never selects it
         )
-        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
-            render_verdict={"failure": "no_template_bound"}, output_file=None,
-        ))
-        await _emit_phase_substep(ctx, phase, failure="no_template_bound")  # state (e)
-        await _surface_failure_message(ctx, run_id, msg, pool)
-        return _emit_failure_output("no_template_bound", msg)
-
-    # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
-    # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
-    # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
-    system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
-    user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
-    # 101.1-06: spotlight the retrieved evidence as <doc id=…> blocks so the model has
-    # REAL source ids to cite; the SAME walk yields the gate's valid set below — one id
-    # namespace, two consumers (prose-only user turns made every citation "invented").
-    spotlight, retrieved_ids = _emit_evidence(accumulated_outputs)
-    if spotlight:
-        user_turn = f"{user_turn}\n\n{spotlight}" if user_turn else spotlight
-    # 101.1-06: the template-placeholder oracle — the model must emit EXACTLY the keys
-    # the template dereferences (live run 7fa36d2a invented its own collection name and
-    # the render died on UndefinedError). Parsed server-side from the resolved bytes.
-    oracle = _template_oracle(src)
-    if oracle:
-        coll_specs = []
-        for coll in oracle["collections"]:
-            cols = (oracle.get("columns") or {}).get(coll)
-            coll_specs.append(
-                f"{coll} (each row's cells keyed EXACTLY: {', '.join(cols)})" if cols else coll
-            )
-        oracle_text = (
-            "TEMPLATE PLACEHOLDERS — emit EXACTLY these keys, names verbatim: "
-            f"scalars: {', '.join(oracle['scalars']) or '(none)'}; "
-            f"collections (one entry per row): {'; '.join(coll_specs) or '(none)'}. "
-            "Every listed key must appear in the field-map; set a value to null when the "
-            "sources do not support it."
-        )
-        user_turn = f"{user_turn}\n\n{oracle_text}" if user_turn else oracle_text
-    messages = [{"role": "user", "content": user_turn}] if user_turn else []
-
-    # ── 2b + 3. Bounded forced shot + citation gate (D-08 layers 2-5) ─────────────
-    # 101.1-06: the engine's _run_phase_with_gates retry only fires for phases that
-    # CONFIGURE validators — the llm_emit citation gate is executor-internal, so the
-    # designed layer-5 bounded retry lives HERE: ≤ _EMIT_MAX_ATTEMPTS sealed single
-    # shots, each rejection feeding the NAMED offending leaves back (cite-or-null),
-    # then the honest state-(b) fail. Retry fires ONLY when there IS retrieval
-    # evidence (a non-empty valid set) — with nothing retrieved the model can never
-    # cite validly, so the first reject is final (live run cef463f7: 28/32 cited,
-    # 0 invented, 4 uncited — exactly the case one feedback round fixes).
-    # Receipts are per-attempt (INSERT-only — the attempt trail IS the audit story).
-    citation_feedback = ""
-    for attempt in range(1, _EMIT_MAX_ATTEMPTS + 1):
-        await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
-        forced_md = _emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter,
-            result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
-                    "recovered_from_narration": None, "truncated": None},
-            gate=None, render_verdict=None, output_file=None,
-        )
-        forced_md["attempt"] = attempt
-        await _emit_audit(ctx, event_type="emit_forced", metadata=forced_md)
-
-        await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
-        result = await forced_emit(
-            messages=messages,
-            model=model,
-            provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
-            emitter=emitter,
-            tools=_emit_forced_tool(emitter),
-            user_settings=getattr(ctx, "user_settings", None),
-            system_prompt=system_prompt + citation_feedback,
-        )
-
-        if result.get("recovered_from_narration"):
-            # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
-            await _emit_phase_substep(ctx, phase, status="recovering")  # amber tint = degraded but honest
-            await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
-                definition=definition, phase=phase, emitter=emitter, result=result,
-                gate=None, render_verdict=None, output_file=None,
-            ))
-
-        if result.get("failure"):
-            # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
+        if not src.get("bytes"):
+            # State (e): no template bound AND no ephemeral upload resolved — honest fail.
             msg = (
-                "The model did not emit a structured field-map for the template "
-                "(it narrated prose or was truncated) and the deliverable was NOT produced. "
-                "This is an honest failure — no Markdown stand-in is delivered as the artifact."
+                "No template is bound to this workflow phase and no usable template was "
+                f"found: {src.get('error') or 'no template available'}."
             )
             await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
-                definition=definition, phase=phase, emitter=emitter, result=result,
-                gate=None, render_verdict=None, output_file=None,
+                definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
+                render_verdict={"failure": "no_template_bound"}, output_file=None,
             ))
-            await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
+            await _emit_phase_substep(ctx, phase, failure="no_template_bound")  # state (e)
             await _surface_failure_message(ctx, run_id, msg, pool)
-            return _emit_failure_output("model_failed_to_emit", msg)
+            return _emit_failure_output("no_template_bound", msg)
 
-        emitted: EmitFieldMap = result["emitted"]
-
-        # Citation gate (layer 4) — BEFORE render (reject without touching the sandbox).
-        legacy_map = emit_field_map_to_legacy(emitted)
-        # retrieved_ids computed above by the SAME _emit_evidence walk that built the
-        # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
-        # placeholder_keys: the PARSED template oracle when available (real coverage —
-        # an uncovered key would die in the render as UndefinedError); else the emitted
-        # map's own keys (the pre-oracle behavior for non-docx emitters).
-        placeholder_keys = (
-            (oracle["scalars"] + oracle["collections"]) if oracle else (
-                list(legacy_map.get("scalars", {}).keys())
-                + list(legacy_map.get("collections", {}).keys())
-            )
-        )
-        await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
-        gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
-        missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
-        # 101.1-06: column coverage — the template derefs specific cell keys inside the
-        # row loop ({{ r.risk_id.value }}); a mis-keyed cell would die in the render as
-        # UndefinedError (live run 454e30c9). Deterministic, BEFORE the sandbox.
+        # ── 2. Forced shot (D-08 layers 1-4) — the SEALED single call, never the loop ─
+        # 099 WFSKILL-01 (D-05/D-06): compose the skill framing; F8 retry feedback consumed
+        # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
+        system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
+        user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
+        # 101.1-06: spotlight the retrieved evidence as <doc id=…> blocks so the model has
+        # REAL source ids to cite; the SAME walk yields the gate's valid set below — one id
+        # namespace, two consumers (prose-only user turns made every citation "invented").
+        spotlight, retrieved_ids = _emit_evidence(accumulated_outputs)
+        if spotlight:
+            user_turn = f"{user_turn}\n\n{spotlight}" if user_turn else spotlight
+        # 101.1-06: the template-placeholder oracle — the model must emit EXACTLY the keys
+        # the template dereferences (live run 7fa36d2a invented its own collection name and
+        # the render died on UndefinedError). Parsed server-side from the resolved bytes.
+        oracle = _template_oracle(src)
         if oracle:
-            for coll, cols in (oracle.get("columns") or {}).items():
-                emitted_rows = (legacy_map.get("collections") or {}).get(coll) or []
-                emitted_cols = set()
-                for row in emitted_rows:
-                    emitted_cols |= set((row or {}).keys())
-                if emitted_rows:
-                    missing_keys += [f"{coll}.{c}" for c in cols if c not in emitted_cols]
-        if (
-            gate["uncited_value_count"] == 0
-            and gate["invented_citation_count"] == 0
-            and not (oracle and missing_keys)
-        ):
-            break  # gate passed — proceed to render
+            coll_specs = []
+            for coll in oracle["collections"]:
+                cols = (oracle.get("columns") or {}).get(coll)
+                coll_specs.append(
+                    f"{coll} (each row's cells keyed EXACTLY: {', '.join(cols)})" if cols else coll
+                )
+            oracle_text = (
+                "TEMPLATE PLACEHOLDERS — emit EXACTLY these keys, names verbatim: "
+                f"scalars: {', '.join(oracle['scalars']) or '(none)'}; "
+                f"collections (one entry per row): {'; '.join(coll_specs) or '(none)'}. "
+                "Every listed key must appear in the field-map; set a value to null when the "
+                "sources do not support it."
+            )
+            user_turn = f"{user_turn}\n\n{oracle_text}" if user_turn else oracle_text
+        messages = [{"role": "user", "content": user_turn}] if user_turn else []
 
-        # Rejected — per-attempt receipt, then retry-with-feedback or honest fail.
-        rejected_md = _emit_audit_metadata(
+        # ── 2b + 3. Bounded forced shot + citation gate (D-08 layers 2-5) ─────────────
+        # 101.1-06: the engine's _run_phase_with_gates retry only fires for phases that
+        # CONFIGURE validators — the llm_emit citation gate is executor-internal, so the
+        # designed layer-5 bounded retry lives HERE: ≤ _EMIT_MAX_ATTEMPTS sealed single
+        # shots, each rejection feeding the NAMED offending leaves back (cite-or-null),
+        # then the honest state-(b) fail. Retry fires ONLY when there IS retrieval
+        # evidence (a non-empty valid set) — with nothing retrieved the model can never
+        # cite validly, so the first reject is final (live run cef463f7: 28/32 cited,
+        # 0 invented, 4 uncited — exactly the case one feedback round fixes).
+        # Receipts are per-attempt (INSERT-only — the attempt trail IS the audit story).
+        citation_feedback = ""
+        for attempt in range(1, _EMIT_MAX_ATTEMPTS + 1):
+            await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
+            forced_md = _emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter,
+                result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
+                        "recovered_from_narration": None, "truncated": None},
+                gate=None, render_verdict=None, output_file=None,
+            )
+            forced_md["attempt"] = attempt
+            await _emit_audit(ctx, event_type="emit_forced", metadata=forced_md)
+
+            await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
+            result = await forced_emit(
+                messages=messages,
+                model=model,
+                provider=getattr(ctx, "provider", None) or _provider_for_model(model, ctx),
+                emitter=emitter,
+                tools=_emit_forced_tool(emitter),
+                user_settings=getattr(ctx, "user_settings", None),
+                system_prompt=system_prompt + citation_feedback,
+            )
+
+            if result.get("recovered_from_narration"):
+                # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
+                await _emit_phase_substep(ctx, phase, status="recovering")  # amber tint = degraded but honest
+                await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
+                    definition=definition, phase=phase, emitter=emitter, result=result,
+                    gate=None, render_verdict=None, output_file=None,
+                ))
+
+            if result.get("failure"):
+                # State (a): the model never emitted (after Plan 02 recovery + truncation guard).
+                msg = (
+                    "The model did not emit a structured field-map for the template "
+                    "(it narrated prose or was truncated) and the deliverable was NOT produced. "
+                    "This is an honest failure — no Markdown stand-in is delivered as the artifact."
+                )
+                await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+                    definition=definition, phase=phase, emitter=emitter, result=result,
+                    gate=None, render_verdict=None, output_file=None,
+                ))
+                await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
+                await _surface_failure_message(ctx, run_id, msg, pool)
+                return _emit_failure_output("model_failed_to_emit", msg)
+
+            emitted: EmitFieldMap = result["emitted"]
+
+            # Citation gate (layer 4) — BEFORE render (reject without touching the sandbox).
+            legacy_map = emit_field_map_to_legacy(emitted)
+            # retrieved_ids computed above by the SAME _emit_evidence walk that built the
+            # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
+            # placeholder_keys: the PARSED template oracle when available (real coverage —
+            # an uncovered key would die in the render as UndefinedError); else the emitted
+            # map's own keys (the pre-oracle behavior for non-docx emitters).
+            placeholder_keys = (
+                (oracle["scalars"] + oracle["collections"]) if oracle else (
+                    list(legacy_map.get("scalars", {}).keys())
+                    + list(legacy_map.get("collections", {}).keys())
+                )
+            )
+            await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
+            gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
+            missing_keys = [k for k in placeholder_keys if k not in gate["covered_keys"]]
+            # 101.1-06: column coverage — the template derefs specific cell keys inside the
+            # row loop ({{ r.risk_id.value }}); a mis-keyed cell would die in the render as
+            # UndefinedError (live run 454e30c9). Deterministic, BEFORE the sandbox.
+            if oracle:
+                for coll, cols in (oracle.get("columns") or {}).items():
+                    emitted_rows = (legacy_map.get("collections") or {}).get(coll) or []
+                    emitted_cols = set()
+                    for row in emitted_rows:
+                        emitted_cols |= set((row or {}).keys())
+                    if emitted_rows:
+                        missing_keys += [f"{coll}.{c}" for c in cols if c not in emitted_cols]
+            if (
+                gate["uncited_value_count"] == 0
+                and gate["invented_citation_count"] == 0
+                and not (oracle and missing_keys)
+            ):
+                break  # gate passed — proceed to render
+
+            # Rejected — per-attempt receipt, then retry-with-feedback or honest fail.
+            rejected_md = _emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=gate, render_verdict=None, output_file=None,
+            )
+            rejected_md["attempt"] = attempt
+            await _emit_audit(ctx, event_type="emit_rejected", metadata=rejected_md)
+
+            if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
+                offenders = ", ".join(
+                    (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
+                ) or "none"
+                missing = ", ".join(missing_keys) or "none"
+                citation_feedback = (
+                    f"\n\nYour previous field-map (attempt {attempt}) was REJECTED by the "
+                    f"citation gate: {gate['uncited_value_count']} value(s) had no citation, "
+                    f"{gate['invented_citation_count']} cited an id that was never shown, and "
+                    f"these REQUIRED template keys were missing: {missing}. "
+                    f"Offending fields: {offenders}. Emit EXACTLY the template's keys; for "
+                    "EVERY non-null value set source_chunk_id to the exact `id` attribute of "
+                    "a <doc> source block; if the sources do not support a value, set its "
+                    "value to null (a null is acceptable; an uncited or invented value is not)."
+                )
+                continue
+
+            # State (b): uncited / invented / missing keys — final (no evidence to cite,
+            # or attempts exhausted).
+            msg = (
+                "The emitted field-map has uncited or invented values or is missing required "
+                "template keys — every non-null value must cite a source that was actually "
+                "retrieved, and every template placeholder must be present. The deliverable "
+                "was NOT produced; the cited field-map is preserved below."
+            )
+            await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
+            await _surface_failure_message(ctx, run_id, msg, pool)
+            return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
+
+        await _emit_audit(ctx, event_type="emit_validated", metadata=_emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result,
             gate=gate, render_verdict=None, output_file=None,
-        )
-        rejected_md["attempt"] = attempt
-        await _emit_audit(ctx, event_type="emit_rejected", metadata=rejected_md)
-
-        if retrieved_ids and attempt < _EMIT_MAX_ATTEMPTS:
-            offenders = ", ".join(
-                (gate.get("uncited_leaves") or []) + (gate.get("invented_leaves") or [])
-            ) or "none"
-            missing = ", ".join(missing_keys) or "none"
-            citation_feedback = (
-                f"\n\nYour previous field-map (attempt {attempt}) was REJECTED by the "
-                f"citation gate: {gate['uncited_value_count']} value(s) had no citation, "
-                f"{gate['invented_citation_count']} cited an id that was never shown, and "
-                f"these REQUIRED template keys were missing: {missing}. "
-                f"Offending fields: {offenders}. Emit EXACTLY the template's keys; for "
-                "EVERY non-null value set source_chunk_id to the exact `id` attribute of "
-                "a <doc> source block; if the sources do not support a value, set its "
-                "value to null (a null is acceptable; an uncited or invented value is not)."
-            )
-            continue
-
-        # State (b): uncited / invented / missing keys — final (no evidence to cite,
-        # or attempts exhausted).
-        msg = (
-            "The emitted field-map has uncited or invented values or is missing required "
-            "template keys — every non-null value must cite a source that was actually "
-            "retrieved, and every template placeholder must be present. The deliverable "
-            "was NOT produced; the cited field-map is preserved below."
-        )
-        await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
-        await _surface_failure_message(ctx, run_id, msg, pool)
-        return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
-
-    await _emit_audit(ctx, event_type="emit_validated", metadata=_emit_audit_metadata(
-        definition=definition, phase=phase, emitter=emitter, result=result,
-        gate=gate, render_verdict=None, output_file=None,
-    ))
-
-    # ── 4. Render (post_processor) — re-dispatch the HARDENED handler (one path) ──
-    entry = resolve_emitter(emitter)
-    if entry.post_processor is None:
-        # Defensive: a registered emitter with no driver cannot produce a deliverable.
-        msg = f"The emitter {emitter!r} has no render driver registered."
-        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result,
-            gate=gate, render_verdict={"failure": "render_failed"}, output_file=None,
         ))
-        await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c) — no driver
+
+        # ── 4. Render (post_processor) — re-dispatch the HARDENED handler (one path) ──
+        entry = resolve_emitter(emitter)
+        if entry.post_processor is None:
+            # Defensive: a registered emitter with no driver cannot produce a deliverable.
+            msg = f"The emitter {emitter!r} has no render driver registered."
+            await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result,
+                gate=gate, render_verdict={"failure": "render_failed"}, output_file=None,
+            ))
+            await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c) — no driver
+            await _surface_failure_message(ctx, run_id, msg, pool)
+            return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+
+        await _emit_phase_substep(ctx, phase, status="rendering")  # sealed-sandbox render in flight
+
+        # The post_processor re-dispatches the HARDENED _handle_render_template (one render
+        # code path). Thread the server-resolved asset_ref + the validated retrieved-id set
+        # through the resolved-template payload so the handler re-resolves the SAME trusted
+        # template (the model never selects it) and its citation gate re-passes deterministically.
+        resolved = dict(src)
+        resolved["asset_ref"] = asset_ref
+        resolved["retrieved_ids"] = sorted(retrieved_ids)
+        render_out = await entry.post_processor(legacy_map, resolved, ctx)
+        status = (render_out or {}).get("status")
+
+        if status == "ok":
+            output_file = render_out.get("output_file") or _output_file_meta(render_out)
+            await _emit_audit(ctx, event_type="emit_rendered", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+                render_verdict=render_out.get("verdict"), output_file=output_file,
+            ))
+            await _emit_phase_substep(ctx, phase, status="validated")  # integrity re-open passed → done (green)
+            path = render_out.get("path") or (output_file or {}).get("path")
+            return {
+                "text": f"Produced the filled deliverable: {path}" if path else "Produced the filled deliverable.",
+                "output_file": output_file,
+                "path": path,
+                "field_map": legacy_map,
+                "source_refs": [],
+                "citations": [],
+            }
+
+        # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
+        reason = (render_out or {}).get("reason")
+        if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
+            # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
+            msg = (
+                "The filled file failed the integrity re-open (it will not open cleanly or "
+                "still contains unsubstituted placeholders) and was NOT delivered. The cited "
+                "field-map is preserved below as fallback."
+            )
+            await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
+                definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+                render_verdict=(render_out or {}).get("verdict") or {"failure": "integrity_failed"},
+                output_file=None,
+            ))
+            await _emit_phase_substep(ctx, phase, failure="integrity_failed")  # state (d)
+            await _surface_failure_message(ctx, run_id, msg, pool)
+            return _emit_failure_output("integrity_failed", msg, field_map=legacy_map)
+
+        # State (c): a render error (sandbox error / bad asset / resolution) — honest fail.
+        msg = (
+            "The template render failed: "
+            + str((render_out or {}).get("message") or reason or "unknown render error")
+            + ". The deliverable was NOT produced; the cited field-map is preserved below."
+        )
+        await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
+            definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
+            render_verdict={"failure": "render_failed", "reason": reason}, output_file=None,
+        ))
+        await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("render_failed", msg, field_map=legacy_map)
-
-    await _emit_phase_substep(ctx, phase, status="rendering")  # sealed-sandbox render in flight
-
-    # The post_processor re-dispatches the HARDENED _handle_render_template (one render
-    # code path). Thread the server-resolved asset_ref + the validated retrieved-id set
-    # through the resolved-template payload so the handler re-resolves the SAME trusted
-    # template (the model never selects it) and its citation gate re-passes deterministically.
-    resolved = dict(src)
-    resolved["asset_ref"] = asset_ref
-    resolved["retrieved_ids"] = sorted(retrieved_ids)
-    render_out = await entry.post_processor(legacy_map, resolved, ctx)
-    status = (render_out or {}).get("status")
-
-    if status == "ok":
-        output_file = render_out.get("output_file") or _output_file_meta(render_out)
-        await _emit_audit(ctx, event_type="emit_rendered", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
-            render_verdict=render_out.get("verdict"), output_file=output_file,
-        ))
-        await _emit_phase_substep(ctx, phase, status="validated")  # integrity re-open passed → done (green)
-        path = render_out.get("path") or (output_file or {}).get("path")
-        return {
-            "text": f"Produced the filled deliverable: {path}" if path else "Produced the filled deliverable.",
-            "output_file": output_file,
-            "path": path,
-            "field_map": legacy_map,
-            "source_refs": [],
-            "citations": [],
-        }
-
-    # A non-ok render: distinguish integrity failure (state d) from a render error (state c).
-    reason = (render_out or {}).get("reason")
-    if status == "failed" and reason in ("integrity", "residual_tokens", "harvest_failed", "no_verdict"):
-        # State (d): the rendered file won't open / has residual tokens — NEVER persisted.
-        msg = (
-            "The filled file failed the integrity re-open (it will not open cleanly or "
-            "still contains unsubstituted placeholders) and was NOT delivered. The cited "
-            "field-map is preserved below as fallback."
+    except Exception as _emit_exc:  # noqa: BLE001 — D-08 layer-6 executor backstop
+        # gap 1b: ANY raise inside the ladder (render dispatch throwing, an
+        # unexpected error) is converted to an honest receipt + ONE surfaced
+        # message + a flagged output — NEVER a silent escape to the engine generic
+        # run-failed catch (which would strand the workflow_phases row in active).
+        return await _emit_unexpected_failure(
+            phase, definition=definition, emitter=emitter, run_id=run_id,
+            pool=pool, ctx=ctx, exc=_emit_exc,
         )
-        await _emit_audit(ctx, event_type="emit_integrity_failed", metadata=_emit_audit_metadata(
-            definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
-            render_verdict=(render_out or {}).get("verdict") or {"failure": "integrity_failed"},
-            output_file=None,
-        ))
-        await _emit_phase_substep(ctx, phase, failure="integrity_failed")  # state (d)
-        await _surface_failure_message(ctx, run_id, msg, pool)
-        return _emit_failure_output("integrity_failed", msg, field_map=legacy_map)
-
-    # State (c): a render error (sandbox error / bad asset / resolution) — honest fail.
-    msg = (
-        "The template render failed: "
-        + str((render_out or {}).get("message") or reason or "unknown render error")
-        + ". The deliverable was NOT produced; the cited field-map is preserved below."
-    )
-    await _emit_audit(ctx, event_type="emit_failed", metadata=_emit_audit_metadata(
-        definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
-        render_verdict={"failure": "render_failed", "reason": reason}, output_file=None,
-    ))
-    await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c)
-    await _surface_failure_message(ctx, run_id, msg, pool)
-    return _emit_failure_output("render_failed", msg, field_map=legacy_map)
 
 
 def _provider_for_model(model: str, ctx) -> str | None:
