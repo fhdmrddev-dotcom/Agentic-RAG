@@ -367,7 +367,14 @@ async def download_workspace_file_raw(
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
 
     pool = await get_pg_pool()
-    row = await get_file_by_id(pool, UUID(file_id))
+    # 101.1 review WR-06: a malformed file_id (typo / crafted URL) must 404 like
+    # every sibling route (which passes the string to PostgREST and degrades to
+    # 404/empty) — never 500 on an unhandled ValueError from UUID().
+    try:
+        fid = UUID(file_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    row = await get_file_by_id(pool, fid)
     # Collapse missing / cross-thread / expired ALL to 404 (no existence leak).
     if (
         not row
