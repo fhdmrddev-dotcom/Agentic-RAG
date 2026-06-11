@@ -1305,8 +1305,19 @@ def create_adaptive_streaming_chat(
     user_settings: UserEffectiveSettings | None = None,
     tools_override: list[dict] | None = None,
     max_tokens: int | None = None,
+    force_tool_name: str | None = None,
+    strict_response_format: bool = False,
 ) -> tuple:
-    """Returns (stream, calling_mode). calling_mode indicates how to parse the response."""
+    """Returns (stream, calling_mode). calling_mode indicates how to parse the response.
+
+    Phase 101.1 (D-05 — TIER-FORCE / TIER-COERCE): the OpenAI-compat gateway adapter
+    passes ``force_tool_name`` to FORCE the model to call a named tool
+    (``tool_choice={"type":"function","function":{"name":...}}``) and, when
+    ``strict_response_format`` is set, requests a token-level guaranteed schema
+    (strict ``response_format`` built from the forced tool's parameters). Both are
+    ADDITIVE — the defaults (None / False) preserve the byte-identical ``"auto"`` path
+    (Deep + every pre-101.1 caller unchanged). This is the openai-compat ADAPTER's own
+    request construction — NOT the shared chunk/SSE path (the D-14 RED LINE)."""
     client = get_llm_client(user_settings)
     effective_model = model or (user_settings.llm_model if user_settings else None) or settings.llm_model
     resolved_tokens = _resolve_max_tokens(max_tokens, user_settings)
@@ -1349,7 +1360,40 @@ def create_adaptive_streaming_chat(
             "reasoning_effort": "high",
         }
 
-    if tool_choice == "auto":
+    # Phase 101.1 (D-05 — TIER-FORCE): a forced emit names the tool the model MUST
+    # call. This branch slots BESIDE the ``"auto"`` branch (additive — force_tool_name
+    # is None for every Deep / pre-101.1 caller). It always passes the tools + the
+    # named tool_choice; on a NATIVE provider it additionally requests a strict
+    # ``response_format`` (token-level guarantee) when ``strict_response_format`` is
+    # set. NEVER reached on the auto path (the byte-identical RED LINE).
+    if force_tool_name is not None:
+        _forced_tools = tools_override if tools_override is not None else get_tools(user_settings)
+        kwargs["tools"] = _forced_tools
+        kwargs["tool_choice"] = {
+            "type": "function",
+            "function": {"name": force_tool_name},
+        }
+        if strict_response_format:
+            # Build a strict json_schema response_format from the forced tool's
+            # parameters (already additionalProperties:false + all-required-with-null
+            # from EmitFieldMap — D-09). Defensive: only inject when the named tool's
+            # schema is present in the tool list.
+            _schema = None
+            for _t in _forced_tools or []:
+                _fn = _t.get("function") if isinstance(_t, dict) else None
+                if _fn and _fn.get("name") == force_tool_name:
+                    _schema = _fn.get("parameters")
+                    break
+            if _schema is not None:
+                kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": force_tool_name,
+                        "schema": _schema,
+                        "strict": True,
+                    },
+                }
+    elif tool_choice == "auto":
         if calling_mode == CallingMode.NATIVE:
             # Native mode: pass tools via API parameter
             kwargs["tools"] = tools_override if tools_override is not None else get_tools(user_settings)

@@ -38,6 +38,11 @@ from typing import TYPE_CHECKING, Generator
 # this namespace so the seam + integration tests patch it HERE (Task 3 repoint).
 from app.services.google_service import stream_google
 
+# Phase 101.1 (D-05): the Gemini forcing shape (mode=ANY) is built from the SAME
+# ``types`` module google_service uses — import it here so the forcing translation
+# is self-contained at the adapter boundary.
+from google.genai import types
+
 # Inline at agent_loop.py:1537 today — SAME source, moves with the construction.
 from app.services.openai_service import _resolve_max_tokens, get_tools
 
@@ -64,6 +69,20 @@ def open_google_stream(request: "GatewayRequest") -> Generator[dict, None, None]
         or ""
     )
     _g_tools = request.tools if request.tools is not None else get_tools(user_settings)
+    # Phase 101.1 (D-05 — TIER-FORCE): a forced emit injects function_calling_config
+    # mode=ANY + allowed_function_names=[<emitter>] so Gemini MUST call the named tool.
+    # ADDITIVE — when ``force_tool_name`` is unset, ``tool_config=None`` keeps the auto
+    # path byte-identical (automatic_function_calling stays disabled either way).
+    _g_tool_config = (
+        types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(
+                mode="ANY",
+                allowed_function_names=[request.force_tool_name],
+            )
+        )
+        if request.force_tool_name
+        else None
+    )
     return stream_google(
         messages=request.messages,
         tools=_g_tools,
@@ -72,4 +91,5 @@ def open_google_stream(request: "GatewayRequest") -> Generator[dict, None, None]
         api_key=_g_api_key,
         max_tokens=_g_max_tokens,
         force_no_tools=request.force_no_tools,
+        tool_config=_g_tool_config,
     )

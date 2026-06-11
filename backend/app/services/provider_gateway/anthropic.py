@@ -62,6 +62,17 @@ def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, No
         or ""
     )
     _ant_tools = request.tools if request.tools is not None else get_tools(user_settings)
+    # Phase 101.1 (D-05 — TIER-FORCE-NOTHINK): a forced emit names the emitter tool so
+    # Anthropic MUST call it (``{"type":"tool","name":<emitter>}``). emit forces
+    # thinking OFF — forcing ERRORS under extended thinking (D-05); this adapter never
+    # enables thinking, so the resting state is already correct. When ``force_tool_name``
+    # is unset, ``tool_choice=None`` is passed and ``stream_anthropic`` keeps its :177
+    # force_no_tools/auto resolution byte-identically (Deep unchanged).
+    _ant_tool_choice = (
+        {"type": "tool", "name": request.force_tool_name}
+        if request.force_tool_name
+        else None
+    )
     return stream_anthropic(
         messages=request.messages,
         tools=_ant_tools,
@@ -70,4 +81,5 @@ def open_anthropic_stream(request: "GatewayRequest") -> Generator[dict, None, No
         api_key=_ant_api_key,
         max_tokens=_ant_max_tokens,
         force_no_tools=request.force_no_tools,
+        tool_choice=_ant_tool_choice,
     )

@@ -157,6 +157,7 @@ def stream_anthropic(
     api_key: str,
     max_tokens: int,
     force_no_tools: bool = False,
+    tool_choice: dict | None = None,
 ) -> Generator[dict, None, None]:
     """Stream Anthropic API call; yield normalized event dicts for threads.py agent loop.
 
@@ -173,8 +174,17 @@ def stream_anthropic(
     # System prompt as content block array with cache_control (D-05)
     system = [{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}]
 
-    # tool_choice must be a dict (Anthropic does not accept string shorthand)
-    tool_choice = {"type": "none"} if force_no_tools else {"type": "auto"}
+    # tool_choice must be a dict (Anthropic does not accept string shorthand).
+    # Phase 101.1 (D-05 / G-5 additive seam): a caller-supplied ``tool_choice`` (the
+    # gateway anthropic adapter passes ``{"type":"tool","name":<emitter>}`` for a
+    # forced emit) takes precedence; when None the pre-101.1 force_no_tools/auto
+    # resolution runs byte-identically (Deep + every existing caller unchanged).
+    # NOTE (D-05 TIER-FORCE-NOTHINK): named-tool forcing ERRORS for Anthropic when
+    # extended-reasoning mode is ON. This client never enables that mode (the resting
+    # state), so a named tool_choice is always valid here.
+    tool_choice = tool_choice if tool_choice is not None else (
+        {"type": "none"} if force_no_tools else {"type": "auto"}
+    )
 
     # tool_choice is invalid when tools list is empty
     stream_kwargs: dict = {

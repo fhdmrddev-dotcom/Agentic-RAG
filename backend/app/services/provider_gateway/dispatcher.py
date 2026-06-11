@@ -70,6 +70,18 @@ class GatewayRequest:
     api_key: str = ""
     user_settings: "UserEffectiveSettings | None" = None
     tool_choice: str = "auto"
+    # Phase 101.1 (D-05 / D-14) — capability-tiered FORCING rides BESIDE tool_choice.
+    # ADDITIVE: the SAFE defaults (force_tool_name=None, strict_schema=False) preserve
+    # the byte-identical "auto" path — a consumer that does not set them (Deep, every
+    # pre-101.1 caller) is unchanged. When ``force_tool_name`` is set, each native
+    # adapter translates it to its provider's named-tool-forcing shape (RESEARCH §2);
+    # ``strict_schema`` additionally requests a token-level guaranteed schema where the
+    # provider supports it (OpenAI-compat strict ``response_format``). The forcing
+    # translation lives ONLY in the 3 adapters — NEVER in the shared chunk/SSE path
+    # (the D-14 RED LINE; the guard test asserts no ``if provider ==`` forcing branch
+    # leaks into the consumer).
+    force_tool_name: str | None = None
+    strict_schema: bool = False
 
 
 async def open_stream(

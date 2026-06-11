@@ -386,6 +386,7 @@ def stream_google(
     api_key: str,
     max_tokens: int,
     force_no_tools: bool = False,
+    tool_config: "types.ToolConfig | None" = None,
 ) -> Generator[dict, None, None]:
     """Stream a Gemini call via the native google-genai SDK; yield normalized
     event dicts for the threads.py agent loop.
@@ -415,6 +416,12 @@ def stream_google(
         config_kwargs["system_instruction"] = effective_system
     if google_tools:
         config_kwargs["tools"] = google_tools
+    # Phase 101.1 (D-05 — TIER-FORCE): a forced emit injects a tool_config with
+    # function_calling_config(mode=ANY, allowed_function_names=[<emitter>]) so Gemini
+    # MUST call the named tool. ADDITIVE — when None the auto path is byte-identical;
+    # automatic_function_calling stays DISABLED (ANY mode is independent of it).
+    if tool_config is not None and google_tools:
+        config_kwargs["tool_config"] = tool_config
 
     config = types.GenerateContentConfig(**config_kwargs)
 

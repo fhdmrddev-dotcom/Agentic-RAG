@@ -389,12 +389,19 @@ def open_openai_compat_stream(
     OpenAI-only). The STRUCTURED ``messages`` injection (L-1) + the
     ``parse_structured_tool_calls`` post-parse (L-3) STAY consumer-side.
     """
+    # Phase 101.1 (D-05 — TIER-FORCE): translate the gateway forcing decision into the
+    # OpenAI-compat request. ADDITIVE — when ``force_tool_name`` is None the auto path
+    # is byte-identical (force_tool_name=None / strict_response_format=False are the
+    # constructor defaults). Self-contained at this adapter; the shared chunk handler
+    # (``_ClosableEventStream._normalize``) is NOT branched (the D-14 RED LINE).
     stream, calling_mode = create_adaptive_streaming_chat(
         messages=request.messages,
         model=request.model,
         user_settings=request.user_settings,
         tool_choice=request.tool_choice,
         tools_override=request.tools,
+        force_tool_name=request.force_tool_name,
+        strict_response_format=request.strict_schema,
     )
     return (
         _ClosableEventStream(stream, request.active_provider_name, calling_mode),
