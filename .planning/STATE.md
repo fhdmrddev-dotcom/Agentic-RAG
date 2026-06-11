@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.9
 milestone_name: Workflow Studio
 status: executing
-last_updated: "2026-06-11T18:40:00.000Z"
-last_activity: 2026-06-11 -- Plan 101.1-09 (gap-closure: download gap-3 + GAP-C phase_substep demux gap-6 RATIFIED + panel self-heal gap-4-frontend) COMPLETE
+last_updated: "2026-06-11T23:10:00.000Z"
+last_activity: 2026-06-11 -- Plan 101.1-10 (live re-verify: 3 dirty rows repaired + all 6 gaps PROVEN CLOSED live + blocked Tests 6-8 reach honest verdicts + weak-model render column filled) COMPLETE
 progress:
   total_phases: 14
   completed_phases: 5
   total_plans: 40
-  completed_plans: 39
-  percent: 98
+  completed_plans: 40
+  percent: 100
 ---
 
 # Project State
@@ -26,10 +26,27 @@ See: .planning/PROJECT.md (updated 2026-06-08 — v2.9 Workflow Studio milestone
 
 ## Current Position
 
-Phase: --phase (101.1) — EXECUTING (gap-closure plans 07-10)
-Plan: 9 of 10 (gap-closure) — COMPLETE
-Status: Executing Phase 101.1 gap-closure
-Last activity: 2026-06-11 -- Plan 101.1-09 COMPLETE (gap 3 download + gap 6 GAP-C phase_substep demux RATIFIED + gap 4 frontend panel self-heal)
+Phase: --phase (101.1) — gap-closure plans 07-10 COMPLETE (live re-verified)
+Plan: 10 of 10 (gap-closure) — COMPLETE
+Status: Phase 101.1 gap-closure execution COMPLETE — ready for /gsd:verify-work 101.1 + /gsd:secure-phase 101.1
+Last activity: 2026-06-11 -- Plan 101.1-10 COMPLETE (live re-verify: dirty-row repair + all 6 gaps PROVEN CLOSED + Tests 6-8 reach honest verdicts + weak-model render column filled)
+
+**Plan 101.1-10 (GAP CLOSURE — dirty-row repair + live re-verification across the 6 gaps) — COMPLETE (2026-06-11):**
+
+- ✓ Task 1 (commit `cb573b72`): **the 3 dirty `workflow_phases` rows repaired** (575e7345 / a7f415ad / 4ea9bc56 — parent run `failed`, fill phase stuck `active` forever → flipped to `failed`). `scripts/repair_dirty_workflow_phases.py` (NEW): idempotent, scoped psycopg2 (:54322) — dry-run preview, `--apply`-gated UPDATE, read-back assertion that no `active` fill row remains for those 3 runs; never touches another run, never deletes, never alters `workflow_runs`/`harness_audit`. A second run finds 0 changes.
+- ✓ Task 2 (`checkpoint:human-verify`) — **LIVE RE-VERIFICATION COMPLETE (orchestrator-driven via Chrome MCP + psycopg2 + downloaded-file byte validation; 7 orchestrator runs + 1 operator-driven DeepSeek run). ALL 6 DIAGNOSED GAPS PROVEN CLOSED:**
+  - **Gap 1 (DeepSeek silent-crash) CLOSED:** deepseek-v4-pro run `fbec07cd` — no 400, no silent crash; `emit_forced` receipt `thinking:false` (FORCE-NOTHINK live); honest `emit_forced->emit_failed`, fill phase flipped `failed`.
+  - **Gap 2 (duplicate message) CLOSED:** EXACTLY ONE assistant message on every honest-failure run (all 8 runs).
+  - **Gaps 3+5 (ephemeral fill persist + download) CLOSED:** gpt-5.5 run `a5705707` — full ladder `emit_forced->emit_validated->emit_rendered`; `/deliverable-filled.docx` (37,859 B) persisted to a DISTINCT path (binary-delta skip held, template untouched); `/raw` route 200 attachment; downloaded bytes re-open via python-docx, residual `[]`, fractured `{{top_risk}}` filled.
+  - **Gap 4 (panel self-heal) CLOSED:** the deliverable appeared in FILES WITHOUT an F5 (workspace files + snapshot refetch on the terminal event; snapshot 200 on the finished run).
+  - **Gap 6 (emit sub-steps on the rail) PROVEN LIVE:** DOM sampler captured 'Emitting the field-map' (19:21:49) -> 'Rendering the deliverable' (19:21:57) -> a named failure state (19:22:22) ticking on the PhaseCard rail (run `9b0e8f5f`; also `dd8e0314`).
+  - **Blocked Tests 6-8 (pptx/xlsx) now reach honest verdicts:** runs `cc7a4098` / `9b0e8f5f` / `23d5eb22` each `emit_forced->emit_validated->emit_integrity_failed`, named on the rail, 1 message, phase `failed` (pre-fix: silent crash at persist).
+  - **Weak-model cross-provider render column filled:** gemini-3.5-flash (`a7878fd6`), claude-sonnet-4-6 (`60bee474`), MiniMax-M3 (`dd8e0314`), deepseek-v4-pro (`fbec07cd`) all VISIBLE honest failures naming the gate. **G-6 acceptance bar MET on every provider** (openable cited .docx OR a visible honest failure naming the gate).
+  - **Global invariant:** zero NEW dirty rows across 8 runs; every fill phase flipped correctly; Task 1's 3 repaired rows stayed repaired. The only remaining `active`-under-`failed` rows are the 2 known out-of-scope Phase-092 `confirm` rows (DI-101.1-10-A).
+- **3 minor run-honesty/calibration findings, non-blocking, routed forward:** (F1) live phase-pill shows green 'Complete' on an honestly-failed fill, flips to red 'Failed' on reload (the failure box + named state ARE visible) — run-legibility phase; (F2) reload replaces the rich failure reason with 'error field was empty' (reason lives in harness_audit + the chat message, not the workflow_phases `error` field) — run-legibility phase; (F3) office-format ephemeral fills (pptx/xlsx) fail integrity re-open instead of delivering with `documented_limit` semantics (honest, but the documented-limit delivery path never emits a file for these formats; `assert_integrity` already carries the limits, the emitter gate must honor them) — follow-up.
+- **No deviations.** Task 1 ran per spec; Task 2 (human-verify) executed via orchestrator/operator live runs, results recorded in `101.1-10-SUMMARY.md` + the `101.1-UAT.md` scoreboard (15 pass / 0 issue / 0 blocked).
+- **TMPL-02 / TMPL-03 closeable at phase verification** — the cross-provider render column is filled; the ephemeral fill persists + downloads; the emit sub-steps render live; the blocked tests reach verdicts. SUMMARY: `.planning/phases/101.1-guaranteed-emission-layer/101.1-10-SUMMARY.md`.
+- **Next:** `/gsd:verify-work 101.1` (the 8 UAT rows + the SC#10 4-axis full roster) then `/gsd:secure-phase 101.1`.
 
 **Plan 101.1-09 (GAP CLOSURE — gap 3 Download dead-text + gap 6 GAP-C phase_substep demux unwired + gap 4 frontend panel staleness) — COMPLETE (2026-06-11):**
 
