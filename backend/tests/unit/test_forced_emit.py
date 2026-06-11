@@ -231,3 +231,50 @@ def test_forced_emit_never_calls_open_loop():
     src = inspect.getsource(fe)
     assert "run_task_sub_agent" not in src
     assert "run_agent_loop" not in src
+
+
+# ── Phase 101.1-07 (gap 1b, layer 6 substrate half) — provider-error backstop ──
+# A provider 400 (e.g. DeepSeek thinking+tool_choice) raised from open_stream/_drain
+# must be CAUGHT and converted to an honest provider_error failure dict — never
+# propagate as a silent escape to threads.py agent_runner (D-08 layer 6).
+
+
+async def test_forced_emit_open_stream_raise_provider_error(monkeypatch):
+    """When open_stream RAISES (a provider 400), forced_emit returns an honest
+    provider_error failure dict — no exception escapes."""
+    import app.services.forced_emit as fe
+
+    async def _boom(provider, request):
+        raise RuntimeError("400 Thinking mode does not support this tool_choice")
+
+    monkeypatch.setattr(fe, "open_stream", _boom)
+    monkeypatch.setattr(
+        fe, "get_model_capability", lambda model: {"forced_emission": True, "provider": "deepseek"}
+    )
+    res = await _run(model="deepseek-v4")
+    assert res["emitted"] is None
+    assert res["failure"] == "provider_error"
+
+
+async def test_forced_emit_drain_raise_provider_error(_patch_gateway, monkeypatch):
+    """When the drain RAISES (provider stream error mid-flight), forced_emit likewise
+    returns provider_error — never raises."""
+    import app.services.forced_emit as fe
+
+    def _boom(stream):
+        raise RuntimeError("stream chunk decode error")
+
+    monkeypatch.setattr(fe, "_drain", _boom)
+    _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
+    res = await _run()
+    assert res["emitted"] is None
+    assert res["failure"] == "provider_error"
+
+
+async def test_forced_emit_happy_path_unchanged(_patch_gateway):
+    """The happy path (a clean forced shot) is UNCHANGED — still returns a validated
+    EmitFieldMap with failure=None (the backstop only fires on a RAISED exception)."""
+    _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
+    res = await _run()
+    assert res["emitted"] is not None
+    assert res["failure"] is None
