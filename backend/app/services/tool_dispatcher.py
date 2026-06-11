@@ -1759,7 +1759,7 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
                 for _root, _dirs, _files in _os_local.walk(_td):
                     for _fn in _files:
                         if _fn == out_filename:
-                            with open(_os_local.join(_root, _fn), "rb") as _fp:
+                            with open(_os_local.path.join(_root, _fn), "rb") as _fp:
                                 produced = _fp.read()
                             break
                     if produced is not None:
