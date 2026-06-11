@@ -844,6 +844,46 @@ async def _emit_audit(ctx, *, event_type: str, metadata: dict) -> None:
         logger.warning("llm_emit: audit receipt %s write failed run=%s", event_type, run_id)
 
 
+async def _emit_phase_substep(ctx, phase, *, status: str | None = None, failure: str | None = None) -> None:
+    """Emit ONE GAP-C ``phase_substep`` run-honesty event (D-11) on the EXISTING producer
+    stream the frontend already tails — reusing the canonical one-XADD ``_emit`` (no new
+    wire path, no per-provider branch; the D-14 shared-path guard still holds).
+
+    A sealed single-shot forced emit is ATOMIC (it cannot stream tokens), so the emit
+    moment surfaces as DISCRETE sub-steps instead of a static "Step 0 · working…" box:
+
+      - ``status`` ∈ {forcing, emitting, recovering, validating, rendering, validated} —
+        the live transition (RESEARCH §5). ``recovering`` is the degraded-but-honest D-06
+        NATIVE-narration recovery.
+      - ``failure`` ∈ {model_failed_to_emit, citation_gate_rejected, render_failed,
+        integrity_failed, no_template_bound} — a TERMINAL failed-as-failed sub-event the
+        PhaseCard renders with a reason (never an empty 'done', RC-4).
+
+    Carries ``phase=phase.slug`` (+ ``phase_index``) so the frontend maps the sub-event to
+    the right phase row on the status-node rail. Best-effort: a missing redis / run_id on a
+    minimal ctx must never crash the emit (mirrors ``_emit_audit``)."""
+    redis = getattr(ctx, "redis", None)
+    if redis is None:
+        return
+    stream_id = getattr(ctx, "producer_run_id", None) or getattr(ctx, "run_id", None)
+    if stream_id is None:
+        return
+    emit = getattr(ctx, "emit", None)
+    if emit is None:
+        # Lazy import to avoid the harness_engine → harness package → phase_types cycle
+        # (same pattern as the module-level _surface_failure_message delegate).
+        from app.services.harness_engine import _emit as emit
+    fields: dict = {"phase": getattr(phase, "slug", None), "phase_index": getattr(phase, "phase_index", None)}
+    if status is not None:
+        fields["status"] = status
+    if failure is not None:
+        fields["failure"] = failure
+    try:
+        await emit(redis, stream_id, "phase_substep", **fields)
+    except Exception:  # noqa: BLE001 — a run-honesty sub-event must never crash the emit
+        logger.warning("llm_emit: phase_substep emit failed run=%s", stream_id)
+
+
 def _emit_failure_output(failure: str, message: str, *, field_map=None) -> dict:
     """The phase output for an honest emit failure (state a-e). Carries ``text`` (the real
     reason — never an empty 'done', RC-4), the ``failure`` taxonomy value (GAP-C, the
@@ -918,6 +958,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             definition=definition, phase=phase, emitter=emitter, result=None, gate=None,
             render_verdict={"failure": "no_template_bound"}, output_file=None,
         ))
+        await _emit_phase_substep(ctx, phase, failure="no_template_bound")  # state (e)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("no_template_bound", msg)
 
@@ -928,6 +969,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
     messages = [{"role": "user", "content": user_turn}] if user_turn else []
 
+    await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
     await _emit_audit(ctx, event_type="emit_forced", metadata=_emit_audit_metadata(
         definition=definition, phase=phase, emitter=emitter,
         result={"tier": None, "provider": getattr(ctx, "provider", None), "forced": None,
@@ -935,6 +977,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         gate=None, render_verdict=None, output_file=None,
     ))
 
+    await _emit_phase_substep(ctx, phase, status="emitting")  # the forced LLM call is in flight (atomic)
     result = await forced_emit(
         messages=messages,
         model=model,
@@ -947,6 +990,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
 
     if result.get("recovered_from_narration"):
         # D-06 fired — record the degraded-but-honest NATIVE recovery transition.
+        await _emit_phase_substep(ctx, phase, status="recovering")  # amber tint = degraded but honest
         await _emit_audit(ctx, event_type="emit_recovered", metadata=_emit_audit_metadata(
             definition=definition, phase=phase, emitter=emitter, result=result,
             gate=None, render_verdict=None, output_file=None,
@@ -963,6 +1007,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             definition=definition, phase=phase, emitter=emitter, result=result,
             gate=None, render_verdict=None, output_file=None,
         ))
+        await _emit_phase_substep(ctx, phase, failure="model_failed_to_emit")  # state (a)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("model_failed_to_emit", msg)
 
@@ -975,6 +1020,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         list(legacy_map.get("scalars", {}).keys())
         + list(legacy_map.get("collections", {}).keys())
     )
+    await _emit_phase_substep(ctx, phase, status="validating")  # citation/coverage gate + truncation guard
     gate = check_coverage(legacy_map, retrieved_ids, placeholder_keys)
     if gate["uncited_value_count"] > 0 or gate["invented_citation_count"] > 0:
         # State (b): uncited / invented — rejected BEFORE render (deterministic, no LLM).
@@ -987,6 +1033,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             definition=definition, phase=phase, emitter=emitter, result=result,
             gate=gate, render_verdict=None, output_file=None,
         ))
+        await _emit_phase_substep(ctx, phase, failure="citation_gate_rejected")  # state (b)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("citation_gate_rejected", msg, field_map=legacy_map)
 
@@ -1004,8 +1051,11 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             definition=definition, phase=phase, emitter=emitter, result=result,
             gate=gate, render_verdict={"failure": "render_failed"}, output_file=None,
         ))
+        await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c) — no driver
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("render_failed", msg, field_map=legacy_map)
+
+    await _emit_phase_substep(ctx, phase, status="rendering")  # sealed-sandbox render in flight
 
     # The post_processor re-dispatches the HARDENED _handle_render_template (one render
     # code path). Thread the server-resolved asset_ref + the validated retrieved-id set
@@ -1023,6 +1073,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
             render_verdict=render_out.get("verdict"), output_file=output_file,
         ))
+        await _emit_phase_substep(ctx, phase, status="validated")  # integrity re-open passed → done (green)
         path = render_out.get("path") or (output_file or {}).get("path")
         return {
             "text": f"Produced the filled deliverable: {path}" if path else "Produced the filled deliverable.",
@@ -1047,6 +1098,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
             render_verdict=(render_out or {}).get("verdict") or {"failure": "integrity_failed"},
             output_file=None,
         ))
+        await _emit_phase_substep(ctx, phase, failure="integrity_failed")  # state (d)
         await _surface_failure_message(ctx, run_id, msg, pool)
         return _emit_failure_output("integrity_failed", msg, field_map=legacy_map)
 
@@ -1060,6 +1112,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
         definition=definition, phase=phase, emitter=emitter, result=result, gate=gate,
         render_verdict={"failure": "render_failed", "reason": reason}, output_file=None,
     ))
+    await _emit_phase_substep(ctx, phase, failure="render_failed")  # state (c)
     await _surface_failure_message(ctx, run_id, msg, pool)
     return _emit_failure_output("render_failed", msg, field_map=legacy_map)
 
