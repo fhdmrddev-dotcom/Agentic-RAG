@@ -64,6 +64,36 @@ _COERCE_DIRECTIVE = (
 )
 
 
+def _coerce_schema_block(emitter: str, tools: list[dict]) -> str:
+    """101.1 review WR-04: the emitter schema inlined into the COERCE system prompt.
+
+    A STRUCTURED calling-mode model (registry ``native_tools: False`` / OpenRouter
+    ``xml`` strategy) never receives the ``tools`` param — the openai_compat path
+    deliberately omits it, and the consumer-side schema injection lives in the open
+    agent loop this substrate bypasses (D-01). Without this block, a coerce-tier
+    STRUCTURED model is asked to call a tool whose schema it has NEVER seen — every
+    ``llm_emit`` phase fails state (a) while the message blames the model. Inlining
+    the schema makes the request honest for EVERY coerce model (harmless duplication
+    for a NATIVE coerce model — its tools param already carries it) and pairs with
+    the STRUCTURED-mode recovery below (``recover_narrated_emission`` already parses
+    the tool-wrapped narration shape via ``parse_structured_tool_calls``)."""
+    for t in tools or []:
+        fn = t.get("function") if isinstance(t, dict) else None
+        if fn and fn.get("name") == emitter:
+            try:
+                schema = json.dumps(fn.get("parameters"))
+            except (TypeError, ValueError):
+                return ""
+            return (
+                f"\n\nThe `{emitter}` tool's arguments MUST validate against this "
+                f"JSON schema:\n{schema}\n"
+                "If you cannot call tools natively, emit EXACTLY ONE fenced ```json "
+                f'block of the shape {{"tool": "{emitter}", "arguments": {{...}}}} '
+                "and nothing else."
+            )
+    return ""
+
+
 def recover_narrated_emission(content: str) -> EmitFieldMap | None:
     """D-06 NATIVE narrated-JSON recovery: parse a still-narrated field-map back into a
     validated ``EmitFieldMap`` — or return ``None`` (honest failure, NEVER a silent
@@ -181,7 +211,8 @@ async def forced_emit(
           "tier": "TIER-FORCE" | "TIER-COERCE",
           "provider": <provider>,
           "forced": bool,                   # was named-tool forcing applied?
-          "recovered_from_narration": bool, # did the D-06 NATIVE recovery fire?
+          "recovered_from_narration": bool, # did the D-06 narration recovery fire?
+                                            # (NATIVE or — WR-04 — STRUCTURED mode)
           "truncated": bool,                # was the shot cut off (D-08 layer 4)?
           "failure": None | "model_failed_to_emit",
         }
@@ -215,8 +246,14 @@ async def forced_emit(
     else:
         # TIER-COERCE (Kimi/Moonshot — genuinely unforceable): keep tool_choice="auto"
         # + an explicit directive, then hard-validate the result (D-05). NEVER a
-        # model-written-code fallback (D-03).
-        _system = (_system or "") + _COERCE_DIRECTIVE.format(emitter=emitter)
+        # model-written-code fallback (D-03). WR-04: inline the emitter schema so a
+        # STRUCTURED calling-mode model (which never receives the tools param) still
+        # sees the schema it must emit — see _coerce_schema_block.
+        _system = (
+            (_system or "")
+            + _COERCE_DIRECTIVE.format(emitter=emitter)
+            + _coerce_schema_block(emitter, tools)
+        )
         req = GatewayRequest(
             messages=messages,
             model=model,
@@ -256,8 +293,18 @@ async def forced_emit(
             if emitted is not None:
                 break
 
-    # D-06 NATIVE recovery: no (valid) tool call but the model narrated the field-map.
-    if emitted is None and calling_mode == CallingMode.NATIVE and content.strip():
+    # D-06 narration recovery: no (valid) tool call but the model narrated the
+    # field-map. NATIVE (the original GAP-D reasoning-native shape) AND — 101.1
+    # review WR-04 — STRUCTURED: a STRUCTURED-mode model can ONLY answer in content
+    # (the gateway never parses tool calls for it on this sealed path), and
+    # recover_narrated_emission already handles both the tool-wrapped narration
+    # ({"tool": ..., "arguments": {...}}) and the bare fenced EmitFieldMap. Without
+    # this, even a perfectly-emitted STRUCTURED field-map was discarded as state (a).
+    if (
+        emitted is None
+        and calling_mode in (CallingMode.NATIVE, CallingMode.STRUCTURED)
+        and content.strip()
+    ):
         emitted = recover_narrated_emission(content)
         if emitted is not None:
             recovered = True
