@@ -740,15 +740,86 @@ def _emit_bound_asset_ref(definition):
     return None
 
 
+def _ref_spotlight_id(ref: dict) -> str | None:
+    """The ONE stable id a retrieved ref is known by — feeds BOTH the ``<doc id=…>``
+    spotlight the model cites FROM and the citation gate's valid set, so the two sides
+    cannot drift (the WR-04 one-mapping discipline applied to citation ids).
+
+    Prefers an explicit chunk id when the ref carries one; falls back to the composite
+    ``{document_id}#{chunk_index}`` the live enriched retrieval refs expose (101.1-06:
+    retrieval threads no raw ``document_chunks.id`` end-to-end — the 097 carry-forward)."""
+    for idk in ("chunk_id", "source_chunk_id", "id"):
+        v = ref.get(idk)
+        if v:
+            return str(v)
+    doc = ref.get("document_id")
+    if doc:
+        idx = ref.get("chunk_index")
+        return f"{doc}#{idx}" if idx is not None else str(doc)
+    return None
+
+
+# Spotlight bounds: enough for a register-style retrieval set without blowing the
+# emit call's context (the forced shot is a single sealed call — no second chance).
+_EMIT_SPOTLIGHT_MAX_REFS = 40
+_EMIT_SPOTLIGHT_MAX_PASSAGE = 1600
+
+
+def _emit_evidence(accumulated_outputs: dict) -> tuple[str, set[str]]:
+    """The grounding evidence for the forced emit — ``(spotlight, valid_ids)`` from ONE walk.
+
+    101.1-06 root cause (live UAT run a12ee906, 100% gate over-rejection): the emit user
+    turn was the prior phase's PROSE, so the model had no real source id to cite (it
+    fabricated), AND the gate's valid set only recognized ``chunk_id``-shaped keys while
+    live retrieval refs carry ``document_id`` + ``chunk_index`` — the set was ALWAYS
+    empty and every citation read as "invented".
+
+    Fix: render the retrieved refs as ``<doc id="…" file="…">passage</doc>`` blocks
+    (the 097 T-097-04 spotlight that proved 100% citation coverage) appended to the emit
+    user turn, and derive the gate's valid set from the SAME ``_ref_spotlight_id``
+    assignment. Security: the valid set is computed server-side from the refs — a fake
+    ``<doc id=…>`` injected inside a passage's TEXT is not in the set, so KB-content
+    prompt injection cannot whitelist its own citation. Empty when nothing was retrieved
+    (any non-null cited value is then invented → state b — the correct honest reject).
+    """
+    blocks: list[str] = []
+    seen: set[str] = set()
+    ids = _retrieved_ids(accumulated_outputs)
+    for out in (accumulated_outputs or {}).values():
+        if not isinstance(out, dict):
+            continue
+        for key in ("source_refs", "citations"):
+            for ref in out.get(key) or []:
+                if not isinstance(ref, dict):
+                    continue
+                sid = _ref_spotlight_id(ref)
+                if not sid or sid in seen or len(blocks) >= _EMIT_SPOTLIGHT_MAX_REFS:
+                    continue
+                seen.add(sid)
+                passage = str(ref.get("passage") or ref.get("text") or "")[:_EMIT_SPOTLIGHT_MAX_PASSAGE]
+                fname = str(ref.get("filename") or ref.get("source_doc") or "")
+                blocks.append(f'<doc id="{sid}" file="{fname}">{passage}</doc>')
+    if not blocks:
+        return "", ids
+    spotlight = (
+        "Sources — every non-null value MUST cite one of these documents; set "
+        "source_chunk_id to the exact `id` attribute of the <doc> block it came from:\n"
+        + "\n".join(blocks)
+    )
+    return spotlight, ids
+
+
 def _retrieved_ids(accumulated_outputs: dict) -> set[str]:
     """The spotlight/source ids the citation gate validates against (D-08 layer 4).
 
     A prior retrieval phase (the D-13 two-step: an ``llm_agent`` ``search_documents``
     phase feeding the emit) threads its grounding up as ``source_refs`` / ``citations``
-    on its phase output. Union every ``chunk_id`` / ``id`` seen across the accumulated
-    outputs so a cited ``source_chunk_id`` is "retrieved" iff it was actually in the
-    evidence set the prior phase gathered. Empty when nothing retrieved (then any
-    non-null cited value is invented → state b — the correct honest reject).
+    on its phase output. Union every id ``_ref_spotlight_id`` assigns across the
+    accumulated outputs — explicit ``chunk_id``-shaped keys AND the composite
+    ``document_id#chunk_index`` fallback (101.1-06) — so a cited ``source_chunk_id``
+    is "retrieved" iff it was actually in the evidence set the prior phase gathered.
+    Empty when nothing retrieved (then any non-null cited value is invented → state b
+    — the correct honest reject).
     """
     ids: set[str] = set()
     for out in accumulated_outputs.values():
@@ -757,10 +828,9 @@ def _retrieved_ids(accumulated_outputs: dict) -> set[str]:
         for key in ("source_refs", "citations"):
             for ref in out.get(key) or []:
                 if isinstance(ref, dict):
-                    for idk in ("chunk_id", "source_chunk_id", "id"):
-                        v = ref.get(idk)
-                        if v:
-                            ids.add(str(v))
+                    sid = _ref_spotlight_id(ref)
+                    if sid:
+                        ids.add(sid)
                 elif ref:
                     ids.add(str(ref))
     return ids
@@ -781,8 +851,9 @@ def _emit_forced_tool(emitter: str) -> list[dict]:
                     "Emit the CITED, structured field-map for the template. Put every "
                     "scalar placeholder under `scalars` (one object each: key, value, "
                     "source_chunk_id, source_doc, source_page) and every table row under "
-                    "`rows`. For EVERY non-null value set source_chunk_id to the <doc id> "
-                    "it came from; if the KB does not support a value set value to null. "
+                    "`rows`. For EVERY non-null value set source_chunk_id to the EXACT "
+                    "`id` attribute of the <doc> source block the value came from; if the "
+                    "sources do not support a value set value to null. "
                     "Never invent a value or a citation."
                 ),
                 "parameters": EmitFieldMap.model_json_schema(),
@@ -967,6 +1038,12 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     # via _retry_suffix (the layer-5 retry loop is the engine's _run_phase_with_gates).
     system_prompt = phase.config.prompt + _skill_block(phase, ctx, with_files=False) + _retry_suffix(ctx)
     user_turn = _first_phase_user_turn(accumulated_outputs, ctx)
+    # 101.1-06: spotlight the retrieved evidence as <doc id=…> blocks so the model has
+    # REAL source ids to cite; the SAME walk yields the gate's valid set below — one id
+    # namespace, two consumers (prose-only user turns made every citation "invented").
+    spotlight, retrieved_ids = _emit_evidence(accumulated_outputs)
+    if spotlight:
+        user_turn = f"{user_turn}\n\n{spotlight}" if user_turn else spotlight
     messages = [{"role": "user", "content": user_turn}] if user_turn else []
 
     await _emit_phase_substep(ctx, phase, status="forcing")  # building the forced request (tier/thinking-off)
@@ -1015,7 +1092,8 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
 
     # ── 3. Citation gate (layer 4) — BEFORE render (reject without touching sandbox) ─
     legacy_map = emit_field_map_to_legacy(emitted)
-    retrieved_ids = _retrieved_ids(accumulated_outputs)
+    # retrieved_ids computed above by the SAME _emit_evidence walk that built the
+    # spotlight (101.1-06) — the model can only have cited ids it was actually shown.
     placeholder_keys = (
         list(legacy_map.get("scalars", {}).keys())
         + list(legacy_map.get("collections", {}).keys())

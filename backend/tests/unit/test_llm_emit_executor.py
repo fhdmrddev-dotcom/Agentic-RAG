@@ -604,3 +604,113 @@ def test_emitter_post_no_top_level_docxtpl():
     # And no second render path (no SandboxedEnvironment / DocxTemplate.render here).
     assert "SandboxedEnvironment" not in src
     assert "DocxTemplate" not in src
+
+
+# ── 101.1-06 regression — the live citation-id namespace (UAT run a12ee906) ─────
+#
+# The live gate over-rejected 100% of emissions (cited=0/uncited=0/invented=24):
+# (1) the emit user turn was prior-phase PROSE — no <doc id=…> spotlight, so the model
+#     had no real id to cite; (2) _retrieved_ids only recognized chunk_id-shaped keys
+#     while live enriched refs carry document_id + chunk_index → valid set always empty.
+# These tests pin the LIVE ref shape (the offline fakes had drifted to chunk_id).
+
+_LIVE_DOC_ID = "8b95ddd2-b834-4b25-83df-85f8614c0aed"
+_LIVE_COMPOSITE = f"{_LIVE_DOC_ID}#2"
+
+
+def _live_shape_accumulated():
+    """EXACTLY the live enriched-retrieval ref shape (document_id + chunk_index +
+    passage + filename — NO chunk_id key), as read back from messages.source_refs."""
+    return {"gather": {"text": "Project Meridian risk evidence summary.", "source_refs": [
+        {
+            "passage": "Strategic risk SR-03 (Legacy decommission dependency). "
+                       "Likelihood Medium, impact High. Owner: Priya Nair (Data Lead).",
+            "filename": "Project-Meridian-Charter-Excerpt.docx",
+            "similarity": 0.520934502608147,
+            "chunk_index": 2,
+            "document_id": _LIVE_DOC_ID,
+            "is_full_doc": False,
+            "version_number": 1,
+        },
+    ]}}
+
+
+def _fm_citing(cid):
+    from app.services.template_render_service import EmitFieldMap
+
+    return EmitFieldMap.model_validate({
+        "scalars": [{
+            "key": "project_name", "value": "Meridian",
+            "source_chunk_id": cid, "source_doc": "charter.docx", "source_page": 1,
+        }],
+        "rows": [],
+    })
+
+
+def test_ref_spotlight_id_one_namespace():
+    """Explicit chunk ids win; live document_id+chunk_index falls back to the composite;
+    a bare document_id stands alone; an id-less ref yields None."""
+    from app.services.harness.phase_types import _ref_spotlight_id
+
+    assert _ref_spotlight_id({"chunk_id": "chunk-7", "document_id": "D"}) == "chunk-7"
+    assert _ref_spotlight_id({"document_id": _LIVE_DOC_ID, "chunk_index": 2}) == _LIVE_COMPOSITE
+    assert _ref_spotlight_id({"document_id": _LIVE_DOC_ID}) == _LIVE_DOC_ID
+    assert _ref_spotlight_id({"passage": "no ids here"}) is None
+
+
+def test_emit_evidence_live_shape_spotlight_and_ids():
+    """ONE walk yields both sides: the <doc id=…> spotlight (with passage + filename)
+    AND a NON-EMPTY valid-id set from the SAME assignment — the live shape that used to
+    produce an always-empty set."""
+    from app.services.harness.phase_types import _emit_evidence
+
+    spotlight, ids = _emit_evidence(_live_shape_accumulated())
+    assert ids == {_LIVE_COMPOSITE}
+    assert f'<doc id="{_LIVE_COMPOSITE}" file="Project-Meridian-Charter-Excerpt.docx">' in spotlight
+    assert "Strategic risk SR-03" in spotlight
+    # No retrieval => no spotlight, empty set (the honest-reject default is unchanged).
+    assert _emit_evidence({}) == ("", set())
+
+
+@pytest.mark.asyncio
+async def test_live_shape_citation_passes_gate(_patch_executor):
+    """THE regression: live-shaped refs + an emission citing the composite id =>
+    the gate PASSES (emit_validated, render reached) and the forced call's user turn
+    carries the spotlight the model cited from."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_result"] = _forced_ok(_fm_citing(_LIVE_COMPOSITE))
+    audit_sink = bag["audit"]
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=audit_sink)
+
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    events = [ev for ev, _ in bag["audit"]]
+    assert "emit_validated" in events, f"gate must pass for a spotlighted citation: {events}"
+    assert "emit_rejected" not in events
+    assert len(bag["render_calls"]) == 1, "render must be reached"
+    assert out.get("failure") is None
+    user_turn = bag["forced_calls"][0]["messages"][0]["content"]
+    assert f'<doc id="{_LIVE_COMPOSITE}"' in user_turn, "the model must SEE the id it cites"
+
+
+@pytest.mark.asyncio
+async def test_fabricated_citation_still_rejected_with_live_refs(_patch_executor):
+    """The no-hallucination guarantee is UNCHANGED: real retrieval present, but the
+    emission cites an id never shown => state (b) reject, render never reached."""
+    from app.services.harness.phase_types import _exec_llm_emit
+
+    bag = _patch_executor
+    bag["forced_result"] = _forced_ok(_fm_citing("fabricated-id-999"))
+    definition = _fake_definition([_fake_asset_ref()])
+    ctx = _fake_ctx(definition, audit_sink=bag["audit"])
+
+    out = await _exec_llm_emit(_fake_phase(), _live_shape_accumulated(), ctx)
+
+    events = [ev for ev, _ in bag["audit"]]
+    assert "emit_rejected" in events
+    assert "emit_validated" not in events
+    assert bag["render_calls"] == []
+    assert out.get("failure") == "citation_gate_rejected"
