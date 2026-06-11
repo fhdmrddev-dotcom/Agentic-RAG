@@ -16,7 +16,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict nrNfMPdRGfmIHgi7S7LgzOqemLDMkLD1574ANSAVhVBkNnPprakUl8Tuz4VyYo0
+\restrict YZTKnHWame0FogNWApuCp8RkPxTHZdj7IT221noT2vrXOFH6LAP5Yy4nqSwY6k3
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -454,7 +454,7 @@ CREATE TABLE public.harness_audit (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     org_id uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text])))
 );
 
 
@@ -2513,5 +2513,5 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- PostgreSQL database dump complete
 --
 
-\unrestrict nrNfMPdRGfmIHgi7S7LgzOqemLDMkLD1574ANSAVhVBkNnPprakUl8Tuz4VyYo0
+\unrestrict YZTKnHWame0FogNWApuCp8RkPxTHZdj7IT221noT2vrXOFH6LAP5Yy4nqSwY6k3
 
