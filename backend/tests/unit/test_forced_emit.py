@@ -1,9 +1,10 @@
 """Phase 101.1 (TMPL-02 / D-06 / D-08) — the forced-emit substrate contract.
 
-Wave 0 RED stubs. The production substrate (``backend/app/services/forced_emit.py``)
-lands in a DOWNSTREAM plan (the gateway-forcing / native-recovery wave), so these
-tests are ``xfail(strict=False)`` RED-by-design and get un-marked to GREEN by that
-plan (the 098/099/100/101 un-mark-on-landing convention).
+Plan 101.1-02 (Wave 2) un-marks these from the Wave-0 RED stubs to GREEN. The
+production substrate (``backend/app/services/forced_emit.py``) runs a SEALED single
+forced shot through the provider gateway (NEVER the open agent loop — D-01 /
+Pitfall 5), recovers a still-narrated emission on the NATIVE path (D-06), and
+rejects a truncated half-object (D-08 layer 4).
 
 D-06: a still-NARRATED emission on the NATIVE path is parsed back (a fenced object
 matching the schema) OR the run fails HONESTLY — NEVER silently dropped (the GAP-D
@@ -22,7 +23,66 @@ import json
 import pytest
 
 
-@pytest.mark.xfail(strict=False, reason="101.1 forced-emit substrate (D-06) — owning plan un-marks to GREEN")
+# ── synthetic forced-shot streams (one sealed call → a list of gateway events) ─
+
+
+def _tool_call_stream(emitter: str, field_map: dict):
+    """A NATIVE stream that committed the forced tool call (the happy path)."""
+    return [
+        {
+            "type": "finish",
+            "finish_reason": "tool_calls",
+            "tool_calls": [
+                {"id": "call_1", "name": emitter, "arguments": json.dumps(field_map)}
+            ],
+        },
+        {"type": "usage", "input_tokens": 10, "output_tokens": 20},
+    ]
+
+
+def _narrated_stream(field_map: dict):
+    """A NATIVE stream where the model NARRATED the field-map as fenced JSON instead
+    of committing the tool call (the GAP-D reasoning-native failure)."""
+    narrated = "Here is the field map:\n\n```json\n" + json.dumps(field_map) + "\n```\n"
+    return [
+        {"type": "delta", "content": narrated},
+        {"type": "finish", "finish_reason": "stop", "tool_calls": []},
+    ]
+
+
+def _unrecoverable_stream():
+    """A NATIVE stream with prose that has NO fenced object — must fail honestly."""
+    return [
+        {"type": "delta", "content": "I cannot produce that from the provided sources."},
+        {"type": "finish", "finish_reason": "stop", "tool_calls": []},
+    ]
+
+
+def _truncated_stream():
+    """A forced shot cut off at the output-token limit (half-object)."""
+    return [
+        {"type": "delta", "content": '{"scalars": [{"key": "a", "value": "b"'},
+        {"type": "finish", "finish_reason": "length", "tool_calls": []},
+    ]
+
+
+_VALID_FM = {
+    "scalars": [
+        {
+            "key": "project_name",
+            "value": "Meridian",
+            "source_chunk_id": "chunk-1",
+            "source_doc": "brief.docx",
+            "source_page": 1,
+        }
+    ],
+    "rows": [],
+}
+
+
+# ── D-06 narrated-JSON recovery (the unit the substrate composes) ─────────────
+
+
 def test_native_recovery_or_honest_fail():
     """On the NATIVE path, when the model NARRATES a fenced JSON object instead of
     committing the forced tool call, the substrate parses it back into a validated
@@ -30,25 +90,7 @@ def test_native_recovery_or_honest_fail():
     """
     from app.services.forced_emit import recover_narrated_emission
 
-    # A reasoning-native narrated the field-map as fenced JSON instead of a tool call.
-    narrated = (
-        "Here is the field map you asked for:\n\n```json\n"
-        + json.dumps(
-            {
-                "scalars": [
-                    {
-                        "key": "project_name",
-                        "value": "Meridian",
-                        "source_chunk_id": "chunk-1",
-                        "source_doc": "brief.docx",
-                        "source_page": 1,
-                    }
-                ],
-                "rows": [],
-            }
-        )
-        + "\n```\n"
-    )
+    narrated = "Here is the field map you asked for:\n\n```json\n" + json.dumps(_VALID_FM) + "\n```\n"
 
     recovered = recover_narrated_emission(narrated)
     # Recovered into the validated flat shape (D-06) — NOT silently dropped.
@@ -58,9 +100,11 @@ def test_native_recovery_or_honest_fail():
     # An un-recoverable narration (no fenced object) must fail honestly, not return
     # an empty "success" field-map.
     assert recover_narrated_emission("I cannot produce that.") is None
+    # A fenced object that does NOT validate as an EmitFieldMap is also a clean None
+    # (never a half-built object masquerading as success).
+    assert recover_narrated_emission("```json\n{\"not\": \"a field map\"}\n```") is None
 
 
-@pytest.mark.xfail(strict=False, reason="101.1 forced-emit substrate (D-08 layer 4) — owning plan un-marks to GREEN")
 def test_truncation_rejected():
     """A forced emission cut off at the output-token limit (``stop_reason=max_tokens``
     / ``finish_reason=length``) is REJECTED before acceptance — never accepted as a
@@ -71,3 +115,119 @@ def test_truncation_rejected():
     assert is_truncated(finish_reason="length") is True
     assert is_truncated(stop_reason="tool_use") is False
     assert is_truncated(finish_reason="tool_calls") is False
+
+
+# ── the sealed forced shot (forced_emit) — drives open_stream ONCE ────────────
+
+
+@pytest.fixture()
+def _patch_gateway(monkeypatch):
+    """Patch the gateway ``open_stream`` the substrate drives so the forced shot is a
+    deterministic synthetic stream. Returns a setter for the per-test event list +
+    a recorder of the GatewayRequest the substrate built."""
+    import app.services.forced_emit as fe
+
+    state: dict = {"events": [], "request": None, "provider": None, "calling_mode": None}
+
+    async def _fake_open_stream(provider, request):
+        from app.services.provider_gateway import CallingMode
+
+        state["request"] = request
+        state["provider"] = provider
+        cm = state["calling_mode"] or CallingMode.NATIVE
+        return iter(state["events"]), cm
+
+    monkeypatch.setattr(fe, "open_stream", _fake_open_stream)
+    # The tier is registry-driven; force a deterministic TIER-FORCE for the happy path
+    # unless a test overrides it.
+    monkeypatch.setattr(
+        fe, "get_model_capability", lambda model: {"forced_emission": True, "provider": "openai"}
+    )
+    return state
+
+
+async def _run(emitter="render_template", model="gpt-5.4"):
+    from app.services.forced_emit import forced_emit
+
+    return await forced_emit(
+        messages=[{"role": "user", "content": "fill the template"}],
+        model=model,
+        provider="openai",
+        emitter=emitter,
+        tools=[{"function": {"name": emitter, "parameters": {}}}],
+        user_settings=None,
+    )
+
+
+async def test_forced_emit_happy_path_tool_call(_patch_gateway):
+    """A TIER-FORCE provider that committed the forced tool call yields a validated
+    EmitFieldMap with forced=True, recovered_from_narration=False, no failure."""
+    _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
+    res = await _run()
+    assert res["emitted"] is not None
+    assert res["emitted"].scalars[0].value == "Meridian"
+    assert res["forced"] is True
+    assert res["recovered_from_narration"] is False
+    assert res["truncated"] is False
+    assert res["failure"] is None
+    # The forced shot named the tool — NOT tool_choice='auto' (Pitfall 5 / D-01).
+    assert _patch_gateway["request"].force_tool_name == "render_template"
+
+
+async def test_forced_emit_native_narration_recovered(_patch_gateway):
+    """A reasoning-native that narrated the field-map (no tool call) is RECOVERED via
+    the D-06 fenced-object parse — recovered_from_narration=True, not dropped."""
+    _patch_gateway["events"] = _narrated_stream(_VALID_FM)
+    res = await _run()
+    assert res["emitted"] is not None
+    assert res["emitted"].scalars[0].value == "Meridian"
+    assert res["recovered_from_narration"] is True
+    assert res["failure"] is None
+
+
+async def test_forced_emit_unrecoverable_narration_honest_fail(_patch_gateway):
+    """Narration with no fenced object fails HONESTLY (model_failed_to_emit) — never a
+    silent empty field-map, never the prose accepted as the artifact (D-06 / GAP-D)."""
+    _patch_gateway["events"] = _unrecoverable_stream()
+    res = await _run()
+    assert res["emitted"] is None
+    assert res["failure"] == "model_failed_to_emit"
+
+
+async def test_forced_emit_truncation_rejected(_patch_gateway):
+    """A truncated forced shot (finish_reason=length) is rejected BEFORE acceptance
+    (D-08 layer 4) — truncated=True, failure=model_failed_to_emit, never half-object."""
+    _patch_gateway["events"] = _truncated_stream()
+    res = await _run()
+    assert res["truncated"] is True
+    assert res["emitted"] is None
+    assert res["failure"] == "model_failed_to_emit"
+
+
+async def test_forced_emit_coerce_tier_no_force(_patch_gateway, monkeypatch):
+    """A TIER-COERCE model (forced_emission absent / registry-miss) does NOT force —
+    it sets tool_choice='auto' + a directive and hard-validates (D-05 TIER-COERCE).
+    Even so, a committed tool call still validates (best-effort)."""
+    import app.services.forced_emit as fe
+
+    monkeypatch.setattr(fe, "get_model_capability", lambda model: {"provider": "moonshot"})
+    _patch_gateway["events"] = _tool_call_stream("render_template", _VALID_FM)
+    res = await _run(model="kimi-k2.5")
+    assert res["forced"] is False  # TIER-COERCE — never wrongly forces
+    # The forced-tool field is NOT set on a coerce provider (tool_choice='auto').
+    assert _patch_gateway["request"].force_tool_name is None
+    assert _patch_gateway["request"].tool_choice == "auto"
+    # A committed tool call still validates on the coerce path.
+    assert res["emitted"] is not None
+
+
+def test_forced_emit_never_calls_open_loop():
+    """The substrate MUST NOT reference the open agent loop (run_task_sub_agent /
+    run_agent_loop) — the emit is a sealed single shot (D-01 / Pitfall 5 / GAP-A)."""
+    import inspect
+
+    import app.services.forced_emit as fe
+
+    src = inspect.getsource(fe)
+    assert "run_task_sub_agent" not in src
+    assert "run_agent_loop" not in src

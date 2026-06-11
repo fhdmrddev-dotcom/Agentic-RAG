@@ -348,7 +348,12 @@ def check_coverage(
 # ---------------------------------------------------------------------------
 
 
-def is_truncated(meta: dict) -> bool:
+def is_truncated(
+    meta: dict | None = None,
+    *,
+    stop_reason: str | None = None,
+    finish_reason: str | None = None,
+) -> bool:
     """True if the emission was cut off mid-tool-JSON (never a valid empty result).
 
     A truncated tool JSON silently drops collections (``default_factory`` empties them)
@@ -356,10 +361,17 @@ def is_truncated(meta: dict) -> bool:
     "no data found" (the spike's Rule-1 guard — derive_fields.py:267). The shared
     gateway normalizes both vocabularies (Anthropic ``stop_reason`` + OpenAI-family
     ``finish_reason``), so cover both.
+
+    Accepts EITHER a positional ``meta`` dict (the legacy spike caller — used by the
+    citation/integrity tests) OR the ``stop_reason=`` / ``finish_reason=`` kwargs (the
+    Phase 101.1 ``forced_emit`` caller, which has the two reasons directly in hand
+    after draining the forced shot). Both forms are equivalent; this reconciles the
+    call shape the Wave-0 ``test_truncation_rejected`` stub asserts (Plan 01 SUMMARY
+    "Issues Encountered" flagged this for THIS plan to resolve).
     """
-    if not meta:
-        return False
-    return meta.get("stop_reason") == "max_tokens" or meta.get("finish_reason") == "length"
+    _stop = stop_reason if stop_reason is not None else (meta or {}).get("stop_reason")
+    _finish = finish_reason if finish_reason is not None else (meta or {}).get("finish_reason")
+    return _stop == "max_tokens" or _finish == "length"
 
 
 # ---------------------------------------------------------------------------
